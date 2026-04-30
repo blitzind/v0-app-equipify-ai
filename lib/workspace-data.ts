@@ -28,6 +28,7 @@ import {
   type Technician,
   type AdminQuote,
   type AdminInvoice,
+  type AiInsight,
 } from "@/lib/mock-data"
 
 import {
@@ -77,14 +78,14 @@ export interface WorkspaceDataBundle {
   equipmentDueSoon: typeof equipmentDueSoon
   repeatRepairs: typeof repeatRepairs
   expiringWarranties: typeof expiringWarranties
-  aiInsights: typeof medInsights
+  aiInsights: AiInsight[]
 }
 
-const ACME_INSIGHTS = [
+const ACME_INSIGHTS: AiInsight[] = [
   {
     id: "od-1",
-    category: "overdue" as const,
-    severity: "critical" as const,
+    category: "overdue_client",
+    severity: "critical",
     title: "14 units are past their service due date",
     description: "Greenfield Industrial has 6 HVAC units averaging 47 days overdue. Continued deferral increases failure risk by ~3x and may void warranty coverage.",
     meta: "Last checked 4 min ago",
@@ -94,8 +95,8 @@ const ACME_INSIGHTS = [
   },
   {
     id: "od-2",
-    category: "overdue" as const,
-    severity: "warning" as const,
+    category: "overdue_client",
+    severity: "high",
     title: "Summit Logistics: 3 compressors past due",
     description: "Refrigeration compressors at Summit Logistics' warehouse have missed their Q1 2026 service window. Schedule before summer peak load.",
     meta: "Due Q1 2026",
@@ -105,8 +106,8 @@ const ACME_INSIGHTS = [
   },
   {
     id: "rf-1",
-    category: "repeat-failure" as const,
-    severity: "critical" as const,
+    category: "repeat_failure",
+    severity: "critical",
     title: "Carrier 50XC unit failing repeatedly at Apex Corp",
     description: "Unit #EQ-1042 has had 5 work orders in 90 days — all for the same fault code (E04). Root cause has not been addressed. Consider replacing the condenser coil assembly.",
     meta: "5 repairs in 90 days",
@@ -116,8 +117,8 @@ const ACME_INSIGHTS = [
   },
   {
     id: "rev-1",
-    category: "revenue" as const,
-    severity: "info" as const,
+    category: "revenue_opportunity",
+    severity: "medium",
     title: "Apex Fabricators contract renewal opportunity",
     description: "Their current PM Plan contract ends June 30. Upselling to Full Coverage could add $8,200 ARR. Prior engagement history shows 92% renewal rate for accounts with 3+ completed PMs.",
     meta: "Renewal due Jun 30",
@@ -127,8 +128,8 @@ const ACME_INSIGHTS = [
   },
   {
     id: "tech-1",
-    category: "technician" as const,
-    severity: "info" as const,
+    category: "upsell",
+    severity: "low",
     title: "Marcus Webb is approaching capacity this week",
     description: "Marcus has 4 confirmed jobs this week at 88% utilization. If WO-2044 is added, reassigning to Sandra Liu (75% utilized, same skill set) would prevent overtime.",
     meta: "88% utilization",

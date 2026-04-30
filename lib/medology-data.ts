@@ -13,6 +13,7 @@ import type {
   AdminQuote,
   AdminInvoice,
   NotificationLogEntry,
+  AiInsight,
 } from "@/lib/mock-data"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -420,7 +421,7 @@ export const medWorkOrders: WorkOrder[] = [
     equipmentName: "Natus Bio-logic ABR System",
     location: "Knoxville ENT Office",
     type: "Repair",
-    status: "Awaiting Parts",
+    status: "In Progress",
     priority: "High",
     technicianId: "MT-01",
     technicianName: "Josh Reynolds",
@@ -1128,11 +1129,11 @@ export const medExpiringWarranties = [
 
 // ─── AI Insights ──────────────────────────────────────────────────────────────
 
-export const medInsights = [
+export const medInsights: AiInsight[] = [
   {
     id: "mi-1",
-    category: "overdue" as const,
-    severity: "critical" as const,
+    category: "overdue_client",
+    severity: "critical",
     title: "OAE System at Tri-Cities Pediatric Audiology is overdue for calibration",
     description: "The Otodynamics ILO292 OAE System has missed its April 10 calibration deadline. Pediatric compliance standards (JCAHO) require up-to-date calibration certificates. Immediate scheduling is recommended.",
     meta: "Overdue since Apr 10",
@@ -1142,8 +1143,8 @@ export const medInsights = [
   },
   {
     id: "mi-2",
-    category: "overdue" as const,
-    severity: "warning" as const,
+    category: "overdue_client",
+    severity: "high",
     title: "Appalachian Audiology Clinic has 3 devices due within 30 days",
     description: "The Interacoustics Titan Tympanometer (due May 3), ABR electrode cable replacement (May 2), and a related calibration check are all converging. Bundling the visits could reduce travel cost.",
     meta: "3 items due before May 10",
@@ -1153,8 +1154,8 @@ export const medInsights = [
   },
   {
     id: "mi-3",
-    category: "revenue" as const,
-    severity: "info" as const,
+    category: "revenue_opportunity",
+    severity: "medium",
     title: "Greeneville Hearing Center is a strong candidate for an annual calibration package",
     description: "With 6 devices on annual calibration cycles and a history of timely payments, offering a bundled package could increase contract value by an estimated 18% and reduce per-visit coordination overhead.",
     meta: "6 devices | Est. +18% value",
@@ -1164,8 +1165,8 @@ export const medInsights = [
   },
   {
     id: "mi-4",
-    category: "repeat-failure" as const,
-    severity: "warning" as const,
+    category: "repeat_failure",
+    severity: "high",
     title: "VNG equipment service history supports semi-annual PM recommendation",
     description: "The Interacoustics EyeSeeCam VNG system at Mountain View Balance Center has required camera re-alignment at 3 of the last 4 visits. Recommending a formal semi-annual PM contract would reduce unplanned service events.",
     meta: "3 of 4 visits required alignment",
@@ -1175,8 +1176,8 @@ export const medInsights = [
   },
   {
     id: "mi-5",
-    category: "technician" as const,
-    severity: "info" as const,
+    category: "upsell",
+    severity: "low",
     title: "Sound booth inspections are underrepresented in current PM plans",
     description: "Only 1 of 2 sound booths in your active client base has a formal PM plan. Knoxville Diagnostic Hearing is covered, but Appalachian Audiology's booth has no scheduled inspection for 2026.",
     meta: "1 of 2 booths covered",

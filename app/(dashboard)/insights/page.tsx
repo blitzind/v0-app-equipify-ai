@@ -174,7 +174,7 @@ function KpiCard({
   )
 }
 
-// ─── Summary Report Modal ─────────────────────────────────────────────────────
+// ─── Summary Report Modal ────────────────────────────────────────────────────���
 
 function SummaryReportModal({ onClose }: { onClose: () => void }) {
   const report = aiSummaryReport
@@ -343,9 +343,9 @@ export default function InsightsPage() {
 
           {/* Category nav tabs */}
           <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: "none" }}>
-            {([["all", "All Insights", allInsights.length - dismissed.size]] as const).concat(
-              breakdown.map((b) => [b.category, b.label, b.count] as const)
-            ).map(([key, label, count]) => {
+            {(([["all", "All Insights", allInsights.length - dismissed.size]] as [string, string, number][]).concat(
+              breakdown.map((b) => [b.category, b.label, b.count] as [string, string, number])
+            )).map(([key, label, count]) => {
               const active = activeCategory === key
               const accentHex = key === "all" ? "#3b82f6" : CATEGORY_META[key as InsightCategory].accentHex
               return (

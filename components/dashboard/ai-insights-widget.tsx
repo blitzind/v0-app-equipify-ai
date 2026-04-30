@@ -20,25 +20,12 @@ import {
 import { cn } from "@/lib/utils"
 import { useWorkspaceData, useTenant } from "@/lib/tenant-store"
 
+import type { AiInsight, InsightCategory, InsightSeverity } from "@/lib/mock-data"
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type InsightCategory =
-  | "overdue"
-  | "repeat-failure"
-  | "churn-risk"
-  | "revenue"
-  | "technician"
-
-type InsightSeverity = "info" | "warning" | "critical"
-
-interface Insight {
-  id: string
-  category: InsightCategory
-  severity: InsightSeverity
-  title: string
-  description: string
-  meta: string
-  value?: string
+// Re-export for local use — types come from mock-data to stay in sync
+type Insight = AiInsight & { value?: string
   actionLabel: string
   actionHref?: string
 }
@@ -178,36 +165,36 @@ const CATEGORY_META: Record<
   InsightCategory,
   { label: string; icon: React.ElementType; color: string; bg: string; border: string }
 > = {
-  "overdue": {
+  "overdue_client": {
     label: "Overdue Service",
     icon: Clock,
     color: "text-destructive",
     bg: "bg-destructive/10",
     border: "border-l-destructive",
   },
-  "repeat-failure": {
+  "repeat_failure": {
     label: "Repeat Failures",
     icon: Repeat2,
     color: "text-[color:var(--status-warning)]",
     bg: "bg-[color:var(--status-warning)]/10",
     border: "border-l-[color:var(--status-warning)]",
   },
-  "churn-risk": {
-    label: "Churn Risk",
+  "expiring_warranty": {
+    label: "Expiring Warranties",
     icon: UserMinus,
     color: "text-destructive",
     bg: "bg-destructive/10",
     border: "border-l-destructive",
   },
-  "revenue": {
+  "revenue_opportunity": {
     label: "Revenue Opportunities",
     icon: DollarSign,
     color: "text-[color:var(--status-success)]",
     bg: "bg-[color:var(--status-success)]/10",
     border: "border-l-[color:var(--status-success)]",
   },
-  "technician": {
-    label: "Technician Optimization",
+  "upsell": {
+    label: "Upsell & Optimization",
     icon: Wrench,
     color: "text-[color:var(--ds-info-subtle)]",
     bg: "bg-[color:var(--ds-info-bg)]",
@@ -217,16 +204,17 @@ const CATEGORY_META: Record<
 
 const SEVERITY_DOT: Record<InsightSeverity, string> = {
   critical: "bg-destructive",
-  warning: "bg-[color:var(--status-warning)]",
-  info: "bg-[color:var(--ds-info-subtle)]",
+  high: "bg-[color:var(--status-warning)]",
+  medium: "bg-[color:var(--ds-info-subtle)]",
+  low: "bg-muted-foreground",
 }
 
 const ALL_CATEGORIES: InsightCategory[] = [
-  "overdue",
-  "repeat-failure",
-  "churn-risk",
-  "revenue",
-  "technician",
+  "overdue_client",
+  "repeat_failure",
+  "expiring_warranty",
+  "revenue_opportunity",
+  "upsell",
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
