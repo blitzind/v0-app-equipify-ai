@@ -179,7 +179,7 @@ export function CreateWorkOrderModal({ open, onClose }: Props) {
               <SelectContent>
                 {technicians.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name} — {t.active} active WOs
+                    {t.name} — {t.jobsThisWeek} active WOs
                   </SelectItem>
                 ))}
               </SelectContent>

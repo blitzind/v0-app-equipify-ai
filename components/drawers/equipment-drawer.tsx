@@ -94,7 +94,7 @@ function buildAIRecommendations(eq: Equipment): AIRecommendation[] {
   const days = daysToDue(eq.nextDueDate)
   const warrantyDays = daysToDue(eq.warrantyExpiration)
   const repairCount = eq.serviceHistory.filter(
-    (h) => h.type === "Repair" || h.type === "Emergency"
+    (h) => h.type === "Repair"
   ).length
   const age = eq.installDate
     ? new Date().getFullYear() - new Date(eq.installDate).getFullYear()
