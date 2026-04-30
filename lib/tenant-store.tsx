@@ -6,6 +6,7 @@ import {
   type TenantWorkspace, type TenantUser, type UserRole,
 } from "./tenant-data"
 import { getPlan, type PlanId } from "./plans"
+import { getWorkspaceData, type WorkspaceDataBundle } from "./workspace-data"
 
 interface TenantState {
   workspace: TenantWorkspace
@@ -75,6 +76,7 @@ interface TenantContextValue extends TenantState {
   dispatch: React.Dispatch<TenantAction>
   plan: ReturnType<typeof getPlan>
   workspaceUsers: TenantUser[]
+  workspaceData: WorkspaceDataBundle
   can: (permission: keyof typeof import("./tenant-data").ROLE_PERMISSIONS["Admin"]) => boolean
 }
 
@@ -94,6 +96,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   })
 
   const plan = getPlan(state.workspace.planId)
+  const workspaceData = getWorkspaceData(state.workspace.id)
 
   // Import inline to avoid circular — permissions table
   const PERMS = {
@@ -110,7 +113,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <TenantContext.Provider value={{ ...state, dispatch, plan, workspaceUsers: state.users, can }}>
+    <TenantContext.Provider value={{ ...state, dispatch, plan, workspaceUsers: state.users, workspaceData, can }}>
       {children}
     </TenantContext.Provider>
   )
@@ -120,4 +123,10 @@ export function useTenant() {
   const ctx = useContext(TenantContext)
   if (!ctx) throw new Error("useTenant must be used within TenantProvider")
   return ctx
+}
+
+/** Convenience hook — returns the workspace-scoped demo data bundle */
+export function useWorkspaceData() {
+  const { workspaceData } = useTenant()
+  return workspaceData
 }

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { workOrdersByStatus } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 const COLORS = [
   "oklch(0.52 0.18 231)",
@@ -28,6 +28,7 @@ function CenterLabel({ cx, cy, total }: { cx: number; cy: number; total: number 
 
 export function WorkOrderStatus() {
   const router = useRouter()
+  const { workOrdersByStatus } = useWorkspaceData()
   const total  = workOrdersByStatus.reduce((s, d) => s + d.count, 0)
 
   function handleSliceClick(data: { status: string }) {

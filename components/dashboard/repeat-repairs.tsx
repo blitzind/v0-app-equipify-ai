@@ -3,19 +3,18 @@
 import { useState } from "react"
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
-import { repeatRepairs } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { Badge } from "@/components/ui/badge"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 
-// Map repeat-repair equipment name → equipment ID for drawer lookup
-const EQUIPMENT_NAME_TO_ID: Record<string, string> = {
-  "Haas VF-2SS CNC Machine":               "EQ-241",
-  "Heatcraft LCE060AGD Refrigeration":     "EQ-412",
-  "Liebherr LTM 1050-3.1 Crane":           "EQ-305",
-}
-
 export function RepeatRepairs() {
+  const { repeatRepairs, equipment } = useWorkspaceData()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Build name → id map dynamically from workspace equipment
+  const equipmentNameToId = Object.fromEntries(
+    equipment.map((e) => [e.model, e.id])
+  )
 
   return (
     <>
@@ -43,7 +42,7 @@ export function RepeatRepairs() {
         ) : (
           <ul className="divide-y divide-border">
             {repeatRepairs.map((item, i) => {
-              const eqId = EQUIPMENT_NAME_TO_ID[item.equipment] ?? null
+              const eqId = equipmentNameToId[item.equipment] ?? null
               return (
                 <li
                   key={i}

@@ -10,13 +10,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { revenueData } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 function formatCurrency(v: number) {
   return "$" + (v / 1000).toFixed(0) + "k"
 }
 
 export function RevenueChart() {
+  const { revenueData } = useWorkspaceData()
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] h-full flex flex-col">
       <Link

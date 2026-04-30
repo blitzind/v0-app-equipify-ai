@@ -2142,6 +2142,21 @@ export type TechSkill =
   | "Hydraulics"
   | "Welding"
   | "PLC / Controls"
+  // Audiology
+  | "Audiometers"
+  | "ABR Systems"
+  | "Tympanometers"
+  | "OAE Systems"
+  | "VNG Systems"
+  | "Balance Systems"
+  | "Otoscopes"
+  | "Sound Booths"
+  | "Real Ear Systems"
+  | "Scheduling"
+  | "Customer Communication"
+  | "PM Plans"
+  | "Invoicing"
+  | "Field Service"
 
 export interface TechCertification {
   name: string

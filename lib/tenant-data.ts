@@ -155,6 +155,28 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     ownerId: "u-06",
     createdAt: "2026-04-14T10:00:00Z",
   },
+  {
+    id: "ws-medology",
+    name: "Medology Solutions",
+    slug: "medology",
+    planId: "growth",
+    billingCycle: "annual",
+    stripeCustomerId: "cus_medology",
+    stripeSubscriptionId: "sub_medology",
+    subscriptionStatus: "active",
+    trialEndsAt: "",
+    currentPeriodEnd: "2026-12-31",
+    logoUrl: "",
+    primaryColor: "#0891b2",
+    companyEmail: "admin@medology.net",
+    companyPhone: "(423) 555-2000",
+    companyAddress: "812 Wellness Pkwy, Kingsport, TN 37660",
+    timezone: "America/New_York",
+    dateFormat: "MM/DD/YYYY",
+    seatCount: 4,
+    ownerId: "u-08",
+    createdAt: "2024-06-01T08:00:00Z",
+  },
 ]
 
 export const MOCK_USERS: TenantUser[] = [
@@ -187,6 +209,23 @@ export const MOCK_USERS: TenantUser[] = [
   {
     id: "u-07", name: "James Torres", email: "james@zephyr.com",
     role: "Tech", avatar: "", joinedAt: "2026-04-14", lastActive: "2026-04-30", status: "Active",
+  },
+  // Medology Solutions workspace
+  {
+    id: "u-08", name: "Megan Brooks", email: "m.brooks@medology.com",
+    role: "Admin", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
+  },
+  {
+    id: "u-09", name: "Josh Reynolds", email: "j.reynolds@medology.com",
+    role: "Tech", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
+  },
+  {
+    id: "u-10", name: "Emily Carter", email: "e.carter@medology.com",
+    role: "Tech", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-29", status: "Active",
+  },
+  {
+    id: "u-11", name: "Brandon Ellis", email: "b.ellis@medology.com",
+    role: "Tech", avatar: "", joinedAt: "2024-07-15", lastActive: "2026-04-28", status: "Active",
   },
 ]
 

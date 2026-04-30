@@ -1,3 +1,5 @@
+"use client"
+
 import {
   CalendarClock,
   AlertCircle,
@@ -6,7 +8,7 @@ import {
   ShieldAlert,
   Repeat2,
 } from "lucide-react"
-import { mockStats } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { RecentWorkOrders } from "@/components/dashboard/recent-work-orders"
 import { EquipmentDue } from "@/components/dashboard/equipment-due"
@@ -17,13 +19,14 @@ import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
 import { AIInsightsWidget } from "@/components/dashboard/ai-insights-widget"
 
 export default function DashboardPage() {
+  const { stats } = useWorkspaceData()
   return (
     <div className="flex flex-col gap-6">
       {/* Stat cards row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 items-stretch">
         <StatCard
           title="Equipment Due This Month"
-          value={mockStats.equipmentDueThisMonth}
+          value={stats.equipmentDueThisMonth}
           subtitle="Scheduled for service"
           icon={CalendarClock}
           iconColor="text-primary"
@@ -33,7 +36,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Overdue Service"
-          value={mockStats.overdueService}
+          value={stats.overdueService}
           subtitle="Immediate attention needed"
           icon={AlertCircle}
           iconColor="text-destructive"
@@ -43,7 +46,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Open Work Orders"
-          value={mockStats.openWorkOrders}
+          value={stats.openWorkOrders}
           subtitle="Across all technicians"
           icon={ClipboardList}
           iconColor="text-primary"

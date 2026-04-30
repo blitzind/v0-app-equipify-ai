@@ -3,10 +3,11 @@
 import { useState } from "react"
 import Link from "next/link"
 import { CalendarClock, ChevronRight } from "lucide-react"
-import { equipmentDueSoon } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 
 export function EquipmentDue() {
+  const { equipmentDueSoon } = useWorkspaceData()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   return (

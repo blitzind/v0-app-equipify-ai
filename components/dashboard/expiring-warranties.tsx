@@ -3,19 +3,18 @@
 import { useState } from "react"
 import Link from "next/link"
 import { ShieldAlert } from "lucide-react"
-import { expiringWarranties } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { cn } from "@/lib/utils"
 
-// Map warranty equipment name → equipment ID for drawer lookup
-const EQUIPMENT_NAME_TO_ID: Record<string, string> = {
-  "Cat 320 GC Excavator":                "EQ-305",
-  "Ingersoll Rand UP6-15 Air Compressor": "EQ-241",
-  "Crown PTH50 Pallet Jack":             "EQ-412",
-}
-
 export function ExpiringWarranties() {
+  const { expiringWarranties, equipment } = useWorkspaceData()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Build name → id map dynamically from workspace equipment
+  const equipmentNameToId = Object.fromEntries(
+    equipment.map((e) => [e.model, e.id])
+  )
 
   return (
     <>
@@ -41,7 +40,7 @@ export function ExpiringWarranties() {
           <ul className="divide-y divide-border">
             {expiringWarranties.map((item, i) => {
               const urgent = item.daysLeft <= 15
-              const eqId   = EQUIPMENT_NAME_TO_ID[item.equipment] ?? null
+              const eqId   = equipmentNameToId[item.equipment] ?? null
               return (
                 <li
                   key={i}

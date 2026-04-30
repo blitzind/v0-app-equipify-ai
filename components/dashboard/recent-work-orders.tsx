@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { recentWorkOrders } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { cn } from "@/lib/utils"
 
@@ -22,6 +22,7 @@ const priorityConfig: Record<string, { className: string }> = {
 }
 
 export function RecentWorkOrders() {
+  const { recentWorkOrders } = useWorkspaceData()
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
 
   return (
