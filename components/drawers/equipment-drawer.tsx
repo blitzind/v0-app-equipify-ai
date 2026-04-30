@@ -12,6 +12,7 @@ import {
   type ToastItem,
 } from "@/components/detail-drawer"
 import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check } from "lucide-react"
+import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
 
 let toastCounter = 0
 
@@ -84,6 +85,103 @@ function EditableRow({ label, value, editing, children }: { label: string; value
   ) : (
     <DrawerRow label={label} value={value} />
   )
+}
+
+// ─── AI Recommendation builder ────────────────────────────────────────────────
+
+function buildAIRecommendations(eq: Equipment): AIRecommendation[] {
+  const recs: AIRecommendation[] = []
+  const days = daysToDue(eq.nextDueDate)
+  const warrantyDays = daysToDue(eq.warrantyExpiration)
+  const repairCount = eq.serviceHistory.filter(
+    (h) => h.type === "Repair" || h.type === "Emergency"
+  ).length
+  const age = eq.installDate
+    ? new Date().getFullYear() - new Date(eq.installDate).getFullYear()
+    : 0
+
+  // Replace soon: old age + frequent repairs
+  if (age >= 10 || repairCount >= 3) {
+    recs.push({
+      id: "replace-soon",
+      title: "Consider equipment replacement soon",
+      description:
+        age >= 10
+          ? `This unit is approximately ${age} years old. Units beyond 10 years see significantly higher failure rates and repair costs.`
+          : `This equipment has had ${repairCount} repair events. Frequent breakdowns often indicate end-of-life.`,
+      severity: "warning",
+      meta: age >= 10 ? `~${age} years old` : `${repairCount} repairs on record`,
+      actionLabel: "Create replacement quote",
+      onAction: () => undefined,
+    })
+  }
+
+  // Service now: overdue or due very soon
+  if (days <= 0) {
+    recs.push({
+      id: "service-now",
+      title: "Schedule preventive service immediately",
+      description: `Service is ${Math.abs(days)} day${Math.abs(days) !== 1 ? "s" : ""} overdue. Delaying further increases the risk of unplanned downtime.`,
+      severity: "critical",
+      meta: `${Math.abs(days)}d overdue`,
+      actionLabel: "Create work order",
+      onAction: () => undefined,
+    })
+  } else if (days <= 14) {
+    recs.push({
+      id: "service-soon",
+      title: "Preventive service due within 2 weeks",
+      description: `Next scheduled service is in ${days} day${days !== 1 ? "s" : ""}. Book now to avoid scheduling conflicts.`,
+      severity: "warning",
+      meta: `Due in ${days}d`,
+      actionLabel: "Schedule service",
+      onAction: () => undefined,
+    })
+  }
+
+  // Offer PM plan: no active plan indicator (use service history gap as proxy)
+  const lastService = eq.lastServiceDate
+    ? daysToDue(eq.lastServiceDate)
+    : -999
+  const hasGap = lastService < -180 // last service was more than 6 months ago
+  if (hasGap || repairCount === 0) {
+    recs.push({
+      id: "pm-plan",
+      title: "Offer a preventive maintenance plan",
+      description:
+        "This customer does not appear to have a scheduled maintenance contract for this unit. A PM plan reduces emergency call-outs and increases contract revenue.",
+      severity: "info",
+      meta: "Revenue opportunity",
+      actionLabel: "Create maintenance plan",
+      onAction: () => undefined,
+    })
+  }
+
+  // Warranty expiring
+  if (warrantyDays > 0 && warrantyDays <= 90) {
+    recs.push({
+      id: "warranty-expiring",
+      title: "Warranty expiring soon",
+      description: `Warranty expires in ${warrantyDays} days. Recommend performing a pre-warranty inspection and addressing any latent issues before coverage ends.`,
+      severity: "info",
+      meta: `Expires in ${warrantyDays}d`,
+      actionLabel: "Schedule inspection",
+      onAction: () => undefined,
+    })
+  }
+
+  // Fallback — no issues detected
+  if (recs.length === 0) {
+    recs.push({
+      id: "no-action",
+      title: "No immediate action required",
+      description: "This equipment is in good standing. Continue on current service schedule.",
+      severity: "info",
+      meta: "All checks passed",
+    })
+  }
+
+  return recs
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -223,6 +321,15 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Service {days < 0 ? "overdue" : `due in ${days} day${days !== 1 ? "s" : ""}`} — {fmtDate(eq.nextDueDate)}</span>
           </div>
+        )}
+
+        {/* AI Recommendations */}
+        {!editing && (
+          <AIRecommendationPanel
+            title="AI Recommendations"
+            recommendations={buildAIRecommendations(eq)}
+            initialLimit={3}
+          />
         )}
 
         {/* Equipment Details */}
