@@ -5,6 +5,7 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
 import {
@@ -17,6 +18,7 @@ import type {
   PlanStatus,
   NotificationRule,
 } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,7 @@ type Action =
   | { type: "UPDATE_RULES"; id: string; rules: NotificationRule[] }
   | { type: "LOG_NOTIFICATION"; entry: NotificationLogEntry }
   | { type: "FIRE_NOTIFICATIONS"; planId: string }
+  | { type: "RESET"; plans: MaintenancePlan[]; notificationLog: NotificationLogEntry[] }
 
 function computeNextDueDate(lastServiceDate: string, interval: MaintenancePlan["interval"], customDays: number): string {
   const base = new Date(lastServiceDate)
@@ -124,6 +127,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, notificationLog: [...newEntries, ...state.notificationLog] }
     }
 
+    case "RESET":
+      return { plans: action.plans, notificationLog: action.notificationLog }
     default:
       return state
   }
@@ -145,10 +150,15 @@ interface MaintenanceContextValue {
 const MaintenanceContext = createContext<MaintenanceContextValue | null>(null)
 
 export function MaintenanceProvider({ children }: { children: ReactNode }) {
+  const { maintenancePlans: wsPlans, notificationLog: wsLog } = useWorkspaceData()
   const [state, dispatch] = useReducer(reducer, {
-    plans: initialPlans,
-    notificationLog: initialLog,
+    plans: wsPlans,
+    notificationLog: wsLog,
   })
+
+  useEffect(() => {
+    dispatch({ type: "RESET", plans: wsPlans, notificationLog: wsLog })
+  }, [wsPlans, wsLog])
 
   const createPlan   = useCallback((plan: MaintenancePlan) => dispatch({ type: "CREATE_PLAN", payload: plan }), [])
   const updatePlan   = useCallback((id: string, payload: Partial<MaintenancePlan>) => dispatch({ type: "UPDATE_PLAN", id, payload }), [])

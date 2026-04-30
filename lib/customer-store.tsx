@@ -5,10 +5,12 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
 import { customers as initialData } from "@/lib/mock-data"
 import type { Customer } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 interface State {
   customers: Customer[]
@@ -17,6 +19,7 @@ interface State {
 type Action =
   | { type: "ADD"; payload: Customer }
   | { type: "UPDATE"; id: string; payload: Partial<Customer> }
+  | { type: "RESET"; customers: Customer[] }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -29,6 +32,8 @@ function reducer(state: State, action: Action): State {
           c.id === action.id ? { ...c, ...action.payload } : c
         ),
       }
+    case "RESET":
+      return { customers: action.customers }
     default:
       return state
   }
@@ -44,7 +49,12 @@ interface CustomerContextValue {
 const CustomerContext = createContext<CustomerContextValue | null>(null)
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { customers: initialData })
+  const { customers: wsCustomers } = useWorkspaceData()
+  const [state, dispatch] = useReducer(reducer, { customers: wsCustomers })
+
+  useEffect(() => {
+    dispatch({ type: "RESET", customers: wsCustomers })
+  }, [wsCustomers])
 
   const addCustomer = useCallback((c: Customer) => dispatch({ type: "ADD", payload: c }), [])
   const updateCustomer = useCallback((id: string, payload: Partial<Customer>) => dispatch({ type: "UPDATE", id, payload }), [])

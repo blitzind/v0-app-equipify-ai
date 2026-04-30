@@ -5,10 +5,12 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
 import { equipment as initialData } from "@/lib/mock-data"
 import type { Equipment } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +22,7 @@ type Action =
   | { type: "ADD"; payload: Equipment }
   | { type: "UPDATE"; id: string; payload: Partial<Equipment> }
   | { type: "REMOVE"; id: string }
+  | { type: "RESET"; equipment: Equipment[] }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -34,6 +37,8 @@ function reducer(state: State, action: Action): State {
       }
     case "REMOVE":
       return { ...state, equipment: state.equipment.filter((e) => e.id !== action.id) }
+    case "RESET":
+      return { equipment: action.equipment }
     default:
       return state
   }
@@ -52,7 +57,12 @@ interface EquipmentContextValue {
 const EquipmentContext = createContext<EquipmentContextValue | null>(null)
 
 export function EquipmentProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { equipment: initialData })
+  const { equipment: wsEquipment } = useWorkspaceData()
+  const [state, dispatch] = useReducer(reducer, { equipment: wsEquipment })
+
+  useEffect(() => {
+    dispatch({ type: "RESET", equipment: wsEquipment })
+  }, [wsEquipment])
 
   const addEquipment = useCallback(
     (e: Equipment) => dispatch({ type: "ADD", payload: e }),

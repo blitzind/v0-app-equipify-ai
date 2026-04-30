@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useEquipment } from "@/lib/equipment-store"
-import { customers } from "@/lib/mock-data"
+import { useCustomers } from "@/lib/customer-store"
 import type { Equipment } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -195,6 +195,7 @@ interface EquipmentDrawerProps {
 
 export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) {
   const { equipment, updateEquipment } = useEquipment()
+  const { customers } = useCustomers()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Equipment>>({})

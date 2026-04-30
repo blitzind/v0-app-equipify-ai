@@ -5,10 +5,12 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
 import { workOrders as initialData } from "@/lib/mock-data"
 import type { WorkOrder, WorkOrderStatus, RepairLog } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +24,7 @@ type Action =
   | { type: "UPDATE_REPAIR_LOG"; id: string; repairLog: Partial<RepairLog> }
   | { type: "UPDATE_WORK_ORDER"; id: string; payload: Partial<WorkOrder> }
   | { type: "REORDER_KANBAN"; id: string; status: WorkOrderStatus; index: number }
+  | { type: "RESET"; workOrders: WorkOrder[] }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -54,6 +57,8 @@ function reducer(state: State, action: Action): State {
         ),
       }
 
+    case "RESET":
+      return { workOrders: action.workOrders }
     default:
       return state
   }
@@ -73,7 +78,12 @@ interface WorkOrderContextValue {
 const WorkOrderContext = createContext<WorkOrderContextValue | null>(null)
 
 export function WorkOrderProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, { workOrders: initialData })
+  const { workOrders: wsWorkOrders } = useWorkspaceData()
+  const [state, dispatch] = useReducer(reducer, { workOrders: wsWorkOrders })
+
+  useEffect(() => {
+    dispatch({ type: "RESET", workOrders: wsWorkOrders })
+  }, [wsWorkOrders])
 
   const createWorkOrder = useCallback(
     (wo: WorkOrder) => dispatch({ type: "CREATE", payload: wo }),

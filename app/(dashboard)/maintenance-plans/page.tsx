@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
-import { customers, equipment, technicians } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import type {
   MaintenancePlan,
   PlanInterval,
@@ -112,6 +112,7 @@ function nextWoId(count: number): string {
 
 function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { createPlan } = useMaintenancePlans()
+  const { customers, equipment, technicians } = useWorkspaceData()
   const [form, setForm] = useState({
     name: "",
     customerId: "",
@@ -359,7 +360,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ────────────────────────�������───────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────���������───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()

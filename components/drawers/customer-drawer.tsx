@@ -4,8 +4,9 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useCustomers } from "@/lib/customer-store"
-import { equipment, workOrders } from "@/lib/mock-data"
-import { adminQuotes, adminInvoices } from "@/lib/mock-data"
+import { useEquipment } from "@/lib/equipment-store"
+import { useWorkOrders } from "@/lib/work-order-store"
+import { useQuotes, useInvoices } from "@/lib/quote-invoice-store"
 import type { Customer, Contact } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -77,6 +78,10 @@ interface CustomerDrawerProps {
 
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const { customers, updateCustomer } = useCustomers()
+  const { equipment } = useEquipment()
+  const { workOrders } = useWorkOrders()
+  const { quotes: adminQuotes } = useQuotes()
+  const { invoices: adminInvoices } = useInvoices()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Customer>>({})

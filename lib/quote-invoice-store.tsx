@@ -5,10 +5,12 @@ import {
   useContext,
   useReducer,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
 import { adminQuotes as initialQuotes, adminInvoices as initialInvoices } from "@/lib/mock-data"
 import type { AdminQuote, AdminInvoice } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 // ─── Quotes ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +18,7 @@ interface QuoteState { quotes: AdminQuote[] }
 type QuoteAction =
   | { type: "ADD_QUOTE"; payload: AdminQuote }
   | { type: "UPDATE_QUOTE"; id: string; payload: Partial<AdminQuote> }
+  | { type: "RESET_QUOTES"; quotes: AdminQuote[] }
 
 function quoteReducer(state: QuoteState, action: QuoteAction): QuoteState {
   switch (action.type) {
@@ -23,6 +26,8 @@ function quoteReducer(state: QuoteState, action: QuoteAction): QuoteState {
       return { quotes: [action.payload, ...state.quotes] }
     case "UPDATE_QUOTE":
       return { quotes: state.quotes.map((q) => q.id === action.id ? { ...q, ...action.payload } : q) }
+    case "RESET_QUOTES":
+      return { quotes: action.quotes }
     default:
       return state
   }
@@ -34,6 +39,7 @@ interface InvoiceState { invoices: AdminInvoice[] }
 type InvoiceAction =
   | { type: "ADD_INVOICE"; payload: AdminInvoice }
   | { type: "UPDATE_INVOICE"; id: string; payload: Partial<AdminInvoice> }
+  | { type: "RESET_INVOICES"; invoices: AdminInvoice[] }
 
 function invoiceReducer(state: InvoiceState, action: InvoiceAction): InvoiceState {
   switch (action.type) {
@@ -41,6 +47,8 @@ function invoiceReducer(state: InvoiceState, action: InvoiceAction): InvoiceStat
       return { invoices: [action.payload, ...state.invoices] }
     case "UPDATE_INVOICE":
       return { invoices: state.invoices.map((i) => i.id === action.id ? { ...i, ...action.payload } : i) }
+    case "RESET_INVOICES":
+      return { invoices: action.invoices }
     default:
       return state
   }
@@ -60,8 +68,14 @@ interface QuoteInvoiceContextValue {
 const QuoteInvoiceContext = createContext<QuoteInvoiceContextValue | null>(null)
 
 export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
-  const [qState, qDispatch] = useReducer(quoteReducer, { quotes: initialQuotes })
-  const [iState, iDispatch] = useReducer(invoiceReducer, { invoices: initialInvoices })
+  const { quotes: wsQuotes, invoices: wsInvoices } = useWorkspaceData()
+  const [qState, qDispatch] = useReducer(quoteReducer, { quotes: wsQuotes })
+  const [iState, iDispatch] = useReducer(invoiceReducer, { invoices: wsInvoices })
+
+  useEffect(() => {
+    qDispatch({ type: "RESET_QUOTES", quotes: wsQuotes })
+    iDispatch({ type: "RESET_INVOICES", invoices: wsInvoices })
+  }, [wsQuotes, wsInvoices])
 
   const addQuote = useCallback((q: AdminQuote) => qDispatch({ type: "ADD_QUOTE", payload: q }), [])
   const updateQuote = useCallback((id: string, payload: Partial<AdminQuote>) => qDispatch({ type: "UPDATE_QUOTE", id, payload }), [])

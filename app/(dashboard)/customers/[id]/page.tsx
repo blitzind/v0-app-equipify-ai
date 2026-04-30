@@ -3,8 +3,8 @@
 import { useMemo } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { customers, equipment } from "@/lib/mock-data"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -118,10 +118,11 @@ function ServiceTimeline({ entries }: { entries: ServiceHistoryEntry[] }) {
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { customers, equipment } = useWorkspaceData()
   const customer = customers.find((c) => c.id === id)
   const customerEquipment = useMemo(
     () => equipment.filter((e) => e.customerId === id),
-    [id]
+    [equipment, id]
   )
 
   const allServiceHistory = useMemo(() => {

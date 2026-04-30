@@ -11,10 +11,7 @@ import {
   ChevronDown, Calendar, User, MapPin, Filter, X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  revenueData, repeatRepairs, expiringWarranties,
-  customers, technicians, workOrders,
-} from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 // ─── Report mock data ─────────────────────────────────────────────────────────
 
@@ -186,6 +183,7 @@ function Section({ title, sub, action, children }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const { customers, technicians, workOrders, revenueData, repeatRepairs, expiringWarranties } = useWorkspaceData()
   const [dateRange, setDateRange] = useState("Last 6 months")
   const [customer, setCustomer] = useState("All Customers")
   const [technician, setTechnician] = useState("All Technicians")
@@ -195,11 +193,11 @@ export default function ReportsPage() {
 
   const customerNames = useMemo(
     () => ["All Customers", ...customers.map((c) => c.company)],
-    []
+    [customers]
   )
   const technicianNames = useMemo(
     () => ["All Technicians", ...technicians.map((t) => t.name)],
-    []
+    [technicians]
   )
 
   const hasActiveFilters =

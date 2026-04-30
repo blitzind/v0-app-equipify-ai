@@ -19,9 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { customers, equipment, technicians } from "@/lib/mock-data"
 import type { WorkOrder, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { useWorkOrders } from "@/lib/work-order-store"
+import { useWorkspaceData } from "@/lib/tenant-store"
 
 interface Props {
   open: boolean
@@ -38,6 +38,7 @@ function generateId() {
 
 export function CreateWorkOrderModal({ open, onClose }: Props) {
   const { createWorkOrder } = useWorkOrders()
+  const { customers, equipment, technicians } = useWorkspaceData()
 
   const [customerId, setCustomerId] = useState("")
   const [equipmentId, setEquipmentId] = useState("")

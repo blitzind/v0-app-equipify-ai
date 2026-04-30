@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import { technicians as initialTechs } from "@/lib/mock-data"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
+import { useWorkspaceData } from "@/lib/tenant-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -359,7 +359,7 @@ function AddTechModal({
   )
 }
 
-// ─── Schedule Modal ──────────────────────────────────────────��────────���───────
+// ─── Schedule Modal ──────────────────────────────────────────���────────���───────
 
 function ScheduleModal({
   tech, onClose, onSave,
@@ -1026,7 +1026,12 @@ function ProfileDrawer({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TechniciansPage() {
-  const [techs, setTechs] = useState<Technician[]>(initialTechs)
+  const { technicians: wsTechs } = useWorkspaceData()
+  const [techs, setTechs] = useState<Technician[]>(wsTechs)
+
+  useEffect(() => {
+    setTechs(wsTechs)
+  }, [wsTechs])
   const [view, setView] = useState<ViewMode>("card")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
