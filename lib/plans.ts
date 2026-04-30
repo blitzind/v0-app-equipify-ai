@@ -14,6 +14,8 @@ export interface Plan {
   badge?: string
   cta: string
   isCustomPricing?: boolean
+  aiLabel?: string        // e.g. "AI Included", "Advanced AI", "Enterprise AI"; undefined = not included
+  aiFeatures?: string[]   // list of AI tools included at this tier
 }
 
 export const PLANS: Plan[] = [
@@ -37,6 +39,7 @@ export const PLANS: Plan[] = [
     stripeMonthlyPriceId: "price_starter_monthly",
     stripeAnnualPriceId: "price_starter_annual",
     cta: "Start Starter Plan",
+    // No AI at Starter
   },
   {
     id: "growth",
@@ -61,6 +64,13 @@ export const PLANS: Plan[] = [
     stripeMonthlyPriceId: "price_growth_monthly",
     stripeAnnualPriceId: "price_growth_annual",
     cta: "Upgrade to Growth",
+    aiLabel: "AI Included",
+    aiFeatures: [
+      "AI Quote Drafting",
+      "AI Payment Reminders",
+      "AI Customer Summaries",
+      "AI Service Notes (limited monthly use)",
+    ],
   },
   {
     id: "scale",
@@ -84,6 +94,15 @@ export const PLANS: Plan[] = [
     stripeMonthlyPriceId: "price_scale_monthly",
     stripeAnnualPriceId: "price_scale_annual",
     cta: "Upgrade to Scale",
+    aiLabel: "Advanced AI",
+    aiFeatures: [
+      "Photo-to-Equipment Intake",
+      "Predictive Maintenance Alerts",
+      "Smart Dispatch Optimization",
+      "Technician Utilization Insights",
+      "Weekly Executive AI Reports",
+      "Unlimited AI Usage",
+    ],
   },
   {
     id: "enterprise",
@@ -106,6 +125,13 @@ export const PLANS: Plan[] = [
     stripeMonthlyPriceId: "price_enterprise_monthly",
     stripeAnnualPriceId: "price_enterprise_annual",
     cta: "Contact Sales",
+    aiLabel: "Enterprise AI",
+    aiFeatures: [
+      "Custom AI Workflows",
+      "Internal Knowledge AI",
+      "Custom Reporting AI",
+      "Dedicated AI Strategy Support",
+    ],
   },
 ]
 

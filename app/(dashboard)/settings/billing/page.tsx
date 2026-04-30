@@ -10,7 +10,7 @@ import type { PlanId } from "@/lib/plans"
 import { createCheckoutSession } from "@/app/actions/stripe"
 import {
   CreditCard, Check, ArrowRight, AlertTriangle,
-  Download, Zap, X, Phone,
+  Download, Zap, X, Phone, Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -209,8 +209,8 @@ export default function BillingPage() {
 
         {/* Trust microcopy */}
         <div className="px-6 pt-5 pb-1">
-          <p className="text-xs text-muted-foreground italic">
-            Recover one missed maintenance contract and Equipify can pay for itself.
+          <p className="text-xs text-muted-foreground">
+            Equipify helps reduce admin work, recover missed service revenue, and automate operations with built-in AI.
           </p>
         </div>
 
@@ -283,6 +283,37 @@ export default function BillingPage() {
                   ))}
                 </ul>
 
+                {/* AI section */}
+                {p.aiLabel && p.aiFeatures ? (
+                  <div className="mb-4 rounded-lg border border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] p-3">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <Sparkles size={11} className="text-[color:var(--ds-info-text)] shrink-0" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--ds-info-text)]">
+                        {p.aiLabel}
+                      </span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {p.aiFeatures.map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-[11px] text-[color:var(--ds-info-text)]">
+                          <span className="mt-[3px] shrink-0 w-1 h-1 rounded-full bg-[color:var(--ds-info-subtle)]" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="mb-4 rounded-lg border border-border bg-secondary/40 p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sparkles size={11} className="text-muted-foreground/50 shrink-0" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/60">
+                        AI Access
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-medium">Not Included</p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">Upgrade to unlock AI tools.</p>
+                  </div>
+                )}
+
                 <button
                   disabled={isCurrent}
                   onClick={() => openCheckout(p.id as PlanId)}
@@ -314,7 +345,7 @@ export default function BillingPage() {
         {/* Bottom trust copy */}
         <div className="px-6 pb-5">
           <p className="text-xs text-muted-foreground text-center">
-            No long-term contracts. Cancel anytime. Annual plans save 20%.
+            No long-term contracts. Cancel anytime. Annual plans save 20%. AI features available on Growth plans and above.
           </p>
         </div>
       </div>
