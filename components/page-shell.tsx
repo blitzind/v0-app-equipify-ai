@@ -16,6 +16,10 @@ const pageTitles: Record<string, string> = {
   "/customer-portal": "Customer Portal",
   "/billing": "Billing",
   "/settings": "Settings",
+  "/settings/workspace": "Settings — Workspace",
+  "/settings/team": "Settings — Team",
+  "/settings/billing": "Settings — Billing",
+  "/settings/permissions": "Settings — Permissions",
 }
 
 function resolveTitle(pathname: string): string {
@@ -25,6 +29,7 @@ function resolveTitle(pathname: string): string {
   if (pathname.startsWith("/work-orders/")) return "Work Order Detail"
   if (pathname.startsWith("/maintenance-plans")) return "Maintenance Plans"
   if (pathname.startsWith("/service-schedule")) return "Service Schedule"
+  if (pathname.startsWith("/settings/")) return "Settings"
   return "Equipify.ai"
 }
 
