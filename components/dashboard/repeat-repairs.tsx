@@ -1,3 +1,5 @@
+"use client"
+
 import { AlertTriangle } from "lucide-react"
 import { repeatRepairs } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"

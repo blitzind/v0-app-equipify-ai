@@ -1,3 +1,5 @@
+"use client"
+
 import { ShieldAlert } from "lucide-react"
 import { expiringWarranties } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"

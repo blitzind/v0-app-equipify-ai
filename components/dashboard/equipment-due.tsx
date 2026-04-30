@@ -1,3 +1,5 @@
+"use client"
+
 import { CalendarClock, ChevronRight } from "lucide-react"
 import { equipmentDueSoon } from "@/lib/mock-data"
 
