@@ -1799,16 +1799,18 @@ export interface AiInsight {
   severity: InsightSeverity
   title: string
   description: string
-  customerId: string
-  customerName: string
+  meta?: string               // short display label shown under description
+  value?: string              // highlight value shown in the card
+  customerId?: string
+  customerName?: string
   equipmentId?: string
   equipmentName?: string
-  confidence: number          // 0–100
+  confidence?: number         // 0–100
   estimatedValue?: number     // revenue opportunity in $
   actionLabel: string
   actionHref: string
-  detectedAt: string
-  dataPoints: { label: string; value: string }[]
+  detectedAt?: string
+  dataPoints?: { label: string; value: string }[]
 }
 
 export const aiInsights: AiInsight[] = [

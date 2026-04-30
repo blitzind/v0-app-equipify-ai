@@ -24,8 +24,8 @@ import type { AiInsight, InsightCategory, InsightSeverity } from "@/lib/mock-dat
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-// Re-export for local use — types come from mock-data to stay in sync
-type Insight = AiInsight & { value?: string
+// Local alias — AiInsight already includes meta and value
+type Insight = AiInsight & {
   actionLabel: string
   actionHref?: string
 }
@@ -36,7 +36,7 @@ const INSIGHTS: Insight[] = [
   // Overdue service
   {
     id: "od-1",
-    category: "overdue",
+    category: "overdue_client",
     severity: "critical",
     title: "14 units are past their service due date",
     description: "Greenfield Industrial has 6 HVAC units averaging 47 days overdue. Continued deferral increases failure risk by ~3× and may void warranty coverage.",
@@ -47,8 +47,8 @@ const INSIGHTS: Insight[] = [
   },
   {
     id: "od-2",
-    category: "overdue",
-    severity: "warning",
+    category: "overdue_client",
+    severity: "high",
     title: "Summit Logistics: 3 compressors past due",
     description: "Refrigeration compressors at Summit Logistics' warehouse have missed their Q1 2026 service window. Schedule before summer peak load.",
     meta: "Due Q1 2026",
@@ -60,7 +60,7 @@ const INSIGHTS: Insight[] = [
   // Repeat failures
   {
     id: "rf-1",
-    category: "repeat-failure",
+    category: "repeat_failure",
     severity: "critical",
     title: "Carrier 50XC unit failing repeatedly at Apex Corp",
     description: "Unit #EQ-1042 has had 5 work orders in 90 days — all for the same fault code (E04). Root cause has not been addressed. Consider replacing the condenser coil assembly.",
@@ -71,8 +71,8 @@ const INSIGHTS: Insight[] = [
   },
   {
     id: "rf-2",
-    category: "repeat-failure",
-    severity: "warning",
+    category: "repeat_failure",
+    severity: "high",
     title: "Trane XR15 recurring electrical fault",
     description: "Unit #EQ-0887 (Valley Fresh Foods) has logged 3 identical capacitor failures. Component may be undersized for the site load.",
     meta: "3 repairs since Jan 2026",
@@ -81,22 +81,22 @@ const INSIGHTS: Insight[] = [
     actionHref: "/work-orders",
   },
 
-  // Churn risks
+  // Expiring warranties (replaces churn-risk)
   {
-    id: "cr-1",
-    category: "churn-risk",
+    id: "ew-1",
+    category: "expiring_warranty",
     severity: "critical",
-    title: "Harborview Restaurant Group: high churn probability",
-    description: "No contact or service activity in 67 days. They have 11 active equipment units. A competitor was mentioned in a portal message 3 weeks ago.",
-    meta: "67 days inactive",
-    value: "87% churn risk",
+    title: "Harborview Restaurant Group: warranties expiring soon",
+    description: "3 units expire within 14 days. No renewal quote has been sent. Proactive outreach at this stage converts at 3× the rate of post-expiry contact.",
+    meta: "14 days remaining",
+    value: "3 units at risk",
     actionLabel: "View customer",
     actionHref: "/customers",
   },
   {
-    id: "cr-2",
-    category: "churn-risk",
-    severity: "warning",
+    id: "ew-2",
+    category: "expiring_warranty",
+    severity: "high",
     title: "2 accounts with unpaid invoices over 45 days",
     description: "Riverside Auto Group ($4,200 overdue) and Oakdale Medical ($1,850 overdue) have not responded to payment reminders. Collections risk is elevated.",
     meta: "Avg $3,025 outstanding",
@@ -108,8 +108,8 @@ const INSIGHTS: Insight[] = [
   // Revenue opportunities
   {
     id: "rev-1",
-    category: "revenue",
-    severity: "info",
+    category: "revenue_opportunity",
+    severity: "medium",
     title: "$38,400 in upsell opportunities identified",
     description: "22 customers on time-and-material billing have equipment that qualifies for a maintenance contract. Converting 50% would add ~$19,200 ARR.",
     meta: "Based on last 6 months",
@@ -119,8 +119,8 @@ const INSIGHTS: Insight[] = [
   },
   {
     id: "rev-2",
-    category: "revenue",
-    severity: "info",
+    category: "revenue_opportunity",
+    severity: "medium",
     title: "8 expiring warranties represent $12K in service contracts",
     description: "Warranties expiring in the next 60 days across 8 accounts. Proactive outreach now converts at 3× the rate of outbound cold contact.",
     meta: "Expiring within 60 days",
@@ -129,11 +129,11 @@ const INSIGHTS: Insight[] = [
     actionHref: "/service-schedule",
   },
 
-  // Technician optimization
+  // Upsell & optimization (replaces technician)
   {
     id: "tech-1",
-    category: "technician",
-    severity: "warning",
+    category: "upsell",
+    severity: "high",
     title: "Marcus Reyes is at 134% capacity this week",
     description: "9 work orders assigned against a 7-order weekly capacity. 3 of his jobs are in the same zone as Jordan Kim, who has 4 open slots.",
     meta: "Week of Apr 28",
@@ -143,8 +143,8 @@ const INSIGHTS: Insight[] = [
   },
   {
     id: "tech-2",
-    category: "technician",
-    severity: "info",
+    category: "upsell",
+    severity: "low",
     title: "Route optimization could save 4.2 hrs/week",
     description: "Current technician routing has 6 cross-city conflicts. Reordering Tuesday stops for Aisha Patel and Devon Cross could cut drive time by 4.2 hours per week.",
     meta: "Est. $840/month savings",
