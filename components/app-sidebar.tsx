@@ -180,26 +180,26 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors group",
                 active
-                  ? "bg-sidebar-accent text-white font-medium"
+                  ? "bg-primary text-white font-medium shadow-sm"
                   : highlight
-                    ? "text-blue-400 hover:bg-sidebar-accent/70 hover:text-white"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-white",
+                    ? "text-[var(--ai-purple)] hover:bg-sidebar-accent/70 hover:text-white"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-white",
                 collapsed && "justify-center"
               )}
             >
               <Icon className={cn(
                 "w-4 h-4 shrink-0 transition-colors",
                 active
-                  ? "text-primary"
+                  ? "text-white"
                   : highlight
-                    ? "text-blue-400 group-hover:text-white"
-                    : "text-sidebar-foreground/60 group-hover:text-white"
+                    ? "text-[var(--ai-purple)] group-hover:text-white"
+                    : "text-sidebar-foreground/50 group-hover:text-white"
               )} />
               {!collapsed && (
                 <>
                   <span className="truncate flex-1">{label}</span>
                   {highlight && !active && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--ai-purple)]/15 text-[var(--ai-purple)]">
                       AI
                     </span>
                   )}
@@ -214,7 +214,7 @@ export function AppSidebar() {
       <div className="border-t border-sidebar-border shrink-0">
         {!collapsed && (
           <div className="px-3 py-2.5 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--status-success)" }} />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-medium text-sidebar-foreground/50 leading-tight truncate">
                 Workspace Active

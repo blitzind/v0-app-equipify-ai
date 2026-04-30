@@ -224,7 +224,7 @@ export function AppTopbar() {
           {/* Footer: Session */}
           <div className="border-t border-border px-5 py-3 flex items-center justify-between bg-secondary/20">
             <p className="text-[10px] text-muted-foreground">
-              Equipify.ai &middot; Growth Plan &middot; <span className="text-emerald-500 font-medium">Active</span>
+              Equipify.ai &middot; Growth Plan &middot; <span className="font-medium" style={{ color: "var(--status-success)" }}>Active</span>
             </p>
             <Link
               href="/login"
