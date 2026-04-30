@@ -305,32 +305,90 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
   )
 }
 
+// ─── View Mode Config ─────────────────────────────────────────────────────────
+
+type ViewMode = "1" | "3" | "4" | "6" | "12" | "year"
+
+const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  "1":    "Month View",
+  "3":    "3-Month View",
+  "4":    "4-Month View",
+  "6":    "6-Month View",
+  "12":   "12-Month View",
+  "year": "Year View",
+}
+
+function viewModeMonths(mode: ViewMode): number {
+  if (mode === "year") return 12
+  return parseInt(mode, 10)
+}
+
+/** Returns the date-range label for the current offset + mode */
+function dateRangeLabel(mode: ViewMode, offset: number): string {
+  const today = new Date()
+
+  if (mode === "year") {
+    const year = today.getFullYear() + offset
+    return String(year)
+  }
+
+  const start = new Date(today.getFullYear(), today.getMonth() + offset * viewModeMonths(mode), 1)
+  const count = viewModeMonths(mode)
+
+  if (count === 1) {
+    return start.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  }
+
+  const end = new Date(start.getFullYear(), start.getMonth() + count - 1, 1)
+  const startStr = start.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+  const endStr   = end.toLocaleDateString("en-US",   { month: "short", year: "numeric" })
+  return `${startStr} – ${endStr}`
+}
+
+/** Build ordered month keys for the current window */
+function buildMonthKeys(mode: ViewMode, offset: number): string[] {
+  const today = new Date()
+  const count = viewModeMonths(mode)
+
+  if (mode === "year") {
+    const year = today.getFullYear() + offset
+    return Array.from({ length: 12 }, (_, i) =>
+      `${year}-${String(i).padStart(2, "0")}`
+    )
+  }
+
+  const base = new Date(today.getFullYear(), today.getMonth() + offset * count, 1)
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(base.getFullYear(), base.getMonth() + i, 1)
+    return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`
+  })
+}
+
+/** Summary card title reflecting mode */
+function summaryTitle(mode: ViewMode): string {
+  return VIEW_MODE_LABELS[mode].replace(" View", "") + " Summary"
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ServiceSchedulePage() {
   const { plans } = useMaintenancePlans()
   const { createWorkOrder, workOrders } = useWorkOrders()
-  const [monthOffset, setMonthOffset] = useState(0)   // 0 = current month, 1 = +1 month ahead
+
+  const [viewMode, setViewMode]         = useState<ViewMode>("4")
+  const [offset, setOffset]             = useState(0)
   const [customerFilter, setCustomerFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
-  const [createdIds, setCreatedIds] = useState<Set<string>>(new Set())
+  const [createdIds, setCreatedIds]     = useState<Set<string>>(new Set())
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
-  // Show 4 months from current + offset
-  const windowStart = useMemo(() => {
-    const d = new Date()
-    d.setMonth(d.getMonth() + monthOffset)
-    d.setDate(1)
-    return d
-  }, [monthOffset])
+  // Reset offset when mode changes so we don't land on an unexpected window
+  function handleModeChange(m: ViewMode) {
+    setViewMode(m)
+    setOffset(0)
+  }
 
-  const monthKeys = useMemo(() => {
-    return Array.from({ length: 4 }, (_, i) => {
-      const d = new Date(windowStart)
-      d.setMonth(d.getMonth() + i)
-      return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`
-    })
-  }, [windowStart])
+  const monthKeys = useMemo(() => buildMonthKeys(viewMode, offset), [viewMode, offset])
 
   const customers = useMemo(() => {
     return ["All", ...Array.from(new Set(plans.map((p) => p.customerName))).sort()]
@@ -403,23 +461,6 @@ export default function ServiceSchedulePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Month navigation */}
-      <div className="flex justify-end">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon-sm" onClick={() => setMonthOffset((n) => n - 1)} aria-label="Previous period">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
-            {monthLabel(monthKeys[0])} — {monthLabel(monthKeys[3])}
-          </span>
-          <Button variant="outline" size="icon-sm" onClick={() => setMonthOffset((n) => n + 1)} aria-label="Next period">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          {monthOffset !== 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setMonthOffset(0)}>Today</Button>
-          )}
-        </div>
-      </div>
 
       {/* Alert banners */}
       {overduePlans.length > 0 && (
@@ -439,27 +480,86 @@ export default function ServiceSchedulePage() {
         </div>
       )}
 
-      {/* Filters + stats */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={customerFilter} onValueChange={setCustomerFilter}>
-          <SelectTrigger className="h-9 w-52 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {customers.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      {/* ── Unified toolbar ───────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap">
+
+        {/* Status filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-36 text-sm"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-36 text-sm shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">All Plans</SelectItem>
+            <SelectItem value="All">All Status</SelectItem>
             <SelectItem value="Active">Active Only</SelectItem>
             <SelectItem value="Paused">Paused Only</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground ml-auto">{totalVisible} service{totalVisible !== 1 ? "s" : ""} in view</span>
+
+        {/* Customer filter */}
+        <Select value={customerFilter} onValueChange={setCustomerFilter}>
+          <SelectTrigger className="h-9 w-52 text-sm shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {customers.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        {/* View mode selector */}
+        <Select value={viewMode} onValueChange={(v) => handleModeChange(v as ViewMode)}>
+          <SelectTrigger className="h-9 w-40 text-sm shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {(Object.keys(VIEW_MODE_LABELS) as ViewMode[]).map((m) => (
+              <SelectItem key={m} value={m}>{VIEW_MODE_LABELS[m]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Spacer */}
+        <span className="flex-1 hidden sm:block" />
+
+        {/* Services-in-view count */}
+        <span className="text-xs text-muted-foreground shrink-0 sm:hidden">
+          {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
+        </span>
+
+        {/* Date navigation group */}
+        <div className="flex items-center gap-1 shrink-0 ml-auto sm:ml-0">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setOffset((n) => n - 1)}
+            aria-label="Previous period"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+
+          {/* Date range pill */}
+          <div className="inline-flex items-center h-9 px-3 rounded-md border border-border bg-background text-sm font-medium text-foreground min-w-[144px] justify-center select-none">
+            {dateRangeLabel(viewMode, offset)}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => setOffset((n) => n + 1)}
+            aria-label="Next period"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+
+          {offset !== 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-9 px-2.5" onClick={() => setOffset(0)}>
+              Today
+            </Button>
+          )}
+        </div>
+
+        {/* Services count — desktop only */}
+        <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+          {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
+        </span>
       </div>
 
-      {/* Two-column layout: timeline + sidebar */}
+      {/* ── Two-column layout: timeline + sidebar ─────────────────────────── */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
+
         {/* Timeline */}
         <div className="flex-1 min-w-0 w-full">
           {monthKeys.map((key) => {
@@ -480,19 +580,20 @@ export default function ServiceSchedulePage() {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Calendar className="w-10 h-10 text-muted-foreground/30 mb-3" />
               <p className="text-sm font-medium text-muted-foreground">No services scheduled in this window.</p>
-              <p className="text-xs text-muted-foreground mt-1">Try adjusting the month range or filters.</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting the date range or filters.</p>
             </div>
           )}
         </div>
 
         {/* Sidebar */}
         <div className="w-full lg:w-72 shrink-0 flex flex-col gap-4 lg:sticky lg:top-0">
-          {/* Summary card */}
+
+          {/* Summary card — title reflects current view mode */}
           <Card className="border border-border">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-muted-foreground" />
-                4-Month Summary
+                {summaryTitle(viewMode)}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 flex flex-col gap-3">
