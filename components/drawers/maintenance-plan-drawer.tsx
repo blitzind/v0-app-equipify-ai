@@ -39,7 +39,7 @@ interface MaintenancePlanDrawerProps {
 }
 
 export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawerProps) {
-  const { plans, updatePlanStatus } = useMaintenancePlans()
+  const { plans, setStatus } = useMaintenancePlans()
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const plan = planId ? plans.find((p) => p.id === planId) ?? null : null
@@ -85,14 +85,14 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
           <>
             {plan.status === "Active" ? (
               <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => {
-                updatePlanStatus(plan.id, "Paused")
+                setStatus(plan.id, "Paused")
                 toast("Plan paused")
               }}>
                 <Pause className="w-3.5 h-3.5" /> Pause Plan
               </Button>
             ) : (
               <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => {
-                updatePlanStatus(plan.id, "Active")
+                setStatus(plan.id, "Active")
                 toast("Plan activated")
               }}>
                 <Play className="w-3.5 h-3.5" /> Activate Plan

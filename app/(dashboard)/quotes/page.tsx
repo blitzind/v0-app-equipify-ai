@@ -17,6 +17,7 @@ import {
   Search, Plus, ArrowUpDown, ChevronRight,
   FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban,
 } from "lucide-react"
+import { QuoteDrawer } from "@/components/drawers/quote-drawer"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,8 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | QuoteStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...adminQuotes]
@@ -258,6 +261,7 @@ export default function QuotesPage() {
                     style={{ backgroundColor: "var(--card)" }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = "color-mix(in oklch, var(--primary) 3%, var(--card))")}
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--card)")}
+                    onClick={() => setSelectedQuoteId(qt.id)}
                   >
                     <TableCell>
                       <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">
@@ -284,8 +288,12 @@ export default function QuotesPage() {
                         <span className="text-xs text-muted-foreground/40">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedQuoteId(qt.id)}
+                      >
                         View <ChevronRight className="w-3.5 h-3.5" />
                       </Button>
                     </TableCell>
@@ -296,6 +304,11 @@ export default function QuotesPage() {
           </Table>
         </div>
       </Card>
+
+      <QuoteDrawer
+        quoteId={selectedQuoteId}
+        onClose={() => setSelectedQuoteId(null)}
+      />
     </div>
   )
 }

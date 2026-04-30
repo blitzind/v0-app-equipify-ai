@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
 import { customers } from "@/lib/mock-data"
 import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
@@ -36,6 +35,7 @@ import {
   ClipboardList,
   ChevronRight,
 } from "lucide-react"
+import { CustomerDrawer } from "@/components/drawers/customer-drawer"
 
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
 type SortDir = "asc" | "desc"
@@ -57,10 +57,9 @@ function StatusBadge({ status }: { status: Customer["status"] }) {
   )
 }
 
-function CustomerCard({ customer }: { customer: Customer }) {
+function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => void }) {
   return (
-    <Link href={`/customers/${customer.id}`}>
-      <Card className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group">
+    <Card onClick={onOpen} className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
@@ -106,7 +105,6 @@ function CustomerCard({ customer }: { customer: Customer }) {
           </div>
         </CardContent>
       </Card>
-    </Link>
   )
 }
 
@@ -116,6 +114,7 @@ export default function CustomersPage() {
   const [sortKey, setSortKey] = useState<SortKey>("company")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...customers]
@@ -286,9 +285,9 @@ export default function CustomersPage() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors">
+                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedCustomerId(c.id)}>
                     <TableCell>
-                      <Link href={`/customers/${c.id}`} className="flex items-center gap-3">
+                      <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">
                           {c.company.slice(0, 2).toUpperCase()}
                         </div>
@@ -298,7 +297,7 @@ export default function CustomersPage() {
                           </p>
                           <p className="text-xs text-muted-foreground">{c.name}</p>
                         </div>
-                      </Link>
+                      </div>
                     </TableCell>
                     <TableCell><StatusBadge status={c.status} /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{c.locations.length}</TableCell>
@@ -315,12 +314,14 @@ export default function CustomersPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(c.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "short" })}
                     </TableCell>
-                    <TableCell>
-                      <Link href={`/customers/${c.id}`}>
-                        <Button variant="ghost" size="sm" className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                          View <ChevronRight className="w-3.5 h-3.5" />
-                        </Button>
-                      </Link>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedCustomerId(c.id)}
+                      >
+                        View <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -339,12 +340,17 @@ export default function CustomersPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((c) => (
-                <CustomerCard key={c.id} customer={c} />
+                <CustomerCard key={c.id} customer={c} onOpen={() => setSelectedCustomerId(c.id)} />
               ))}
             </div>
           )}
         </>
       )}
+
+      <CustomerDrawer
+        customerId={selectedCustomerId}
+        onClose={() => setSelectedCustomerId(null)}
+      />
     </div>
   )
 }

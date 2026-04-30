@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
+import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,10 +101,9 @@ function formatDate(d: string) {
 
 // ─── Kanban card ──────────────────────────────────────────────────────────────
 
-function KanbanCard({ wo }: { wo: WorkOrder }) {
+function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
   return (
-    <Link href={`/work-orders/${wo.id}`}>
-      <div className="bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group">
+    <div onClick={onOpen} className="bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-mono text-muted-foreground">{wo.id}</span>
           <div className="flex items-center gap-1.5">
@@ -135,13 +135,12 @@ function KanbanCard({ wo }: { wo: WorkOrder }) {
           </div>
         )}
       </div>
-    </Link>
   )
 }
 
 // ─── Kanban view ──────────────────────────────────────────────────────────────
 
-function KanbanView({ workOrders }: { workOrders: WorkOrder[] }) {
+function KanbanView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (id: string) => void }) {
   const columns = KANBAN_COLUMNS.map((status) => ({
     status,
     items: workOrders.filter((wo) => wo.status === status),
@@ -167,7 +166,7 @@ function KanbanView({ workOrders }: { workOrders: WorkOrder[] }) {
                 <span className="text-xs text-muted-foreground">No work orders</span>
               </div>
             ) : (
-              items.map((wo) => <KanbanCard key={wo.id} wo={wo} />)
+              items.map((wo) => <KanbanCard key={wo.id} wo={wo} onOpen={() => onOpen(wo.id)} />)
             )}
           </div>
         </div>
@@ -183,11 +182,13 @@ function TableView({
   sortKey,
   sortDir,
   onSort,
+  onOpen,
 }: {
   workOrders: WorkOrder[]
   sortKey: SortKey
   sortDir: "asc" | "desc"
   onSort: (k: SortKey) => void
+  onOpen: (id: string) => void
 }) {
   function SortHeader({ label, col }: { label: string; col: SortKey }) {
     return (
@@ -219,11 +220,9 @@ function TableView({
         </TableHeader>
         <TableBody>
           {workOrders.map((wo) => (
-            <TableRow key={wo.id} className="hover:bg-muted/30 cursor-pointer transition-colors">
+            <TableRow key={wo.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => onOpen(wo.id)}>
               <TableCell>
-                <Link href={`/work-orders/${wo.id}`} className="font-mono text-xs text-primary hover:underline">
-                  {wo.id}
-                </Link>
+                <span className="font-mono text-xs text-primary hover:underline">{wo.id}</span>
               </TableCell>
               <TableCell className="font-medium text-sm">{wo.customerName}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{wo.equipmentName}</TableCell>
@@ -239,10 +238,10 @@ function TableView({
               <TableCell><StatusBadge status={wo.status} /></TableCell>
               <TableCell className="text-sm text-muted-foreground">{wo.technicianName}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{formatDate(wo.scheduledDate)}</TableCell>
-              <TableCell>
-                <Link href={`/work-orders/${wo.id}`}>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => onOpen(wo.id)}>
                   <Arrow className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
-                </Link>
+                </button>
               </TableCell>
             </TableRow>
           ))}
@@ -381,7 +380,7 @@ function CalendarView({ workOrders }: { workOrders: WorkOrder[] }) {
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ─── Main page ─────────────────────────────────────────��──────────────────────
 
 export default function WorkOrdersPage() {
   const { workOrders } = useWorkOrders()
@@ -394,6 +393,7 @@ export default function WorkOrdersPage() {
   const [sortKey, setSortKey] = useState<SortKey>("scheduledDate")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [createOpen, setCreateOpen] = useState(false)
+  const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
 
   const allTechs = useMemo(() => {
     const seen = new Set<string>()
@@ -544,19 +544,25 @@ export default function WorkOrdersPage() {
 
       {/* Views */}
       <div className={cn("flex-1 overflow-hidden", view !== "kanban" && "overflow-y-auto")}>
-        {view === "kanban" && <KanbanView workOrders={filtered} />}
+        {view === "kanban" && <KanbanView workOrders={filtered} onOpen={setSelectedWoId} />}
         {view === "table" && (
           <TableView
             workOrders={filtered}
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onOpen={setSelectedWoId}
           />
         )}
         {view === "calendar" && <CalendarView workOrders={filtered} />}
       </div>
 
       <CreateWorkOrderModal open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      <WorkOrderDrawer
+        workOrderId={selectedWoId}
+        onClose={() => setSelectedWoId(null)}
+      />
     </div>
   )
 }

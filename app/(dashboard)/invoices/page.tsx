@@ -17,6 +17,7 @@ import {
   Search, Plus, ArrowUpDown, ChevronRight,
   Receipt, CheckCircle2, AlertTriangle, Clock, FilePen, Ban, Send,
 } from "lucide-react"
+import { InvoiceDrawer } from "@/components/drawers/invoice-drawer"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("issueDate")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...adminInvoices]
@@ -263,6 +265,7 @@ export default function InvoicesPage() {
                     style={{ backgroundColor: "var(--card)" }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = "color-mix(in oklch, var(--primary) 3%, var(--card))")}
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--card)")}
+                    onClick={() => setSelectedInvoiceId(inv.id)}
                   >
                     <TableCell>
                       <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">
@@ -292,8 +295,12 @@ export default function InvoicesPage() {
                     <TableCell className="text-xs text-[color:var(--status-success)] ds-tabular">
                       {inv.paidDate ? fmtDate(inv.paidDate) : <span className="text-muted-foreground/40">—</span>}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedInvoiceId(inv.id)}
+                      >
                         View <ChevronRight className="w-3.5 h-3.5" />
                       </Button>
                     </TableCell>
@@ -304,6 +311,11 @@ export default function InvoicesPage() {
           </Table>
         </div>
       </Card>
+
+      <InvoiceDrawer
+        invoiceId={selectedInvoiceId}
+        onClose={() => setSelectedInvoiceId(null)}
+      />
     </div>
   )
 }

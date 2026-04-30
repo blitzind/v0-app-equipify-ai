@@ -48,6 +48,7 @@ import {
   Download,
   Tag,
 } from "lucide-react"
+import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 
 type SortKey = "model" | "customerName" | "nextDueDate" | "lastServiceDate" | "category"
 type SortDir = "asc" | "desc"
@@ -85,7 +86,7 @@ function DueBadge({ nextDueDate }: { nextDueDate: string }) {
   return <span className="text-xs text-muted-foreground">{fmtDate(nextDueDate)}</span>
 }
 
-function EquipmentCard({ eq, selected, onSelect }: { eq: Equipment; selected: boolean; onSelect: () => void }) {
+function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; selected: boolean; onSelect: () => void; onOpen: (id: string) => void }) {
   const days = daysToDue(eq.nextDueDate)
   const urgent = days < 0 || days <= 7
 
@@ -139,9 +140,9 @@ function EquipmentCard({ eq, selected, onSelect }: { eq: Equipment; selected: bo
               <Calendar className={cn("w-3.5 h-3.5 shrink-0", urgent && "hidden")} />
               <DueBadge nextDueDate={eq.nextDueDate} />
             </div>
-            <Link href={`/equipment/${eq.id}`} className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
+            <button className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors text-xs" onClick={(e) => { e.stopPropagation(); onOpen(eq.id) }}>
               View <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            </button>
           </div>
         </div>
       </CardContent>
@@ -157,6 +158,7 @@ export default function EquipmentPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -371,7 +373,7 @@ export default function EquipmentPage() {
                 </TableRow>
               ) : (
                 filtered.map((eq) => (
-                  <TableRow key={eq.id} className={cn("group cursor-pointer hover:bg-muted/30 transition-colors", selected.has(eq.id) && "bg-primary/5")}>
+                  <TableRow key={eq.id} className={cn("group cursor-pointer hover:bg-muted/30 transition-colors", selected.has(eq.id) && "bg-primary/5")} onClick={() => setSelectedEquipmentId(eq.id)}>
                     <TableCell onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}>
                       <Checkbox
                         checked={selected.has(eq.id)}
@@ -402,12 +404,14 @@ export default function EquipmentPage() {
                     <TableCell>
                       <DueBadge nextDueDate={eq.nextDueDate} />
                     </TableCell>
-                    <TableCell>
-                      <Link href={`/equipment/${eq.id}`}>
-                        <Button variant="ghost" size="sm" className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                          View <ChevronRight className="w-3.5 h-3.5" />
-                        </Button>
-                      </Link>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedEquipmentId(eq.id)}
+                      >
+                        View <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -431,12 +435,18 @@ export default function EquipmentPage() {
                   eq={eq}
                   selected={selected.has(eq.id)}
                   onSelect={() => toggleSelect(eq.id)}
+                  onOpen={(id) => setSelectedEquipmentId(id)}
                 />
               ))}
             </div>
           )}
         </>
       )}
+
+      <EquipmentDrawer
+        equipmentId={selectedEquipmentId}
+        onClose={() => setSelectedEquipmentId(null)}
+      />
     </div>
   )
 }

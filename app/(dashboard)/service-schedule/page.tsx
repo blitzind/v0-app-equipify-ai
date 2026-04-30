@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { MaintenancePlanDrawer } from "@/components/drawers/maintenance-plan-drawer"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
