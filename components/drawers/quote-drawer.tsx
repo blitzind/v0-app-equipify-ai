@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
@@ -10,9 +10,22 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { CheckCircle2, ClipboardList, Download, Send, Pencil, X, Check, FileText, Plus, Trash2 } from "lucide-react"
+import {
+  CheckCircle2, ClipboardList, Download, Send, Pencil, X, Check,
+  FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
+  ThumbsDown, DollarSign, FileEdit,
+} from "lucide-react"
 
 let toastCounter = 0
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const AI_BG     = "bg-[color:var(--ds-info-bg)]"
+const AI_BORDER = "border-[color:var(--ds-info-border)]"
+const AI_TEXT   = "text-[color:var(--ds-info-text)]"
+const AI_SUBTLE = "text-[color:var(--ds-info-subtle)]"
+
+// ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<QuoteStatus, { className: string }> = {
   "Draft":            { className: "bg-muted text-muted-foreground border-border" },
@@ -25,6 +38,8 @@ const STATUS_CONFIG: Record<QuoteStatus, { className: string }> = {
 
 const ALL_STATUSES: QuoteStatus[] = ["Draft", "Sent", "Pending Approval", "Approved", "Declined", "Expired"]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function fmtDate(d: string) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -36,9 +51,281 @@ function fmtCurrency(n: number) {
 
 type LineItem = { description: string; qty: number; unit: number }
 
+// ─── AI mock generators ───────────────────────────────────────────────────────
+
+function generateQuoteDraft(quote: AdminQuote): string {
+  const total = fmtCurrency(quote.amount)
+  return `Dear ${quote.customerName},\n\nThank you for reaching out to us regarding your ${quote.equipmentName}. We are pleased to present this service quote for your review.\n\nBased on our initial assessment, the proposed scope of work includes ${quote.description.toLowerCase()}. Our team will ensure all work is completed to manufacturer specifications and industry standards.\n\nThis quote is valid for 30 days from the issue date. Please review the attached line items totaling ${total} and let us know if you have any questions or would like to proceed.\n\nWe look forward to serving you.`
+}
+
+function generatePricingRecommendation(quote: AdminQuote): { text: string; rows: { label: string; value: string }[] } {
+  const base = quote.amount
+  const competitive = Math.round(base * 0.97)
+  const premium     = Math.round(base * 1.12)
+  const pmBundle    = Math.round(base * 0.90)
+
+  return {
+    text: `Based on similar jobs for ${quote.equipmentName} in this market segment, the current quote of ${fmtCurrency(base)} is well-positioned. Consider the pricing options below based on your goals for this customer.`,
+    rows: [
+      { label: "Competitive (close faster)",    value: fmtCurrency(competitive) },
+      { label: "Current quote",                 value: fmtCurrency(base) },
+      { label: "Premium (higher margin)",       value: fmtCurrency(premium) },
+      { label: "PM plan bundle discount",       value: fmtCurrency(pmBundle) + " + recurring" },
+    ],
+  }
+}
+
+// ─── AI Tools Panel ───────────────────────────────────────────────────────────
+
+type AITool = "draft" | "pricing" | null
+
+interface AIResult {
+  tool: AITool
+  text: string
+  rows?: { label: string; value: string }[]
+}
+
+function QuoteAIToolsPanel({
+  quote,
+  onApplyDraft,
+  onApplyPricing,
+}: {
+  quote: AdminQuote
+  onApplyDraft: (text: string) => void
+  onApplyPricing: (amount: number) => void
+}) {
+  const [activeTool, setActiveTool] = useState<AITool>(null)
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<AIResult | null>(null)
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(null)
+  const [appliedTool, setAppliedTool] = useState<AITool>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function runTool(tool: AITool) {
+    if (loading) return
+    setActiveTool(tool)
+    setLoading(true)
+    setResult(null)
+    setFeedback(null)
+    setAppliedTool(null)
+
+    timerRef.current = setTimeout(() => {
+      if (!tool) return
+      if (tool === "draft") {
+        setResult({ tool, text: generateQuoteDraft(quote) })
+      } else if (tool === "pricing") {
+        const rec = generatePricingRecommendation(quote)
+        setResult({ tool, text: rec.text, rows: rec.rows })
+      }
+      setLoading(false)
+    }, 1700)
+  }
+
+  function regenerate() {
+    if (activeTool) runTool(activeTool)
+  }
+
+  // Extract numeric amount from pricing row label
+  function applyPricingRow(value: string) {
+    const num = parseInt(value.replace(/[^0-9]/g, ""), 10)
+    if (!isNaN(num)) {
+      onApplyPricing(num)
+      setAppliedTool("pricing")
+    }
+  }
+
+  const tools: { id: AITool; icon: React.ReactNode; label: string; sub: string }[] = [
+    {
+      id: "draft",
+      icon: <FileEdit className="w-3.5 h-3.5" />,
+      label: "Generate Quote Draft",
+      sub: "Write a professional email for this quote",
+    },
+    {
+      id: "pricing",
+      icon: <DollarSign className="w-3.5 h-3.5" />,
+      label: "Recommend Pricing",
+      sub: "Compare pricing options for this job",
+    },
+  ]
+
+  return (
+    <div className={cn("rounded-xl border overflow-hidden", AI_BG, AI_BORDER)}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3">
+        <div className="w-5 h-5 rounded bg-[color:var(--ds-info-subtle)] flex items-center justify-center shrink-0">
+          <Sparkles className="w-2.5 h-2.5 text-white" aria-hidden />
+        </div>
+        <span className={cn("text-xs font-semibold", AI_TEXT)}>AI Tools</span>
+        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase ml-0.5 bg-[color:var(--ds-info-subtle)] text-white border-transparent">
+          AI
+        </span>
+      </div>
+
+      {/* Tool buttons */}
+      <div className={cn("grid grid-cols-1 gap-px border-t", AI_BORDER)}>
+        {tools.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => runTool(t.id)}
+            disabled={loading}
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer",
+              "hover:bg-[color:var(--ds-info-border)]/30 disabled:opacity-50 disabled:cursor-not-allowed",
+              activeTool === t.id && result ? "bg-[color:var(--ds-info-border)]/20" : "",
+            )}
+          >
+            <span className={cn("shrink-0 mt-0.5", AI_SUBTLE)}>{t.icon}</span>
+            <span className="flex-1 min-w-0">
+              <span className={cn("block text-xs font-semibold", AI_TEXT)}>{t.label}</span>
+              <span className="block text-[10px] text-muted-foreground mt-0.5">{t.sub}</span>
+            </span>
+            {loading && activeTool === t.id && (
+              <RefreshCw className={cn("w-3.5 h-3.5 shrink-0 animate-spin", AI_SUBTLE)} />
+            )}
+            {activeTool !== t.id && (
+              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 -rotate-90", AI_SUBTLE)} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Result panel */}
+      {(loading || result) && (
+        <div className={cn("border-t px-4 py-3 space-y-3", AI_BORDER)}>
+          {loading ? (
+            <div className="space-y-2" aria-label="Generating...">
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-full" />
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-5/6" />
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-3/4" />
+            </div>
+          ) : result ? (
+            <>
+              {/* Text output */}
+              <div className={cn("rounded-lg border p-3 space-y-1.5", AI_BORDER, "bg-[color:var(--ds-info-border)]/10")}>
+                {result.text.split("\n").filter(Boolean).map((p, i) => (
+                  <p key={i} className={cn("text-xs leading-relaxed", AI_TEXT)}>{p}</p>
+                ))}
+              </div>
+
+              {/* Pricing rows */}
+              {result.rows && result.rows.length > 0 && (
+                <div className={cn("rounded-lg border divide-y overflow-hidden", AI_BORDER)}>
+                  {result.rows.map((row, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between gap-3 px-3 py-2 group"
+                    >
+                      <span className={cn("text-[10px] font-medium opacity-70", AI_TEXT)}>{row.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-[10px] font-semibold", AI_TEXT)}>{row.value}</span>
+                        {!row.value.includes("recurring") && (
+                          <button
+                            type="button"
+                            onClick={() => applyPricingRow(row.value)}
+                            className={cn(
+                              "text-[9px] font-bold px-1.5 py-0.5 rounded border transition-all cursor-pointer",
+                              "opacity-0 group-hover:opacity-100",
+                              AI_BORDER, AI_TEXT,
+                              "hover:bg-[color:var(--ds-info-border)]/30",
+                            )}
+                          >
+                            Apply
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Draft apply button */}
+              {result.tool === "draft" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "w-full text-xs gap-1.5 cursor-pointer border",
+                    AI_BORDER, AI_TEXT,
+                    "hover:bg-[color:var(--ds-info-border)]/30 bg-transparent",
+                    appliedTool === "draft" && "opacity-60",
+                  )}
+                  onClick={() => {
+                    onApplyDraft(result.text)
+                    setAppliedTool("draft")
+                  }}
+                  disabled={appliedTool === "draft"}
+                >
+                  {appliedTool === "draft" ? (
+                    <><Check className="w-3.5 h-3.5" /> Applied to Notes</>
+                  ) : (
+                    <><FileEdit className="w-3.5 h-3.5" /> Apply to Notes</>
+                  )}
+                </Button>
+              )}
+
+              {/* Feedback + regenerate row */}
+              <div className={cn("flex items-center justify-between gap-2 pt-1 border-t", AI_BORDER)}>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setFeedback("up")}
+                    className={cn(
+                      "p-1 rounded transition-colors cursor-pointer",
+                      feedback === "up"
+                        ? "text-[color:var(--ds-info-subtle)]"
+                        : "text-muted-foreground hover:text-[color:var(--ds-info-subtle)]",
+                    )}
+                    aria-label="Good result"
+                  >
+                    <ThumbsUp className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeedback("down")}
+                    className={cn(
+                      "p-1 rounded transition-colors cursor-pointer",
+                      feedback === "down"
+                        ? "text-destructive"
+                        : "text-muted-foreground hover:text-destructive",
+                    )}
+                    aria-label="Poor result"
+                  >
+                    <ThumbsDown className="w-3 h-3" />
+                  </button>
+                  {feedback && (
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      {feedback === "up" ? "Thanks for the feedback!" : "We'll improve this."}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={loading}
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-semibold cursor-pointer",
+                    AI_TEXT, "hover:underline disabled:opacity-40 transition-all",
+                  )}
+                >
+                  <RefreshCw className={cn("w-2.5 h-2.5", loading && "animate-spin")} />
+                  Regenerate
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Edit controls ────────────────────────────────────────────────────────────
 
-function EditInput({ value, onChange, type = "text", placeholder, className }: { value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string }) {
+function EditInput({ value, onChange, type = "text", placeholder, className }: {
+  value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string
+}) {
   return (
     <input
       type={type}
@@ -46,8 +333,9 @@ function EditInput({ value, onChange, type = "text", placeholder, className }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className
+        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none",
+        "focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
+        className,
       )}
     />
   )
@@ -77,7 +365,9 @@ function EditTextarea({ value, onChange, placeholder }: { value: string; onChang
   )
 }
 
-function EditRow({ label, view, editing, children }: { label: string; view: React.ReactNode; editing: boolean; children: React.ReactNode }) {
+function EditRow({ label, view, editing, children }: {
+  label: string; view: React.ReactNode; editing: boolean; children: React.ReactNode
+}) {
   return editing ? (
     <div className="flex items-start gap-4 py-1.5 border-b border-border/50 last:border-0">
       <span className="text-xs text-muted-foreground shrink-0 pt-1.5 w-28">{label}</span>
@@ -88,25 +378,16 @@ function EditRow({ label, view, editing, children }: { label: string; view: Reac
   )
 }
 
-// ─── Editable line items table ────────────────────────────────────────────────
+// ─── Line items ───────────────────────────────────────────────────────────────
 
 function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (items: LineItem[]) => void }) {
   function updateItem(idx: number, field: keyof LineItem, raw: string) {
-    const next = items.map((item, i) => {
-      if (i !== idx) return item
-      return { ...item, [field]: field === "description" ? raw : parseFloat(raw) || 0 }
-    })
-    onChange(next)
+    onChange(items.map((item, i) =>
+      i !== idx ? item : { ...item, [field]: field === "description" ? raw : parseFloat(raw) || 0 }
+    ))
   }
-
-  function addItem() {
-    onChange([...items, { description: "", qty: 1, unit: 0 }])
-  }
-
-  function removeItem(idx: number) {
-    onChange(items.filter((_, i) => i !== idx))
-  }
-
+  function addItem() { onChange([...items, { description: "", qty: 1, unit: 0 }]) }
+  function removeItem(idx: number) { onChange(items.filter((_, i) => i !== idx)) }
   const total = items.reduce((s, i) => s + i.qty * i.unit, 0)
 
   return (
@@ -125,22 +406,12 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           <tbody className="divide-y divide-border">
             {items.map((item, i) => (
               <tr key={i} className="bg-card">
-                <td className="px-2 py-1.5">
-                  <EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" />
-                </td>
-                <td className="px-2 py-1.5">
-                  <EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" />
-                </td>
-                <td className="px-2 py-1.5">
-                  <EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" />
-                </td>
+                <td className="px-2 py-1.5"><EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" /></td>
+                <td className="px-2 py-1.5"><EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" /></td>
+                <td className="px-2 py-1.5"><EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" /></td>
                 <td className="px-2 py-1.5 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
                 <td className="px-2 py-1.5 text-center">
-                  <button
-                    onClick={() => removeItem(i)}
-                    className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                    aria-label="Remove line item"
-                  >
+                  <button onClick={() => removeItem(i)} className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer" aria-label="Remove line item">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -156,22 +427,14 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           </tfoot>
         </table>
       </div>
-      <button
-        onClick={addItem}
-        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer font-medium"
-      >
+      <button onClick={addItem} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer font-medium">
         <Plus className="w-3.5 h-3.5" /> Add Line Item
       </button>
     </div>
   )
 }
 
-// ─── Read-only line items ─────────────────────────────────────────────────────
-
 function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number }) {
-  function fmt$(n: number) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
-  }
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       <table className="w-full text-xs">
@@ -188,15 +451,15 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
             <tr key={i} className="bg-card">
               <td className="px-3 py-2 text-foreground">{item.description}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
-              <td className="px-3 py-2 text-right text-muted-foreground">{fmt$(item.unit)}</td>
-              <td className="px-3 py-2 text-right font-medium text-foreground">{fmt$(item.qty * item.unit)}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unit)}</td>
+              <td className="px-3 py-2 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot className="bg-muted/40 border-t border-border">
           <tr>
             <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
-            <td className="px-3 py-2 text-right font-bold text-foreground">{fmt$(total)}</td>
+            <td className="px-3 py-2 text-right font-bold text-foreground">{fmtCurrency(total)}</td>
           </tr>
         </tfoot>
       </table>
@@ -223,6 +486,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   useEffect(() => {
     setEditing(false)
     setDraft({})
+    setDraftItems([])
   }, [quoteId])
 
   function toast(message: string) {
@@ -233,11 +497,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
   function startEdit() {
     if (!quote) return
-    setDraft({
-      status: quote.status,
-      expiresDate: quote.expiresDate,
-      notes: quote.notes,
-    })
+    setDraft({ status: quote.status, expiresDate: quote.expiresDate, notes: quote.notes })
     setDraftItems(quote.lineItems.map((li) => ({ ...li })))
     setEditing(true)
   }
@@ -251,11 +511,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   function saveEdit() {
     if (!quote) return
     const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
-    updateQuote(quote.id, {
-      ...draft,
-      lineItems: draftItems,
-      amount: newTotal,
-    })
+    updateQuote(quote.id, { ...draft, lineItems: draftItems, amount: newTotal })
     setEditing(false)
     setDraft({})
     setDraftItems([])
@@ -264,6 +520,31 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
   function setField<K extends keyof AdminQuote>(field: K, value: AdminQuote[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // AI apply callbacks
+  function handleApplyDraft(text: string) {
+    setDraft((prev) => ({ ...prev, notes: text }))
+    if (!editing) startEdit()
+    toast("Draft applied to notes — review and save")
+  }
+
+  function handleApplyPricing(amount: number) {
+    // Update total by scaling all line items proportionally
+    if (!quote) return
+    const scale = amount / (quote.amount || 1)
+    const scaledItems = quote.lineItems.map((li) => ({
+      ...li,
+      unit: Math.round(li.unit * scale),
+    }))
+    if (!editing) {
+      setDraft({ status: quote.status, expiresDate: quote.expiresDate, notes: quote.notes })
+      setDraftItems(scaledItems)
+      setEditing(true)
+    } else {
+      setDraftItems(scaledItems)
+    }
+    toast(`Pricing updated to ${fmtCurrency(amount)} — review and save`)
   }
 
   if (!quote) return null
@@ -328,6 +609,15 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           )
         }
       >
+        {/* AI Tools */}
+        {!editing && (
+          <QuoteAIToolsPanel
+            quote={quote}
+            onApplyDraft={handleApplyDraft}
+            onApplyPricing={handleApplyPricing}
+          />
+        )}
+
         <DrawerSection title="Quote Details">
           <DrawerRow label="Customer" value={quote.customerName} />
           <DrawerRow label="Equipment" value={quote.equipmentName} />

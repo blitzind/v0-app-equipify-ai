@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
@@ -10,9 +10,22 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { CheckCircle2, Download, DollarSign, AlertTriangle, Pencil, X, Check, Plus, Trash2 } from "lucide-react"
+import {
+  CheckCircle2, Download, DollarSign, AlertTriangle, Pencil, X, Check,
+  Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp, ThumbsDown,
+  Mail, ShieldAlert,
+} from "lucide-react"
 
 let toastCounter = 0
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const AI_BG     = "bg-[color:var(--ds-info-bg)]"
+const AI_BORDER = "border-[color:var(--ds-info-border)]"
+const AI_TEXT   = "text-[color:var(--ds-info-text)]"
+const AI_SUBTLE = "text-[color:var(--ds-info-subtle)]"
+
+// ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<InvoiceStatus, { className: string }> = {
   "Draft":   { className: "bg-muted text-muted-foreground border-border" },
@@ -25,6 +38,8 @@ const STATUS_CONFIG: Record<InvoiceStatus, { className: string }> = {
 
 const ALL_STATUSES: InvoiceStatus[] = ["Draft", "Sent", "Unpaid", "Paid", "Overdue", "Void"]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function fmtDate(d: string) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -34,11 +49,299 @@ function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
 }
 
+function daysOverdue(dueDate: string): number {
+  if (!dueDate) return 0
+  const diff = Date.now() - new Date(dueDate).getTime()
+  return Math.max(0, Math.floor(diff / 86_400_000))
+}
+
 type LineItem = { description: string; qty: number; unit: number }
+
+// ─── AI mock generators ───────────────────────────────────────────────────────
+
+function generatePaymentReminder(invoice: AdminInvoice): string {
+  const overdue = daysOverdue(invoice.dueDate)
+  const tone = overdue > 30 ? "firm" : overdue > 14 ? "direct" : "friendly"
+
+  if (tone === "friendly") {
+    return `Subject: Friendly Payment Reminder — Invoice ${invoice.id}\n\nDear ${invoice.customerName},\n\nThis is a friendly reminder that Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)} is due on ${fmtDate(invoice.dueDate)}.\n\nIf you have already arranged payment, please disregard this message. Otherwise, you can pay securely via the link in your original invoice email or contact us to arrange an alternative method.\n\nThank you for your continued business. Please don't hesitate to reach out if you have any questions.\n\nBest regards,\nEquipify Service Team`
+  }
+
+  if (tone === "direct") {
+    return `Subject: Payment Overdue — Invoice ${invoice.id} (${overdue} days)\n\nDear ${invoice.customerName},\n\nWe notice that Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)}, which was due on ${fmtDate(invoice.dueDate)}, remains outstanding after ${overdue} days.\n\nWe kindly ask that you arrange payment at your earliest convenience to avoid any service interruptions or late fees.\n\nIf you are experiencing any issues, please contact our billing team directly and we will work with you to find a solution.\n\nThank you,\nEquipify Service Team`
+  }
+
+  return `Subject: Final Notice — Invoice ${invoice.id} Now ${overdue} Days Overdue\n\nDear ${invoice.customerName},\n\nDespite previous reminders, Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)} remains unpaid at ${overdue} days past its due date of ${fmtDate(invoice.dueDate)}.\n\nThis is a final notice requesting immediate payment. Continued non-payment may result in suspension of service and referral to collections.\n\nPlease contact us immediately to resolve this matter.\n\nEquipify Service Team`
+}
+
+interface RiskResult {
+  level: "low" | "medium" | "high"
+  score: number
+  text: string
+  rows: { label: string; value: string }[]
+}
+
+function generateLatePayerRisk(invoice: AdminInvoice): RiskResult {
+  const overdue = daysOverdue(invoice.dueDate)
+
+  // Deterministic score based on invoice ID hash + overdue days
+  const idHash = invoice.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+  const pastLateFactor = (idHash % 3) // 0, 1, or 2 prior late incidents
+  const baseScore = Math.min(95, 20 + (overdue * 1.2) + (pastLateFactor * 18))
+  const score = Math.round(baseScore)
+
+  const level: "low" | "medium" | "high" = score >= 65 ? "high" : score >= 35 ? "medium" : "low"
+
+  const levelText = {
+    low: "This customer has a strong payment history with no significant risk indicators. Recommend a standard follow-up reminder.",
+    medium: "This customer shows moderate late-payment signals. Consider proactive outreach and offer a payment plan if needed to avoid escalation.",
+    high: "This customer has a high churn and non-payment risk score. Immediate personal outreach is recommended. Consider requiring pre-payment for future work orders.",
+  }[level]
+
+  return {
+    level,
+    score,
+    text: levelText,
+    rows: [
+      { label: "Risk score",             value: `${score} / 100` },
+      { label: "Days overdue",           value: overdue > 0 ? `${overdue} days` : "Not yet overdue" },
+      { label: "Prior late payments",    value: pastLateFactor === 0 ? "None on record" : `${pastLateFactor} previous` },
+      { label: "Recommended action",     value: level === "high" ? "Immediate call" : level === "medium" ? "Send reminder" : "Monitor" },
+    ],
+  }
+}
+
+// ─── AI Tools Panel ───────────────────────────────────────────────────────────
+
+type AITool = "reminder" | "risk" | null
+
+function InvoiceAIToolsPanel({
+  invoice,
+  onApplyReminder,
+}: {
+  invoice: AdminInvoice
+  onApplyReminder: (text: string) => void
+}) {
+  const [activeTool, setActiveTool] = useState<AITool>(null)
+  const [loading, setLoading]       = useState(false)
+  const [reminder, setReminder]     = useState<string | null>(null)
+  const [risk, setRisk]             = useState<RiskResult | null>(null)
+  const [feedback, setFeedback]     = useState<"up" | "down" | null>(null)
+  const [applied, setApplied]       = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function runTool(tool: AITool) {
+    if (loading) return
+    setActiveTool(tool)
+    setLoading(true)
+    setReminder(null)
+    setRisk(null)
+    setFeedback(null)
+    setApplied(false)
+
+    timerRef.current = setTimeout(() => {
+      if (tool === "reminder") setReminder(generatePaymentReminder(invoice))
+      if (tool === "risk")     setRisk(generateLatePayerRisk(invoice))
+      setLoading(false)
+    }, 1700)
+  }
+
+  function regenerate() { if (activeTool) runTool(activeTool) }
+
+  const RISK_COLORS: Record<RiskResult["level"], string> = {
+    low:    "text-[color:var(--status-success)] bg-[color:var(--status-success)]/10 border-[color:var(--status-success)]/30",
+    medium: "text-[color:var(--status-warning)] bg-[color:var(--status-warning)]/10 border-[color:var(--status-warning)]/30",
+    high:   "text-destructive bg-destructive/10 border-destructive/30",
+  }
+
+  const tools: { id: AITool; icon: React.ReactNode; label: string; sub: string }[] = [
+    {
+      id: "reminder",
+      icon: <Mail className="w-3.5 h-3.5" />,
+      label: "Draft Payment Reminder",
+      sub: "Generate a tone-matched reminder email",
+    },
+    {
+      id: "risk",
+      icon: <ShieldAlert className="w-3.5 h-3.5" />,
+      label: "Late Payer Risk Alert",
+      sub: "Analyse churn and non-payment risk signals",
+    },
+  ]
+
+  const hasResult = !loading && (reminder !== null || risk !== null)
+
+  return (
+    <div className={cn("rounded-xl border overflow-hidden", AI_BG, AI_BORDER)}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3">
+        <div className="w-5 h-5 rounded bg-[color:var(--ds-info-subtle)] flex items-center justify-center shrink-0">
+          <Sparkles className="w-2.5 h-2.5 text-white" aria-hidden />
+        </div>
+        <span className={cn("text-xs font-semibold", AI_TEXT)}>AI Tools</span>
+        <span className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase ml-0.5 bg-[color:var(--ds-info-subtle)] text-white border-transparent">
+          AI
+        </span>
+      </div>
+
+      {/* Tool buttons */}
+      <div className={cn("grid grid-cols-1 gap-px border-t", AI_BORDER)}>
+        {tools.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => runTool(t.id)}
+            disabled={loading}
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-left transition-colors cursor-pointer",
+              "hover:bg-[color:var(--ds-info-border)]/30 disabled:opacity-50 disabled:cursor-not-allowed",
+              activeTool === t.id && hasResult ? "bg-[color:var(--ds-info-border)]/20" : "",
+            )}
+          >
+            <span className={cn("shrink-0 mt-0.5", AI_SUBTLE)}>{t.icon}</span>
+            <span className="flex-1 min-w-0">
+              <span className={cn("block text-xs font-semibold", AI_TEXT)}>{t.label}</span>
+              <span className="block text-[10px] text-muted-foreground mt-0.5">{t.sub}</span>
+            </span>
+            {loading && activeTool === t.id ? (
+              <RefreshCw className={cn("w-3.5 h-3.5 shrink-0 animate-spin", AI_SUBTLE)} />
+            ) : (
+              <ChevronDown className={cn("w-3.5 h-3.5 shrink-0 -rotate-90", AI_SUBTLE)} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Result panel */}
+      {(loading || hasResult) && (
+        <div className={cn("border-t px-4 py-3 space-y-3", AI_BORDER)}>
+          {loading ? (
+            <div className="space-y-2" aria-label="Generating...">
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-full" />
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-5/6" />
+              <div className="h-2.5 rounded bg-[color:var(--ds-info-border)] animate-pulse w-3/4" />
+            </div>
+          ) : (
+            <>
+              {/* Payment reminder output */}
+              {reminder !== null && (
+                <>
+                  <div className={cn("rounded-lg border p-3 space-y-1.5 bg-[color:var(--ds-info-border)]/10", AI_BORDER)}>
+                    {reminder.split("\n").filter(Boolean).map((line, i) => (
+                      <p key={i} className={cn("text-xs leading-relaxed", i === 0 ? "font-semibold" : "", AI_TEXT)}>
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={cn(
+                      "w-full text-xs gap-1.5 cursor-pointer border bg-transparent",
+                      AI_BORDER, AI_TEXT,
+                      "hover:bg-[color:var(--ds-info-border)]/30",
+                      applied && "opacity-60",
+                    )}
+                    onClick={() => { onApplyReminder(reminder); setApplied(true) }}
+                    disabled={applied}
+                  >
+                    {applied ? (
+                      <><Check className="w-3.5 h-3.5" /> Applied to Notes</>
+                    ) : (
+                      <><Mail className="w-3.5 h-3.5" /> Apply to Notes</>
+                    )}
+                  </Button>
+                </>
+              )}
+
+              {/* Risk alert output */}
+              {risk !== null && (
+                <>
+                  {/* Risk level badge */}
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold",
+                      RISK_COLORS[risk.level],
+                    )}>
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      {risk.level.charAt(0).toUpperCase() + risk.level.slice(1)} Risk — {risk.score}/100
+                    </span>
+                  </div>
+
+                  {/* Risk description */}
+                  <div className={cn("rounded-lg border p-3 bg-[color:var(--ds-info-border)]/10", AI_BORDER)}>
+                    <p className={cn("text-xs leading-relaxed", AI_TEXT)}>{risk.text}</p>
+                  </div>
+
+                  {/* Risk data rows */}
+                  <div className={cn("rounded-lg border divide-y overflow-hidden", AI_BORDER)}>
+                    {risk.rows.map((row, i) => (
+                      <div key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <span className={cn("text-[10px] font-medium opacity-70", AI_TEXT)}>{row.label}</span>
+                        <span className={cn("text-[10px] font-semibold text-right", AI_TEXT)}>{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Feedback + regenerate */}
+              <div className={cn("flex items-center justify-between gap-2 pt-1 border-t", AI_BORDER)}>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setFeedback("up")}
+                    className={cn(
+                      "p-1 rounded transition-colors cursor-pointer",
+                      feedback === "up" ? "text-[color:var(--ds-info-subtle)]" : "text-muted-foreground hover:text-[color:var(--ds-info-subtle)]",
+                    )}
+                    aria-label="Good result"
+                  >
+                    <ThumbsUp className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeedback("down")}
+                    className={cn(
+                      "p-1 rounded transition-colors cursor-pointer",
+                      feedback === "down" ? "text-destructive" : "text-muted-foreground hover:text-destructive",
+                    )}
+                    aria-label="Poor result"
+                  >
+                    <ThumbsDown className="w-3 h-3" />
+                  </button>
+                  {feedback && (
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      {feedback === "up" ? "Thanks for the feedback!" : "We'll improve this."}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={loading}
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-semibold cursor-pointer",
+                    AI_TEXT, "hover:underline disabled:opacity-40 transition-all",
+                  )}
+                >
+                  <RefreshCw className={cn("w-2.5 h-2.5", loading && "animate-spin")} />
+                  Regenerate
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Edit controls ────────────────────────────────────────────────────────────
 
-function EditInput({ value, onChange, type = "text", placeholder, className }: { value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string }) {
+function EditInput({ value, onChange, type = "text", placeholder, className }: {
+  value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string; className?: string
+}) {
   return (
     <input
       type={type}
@@ -46,8 +349,9 @@ function EditInput({ value, onChange, type = "text", placeholder, className }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className
+        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none",
+        "focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
+        className,
       )}
     />
   )
@@ -77,7 +381,9 @@ function EditTextarea({ value, onChange, placeholder }: { value: string; onChang
   )
 }
 
-function EditRow({ label, view, editing, children }: { label: string; view: React.ReactNode; editing: boolean; children: React.ReactNode }) {
+function EditRow({ label, view, editing, children }: {
+  label: string; view: React.ReactNode; editing: boolean; children: React.ReactNode
+}) {
   return editing ? (
     <div className="flex items-start gap-4 py-1.5 border-b border-border/50 last:border-0">
       <span className="text-xs text-muted-foreground shrink-0 pt-1.5 w-28">{label}</span>
@@ -92,16 +398,12 @@ function EditRow({ label, view, editing, children }: { label: string; view: Reac
 
 function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (items: LineItem[]) => void }) {
   function updateItem(idx: number, field: keyof LineItem, raw: string) {
-    const next = items.map((item, i) => {
-      if (i !== idx) return item
-      return { ...item, [field]: field === "description" ? raw : parseFloat(raw) || 0 }
-    })
-    onChange(next)
+    onChange(items.map((item, i) =>
+      i !== idx ? item : { ...item, [field]: field === "description" ? raw : parseFloat(raw) || 0 }
+    ))
   }
-
   function addItem() { onChange([...items, { description: "", qty: 1, unit: 0 }]) }
   function removeItem(idx: number) { onChange(items.filter((_, i) => i !== idx)) }
-
   const total = items.reduce((s, i) => s + i.qty * i.unit, 0)
 
   return (
@@ -120,15 +422,9 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           <tbody className="divide-y divide-border">
             {items.map((item, i) => (
               <tr key={i} className="bg-card">
-                <td className="px-2 py-1.5">
-                  <EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" />
-                </td>
-                <td className="px-2 py-1.5">
-                  <EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" />
-                </td>
-                <td className="px-2 py-1.5">
-                  <EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" />
-                </td>
+                <td className="px-2 py-1.5"><EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" /></td>
+                <td className="px-2 py-1.5"><EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" /></td>
+                <td className="px-2 py-1.5"><EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" /></td>
                 <td className="px-2 py-1.5 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
                 <td className="px-2 py-1.5 text-center">
                   <button onClick={() => removeItem(i)} className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer" aria-label="Remove">
@@ -155,9 +451,6 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
 }
 
 function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number }) {
-  function fmt$(n: number) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
-  }
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       <table className="w-full text-xs">
@@ -174,15 +467,15 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
             <tr key={i} className="bg-card">
               <td className="px-3 py-2 text-foreground">{item.description}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
-              <td className="px-3 py-2 text-right text-muted-foreground">{fmt$(item.unit)}</td>
-              <td className="px-3 py-2 text-right font-medium text-foreground">{fmt$(item.qty * item.unit)}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unit)}</td>
+              <td className="px-3 py-2 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot className="bg-muted/40 border-t border-border">
           <tr>
             <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
-            <td className="px-3 py-2 text-right font-bold text-foreground">{fmt$(total)}</td>
+            <td className="px-3 py-2 text-right font-bold text-foreground">{fmtCurrency(total)}</td>
           </tr>
         </tfoot>
       </table>
@@ -199,9 +492,9 @@ interface InvoiceDrawerProps {
 
 export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
   const { invoices, updateInvoice } = useInvoices()
-  const [toasts, setToasts] = useState<ToastItem[]>([])
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<Partial<AdminInvoice>>({})
+  const [toasts, setToasts]     = useState<ToastItem[]>([])
+  const [editing, setEditing]   = useState(false)
+  const [draft, setDraft]       = useState<Partial<AdminInvoice>>({})
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
 
   const invoice = invoiceId ? invoices.find((i) => i.id === invoiceId) ?? null : null
@@ -209,6 +502,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
   useEffect(() => {
     setEditing(false)
     setDraft({})
+    setDraftItems([])
   }, [invoiceId])
 
   function toast(message: string) {
@@ -219,11 +513,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
 
   function startEdit() {
     if (!invoice) return
-    setDraft({
-      status: invoice.status,
-      dueDate: invoice.dueDate,
-      notes: invoice.notes,
-    })
+    setDraft({ status: invoice.status, dueDate: invoice.dueDate, notes: invoice.notes })
     setDraftItems(invoice.lineItems.map((li) => ({ ...li })))
     setEditing(true)
   }
@@ -253,16 +543,20 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
+  function handleApplyReminder(text: string) {
+    setDraft((prev) => ({ ...prev, notes: text }))
+    if (!editing) startEdit()
+    toast("Reminder draft applied to notes — review and save")
+  }
+
   if (!invoice) return null
 
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
-  const displayTotal = editing
-    ? draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
-    : invoice.amount
+  const displayTotal  = editing ? draftItems.reduce((s, i) => s + i.qty * i.unit, 0) : invoice.amount
 
   const timelineItems = [
     { date: fmtDate(invoice.issueDate), label: "Invoice issued", accent: "muted" as const },
-    { date: fmtDate(invoice.dueDate), label: "Payment due", accent: (invoice.status === "Overdue" ? "danger" : "muted") as "danger" | "muted" },
+    { date: fmtDate(invoice.dueDate),   label: "Payment due",    accent: (invoice.status === "Overdue" ? "danger" : "muted") as "danger" | "muted" },
     ...(invoice.paidDate ? [{ date: fmtDate(invoice.paidDate), label: "Payment received", description: fmtCurrency(invoice.amount), accent: "success" as const }] : []),
   ]
 
@@ -312,6 +606,14 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
             <AlertTriangle className="w-4 h-4 shrink-0" />
             Payment overdue since {fmtDate(invoice.dueDate)}
           </div>
+        )}
+
+        {/* AI Tools */}
+        {!editing && (
+          <InvoiceAIToolsPanel
+            invoice={invoice}
+            onApplyReminder={handleApplyReminder}
+          />
         )}
 
         <DrawerSection title="Invoice Details">
