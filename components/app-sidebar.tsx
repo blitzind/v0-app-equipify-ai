@@ -9,8 +9,8 @@ import { MOCK_WORKSPACES } from "@/lib/tenant-data"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe,
-  ChevronLeft, Sparkles, ChevronDown, Check, LogOut,
-  Building2, UserCircle, CreditCard,
+  ChevronLeft, Sparkles, ChevronDown, Check,
+  Building2,
 } from "lucide-react"
 
 const NAV_ITEMS: {
@@ -43,7 +43,6 @@ export function AppSidebar() {
   const { workspace, currentUser, dispatch, can } = useTenant()
   const [collapsed, setCollapsed] = useState(false)
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const planMeta = PLAN_META[workspace.planId]
   const initials = currentUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2)
@@ -151,62 +150,28 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Bottom: collapse + user */}
+      {/* Bottom: system footer + collapse */}
       <div className="border-t border-sidebar-border">
+        {!collapsed && (
+          <div className="px-3 py-3 space-y-0.5">
+            <p className="text-[11px] font-semibold text-sidebar-foreground/60 leading-tight">Equipify.ai</p>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <p className="text-[10px] text-sidebar-foreground/40">Workspace Active</p>
+            </div>
+            <p className="text-[10px] text-sidebar-foreground/30">Version 1.0</p>
+          </div>
+        )}
         <button
           onClick={() => setCollapsed((v) => !v)}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors",
+            "w-full flex items-center gap-2 px-3 py-2.5 text-xs text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors border-t border-sidebar-border",
             collapsed && "justify-center"
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
           <ChevronLeft className={cn("w-3.5 h-3.5 shrink-0 transition-transform", collapsed && "rotate-180")} />
           {!collapsed && <span>Collapse</span>}
         </button>
-
-        {/* User row */}
-        <div className="relative border-t border-sidebar-border">
-          <button
-            onClick={() => { setUserMenuOpen((v) => !v); setWsMenuOpen(false) }}
-            className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-sidebar-accent/50 transition-colors",
-              collapsed && "justify-center px-0"
-            )}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-              style={{ background: workspace.primaryColor }} suppressHydrationWarning>
-              {initials}
-            </div>
-            {!collapsed && (
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-xs font-medium text-sidebar-foreground truncate leading-tight">{currentUser.name}</p>
-                <p className="text-[10px] text-sidebar-foreground/50 truncate">{currentUser.role}</p>
-              </div>
-            )}
-          </button>
-
-          {userMenuOpen && !collapsed && (
-            <div className="absolute bottom-full left-0 right-0 z-50 bg-sidebar border border-sidebar-border shadow-lg rounded-t-lg overflow-hidden">
-              <div className="px-3 py-2.5 border-b border-sidebar-border">
-                <p className="text-xs font-medium text-sidebar-foreground">{currentUser.name}</p>
-                <p className="text-[10px] text-sidebar-foreground/50">{currentUser.email}</p>
-              </div>
-              <Link href="/settings/workspace" onClick={() => setUserMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-                <UserCircle size={12} /> Account settings
-              </Link>
-              <Link href="/settings/billing" onClick={() => setUserMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-                <CreditCard size={12} /> Billing
-              </Link>
-              <div className="border-t border-sidebar-border">
-                <Link href="/login" onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-sidebar-accent/50 transition-colors">
-                  <LogOut size={12} /> Sign out
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </aside>
   )
