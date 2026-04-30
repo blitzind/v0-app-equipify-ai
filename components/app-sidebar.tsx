@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe,
   ChevronLeft, Sparkles, ChevronDown, Check,
-  Building2, X,
+  Building2, X, FileText, Receipt,
 } from "lucide-react"
 
 const NAV_ITEMS: {
@@ -27,6 +27,8 @@ const NAV_ITEMS: {
   { label: "Service Schedule",  href: "/service-schedule",   icon: CalendarClock },
   { label: "Maintenance Plans", href: "/maintenance-plans",  icon: ShieldCheck },
   { label: "Technicians",       href: "/technicians",        icon: HardHat },
+  { label: "Quotes",             href: "/quotes",             icon: FileText },
+  { label: "Invoices",          href: "/invoices",           icon: Receipt },
   { label: "Reports",           href: "/reports",            icon: BarChart3 },
   { label: "AI Insights",       href: "/insights",           icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
   { label: "Customer Portal",   href: "/portal",             icon: Globe, requirePerm: "canAccessPortal" },

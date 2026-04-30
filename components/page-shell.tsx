@@ -5,7 +5,7 @@ import { AppTopbar } from "@/components/app-topbar"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
-  CreditCard, Shield, Sparkles, Plus,
+  CreditCard, Shield, Sparkles, Plus, FileText, Receipt,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -58,6 +58,18 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Manage your workforce, assignments, certifications, and productivity.",
     icon: HardHat,
     cta: { label: "+ Add Technician" },
+  },
+  "/quotes": {
+    title: "Quotes",
+    subtitle: "Create, send, and track service quotes awaiting customer approval.",
+    icon: FileText,
+    cta: { label: "+ New Quote" },
+  },
+  "/invoices": {
+    title: "Invoices",
+    subtitle: "Manage all invoices, track outstanding balances, and record payments.",
+    icon: Receipt,
+    cta: { label: "+ New Invoice" },
   },
   "/reports": {
     title: "Reports",
