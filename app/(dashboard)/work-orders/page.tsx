@@ -47,7 +47,7 @@ const ALL_STATUSES: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "Co
 
 const STATUS_STYLE: Record<WorkOrderStatus, string> = {
   "Open":        "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
-  "Scheduled":   "bg-violet-500/10 text-violet-600 border-violet-500/30",
+  "Scheduled":   "bg-[color:var(--status-info)]/15 text-[color:var(--status-info)] border-[color:var(--status-info)]/25",
   "In Progress": "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
   "Completed":   "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
   "Invoiced":    "bg-muted text-muted-foreground border-border",
@@ -64,7 +64,7 @@ const KANBAN_COLUMNS: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "
 
 const KANBAN_HEADER: Record<WorkOrderStatus, string> = {
   "Open":        "bg-[color:var(--status-info)]/8 border-[color:var(--status-info)]/20",
-  "Scheduled":   "bg-violet-500/8 border-violet-500/20",
+  "Scheduled":   "bg-[color:var(--status-info)]/12 border-[color:var(--status-info)]/18",
   "In Progress": "bg-[color:var(--status-warning)]/8 border-[color:var(--status-warning)]/20",
   "Completed":   "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/20",
   "Invoiced":    "bg-muted/50 border-border",

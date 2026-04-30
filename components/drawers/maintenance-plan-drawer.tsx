@@ -30,7 +30,7 @@ function daysToDue(dateStr: string) {
 const CHANNEL_STYLE: Record<string, string> = {
   "Email":          "bg-blue-50 text-blue-700 border-blue-200",
   "SMS":            "bg-green-50 text-green-700 border-green-200",
-  "Internal Alert": "bg-violet-50 text-violet-700 border-violet-200",
+  "Internal Alert": "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
 }
 
 interface MaintenancePlanDrawerProps {

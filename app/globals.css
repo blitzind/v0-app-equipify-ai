@@ -25,11 +25,11 @@
   --border: oklch(0.88 0.008 240);
   --input: oklch(0.88 0.008 240);
   --ring: oklch(0.56 0.21 231);
-  /* Chart palette: blue, green, orange, purple, red */
+  /* Chart palette: blue, green, orange, teal, red */
   --chart-1: oklch(0.56 0.21 231);
   --chart-2: oklch(0.53 0.15 145);
   --chart-3: oklch(0.72 0.17 70);
-  --chart-4: oklch(0.49 0.22 293);
+  --chart-4: oklch(0.59 0.14 200);
   --chart-5: oklch(0.577 0.245 27.33);
   --radius: 0.5rem;
   /* Dark navy sidebar: #08111f */
@@ -46,8 +46,8 @@
   --status-warning: oklch(0.72 0.17 70);    /* #f59e0b */
   --status-danger:  oklch(0.577 0.245 27.33); /* #ef4444 */
   --status-info:    oklch(0.56 0.21 231);   /* #0f7ae5 */
-  /* AI purple: #7c3aed */
-  --ai-purple: oklch(0.49 0.22 293);
+  /* AI accent: aliases to brand blue */
+  --ai-purple: oklch(0.56 0.21 231);
   --ai-purple-fg: oklch(0.99 0 0);
 }
 
@@ -74,7 +74,7 @@
   --chart-1: oklch(0.60 0.21 231);
   --chart-2: oklch(0.55 0.15 145);
   --chart-3: oklch(0.72 0.17 70);
-  --chart-4: oklch(0.52 0.22 293);
+  --chart-4: oklch(0.62 0.14 200);
   --chart-5: oklch(0.577 0.245 27.33);
   --sidebar: oklch(0.09 0.018 250);
   --sidebar-foreground: oklch(0.87 0.01 240);
@@ -350,7 +350,7 @@
     font-feature-settings: "tnum";
   }
 
-  /* ── Table sort header button ─────────────────────────────────────────────
+  /* ── Table sort header button ──────────────────────────────────────���──────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {
     @apply inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;

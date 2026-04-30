@@ -186,7 +186,7 @@ function MonthSection({
                   <div className="hidden md:flex items-center gap-1.5 shrink-0">
                     {nextEmail    && <span className="text-xs px-2 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-200">Email</span>}
                     {nextSms      && <span className="text-xs px-2 py-0.5 rounded border bg-green-50 text-green-600 border-green-200">SMS</span>}
-                    {nextInternal && <span className="text-xs px-2 py-0.5 rounded border bg-violet-50 text-violet-600 border-violet-200">Alert</span>}
+                    {nextInternal && <span className="text-xs px-2 py-0.5 rounded border bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30">Alert</span>}
                   </div>
 
                   {/* WO creation */}
@@ -265,7 +265,7 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
   const CHANNEL_STYLE: Record<string, string> = {
     "Email":          "bg-blue-50 text-blue-700 border-blue-200",
     "SMS":            "bg-green-50 text-green-700 border-green-200",
-    "Internal Alert": "bg-violet-50 text-violet-700 border-violet-200",
+    "Internal Alert": "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
   }
 
   return (
