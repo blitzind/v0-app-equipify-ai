@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useEquipment } from "@/lib/equipment-store"
-import { customers } from "@/lib/mock-data"
+import { useCustomers } from "@/lib/customer-store"
 import type { Equipment } from "@/lib/mock-data"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
@@ -109,6 +109,7 @@ function validate(form: FormState): FormErrors {
 
 export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModalProps) {
   const { addEquipment } = useEquipment()
+  const { customers } = useCustomers()
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
   const [toastMsg, setToastMsg] = useState<string | null>(null)
