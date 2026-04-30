@@ -138,8 +138,10 @@ export function PageShell({ children }: { children: React.ReactNode }) {
     <>
       <AppTopbar />
       {meta && <PageHero title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />}
-      <main className="flex-1 overflow-y-auto p-6">
-        {children}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-[1440px] mx-auto p-6">
+          {children}
+        </div>
       </main>
     </>
   )

@@ -79,7 +79,7 @@ export default function BillingPage() {
   const nextRenewalDate = fmtIsoDate(workspace.currentPeriodEnd)
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Current plan */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">

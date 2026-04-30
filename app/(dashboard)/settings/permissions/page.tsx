@@ -73,7 +73,7 @@ function PermIcon({ allowed }: { allowed: boolean }) {
 
 export default function PermissionsPage() {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Role permissions matrix</h3>

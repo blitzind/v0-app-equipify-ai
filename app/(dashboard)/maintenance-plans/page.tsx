@@ -359,7 +359,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ────────────────────────────────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────���───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -546,7 +546,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Notification Rules */}
-            <TabsContent value="notifications" className="p-6 mt-0 flex flex-col gap-5">
+            <TabsContent value="notifications" className="p-6 mt-0 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">Notification Rules</p>
@@ -616,7 +616,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Settings */}
-            <TabsContent value="settings" className="p-6 mt-0 flex flex-col gap-5">
+            <TabsContent value="settings" className="p-6 mt-0 flex flex-col gap-6">
               <div>
                 <p className="text-sm font-semibold mb-3">Plan Status</p>
                 <div className="flex gap-2 flex-wrap">
@@ -770,7 +770,7 @@ export default function MaintenancePlansPage() {
   }, [plans])
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex flex-col gap-6">
       {/* CTA row */}
       <div className="flex justify-end">
         <Button onClick={() => setCreateOpen(true)} className="gap-2">

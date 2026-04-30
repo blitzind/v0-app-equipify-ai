@@ -56,7 +56,7 @@ export default function WorkspacePage() {
   const isGrowthOrAbove = plan.id !== "starter"
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* General */}
       <SettingCard title="General" description="Basic workspace information shown across the platform.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -112,7 +112,7 @@ export default function WorkspacePage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+    <div className="flex flex-col gap-6">
             {/* Logo upload */}
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2">Company logo</p>

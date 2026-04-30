@@ -443,7 +443,7 @@ export default function WorkOrdersPage() {
   }, [workOrders])
 
   return (
-    <div className="flex flex-col gap-6 h-full">
+    <div className="flex flex-col gap-6">
       {/* Stat strip */}
       <div className="grid grid-cols-5 gap-3">
         {ALL_STATUSES.map((s) => (

@@ -17,7 +17,7 @@ import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Stat cards row */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
