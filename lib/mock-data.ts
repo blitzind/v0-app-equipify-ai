@@ -742,6 +742,371 @@ export const workOrders: WorkOrder[] = [
   },
 ]
 
+// ─── Maintenance Plans ────────────────────────────────────────────────────────
+
+export type PlanInterval = "Annual" | "Semi-Annual" | "Quarterly" | "Monthly" | "Custom"
+export type PlanStatus = "Active" | "Paused" | "Expired"
+export type NotificationChannel = "Email" | "SMS" | "Internal Alert"
+export type NotificationTriggerDays = 30 | 14 | 7 | 1
+
+export interface NotificationRule {
+  id: string
+  channel: NotificationChannel
+  triggerDays: NotificationTriggerDays
+  enabled: boolean
+  recipients: string[]   // email addresses or phone numbers
+}
+
+export interface MaintenancePlanService {
+  id: string
+  name: string
+  description: string
+  estimatedHours: number
+  estimatedCost: number
+}
+
+export interface MaintenancePlan {
+  id: string
+  name: string
+  customerId: string
+  customerName: string
+  equipmentId: string
+  equipmentName: string
+  equipmentCategory: string
+  location: string
+  technicianId: string
+  technicianName: string
+  interval: PlanInterval
+  customIntervalDays: number   // only used when interval === "Custom"
+  status: PlanStatus
+  startDate: string            // ISO date
+  lastServiceDate: string
+  nextDueDate: string
+  services: MaintenancePlanService[]
+  notificationRules: NotificationRule[]
+  autoCreateWorkOrder: boolean
+  workOrderType: WorkOrderType
+  workOrderPriority: WorkOrderPriority
+  notes: string
+  createdAt: string
+  totalServicesCompleted: number
+}
+
+// Notification log entry — each fired notification is recorded here
+export interface NotificationLogEntry {
+  id: string
+  planId: string
+  planName: string
+  equipmentName: string
+  customerName: string
+  channel: NotificationChannel
+  triggerDays: NotificationTriggerDays
+  sentAt: string    // ISO datetime
+  recipient: string
+  message: string
+  status: "Sent" | "Failed" | "Simulated"
+}
+
+function buildDefaultRules(emails: string[], phones: string[]): NotificationRule[] {
+  const rules: NotificationRule[] = []
+  const days: NotificationTriggerDays[] = [30, 14, 7, 1]
+  days.forEach((d) => {
+    rules.push({ id: `r-email-${d}`, channel: "Email", triggerDays: d, enabled: true, recipients: emails })
+    rules.push({ id: `r-internal-${d}`, channel: "Internal Alert", triggerDays: d, enabled: d <= 7, recipients: ["admin@equipify.ai"] })
+    if (phones.length) {
+      rules.push({ id: `r-sms-${d}`, channel: "SMS", triggerDays: d, enabled: d <= 7, recipients: phones })
+    }
+  })
+  return rules
+}
+
+export const maintenancePlans: MaintenancePlan[] = [
+  {
+    id: "MP-001",
+    name: "Forklift Semi-Annual PM",
+    customerId: "CUS-001",
+    customerName: "Riverstone Logistics",
+    equipmentId: "EQ-188",
+    equipmentName: "Toyota 8FGU25 Forklift",
+    equipmentCategory: "Forklift",
+    location: "Main Warehouse",
+    technicianId: "T-01",
+    technicianName: "Marcus Webb",
+    interval: "Semi-Annual",
+    customIntervalDays: 0,
+    status: "Active",
+    startDate: "2022-06-10",
+    lastServiceDate: "2026-01-15",
+    nextDueDate: "2026-07-15",
+    services: [
+      { id: "SVC-001", name: "Engine Oil & Filter Change", description: "Drain and replace engine oil, install new filter", estimatedHours: 0.5, estimatedCost: 65 },
+      { id: "SVC-002", name: "Brake System Inspection", description: "Inspect pads, drums, lines. Replace if under 20%", estimatedHours: 0.75, estimatedCost: 80 },
+      { id: "SVC-003", name: "Hydraulic Fluid Check", description: "Check level, inspect for contamination", estimatedHours: 0.25, estimatedCost: 30 },
+      { id: "SVC-004", name: "Tire & Wheel Inspection", description: "Inspect tread, air pressure, lug torque", estimatedHours: 0.5, estimatedCost: 40 },
+    ],
+    notificationRules: buildDefaultRules(["dale@riverstonelogistics.com", "rita@riverstonelogistics.com"], ["(614) 555-0142"]),
+    autoCreateWorkOrder: true,
+    workOrderType: "PM",
+    workOrderPriority: "Normal",
+    notes: "Service required during operational hours. Forklift must be parked and locked out before work begins.",
+    createdAt: "2022-06-10T08:00:00Z",
+    totalServicesCompleted: 8,
+  },
+  {
+    id: "MP-002",
+    name: "Air Compressor Quarterly PM",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators",
+    equipmentId: "EQ-241",
+    equipmentName: "Ingersoll Rand UP6-15 Air Compressor",
+    equipmentCategory: "Air Compressor",
+    location: "Plant A",
+    technicianId: "T-02",
+    technicianName: "Sandra Liu",
+    interval: "Quarterly",
+    customIntervalDays: 0,
+    status: "Active",
+    startDate: "2021-09-05",
+    lastServiceDate: "2026-02-10",
+    nextDueDate: "2026-05-10",
+    services: [
+      { id: "SVC-005", name: "Air Filter Replacement", description: "Remove and replace intake air filter", estimatedHours: 0.25, estimatedCost: 28 },
+      { id: "SVC-006", name: "Belt Tension Check", description: "Check and adjust drive belt tension", estimatedHours: 0.25, estimatedCost: 20 },
+      { id: "SVC-007", name: "Separator Element Inspection", description: "Inspect air/oil separator element. Replace if saturated", estimatedHours: 0.5, estimatedCost: 90 },
+      { id: "SVC-008", name: "Drain Valve Function Test", description: "Test auto-drain valve cycling", estimatedHours: 0.25, estimatedCost: 15 },
+    ],
+    notificationRules: buildDefaultRules(["kmarsh@apexfab.com", "sliu@apexfab.com"], []),
+    autoCreateWorkOrder: true,
+    workOrderType: "PM",
+    workOrderPriority: "Normal",
+    notes: "Compressor must be depressurized before inspection. Notify plant floor 24hrs in advance.",
+    createdAt: "2021-09-05T08:00:00Z",
+    totalServicesCompleted: 18,
+  },
+  {
+    id: "MP-003",
+    name: "Crane Annual Safety Inspection",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-601",
+    equipmentName: "Liebherr LTM 1050-3.1 Crane",
+    equipmentCategory: "Crane",
+    location: "Equipment Yard",
+    technicianId: "T-04",
+    technicianName: "Priya Mehta",
+    interval: "Annual",
+    customIntervalDays: 0,
+    status: "Active",
+    startDate: "2019-06-01",
+    lastServiceDate: "2026-01-20",
+    nextDueDate: "2027-01-20",
+    services: [
+      { id: "SVC-009", name: "OSHA Annual Inspection", description: "Full crane inspection per OSHA 1926.1412", estimatedHours: 4, estimatedCost: 680 },
+      { id: "SVC-010", name: "Wire Rope Inspection", description: "Inspect all load lines for wear, kinks, broken wires", estimatedHours: 2, estimatedCost: 240 },
+      { id: "SVC-011", name: "Load Test", description: "Perform rated capacity load test at 100% and 125%", estimatedHours: 3, estimatedCost: 450 },
+      { id: "SVC-012", name: "Hydraulic System Service", description: "Fluid change, filter replacement, cylinder check", estimatedHours: 3, estimatedCost: 580 },
+    ],
+    notificationRules: buildDefaultRules(["astrom@summitconst.com", "rgavin@summitconst.com"], ["(216) 555-0812"]),
+    autoCreateWorkOrder: true,
+    workOrderType: "Inspection",
+    workOrderPriority: "High",
+    notes: "OSHA certification required. Angela Strom must be on-site for load test sign-off.",
+    createdAt: "2019-06-01T08:00:00Z",
+    totalServicesCompleted: 7,
+  },
+  {
+    id: "MP-004",
+    name: "Refrigeration Bi-Annual PM",
+    customerId: "CUS-005",
+    customerName: "Clearfield Foods",
+    equipmentId: "EQ-712",
+    equipmentName: "Heatcraft LCE060AGD Refrigeration",
+    equipmentCategory: "Refrigeration",
+    location: "Processing Plant",
+    technicianId: "T-05",
+    technicianName: "James Torres",
+    interval: "Semi-Annual",
+    customIntervalDays: 0,
+    status: "Active",
+    startDate: "2023-04-15",
+    lastServiceDate: "2026-04-10",
+    nextDueDate: "2026-10-10",
+    services: [
+      { id: "SVC-013", name: "Evaporator Coil Clean", description: "Chemical clean evaporator coil, flush drain pans", estimatedHours: 1, estimatedCost: 120 },
+      { id: "SVC-014", name: "Refrigerant Level Check", description: "Check refrigerant charge per nameplate spec", estimatedHours: 0.5, estimatedCost: 60 },
+      { id: "SVC-015", name: "Defrost Cycle Verification", description: "Verify defrost timer, heater output, termination", estimatedHours: 0.5, estimatedCost: 55 },
+      { id: "SVC-016", name: "Pump Seal Inspection", description: "Inspect pump shaft seal for leaks. Log condition.", estimatedHours: 0.75, estimatedCost: 90 },
+    ],
+    notificationRules: buildDefaultRules(["lpark@clearfieldfoods.com"], ["(330) 555-0633"]),
+    autoCreateWorkOrder: true,
+    workOrderType: "PM",
+    workOrderPriority: "High",
+    notes: "FDA facility — all work must be in 2am–6am window. Technician must sign food-safety compliance form.",
+    createdAt: "2023-04-15T08:00:00Z",
+    totalServicesCompleted: 4,
+  },
+  {
+    id: "MP-005",
+    name: "HVAC Custom 6-Month Service",
+    customerId: "CUS-003",
+    customerName: "Metro Warehousing",
+    equipmentId: "EQ-500",
+    equipmentName: "Carrier 50XCZ060 HVAC",
+    equipmentCategory: "HVAC",
+    location: "Cold Storage Annex",
+    technicianId: "T-03",
+    technicianName: "Tyler Oakes",
+    interval: "Custom",
+    customIntervalDays: 183,
+    status: "Active",
+    startDate: "2021-05-10",
+    lastServiceDate: "2026-04-29",
+    nextDueDate: "2026-10-29",
+    services: [
+      { id: "SVC-017", name: "Coil Cleaning", description: "Clean evaporator and condenser coils", estimatedHours: 1.5, estimatedCost: 160 },
+      { id: "SVC-018", name: "Filter Replacement", description: "Replace all return air filters", estimatedHours: 0.5, estimatedCost: 45 },
+      { id: "SVC-019", name: "Refrigerant Charge Check", description: "Verify R-410A charge, check for leaks (EPA 608)", estimatedHours: 0.75, estimatedCost: 90 },
+      { id: "SVC-020", name: "Drain Pan & Line Flush", description: "Flush condensate drain pans and lines", estimatedHours: 0.5, estimatedCost: 40 },
+    ],
+    notificationRules: buildDefaultRules(["tflynn@metrowh.com"], []),
+    autoCreateWorkOrder: true,
+    workOrderType: "PM",
+    workOrderPriority: "Normal",
+    notes: "Cold storage annex — entry requires cold-weather PPE. Coordinate with warehouse night shift.",
+    createdAt: "2021-05-10T08:00:00Z",
+    totalServicesCompleted: 10,
+  },
+  {
+    id: "MP-006",
+    name: "Boom Lift Semi-Annual Hydraulic Service",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-305",
+    equipmentName: "JLG 600S Boom Lift",
+    equipmentCategory: "Boom Lift",
+    location: "Equipment Yard",
+    technicianId: "T-04",
+    technicianName: "Priya Mehta",
+    interval: "Semi-Annual",
+    customIntervalDays: 0,
+    status: "Paused",
+    startDate: "2023-04-01",
+    lastServiceDate: "2025-08-14",
+    nextDueDate: "2026-02-14",
+    services: [
+      { id: "SVC-021", name: "Hydraulic Fluid Replacement", description: "Drain and fill hydraulic reservoir", estimatedHours: 1, estimatedCost: 140 },
+      { id: "SVC-022", name: "Boom Cylinder Inspection", description: "Inspect all cylinders for leaks, scoring", estimatedHours: 1.5, estimatedCost: 180 },
+      { id: "SVC-023", name: "Outrigger Function Test", description: "Extend/retract all outriggers, check pads", estimatedHours: 0.5, estimatedCost: 55 },
+    ],
+    notificationRules: buildDefaultRules(["astrom@summitconst.com"], ["(216) 555-0812"]),
+    autoCreateWorkOrder: false,
+    workOrderType: "PM",
+    workOrderPriority: "Normal",
+    notes: "Paused pending warranty expiry resolution. Warranty expired April 2026 — review before resuming.",
+    createdAt: "2023-04-01T08:00:00Z",
+    totalServicesCompleted: 3,
+  },
+  {
+    id: "MP-007",
+    name: "Excavator 250-Hour PM",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-820",
+    equipmentName: "Cat 320 GC Excavator",
+    equipmentCategory: "Excavator",
+    location: "Equipment Yard",
+    technicianId: "T-04",
+    technicianName: "Priya Mehta",
+    interval: "Custom",
+    customIntervalDays: 60,
+    status: "Active",
+    startDate: "2023-05-01",
+    lastServiceDate: "2026-03-05",
+    nextDueDate: "2026-05-04",
+    services: [
+      { id: "SVC-024", name: "Engine Oil & Filter", description: "250-hour engine oil and filter change", estimatedHours: 0.5, estimatedCost: 95 },
+      { id: "SVC-025", name: "Undercarriage Inspection", description: "Measure track pad wear, adjust tension", estimatedHours: 1, estimatedCost: 120 },
+      { id: "SVC-026", name: "Hydraulic Filter Replacement", description: "Replace return line hydraulic filter", estimatedHours: 0.5, estimatedCost: 85 },
+    ],
+    notificationRules: buildDefaultRules(["astrom@summitconst.com"], ["(216) 555-0812"]),
+    autoCreateWorkOrder: true,
+    workOrderType: "PM",
+    workOrderPriority: "Normal",
+    notes: "Hour-meter based. Verify actual hours from telematics before scheduling.",
+    createdAt: "2023-05-01T08:00:00Z",
+    totalServicesCompleted: 6,
+  },
+]
+
+// ─── Notification Log (simulated fired alerts) ────────────────────────────────
+
+export const notificationLog: NotificationLogEntry[] = [
+  {
+    id: "NL-001", planId: "MP-007", planName: "Excavator 250-Hour PM",
+    equipmentName: "Cat 320 GC Excavator", customerName: "Summit Construction",
+    channel: "Email", triggerDays: 30, sentAt: "2026-04-04T08:00:00Z",
+    recipient: "astrom@summitconst.com",
+    message: "Reminder: Cat 320 GC Excavator PM is due in 30 days (2026-05-04).",
+    status: "Sent",
+  },
+  {
+    id: "NL-002", planId: "MP-002", planName: "Air Compressor Quarterly PM",
+    equipmentName: "Ingersoll Rand UP6-15 Air Compressor", customerName: "Apex Fabricators",
+    channel: "Email", triggerDays: 30, sentAt: "2026-04-10T08:00:00Z",
+    recipient: "kmarsh@apexfab.com",
+    message: "Reminder: Air Compressor Quarterly PM is due in 30 days (2026-05-10).",
+    status: "Sent",
+  },
+  {
+    id: "NL-003", planId: "MP-007", planName: "Excavator 250-Hour PM",
+    equipmentName: "Cat 320 GC Excavator", customerName: "Summit Construction",
+    channel: "Email", triggerDays: 14, sentAt: "2026-04-20T08:00:00Z",
+    recipient: "astrom@summitconst.com",
+    message: "Reminder: Cat 320 GC Excavator PM is due in 14 days (2026-05-04).",
+    status: "Sent",
+  },
+  {
+    id: "NL-004", planId: "MP-007", planName: "Excavator 250-Hour PM",
+    equipmentName: "Cat 320 GC Excavator", customerName: "Summit Construction",
+    channel: "Internal Alert", triggerDays: 14, sentAt: "2026-04-20T08:00:00Z",
+    recipient: "admin@equipify.ai",
+    message: "Internal: Excavator PM due in 14 days. Assign technician.",
+    status: "Sent",
+  },
+  {
+    id: "NL-005", planId: "MP-002", planName: "Air Compressor Quarterly PM",
+    equipmentName: "Ingersoll Rand UP6-15 Air Compressor", customerName: "Apex Fabricators",
+    channel: "Email", triggerDays: 14, sentAt: "2026-04-26T08:00:00Z",
+    recipient: "kmarsh@apexfab.com",
+    message: "Reminder: Air Compressor Quarterly PM is due in 14 days (2026-05-10).",
+    status: "Sent",
+  },
+  {
+    id: "NL-006", planId: "MP-007", planName: "Excavator 250-Hour PM",
+    equipmentName: "Cat 320 GC Excavator", customerName: "Summit Construction",
+    channel: "SMS", triggerDays: 7, sentAt: "2026-04-27T08:00:00Z",
+    recipient: "(216) 555-0812",
+    message: "Equipify: Excavator 320 GC PM due in 7 days (May 4). Reply STOP to opt out.",
+    status: "Sent",
+  },
+  {
+    id: "NL-007", planId: "MP-007", planName: "Excavator 250-Hour PM",
+    equipmentName: "Cat 320 GC Excavator", customerName: "Summit Construction",
+    channel: "Internal Alert", triggerDays: 7, sentAt: "2026-04-27T08:00:00Z",
+    recipient: "admin@equipify.ai",
+    message: "Internal: Excavator PM due in 7 days. Work order auto-creation scheduled.",
+    status: "Sent",
+  },
+  {
+    id: "NL-008", planId: "MP-002", planName: "Air Compressor Quarterly PM",
+    equipmentName: "Ingersoll Rand UP6-15 Air Compressor", customerName: "Apex Fabricators",
+    channel: "Internal Alert", triggerDays: 7, sentAt: "2026-05-03T08:00:00Z",
+    recipient: "admin@equipify.ai",
+    message: "Internal: Air Compressor PM due in 7 days. Work order auto-created.",
+    status: "Simulated",
+  },
+]
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 export const mockStats = {

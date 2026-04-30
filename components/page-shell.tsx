@@ -22,6 +22,8 @@ function resolveTitle(pathname: string): string {
   if (pathname.startsWith("/customers/")) return "Customer Detail"
   if (pathname.startsWith("/equipment/")) return "Equipment Detail"
   if (pathname.startsWith("/work-orders/")) return "Work Order Detail"
+  if (pathname.startsWith("/maintenance-plans")) return "Maintenance Plans"
+  if (pathname.startsWith("/service-schedule")) return "Service Schedule"
   return "Equipify.ai"
 }
 

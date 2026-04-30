@@ -127,3 +127,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .input-base {
+    @apply w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground transition-shadow;
+  }
+}
