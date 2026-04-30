@@ -40,8 +40,8 @@ export function RecentWorkOrders() {
           </thead>
           <tbody className="divide-y divide-border">
             {recentWorkOrders.map((wo) => {
-              const status = statusConfig[wo.status]
-              const priority = priorityConfig[wo.priority]
+              const status = statusConfig[wo.status] ?? { label: wo.status, className: "bg-secondary text-secondary-foreground border-border" }
+              const priority = priorityConfig[wo.priority] ?? { className: "bg-secondary text-secondary-foreground border-border" }
               return (
                 <tr key={wo.id} className="hover:bg-muted/30 transition-colors cursor-pointer">
                   <td className="px-5 py-3 font-mono text-xs font-medium text-primary whitespace-nowrap">{wo.id}</td>
