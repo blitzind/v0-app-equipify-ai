@@ -5,7 +5,7 @@ import { AppTopbar } from "@/components/app-topbar"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
-  CreditCard, Shield, Sparkles, Plus, FileText, Receipt, Plug,
+  CreditCard, Shield, Sparkles, FileText, Receipt, Plug,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 

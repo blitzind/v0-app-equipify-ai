@@ -360,7 +360,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ────────────────────────���������───────────────────────────────
+// ─── Plan Detail Sheet ──────���─────────────────���������───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -772,12 +772,13 @@ export default function MaintenancePlansPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* CTA row */}
-      <div className="flex justify-end">
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /> New Plan
-        </Button>
-      </div>
+      {/* CTA + Stats group */}
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-end">
+          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" /> New Plan
+          </Button>
+        </div>
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -796,6 +797,7 @@ export default function MaintenancePlansPage() {
           </Card>
         ))}
       </div>
+      </div>{/* end CTA + Stats group */}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">

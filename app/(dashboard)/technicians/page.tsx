@@ -104,13 +104,19 @@ const SCHEDULE_STYLE: Record<string, string> = {
 }
 
 const AVATAR_COLORS = [
-  "bg-[var(--ds-info-subtle)]", "bg-[var(--ds-success-subtle)]", "bg-[var(--ds-accent-subtle)]",
-  "bg-[var(--ds-danger-subtle)]", "bg-[var(--ds-warning-subtle)]", "bg-primary",
+  "bg-[oklch(0.48_0.18_245)]",  // blue
+  "bg-[oklch(0.44_0.16_160)]",  // teal/green
+  "bg-[oklch(0.52_0.20_290)]",  // violet
+  "bg-[oklch(0.47_0.20_25)]",   // red-orange
+  "bg-[oklch(0.50_0.18_55)]",   // amber
+  "bg-primary",
 ]
 
 function avatarColor(id: string) {
-  const idx = parseInt(id.replace("T-", ""), 10) - 1
-  return AVATAR_COLORS[idx % AVATAR_COLORS.length]
+  // Extract trailing numeric part robustly for both "T-01" and "MT-01"
+  const match = id.match(/(\d+)$/)
+  const idx = match ? parseInt(match[1], 10) - 1 : 0
+  return AVATAR_COLORS[Math.abs(idx) % AVATAR_COLORS.length]
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -171,9 +177,16 @@ function UtilBar({ pct, className }: { pct: number; className?: string }) {
 }
 
 function TechAvatar({ tech, size = "md" }: { tech: Technician; size?: "sm" | "md" | "lg" }) {
-  const sz = size === "lg" ? "w-14 h-14 text-lg" : size === "sm" ? "w-8 h-8 text-xs" : "w-10 h-10 text-sm"
+  const sz = size === "lg" ? "w-14 h-14 text-base" : size === "sm" ? "w-8 h-8 text-[11px]" : "w-10 h-10 text-[13px]"
   return (
-    <div className={cn("rounded-full flex items-center justify-center font-bold text-white shrink-0", avatarColor(tech.id), sz)}>
+    <div
+      className={cn(
+        "rounded-full flex items-center justify-center font-semibold text-white shrink-0 ring-2 ring-background select-none",
+        avatarColor(tech.id),
+        sz
+      )}
+      aria-label={tech.name}
+    >
       {tech.avatar}
     </div>
   )
@@ -359,7 +372,7 @@ function AddTechModal({
   )
 }
 
-// ─── Schedule Modal ──────────────────────────────────────────���────────���───────
+// ─── Schedule Modal ──────────────────────────────────────────������───────���───────
 
 function ScheduleModal({
   tech, onClose, onSave,
@@ -1134,12 +1147,13 @@ export default function TechniciansPage() {
     <>
       <div className="flex flex-col gap-6">
 
-        {/* Add Technician action */}
-        <div className="flex justify-end">
-          <Button className="gap-2 shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
-            <Plus className="w-4 h-4" /> Add Technician
-          </Button>
-        </div>
+        {/* CTA + KPI cards */}
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-end">
+            <Button className="gap-2 shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
+              <Plus className="w-4 h-4" /> Add Technician
+            </Button>
+          </div>
 
         {/* KPI cards — clickable filters */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1171,6 +1185,7 @@ export default function TechniciansPage() {
             active={kpiFilter === "expiring"} onClick={() => toggleKpi("expiring")}
           />
         </div>
+        </div>{/* end CTA + KPI group */}
 
         {/* Active KPI label */}
         {kpiFilter && (
