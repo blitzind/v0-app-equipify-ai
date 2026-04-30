@@ -1435,6 +1435,356 @@ export const portalReports: PortalReport[] = [
   },
 ]
 
+// ─── AI Insights Data ─────────────────────────────────────────────────────────
+
+export type InsightSeverity = "critical" | "high" | "medium" | "low"
+export type InsightCategory =
+  | "overdue_client"
+  | "repeat_failure"
+  | "upsell"
+  | "expiring_warranty"
+  | "revenue_opportunity"
+
+export interface AiInsight {
+  id: string
+  category: InsightCategory
+  severity: InsightSeverity
+  title: string
+  description: string
+  customerId: string
+  customerName: string
+  equipmentId?: string
+  equipmentName?: string
+  confidence: number          // 0–100
+  estimatedValue?: number     // revenue opportunity in $
+  actionLabel: string
+  actionHref: string
+  detectedAt: string
+  dataPoints: { label: string; value: string }[]
+}
+
+export const aiInsights: AiInsight[] = [
+  // ── Overdue clients ────────────────────────────────────────────────────────
+  {
+    id: "INS-001",
+    category: "overdue_client",
+    severity: "critical",
+    title: "Apex Fabricators — 5 open work orders, 22-day avg age",
+    description: "This account has the highest open WO backlog in the system. Two critical-priority orders have been open for over 18 days with no scheduled visit. Risk of client escalation is high.",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators",
+    confidence: 96,
+    actionLabel: "View Work Orders",
+    actionHref: "/work-orders",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Open WOs", value: "5" },
+      { label: "Avg age", value: "22 days" },
+      { label: "Critical WOs", value: "2" },
+      { label: "Last visit", value: "Apr 10, 2026" },
+    ],
+  },
+  {
+    id: "INS-002",
+    category: "overdue_client",
+    severity: "high",
+    title: "Summit Construction — 7 open orders across 31 units",
+    description: "Summit has the largest equipment fleet and a growing backlog. The crane repair scheduled for May 2 has upstream dependencies — delaying it risks cascading project delays for the customer.",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    confidence: 88,
+    actionLabel: "View Account",
+    actionHref: "/customers/CUS-004",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Open WOs", value: "7" },
+      { label: "Fleet size", value: "31 units" },
+      { label: "Next critical WO", value: "May 2" },
+      { label: "Contract value", value: "$46,300/yr" },
+    ],
+  },
+  {
+    id: "INS-003",
+    category: "overdue_client",
+    severity: "medium",
+    title: "Clearfield Foods — overdue invoice $640 at risk",
+    description: "INV-4408 is 5 days past due. Clearfield has a Full Coverage contract renewing in June. Unresolved invoice balances typically delay contract renewals by 30–45 days.",
+    customerId: "CUS-005",
+    customerName: "Clearfield Foods",
+    confidence: 82,
+    estimatedValue: 22000,
+    actionLabel: "View Invoice",
+    actionHref: "/billing",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Overdue invoice", value: "$640" },
+      { label: "Days past due", value: "5" },
+      { label: "Contract renewal", value: "Jun 2026" },
+      { label: "Contract value", value: "$22,000/yr" },
+    ],
+  },
+
+  // ── Repeat failures ────────────────────────────────────────────────────────
+  {
+    id: "INS-004",
+    category: "repeat_failure",
+    severity: "critical",
+    title: "Haas VF-2SS — motor overheating 4x in 4 months",
+    description: "EQ-304 has had the same failure mode repaired 4 times since January 2026 at a cumulative cost of $5,290. Pattern analysis suggests the root cause is an upstream electrical supply issue, not the motor itself. Component-level repair will continue to fail.",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators",
+    equipmentId: "EQ-304",
+    equipmentName: "Haas VF-2SS CNC Machine",
+    confidence: 94,
+    estimatedValue: 4800,
+    actionLabel: "View Equipment",
+    actionHref: "/equipment",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Repair count", value: "4 (90 days)" },
+      { label: "Cumulative cost", value: "$5,290" },
+      { label: "Failure mode", value: "Motor Overheating" },
+      { label: "Pending quote", value: "QT-881 · $4,800" },
+    ],
+  },
+  {
+    id: "INS-005",
+    category: "repeat_failure",
+    severity: "high",
+    title: "Liebherr LTM 1050 — cable tension alarm 3x in 3 months",
+    description: "EQ-601 has triggered cable tension failures 3 times this year at a total cost of $5,880. Engineering review is recommended before the next lift operation. Continued operation poses a safety and liability risk.",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-601",
+    equipmentName: "Liebherr LTM 1050-3.1 Crane",
+    confidence: 91,
+    estimatedValue: 7200,
+    actionLabel: "View Equipment",
+    actionHref: "/equipment",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Repair count", value: "3 (90 days)" },
+      { label: "Cumulative cost", value: "$5,880" },
+      { label: "Failure mode", value: "Cable Tension" },
+      { label: "Pending quote", value: "QT-874 · $7,200" },
+    ],
+  },
+  {
+    id: "INS-006",
+    category: "repeat_failure",
+    severity: "high",
+    title: "Heatcraft LCE060 — pump seal failure 3x in 5 months",
+    description: "EQ-712 has had 3 pump seal failures since December 2025 ($1,870 cumulative). The seal kit used in prior repairs may be the wrong spec for the unit's operating pressure. Recommend OEM seal review.",
+    customerId: "CUS-005",
+    customerName: "Clearfield Foods",
+    equipmentId: "EQ-712",
+    equipmentName: "Heatcraft LCE060AGD Refrigeration",
+    confidence: 87,
+    actionLabel: "View Equipment",
+    actionHref: "/equipment",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Repair count", value: "3 (150 days)" },
+      { label: "Cumulative cost", value: "$1,870" },
+      { label: "Failure mode", value: "Pump Seal" },
+      { label: "Warranty status", value: "Expired Apr 2026" },
+    ],
+  },
+
+  // ── Upsells ────────────────────────────────────────────────────────────────
+  {
+    id: "INS-007",
+    category: "upsell",
+    severity: "high",
+    title: "Lakefront Printing — inactive account, re-engagement opportunity",
+    description: "CUS-006 went inactive in early 2026 and has no active contracts. Their 4 units are now out of warranty coverage. A targeted outreach with a Full Coverage quote could reactivate this account at an estimated $14,000–18,000 ARR.",
+    customerId: "CUS-006",
+    customerName: "Lakefront Printing",
+    confidence: 79,
+    estimatedValue: 16000,
+    actionLabel: "View Customer",
+    actionHref: "/customers/CUS-006",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Status", value: "Inactive" },
+      { label: "Units registered", value: "4" },
+      { label: "Active contracts", value: "0" },
+      { label: "Est. ARR opportunity", value: "$16,000" },
+    ],
+  },
+  {
+    id: "INS-008",
+    category: "upsell",
+    severity: "medium",
+    title: "Riverstone Logistics — 14 units, only 1 PM plan active",
+    description: "Riverstone has 14 registered units but only 1 active maintenance plan covering the forklift fleet. 11 units have no scheduled service coverage. Upselling a multi-unit PM bundle could yield $22,000–28,000 in additional ARR.",
+    customerId: "CUS-001",
+    customerName: "Riverstone Logistics",
+    confidence: 85,
+    estimatedValue: 25000,
+    actionLabel: "View Maintenance Plans",
+    actionHref: "/maintenance-plans",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Total units", value: "14" },
+      { label: "Plans active", value: "1" },
+      { label: "Uncovered units", value: "11" },
+      { label: "Est. upsell value", value: "$25,000/yr" },
+    ],
+  },
+  {
+    id: "INS-009",
+    category: "upsell",
+    severity: "medium",
+    title: "Summit Construction — Labor Only contract, upgrade to Full Coverage",
+    description: "Summit currently has a Labor Only contract ($31,500/yr) but incurred $10,480 in unplanned parts costs in Q1 2026. Upgrading to Full Coverage would protect them from cost variance while increasing ARR by ~$18,000.",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    confidence: 80,
+    estimatedValue: 18000,
+    actionLabel: "View Contracts",
+    actionHref: "/customers/CUS-004",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Current contract", value: "Labor Only · $31,500" },
+      { label: "Q1 parts spend", value: "$10,480" },
+      { label: "Upgrade target", value: "Full Coverage" },
+      { label: "Est. ARR increase", value: "$18,000" },
+    ],
+  },
+
+  // ── Expiring warranties ────────────────────────────────────────────────────
+  {
+    id: "INS-010",
+    category: "expiring_warranty",
+    severity: "high",
+    title: "Cat 320 GC Excavator — warranty expires May 15 (15 days)",
+    description: "EQ-820 warranty expires in 15 days. No pre-warranty inspection has been scheduled. Now is the last window to surface and file any warranty claims before the unit becomes fully out-of-pocket for Summit Construction.",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-820",
+    equipmentName: "Cat 320 GC Excavator",
+    confidence: 100,
+    estimatedValue: 3150,
+    actionLabel: "Schedule Inspection",
+    actionHref: "/work-orders",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Warranty expires", value: "May 15, 2026" },
+      { label: "Days remaining", value: "15" },
+      { label: "Last service", value: "Mar 5, 2026" },
+      { label: "Approved quote", value: "QT-860 · $3,150" },
+    ],
+  },
+  {
+    id: "INS-011",
+    category: "expiring_warranty",
+    severity: "medium",
+    title: "JLG 600S Boom Lift — warranty expired Apr 1, plan paused",
+    description: "EQ-305 warranty expired April 1, 2026, and its maintenance plan is currently paused. Without coverage, any failure is fully billable to Summit. Resuming the PM plan now reduces breakdown risk and surfaces a PM upsell.",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-305",
+    equipmentName: "JLG 600S Boom Lift",
+    confidence: 92,
+    estimatedValue: 8500,
+    actionLabel: "Resume Plan",
+    actionHref: "/maintenance-plans",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Warranty expired", value: "Apr 1, 2026" },
+      { label: "Plan status", value: "Paused" },
+      { label: "Last service", value: "Aug 14, 2025" },
+      { label: "Est. plan value", value: "$8,500/yr" },
+    ],
+  },
+
+  // ── Revenue opportunities ──────────────────────────────────────────────────
+  {
+    id: "INS-012",
+    category: "revenue_opportunity",
+    severity: "high",
+    title: "$12,000 in pending quotes awaiting approval",
+    description: "Quotes QT-881 ($4,800) and QT-874 ($7,200) are both pending customer approval and expire within 28 days. Proactive follow-up could close both this month, adding $12,000 to recognized revenue.",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators / Summit Construction",
+    confidence: 88,
+    estimatedValue: 12000,
+    actionLabel: "View Quotes",
+    actionHref: "/billing",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Pending quotes", value: "2" },
+      { label: "Total value", value: "$12,000" },
+      { label: "QT-881 expires", value: "May 28, 2026" },
+      { label: "QT-874 expires", value: "May 26, 2026" },
+    ],
+  },
+  {
+    id: "INS-013",
+    category: "revenue_opportunity",
+    severity: "medium",
+    title: "Clearfield Foods Full Coverage renewal — $22,000 ARR at risk",
+    description: "CUS-005's Full Coverage contract expires April 1, 2027 — renewal outreach should begin now (90 days out is best practice). Combined with the overdue invoice, early engagement prevents churn. Client has a 100% renewal history.",
+    customerId: "CUS-005",
+    customerName: "Clearfield Foods",
+    confidence: 83,
+    estimatedValue: 22000,
+    actionLabel: "View Account",
+    actionHref: "/customers/CUS-005",
+    detectedAt: "2026-04-30T08:00:00Z",
+    dataPoints: [
+      { label: "Contract expires", value: "Apr 1, 2027" },
+      { label: "Annual value", value: "$22,000" },
+      { label: "Renewal health", value: "At Risk" },
+      { label: "Outstanding balance", value: "$640" },
+    ],
+  },
+]
+
+// ── AI summary report ─────────────────────────────────────────────────────────
+
+export interface AiSummaryReport {
+  generatedAt: string
+  period: string
+  totalInsights: number
+  criticalCount: number
+  highCount: number
+  totalEstimatedOpportunity: number
+  revenueAtRisk: number
+  topRisks: string[]
+  topOpportunities: string[]
+  recommendedActions: { priority: number; action: string; impact: string }[]
+}
+
+export const aiSummaryReport: AiSummaryReport = {
+  generatedAt: "2026-04-30T08:00:00Z",
+  period: "April 30, 2026",
+  totalInsights: 13,
+  criticalCount: 2,
+  highCount: 6,
+  totalEstimatedOpportunity: 108450,
+  revenueAtRisk: 34000,
+  topRisks: [
+    "Haas VF-2SS repeat failure pattern indicates root cause not yet resolved — continued repairs risk client trust and equipment downtime.",
+    "Liebherr LTM crane cable tension failures present a safety and liability risk if machine returns to operation before full engineering review.",
+    "Clearfield Foods overdue invoice may delay contract renewal for a $22,000/yr account.",
+  ],
+  topOpportunities: [
+    "Close QT-881 and QT-874 before month-end to capture $12,000 in immediate revenue.",
+    "Upsell Riverstone Logistics multi-unit PM bundle — 11 uncovered units represent $25,000/yr opportunity.",
+    "Re-engage Lakefront Printing with a targeted Full Coverage proposal — estimated $16,000 ARR.",
+    "Upgrade Summit Construction to Full Coverage — saves client $10,000+/yr in parts variance, adds $18,000 ARR.",
+  ],
+  recommendedActions: [
+    { priority: 1, action: "Call Apex Fabricators — schedule root cause engineering review for Haas VF-2SS", impact: "Prevent $5,290+ in continued repair costs; protect $42,000/yr contract" },
+    { priority: 2, action: "Follow up on QT-881 and QT-874 approval — 28-day window closing", impact: "$12,000 immediate recognized revenue" },
+    { priority: 3, action: "Schedule pre-warranty inspection for Cat 320 GC before May 15", impact: "Last chance to file warranty claims; prevent full cost exposure" },
+    { priority: 4, action: "Send contract upgrade proposal to Summit Construction", impact: "$18,000 ARR increase; client saves on parts cost variance" },
+    { priority: 5, action: "Re-activate Lakefront Printing account with Full Coverage quote", impact: "$16,000 ARR recovery from inactive account" },
+  ],
+}
+
 export const technicians = [
   { id: "T-01", name: "Marcus Webb", active: 3, completed: 28, rating: 4.9, avatar: "MW" },
   { id: "T-02", name: "Sandra Liu", active: 2, completed: 31, rating: 4.8, avatar: "SL" },

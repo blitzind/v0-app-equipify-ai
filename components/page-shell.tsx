@@ -12,6 +12,7 @@ const pageTitles: Record<string, string> = {
   "/maintenance-plans": "Maintenance Plans",
   "/technicians": "Technicians",
   "/reports": "Reports",
+  "/insights": "AI Insights",
   "/customer-portal": "Customer Portal",
   "/billing": "Billing",
   "/settings": "Settings",

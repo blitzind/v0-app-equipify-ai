@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -18,9 +18,10 @@ import {
   Settings,
   ChevronLeft,
   Zap,
+  Sparkles,
 } from "lucide-react"
 
-const navItems = [
+const navItems: { label: string; href: string; icon: React.ElementType; highlight?: boolean }[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Equipment", href: "/equipment", icon: Wrench },
@@ -29,6 +30,7 @@ const navItems = [
   { label: "Maintenance Plans", href: "/maintenance-plans", icon: ShieldCheck },
   { label: "Technicians", href: "/technicians", icon: HardHat },
   { label: "Reports", href: "/reports", icon: BarChart3 },
+  { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true },
   { label: "Customer Portal", href: "/portal", icon: Globe },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -59,8 +61,8 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href
+        {navItems.map(({ label, href, icon: Icon, highlight }) => {
+          const active = pathname === href || pathname.startsWith(href + "/")
           return (
             <Link
               key={href}
@@ -70,12 +72,24 @@ export function AppSidebar() {
                 "flex items-center gap-3 px-2.5 py-2 rounded-md text-sm transition-colors group",
                 active
                   ? "bg-sidebar-accent text-white font-medium"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white",
+                  : highlight
+                    ? "text-blue-400 hover:bg-sidebar-accent hover:text-white"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white",
                 collapsed && "justify-center"
               )}
             >
-              <Icon className={cn("w-4 h-4 shrink-0", active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary")} />
-              {!collapsed && <span className="truncate">{label}</span>}
+              <Icon className={cn(
+                "w-4 h-4 shrink-0",
+                active ? "text-primary" : highlight ? "text-blue-400 group-hover:text-primary" : "text-sidebar-foreground group-hover:text-primary"
+              )} />
+              {!collapsed && (
+                <span className="truncate flex-1">{label}</span>
+              )}
+              {!collapsed && highlight && !active && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                  AI
+                </span>
+              )}
             </Link>
           )
         })}
