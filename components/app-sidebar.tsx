@@ -8,9 +8,9 @@ import { useTenant } from "@/lib/tenant-store"
 import { MOCK_WORKSPACES } from "@/lib/tenant-data"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
-  ShieldCheck, HardHat, BarChart3, Globe, CreditCard, Settings,
+  ShieldCheck, HardHat, BarChart3, Globe,
   ChevronLeft, Sparkles, ChevronDown, Check, LogOut,
-  Building2, UserCircle,
+  Building2, UserCircle, CreditCard,
 } from "lucide-react"
 
 const NAV_ITEMS: {
@@ -30,8 +30,6 @@ const NAV_ITEMS: {
   { label: "Reports",           href: "/reports",            icon: BarChart3 },
   { label: "AI Insights",       href: "/insights",           icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
   { label: "Customer Portal",   href: "/portal",             icon: Globe, requirePerm: "canAccessPortal" },
-  { label: "Billing",           href: "/billing",            icon: CreditCard, requirePerm: "canViewBilling" },
-  { label: "Settings",          href: "/settings/workspace", icon: Settings },
 ]
 
 const PLAN_META = {

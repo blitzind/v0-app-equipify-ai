@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, Search, ChevronDown, Settings, LogOut, User } from "lucide-react"
+import Link from "next/link"
+import { Bell, Search, ChevronDown, Settings, LogOut, User, Users, CreditCard, BellRing, Plug } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -92,18 +93,45 @@ export function AppTopbar({ title }: { title: string }) {
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground hidden sm:block" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <User className="w-4 h-4" /> Profile
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/workspace">
+                <User className="w-4 h-4" /> My Profile
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <Settings className="w-4 h-4" /> Settings
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/workspace">
+                <Settings className="w-4 h-4" /> Company Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/team">
+                <Users className="w-4 h-4" /> Team Members
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive">
-              <LogOut className="w-4 h-4" /> Sign out
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/billing">
+                <CreditCard className="w-4 h-4" /> Billing &amp; Subscription
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/workspace">
+                <BellRing className="w-4 h-4" /> Notifications
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+              <Link href="/settings/workspace">
+                <Plug className="w-4 h-4" /> Integrations
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="gap-2 cursor-pointer text-destructive focus:text-destructive">
+              <Link href="/login">
+                <LogOut className="w-4 h-4" /> Logout
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
