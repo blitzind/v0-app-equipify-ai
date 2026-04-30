@@ -155,6 +155,140 @@
   }
 }
 
+/* ─── Semantic status color tokens ──────────────────────────────────────────
+   Use these everywhere instead of raw Tailwind palette classes (emerald-*, red-*, etc.)
+   so that status colors are driven by the design system and change globally.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Danger (errors, overdue, critical, destructive actions) */
+  --ds-danger-bg:     oklch(0.97 0.02 27);
+  --ds-danger-border: oklch(0.88 0.06 27);
+  --ds-danger-text:   oklch(0.45 0.18 27);
+  --ds-danger-subtle: oklch(0.57 0.22 27);   /* icon / accent */
+
+  /* Warning (overdue soon, expiring, paused) */
+  --ds-warning-bg:     oklch(0.98 0.025 75);
+  --ds-warning-border: oklch(0.88 0.07 75);
+  --ds-warning-text:   oklch(0.50 0.13 75);
+  --ds-warning-subtle: oklch(0.65 0.16 75);  /* icon / accent */
+
+  /* Success (active, completed, healthy, paid) */
+  --ds-success-bg:     oklch(0.97 0.025 145);
+  --ds-success-border: oklch(0.86 0.07 145);
+  --ds-success-text:   oklch(0.38 0.13 145);
+  --ds-success-subtle: oklch(0.55 0.15 145); /* icon / accent */
+
+  /* Info / primary (open, scheduled, info, links) */
+  --ds-info-bg:     oklch(0.96 0.02 231);
+  --ds-info-border: oklch(0.82 0.07 231);
+  --ds-info-text:   oklch(0.40 0.15 231);
+  --ds-info-subtle: oklch(0.52 0.18 231);    /* icon / accent — same as --primary */
+
+  /* Neutral accent (vacation, secondary badges) */
+  --ds-accent-bg:     oklch(0.95 0.02 280);
+  --ds-accent-border: oklch(0.83 0.06 280);
+  --ds-accent-text:   oklch(0.42 0.14 280);
+  --ds-accent-subtle: oklch(0.55 0.17 280);
+}
+
+@layer utilities {
+  /* ── Status badges ─────────────────────────────────────────────────────────
+     Apply as className on <Badge> or a <span>
+     Usage: class="ds-badge-success" / "ds-badge-warning" / etc.           */
+  .ds-badge-success {
+    background-color: var(--ds-success-bg);
+    color:            var(--ds-success-text);
+    border-color:     var(--ds-success-border);
+  }
+  .ds-badge-warning {
+    background-color: var(--ds-warning-bg);
+    color:            var(--ds-warning-text);
+    border-color:     var(--ds-warning-border);
+  }
+  .ds-badge-danger {
+    background-color: var(--ds-danger-bg);
+    color:            var(--ds-danger-text);
+    border-color:     var(--ds-danger-border);
+  }
+  .ds-badge-info {
+    background-color: var(--ds-info-bg);
+    color:            var(--ds-info-text);
+    border-color:     var(--ds-info-border);
+  }
+  .ds-badge-accent {
+    background-color: var(--ds-accent-bg);
+    color:            var(--ds-accent-text);
+    border-color:     var(--ds-accent-border);
+  }
+
+  /* ── Alert / callout rows ─────────────────────────────────────────────────
+     Subtle tinted backgrounds for in-line alert rows / callout blocks.     */
+  .ds-alert-danger  { background-color: var(--ds-danger-bg);  border-color: var(--ds-danger-border);  color: var(--ds-danger-text);  }
+  .ds-alert-warning { background-color: var(--ds-warning-bg); border-color: var(--ds-warning-border); color: var(--ds-warning-text); }
+  .ds-alert-success { background-color: var(--ds-success-bg); border-color: var(--ds-success-border); color: var(--ds-success-text); }
+  .ds-alert-info    { background-color: var(--ds-info-bg);    border-color: var(--ds-info-border);    color: var(--ds-info-text);    }
+
+  /* ── Icon tint helpers ────────────────────────────────────────────────────
+     For small icon tiles (w-8 h-8 rounded-lg).                             */
+  .ds-icon-tile-primary  { background-color: var(--ds-info-bg);    color: var(--ds-info-subtle);    }
+  .ds-icon-tile-success  { background-color: var(--ds-success-bg); color: var(--ds-success-subtle); }
+  .ds-icon-tile-warning  { background-color: var(--ds-warning-bg); color: var(--ds-warning-subtle); }
+  .ds-icon-tile-danger   { background-color: var(--ds-danger-bg);  color: var(--ds-danger-subtle);  }
+  .ds-icon-tile-accent   { background-color: var(--ds-accent-bg);  color: var(--ds-accent-subtle);  }
+
+  /* ── Filter / toolbar bar ─────────────────────────────────────────────────
+     Consistent toolbar wrapper across all list pages.                       */
+  .ds-toolbar {
+    @apply flex flex-wrap items-center gap-2 bg-card border border-border rounded-xl px-4 py-3;
+  }
+
+  /* ── Page section card ────────────────────────────────────────────────────
+     Standard card with consistent padding used inside page content areas.   */
+  .ds-card {
+    @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+  .ds-card-body {
+    @apply p-5;
+  }
+
+  /* ── Section header inside a card ────────────────────────────────────────
+     Consistent card header row with title + optional action.               */
+  .ds-card-header {
+    @apply flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-border;
+  }
+  .ds-card-title {
+    @apply text-sm font-semibold text-foreground;
+  }
+
+  /* ── KPI stat row ─────────────────────────────────────────────────────────
+     Used in reports, maintenance-plans, technicians KPI strips.            */
+  .ds-kpi-card {
+    @apply bg-card border border-border rounded-xl p-5 flex flex-col gap-2;
+  }
+  .ds-kpi-value {
+    @apply text-2xl font-bold text-foreground leading-none;
+  }
+  .ds-kpi-label {
+    @apply text-xs text-muted-foreground leading-relaxed;
+  }
+
+  /* ── Text helpers ─────────────────────────────────────────────────────────
+     Consistent urgency text colors mapped to design tokens.                */
+  .ds-text-success { color: var(--ds-success-text); }
+  .ds-text-warning { color: var(--ds-warning-text); }
+  .ds-text-danger  { color: var(--ds-danger-text);  }
+  .ds-text-info    { color: var(--ds-info-text);    }
+
+  .ds-icon-success { color: var(--ds-success-subtle); }
+  .ds-icon-warning { color: var(--ds-warning-subtle); }
+  .ds-icon-danger  { color: var(--ds-danger-subtle);  }
+  .ds-icon-info    { color: var(--ds-info-subtle);    }
+
+  /* Positive / negative change indicators */
+  .ds-change-positive { color: var(--ds-success-text); }
+  .ds-change-negative { color: var(--ds-danger-text);  }
+}
+
 @layer utilities {
   .input-base {
     @apply w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground transition-shadow;

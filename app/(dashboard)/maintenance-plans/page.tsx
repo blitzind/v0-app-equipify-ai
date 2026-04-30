@@ -63,9 +63,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<PlanStatus, { label: string; className: string; Icon: React.ElementType }> = {
-  Active:  { label: "Active",  className: "bg-emerald-50 text-emerald-700 border-emerald-200",  Icon: CheckCircle2 },
-  Paused:  { label: "Paused",  className: "bg-amber-50 text-amber-700 border-amber-200",          Icon: PauseCircle },
-  Expired: { label: "Expired", className: "bg-red-50 text-red-700 border-red-200",                Icon: AlertTriangle },
+  Active:  { label: "Active",  className: "ds-badge-success",  Icon: CheckCircle2 },
+  Paused:  { label: "Paused",  className: "ds-badge-warning",  Icon: PauseCircle },
+  Expired: { label: "Expired", className: "ds-badge-danger",   Icon: AlertTriangle },
 }
 
 const INTERVAL_LABELS: Record<PlanInterval, string> = {
@@ -77,9 +77,9 @@ const INTERVAL_LABELS: Record<PlanInterval, string> = {
 }
 
 const CHANNEL_CONFIG: Record<NotificationChannel, { Icon: React.ElementType; color: string }> = {
-  "Email":          { Icon: Mail,          color: "text-blue-500" },
-  "SMS":            { Icon: MessageSquare, color: "text-green-600" },
-  "Internal Alert": { Icon: MonitorCheck,  color: "text-violet-500" },
+  "Email":          { Icon: Mail,          color: "ds-icon-info" },
+  "SMS":            { Icon: MessageSquare, color: "ds-icon-success" },
+  "Internal Alert": { Icon: MonitorCheck,  color: "ds-icon-accent" },
 }
 
 function daysUntil(dateStr: string): number {
@@ -90,10 +90,10 @@ function daysUntil(dateStr: string): number {
 }
 
 function urgencyClass(days: number): string {
-  if (days < 0)   return "text-red-600 font-semibold"
-  if (days <= 7)  return "text-red-500 font-medium"
-  if (days <= 14) return "text-amber-600 font-medium"
-  if (days <= 30) return "text-amber-500"
+  if (days < 0)   return "ds-text-danger font-semibold"
+  if (days <= 7)  return "ds-text-danger font-medium"
+  if (days <= 14) return "ds-text-warning font-medium"
+  if (days <= 30) return "ds-text-warning"
   return "text-muted-foreground"
 }
 

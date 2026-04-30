@@ -87,14 +87,14 @@ const STATUS_STYLE: Record<TechStatus, string> = {
   "Available": "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
   "On Job":    "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
   "Off":       "bg-muted text-muted-foreground border-border",
-  "Vacation":  "bg-violet-500/10 text-violet-600 border-violet-500/30",
+  "Vacation":  "ds-badge-accent border",
 }
 
 const STATUS_DOT: Record<TechStatus, string> = {
   "Available": "bg-[color:var(--status-success)]",
   "On Job":    "bg-[color:var(--status-warning)]",
   "Off":       "bg-muted-foreground",
-  "Vacation":  "bg-violet-500",
+  "Vacation":  "bg-[var(--ds-accent-subtle)]",
 }
 
 const SCHEDULE_STYLE: Record<string, string> = {
@@ -104,8 +104,8 @@ const SCHEDULE_STYLE: Record<string, string> = {
 }
 
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-emerald-500", "bg-violet-500",
-  "bg-rose-500", "bg-amber-500", "bg-cyan-500",
+  "bg-[var(--ds-info-subtle)]", "bg-[var(--ds-success-subtle)]", "bg-[var(--ds-accent-subtle)]",
+  "bg-[var(--ds-danger-subtle)]", "bg-[var(--ds-warning-subtle)]", "bg-primary",
 ]
 
 function avatarColor(id: string) {
@@ -359,7 +359,7 @@ function AddTechModal({
   )
 }
 
-// ─── Schedule Modal ───────────────────────────────────────────────────��───────
+// ─── Schedule Modal ───────────────────────────────────────────────────���───────
 
 function ScheduleModal({
   tech, onClose, onSave,

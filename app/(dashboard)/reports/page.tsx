@@ -80,8 +80,7 @@ const kpis = [
     positive: true,
     sub: "vs. $171,800 last month",
     icon: DollarSign,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
+    tile: "ds-icon-tile-info",
   },
   {
     label: "Completed Work Orders",
@@ -90,8 +89,7 @@ const kpis = [
     positive: true,
     sub: "vs. 191 last month",
     icon: RefreshCcw,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
+    tile: "ds-icon-tile-success",
   },
   {
     label: "Avg Response Time",
@@ -100,8 +98,7 @@ const kpis = [
     positive: true,
     sub: "vs. 4.5 hrs last month",
     icon: Clock,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
+    tile: "ds-icon-tile-warning",
   },
   {
     label: "Renewed PM Contracts",
@@ -110,8 +107,7 @@ const kpis = [
     positive: true,
     sub: "contract value renewed",
     icon: TrendingUp,
-    color: "text-violet-600",
-    bg: "bg-violet-50",
+    tile: "ds-icon-tile-accent",
   },
 ]
 
@@ -127,9 +123,9 @@ function fmtFull$(n: number) {
 }
 
 function healthBadge(h: string) {
-  if (h === "At Risk")  return "bg-red-50 text-red-700 border border-red-200"
-  if (h === "Upgrade")  return "bg-amber-50 text-amber-700 border border-amber-200"
-  return "bg-emerald-50 text-emerald-700 border border-emerald-200"
+  if (h === "At Risk")  return "ds-badge-danger border"
+  if (h === "Upgrade")  return "ds-badge-warning border"
+  return "ds-badge-success border"
 }
 
 // ─── Custom tooltip ───────────────────────────────────────────────────────────
@@ -217,11 +213,11 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-screen-xl mx-auto">
+    <div className="flex flex-col gap-6">
 
       {/* ── Filter bar ── */}
-      <div className="bg-card border border-border rounded-xl px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="ds-toolbar">
+        <div className="flex flex-wrap items-center gap-3 w-full">
 
           {/* Date range */}
           <div className="relative">
@@ -297,17 +293,17 @@ export default function ReportsPage() {
         {kpis.map((k) => {
           const Icon = k.icon
           return (
-            <div key={k.label} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3">
+            <div key={k.label} className="ds-kpi-card">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">{k.label}</span>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${k.bg}`}>
-                  <Icon className={`w-4 h-4 ${k.color}`} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${k.tile}`}>
+                  <Icon className="w-4 h-4" />
                 </div>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground tracking-tight">{k.value}</p>
+                <p className="ds-kpi-value">{k.value}</p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className={`text-xs font-semibold ${k.positive ? "text-emerald-600" : "text-red-500"}`}>
+                  <span className={`text-xs font-semibold ${k.positive ? "ds-change-positive" : "ds-change-negative"}`}>
                     {k.change}
                   </span>
                   <span className="text-xs text-muted-foreground">{k.sub}</span>
@@ -327,7 +323,7 @@ export default function ReportsPage() {
             title="Revenue by Month"
             sub="Last 6 months — total recognized revenue"
             action={
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold ds-badge-success border px-2 py-0.5 rounded-full">
                 +7.2% MoM
               </span>
             }
@@ -509,20 +505,20 @@ export default function ReportsPage() {
           title="Repeat Failure Alerts"
           sub="Equipment repaired 3+ times for the same issue"
           action={
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ds-badge-danger border">
               {repeatRepairs.length} alerts
             </span>
           }
         >
           <div className="space-y-2">
             {repeatRepairs.map((r) => (
-              <div key={r.equipment} className="flex items-start gap-3 p-3 rounded-lg bg-red-50/60 border border-red-100">
-                <RefreshCcw className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+              <div key={r.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-danger border">
+                <RefreshCcw className="w-4 h-4 ds-icon-danger mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">{r.equipment}</p>
                   <p className="text-[11px] text-muted-foreground">{r.customer}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[11px] font-medium text-red-600">{r.repairs}x repairs</span>
+                    <span className="text-[11px] font-medium ds-text-danger">{r.repairs}x repairs</span>
                     <span className="text-[11px] text-muted-foreground">Issue: {r.issue}</span>
                   </div>
                 </div>
@@ -537,22 +533,22 @@ export default function ReportsPage() {
           title="Warranty Expiring Soon"
           sub="Equipment with warranty expiring within 90 days"
           action={
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ds-badge-warning border">
               {expiringWarranties.length} expiring
             </span>
           }
         >
           <div className="space-y-2">
             {expiringWarranties.map((w) => (
-              <div key={w.equipment} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50/60 border border-amber-100">
-                <ShieldAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+              <div key={w.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-warning border">
+                <ShieldAlert className="w-4 h-4 ds-icon-warning mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">{w.equipment}</p>
                   <p className="text-[11px] text-muted-foreground">{w.customer}</p>
-                  <p className="text-[11px] text-amber-600 font-medium mt-0.5">Expires {w.expires}</p>
+                  <p className="text-[11px] ds-text-warning font-medium mt-0.5">Expires {w.expires}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className={`text-xs font-bold ${w.daysLeft <= 15 ? "text-red-600" : "text-amber-600"}`}>
+                  <span className={`text-xs font-bold ${w.daysLeft <= 15 ? "ds-text-danger" : "ds-text-warning"}`}>
                     {w.daysLeft}d
                   </span>
                   <p className="text-[10px] text-muted-foreground">remaining</p>
@@ -595,7 +591,7 @@ export default function ReportsPage() {
                     onClick={() => setScheduledReport(isScheduled ? null : r.id)}
                     className={`inline-flex items-center justify-center gap-1 text-[11px] font-medium rounded-md py-1.5 px-2.5 border transition-colors ${
                       isScheduled
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        ? "ds-badge-success"
                         : "border-border bg-secondary hover:bg-accent text-foreground"
                     }`}
                   >

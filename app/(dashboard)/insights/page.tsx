@@ -124,7 +124,7 @@ function InsightCard({ insight, onDismiss }: { insight: AiInsight; onDismiss: (i
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {insight.estimatedValue && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold ds-badge-success border px-2 py-0.5 rounded-full">
                 <ArrowUpRight size={11} />
                 {fmtFull$(insight.estimatedValue)} opportunity
               </span>
@@ -136,7 +136,7 @@ function InsightCard({ insight, onDismiss }: { insight: AiInsight; onDismiss: (i
               {expanded ? "Show less" : "Show more"}
             </button>
             <Link href={insight.actionHref}
-              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+              className="inline-flex items-center gap-1 text-xs font-medium ds-text-info hover:opacity-80 bg-[var(--ds-info-bg)] hover:bg-[var(--ds-info-border)] px-3 py-1.5 rounded-lg transition-colors">
               {insight.actionLabel} <ChevronRight size={12} />
             </Link>
           </div>
@@ -187,8 +187,8 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-zinc-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Sparkles size={15} className="text-white" />
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Sparkles size={15} className="text-primary-foreground" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-zinc-900">AI Executive Summary</h2>
@@ -225,8 +225,8 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">Top Risks</h3>
             <div className="space-y-2">
               {report.topRisks.map((r, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
-                  <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                <div key={i} className="flex gap-3 p-3 ds-alert-danger border rounded-xl">
+                  <AlertTriangle size={14} className="ds-icon-danger shrink-0 mt-0.5" />
                   <p className="text-sm text-zinc-700 leading-relaxed">{r}</p>
                 </div>
               ))}
@@ -238,8 +238,8 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">Top Opportunities</h3>
             <div className="space-y-2">
               {report.topOpportunities.map((o, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <TrendingUp size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div key={i} className="flex gap-3 p-3 ds-alert-success border rounded-xl">
+                  <TrendingUp size={14} className="ds-icon-success shrink-0 mt-0.5" />
                   <p className="text-sm text-zinc-700 leading-relaxed">{o}</p>
                 </div>
               ))}
@@ -252,7 +252,7 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
             <div className="space-y-2">
               {report.recommendedActions.map((a) => (
                 <div key={a.priority} className="flex gap-3 p-3 bg-zinc-50 border border-zinc-100 rounded-xl">
-                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0">
                     {a.priority}
                   </span>
                   <div>
@@ -475,7 +475,7 @@ export default function InsightsPage() {
                       <span className="text-[10px] text-zinc-400">{r.insightCount} insights</span>
                       {r.openWOs > 0 && <span className="text-[10px] text-zinc-400">{r.openWOs} open WOs</span>}
                       {r.totalOpportunity > 0 && (
-                        <span className="text-[10px] text-emerald-600 font-medium">
+                        <span className="text-[10px] ds-change-positive font-medium">
                           {fmt$(r.totalOpportunity)}
                         </span>
                       )}

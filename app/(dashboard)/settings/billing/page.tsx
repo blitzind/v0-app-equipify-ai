@@ -89,15 +89,15 @@ export default function BillingPage() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-                  <Zap size={16} className="text-white" />
+                <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+                  <Zap size={16} className="text-primary-foreground" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-foreground capitalize">{plan.name} plan</p>
                     <PlanBadge planId={workspace.planId} />
                     {workspace.subscriptionStatus === "trialing" && (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ds-badge-warning border">
                         Trial
                       </span>
                     )}
@@ -135,14 +135,14 @@ export default function BillingPage() {
                 <CreditCard size={13} /> Manage payment
               </button>
               <button
-                className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors">
                 Cancel subscription
               </button>
             </div>
           </div>
 
           {workspace.subscriptionStatus === "past_due" && (
-            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-danger text-sm">
               <AlertTriangle size={14} />
               <span>Your subscription payment is past due. Please update your payment method to avoid service interruption.</span>
               <button className="ml-auto text-xs font-medium underline">Update now</button>
@@ -150,7 +150,7 @@ export default function BillingPage() {
           )}
 
           {workspace.subscriptionStatus === "trialing" && (
-            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-warning text-sm">
               <AlertTriangle size={14} />
               <span>Your free trial ends on <strong>{fmtIsoDate(workspace.trialEndsAt ?? workspace.currentPeriodEnd)}</strong>. Add a payment method to continue after trial.</span>
               <button className="ml-auto text-xs font-medium underline">Add card</button>
@@ -172,7 +172,7 @@ export default function BillingPage() {
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${billingCycle === cycle ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
                 {cycle === "monthly" ? "Monthly" : "Annual"}
                 {cycle === "annual" && (
-                  <span className="ml-1 text-[9px] font-bold text-emerald-700">-20%</span>
+                  <span className="ml-1 text-[9px] font-bold ds-change-positive">-20%</span>
                 )}
               </button>
             ))}
@@ -184,14 +184,14 @@ export default function BillingPage() {
             const monthly = billingCycle === "annual" ? p.priceAnnual : p.priceMonthly
             return (
               <div key={p.id}
-                className={`relative rounded-xl border-2 p-5 transition-all ${isCurrent ? "border-blue-600 bg-blue-50/40" : "border-border bg-card hover:border-gray-300"}`}>
+                className={`relative rounded-xl border-2 p-5 transition-all ${isCurrent ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/30"}`}>
                 {p.badge && (
-                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-blue-600 text-white whitespace-nowrap">
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-primary text-primary-foreground whitespace-nowrap">
                     {p.badge}
                   </span>
                 )}
                 {isCurrent && (
-                  <span className="absolute top-3 right-3 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                  <span className="absolute top-3 right-3 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
                     Current
                   </span>
                 )}
@@ -204,7 +204,7 @@ export default function BillingPage() {
                 <ul className="space-y-1.5 mb-4">
                   {p.features.slice(0, 4).map((f) => (
                     <li key={f} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <Check size={11} className="text-blue-600 mt-0.5 shrink-0" /> {f}
+                      <Check size={11} className="text-primary mt-0.5 shrink-0" /> {f}
                     </li>
                   ))}
                 </ul>
@@ -213,8 +213,8 @@ export default function BillingPage() {
                   onClick={() => openCheckout(p.id as PlanId)}
                   className={`w-full h-8 text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-colors
                     ${isCurrent
-                      ? "bg-blue-100 text-blue-600 cursor-default"
-                      : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+                      ? "bg-primary/10 text-primary cursor-default"
+                      : "bg-primary text-primary-foreground hover:opacity-90"}`}>
                   {isCurrent ? (
                     <><Check size={12} /> Current plan</>
                   ) : p.id === "enterprise" && workspace.planId !== "enterprise" ? (
@@ -254,7 +254,7 @@ export default function BillingPage() {
                   ${(inv.amount / 100).toFixed(2)}
                 </td>
                 <td className="px-6 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${inv.status === "Paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${inv.status === "Paid" ? "ds-badge-success" : "ds-badge-warning"}`}>
                     {inv.status}
                   </span>
                 </td>
@@ -285,7 +285,7 @@ export default function BillingPage() {
             <div className="p-5">
               {checkoutError ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm ds-alert-danger border rounded-lg p-4">
                     {checkoutError}
                   </p>
                   <div className="flex items-center justify-between">
@@ -296,7 +296,7 @@ export default function BillingPage() {
                     </p>
                   </div>
                   <button onClick={() => simulateUpgrade(checkoutPlan)}
-                    className="w-full h-9 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                    className="w-full h-9 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
                     Simulate upgrade (demo)
                   </button>
                 </div>
@@ -306,7 +306,7 @@ export default function BillingPage() {
                 </EmbeddedCheckoutProvider>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  <div className="rounded-lg border ds-alert-warning p-4 text-sm">
                     <p className="font-medium mb-1">Stripe not configured</p>
                     <p className="text-xs leading-relaxed">
                       Add your Stripe environment variables to enable live checkout. In the meantime, use the demo button below.
@@ -317,7 +317,7 @@ export default function BillingPage() {
                     </ul>
                   </div>
                   <button onClick={() => simulateUpgrade(checkoutPlan)}
-                    className="w-full h-9 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5">
+                    className="w-full h-9 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5">
                     <Check size={14} /> Simulate upgrade to {PLANS.find(p => p.id === checkoutPlan)?.name}
                   </button>
                 </div>

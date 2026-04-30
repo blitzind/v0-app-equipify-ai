@@ -67,8 +67,8 @@ const PERMISSION_GROUPS: {
 
 function PermIcon({ allowed }: { allowed: boolean }) {
   return allowed
-    ? <Check size={14} className="text-emerald-600 mx-auto" />
-    : <X size={14} className="text-gray-300 mx-auto" />
+    ? <Check size={14} className="ds-icon-success mx-auto" />
+    : <X size={14} className="text-muted-foreground/40 mx-auto" />
 }
 
 export default function PermissionsPage() {
@@ -124,9 +124,9 @@ export default function PermissionsPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-amber-50/60 px-5 py-4">
-        <p className="text-sm font-medium text-amber-800">Custom role permissions</p>
-        <p className="text-xs text-amber-700 mt-0.5">
+      <div className="rounded-lg border ds-alert-warning px-5 py-4">
+        <p className="text-sm font-medium">Custom role permissions</p>
+        <p className="text-xs mt-0.5">
           Custom role configuration is available on the Enterprise plan. <a href="/settings/billing" className="underline font-medium">Upgrade to Enterprise</a> to define granular permissions per role.
         </p>
       </div>

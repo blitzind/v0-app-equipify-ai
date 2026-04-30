@@ -88,8 +88,7 @@ export default function TeamPage() {
           </div>
           <button onClick={() => setInviteOpen((v) => !v)}
             disabled={atLimit}
-            className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md text-white disabled:opacity-50 transition-colors"
-            style={{ background: "#2563eb" }}>
+            className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity">
             <UserPlus size={14} /> Invite member
           </button>
         </div>
@@ -99,17 +98,17 @@ export default function TeamPage() {
           <div className="px-6 py-3 bg-secondary border-b border-border">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
               <span>Seat usage</span>
-              <span className={usedSeats >= seatLimit ? "text-red-600 font-medium" : ""}>{usedSeats}/{seatLimit}</span>
+              <span className={usedSeats >= seatLimit ? "ds-text-danger font-medium" : ""}>{usedSeats}/{seatLimit}</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
               <div className="h-full rounded-full transition-all"
                 style={{
                   width: `${Math.min(100, (usedSeats / seatLimit) * 100)}%`,
-                  background: usedSeats >= seatLimit ? "#dc2626" : "#2563eb",
+                  background: usedSeats >= seatLimit ? "var(--ds-danger-subtle)" : "var(--primary)",
                 }} />
             </div>
             {atLimit && (
-              <p className="text-xs text-red-600 mt-1.5">
+              <p className="text-xs ds-text-danger mt-1.5">
                 Seat limit reached. <a href="/settings/billing" className="underline">Upgrade to add more seats.</a>
               </p>
             )}
@@ -118,8 +117,8 @@ export default function TeamPage() {
 
         {/* Invite form */}
         {inviteOpen && (
-          <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
-            <p className="text-xs font-medium text-blue-800 mb-3 flex items-center gap-1"><Mail size={12} /> Invite a new team member</p>
+          <div className="px-6 py-4 ds-alert-info border-b">
+            <p className="text-xs font-medium mb-3 flex items-center gap-1"><Mail size={12} /> Invite a new team member</p>
             <div className="flex gap-2 flex-wrap">
               <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="colleague@company.com" className="input-base flex-1 min-w-48" />
@@ -128,8 +127,7 @@ export default function TeamPage() {
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
               <button onClick={sendInvite}
-                className="flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md text-white"
-                style={{ background: inviteSent ? "#16a34a" : "#2563eb" }}>
+                className={`flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md transition-colors ${inviteSent ? "bg-[var(--ds-success-subtle)] text-white" : "bg-primary text-primary-foreground hover:opacity-90"}`}>
                 {inviteSent ? <><Check size={13} /> Sent!</> : "Send invite"}
               </button>
               <button onClick={() => setInviteOpen(false)}
@@ -154,8 +152,7 @@ export default function TeamPage() {
               <tr key={user.id} className="border-b border-border last:border-0 hover:bg-secondary/40 transition-colors">
                 <td className="px-6 py-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-                      style={{ background: "#2563eb" }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-primary text-primary-foreground shrink-0">
                       {user.name.split(" ").map(n => n[0]).join("").slice(0,2)}
                     </div>
                     <div>
@@ -188,16 +185,16 @@ export default function TeamPage() {
                             <button key={r} onClick={() => changeRole(user.id, r)}
                               className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-secondary transition-colors">
                               <RoleBadge role={r} />
-                              {user.role === r && <Check size={12} className="text-blue-600" />}
+                              {user.role === r && <Check size={12} className="text-primary" />}
                             </button>
                           ))}
                           <div className="border-t border-border">
                             <button onClick={() => suspendUser(user.id)}
-                              className="w-full text-left px-3 py-1.5 text-sm text-amber-600 hover:bg-amber-50 transition-colors">
+                              className="w-full text-left px-3 py-1.5 text-sm ds-text-warning hover:bg-[var(--ds-warning-bg)] transition-colors">
                               Suspend
                             </button>
                             <button onClick={() => removeUser(user.id)}
-                              className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                              className="w-full text-left px-3 py-1.5 text-sm ds-text-danger hover:bg-[var(--ds-danger-bg)] transition-colors">
                               Remove from workspace
                             </button>
                           </div>

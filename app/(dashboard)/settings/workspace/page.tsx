@@ -103,8 +103,8 @@ export default function WorkspacePage() {
         description={isGrowthOrAbove ? "Upload your logo and choose an accent color for your workspace and customer portal." : undefined}>
         {!isGrowthOrAbove ? (
           <div className="flex items-center gap-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-              <Globe size={14} className="text-amber-600" />
+            <div className="w-8 h-8 rounded-full ds-icon-tile-warning flex items-center justify-center">
+              <Globe size={14} />
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">Available on Growth and Enterprise</p>
@@ -131,7 +131,7 @@ export default function WorkspacePage() {
                   <p className="text-xs text-muted-foreground mt-1">PNG or SVG, max 2MB. Recommended: 200×200px.</p>
                   {workspace.logoUrl && (
                     <button onClick={() => dispatch({ type: "SET_LOGO", payload: "" })}
-                      className="text-xs text-red-500 hover:underline mt-1">Remove</button>
+                      className="text-xs ds-text-danger hover:underline mt-1">Remove</button>
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
@@ -185,7 +185,7 @@ export default function WorkspacePage() {
             <p className="text-sm font-medium text-foreground">Delete workspace</p>
             <p className="text-xs text-muted-foreground">Permanently delete this workspace and all its data. This action cannot be undone.</p>
           </div>
-          <button className="px-3 h-8 text-sm font-medium border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors">
+          <button className="px-3 h-8 text-sm font-medium border border-destructive/30 text-destructive rounded-md hover:bg-destructive/5 transition-colors">
             Delete workspace
           </button>
         </div>
@@ -194,8 +194,7 @@ export default function WorkspacePage() {
       {/* Save */}
       <div className="flex justify-end">
         <button onClick={handleSave}
-          className="flex items-center gap-1.5 h-9 px-5 text-sm font-medium rounded-md text-white transition-colors"
-          style={{ background: saved ? "#16a34a" : "#2563eb" }}>
+          className={`flex items-center gap-1.5 h-9 px-5 text-sm font-medium rounded-md transition-colors ${saved ? "bg-[var(--ds-success-subtle)] text-white" : "bg-primary text-primary-foreground hover:opacity-90"}`}>
           {saved ? <><Check size={14} /> Saved</> : "Save changes"}
         </button>
       </div>

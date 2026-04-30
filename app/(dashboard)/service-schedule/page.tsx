@@ -35,11 +35,11 @@ import {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
 
 const INTERVAL_COLORS: Record<string, string> = {
-  "Annual":      "bg-violet-100 text-violet-700 border-violet-200",
-  "Semi-Annual": "bg-blue-100 text-blue-700 border-blue-200",
-  "Quarterly":   "bg-cyan-100 text-cyan-700 border-cyan-200",
-  "Monthly":     "bg-teal-100 text-teal-700 border-teal-200",
-  "Custom":      "bg-orange-100 text-orange-700 border-orange-200",
+  "Annual":      "ds-badge-accent border",
+  "Semi-Annual": "ds-badge-info border",
+  "Quarterly":   "ds-badge-info border",
+  "Monthly":     "ds-badge-success border",
+  "Custom":      "ds-badge-warning border",
 }
 
 function daysUntil(dateStr: string): number {
@@ -50,18 +50,18 @@ function daysUntil(dateStr: string): number {
 }
 
 function urgencyBg(days: number): string {
-  if (days < 0)   return "border-l-4 border-l-red-500"
-  if (days <= 7)  return "border-l-4 border-l-red-400"
-  if (days <= 14) return "border-l-4 border-l-amber-400"
-  if (days <= 30) return "border-l-4 border-l-amber-300"
+  if (days < 0)   return "border-l-4 border-l-[var(--ds-danger-subtle)]"
+  if (days <= 7)  return "border-l-4 border-l-[var(--ds-danger-subtle)]"
+  if (days <= 14) return "border-l-4 border-l-[var(--ds-warning-subtle)]"
+  if (days <= 30) return "border-l-4 border-l-[var(--ds-warning-border)]"
   return "border-l-4 border-l-border"
 }
 
 function urgencyText(days: number): string {
-  if (days < 0)   return "text-red-600 font-semibold"
-  if (days <= 7)  return "text-red-500 font-medium"
-  if (days <= 14) return "text-amber-600 font-medium"
-  if (days <= 30) return "text-amber-500"
+  if (days < 0)   return "ds-text-danger font-semibold"
+  if (days <= 7)  return "ds-text-danger font-medium"
+  if (days <= 14) return "ds-text-warning font-medium"
+  if (days <= 30) return "ds-text-warning"
   return "text-muted-foreground"
 }
 
