@@ -204,11 +204,11 @@
   --ds-info-text:   oklch(0.40 0.16  231);
   --ds-info-subtle: oklch(0.56 0.21  231);
 
-  /* AI accent — Purple #7c3aed */
-  --ds-accent-bg:     oklch(0.954 0.022 293);
-  --ds-accent-border: oklch(0.83  0.065 293);
-  --ds-accent-text:   oklch(0.42  0.15  293);
-  --ds-accent-subtle: oklch(0.49  0.22  293);
+  /* AI accent — Brand blue (mirrors --ds-info-*) */
+  --ds-accent-bg:     oklch(0.96 0.022 231);
+  --ds-accent-border: oklch(0.82 0.075 231);
+  --ds-accent-text:   oklch(0.40 0.16  231);
+  --ds-accent-subtle: oklch(0.56 0.21  231);
 }
 
 @layer utilities {
@@ -350,7 +350,7 @@
     font-feature-settings: "tnum";
   }
 
-  /* ── Table sort header button ──────────────────────────────────────���──────
+  /* ── Table sort header button ──────────────────────────────────���───���──────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {
     @apply inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;
