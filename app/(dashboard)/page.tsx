@@ -56,27 +56,27 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Revenue"
-          value={"$184K"}
-          subtitle="April 2026"
+          value={stats.monthlyRevenue}
+          subtitle={stats.revenueSubtitle}
           icon={DollarSign}
           iconColor="text-[oklch(0.42_0.17_145)]"
           iconBg="bg-[oklch(0.62_0.17_145)]/10"
-          trend={{ value: "+7.1% vs March", positive: true }}
+          trend={{ value: stats.revenueTrend, positive: true }}
           href="/reports"
         />
         <StatCard
           title="Expiring Warranties"
-          value={mockStats.expiringWarranties}
+          value={stats.expiringWarranties}
           subtitle="Within 30 days"
           icon={ShieldAlert}
           iconColor="text-[oklch(0.50_0.12_70)]"
           iconBg="bg-[oklch(0.75_0.16_70)]/10"
-          trend={{ value: "3 expire this week", positive: false }}
+          trend={{ value: stats.warrantyTrend, positive: false }}
           href="/equipment"
         />
         <StatCard
           title="Repeat Repair Alerts"
-          value={mockStats.repeatRepairAlerts}
+          value={stats.repeatRepairAlerts}
           subtitle="Flagged units"
           icon={Repeat2}
           iconColor="text-destructive"

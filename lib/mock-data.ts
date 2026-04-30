@@ -1113,8 +1113,11 @@ export const mockStats = {
   equipmentDueThisMonth: 47,
   overdueService: 12,
   openWorkOrders: 83,
-  monthlyRevenue: 184_250,
+  monthlyRevenue: "$184K",
+  revenueSubtitle: "April 2026",
+  revenueTrend: "+7.1% vs March",
   expiringWarranties: 19,
+  warrantyTrend: "3 expire this week",
   repeatRepairAlerts: 6,
 }
 

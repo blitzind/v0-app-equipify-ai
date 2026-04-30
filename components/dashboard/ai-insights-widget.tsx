@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Sparkles,
@@ -18,6 +18,7 @@ import {
   DollarSign,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useWorkspaceData, useTenant } from "@/lib/tenant-store"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -232,6 +233,8 @@ const ALL_CATEGORIES: InsightCategory[] = [
 
 export function AIInsightsWidget() {
   const router = useRouter()
+  const { workspace } = useTenant()
+  const { aiInsights: INSIGHTS } = useWorkspaceData()
   const [running, setRunning] = useState(false)
   const [ran, setRan] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
@@ -239,6 +242,15 @@ export function AIInsightsWidget() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null)
   const [summaryKey, setSummaryKey] = useState(0)
+
+  // Reset local state whenever the workspace changes
+  useEffect(() => {
+    setDismissed(new Set())
+    setActiveCategory(null)
+    setRan(false)
+    setShowSummary(false)
+    setFeedback(null)
+  }, [workspace.id])
 
   const handleRunSummary = useCallback(async () => {
     setRunning(true)

@@ -1032,8 +1032,11 @@ export const medStats = {
   equipmentDueThisMonth: 14,
   overdueService: 3,
   openWorkOrders: 24,
-  monthlyRevenue: 38_400,
+  monthlyRevenue: "$38K",
+  revenueSubtitle: "April 2026",
+  revenueTrend: "+12.4% vs March",
   expiringWarranties: 3,
+  warrantyTrend: "1 expires this week",
   repeatRepairAlerts: 1,
 }
 

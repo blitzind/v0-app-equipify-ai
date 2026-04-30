@@ -49,6 +49,18 @@ import {
   medInsights,
 } from "@/lib/medology-data"
 
+export interface DashboardStats {
+  equipmentDueThisMonth: number
+  overdueService: number
+  openWorkOrders: number
+  monthlyRevenue: string
+  revenueSubtitle: string
+  revenueTrend: string
+  expiringWarranties: number
+  warrantyTrend: string
+  repeatRepairAlerts: number
+}
+
 export interface WorkspaceDataBundle {
   customers: Customer[]
   equipment: Equipment[]
@@ -58,7 +70,7 @@ export interface WorkspaceDataBundle {
   technicians: Technician[]
   quotes: AdminQuote[]
   invoices: AdminInvoice[]
-  stats: typeof mockStats
+  stats: DashboardStats
   revenueData: typeof revenueData
   workOrdersByStatus: typeof workOrdersByStatus
   recentWorkOrders: typeof recentWorkOrders

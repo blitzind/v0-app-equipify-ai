@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarContext } from "@/components/app-sidebar"
+import { useTenant } from "@/lib/tenant-store"
 import type { LucideIcon } from "lucide-react"
 
 // ─── Notification data ────────────────────────────────────────────────────────
@@ -38,71 +39,127 @@ interface Notification {
   drawerParam?: string   // optional query param to open a specific drawer
 }
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: 1,
-    icon: AlertCircle,
-    iconColor: "text-destructive",
-    title: "Overdue: WO-2038",
-    desc: "Crane #CR-02 repair past due",
-    time: "5m ago",
-    unread: true,
-    href: "/work-orders",
-    drawerParam: "WO-2038",
-  },
-  {
-    id: 2,
-    icon: Repeat2,
-    iconColor: "text-destructive",
-    title: "Repeat Repair Alert",
-    desc: "CNC Machine #CNC-3 flagged (4 repairs)",
-    time: "1h ago",
-    unread: true,
-    href: "/insights",
-  },
-  {
-    id: 3,
-    icon: ShieldAlert,
-    iconColor: "text-[oklch(0.50_0.12_70)]",
-    title: "Warranty Expiring",
-    desc: "Excavator #EX-4 expires in 15 days",
-    time: "3h ago",
-    unread: true,
-    href: "/equipment",
-    drawerParam: "EQ-188",
-  },
-  {
-    id: 4,
-    icon: CheckCircle2,
-    iconColor: "text-[oklch(0.42_0.17_145)]",
-    title: "WO-2039 Completed",
-    desc: "Tyler Oakes closed HVAC inspection",
-    time: "5h ago",
-    unread: false,
-    href: "/work-orders",
-    drawerParam: "WO-2039",
-  },
-  {
-    id: 5,
-    icon: CalendarClock,
-    iconColor: "text-primary",
-    title: "PM Due: Forklift #EQ-188",
-    desc: "Toyota 8FGU25 service due Apr 30",
-    time: "8h ago",
-    unread: false,
-    href: "/service-schedule",
-  },
-  {
-    id: 6,
-    icon: UserCog,
-    iconColor: "text-primary",
-    title: "Technician schedule change",
-    desc: "Marcus Webb reassigned to WO-2041",
-    time: "1d ago",
-    unread: false,
-    href: "/technicians",
-  },
-]
+const NOTIFICATIONS_BY_WORKSPACE: Record<string, Notification[]> = {
+  "ws-acme": [
+    {
+      id: 1,
+      icon: AlertCircle,
+      iconColor: "text-destructive",
+      title: "Overdue: WO-2038",
+      desc: "Crane #CR-02 repair past due",
+      time: "5m ago",
+      unread: true,
+      href: "/work-orders",
+      drawerParam: "WO-2038",
+    },
+    {
+      id: 2,
+      icon: Repeat2,
+      iconColor: "text-destructive",
+      title: "Repeat Repair Alert",
+      desc: "CNC Machine #CNC-3 flagged (4 repairs)",
+      time: "1h ago",
+      unread: true,
+      href: "/insights",
+    },
+    {
+      id: 3,
+      icon: ShieldAlert,
+      iconColor: "text-[oklch(0.50_0.12_70)]",
+      title: "Warranty Expiring",
+      desc: "Excavator #EX-4 expires in 15 days",
+      time: "3h ago",
+      unread: true,
+      href: "/equipment",
+      drawerParam: "EQ-188",
+    },
+    {
+      id: 4,
+      icon: CheckCircle2,
+      iconColor: "text-[oklch(0.42_0.17_145)]",
+      title: "WO-2039 Completed",
+      desc: "Tyler Oakes closed HVAC inspection",
+      time: "5h ago",
+      unread: false,
+      href: "/work-orders",
+      drawerParam: "WO-2039",
+    },
+    {
+      id: 5,
+      icon: CalendarClock,
+      iconColor: "text-primary",
+      title: "PM Due: Forklift #EQ-188",
+      desc: "Toyota 8FGU25 service due Apr 30",
+      time: "8h ago",
+      unread: false,
+      href: "/service-schedule",
+    },
+    {
+      id: 6,
+      icon: UserCog,
+      iconColor: "text-primary",
+      title: "Technician schedule change",
+      desc: "Marcus Webb reassigned to WO-2041",
+      time: "1d ago",
+      unread: false,
+      href: "/technicians",
+    },
+  ],
+  "ws-medology": [
+    {
+      id: 1,
+      icon: AlertCircle,
+      iconColor: "text-destructive",
+      title: "Overdue: MWO-1040",
+      desc: "OAE System calibration past due",
+      time: "2h ago",
+      unread: true,
+      href: "/work-orders",
+      drawerParam: "MWO-1040",
+    },
+    {
+      id: 2,
+      icon: ShieldAlert,
+      iconColor: "text-[oklch(0.50_0.12_70)]",
+      title: "Invoice Overdue",
+      desc: "MINV-3004 — $390 unpaid (55+ days)",
+      time: "4h ago",
+      unread: true,
+      href: "/invoices",
+    },
+    {
+      id: 3,
+      icon: CalendarClock,
+      iconColor: "text-primary",
+      title: "PM Due: Tympanometer",
+      desc: "Appalachian Audiology due May 3",
+      time: "8h ago",
+      unread: true,
+      href: "/service-schedule",
+    },
+    {
+      id: 4,
+      icon: CheckCircle2,
+      iconColor: "text-[oklch(0.42_0.17_145)]",
+      title: "MWO-2034 Completed",
+      desc: "Megan Brooks closed audiometer repair",
+      time: "1d ago",
+      unread: false,
+      href: "/work-orders",
+      drawerParam: "MWO-2034",
+    },
+    {
+      id: 5,
+      icon: Repeat2,
+      iconColor: "text-destructive",
+      title: "Repeat Repair Alert",
+      desc: "VNG system at Mountain View flagged",
+      time: "2d ago",
+      unread: false,
+      href: "/insights",
+    },
+  ],
+}
 
 // ─── Account hub sections ─────────────────────────────────────────────────────
 
@@ -148,7 +205,14 @@ const ACCOUNT_SECTIONS = [
 export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS)
+  const { workspace } = useTenant()
+  const workspaceNotifs = NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"]
+  const [notifications, setNotifications] = useState<Notification[]>(workspaceNotifs)
+
+  // Reset notifications whenever the workspace changes
+  useEffect(() => {
+    setNotifications(NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"])
+  }, [workspace.id])
   const [notifOpen, setNotifOpen]   = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
