@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { adminInvoices } from "@/lib/mock-data"
+import { useInvoices } from "@/lib/quote-invoice-store"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,9 @@ import {
   Receipt, CheckCircle2, AlertTriangle, Clock, FilePen, Ban, Send,
 } from "lucide-react"
 import { InvoiceDrawer } from "@/components/drawers/invoice-drawer"
+import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +108,9 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InvoicesPage() {
+  const { invoices } = useInvoices()
+  const { toast } = useToast()
+  const [newModalOpen, setNewModalOpen] = useState(false)
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("issueDate")
@@ -112,7 +118,7 @@ export default function InvoicesPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
-    let list = [...adminInvoices]
+    let list = [...invoices]
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -150,7 +156,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <InvoiceStatCards invoices={adminInvoices} />
+      <InvoiceStatCards invoices={invoices} />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -177,7 +183,7 @@ export default function InvoicesPage() {
           </SelectContent>
         </Select>
 
-        <Button size="sm" className="gap-2 ml-auto shrink-0">
+        <Button size="sm" className="gap-2 ml-auto shrink-0 cursor-pointer" onClick={() => setNewModalOpen(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Invoice</span>
           <span className="sm:hidden">New</span>
@@ -186,7 +192,7 @@ export default function InvoicesPage() {
 
       <p className="text-sm text-muted-foreground -mt-1">
         Showing <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
-        <span className="font-medium text-foreground">{adminInvoices.length}</span> invoices
+        <span className="font-medium text-foreground">{invoices.length}</span> invoices
       </p>
 
       {/* Overdue callout */}
@@ -316,6 +322,18 @@ export default function InvoicesPage() {
         invoiceId={selectedInvoiceId}
         onClose={() => setSelectedInvoiceId(null)}
       />
+
+      <NewInvoiceModal
+        open={newModalOpen}
+        onClose={() => setNewModalOpen(false)}
+        onSuccess={(id, status) => {
+          toast({
+            title: status === "Sent" ? "Invoice sent to customer" : "Invoice saved as draft",
+            description: `${id} has been ${status === "Sent" ? "sent" : "saved"}.`,
+          })
+        }}
+      />
+      <Toaster />
     </div>
   )
 }

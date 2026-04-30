@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
-import { adminQuotes } from "@/lib/mock-data"
+import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,9 @@ import {
   FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban,
 } from "lucide-react"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
+import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +105,9 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function QuotesPage() {
+  const { quotes } = useQuotes()
+  const { toast } = useToast()
+  const [newModalOpen, setNewModalOpen] = useState(false)
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | QuoteStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")
@@ -109,7 +115,7 @@ export default function QuotesPage() {
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
-    let list = [...adminQuotes]
+    let list = [...quotes]
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -147,7 +153,7 @@ export default function QuotesPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <QuoteStatCards quotes={adminQuotes} />
+      <QuoteStatCards quotes={quotes} />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -174,7 +180,7 @@ export default function QuotesPage() {
           </SelectContent>
         </Select>
 
-        <Button size="sm" className="gap-2 ml-auto shrink-0">
+        <Button size="sm" className="gap-2 ml-auto shrink-0 cursor-pointer" onClick={() => setNewModalOpen(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Quote</span>
           <span className="sm:hidden">New</span>
@@ -183,7 +189,7 @@ export default function QuotesPage() {
 
       <p className="text-sm text-muted-foreground -mt-1">
         Showing <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
-        <span className="font-medium text-foreground">{adminQuotes.length}</span> quotes
+        <span className="font-medium text-foreground">{quotes.length}</span> quotes
       </p>
 
       {/* Pending approval callout */}
@@ -308,6 +314,18 @@ export default function QuotesPage() {
         quoteId={selectedQuoteId}
         onClose={() => setSelectedQuoteId(null)}
       />
+
+      <NewQuoteModal
+        open={newModalOpen}
+        onClose={() => setNewModalOpen(false)}
+        onSuccess={(id, status) => {
+          toast({
+            title: status === "Sent" ? "Quote sent to customer" : "Quote saved as draft",
+            description: `${id} has been ${status === "Sent" ? "sent" : "saved"}.`,
+          })
+        }}
+      />
+      <Toaster />
     </div>
   )
 }
