@@ -73,22 +73,24 @@ function SidebarBody({
     <>
       {/* ── Logo hero ─────────────────────────────────────────── */}
       <div className={cn(
-        "flex items-center border-b border-sidebar-border shrink-0",
-        isCollapsed ? "justify-center px-2 py-5" : "px-4 pt-5 pb-[18px]"
+        "flex items-center justify-center border-b border-sidebar-border shrink-0",
+        isCollapsed ? "px-2 py-5" : "px-4 py-4"
       )}>
         {isCollapsed ? (
           <div className="w-9 h-9 flex items-center justify-center">
-            <svg viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-              <polygon points="6,0 36,0 28,14 16,14" fill="#3b82f6" />
-              <polygon points="6,16 30,16 22,30 10,30" fill="#60a5fa" />
-              <polygon points="6,32 34,32 26,44 4,44" fill="#f59e0b" />
-            </svg>
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
+              alt="Equipify.ai"
+              className="w-9 h-9 object-contain select-none"
+              style={{ objectPosition: "left center" }}
+              draggable={false}
+            />
           </div>
         ) : (
           <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipifyai-logo-jQMbC4ulkrtsosGYjH8bqfcHgelhfK.png"
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
             alt="Equipify.ai"
-            className="h-10 w-auto max-w-[172px] object-contain select-none"
+            className="h-9 w-auto object-contain select-none mx-auto"
             draggable={false}
           />
         )}
