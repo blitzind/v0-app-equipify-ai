@@ -90,11 +90,13 @@ function MonthSection({
   plans,
   onCreateWo,
   createdIds,
+  onOpenPlan,
 }: {
   monthKey: string
   plans: MaintenancePlan[]
   onCreateWo: (plan: MaintenancePlan) => void
   createdIds: Set<string>
+  onOpenPlan: (id: string) => void
 }) {
   const [year, month] = monthKey.split("-").map(Number)
   const label = `${MONTHS[month]} ${year}`
@@ -138,9 +140,10 @@ function MonthSection({
               <div
                 key={plan.id}
                 className={cn(
-                  "flex items-stretch gap-0 bg-card rounded-lg border border-border overflow-hidden hover:shadow-sm transition-shadow",
+                  "flex items-stretch gap-0 bg-card rounded-lg border border-border overflow-hidden hover:shadow-sm transition-shadow cursor-pointer",
                   urgencyBg(days)
                 )}
+                onClick={() => onOpenPlan(plan.id)}
               >
                 {/* Date block */}
                 <div className="flex flex-col items-center justify-center px-4 py-3 border-r border-border bg-muted/30 min-w-[72px]">
@@ -189,7 +192,7 @@ function MonthSection({
                   {/* WO creation */}
                   {plan.autoCreateWorkOrder && (
                     <button
-                      onClick={() => onCreateWo(plan)}
+                      onClick={(e) => { e.stopPropagation(); onCreateWo(plan) }}
                       disabled={alreadyCreated || plan.status === "Paused"}
                       className={cn(
                         "shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border font-medium transition-colors",
@@ -311,6 +314,7 @@ export default function ServiceSchedulePage() {
   const [customerFilter, setCustomerFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
   const [createdIds, setCreatedIds] = useState<Set<string>>(new Set())
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
   // Show 4 months from current + offset
   const windowStart = useMemo(() => {
@@ -468,6 +472,7 @@ export default function ServiceSchedulePage() {
                 plans={monthPlans}
                 onCreateWo={handleCreateWo}
                 createdIds={createdIds}
+                onOpenPlan={setSelectedPlanId}
               />
             )
           })}
@@ -522,6 +527,11 @@ export default function ServiceSchedulePage() {
           <NotificationTimeline plans={plans} />
         </div>
       </div>
+
+      <MaintenancePlanDrawer
+        planId={selectedPlanId}
+        onClose={() => setSelectedPlanId(null)}
+      />
     </div>
   )
 }

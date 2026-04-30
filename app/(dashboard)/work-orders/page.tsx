@@ -260,7 +260,7 @@ function TableView({
 
 // ─── Calendar view ────────────────────────────────────────────────────────────
 
-function CalendarView({ workOrders }: { workOrders: WorkOrder[] }) {
+function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (id: string) => void }) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth()) // 0-indexed
@@ -357,14 +357,14 @@ function CalendarView({ workOrders }: { workOrders: WorkOrder[] }) {
                   </span>
                   <div className="flex flex-col gap-0.5 overflow-hidden">
                     {dayOrders.slice(0, 3).map((wo) => (
-                      <Link key={wo.id} href={`/work-orders/${wo.id}`}>
+                      <button key={wo.id} onClick={() => onOpen(wo.id)} className="text-left w-full">
                         <div className={cn(
                           "text-[10px] px-1.5 py-0.5 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity",
                           STATUS_STYLE[wo.status]
                         )}>
                           {wo.id} · {wo.technicianName.split(" ")[0]}
                         </div>
-                      </Link>
+                      </button>
                     ))}
                     {dayOrders.length > 3 && (
                       <span className="text-[10px] text-muted-foreground px-1">+{dayOrders.length - 3} more</span>
@@ -554,7 +554,7 @@ export default function WorkOrdersPage() {
             onOpen={setSelectedWoId}
           />
         )}
-        {view === "calendar" && <CalendarView workOrders={filtered} />}
+        {view === "calendar" && <CalendarView workOrders={filtered} onOpen={setSelectedWoId} />}
       </div>
 
       <CreateWorkOrderModal open={createOpen} onClose={() => setCreateOpen(false)} />

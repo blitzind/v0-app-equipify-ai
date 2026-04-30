@@ -107,7 +107,6 @@ export default function QuotesPage() {
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
-  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     let list = [...adminQuotes]
