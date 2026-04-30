@@ -191,8 +191,8 @@ export const MOCK_USERS: TenantUser[] = [
 ]
 
 export const INVOICE_HISTORY = [
-  { id: "INV-S001", date: "2026-04-01", amount: 31900, status: "Paid", description: "Growth Plan — Annual (Apr 2026)" },
-  { id: "INV-S002", date: "2026-03-01", amount: 31900, status: "Paid", description: "Growth Plan — Annual (Mar 2026)" },
-  { id: "INV-S003", date: "2026-02-01", amount: 31900, status: "Paid", description: "Growth Plan — Annual (Feb 2026)" },
-  { id: "INV-S004", date: "2026-01-01", amount: 31900, status: "Paid", description: "Growth Plan — Annual (Jan 2026)" },
+  { id: "INV-S001", date: "2026-04-01", amount: 31800, status: "Paid", description: "Growth Plan — Annual (Apr 2026)" },
+  { id: "INV-S002", date: "2026-03-01", amount: 31800, status: "Paid", description: "Growth Plan — Annual (Mar 2026)" },
+  { id: "INV-S003", date: "2026-02-01", amount: 31800, status: "Paid", description: "Growth Plan — Annual (Feb 2026)" },
+  { id: "INV-S004", date: "2026-01-01", amount: 31800, status: "Paid", description: "Growth Plan — Annual (Jan 2026)" },
 ]

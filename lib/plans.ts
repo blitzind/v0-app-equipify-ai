@@ -1,82 +1,111 @@
-export type PlanId = "starter" | "growth" | "enterprise"
+export type PlanId = "starter" | "growth" | "scale" | "enterprise"
 
 export interface Plan {
   id: PlanId
   name: string
   description: string
-  priceMonthly: number   // in cents
-  priceAnnual: number    // in cents (per month, billed annually)
+  priceMonthly: number   // in cents; 0 = custom/contact sales
+  priceAnnual: number    // in cents (per month, billed annually); 0 = custom
   seats: number          // max users; -1 = unlimited
   equipmentLimit: number // max equipment records; -1 = unlimited
   features: string[]
   stripeMonthlyPriceId: string
   stripeAnnualPriceId: string
   badge?: string
+  cta: string
+  isCustomPricing?: boolean
 }
 
 export const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
-    description: "For small service teams getting started.",
-    priceMonthly: 14900,   // $149/mo
-    priceAnnual: 11900,    // $119/mo billed annually
-    seats: 5,
-    equipmentLimit: 100,
+    description: "For small service teams ready to get organized and grow.",
+    priceMonthly: 19700,   // $197/mo
+    priceAnnual: 15800,    // $158/mo billed annually
+    seats: 3,
+    equipmentLimit: 250,
     features: [
-      "Up to 5 users",
-      "Up to 100 equipment records",
+      "Up to 3 users",
+      "Up to 250 equipment records",
       "Work orders & scheduling",
       "Customer portal",
-      "Email notifications",
+      "Quotes & invoices",
+      "Email reminders",
       "Basic reporting",
     ],
     stripeMonthlyPriceId: "price_starter_monthly",
     stripeAnnualPriceId: "price_starter_annual",
+    cta: "Start Starter Plan",
   },
   {
     id: "growth",
     name: "Growth",
-    description: "For growing teams that need automation and AI.",
-    priceMonthly: 39900,   // $399/mo
-    priceAnnual: 31900,    // $319/mo billed annually
-    seats: 20,
-    equipmentLimit: -1,
+    description: "For growing teams needing automation, maintenance plans, and visibility.",
+    priceMonthly: 39700,   // $397/mo
+    priceAnnual: 31800,    // $318/mo billed annually
+    seats: 10,
+    equipmentLimit: 2500,
     badge: "Most Popular",
     features: [
-      "Up to 20 users",
-      "Unlimited equipment",
+      "Up to 10 users",
+      "Up to 2,500 equipment records",
       "Everything in Starter",
-      "Maintenance plan engine",
-      "AI Insights module",
-      "SMS & email reminders",
-      "White-label branding",
+      "Maintenance plans",
+      "Automated reminders",
+      "Technician management",
+      "Advanced reports",
+      "Payment links",
       "Priority support",
     ],
     stripeMonthlyPriceId: "price_growth_monthly",
     stripeAnnualPriceId: "price_growth_annual",
+    cta: "Upgrade to Growth",
+  },
+  {
+    id: "scale",
+    name: "Scale",
+    description: "For established operations that need advanced controls and expansion.",
+    priceMonthly: 79700,   // $797/mo
+    priceAnnual: 63800,    // $638/mo billed annually
+    seats: 25,
+    equipmentLimit: -1,
+    features: [
+      "Up to 25 users",
+      "Unlimited equipment records",
+      "Everything in Growth",
+      "AI Insights",
+      "Multi-location support",
+      "Approval workflows",
+      "API access",
+      "Advanced analytics",
+      "Priority onboarding",
+    ],
+    stripeMonthlyPriceId: "price_scale_monthly",
+    stripeAnnualPriceId: "price_scale_annual",
+    cta: "Upgrade to Scale",
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    description: "For large operations with custom requirements.",
-    priceMonthly: 99900,   // $999/mo
-    priceAnnual: 79900,    // $799/mo billed annually
+    description: "For large organizations with custom requirements.",
+    priceMonthly: 0,
+    priceAnnual: 0,
     seats: -1,
     equipmentLimit: -1,
+    isCustomPricing: true,
     features: [
       "Unlimited users",
-      "Unlimited equipment",
-      "Everything in Growth",
-      "Custom roles & permissions",
       "SSO / SAML",
-      "Dedicated account manager",
-      "SLA uptime guarantee",
+      "Dedicated support",
+      "Data migration",
       "Custom integrations",
-      "On-premise option",
+      "White label options",
+      "SLA support",
     ],
     stripeMonthlyPriceId: "price_enterprise_monthly",
     stripeAnnualPriceId: "price_enterprise_annual",
+    cta: "Contact Sales",
   },
 ]
 
