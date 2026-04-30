@@ -401,17 +401,17 @@ export default function ServiceSchedulePage() {
       {/* Month navigation */}
       <div className="flex justify-end">
         <div className="flex items-center gap-2">
-          <button onClick={() => setMonthOffset((n) => n - 1)} className="p-2 rounded-md border border-border hover:bg-muted transition-colors" aria-label="Previous period">
-            <ChevronLeft className="w-4 h-4 text-foreground" />
-          </button>
+          <Button variant="outline" size="icon-sm" onClick={() => setMonthOffset((n) => n - 1)} aria-label="Previous period">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
           <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
             {monthLabel(monthKeys[0])} — {monthLabel(monthKeys[3])}
           </span>
-          <button onClick={() => setMonthOffset((n) => n + 1)} className="p-2 rounded-md border border-border hover:bg-muted transition-colors" aria-label="Next period">
-            <ChevronRight className="w-4 h-4 text-foreground" />
-          </button>
+          <Button variant="outline" size="icon-sm" onClick={() => setMonthOffset((n) => n + 1)} aria-label="Next period">
+            <ChevronRight className="w-4 h-4" />
+          </Button>
           {monthOffset !== 0 && (
-            <button onClick={() => setMonthOffset(0)} className="text-xs text-primary hover:underline">Today</button>
+            <Button variant="ghost" size="sm" onClick={() => setMonthOffset(0)}>Today</Button>
           )}
         </div>
       </div>

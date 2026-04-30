@@ -284,7 +284,7 @@ export default function CustomersPage() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30">
+                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors">
                     <TableCell>
                       <Link href={`/customers/${c.id}`} className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">

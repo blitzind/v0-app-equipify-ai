@@ -132,9 +132,9 @@ function ToastStack({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: n
         >
           {t.type === "success" && <CheckCircle2 className="w-4 h-4 shrink-0" />}
           {t.message}
-          <button onClick={() => onRemove(t.id)} className="ml-1 opacity-70 hover:opacity-100">
+          <Button variant="ghost" size="icon-sm" onClick={() => onRemove(t.id)} className="ml-1 opacity-70 hover:opacity-100 size-5">
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       ))}
     </div>
@@ -269,9 +269,9 @@ function AddTechModal({
             <h2 className="text-lg font-semibold text-foreground">Add Technician</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Fill in the details to create a new team member.</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -393,9 +393,9 @@ function ScheduleModal({
             <h2 className="text-lg font-semibold text-foreground">Schedule Job</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Assigning to <strong>{tech.name}</strong></p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -478,9 +478,9 @@ function MessageModal({
             <h2 className="text-lg font-semibold text-foreground">Send Message</h2>
             <p className="text-xs text-muted-foreground mt-0.5">To: <strong>{tech.name}</strong> &bull; {tech.email}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex border-b border-border px-6">
@@ -730,9 +730,9 @@ function ProfileDrawer({
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer">
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Tabs */}
@@ -1176,9 +1176,9 @@ export default function TechniciansPage() {
               {kpiFilter === "performance" && "Sorted by: Completion rate"}
               {kpiFilter === "expiring" && "Showing: Certs expiring in 90 days"}
             </span>
-            <button onClick={() => setKpiFilter(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer">
+            <Button variant="ghost" size="sm" onClick={() => setKpiFilter(null)} className="text-xs gap-1 h-7">
               <X className="w-3 h-3" /> Clear
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1288,7 +1288,7 @@ export default function TechniciansPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((tech) => (
-                  <TableRow key={tech.id} className="cursor-pointer hover:bg-secondary/40 transition-colors" onClick={() => setSelectedTech(tech)}>
+                  <TableRow key={tech.id} className="cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedTech(tech)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <TechAvatar tech={tech} size="sm" />

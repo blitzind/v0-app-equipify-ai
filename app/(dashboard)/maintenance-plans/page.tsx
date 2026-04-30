@@ -359,7 +359,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ────────────────────────���───────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────�����───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -466,7 +466,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             <h2 className="text-lg font-semibold text-foreground leading-tight">{plan.name}</h2>
             <p className="text-sm text-muted-foreground">{plan.customerName} — {plan.equipmentName}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+          <Button variant="ghost" size="icon-sm" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
 
         {/* Stat strip */}
@@ -537,9 +537,9 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Notes</label>
-                  <button onClick={handleSaveNotes} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                  <Button variant="ghost" size="sm" onClick={handleSaveNotes} className="text-xs h-7 gap-1 text-primary hover:text-primary">
                     <Save className="w-3 h-3" /> {saving ? "Saved" : "Save"}
-                  </button>
+                  </Button>
                 </div>
                 <textarea rows={3} className="input-base resize-none text-sm" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
               </div>

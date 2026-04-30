@@ -12,6 +12,7 @@ import {
   CreditCard, Check, ArrowRight, AlertTriangle,
   Download, ExternalLink, Zap, X,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
@@ -145,7 +146,7 @@ export default function BillingPage() {
             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-danger text-sm">
               <AlertTriangle size={14} />
               <span>Your subscription payment is past due. Please update your payment method to avoid service interruption.</span>
-              <button className="ml-auto text-xs font-medium underline">Update now</button>
+              <Button variant="ghost" size="sm" className="ml-auto text-xs h-7">Update now</Button>
             </div>
           )}
 
@@ -153,7 +154,7 @@ export default function BillingPage() {
             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-warning text-sm">
               <AlertTriangle size={14} />
               <span>Your free trial ends on <strong>{fmtIsoDate(workspace.trialEndsAt ?? workspace.currentPeriodEnd)}</strong>. Add a payment method to continue after trial.</span>
-              <button className="ml-auto text-xs font-medium underline">Add card</button>
+              <Button variant="ghost" size="sm" className="ml-auto text-xs h-7">Add card</Button>
             </div>
           )}
         </div>
@@ -168,13 +169,13 @@ export default function BillingPage() {
           </div>
           <div className="flex items-center gap-1 p-1 rounded-lg border border-border bg-secondary">
             {(["monthly", "annual"] as const).map((cycle) => (
-              <button key={cycle} onClick={() => setBillingCycle(cycle)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${billingCycle === cycle ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+              <Button key={cycle} onClick={() => setBillingCycle(cycle)} variant="ghost" size="sm"
+                className={`text-xs h-7 ${billingCycle === cycle ? "bg-white text-foreground shadow-sm hover:bg-white" : "text-muted-foreground hover:text-foreground"}`}>
                 {cycle === "monthly" ? "Monthly" : "Annual"}
                 {cycle === "annual" && (
                   <span className="ml-1 text-[9px] font-bold ds-change-positive">-20%</span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -259,9 +260,9 @@ export default function BillingPage() {
                   </span>
                 </td>
                 <td className="px-6 py-3 text-right">
-                  <button className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
                     <Download size={12} /> PDF
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -278,9 +279,9 @@ export default function BillingPage() {
                 <CreditCard size={15} />
                 {PLANS.find(p => p.id === checkoutPlan)?.name} — {billingCycle}
               </h3>
-              <button onClick={closeCheckout} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <Button variant="ghost" size="icon-sm" onClick={closeCheckout} className="text-gray-400 hover:text-gray-600">
                 <X size={18} />
-              </button>
+              </Button>
             </div>
             <div className="p-5">
               {checkoutError ? (
@@ -316,10 +317,9 @@ export default function BillingPage() {
                       <li>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
                     </ul>
                   </div>
-                  <button onClick={() => simulateUpgrade(checkoutPlan)}
-                    className="w-full h-9 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5">
+                  <Button onClick={() => simulateUpgrade(checkoutPlan)} className="w-full">
                     <Check size={14} /> Simulate upgrade to {PLANS.find(p => p.id === checkoutPlan)?.name}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

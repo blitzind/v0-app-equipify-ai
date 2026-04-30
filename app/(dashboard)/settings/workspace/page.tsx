@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { useTenant } from "@/lib/tenant-store"
 import { Upload, Check, Globe, Palette, Building2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 const TIMEZONES = ["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Europe/London","Asia/Tokyo"]
 const DATE_FORMATS = ["MM/DD/YYYY","DD/MM/YYYY","YYYY-MM-DD"]
@@ -124,14 +125,12 @@ export default function WorkspacePage() {
                     : <Upload size={20} className="text-muted-foreground" />}
                 </div>
                 <div>
-                  <button onClick={() => fileRef.current?.click()}
-                    className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()} className="text-primary hover:text-primary gap-1">
                     <Upload size={13} /> Upload logo
-                  </button>
+                  </Button>
                   <p className="text-xs text-muted-foreground mt-1">PNG or SVG, max 2MB. Recommended: 200×200px.</p>
                   {workspace.logoUrl && (
-                    <button onClick={() => dispatch({ type: "SET_LOGO", payload: "" })}
-                      className="text-xs ds-text-danger hover:underline mt-1">Remove</button>
+                    <Button variant="ghost" size="sm" onClick={() => dispatch({ type: "SET_LOGO", payload: "" })} className="text-xs ds-text-danger h-6 px-1 mt-1">Remove</Button>
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
@@ -185,18 +184,17 @@ export default function WorkspacePage() {
             <p className="text-sm font-medium text-foreground">Delete workspace</p>
             <p className="text-xs text-muted-foreground">Permanently delete this workspace and all its data. This action cannot be undone.</p>
           </div>
-          <button className="px-3 h-8 text-sm font-medium border border-destructive/30 text-destructive rounded-md hover:bg-destructive/5 transition-colors">
+          <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive">
             Delete workspace
-          </button>
+          </Button>
         </div>
       </SettingCard>
 
       {/* Save */}
       <div className="flex justify-end">
-        <button onClick={handleSave}
-          className={`flex items-center gap-1.5 h-9 px-5 text-sm font-medium rounded-md transition-colors ${saved ? "bg-[var(--ds-success-subtle)] text-white" : "bg-primary text-primary-foreground hover:opacity-90"}`}>
+        <Button onClick={handleSave} className={saved ? "bg-[var(--ds-success-subtle)] hover:bg-[var(--ds-success-subtle)] text-white" : ""}>
           {saved ? <><Check size={14} /> Saved</> : "Save changes"}
-        </button>
+        </Button>
       </div>
     </div>
   )

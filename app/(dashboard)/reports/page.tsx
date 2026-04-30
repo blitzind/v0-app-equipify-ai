@@ -10,6 +10,7 @@ import {
   AlertTriangle, ShieldAlert, RefreshCcw, DollarSign,
   ChevronDown, Calendar, User, MapPin, Filter, X,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   revenueData, repeatRepairs, expiringWarranties,
   customers, technicians, workOrders,
@@ -279,12 +280,12 @@ export default function ReportsPage() {
           <div className="flex-1" />
 
           {/* Export buttons */}
-          <button className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-secondary hover:bg-accent transition-colors text-foreground">
+          <Button variant="outline" size="sm">
             <Download className="w-3.5 h-3.5" /> CSV
-          </button>
-          <button className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-secondary hover:bg-accent transition-colors text-foreground">
+          </Button>
+          <Button variant="outline" size="sm">
             <FileText className="w-3.5 h-3.5" /> PDF
-          </button>
+          </Button>
         </div>
       </div>
 

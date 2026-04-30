@@ -8,6 +8,7 @@ import {
   AlertTriangle, Clock, ArrowUpRight, BarChart3, Users,
   Zap, FileText,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell,
@@ -93,11 +94,9 @@ function InsightCard({ insight, onDismiss }: { insight: AiInsight; onDismiss: (i
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SeverityBadge severity={insight.severity} />
-            <button onClick={() => onDismiss(insight.id)}
-              className="p-0.5 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors"
-              aria-label="Dismiss insight">
+            <Button variant="ghost" size="icon-sm" onClick={() => onDismiss(insight.id)} className="size-6 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100" aria-label="Dismiss insight">
               <X size={13} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -131,10 +130,9 @@ function InsightCard({ insight, onDismiss }: { insight: AiInsight; onDismiss: (i
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setExpanded(!expanded)}
-              className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">
+            <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)} className="text-xs text-zinc-400 hover:text-zinc-600 h-7">
               {expanded ? "Show less" : "Show more"}
-            </button>
+            </Button>
             <Link href={insight.actionHref}
               className="inline-flex items-center gap-1 text-xs font-medium ds-text-info hover:opacity-80 bg-[var(--ds-info-bg)] hover:bg-[var(--ds-info-border)] px-3 py-1.5 rounded-lg transition-colors">
               {insight.actionLabel} <ChevronRight size={12} />
@@ -196,12 +194,12 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-lg transition-colors">
+            <Button variant="outline" size="sm" className="text-zinc-600 bg-zinc-100 hover:bg-zinc-200 border-zinc-200">
               <Download size={12} /> Export PDF
-            </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors">
+            </Button>
+            <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100">
               <X size={16} />
-            </button>
+            </Button>
           </div>
         </div>
 

@@ -330,28 +330,28 @@ export default function EquipmentPage() {
                   />
                 </TableHead>
                 <TableHead>
-                  <button onClick={() => toggleSort("model")} className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => toggleSort("model")} className="ds-btn-sort">
                     Model <SortIcon col="model" />
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button onClick={() => toggleSort("customerName")} className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => toggleSort("customerName")} className="ds-btn-sort">
                     Customer <SortIcon col="customerName" />
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button onClick={() => toggleSort("category")} className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => toggleSort("category")} className="ds-btn-sort">
                     Category <SortIcon col="category" />
                   </button>
                 </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</TableHead>
+                <TableHead className="ds-btn-sort pointer-events-none">Status</TableHead>
                 <TableHead>
-                  <button onClick={() => toggleSort("lastServiceDate")} className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => toggleSort("lastServiceDate")} className="ds-btn-sort">
                     Last Service <SortIcon col="lastServiceDate" />
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button onClick={() => toggleSort("nextDueDate")} className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={() => toggleSort("nextDueDate")} className="ds-btn-sort">
                     Next Due <SortIcon col="nextDueDate" />
                   </button>
                 </TableHead>
@@ -367,7 +367,7 @@ export default function EquipmentPage() {
                 </TableRow>
               ) : (
                 filtered.map((eq) => (
-                  <TableRow key={eq.id} className={cn("group cursor-pointer hover:bg-muted/30", selected.has(eq.id) && "bg-primary/5")}>
+                  <TableRow key={eq.id} className={cn("group cursor-pointer hover:bg-muted/30 transition-colors", selected.has(eq.id) && "bg-primary/5")}>
                     <TableCell onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}>
                       <Checkbox
                         checked={selected.has(eq.id)}

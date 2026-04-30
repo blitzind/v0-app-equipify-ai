@@ -219,7 +219,7 @@ function TableView({
         </TableHeader>
         <TableBody>
           {workOrders.map((wo) => (
-            <TableRow key={wo.id} className="hover:bg-muted/20 cursor-pointer">
+            <TableRow key={wo.id} className="hover:bg-muted/30 cursor-pointer transition-colors">
               <TableCell>
                 <Link href={`/work-orders/${wo.id}`} className="font-mono text-xs text-primary hover:underline">
                   {wo.id}
@@ -516,7 +516,7 @@ export default function WorkOrdersPage() {
                 "flex items-center gap-1.5 px-3 py-2 text-xs transition-colors",
                 view === mode
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
               )}
             >
               <Icon className="w-3.5 h-3.5" />

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useTenant } from "@/lib/tenant-store"
 import type { UserRole, TenantUser } from "@/lib/tenant-data"
 import { UserPlus, MoreHorizontal, Check, X, Mail, Shield, ChevronDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 const ROLES: UserRole[] = ["Admin", "Manager", "Tech", "Read Only"]
 
@@ -86,11 +87,9 @@ export default function TeamPage() {
               {usedSeats} of {seatLimit === -1 ? "unlimited" : seatLimit} seats used
             </p>
           </div>
-          <button onClick={() => setInviteOpen((v) => !v)}
-            disabled={atLimit}
-            className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity">
+          <Button onClick={() => setInviteOpen((v) => !v)} disabled={atLimit} size="sm">
             <UserPlus size={14} /> Invite member
-          </button>
+          </Button>
         </div>
 
         {/* Seat usage bar */}
@@ -126,14 +125,13 @@ export default function TeamPage() {
                 className="input-base w-36">
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
-              <button onClick={sendInvite}
-                className={`flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md transition-colors ${inviteSent ? "bg-[var(--ds-success-subtle)] text-white" : "bg-primary text-primary-foreground hover:opacity-90"}`}>
+              <Button onClick={sendInvite}
+                className={inviteSent ? "bg-[var(--ds-success-subtle)] hover:bg-[var(--ds-success-subtle)] text-white" : ""}>
                 {inviteSent ? <><Check size={13} /> Sent!</> : "Send invite"}
-              </button>
-              <button onClick={() => setInviteOpen(false)}
-                className="h-9 w-9 flex items-center justify-center rounded-md border border-border bg-white text-muted-foreground hover:text-foreground">
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setInviteOpen(false)}>
                 <X size={14} />
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -172,10 +170,9 @@ export default function TeamPage() {
                 <td className="px-6 py-3 text-right">
                   {user.id !== currentUser.id && currentUser.role === "Admin" && (
                     <div className="relative inline-block">
-                      <button onClick={() => setMenuOpen(menuOpen === user.id ? null : user.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                      <Button variant="ghost" size="icon-sm" onClick={() => setMenuOpen(menuOpen === user.id ? null : user.id)}>
                         <MoreHorizontal size={14} />
-                      </button>
+                      </Button>
                       {menuOpen === user.id && (
                         <div className="absolute right-0 top-8 z-50 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
                           <div className="px-3 py-2 border-b border-border">
@@ -183,18 +180,18 @@ export default function TeamPage() {
                           </div>
                           {ROLES.map((r) => (
                             <button key={r} onClick={() => changeRole(user.id, r)}
-                              className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-secondary transition-colors">
+                              className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-secondary transition-colors cursor-default">
                               <RoleBadge role={r} />
                               {user.role === r && <Check size={12} className="text-primary" />}
                             </button>
                           ))}
                           <div className="border-t border-border">
                             <button onClick={() => suspendUser(user.id)}
-                              className="w-full text-left px-3 py-1.5 text-sm ds-text-warning hover:bg-[var(--ds-warning-bg)] transition-colors">
+                              className="w-full text-left px-3 py-1.5 text-sm ds-text-warning hover:bg-[var(--ds-warning-bg)] transition-colors cursor-default">
                               Suspend
                             </button>
                             <button onClick={() => removeUser(user.id)}
-                              className="w-full text-left px-3 py-1.5 text-sm ds-text-danger hover:bg-[var(--ds-danger-bg)] transition-colors">
+                              className="w-full text-left px-3 py-1.5 text-sm ds-text-danger hover:bg-[var(--ds-danger-bg)] transition-colors cursor-default">
                               Remove from workspace
                             </button>
                           </div>

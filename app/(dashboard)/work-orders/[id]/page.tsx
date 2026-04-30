@@ -217,7 +217,7 @@ function SignatureCanvas({
   )
 }
 
-// ─── Parts table ─────────────────────────────────────────────────────────────
+// ─── Parts table ────────────────────────────────────��────────────────────────
 
 function PartsTable({
   parts,
@@ -315,9 +315,9 @@ function PartsTable({
                 </TableCell>
                 {editable && (
                   <TableCell>
-                    <button onClick={() => remove(p.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <Button variant="ghost" size="icon-sm" onClick={() => remove(p.id)} className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                   </TableCell>
                 )}
               </TableRow>
