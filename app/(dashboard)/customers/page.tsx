@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { customers } from "@/lib/mock-data"
+import { useCustomers } from "@/lib/customer-store"
 import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -109,6 +109,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 }
 
 export default function CustomersPage() {
+  const { customers } = useCustomers()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "Inactive">("all")
   const [sortKey, setSortKey] = useState<SortKey>("company")

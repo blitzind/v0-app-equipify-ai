@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { equipment, workOrders } from "@/lib/mock-data"
+import { useEquipment } from "@/lib/equipment-store"
+import { customers } from "@/lib/mock-data"
 import type { Equipment } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,7 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { Wrench, ClipboardList, FileText, AlertTriangle, Calendar } from "lucide-react"
+import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check } from "lucide-react"
 
 let toastCounter = 0
 
@@ -20,6 +21,8 @@ const STATUS_COLORS: Record<Equipment["status"], string> = {
   "Out of Service": "bg-destructive/15 text-destructive border-destructive/30",
   "In Repair": "bg-[color:var(--status-info)]/15 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
 }
+
+const STATUSES: Equipment["status"][] = ["Active", "Needs Service", "In Repair", "Out of Service"]
 
 function fmtDate(iso: string) {
   if (!iso) return "—"
@@ -32,21 +35,124 @@ function daysToDue(nextDueDate: string) {
   return Math.ceil((due - today) / (1000 * 60 * 60 * 24))
 }
 
+// ─── Shared input components ──────────────────────────────────────────────────
+
+function EditInput({ value, onChange, type = "text", placeholder }: { value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+    />
+  )
+}
+
+function EditSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+    >
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  )
+}
+
+function EditTextarea({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <textarea
+      rows={3}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+    />
+  )
+}
+
+// ─── Editable row ─────────────────────────────────────────────────────────────
+
+function EditableRow({ label, value, editing, children }: { label: string; value: React.ReactNode; editing: boolean; children?: React.ReactNode }) {
+  return editing ? (
+    <div className="flex items-start justify-between gap-4 py-1.5 border-b border-border/50 last:border-0">
+      <span className="text-xs text-muted-foreground shrink-0 pt-1.5 w-28">{label}</span>
+      <div className="flex-1">{children}</div>
+    </div>
+  ) : (
+    <DrawerRow label={label} value={value} />
+  )
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface EquipmentDrawerProps {
   equipmentId: string | null
   onClose: () => void
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) {
+  const { equipment, updateEquipment } = useEquipment()
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Partial<Equipment>>({})
 
   const eq = equipmentId ? equipment.find((e) => e.id === equipmentId) ?? null : null
-  const eqWOs = eq ? workOrders.filter((w) => w.equipmentId === eq.id) : []
+
+  // Reset edit state when drawer opens on a different item
+  useEffect(() => {
+    setEditing(false)
+    setDraft({})
+  }, [equipmentId])
 
   function toast(message: string) {
     const id = ++toastCounter
     setToasts((prev) => [...prev, { id, message, type: "success" }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500)
+  }
+
+  function startEdit() {
+    if (!eq) return
+    setDraft({
+      model: eq.model,
+      manufacturer: eq.manufacturer,
+      category: eq.category,
+      serialNumber: eq.serialNumber,
+      customerId: eq.customerId,
+      location: eq.location,
+      installDate: eq.installDate,
+      warrantyExpiration: eq.warrantyExpiration,
+      lastServiceDate: eq.lastServiceDate,
+      nextDueDate: eq.nextDueDate,
+      status: eq.status,
+      notes: eq.notes,
+    })
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+    setDraft({})
+  }
+
+  function saveEdit() {
+    if (!eq) return
+    const selectedCustomer = draft.customerId ? customers.find((c) => c.id === draft.customerId) : null
+    updateEquipment(eq.id, {
+      ...draft,
+      customerName: selectedCustomer ? selectedCustomer.company : eq.customerName,
+    })
+    setEditing(false)
+    setDraft({})
+    toast("Equipment updated successfully")
+  }
+
+  function setField(field: keyof Equipment, value: string) {
+    setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
   if (!eq) return null
@@ -59,14 +165,14 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
   const warrantyLabel = warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? `Expires in ${warrantyDays}d` : fmtDate(eq.warrantyExpiration)
   const warrantyColor = warrantyDays < 0 ? "text-destructive" : warrantyDays <= 90 ? "text-[color:var(--status-warning)]" : "text-foreground"
 
-  const timelineItems = [
-    ...eq.serviceHistory.slice(0, 6).map((h) => ({
-      date: h.date,
-      label: `${h.type} — ${h.workOrderId}`,
-      description: h.description + (h.technician ? ` · ${h.technician}` : ""),
-      accent: (h.status === "Completed" ? "success" : "muted") as "success" | "muted",
-    })),
-  ]
+  const timelineItems = eq.serviceHistory.slice(0, 6).map((h) => ({
+    date: h.date,
+    label: `${h.type} — ${h.workOrderId}`,
+    description: h.description + (h.technician ? ` · ${h.technician}` : ""),
+    accent: (h.status === "Completed" ? "success" : "muted") as "success" | "muted",
+  }))
+
+  const currentStatus = (draft.status ?? eq.status) as Equipment["status"]
 
   return (
     <>
@@ -77,23 +183,37 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
         subtitle={`${eq.id} · ${eq.manufacturer}`}
         width="lg"
         badge={
-          <Badge variant="secondary" className={cn("text-xs border", STATUS_COLORS[eq.status])}>
-            {eq.status}
+          <Badge variant="secondary" className={cn("text-xs border", STATUS_COLORS[currentStatus])}>
+            {currentStatus}
           </Badge>
         }
         actions={
-          <>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => toast("Work order created")}>
-              <ClipboardList className="w-3.5 h-3.5" /> Create WO
-            </Button>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => toast("Service log downloaded")}>
-              <FileText className="w-3.5 h-3.5" /> Export Log
-            </Button>
-          </>
+          editing ? (
+            <>
+              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={saveEdit}>
+                <Check className="w-3.5 h-3.5" /> Save Changes
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>
+                <X className="w-3.5 h-3.5" /> Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order created")}>
+                <ClipboardList className="w-3.5 h-3.5" /> Create WO
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Service log downloaded")}>
+                <FileText className="w-3.5 h-3.5" /> Export Log
+              </Button>
+            </>
+          )
         }
       >
         {/* Service urgency banner */}
-        {days <= 7 && (
+        {days <= 7 && !editing && (
           <div className={cn(
             "flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium",
             days < 0
@@ -105,41 +225,76 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
           </div>
         )}
 
-        {/* Details */}
+        {/* Equipment Details */}
         <DrawerSection title="Equipment Details">
-          <DrawerRow label="Serial Number" value={eq.serialNumber} />
-          <DrawerRow label="Category" value={eq.category} />
-          <DrawerRow label="Customer" value={eq.customerName} />
-          <DrawerRow label="Location" value={eq.location} />
-          <DrawerRow label="Installed" value={fmtDate(eq.installDate)} />
+          <EditableRow label="Model" value={eq.model} editing={editing}>
+            <EditInput value={draft.model ?? ""} onChange={(v) => setField("model", v)} />
+          </EditableRow>
+          <EditableRow label="Manufacturer" value={eq.manufacturer} editing={editing}>
+            <EditInput value={draft.manufacturer ?? ""} onChange={(v) => setField("manufacturer", v)} />
+          </EditableRow>
+          <EditableRow label="Category" value={eq.category} editing={editing}>
+            <EditInput value={draft.category ?? ""} onChange={(v) => setField("category", v)} />
+          </EditableRow>
+          <EditableRow label="Serial Number" value={eq.serialNumber} editing={editing}>
+            <EditInput value={draft.serialNumber ?? ""} onChange={(v) => setField("serialNumber", v)} />
+          </EditableRow>
+          <EditableRow label="Customer" value={eq.customerName} editing={editing}>
+            <select
+              value={draft.customerId ?? ""}
+              onChange={(e) => setField("customerId", e.target.value)}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+            >
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+            </select>
+          </EditableRow>
+          <EditableRow label="Location" value={eq.location} editing={editing}>
+            <EditInput value={draft.location ?? ""} onChange={(v) => setField("location", v)} />
+          </EditableRow>
+          <EditableRow label="Status" value={
+            <Badge variant="secondary" className={cn("text-[10px] border", STATUS_COLORS[eq.status])}>{eq.status}</Badge>
+          } editing={editing}>
+            <EditSelect value={draft.status ?? eq.status} onChange={(v) => setField("status", v)} options={STATUSES} />
+          </EditableRow>
         </DrawerSection>
 
-        {/* Service */}
+        {/* Service Information */}
         <DrawerSection title="Service Information">
-          <DrawerRow label="Last Service" value={fmtDate(eq.lastServiceDate)} />
-          <DrawerRow
+          <EditableRow label="Installed" value={fmtDate(eq.installDate)} editing={editing}>
+            <EditInput type="date" value={draft.installDate ?? ""} onChange={(v) => setField("installDate", v)} />
+          </EditableRow>
+          <EditableRow label="Last Service" value={fmtDate(eq.lastServiceDate)} editing={editing}>
+            <EditInput type="date" value={draft.lastServiceDate ?? ""} onChange={(v) => setField("lastServiceDate", v)} />
+          </EditableRow>
+          <EditableRow
             label="Next Due"
             value={<span className={cn("font-semibold", daysColor)}>{fmtDate(eq.nextDueDate)} · {daysLabel}</span>}
-          />
-          <DrawerRow
+            editing={editing}
+          >
+            <EditInput type="date" value={draft.nextDueDate ?? ""} onChange={(v) => setField("nextDueDate", v)} />
+          </EditableRow>
+          <EditableRow
             label="Warranty"
             value={<span className={warrantyColor}>{warrantyLabel}</span>}
-          />
+            editing={editing}
+          >
+            <EditInput type="date" value={draft.warrantyExpiration ?? ""} onChange={(v) => setField("warrantyExpiration", v)} />
+          </EditableRow>
         </DrawerSection>
 
-        {/* Work Order summary */}
-        <DrawerSection title={`Work Orders (${eqWOs.length})`}>
+        {/* Work Orders */}
+        <DrawerSection title={`Work Orders`}>
           <div className="space-y-1.5">
-            {eqWOs.slice(0, 5).map((wo) => (
-              <div key={wo.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+            {eq.serviceHistory.slice(0, 5).map((h) => (
+              <div key={h.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
                 <div>
-                  <p className="text-xs font-semibold font-mono text-primary">{wo.id}</p>
-                  <p className="text-[10px] text-muted-foreground">{wo.type} · {wo.technicianName}</p>
+                  <p className="text-xs font-semibold font-mono text-primary">{h.workOrderId}</p>
+                  <p className="text-[10px] text-muted-foreground">{h.type} · {h.technician}</p>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{wo.status}</Badge>
+                <Badge variant="secondary" className="text-[10px] shrink-0">{h.status}</Badge>
               </div>
             ))}
-            {eqWOs.length === 0 && (
+            {eq.serviceHistory.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No work orders for this equipment.</p>
             )}
           </div>
@@ -154,7 +309,7 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
           )}
         </DrawerSection>
 
-        {/* Manuals / Photos */}
+        {/* Documents */}
         <DrawerSection title="Documents & Photos">
           {eq.manuals.length > 0 ? (
             <div className="space-y-1.5">
@@ -171,13 +326,21 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
         </DrawerSection>
 
         {/* Notes */}
-        {eq.notes && (
-          <DrawerSection title="Notes">
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
-              {eq.notes}
-            </p>
-          </DrawerSection>
-        )}
+        <DrawerSection title="Notes">
+          {editing ? (
+            <EditTextarea
+              value={draft.notes ?? ""}
+              onChange={(v) => setField("notes", v)}
+              placeholder="Add notes about this equipment..."
+            />
+          ) : (
+            eq.notes ? (
+              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">{eq.notes}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
+            )
+          )}
+        </DrawerSection>
       </DetailDrawer>
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

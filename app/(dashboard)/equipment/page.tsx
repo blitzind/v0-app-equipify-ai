@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
-import { equipment } from "@/lib/mock-data"
+import { useEquipment } from "@/lib/equipment-store"
 import type { Equipment } from "@/lib/mock-data"
+import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,7 +63,7 @@ const statusColors: Record<Equipment["status"], string> = {
 }
 
 const allStatuses = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
-const allCategories = [...new Set(equipment.map((e) => e.category))].sort()
+// allCategories computed inside component from store
 
 /** Format an ISO date string (YYYY-MM-DD) using UTC so server and client agree. */
 function fmtDate(iso: string) {
@@ -151,6 +152,9 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 }
 
 export default function EquipmentPage() {
+  const { equipment } = useEquipment()
+  const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
+
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
@@ -159,6 +163,7 @@ export default function EquipmentPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -286,7 +291,7 @@ export default function EquipmentPage() {
           </button>
         </div>
 
-        <Button size="sm" className="gap-2 shrink-0">
+        <Button size="sm" className="gap-2 shrink-0 cursor-pointer" onClick={() => setAddModalOpen(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add Equipment</span>
           <span className="sm:hidden">Add</span>
@@ -446,6 +451,11 @@ export default function EquipmentPage() {
       <EquipmentDrawer
         equipmentId={selectedEquipmentId}
         onClose={() => setSelectedEquipmentId(null)}
+      />
+
+      <AddEquipmentModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
       />
     </div>
   )
