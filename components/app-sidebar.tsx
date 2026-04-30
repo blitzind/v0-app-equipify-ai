@@ -156,8 +156,6 @@ function SidebarBody({
                 isCollapsed ? "justify-center h-11 w-11 mx-auto" : "h-11 px-3",
                 active
                   ? "bg-primary text-white font-medium shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-                  : highlight
-                  ? "text-[var(--ai-purple)] hover:bg-sidebar-accent/70 hover:text-white"
                   : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
@@ -166,15 +164,13 @@ function SidebarBody({
               )}
               <Icon className={cn(
                 "w-[18px] h-[18px] shrink-0 transition-all duration-100",
-                active ? "text-white"
-                  : highlight ? "text-[var(--ai-purple)] group-hover:text-white"
-                  : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground"
+                active ? "text-white" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground"
               )} />
               {!isCollapsed && (
                 <>
                   <span className="truncate flex-1 font-medium">{label}</span>
                   {highlight && !active && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--ai-purple)]/15 text-[var(--ai-purple)]">AI</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">AI</span>
                   )}
                 </>
               )}
