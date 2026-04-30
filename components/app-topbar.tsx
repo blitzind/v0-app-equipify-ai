@@ -66,7 +66,7 @@ const ACCOUNT_SECTIONS = [
   },
 ]
 
-export function AppTopbar({ title }: { title: string }) {
+export function AppTopbar() {
   const pathname = usePathname()
   const [searchFocused, setSearchFocused] = useState(false)
   const [hubOpen, setHubOpen] = useState(false)
@@ -97,9 +97,6 @@ export function AppTopbar({ title }: { title: string }) {
 
   return (
     <header className="flex items-center h-16 px-6 bg-card border-b border-border gap-4 shrink-0 relative z-30">
-      {/* Page title */}
-      <h1 className="text-base font-semibold text-foreground mr-4 shrink-0">{title}</h1>
-
       {/* Search */}
       <div
         className={cn(

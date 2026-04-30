@@ -359,7 +359,7 @@ function AddTechModal({
   )
 }
 
-// ─── Schedule Modal ───────────────────────────────────────────────────────────
+// ─── Schedule Modal ───────────────────────────────────────────────────��───────
 
 function ScheduleModal({
   tech, onClose, onSave,
@@ -1129,14 +1129,8 @@ export default function TechniciansPage() {
     <>
       <div className="flex flex-col gap-6 p-6">
 
-        {/* Page header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Technicians</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage your workforce, assignments, certifications, and productivity.
-            </p>
-          </div>
+        {/* Add Technician action */}
+        <div className="flex justify-end">
           <Button className="gap-2 shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
             <Plus className="w-4 h-4" /> Add Technician
           </Button>

@@ -219,20 +219,6 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-6 p-6 max-w-screen-xl mx-auto">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Track revenue, service performance, asset activity, and technician productivity.
-          </p>
-        </div>
-        <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
-          <Download className="w-4 h-4" />
-          Export Report
-        </button>
-      </div>
-
       {/* ── Filter bar ── */}
       <div className="bg-card border border-border rounded-xl px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
