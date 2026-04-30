@@ -2,72 +2,93 @@
 
 import { usePathname } from "next/navigation"
 import { AppTopbar } from "@/components/app-topbar"
+import {
+  LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
+  ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
+  CreditCard, Shield, Sparkles, Plus,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-// ─── Route meta ──────────────────────────────────────────────────────────────
-// Each entry defines the hero title and subtitle for a route.
-// Routes listed in HERO_SUPPRESS will NOT render a PageHero (they manage their own).
+// ─── Route meta ───────────────────────────────────────────────────────────────
 
 interface RouteMeta {
   title: string
   subtitle: string
+  icon: LucideIcon
+  cta?: { label: string; href?: string }
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
   "/": {
     title: "Dashboard",
     subtitle: "Your real-time overview of equipment, work orders, and revenue.",
+    icon: LayoutDashboard,
   },
   "/customers": {
     title: "Customers",
     subtitle: "Manage accounts, contracts, equipment, and service history.",
+    icon: Users,
+    cta: { label: "+ New Customer" },
   },
   "/equipment": {
     title: "Equipment",
     subtitle: "Track every asset — service status, warranty, and maintenance history.",
+    icon: Wrench,
+    cta: { label: "+ Add Equipment" },
   },
   "/work-orders": {
     title: "Work Orders",
     subtitle: "Create, assign, and monitor all active and historical work orders.",
+    icon: ClipboardList,
+    cta: { label: "+ New Work Order" },
   },
   "/service-schedule": {
     title: "Service Schedule",
-    subtitle: "View and manage upcoming preventive maintenance and field visits.",
+    subtitle: "Upcoming maintenance services grouped by month, with notification and work order previews.",
+    icon: CalendarClock,
   },
   "/maintenance-plans": {
     title: "Maintenance Plans",
     subtitle: "Recurring service schedules with automated notifications and work order creation.",
+    icon: ShieldCheck,
+    cta: { label: "+ New Plan" },
   },
   "/technicians": {
     title: "Technicians",
     subtitle: "Manage your workforce, assignments, certifications, and productivity.",
+    icon: HardHat,
+    cta: { label: "+ Add Technician" },
   },
   "/reports": {
     title: "Reports",
     subtitle: "Track revenue, service performance, asset activity, and technician productivity.",
+    icon: BarChart3,
+    cta: { label: "Export Report" },
   },
   "/portal": {
     title: "Customer Portal",
     subtitle: "Self-service access for customers to view equipment, requests, and invoices.",
-  },
-  "/billing": {
-    title: "Billing",
-    subtitle: "Manage invoices, quotes, and payment history.",
+    icon: Globe,
   },
   "/settings/workspace": {
     title: "Workspace Settings",
     subtitle: "Configure your company profile, branding, and regional preferences.",
+    icon: Building2,
   },
   "/settings/team": {
     title: "Team Members",
     subtitle: "Invite users, assign roles, and manage seat allocations.",
+    icon: Users,
   },
   "/settings/billing": {
     title: "Billing & Subscription",
     subtitle: "Manage your plan, payment methods, and invoice history.",
+    icon: CreditCard,
   },
   "/settings/permissions": {
     title: "Permissions",
     subtitle: "Role-based access control across all modules.",
+    icon: Shield,
   },
 }
 
@@ -77,23 +98,32 @@ const HERO_SUPPRESS = new Set(["/insights"])
 function resolveMeta(pathname: string): RouteMeta | null {
   if (HERO_SUPPRESS.has(pathname)) return null
   if (ROUTE_META[pathname]) return ROUTE_META[pathname]
-  if (pathname.startsWith("/customers/")) return { title: "Customer Detail", subtitle: "Full account overview — equipment, work orders, and service history." }
-  if (pathname.startsWith("/work-orders/")) return { title: "Work Order Detail", subtitle: "Full details, activity timeline, and technician notes." }
+  if (pathname.startsWith("/customers/")) return { title: "Customer Detail", subtitle: "Full account overview — equipment, work orders, and service history.", icon: Users }
+  if (pathname.startsWith("/work-orders/")) return { title: "Work Order Detail", subtitle: "Full details, activity timeline, and technician notes.", icon: ClipboardList }
   if (pathname.startsWith("/settings/")) return ROUTE_META["/settings/workspace"] ?? null
   return null
 }
 
 // ─── PageHero ─────────────────────────────────────────────────────────────────
 
-function PageHero({ title, subtitle }: { title: string; subtitle: string }) {
+function PageHero({ title, subtitle, icon: Icon }: { title: string; subtitle: string; icon: LucideIcon }) {
   return (
-    <div className="px-6 pt-6 pb-4 border-b border-border bg-card shrink-0">
-      <h1 className="text-xl font-bold text-foreground tracking-tight leading-tight text-balance">
-        {title}
-      </h1>
-      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-        {subtitle}
-      </p>
+    <div className="px-6 pt-5 pb-1 shrink-0">
+      <div className="flex items-center justify-between gap-4 bg-card border border-border rounded-xl shadow-sm px-6 py-5">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
+              {title}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed truncate">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -107,7 +137,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppTopbar />
-      {meta && <PageHero title={meta.title} subtitle={meta.subtitle} />}
+      {meta && <PageHero title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />}
       <main className="flex-1 overflow-y-auto p-6">
         {children}
       </main>

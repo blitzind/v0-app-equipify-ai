@@ -771,12 +771,8 @@ export default function MaintenancePlansPage() {
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Maintenance Plans</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Recurring service schedules with automated notifications and work order creation.</p>
-        </div>
+      {/* CTA row */}
+      <div className="flex justify-end">
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" /> New Plan
         </Button>

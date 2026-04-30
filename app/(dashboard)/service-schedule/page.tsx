@@ -398,12 +398,8 @@ export default function ServiceSchedulePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Service Schedule</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Upcoming maintenance services grouped by month, with notification and work order previews.</p>
-        </div>
+      {/* Month navigation */}
+      <div className="flex justify-end">
         <div className="flex items-center gap-2">
           <button onClick={() => setMonthOffset((n) => n - 1)} className="p-2 rounded-md border border-border hover:bg-muted transition-colors" aria-label="Previous period">
             <ChevronLeft className="w-4 h-4 text-foreground" />

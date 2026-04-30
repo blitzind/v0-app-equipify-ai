@@ -15,10 +15,6 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname()
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your workspace, team, billing, and permissions.</p>
-      </div>
       <nav className="flex gap-1 mb-8 border-b border-border">
         {TABS.map(({ label, href, icon: Icon }) => {
           const active = pathname === href
