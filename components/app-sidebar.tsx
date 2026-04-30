@@ -74,7 +74,7 @@ function SidebarBody({
       {/* ── Logo hero ─────────────────────────────────────────── */}
       <div className="flex items-center justify-center border-b border-sidebar-border shrink-0 px-3 py-4">
         <img
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
           alt="Equipify.ai"
           className={cn(
             "object-contain select-none transition-all duration-200",
