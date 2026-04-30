@@ -5,7 +5,7 @@ import { AppTopbar } from "@/components/app-topbar"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
-  CreditCard, Shield, Sparkles, Plus, FileText, Receipt,
+  CreditCard, Shield, Sparkles, Plus, FileText, Receipt, Plug,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -102,10 +102,16 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Role-based access control across all modules.",
     icon: Shield,
   },
+  "/integrations": {
+    title: "Integrations",
+    subtitle: "Connect Equipify.ai with the tools you already use to automate workflows, sync data, and streamline operations.",
+    icon: Plug,
+    cta: { label: "Request Integration" },
+  },
 }
 
 // Routes that render their own full-bleed hero — PageHero is suppressed.
-const HERO_SUPPRESS = new Set(["/insights"])
+const HERO_SUPPRESS = new Set(["/insights", "/integrations"])
 
 function resolveMeta(pathname: string): RouteMeta | null {
   if (HERO_SUPPRESS.has(pathname)) return null

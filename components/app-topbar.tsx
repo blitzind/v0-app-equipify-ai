@@ -60,7 +60,7 @@ const ACCOUNT_SECTIONS = [
   {
     label: "System",
     items: [
-      { icon: Plug,       label: "Integrations", sub: "Connect third-party apps", href: "/settings/workspace" },
+      { icon: Plug,       label: "Integrations", sub: "Connect third-party apps", href: "/integrations" },
       { icon: KeyRound,   label: "API Keys",     sub: "Generate & manage API tokens", href: "/settings/workspace" },
       { icon: ScrollText, label: "Audit Log",    sub: "All user actions & changes", href: "/settings/workspace" },
     ],
