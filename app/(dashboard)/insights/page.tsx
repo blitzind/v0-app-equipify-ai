@@ -105,20 +105,24 @@ function InsightCard({ insight, onDismiss }: { insight: AiInsight; onDismiss: (i
         </p>
 
         {/* Data points */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-          {insight.dataPoints.map((dp) => (
-            <div key={dp.label} className="bg-zinc-50 rounded-lg px-2.5 py-2">
-              <p className="text-[10px] text-zinc-400 uppercase tracking-wide mb-0.5">{dp.label}</p>
-              <p className="text-xs font-semibold text-zinc-800">{dp.value}</p>
-            </div>
-          ))}
-        </div>
+        {insight.dataPoints && insight.dataPoints.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {insight.dataPoints.map((dp) => (
+              <div key={dp.label} className="bg-zinc-50 rounded-lg px-2.5 py-2">
+                <p className="text-[10px] text-zinc-400 uppercase tracking-wide mb-0.5">{dp.label}</p>
+                <p className="text-xs font-semibold text-zinc-800">{dp.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Confidence */}
-        <div className="mb-3">
-          <p className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1">AI Confidence</p>
-          <ConfidenceMeter value={insight.confidence} />
-        </div>
+        {insight.confidence != null && (
+          <div className="mb-3">
+            <p className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1">AI Confidence</p>
+            <ConfidenceMeter value={insight.confidence} />
+          </div>
+        )}
 
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -174,7 +178,7 @@ function KpiCard({
   )
 }
 
-// ─── Summary Report Modal ────────────────────────────────────────────────────���
+// ─── Summary Report Modal ────────────────────────────────────────────────────�����
 
 function SummaryReportModal({ onClose }: { onClose: () => void }) {
   const report = aiSummaryReport
