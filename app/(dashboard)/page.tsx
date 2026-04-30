@@ -14,6 +14,7 @@ import { RepeatRepairs } from "@/components/dashboard/repeat-repairs"
 import { ExpiringWarranties } from "@/components/dashboard/expiring-warranties"
 import { RevenueChart } from "@/components/dashboard/revenue-chart"
 import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
+import { AIInsightsWidget } from "@/components/dashboard/ai-insights-widget"
 
 export default function DashboardPage() {
   return (
@@ -85,6 +86,9 @@ export default function DashboardPage() {
           <WorkOrderStatus />
         </div>
       </div>
+
+      {/* AI Insights widget */}
+      <AIInsightsWidget />
 
       {/* Main table */}
       <RecentWorkOrders />
