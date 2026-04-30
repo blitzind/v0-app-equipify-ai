@@ -9,6 +9,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   "In Progress": { label: "In Progress", className: "bg-[oklch(0.65_0.15_162)]/10 text-[oklch(0.45_0.15_162)] border-[oklch(0.65_0.15_162)]/20" },
   "Completed": { label: "Completed", className: "bg-[oklch(0.62_0.17_145)]/10 text-[oklch(0.42_0.17_145)] border-[oklch(0.62_0.17_145)]/20" },
   "On Hold": { label: "On Hold", className: "bg-[oklch(0.75_0.16_70)]/10 text-[oklch(0.50_0.12_70)] border-[oklch(0.75_0.16_70)]/20" },
+  "Scheduled": { label: "Scheduled", className: "bg-primary/10 text-primary border-primary/20" },
 }
 
 const priorityConfig: Record<string, { className: string }> = {
