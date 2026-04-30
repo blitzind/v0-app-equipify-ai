@@ -1785,10 +1785,265 @@ export const aiSummaryReport: AiSummaryReport = {
   ],
 }
 
-export const technicians = [
-  { id: "T-01", name: "Marcus Webb", active: 3, completed: 28, rating: 4.9, avatar: "MW" },
-  { id: "T-02", name: "Sandra Liu", active: 2, completed: 31, rating: 4.8, avatar: "SL" },
-  { id: "T-03", name: "Tyler Oakes", active: 4, completed: 19, rating: 4.7, avatar: "TO" },
-  { id: "T-04", name: "Priya Mehta", active: 2, completed: 24, rating: 4.9, avatar: "PM" },
-  { id: "T-05", name: "James Torres", active: 1, completed: 22, rating: 4.6, avatar: "JT" },
+export type TechStatus = "Available" | "On Job" | "Off" | "Vacation"
+export type TechSkill =
+  | "HVAC"
+  | "Electrical"
+  | "Calibration"
+  | "Medical Equipment"
+  | "Industrial Repair"
+  | "Installations"
+  | "Refrigeration"
+  | "Hydraulics"
+  | "Welding"
+  | "PLC / Controls"
+
+export interface TechCertification {
+  name: string
+  issuer: string
+  issuedDate: string
+  expiryDate: string
+}
+
+export interface TechScheduleEntry {
+  date: string
+  time: string
+  customer: string
+  jobType: string
+  woId: string
+  status: "Confirmed" | "Tentative" | "Completed"
+}
+
+export interface TechHistoryEntry {
+  woId: string
+  customer: string
+  jobType: string
+  completedDate: string
+  duration: string
+  rating: number
+}
+
+export interface Technician {
+  id: string
+  name: string
+  avatar: string
+  role: string
+  region: string
+  email: string
+  phone: string
+  hireDate: string
+  status: TechStatus
+  skills: TechSkill[]
+  jobsThisWeek: number
+  completionPct: number
+  rating: number
+  utilizationPct: number
+  totalCompleted: number
+  avgJobDurationHrs: number
+  certifications: TechCertification[]
+  schedule: TechScheduleEntry[]
+  history: TechHistoryEntry[]
+  bio: string
+}
+
+export const technicians: Technician[] = [
+  {
+    id: "T-01",
+    name: "Marcus Webb",
+    avatar: "MW",
+    role: "Senior Field Technician",
+    region: "Midwest",
+    email: "m.webb@equipify.ai",
+    phone: "(312) 555-0192",
+    hireDate: "2018-03-12",
+    status: "On Job",
+    skills: ["HVAC", "Electrical", "Installations"],
+    jobsThisWeek: 4,
+    completionPct: 96,
+    rating: 4.9,
+    utilizationPct: 88,
+    totalCompleted: 312,
+    avgJobDurationHrs: 3.2,
+    bio: "Marcus is a senior field tech with 8 years of experience specializing in commercial HVAC systems and large-scale electrical installations. Consistently rated in the top 5% for customer satisfaction.",
+    certifications: [
+      { name: "EPA 608 Universal", issuer: "Environmental Protection Agency", issuedDate: "2019-06-01", expiryDate: "2029-06-01" },
+      { name: "NATE Core", issuer: "NATE", issuedDate: "2020-09-15", expiryDate: "2025-09-15" },
+      { name: "OSHA 30", issuer: "OSHA", issuedDate: "2021-02-10", expiryDate: "2027-02-10" },
+    ],
+    schedule: [
+      { date: "2026-04-30", time: "8:00 AM", customer: "Apex Fabricators", jobType: "HVAC PM", woId: "WO-2039", status: "Confirmed" },
+      { date: "2026-04-30", time: "1:30 PM", customer: "Riverstone Logistics", jobType: "AC Unit Install", woId: "WO-2042", status: "Confirmed" },
+      { date: "2026-05-01", time: "9:00 AM", customer: "Metro Warehousing", jobType: "Electrical Inspection", woId: "WO-2044", status: "Tentative" },
+      { date: "2026-05-02", time: "10:00 AM", customer: "Summit Construction", jobType: "HVAC Repair", woId: "WO-2048", status: "Confirmed" },
+    ],
+    history: [
+      { woId: "WO-2031", customer: "Apex Fabricators", jobType: "Compressor Replacement", completedDate: "2026-04-22", duration: "4.5 hrs", rating: 5 },
+      { woId: "WO-2018", customer: "Clearfield Foods", jobType: "HVAC Seasonal PM", completedDate: "2026-04-10", duration: "3.0 hrs", rating: 5 },
+      { woId: "WO-2009", customer: "Riverstone Logistics", jobType: "Electrical Panel Upgrade", completedDate: "2026-04-01", duration: "5.0 hrs", rating: 4 },
+      { woId: "WO-1998", customer: "Lakefront Printing", jobType: "AC Install", completedDate: "2026-03-18", duration: "6.0 hrs", rating: 5 },
+    ],
+  },
+  {
+    id: "T-02",
+    name: "Sandra Liu",
+    avatar: "SL",
+    role: "Lead Calibration Specialist",
+    region: "Northeast",
+    email: "s.liu@equipify.ai",
+    phone: "(617) 555-0347",
+    hireDate: "2020-07-06",
+    status: "Available",
+    skills: ["Calibration", "Medical Equipment", "Electrical"],
+    jobsThisWeek: 3,
+    completionPct: 99,
+    rating: 4.8,
+    utilizationPct: 75,
+    totalCompleted: 198,
+    avgJobDurationHrs: 4.1,
+    bio: "Sandra specializes in precision calibration and medical-grade equipment servicing. She holds multiple ISO and medical device certifications and is the team lead for all regulated instrument work.",
+    certifications: [
+      { name: "ISO 17025 Internal Auditor", issuer: "ANSI", issuedDate: "2021-03-20", expiryDate: "2026-03-20" },
+      { name: "Biomedical Equipment Technician (BMET)", issuer: "AAMI", issuedDate: "2020-11-01", expiryDate: "2026-11-01" },
+      { name: "OSHA 10", issuer: "OSHA", issuedDate: "2020-07-15", expiryDate: "2026-07-15" },
+    ],
+    schedule: [
+      { date: "2026-04-30", time: "10:00 AM", customer: "Apex Fabricators", jobType: "Calibration Audit", woId: "WO-2040", status: "Confirmed" },
+      { date: "2026-05-02", time: "8:30 AM", customer: "Metro Warehousing", jobType: "Instrument Cal.", woId: "WO-2045", status: "Tentative" },
+    ],
+    history: [
+      { woId: "WO-2027", customer: "Apex Fabricators", jobType: "Torque Wrench Cal.", completedDate: "2026-04-18", duration: "2.5 hrs", rating: 5 },
+      { woId: "WO-2011", customer: "Metro Warehousing", jobType: "Scale Calibration", completedDate: "2026-04-05", duration: "3.0 hrs", rating: 5 },
+      { woId: "WO-1995", customer: "Clearfield Foods", jobType: "Pressure Gauge Cal.", completedDate: "2026-03-22", duration: "2.0 hrs", rating: 4 },
+    ],
+  },
+  {
+    id: "T-03",
+    name: "Tyler Oakes",
+    avatar: "TO",
+    role: "Industrial Repair Technician",
+    region: "Southwest",
+    email: "t.oakes@equipify.ai",
+    phone: "(512) 555-0884",
+    hireDate: "2021-01-18",
+    status: "On Job",
+    skills: ["Industrial Repair", "Hydraulics", "Welding"],
+    jobsThisWeek: 5,
+    completionPct: 91,
+    rating: 4.7,
+    utilizationPct: 94,
+    totalCompleted: 174,
+    avgJobDurationHrs: 5.8,
+    bio: "Tyler handles the heaviest industrial repair work on the team — cranes, excavators, and large hydraulic systems. His 94% utilization rate makes him the most deployed technician in the region.",
+    certifications: [
+      { name: "AWS Certified Welder", issuer: "American Welding Society", issuedDate: "2021-06-01", expiryDate: "2027-06-01" },
+      { name: "Hydraulic Specialist Cert.", issuer: "IFPS", issuedDate: "2022-02-15", expiryDate: "2027-02-15" },
+      { name: "OSHA 30", issuer: "OSHA", issuedDate: "2021-01-25", expiryDate: "2027-01-25" },
+      { name: "Crane Operator Safety", issuer: "NCCCO", issuedDate: "2023-05-10", expiryDate: "2026-05-10" },
+    ],
+    schedule: [
+      { date: "2026-04-30", time: "7:30 AM", customer: "Summit Construction", jobType: "Crane Cable Repair", woId: "WO-2036", status: "Confirmed" },
+      { date: "2026-04-30", time: "2:00 PM", customer: "Summit Construction", jobType: "Excavator PM", woId: "WO-2037", status: "Confirmed" },
+      { date: "2026-05-01", time: "8:00 AM", customer: "Riverstone Logistics", jobType: "Hydraulic Leak Repair", woId: "WO-2041", status: "Confirmed" },
+    ],
+    history: [
+      { woId: "WO-2026", customer: "Summit Construction", jobType: "Wire Rope Replace", completedDate: "2026-04-20", duration: "7.0 hrs", rating: 5 },
+      { woId: "WO-2010", customer: "Riverstone Logistics", jobType: "Boom Lift Repair", completedDate: "2026-04-03", duration: "5.5 hrs", rating: 4 },
+      { woId: "WO-1988", customer: "Summit Construction", jobType: "Excavator Undercarriage", completedDate: "2026-03-12", duration: "8.0 hrs", rating: 5 },
+    ],
+  },
+  {
+    id: "T-04",
+    name: "Priya Mehta",
+    avatar: "PM",
+    role: "Field Technician II",
+    region: "Southeast",
+    email: "p.mehta@equipify.ai",
+    phone: "(404) 555-0561",
+    hireDate: "2022-05-02",
+    status: "Available",
+    skills: ["HVAC", "Refrigeration", "Installations"],
+    jobsThisWeek: 3,
+    completionPct: 97,
+    rating: 4.9,
+    utilizationPct: 80,
+    totalCompleted: 142,
+    avgJobDurationHrs: 3.6,
+    bio: "Priya joined from the food-service equipment industry and brings deep refrigeration expertise. She is the primary technician for Clearfield Foods and manages all cold-chain equipment PMs in the Southeast.",
+    certifications: [
+      { name: "EPA 608 Universal", issuer: "Environmental Protection Agency", issuedDate: "2022-06-01", expiryDate: "2032-06-01" },
+      { name: "CFESA Certified Technician", issuer: "CFESA", issuedDate: "2023-01-10", expiryDate: "2026-01-10" },
+      { name: "NATE Heat Pump", issuer: "NATE", issuedDate: "2022-09-01", expiryDate: "2026-06-01" },
+    ],
+    schedule: [
+      { date: "2026-04-30", time: "9:00 AM", customer: "Clearfield Foods", jobType: "Refrigeration PM", woId: "WO-2038", status: "Confirmed" },
+      { date: "2026-05-01", time: "11:00 AM", customer: "Clearfield Foods", jobType: "Pump Seal Repair", woId: "WO-2043", status: "Tentative" },
+      { date: "2026-05-03", time: "8:00 AM", customer: "Metro Warehousing", jobType: "Freezer Unit Install", woId: "WO-2050", status: "Confirmed" },
+    ],
+    history: [
+      { woId: "WO-2025", customer: "Clearfield Foods", jobType: "Pump Seal Repair", completedDate: "2026-04-19", duration: "3.5 hrs", rating: 5 },
+      { woId: "WO-2008", customer: "Clearfield Foods", jobType: "Refrigeration PM", completedDate: "2026-04-02", duration: "4.0 hrs", rating: 5 },
+      { woId: "WO-1990", customer: "Metro Warehousing", jobType: "Cooler Install", completedDate: "2026-03-15", duration: "5.0 hrs", rating: 4 },
+    ],
+  },
+  {
+    id: "T-05",
+    name: "James Torres",
+    avatar: "JT",
+    role: "Field Technician I",
+    region: "West",
+    email: "j.torres@equipify.ai",
+    phone: "(310) 555-0728",
+    hireDate: "2023-09-11",
+    status: "Vacation",
+    skills: ["Electrical", "PLC / Controls", "Industrial Repair"],
+    jobsThisWeek: 0,
+    completionPct: 88,
+    rating: 4.6,
+    utilizationPct: 62,
+    totalCompleted: 87,
+    avgJobDurationHrs: 4.4,
+    bio: "James is a newer team member with a background in industrial automation and PLC programming. He is ramping up quickly and handles most of the West Coast electrical and controls work.",
+    certifications: [
+      { name: "OSHA 10", issuer: "OSHA", issuedDate: "2023-09-20", expiryDate: "2029-09-20" },
+      { name: "NFPA 70E (Arc Flash)", issuer: "NFPA", issuedDate: "2024-01-15", expiryDate: "2027-01-15" },
+    ],
+    schedule: [],
+    history: [
+      { woId: "WO-2014", customer: "Apex Fabricators", jobType: "PLC Diagnostic", completedDate: "2026-04-07", duration: "6.0 hrs", rating: 4 },
+      { woId: "WO-1999", customer: "Riverstone Logistics", jobType: "Electrical Repair", completedDate: "2026-03-25", duration: "3.5 hrs", rating: 5 },
+    ],
+  },
+  {
+    id: "T-06",
+    name: "Denise Harmon",
+    avatar: "DH",
+    role: "Senior Field Technician",
+    region: "Midwest",
+    email: "d.harmon@equipify.ai",
+    phone: "(773) 555-0312",
+    hireDate: "2017-11-28",
+    status: "Off",
+    skills: ["HVAC", "Electrical", "Calibration", "Installations"],
+    jobsThisWeek: 2,
+    completionPct: 98,
+    rating: 4.8,
+    utilizationPct: 71,
+    totalCompleted: 389,
+    avgJobDurationHrs: 3.8,
+    bio: "Denise is the most experienced technician on the team with over 8 years at Equipify. She mentors junior technicians and handles escalated repairs across HVAC and complex electrical systems.",
+    certifications: [
+      { name: "EPA 608 Universal", issuer: "Environmental Protection Agency", issuedDate: "2018-04-01", expiryDate: "2028-04-01" },
+      { name: "NATE Core", issuer: "NATE", issuedDate: "2019-08-10", expiryDate: "2025-08-10" },
+      { name: "OSHA 30", issuer: "OSHA", issuedDate: "2020-03-05", expiryDate: "2026-03-05" },
+      { name: "Electrical Inspector Cert.", issuer: "ICC", issuedDate: "2022-07-20", expiryDate: "2025-07-20" },
+    ],
+    schedule: [
+      { date: "2026-05-04", time: "8:00 AM", customer: "Riverstone Logistics", jobType: "Annual HVAC Inspection", woId: "WO-2051", status: "Confirmed" },
+    ],
+    history: [
+      { woId: "WO-2020", customer: "Metro Warehousing", jobType: "Electrical Panel PM", completedDate: "2026-04-14", duration: "4.0 hrs", rating: 5 },
+      { woId: "WO-2006", customer: "Apex Fabricators", jobType: "HVAC Repair", completedDate: "2026-04-01", duration: "3.5 hrs", rating: 5 },
+      { woId: "WO-1985", customer: "Riverstone Logistics", jobType: "AC Install", completedDate: "2026-03-10", duration: "5.5 hrs", rating: 4 },
+    ],
+  },
 ]
