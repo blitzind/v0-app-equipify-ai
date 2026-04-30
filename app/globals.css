@@ -298,6 +298,16 @@
   .ds-change-positive { color: var(--ds-success-text); }
   .ds-change-negative { color: var(--ds-danger-text);  }
 
+  /* ── Scrollbar hide ──────────────────────────────────────────────────────
+     Hide scrollbar while preserving scroll behavior (tabs, overflow chips).  */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   /* ── Table sort header button ─────────────────────────────────────────────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {

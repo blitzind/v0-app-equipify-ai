@@ -359,7 +359,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ────────────────────────�����───────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────�������───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -470,7 +470,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
         </div>
 
         {/* Stat strip */}
-        <div className="grid grid-cols-4 divide-x divide-border border-b border-border shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border border-b border-border shrink-0">
           {[
             { label: "Interval",    value: plan.interval === "Custom" ? `Every ${plan.customIntervalDays}d` : plan.interval },
             { label: "Technician",  value: plan.technicianName },
@@ -779,7 +779,7 @@ export default function MaintenancePlansPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: "Active Plans",       value: stats.active,  sub: "currently running",          color: "text-emerald-600" },
           { label: "Due This Week",      value: stats.due7,    sub: "within 7 days",               color: "text-red-500" },
@@ -797,8 +797,8 @@ export default function MaintenancePlansPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             className="w-full pl-9 pr-3 h-9 text-sm border border-border rounded-md bg-background outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground"
@@ -848,8 +848,8 @@ export default function MaintenancePlansPage() {
           )}
         </div>
       ) : (
-        <div className="border border-border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="border border-border rounded-lg overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 border-b border-border">
               <tr>
                 {["Plan Name", "Customer", "Equipment", "Interval", "Technician", "Next Due", "Status", ""].map((h) => (

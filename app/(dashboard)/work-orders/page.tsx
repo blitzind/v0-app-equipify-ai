@@ -148,7 +148,7 @@ function KanbanView({ workOrders }: { workOrders: WorkOrder[] }) {
   }))
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 h-full">
+    <div className="flex gap-4 overflow-x-auto scrollbar-none pb-4 h-full">
       {columns.map(({ status, items }) => (
         <div key={status} className="flex flex-col gap-3 w-72 shrink-0">
           {/* Column header */}
@@ -202,7 +202,7 @@ function TableView({
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-lg border border-border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -326,9 +326,10 @@ function CalendarView({ workOrders }: { workOrders: WorkOrder[] }) {
 
       {/* Day labels */}
       <div className="grid grid-cols-7 gap-px">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">
-            {d}
+        {[["Sun","S"],["Mon","M"],["Tue","T"],["Wed","W"],["Thu","T"],["Fri","F"],["Sat","S"]].map(([full, short]) => (
+          <div key={full} className="text-center text-xs font-medium text-muted-foreground py-2">
+            <span className="hidden sm:inline">{full}</span>
+            <span className="sm:hidden">{short}</span>
           </div>
         ))}
       </div>
@@ -342,7 +343,7 @@ function CalendarView({ workOrders }: { workOrders: WorkOrder[] }) {
             <div
               key={i}
               className={cn(
-                "bg-card min-h-24 p-2 flex flex-col gap-1",
+                "bg-card min-h-[3.5rem] sm:min-h-24 p-1 sm:p-2 flex flex-col gap-1",
                 !day && "bg-muted/30",
                 day && isToday(day) && "bg-primary/5"
               )}
@@ -445,7 +446,7 @@ export default function WorkOrdersPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Stat strip */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
         {ALL_STATUSES.map((s) => (
           <button
             key={s}
@@ -455,16 +456,16 @@ export default function WorkOrdersPage() {
               statusFilter === s && "border-primary ring-1 ring-primary/20"
             )}
           >
-            <span className="text-2xl font-bold text-foreground">{counts[s] ?? 0}</span>
-            <span className={cn("text-xs font-medium border rounded-full px-2 py-0.5 w-fit", STATUS_STYLE[s])}>{s}</span>
+            <span className="text-xl sm:text-2xl font-bold text-foreground">{counts[s] ?? 0}</span>
+            <span className={cn("text-xs font-medium border rounded-full px-2 py-0.5 w-fit truncate max-w-full", STATUS_STYLE[s])}>{s}</span>
           </button>
         ))}
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Search */}
-        <div className="relative flex-1 min-w-48">
+        <div className="relative w-full sm:flex-1 sm:min-w-0 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search work orders..."
@@ -474,32 +475,34 @@ export default function WorkOrdersPage() {
           />
         </div>
 
-        {/* Priority filter */}
-        <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as WorkOrderPriority | "all")}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
-            <SelectItem value="Critical">Critical</SelectItem>
-            <SelectItem value="High">High</SelectItem>
-            <SelectItem value="Normal">Normal</SelectItem>
-            <SelectItem value="Low">Low</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Priority filter */}
+          <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as WorkOrderPriority | "all")}>
+            <SelectTrigger className="w-32 sm:w-36">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              <SelectItem value="Critical">Critical</SelectItem>
+              <SelectItem value="High">High</SelectItem>
+              <SelectItem value="Normal">Normal</SelectItem>
+              <SelectItem value="Low">Low</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Technician filter */}
-        <Select value={techFilter} onValueChange={setTechFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Technician" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Technicians</SelectItem>
-            {allTechs.map((t) => (
-              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* Technician filter */}
+          <Select value={techFilter} onValueChange={setTechFilter}>
+            <SelectTrigger className="w-36 sm:w-44">
+              <SelectValue placeholder="Technician" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Technicians</SelectItem>
+              {allTechs.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* View toggle */}
         <div className="flex items-center border border-border rounded-md overflow-hidden">

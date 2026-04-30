@@ -217,7 +217,7 @@ function SignatureCanvas({
   )
 }
 
-// ─── Parts table ────────────────────────────────────��────────────────────────
+// ─── Parts table ────────────────────────────────────���────────────────────────
 
 function PartsTable({
   parts,
@@ -245,7 +245,7 @@ function PartsTable({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -504,7 +504,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Link href="/work-orders">
             <Button variant="ghost" size="icon" className="mt-0.5 h-8 w-8 shrink-0">
@@ -525,7 +525,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 shrink-0">
           {saved && (
             <div className="flex items-center gap-1.5 text-xs text-[color:var(--status-success)] bg-[color:var(--status-success)]/10 border border-[color:var(--status-success)]/20 rounded-md px-3 py-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />

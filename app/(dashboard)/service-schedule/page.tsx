@@ -454,9 +454,9 @@ export default function ServiceSchedulePage() {
       </div>
 
       {/* Two-column layout: timeline + sidebar */}
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Timeline */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 w-full">
           {monthKeys.map((key) => {
             const monthPlans = grouped[key]
             if (!monthPlans) return null
@@ -480,7 +480,7 @@ export default function ServiceSchedulePage() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-72 shrink-0 flex flex-col gap-4 sticky top-0">
+        <div className="w-full lg:w-72 shrink-0 flex flex-col gap-4 lg:sticky lg:top-0">
           {/* Summary card */}
           <Card className="border border-border">
             <CardHeader className="pb-3">

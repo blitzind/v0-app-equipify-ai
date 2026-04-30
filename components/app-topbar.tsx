@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useContext } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -9,7 +9,7 @@ import {
   Building2, Palette, MapPin, Users,
   CreditCard, Receipt, Wallet, BarChart3,
   Plug, KeyRound, ScrollText,
-  LogOut, ChevronRight,
+  LogOut, ChevronRight, Menu, X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SidebarContext } from "@/components/app-sidebar"
 
 const notifications = [
   { id: 1, title: "Overdue: WO-2038", desc: "Crane #CR-02 repair past due", time: "5m ago", unread: true },
@@ -69,9 +70,11 @@ const ACCOUNT_SECTIONS = [
 export function AppTopbar() {
   const pathname = usePathname()
   const [searchFocused, setSearchFocused] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [hubOpen, setHubOpen] = useState(false)
   const hubRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const { setMobileOpen } = useContext(SidebarContext)
   const unreadCount = notifications.filter((n) => n.unread).length
 
   // Close on outside click or ESC
@@ -96,25 +99,44 @@ export function AppTopbar() {
   useEffect(() => { setHubOpen(false) }, [pathname])
 
   return (
-    <header className="flex items-center h-16 px-6 bg-card border-b border-border gap-4 shrink-0 relative z-30">
-      {/* Search */}
+    <header className="flex items-center h-14 md:h-16 px-3 md:px-6 bg-card border-b border-border gap-3 shrink-0 relative z-30">
+      {/* Hamburger — mobile only */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors shrink-0"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5 text-muted-foreground" />
+      </button>
+
+      {/* Search — hidden on mobile unless expanded */}
       <div
         className={cn(
-          "flex items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 transition-colors bg-background",
+          "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 transition-colors bg-background",
+          "hidden sm:flex",
           searchFocused ? "border-primary ring-1 ring-primary/30" : "border-border"
         )}
       >
         <Search className="w-4 h-4 text-muted-foreground shrink-0" />
         <input
           type="text"
-          placeholder="Search equipment, work orders, customers..."
-          className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
+          placeholder="Search equipment, work orders..."
+          className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
         />
       </div>
 
-      <div className="flex items-center gap-3 ml-auto">
+      {/* Mobile search icon */}
+      <button
+        className="sm:hidden flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors"
+        aria-label="Search"
+        onClick={() => setSearchOpen((v) => !v)}
+      >
+        <Search className="w-4 h-4 text-muted-foreground" />
+      </button>
+
+      <div className="flex items-center gap-2 ml-auto">
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -171,11 +193,27 @@ export function AppTopbar() {
         </button>
       </div>
 
+      {/* Mobile search bar — full-width dropdown */}
+      {searchOpen && (
+        <div className="sm:hidden absolute top-full left-0 right-0 z-40 bg-card border-b border-border px-4 py-2 flex items-center gap-2 shadow-md">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            placeholder="Search equipment, work orders..."
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
+            autoFocus
+          />
+          <button onClick={() => setSearchOpen(false)} className="text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Premium Account Hub Panel */}
       {hubOpen && (
         <div
           ref={hubRef}
-          className="absolute top-[calc(100%+6px)] right-4 z-50 w-[480px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+          className="absolute top-[calc(100%+6px)] right-2 md:right-4 z-50 w-[calc(100vw-1rem)] max-w-[480px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
           role="dialog"
           aria-label="Account settings hub"
         >
@@ -194,7 +232,7 @@ export function AppTopbar() {
           </div>
 
           {/* Sections grid */}
-          <div className="grid grid-cols-2 divide-x divide-border">
+          <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-border max-h-[70vh] overflow-y-auto">
             {ACCOUNT_SECTIONS.map((section) => (
               <div key={section.label} className="py-3">
                 <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">

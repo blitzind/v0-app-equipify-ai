@@ -173,20 +173,20 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 min-w-48 max-w-sm rounded-md border border-border bg-card px-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-1.5">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
             placeholder="Search customers..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
           />
         </div>
 
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-36 bg-card">
+          <SelectTrigger className="w-32 sm:w-36 bg-card">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -221,7 +221,8 @@ export default function CustomersPage() {
 
         <Button size="sm" className="gap-2 shrink-0">
           <Plus className="w-4 h-4" />
-          Add Customer
+          <span className="hidden sm:inline">Add Customer</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
@@ -234,6 +235,7 @@ export default function CustomersPage() {
       {/* Table view */}
       {viewMode === "table" && (
         <Card className="overflow-hidden p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -325,6 +327,7 @@ export default function CustomersPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </Card>
       )}
 

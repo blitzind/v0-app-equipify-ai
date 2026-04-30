@@ -15,7 +15,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname()
   return (
     <div className="max-w-5xl mx-auto">
-      <nav className="flex gap-1 mb-8 border-b border-border">
+      <nav className="flex gap-1 mb-8 border-b border-border overflow-x-auto scrollbar-none">
         {TABS.map(({ label, href, icon: Icon }) => {
           const active = pathname === href
           return (

@@ -119,7 +119,7 @@ export function CreateWorkOrderModal({ open, onClose }: Props) {
 
         <div className="grid gap-5 py-2">
           {/* Row 1: Customer + Equipment */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>Customer <span className="text-destructive">*</span></Label>
               <Select value={customerId} onValueChange={(v) => { setCustomerId(v); setEquipmentId("") }}>
@@ -149,7 +149,7 @@ export function CreateWorkOrderModal({ open, onClose }: Props) {
           </div>
 
           {/* Row 2: Type + Priority */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>Type <span className="text-destructive">*</span></Label>
               <Select value={type} onValueChange={(v) => setType(v as WorkOrderType)}>
@@ -186,7 +186,7 @@ export function CreateWorkOrderModal({ open, onClose }: Props) {
           </div>
 
           {/* Row 4: Scheduled Date + Time */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>Scheduled Date <span className="text-destructive">*</span></Label>
               <Input

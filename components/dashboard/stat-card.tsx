@@ -23,15 +23,15 @@ export function StatCard({
   urgent,
 }: StatCardProps) {
   return (
-    <div className={cn("bg-card rounded-xl border border-border p-5 flex flex-col gap-4", urgent && "border-destructive/40")}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <div className={cn("flex items-center justify-center w-9 h-9 rounded-lg", iconBg)}>
-          <Icon className={cn("w-4 h-4", iconColor)} />
+    <div className={cn("bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col gap-3 sm:gap-4", urgent && "border-destructive/40")}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-snug">{title}</p>
+        <div className={cn("flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0", iconBg)}>
+          <Icon className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", iconColor)} />
         </div>
       </div>
       <div>
-        <p className={cn("text-3xl font-bold tracking-tight", urgent ? "text-destructive" : "text-foreground")}>
+        <p className={cn("text-2xl sm:text-3xl font-bold tracking-tight", urgent ? "text-destructive" : "text-foreground")}>
           {value}
         </p>
         {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}

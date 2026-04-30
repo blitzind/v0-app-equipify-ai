@@ -108,20 +108,18 @@ function resolveMeta(pathname: string): RouteMeta | null {
 
 function PageHero({ title, subtitle, icon: Icon }: { title: string; subtitle: string; icon: LucideIcon }) {
   return (
-    <div className="px-6 pt-5 pb-1 shrink-0">
-      <div className="flex items-center justify-between gap-4 bg-card border border-border rounded-xl shadow-sm px-6 py-5">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
-              {title}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed truncate">
-              {subtitle}
-            </p>
-          </div>
+    <div className="px-3 sm:px-6 pt-4 sm:pt-5 pb-1 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-sm px-4 sm:px-6 py-4 sm:py-5">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
+            {title}
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed line-clamp-1">
+            {subtitle}
+          </p>
         </div>
       </div>
     </div>
@@ -139,7 +137,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       <AppTopbar />
       {meta && <PageHero title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-[1440px] mx-auto p-6">
+        <div className="max-w-[1440px] mx-auto p-3 sm:p-6">
           {children}
         </div>
       </main>

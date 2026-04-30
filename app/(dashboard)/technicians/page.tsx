@@ -359,7 +359,7 @@ function AddTechModal({
   )
 }
 
-// ─── Schedule Modal ───────────────────────────────────────────────────���───────
+// ─── Schedule Modal ──────────────────────────────────────────��────────���───────
 
 function ScheduleModal({
   tech, onClose, onSave,
@@ -1127,7 +1127,7 @@ export default function TechniciansPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6">
 
         {/* Add Technician action */}
         <div className="flex justify-end">
@@ -1183,8 +1183,8 @@ export default function TechniciansPage() {
         )}
 
         {/* Filter toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-48 max-w-64">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:flex-1 sm:min-w-0 sm:max-w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search name, role, region, skill…"
