@@ -72,28 +72,17 @@ function SidebarBody({
   return (
     <>
       {/* ── Logo hero ─────────────────────────────────────────── */}
-      <div className={cn(
-        "flex items-center justify-center border-b border-sidebar-border shrink-0",
-        isCollapsed ? "px-2 py-5" : "px-4 py-4"
-      )}>
-        {isCollapsed ? (
-          <div className="w-9 h-9 flex items-center justify-center">
-            <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
-              alt="Equipify.ai"
-              className="w-9 h-9 object-contain select-none"
-              style={{ objectPosition: "left center" }}
-              draggable={false}
-            />
-          </div>
-        ) : (
-          <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
-            alt="Equipify.ai"
-            className="h-9 w-auto object-contain select-none mx-auto"
-            draggable={false}
-          />
-        )}
+      <div className="flex items-center justify-center border-b border-sidebar-border shrink-0 px-3 py-4">
+        <img
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Equipify-ai-logo-f7EFjaBUGomUmpbzcNVUhtvs7TEz7H.png"
+          alt="Equipify.ai"
+          className={cn(
+            "object-contain select-none transition-all duration-200",
+            isCollapsed ? "w-9 h-9" : "h-9 w-auto max-w-[168px]"
+          )}
+          style={isCollapsed ? { objectPosition: "left center" } : undefined}
+          draggable={false}
+        />
       </div>
 
       {/* ── Workspace selector ────────────────────────────────── */}
