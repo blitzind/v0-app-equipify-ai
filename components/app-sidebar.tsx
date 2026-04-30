@@ -9,7 +9,7 @@ import { MOCK_WORKSPACES } from "@/lib/tenant-data"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, CreditCard, Settings,
-  ChevronLeft, Zap, Sparkles, ChevronDown, Check, LogOut,
+  ChevronLeft, Sparkles, ChevronDown, Check, LogOut,
   Building2, UserCircle,
 } from "lucide-react"
 
@@ -69,14 +69,15 @@ export function AppSidebar() {
             "w-full flex items-center gap-2.5 px-3 py-3 hover:bg-sidebar-accent/50 transition-colors",
             collapsed && "justify-center px-0"
           )}>
-          {workspace.logoUrl ? (
-            <img src={workspace.logoUrl} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-sidebar-border shrink-0" />
-          ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
-              style={{ background: workspace.primaryColor }}>
-              {workspace.name[0]}
-            </div>
-          )}
+          {workspace.logoUrl
+            ? <img src={workspace.logoUrl} alt="" className="w-7 h-7 rounded-lg object-contain bg-white border border-sidebar-border shrink-0" />
+            : (
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+                style={{ background: workspace.primaryColor }} suppressHydrationWarning>
+                {workspace.name[0]}
+              </div>
+            )
+          }
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0 text-left">
@@ -174,7 +175,7 @@ export function AppSidebar() {
               collapsed && "justify-center px-0"
             )}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-              style={{ background: workspace.primaryColor }}>
+              style={{ background: workspace.primaryColor }} suppressHydrationWarning>
               {initials}
             </div>
             {!collapsed && (

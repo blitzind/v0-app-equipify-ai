@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useTenant } from "@/lib/tenant-store"
-import { getPlan } from "@/lib/plans"
 import type { UserRole, TenantUser } from "@/lib/tenant-data"
 import { UserPlus, MoreHorizontal, Check, X, Mail, Shield, ChevronDown } from "lucide-react"
 

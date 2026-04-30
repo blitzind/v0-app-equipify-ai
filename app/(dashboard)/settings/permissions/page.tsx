@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { Check, X } from "lucide-react"
 import type { UserRole } from "@/lib/tenant-data"
 
@@ -98,8 +99,8 @@ export default function PermissionsPage() {
             </thead>
             <tbody>
               {PERMISSION_GROUPS.map((group) => (
-                <>
-                  <tr key={group.group} className="bg-secondary/30">
+                <React.Fragment key={group.group}>
+                  <tr className="bg-secondary/30">
                     <td colSpan={5} className="px-6 py-2">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         {group.group}
@@ -116,7 +117,7 @@ export default function PermissionsPage() {
                       ))}
                     </tr>
                   ))}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

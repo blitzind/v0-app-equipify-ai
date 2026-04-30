@@ -69,14 +69,14 @@ export default function BillingPage() {
 
   const hasStripe = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
-  // Use UTC date parts to avoid timezone-induced off-by-one day mismatches between SSR and client
-  function fmtDateUTC(iso: string) {
-    const d = new Date(iso)
-    return d.toLocaleDateString("en-US", {
-      year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
-    })
+  // Parse ISO date string directly to avoid timezone-induced day shifts.
+  // e.g. "2026-12-31" → { year:2026, month:12, day:31 } in UTC without any Date conversion.
+  function fmtIsoDate(iso: string) {
+    const [year, month, day] = iso.split("-").map(Number)
+    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+    return `${MONTHS[month - 1]} ${day}, ${year}`
   }
-  const nextRenewalDate = fmtDateUTC(workspace.currentPeriodEnd)
+  const nextRenewalDate = fmtIsoDate(workspace.currentPeriodEnd)
 
   return (
     <div className="space-y-6">
@@ -152,7 +152,7 @@ export default function BillingPage() {
           {workspace.subscriptionStatus === "trialing" && (
             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
               <AlertTriangle size={14} />
-              <span>Your free trial ends on <strong>{fmtDateUTC(workspace.trialEndsAt ?? workspace.currentPeriodEnd)}</strong>. Add a payment method to continue after trial.</span>
+              <span>Your free trial ends on <strong>{fmtIsoDate(workspace.trialEndsAt ?? workspace.currentPeriodEnd)}</strong>. Add a payment method to continue after trial.</span>
               <button className="ml-auto text-xs font-medium underline">Add card</button>
             </div>
           )}
@@ -247,7 +247,7 @@ export default function BillingPage() {
               <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
                 <td className="px-6 py-3 text-xs font-mono text-foreground">{inv.id}</td>
                 <td className="px-6 py-3 text-xs text-muted-foreground">
-                  {new Date(inv.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}
+                  {fmtIsoDate(inv.date)}
                 </td>
                 <td className="px-6 py-3 text-xs text-foreground">{inv.description}</td>
                 <td className="px-6 py-3 text-xs font-medium text-foreground">
