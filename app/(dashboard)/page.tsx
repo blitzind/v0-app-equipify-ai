@@ -20,7 +20,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Stat cards row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 items-stretch">
         <StatCard
           title="Equipment Due This Month"
           value={mockStats.equipmentDueThisMonth}
@@ -84,11 +84,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className="lg:col-span-2 h-full">
           <RevenueChart />
         </div>
-        <div>
+        <div className="h-full">
           <WorkOrderStatus />
         </div>
       </div>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
       <RecentWorkOrders />
 
       {/* Bottom panels */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
         <EquipmentDue />
         <ExpiringWarranties />
         <RepeatRepairs />

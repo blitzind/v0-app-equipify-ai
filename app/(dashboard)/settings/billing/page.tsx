@@ -214,7 +214,7 @@ export default function BillingPage() {
           </p>
         </div>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
           {PLANS.map((p) => {
             const isCurrent = p.id === workspace.planId
             const isDowngrade =

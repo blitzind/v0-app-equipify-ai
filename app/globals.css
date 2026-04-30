@@ -283,7 +283,7 @@
   /* ── KPI stat row ─────────────────────────────────────────────────────────
      Used in reports, maintenance-plans, technicians KPI strips.            */
   .ds-kpi-card {
-    @apply bg-card border border-border rounded-xl p-5 flex flex-col gap-2;
+    @apply bg-card border border-border rounded-xl p-5 flex flex-col gap-2 justify-between;
   }
   .ds-kpi-value {
     @apply text-2xl font-bold text-foreground leading-none;
@@ -350,7 +350,7 @@
     font-feature-settings: "tnum";
   }
 
-  /* ── Table sort header button ──────────────────────────────────���───���──────
+  /* ── Table sort header button ─────────────────────────────��────���───���──────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {
     @apply inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;

@@ -18,7 +18,7 @@ function formatCurrency(v: number) {
 
 export function RevenueChart() {
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]">
+    <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] h-full flex flex-col">
       <Link
         href="/reports"
         className="flex items-center justify-between px-5 py-4 border-b border-border group hover:bg-muted/30 transition-colors cursor-pointer"

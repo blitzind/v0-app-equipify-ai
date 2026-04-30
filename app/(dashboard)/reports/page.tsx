@@ -170,15 +170,15 @@ function Section({ title, sub, action, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-border">
+    <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-full">
+      <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-border shrink-0">
         <div>
           <h3 className="font-semibold text-foreground text-sm">{title}</h3>
           {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
         </div>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-5 flex-1">{children}</div>
     </div>
   )
 }
@@ -290,7 +290,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
         {kpis.map((k) => {
           const Icon = k.icon
           return (
@@ -316,10 +316,10 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Charts row 1: Revenue + WO by Type ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
 
         {/* Revenue by month — line chart */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 h-full">
           <Section
             title="Revenue by Month"
             sub="Last 6 months — total recognized revenue"
@@ -349,7 +349,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Work Orders by Type — vertical bar chart */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 h-full">
           <Section title="Work Orders by Type" sub="Current period — all statuses">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={woByType} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={36}>
@@ -377,7 +377,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Charts row 2: Tech Productivity + Equipment Due by Month ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
 
         {/* Technician Productivity — horizontal bars */}
         <Section title="Technician Productivity" sub="Jobs completed this period, by technician">
@@ -438,7 +438,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Tables row: Top Customers + Contract Renewal Pipeline ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
 
         {/* Top Customers by Revenue */}
         <Section title="Top Customers by Revenue" sub="Current period — sorted by revenue">
@@ -499,7 +499,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Alert tables: Repeat Failures + Expiring Warranties ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
 
         {/* Repeat Failure Alerts */}
         <Section

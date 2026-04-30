@@ -64,9 +64,9 @@ function InvoiceStatCards({ invoices }: { invoices: AdminInvoice[] }) {
   ]
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
       {stats.map(({ label, value, sub, icon: Icon, accent, bg }) => (
-        <div key={label} className="bg-card rounded-xl border border-border p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+        <div key={label} className="bg-card rounded-xl border border-border p-4 flex flex-col gap-2 justify-between shadow-[0_1px_3px_rgba(0,0,0,0.06)] h-full">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
             <div className={cn("w-7 h-7 rounded-md flex items-center justify-center shrink-0", bg)}>
