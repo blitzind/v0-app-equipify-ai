@@ -9,6 +9,7 @@ import { TenantProvider } from "@/lib/tenant-store"
 import { EquipmentProvider } from "@/lib/equipment-store"
 import { CustomerProvider } from "@/lib/customer-store"
 import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
+import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -20,14 +21,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <EquipmentProvider>
             <CustomerProvider>
               <QuoteInvoiceProvider>
-                <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
-                  <div className="flex h-dvh overflow-hidden bg-background">
-                    <AppSidebar />
-                    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-                      <PageShell>{children}</PageShell>
+                <EquipmentTypeProvider>
+                  <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
+                    <div className="flex h-dvh overflow-hidden bg-background">
+                      <AppSidebar />
+                      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                        <PageShell>{children}</PageShell>
+                      </div>
                     </div>
-                  </div>
-                </SidebarContext.Provider>
+                  </SidebarContext.Provider>
+                </EquipmentTypeProvider>
               </QuoteInvoiceProvider>
             </CustomerProvider>
           </EquipmentProvider>

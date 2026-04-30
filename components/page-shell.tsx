@@ -102,6 +102,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Role-based access control across all modules.",
     icon: Shield,
   },
+  "/settings/equipment-types": {
+    title: "Equipment Types",
+    subtitle: "Manage the categories used to classify equipment across your workspace.",
+    icon: Wrench,
+  },
   "/integrations": {
     title: "Integrations",
     subtitle: "Connect Equipify.ai with the tools you already use to automate workflows, sync data, and streamline operations.",

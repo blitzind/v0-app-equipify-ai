@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Building2, Users, CreditCard, Shield } from "lucide-react"
+import { Building2, Users, CreditCard, Shield, Wrench } from "lucide-react"
 
 const TABS = [
-  { label: "Workspace",    href: "/settings/workspace", icon: Building2 },
-  { label: "Team",         href: "/settings/team",      icon: Users },
-  { label: "Billing",      href: "/settings/billing",   icon: CreditCard },
-  { label: "Permissions",  href: "/settings/permissions", icon: Shield },
+  { label: "Workspace",        href: "/settings/workspace",        icon: Building2 },
+  { label: "Team",             href: "/settings/team",             icon: Users },
+  { label: "Billing",          href: "/settings/billing",          icon: CreditCard },
+  { label: "Permissions",      href: "/settings/permissions",      icon: Shield },
+  { label: "Equipment Types",  href: "/settings/equipment-types",  icon: Wrench },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
