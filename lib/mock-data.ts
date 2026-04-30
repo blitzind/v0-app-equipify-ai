@@ -1206,6 +1206,235 @@ export const expiringWarranties = [
   { equipment: "Conveyor #CV-9", customer: "Metro Warehousing", expires: "2026-05-28", daysLeft: 28 },
 ]
 
+// ─── Portal ───────────────────────────────────────────────────────────────────
+
+export interface Invoice {
+  id: string
+  workOrderId: string
+  customerId: string
+  date: string
+  dueDate: string
+  amount: number
+  status: "Paid" | "Unpaid" | "Overdue" | "Draft"
+  lineItems: { description: string; qty: number; unit: number }[]
+  pdfUrl: string
+}
+
+export interface Quote {
+  id: string
+  customerId: string
+  equipmentId: string
+  equipmentName: string
+  date: string
+  expiresDate: string
+  amount: number
+  status: "Pending Approval" | "Approved" | "Declined" | "Expired"
+  description: string
+  lineItems: { description: string; qty: number; unit: number }[]
+  notes: string
+}
+
+export interface PortalReport {
+  id: string
+  customerId: string
+  title: string
+  type: "Service Summary" | "Equipment Health" | "PM Compliance" | "Cost Analysis"
+  period: string
+  generatedDate: string
+  sizeKb: number
+  pdfUrl: string
+}
+
+export const portalInvoices: Invoice[] = [
+  {
+    id: "INV-4412",
+    workOrderId: "WO-2039",
+    customerId: "CUS-003",
+    date: "2026-04-29",
+    dueDate: "2026-05-29",
+    amount: 340,
+    status: "Unpaid",
+    pdfUrl: "#",
+    lineItems: [
+      { description: "HVAC Inspection — Carrier 50XCZ060", qty: 1, unit: 240 },
+      { description: "Coil Cleaner (1 gal)", qty: 1, unit: 28 },
+      { description: "Drain Pan Treatment Tablets", qty: 2, unit: 14 },
+      { description: "Drain Pan Treatment Tablets", qty: 2, unit: 14 },
+    ],
+  },
+  {
+    id: "INV-4411",
+    workOrderId: "WO-2036",
+    customerId: "CUS-004",
+    date: "2026-04-25",
+    dueDate: "2026-05-25",
+    amount: 875,
+    status: "Paid",
+    pdfUrl: "#",
+    lineItems: [
+      { description: "Cat 320 GC Excavator — 500-hr PM Labor", qty: 4, unit: 120 },
+      { description: "Hydraulic Filter Set", qty: 1, unit: 145 },
+      { description: "Engine Air Filter", qty: 1, unit: 62 },
+      { description: "Hydraulic Fluid (5gal)", qty: 4, unit: 47 },
+    ],
+  },
+  {
+    id: "INV-4408",
+    workOrderId: "WO-2025",
+    customerId: "CUS-005",
+    date: "2026-04-10",
+    dueDate: "2026-04-25",
+    amount: 640,
+    status: "Overdue",
+    pdfUrl: "#",
+    lineItems: [
+      { description: "Refrigeration Pump Seal Repair — Labor", qty: 2, unit: 180 },
+      { description: "Pump Seal Kit — Heatcraft LCE060", qty: 1, unit: 280 },
+    ],
+  },
+  {
+    id: "INV-4401",
+    workOrderId: "WO-1980",
+    customerId: "CUS-001",
+    date: "2026-01-20",
+    dueDate: "2026-02-20",
+    amount: 385,
+    status: "Paid",
+    pdfUrl: "#",
+    lineItems: [
+      { description: "Forklift Semi-Annual PM — Labor", qty: 3.5, unit: 80 },
+      { description: "Engine Oil 10W-30 (5qt)", qty: 2, unit: 18.50 },
+      { description: "Oil Filter", qty: 1, unit: 12 },
+      { description: "Rear Brake Pad Set", qty: 1, unit: 34 },
+    ],
+  },
+]
+
+export const portalQuotes: Quote[] = [
+  {
+    id: "QT-881",
+    customerId: "CUS-002",
+    equipmentId: "EQ-304",
+    equipmentName: "Haas VF-2SS CNC Machine",
+    date: "2026-04-28",
+    expiresDate: "2026-05-28",
+    amount: 4800,
+    status: "Pending Approval",
+    description: "Root cause analysis and full motor replacement for repeat overheating issue. Includes extended burn-in test.",
+    notes: "If motor replacement is approved, downtime estimated at 3 business days. Loaner available.",
+    lineItems: [
+      { description: "CNC Spindle Motor Assembly (OEM)", qty: 1, unit: 2800 },
+      { description: "Motor Replacement Labor", qty: 8, unit: 125 },
+      { description: "Burn-in Test & Calibration", qty: 4, unit: 125 },
+      { description: "Root Cause Engineering Report", qty: 1, unit: 600 },
+    ],
+  },
+  {
+    id: "QT-874",
+    customerId: "CUS-004",
+    equipmentId: "EQ-601",
+    equipmentName: "Liebherr LTM 1050-3.1 Crane",
+    date: "2026-04-26",
+    expiresDate: "2026-05-26",
+    amount: 7200,
+    status: "Pending Approval",
+    description: "Full wire rope replacement and load-line re-engineering to address repeat cable tension failures.",
+    notes: "Crane must be out of service for 2 days. Load certification test included.",
+    lineItems: [
+      { description: "Wire Rope Assembly — Main Hoist (OEM)", qty: 1, unit: 3400 },
+      { description: "Wire Rope Assembly — Secondary Hoist (OEM)", qty: 1, unit: 2100 },
+      { description: "Rope Replacement Labor", qty: 6, unit: 150 },
+      { description: "Load Test Certification", qty: 1, unit: 800 },
+    ],
+  },
+  {
+    id: "QT-860",
+    customerId: "CUS-004",
+    equipmentId: "EQ-820",
+    equipmentName: "Cat 320 GC Excavator",
+    date: "2026-04-01",
+    expiresDate: "2026-05-01",
+    amount: 3150,
+    status: "Approved",
+    description: "Undercarriage replacement at 50% wear threshold. Recommended from 1000-hr PM inspection.",
+    notes: "Track shoe sets shipped from depot — 5 business days lead time.",
+    lineItems: [
+      { description: "Track Shoe Set (Left)", qty: 1, unit: 1100 },
+      { description: "Track Shoe Set (Right)", qty: 1, unit: 1100 },
+      { description: "Undercarriage Install Labor", qty: 6, unit: 150 },
+    ],
+  },
+  {
+    id: "QT-841",
+    customerId: "CUS-001",
+    equipmentId: "EQ-188",
+    equipmentName: "Toyota 8FGU25 Forklift",
+    date: "2026-02-15",
+    expiresDate: "2026-03-15",
+    amount: 820,
+    status: "Declined",
+    description: "Hydraulic lift cylinder full replacement (vs. seal-only repair).",
+    notes: "Customer opted for seal repair instead. Cylinder flagged for next review.",
+    lineItems: [
+      { description: "Hydraulic Lift Cylinder Assembly (OEM)", qty: 1, unit: 540 },
+      { description: "Cylinder Replacement Labor", qty: 2, unit: 140 },
+    ],
+  },
+]
+
+export const portalReports: PortalReport[] = [
+  {
+    id: "RPT-CUS001-Q1",
+    customerId: "CUS-001",
+    title: "Q1 2026 Service Summary — Riverstone Logistics",
+    type: "Service Summary",
+    period: "Jan–Mar 2026",
+    generatedDate: "2026-04-03",
+    sizeKb: 284,
+    pdfUrl: "#",
+  },
+  {
+    id: "RPT-CUS002-HEALTH",
+    customerId: "CUS-002",
+    title: "Equipment Health Report — Apex Fabricators",
+    type: "Equipment Health",
+    period: "Q1 2026",
+    generatedDate: "2026-04-05",
+    sizeKb: 512,
+    pdfUrl: "#",
+  },
+  {
+    id: "RPT-CUS004-PM",
+    customerId: "CUS-004",
+    title: "PM Compliance Report — Summit Construction",
+    type: "PM Compliance",
+    period: "2025 Annual",
+    generatedDate: "2026-01-10",
+    sizeKb: 398,
+    pdfUrl: "#",
+  },
+  {
+    id: "RPT-CUS003-COST",
+    customerId: "CUS-003",
+    title: "Cost Analysis Report — Metro Warehousing",
+    type: "Cost Analysis",
+    period: "Jan–Mar 2026",
+    generatedDate: "2026-04-07",
+    sizeKb: 320,
+    pdfUrl: "#",
+  },
+  {
+    id: "RPT-CUS005-Q4",
+    customerId: "CUS-005",
+    title: "Q4 2025 Service Summary — Clearfield Foods",
+    type: "Service Summary",
+    period: "Oct–Dec 2025",
+    generatedDate: "2026-01-08",
+    sizeKb: 196,
+    pdfUrl: "#",
+  },
+]
+
 export const technicians = [
   { id: "T-01", name: "Marcus Webb", active: 3, completed: 28, rating: 4.9, avatar: "MW" },
   { id: "T-02", name: "Sandra Liu", active: 2, completed: 31, rating: 4.8, avatar: "SL" },
