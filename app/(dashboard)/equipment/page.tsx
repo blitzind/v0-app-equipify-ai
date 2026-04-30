@@ -63,8 +63,18 @@ const statusColors: Record<Equipment["status"], string> = {
 const allStatuses = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
 const allCategories = [...new Set(equipment.map((e) => e.category))].sort()
 
+/** Format an ISO date string (YYYY-MM-DD) using UTC so server and client agree. */
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  })
+}
+
 function daysToDue(nextDueDate: string) {
-  return Math.ceil((new Date(nextDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  // Compare UTC midnight of the due date against UTC midnight of today.
+  const due   = new Date(nextDueDate + "T00:00:00Z").getTime()
+  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime()
+  return Math.ceil((due - today) / (1000 * 60 * 60 * 24))
 }
 
 function DueBadge({ nextDueDate }: { nextDueDate: string }) {
@@ -72,7 +82,7 @@ function DueBadge({ nextDueDate }: { nextDueDate: string }) {
   if (days < 0) return <span className="text-xs font-medium text-destructive">Overdue</span>
   if (days <= 7) return <span className="text-xs font-medium text-[color:var(--status-warning)]">Due in {days}d</span>
   if (days <= 30) return <span className="text-xs font-medium text-[color:var(--status-info)]">Due in {days}d</span>
-  return <span className="text-xs text-muted-foreground">{new Date(nextDueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+  return <span className="text-xs text-muted-foreground">{fmtDate(nextDueDate)}</span>
 }
 
 function EquipmentCard({ eq, selected, onSelect }: { eq: Equipment; selected: boolean; onSelect: () => void }) {
@@ -383,7 +393,7 @@ export default function EquipmentPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(eq.lastServiceDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {fmtDate(eq.lastServiceDate)}
                     </TableCell>
                     <TableCell>
                       <DueBadge nextDueDate={eq.nextDueDate} />
