@@ -402,6 +402,346 @@ export const equipment: Equipment[] = [
   },
 ]
 
+// ─── Work Orders ─────────────────────────────────────────────────────────────
+
+export type WorkOrderStatus = "Open" | "Scheduled" | "In Progress" | "Completed" | "Invoiced"
+export type WorkOrderPriority = "Low" | "Normal" | "High" | "Critical"
+export type WorkOrderType = "Repair" | "PM" | "Inspection" | "Install" | "Emergency"
+
+export interface Part {
+  id: string
+  name: string
+  partNumber: string
+  quantity: number
+  unitCost: number
+}
+
+export interface RepairLog {
+  problemReported: string
+  diagnosis: string
+  partsUsed: Part[]
+  laborHours: number
+  technicianNotes: string
+  photos: string[]          // base64 or URL placeholders
+  signatureDataUrl: string  // base64 canvas data or ""
+  signedBy: string
+  signedAt: string
+}
+
+export interface WorkOrder {
+  id: string
+  customerId: string
+  customerName: string
+  equipmentId: string
+  equipmentName: string
+  location: string
+  type: WorkOrderType
+  status: WorkOrderStatus
+  priority: WorkOrderPriority
+  technicianId: string
+  technicianName: string
+  scheduledDate: string   // ISO date string
+  scheduledTime: string   // "HH:MM"
+  completedDate: string
+  createdAt: string
+  createdBy: string
+  description: string
+  repairLog: RepairLog
+  totalLaborCost: number
+  totalPartsCost: number
+  invoiceNumber: string
+}
+
+const emptyRepairLog = (): RepairLog => ({
+  problemReported: "",
+  diagnosis: "",
+  partsUsed: [],
+  laborHours: 0,
+  technicianNotes: "",
+  photos: [],
+  signatureDataUrl: "",
+  signedBy: "",
+  signedAt: "",
+})
+
+export const workOrders: WorkOrder[] = [
+  {
+    id: "WO-2041",
+    customerId: "CUS-001",
+    customerName: "Riverstone Logistics",
+    equipmentId: "EQ-188",
+    equipmentName: "Toyota 8FGU25 Forklift",
+    location: "Main Warehouse",
+    type: "PM",
+    status: "In Progress",
+    priority: "High",
+    technicianId: "T-01",
+    technicianName: "Marcus Webb",
+    scheduledDate: "2026-04-30",
+    scheduledTime: "08:00",
+    completedDate: "",
+    createdAt: "2026-04-28T09:14:00Z",
+    createdBy: "Admin",
+    description: "Semi-annual PM service due. Engine oil dark, brake check required.",
+    totalLaborCost: 320,
+    totalPartsCost: 65,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Engine oil overdue for change. Brakes feel soft per operator.",
+      diagnosis: "Oil degraded past service interval. Rear brake pads at 15% — replacement required.",
+      partsUsed: [
+        { id: "P-001", name: "Engine Oil 10W-30 (5qt)", partNumber: "OIL-10W30-5Q", quantity: 2, unitCost: 18.50 },
+        { id: "P-002", name: "Oil Filter", partNumber: "FIL-OF-8FGU", quantity: 1, unitCost: 12.00 },
+        { id: "P-003", name: "Rear Brake Pad Set", partNumber: "BRK-8FGU-R", quantity: 1, unitCost: 34.00 },
+      ],
+      laborHours: 3.5,
+      technicianNotes: "Recommend hydraulic fluid flush at next visit. Tires at 60% tread.",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+  {
+    id: "WO-2040",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators",
+    equipmentId: "EQ-304",
+    equipmentName: "Haas VF-2SS CNC Machine",
+    location: "Plant A",
+    type: "Repair",
+    status: "Open",
+    priority: "Critical",
+    technicianId: "T-02",
+    technicianName: "Sandra Liu",
+    scheduledDate: "2026-04-30",
+    scheduledTime: "07:00",
+    completedDate: "",
+    createdAt: "2026-04-29T06:50:00Z",
+    createdBy: "Admin",
+    description: "Motor overheating — 4th occurrence. Machine offline. Root cause analysis required.",
+    totalLaborCost: 640,
+    totalPartsCost: 250,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Machine tripped thermal overload at 11:45am. Fourth incident this year.",
+      diagnosis: "",
+      partsUsed: [],
+      laborHours: 0,
+      technicianNotes: "",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+  {
+    id: "WO-2039",
+    customerId: "CUS-003",
+    customerName: "Metro Warehousing",
+    equipmentId: "EQ-500",
+    equipmentName: "Carrier 50XCZ060 HVAC",
+    location: "Cold Storage Annex",
+    type: "Inspection",
+    status: "Completed",
+    priority: "Normal",
+    technicianId: "T-03",
+    technicianName: "Tyler Oakes",
+    scheduledDate: "2026-04-29",
+    scheduledTime: "09:00",
+    completedDate: "2026-04-29",
+    createdAt: "2026-04-25T11:00:00Z",
+    createdBy: "Admin",
+    description: "Semi-annual HVAC inspection: coils, refrigerant, drains.",
+    totalLaborCost: 240,
+    totalPartsCost: 100,
+    invoiceNumber: "INV-4412",
+    repairLog: {
+      problemReported: "Scheduled semi-annual inspection.",
+      diagnosis: "Unit operating within spec. Minor coil buildup on evaporator side. R-410A charge confirmed.",
+      partsUsed: [
+        { id: "P-010", name: "Coil Cleaner (1 gal)", partNumber: "CLN-COIL-1G", quantity: 1, unitCost: 28.00 },
+        { id: "P-011", name: "Drain Pan Treatment Tablets", partNumber: "DRN-TAB-12", quantity: 2, unitCost: 14.00 },
+      ],
+      laborHours: 2.5,
+      technicianNotes: "Evaporator coil cleaned. Drain lines flushed. No refrigerant added. Next inspection: Oct 2026.",
+      photos: [],
+      signatureDataUrl: "SIGNED",
+      signedBy: "Terrence Flynn",
+      signedAt: "2026-04-29T14:32:00Z",
+    },
+  },
+  {
+    id: "WO-2038",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-601",
+    equipmentName: "Liebherr LTM 1050-3.1 Crane",
+    location: "Equipment Yard",
+    type: "Repair",
+    status: "Scheduled",
+    priority: "High",
+    technicianId: "T-04",
+    technicianName: "Priya Mehta",
+    scheduledDate: "2026-05-02",
+    scheduledTime: "06:30",
+    completedDate: "",
+    createdAt: "2026-04-26T14:22:00Z",
+    createdBy: "Admin",
+    description: "Cable tension repeat issue. Engineering review + load line replacement.",
+    totalLaborCost: 0,
+    totalPartsCost: 0,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Cable tension alarm triggered during 40-ton lift. Third occurrence this year.",
+      diagnosis: "",
+      partsUsed: [],
+      laborHours: 0,
+      technicianNotes: "",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+  {
+    id: "WO-2037",
+    customerId: "CUS-005",
+    customerName: "Clearfield Foods",
+    equipmentId: "EQ-712",
+    equipmentName: "Heatcraft LCE060AGD Refrigeration",
+    location: "Processing Plant",
+    type: "Repair",
+    status: "Open",
+    priority: "Normal",
+    technicianId: "T-05",
+    technicianName: "James Torres",
+    scheduledDate: "2026-05-05",
+    scheduledTime: "02:00",
+    completedDate: "",
+    createdAt: "2026-04-29T10:00:00Z",
+    createdBy: "Admin",
+    description: "Pump seal failure — third occurrence. Must be serviced in 2am–6am window.",
+    totalLaborCost: 0,
+    totalPartsCost: 0,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Pump pressure dropped below threshold. Seal leak confirmed by on-site team.",
+      diagnosis: "",
+      partsUsed: [],
+      laborHours: 0,
+      technicianNotes: "",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+  {
+    id: "WO-2036",
+    customerId: "CUS-004",
+    customerName: "Summit Construction",
+    equipmentId: "EQ-820",
+    equipmentName: "Cat 320 GC Excavator",
+    location: "Equipment Yard",
+    type: "PM",
+    status: "Invoiced",
+    priority: "Normal",
+    technicianId: "T-04",
+    technicianName: "Priya Mehta",
+    scheduledDate: "2026-04-25",
+    scheduledTime: "08:00",
+    completedDate: "2026-04-25",
+    createdAt: "2026-04-20T08:00:00Z",
+    createdBy: "Admin",
+    description: "500-hour PM service. Pre-warranty expiration inspection.",
+    totalLaborCost: 480,
+    totalPartsCost: 395,
+    invoiceNumber: "INV-4411",
+    repairLog: {
+      problemReported: "Scheduled 500-hour PM. Warranty expires 2026-05-15.",
+      diagnosis: "All systems within spec. Undercarriage at 45% wear. Track tension adjusted.",
+      partsUsed: [
+        { id: "P-020", name: "Hydraulic Filter Set", partNumber: "FIL-HYD-320", quantity: 1, unitCost: 145.00 },
+        { id: "P-021", name: "Engine Air Filter", partNumber: "FIL-AIR-320", quantity: 1, unitCost: 62.00 },
+        { id: "P-022", name: "Hydraulic Fluid (5gal)", partNumber: "FLD-HYD-5G", quantity: 4, unitCost: 47.00 },
+      ],
+      laborHours: 4.0,
+      technicianNotes: "Recommend undercarriage replacement at 1000hrs. Track tension re-torqued to spec. Photos on file.",
+      photos: [],
+      signatureDataUrl: "SIGNED",
+      signedBy: "Angela Strom",
+      signedAt: "2026-04-25T15:45:00Z",
+    },
+  },
+  {
+    id: "WO-2035",
+    customerId: "CUS-001",
+    customerName: "Riverstone Logistics",
+    equipmentId: "EQ-188",
+    equipmentName: "Toyota 8FGU25 Forklift",
+    location: "South Depot",
+    type: "Inspection",
+    status: "Scheduled",
+    priority: "Low",
+    technicianId: "T-01",
+    technicianName: "Marcus Webb",
+    scheduledDate: "2026-05-08",
+    scheduledTime: "10:00",
+    completedDate: "",
+    createdAt: "2026-04-27T13:00:00Z",
+    createdBy: "Admin",
+    description: "Annual OSHA forklift inspection.",
+    totalLaborCost: 0,
+    totalPartsCost: 0,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Annual regulatory inspection due.",
+      diagnosis: "",
+      partsUsed: [],
+      laborHours: 0,
+      technicianNotes: "",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+  {
+    id: "WO-2034",
+    customerId: "CUS-002",
+    customerName: "Apex Fabricators",
+    equipmentId: "EQ-241",
+    equipmentName: "Ingersoll Rand UP6-15 Air Compressor",
+    location: "Plant A",
+    type: "PM",
+    status: "Scheduled",
+    priority: "Normal",
+    technicianId: "T-02",
+    technicianName: "Sandra Liu",
+    scheduledDate: "2026-05-12",
+    scheduledTime: "07:30",
+    completedDate: "",
+    createdAt: "2026-04-29T09:00:00Z",
+    createdBy: "Admin",
+    description: "Quarterly PM: filter replacement, belt tension check, separator element.",
+    totalLaborCost: 0,
+    totalPartsCost: 0,
+    invoiceNumber: "",
+    repairLog: {
+      problemReported: "Scheduled quarterly PM.",
+      diagnosis: "",
+      partsUsed: [],
+      laborHours: 0,
+      technicianNotes: "",
+      photos: [],
+      signatureDataUrl: "",
+      signedBy: "",
+      signedAt: "",
+    },
+  },
+]
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 export const mockStats = {
