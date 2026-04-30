@@ -112,9 +112,12 @@ export function AppTopbar() {
       {/* Search — hidden on mobile unless expanded */}
       <div
         className={cn(
-          "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 transition-colors bg-background",
+          "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 bg-background",
           "hidden sm:flex",
-          searchFocused ? "border-primary ring-1 ring-primary/30" : "border-border"
+          "transition-all duration-150",
+          searchFocused
+            ? "border-primary ring-2 ring-primary/20 shadow-[0_0_0_3px_rgba(15,122,229,0.08)]"
+            : "border-border hover:border-border/80"
         )}
       >
         <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -146,8 +149,11 @@ export function AppTopbar() {
             >
               <Bell className="w-4 h-4 text-muted-foreground" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-white text-[10px] font-bold leading-none">
-                  {unreadCount}
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-30" />
+                  <span className="relative flex items-center justify-center w-4 h-4 rounded-full bg-destructive text-white text-[10px] font-bold leading-none">
+                    {unreadCount}
+                  </span>
                 </span>
               )}
             </button>
@@ -213,7 +219,7 @@ export function AppTopbar() {
       {hubOpen && (
         <div
           ref={hubRef}
-          className="absolute top-[calc(100%+6px)] right-2 md:right-4 z-50 w-[calc(100vw-1rem)] max-w-[480px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+          className="absolute top-[calc(100%+6px)] right-2 md:right-4 z-50 w-[calc(100vw-1rem)] max-w-[480px] bg-card border border-border rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden"
           role="dialog"
           aria-label="Account settings hub"
         >

@@ -159,9 +159,19 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* Don't animate layout-affecting properties globally */
+  *, *::before, *::after {
+    box-sizing: border-box;
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 }
 
@@ -306,6 +316,38 @@
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
+  }
+
+  /* ── Premium shadow scale ────────────────────────────────────────────────
+     Consistent elevation tokens. Apply via class or CSS var.               */
+  .ds-shadow-card   { box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); }
+  .ds-shadow-hover  { box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04); }
+  .ds-shadow-panel  { box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06); }
+
+  /* ── Table / list row hover ───────────────────────────────────────────────
+     Drop-in for any <tr> or <li> that should react to hover.               */
+  .ds-row-hover {
+    @apply transition-colors cursor-pointer;
+  }
+  .ds-row-hover:hover {
+    background-color: color-mix(in oklch, var(--primary) 3%, var(--card));
+  }
+
+  /* ── Interactive card lift ────────────────────────────────────────────────
+     Apply to any card that should lift on hover (opt-in, not global).      */
+  .ds-card-interactive {
+    @apply transition-all duration-200;
+  }
+  .ds-card-interactive:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    transform: translateY(-1px);
+  }
+
+  /* ── Tabular numbers ─────────────────────────────────────────────────────
+     Prevents jitter in number columns (revenue, counts, IDs).              */
+  .ds-tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 
   /* ── Table sort header button ─────────────────────────────────────────────

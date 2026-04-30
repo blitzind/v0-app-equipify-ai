@@ -28,14 +28,14 @@ export function RecentWorkOrders() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">WO #</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Customer</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Equipment</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Technician</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Priority</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Status</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Due</th>
+            <tr className="border-b border-border bg-muted/30">
+              <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">WO #</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Customer</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Equipment</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Technician</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Priority</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Status</th>
+              <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Due</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -43,22 +43,30 @@ export function RecentWorkOrders() {
               const status = statusConfig[wo.status] ?? { label: wo.status, className: "bg-secondary text-secondary-foreground border-border" }
               const priority = priorityConfig[wo.priority] ?? { className: "bg-secondary text-secondary-foreground border-border" }
               return (
-                <tr key={wo.id} className="hover:bg-muted/30 transition-colors cursor-pointer">
-                  <td className="px-5 py-3 font-mono text-xs font-medium text-primary whitespace-nowrap">{wo.id}</td>
-                  <td className="px-3 py-3 text-foreground whitespace-nowrap">{wo.customer}</td>
-                  <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{wo.equipment}</td>
-                  <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{wo.technician}</td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <Badge variant="outline" className={cn("text-[10px] font-medium", priority.className)}>
+                <tr
+                  key={wo.id}
+                  className="group transition-colors duration-100 cursor-pointer"
+                  style={{ backgroundColor: "var(--card)" }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = "color-mix(in oklch, var(--primary) 3%, var(--card))")}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "var(--card)")}
+                >
+                  <td className="px-5 py-3.5 whitespace-nowrap">
+                    <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">{wo.id}</span>
+                  </td>
+                  <td className="px-3 py-3.5 text-sm text-foreground whitespace-nowrap font-medium">{wo.customer}</td>
+                  <td className="px-3 py-3.5 text-sm text-muted-foreground whitespace-nowrap">{wo.equipment}</td>
+                  <td className="px-3 py-3.5 text-sm text-muted-foreground whitespace-nowrap">{wo.technician}</td>
+                  <td className="px-3 py-3.5 whitespace-nowrap">
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold", priority.className)}>
                       {wo.priority}
                     </Badge>
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <Badge variant="outline" className={cn("text-[10px] font-medium", status.className)}>
+                  <td className="px-3 py-3.5 whitespace-nowrap">
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold", status.className)}>
                       {status.label}
                     </Badge>
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{wo.due}</td>
+                  <td className="px-3 py-3.5 text-xs text-muted-foreground whitespace-nowrap ds-tabular">{wo.due}</td>
                 </tr>
               )
             })}

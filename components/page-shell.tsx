@@ -109,8 +109,8 @@ function resolveMeta(pathname: string): RouteMeta | null {
 function PageHero({ title, subtitle, icon: Icon }: { title: string; subtitle: string; icon: LucideIcon }) {
   return (
     <div className="px-3 sm:px-6 pt-4 sm:pt-5 pb-1 shrink-0">
-      <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-sm px-4 sm:px-6 py-4 sm:py-5">
-        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
         </div>
         <div className="min-w-0">

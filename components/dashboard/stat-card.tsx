@@ -23,21 +23,35 @@ export function StatCard({
   urgent,
 }: StatCardProps) {
   return (
-    <div className={cn("bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col gap-3 sm:gap-4", urgent && "border-destructive/40")}>
+    <div className={cn(
+      "group bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col gap-3 sm:gap-4",
+      "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+      "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] hover:-translate-y-px",
+      "transition-all duration-200 cursor-default select-none",
+      urgent && "border-destructive/40"
+    )}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-snug">{title}</p>
-        <div className={cn("flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0", iconBg)}>
-          <Icon className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", iconColor)} />
+        <p className="text-[11px] font-semibold text-muted-foreground leading-snug tracking-wider uppercase">{title}</p>
+        <div className={cn(
+          "flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0",
+          "ring-2 ring-transparent ring-offset-1 ring-offset-card",
+          "group-hover:ring-primary/20 transition-all duration-200",
+          iconBg
+        )}>
+          <Icon className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 group-hover:scale-110", iconColor)} />
         </div>
       </div>
       <div>
-        <p className={cn("text-2xl sm:text-3xl font-bold tracking-tight", urgent ? "text-destructive" : "text-foreground")}>
+        <p className={cn(
+          "text-2xl sm:text-3xl font-bold tracking-tight ds-tabular",
+          urgent ? "text-destructive" : "text-foreground"
+        )}>
           {value}
         </p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{subtitle}</p>}
       </div>
       {trend && (
-        <p className={cn("text-xs font-medium", trend.positive ? "text-[oklch(0.62_0.17_145)]" : "text-destructive")}>
+        <p className={cn("text-xs font-semibold", trend.positive ? "text-[oklch(0.42_0.17_145)]" : "text-destructive")}>
           {trend.value}
         </p>
       )}
