@@ -29,6 +29,7 @@ export default function DashboardPage() {
           iconColor="text-primary"
           iconBg="bg-primary/10"
           trend={{ value: "+5 from last month", positive: false }}
+          href="/service-schedule"
         />
         <StatCard
           title="Overdue Service"
@@ -38,6 +39,7 @@ export default function DashboardPage() {
           iconColor="text-destructive"
           iconBg="bg-destructive/10"
           urgent
+          href="/service-schedule"
         />
         <StatCard
           title="Open Work Orders"
@@ -47,6 +49,7 @@ export default function DashboardPage() {
           iconColor="text-primary"
           iconBg="bg-primary/10"
           trend={{ value: "+11 this week", positive: false }}
+          href="/work-orders"
         />
         <StatCard
           title="Monthly Revenue"
@@ -56,6 +59,7 @@ export default function DashboardPage() {
           iconColor="text-[oklch(0.42_0.17_145)]"
           iconBg="bg-[oklch(0.62_0.17_145)]/10"
           trend={{ value: "+7.1% vs March", positive: true }}
+          href="/reports"
         />
         <StatCard
           title="Expiring Warranties"
@@ -65,6 +69,7 @@ export default function DashboardPage() {
           iconColor="text-[oklch(0.50_0.12_70)]"
           iconBg="bg-[oklch(0.75_0.16_70)]/10"
           trend={{ value: "3 expire this week", positive: false }}
+          href="/equipment"
         />
         <StatCard
           title="Repeat Repair Alerts"
@@ -74,6 +79,7 @@ export default function DashboardPage() {
           iconColor="text-destructive"
           iconBg="bg-destructive/10"
           urgent
+          href="/insights"
         />
       </div>
 

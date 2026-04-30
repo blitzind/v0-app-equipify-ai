@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import {
   AreaChart,
   Area,
@@ -18,16 +19,20 @@ function formatCurrency(v: number) {
 export function RevenueChart() {
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <Link
+        href="/reports"
+        className="flex items-center justify-between px-5 py-4 border-b border-border group hover:bg-muted/30 transition-colors cursor-pointer"
+        title="View revenue report"
+      >
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Monthly Revenue</h2>
+          <h2 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Monthly Revenue</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Last 6 months</p>
         </div>
         <div className="text-right">
           <p className="text-xl font-bold text-foreground ds-tabular">$184,250</p>
           <p className="text-xs text-[oklch(0.42_0.17_145)] font-semibold">+7.1% vs last month</p>
         </div>
-      </div>
+      </Link>
       <div className="px-4 py-4">
         <ResponsiveContainer width="100%" height={160}>
           <AreaChart data={revenueData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>

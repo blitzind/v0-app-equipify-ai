@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useContext } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Bell, Search, ChevronDown,
   User, Lock, BellRing,
@@ -10,25 +10,101 @@ import {
   CreditCard, Receipt, Wallet, BarChart3,
   Plug, KeyRound, ScrollText,
   LogOut, ChevronRight, Menu, X,
+  AlertCircle, Repeat2, ShieldAlert, CheckCircle2, CalendarClock, UserCog,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarContext } from "@/components/app-sidebar"
+import type { LucideIcon } from "lucide-react"
 
-const notifications = [
-  { id: 1, title: "Overdue: WO-2038", desc: "Crane #CR-02 repair past due", time: "5m ago", unread: true },
-  { id: 2, title: "Repeat Repair Alert", desc: "CNC Machine #CNC-3 flagged (4 repairs)", time: "1h ago", unread: true },
-  { id: 3, title: "Warranty Expiring", desc: "Excavator #EX-4 expires in 15 days", time: "3h ago", unread: true },
-  { id: 4, title: "WO-2039 Completed", desc: "Tyler Oakes closed HVAC inspection", time: "5h ago", unread: false },
+// ─── Notification data ────────────────────────────────────────────────────────
+
+interface Notification {
+  id: number
+  icon: LucideIcon
+  iconColor: string
+  title: string
+  desc: string
+  time: string
+  unread: boolean
+  href: string           // route to navigate to
+  drawerParam?: string   // optional query param to open a specific drawer
+}
+
+const INITIAL_NOTIFICATIONS: Notification[] = [
+  {
+    id: 1,
+    icon: AlertCircle,
+    iconColor: "text-destructive",
+    title: "Overdue: WO-2038",
+    desc: "Crane #CR-02 repair past due",
+    time: "5m ago",
+    unread: true,
+    href: "/work-orders",
+    drawerParam: "WO-2038",
+  },
+  {
+    id: 2,
+    icon: Repeat2,
+    iconColor: "text-destructive",
+    title: "Repeat Repair Alert",
+    desc: "CNC Machine #CNC-3 flagged (4 repairs)",
+    time: "1h ago",
+    unread: true,
+    href: "/insights",
+  },
+  {
+    id: 3,
+    icon: ShieldAlert,
+    iconColor: "text-[oklch(0.50_0.12_70)]",
+    title: "Warranty Expiring",
+    desc: "Excavator #EX-4 expires in 15 days",
+    time: "3h ago",
+    unread: true,
+    href: "/equipment",
+    drawerParam: "EQ-188",
+  },
+  {
+    id: 4,
+    icon: CheckCircle2,
+    iconColor: "text-[oklch(0.42_0.17_145)]",
+    title: "WO-2039 Completed",
+    desc: "Tyler Oakes closed HVAC inspection",
+    time: "5h ago",
+    unread: false,
+    href: "/work-orders",
+    drawerParam: "WO-2039",
+  },
+  {
+    id: 5,
+    icon: CalendarClock,
+    iconColor: "text-primary",
+    title: "PM Due: Forklift #EQ-188",
+    desc: "Toyota 8FGU25 service due Apr 30",
+    time: "8h ago",
+    unread: false,
+    href: "/service-schedule",
+  },
+  {
+    id: 6,
+    icon: UserCog,
+    iconColor: "text-primary",
+    title: "Technician schedule change",
+    desc: "Marcus Webb reassigned to WO-2041",
+    time: "1d ago",
+    unread: false,
+    href: "/technicians",
+  },
 ]
+
+// ─── Account hub sections ─────────────────────────────────────────────────────
 
 const ACCOUNT_SECTIONS = [
   {
@@ -67,17 +143,36 @@ const ACCOUNT_SECTIONS = [
   },
 ]
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function AppTopbar() {
-  const pathname = usePathname()
+  const pathname  = usePathname()
+  const router    = useRouter()
+  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS)
+  const [notifOpen, setNotifOpen]   = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [hubOpen, setHubOpen] = useState(false)
-  const hubRef = useRef<HTMLDivElement>(null)
+  const [hubOpen, setHubOpen]       = useState(false)
+  const hubRef     = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { setMobileOpen } = useContext(SidebarContext)
   const unreadCount = notifications.filter((n) => n.unread).length
 
-  // Close on outside click or ESC
+  // Mark a notification as read and navigate
+  function handleNotifClick(n: Notification) {
+    setNotifications((prev) =>
+      prev.map((item) => item.id === n.id ? { ...item, unread: false } : item)
+    )
+    setNotifOpen(false)
+    router.push(n.href)
+  }
+
+  // Mark all as read
+  function markAllRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  }
+
+  // Close account hub on outside click or ESC
   useEffect(() => {
     if (!hubOpen) return
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setHubOpen(false) }
@@ -141,11 +236,11 @@ export function AppTopbar() {
 
       <div className="flex items-center gap-2 ml-auto">
         {/* Notifications */}
-        <DropdownMenu>
+        <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="relative flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors"
-              aria-label="Notifications"
+              className="relative flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors cursor-pointer"
+              aria-label={`Notifications — ${unreadCount} unread`}
             >
               <Bell className="w-4 h-4 text-muted-foreground" />
               {unreadCount > 0 && (
@@ -158,22 +253,78 @@ export function AppTopbar() {
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              <Badge variant="secondary" className="text-xs">{unreadCount} new</Badge>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {notifications.map((n) => (
-              <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-2.5 cursor-pointer">
-                <div className="flex items-center gap-2 w-full">
-                  {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                  <span className={cn("text-sm font-medium flex-1", !n.unread && "pl-3.5")}>{n.title}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">{n.time}</span>
-                </div>
-                <p className="text-xs text-muted-foreground pl-3.5">{n.desc}</p>
-              </DropdownMenuItem>
-            ))}
+          <DropdownMenuContent align="end" className="w-80 p-0" sideOffset={8}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <DropdownMenuLabel className="p-0 text-sm font-semibold">Notifications</DropdownMenuLabel>
+                {unreadCount > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{unreadCount} new</Badge>
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); markAllRead() }}
+                  className="text-[10px] font-medium text-primary hover:underline cursor-pointer"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+
+            {/* Items */}
+            <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
+              {notifications.map((n) => {
+                const Icon = n.icon
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotifClick(n)}
+                    className={cn(
+                      "w-full flex items-start gap-3 px-4 py-3 text-left cursor-pointer",
+                      "transition-colors duration-100",
+                      "hover:bg-muted/60",
+                      n.unread ? "bg-primary/[0.03]" : "bg-card"
+                    )}
+                    aria-label={`${n.title}: ${n.desc}`}
+                  >
+                    {/* Icon tile */}
+                    <div className={cn(
+                      "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5",
+                      n.unread ? "bg-primary/10" : "bg-muted"
+                    )}>
+                      <Icon className={cn("w-4 h-4", n.unread ? n.iconColor : "text-muted-foreground")} />
+                    </div>
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                        <p className={cn(
+                          "text-xs font-semibold leading-tight truncate",
+                          n.unread ? "text-foreground" : "text-foreground/80 pl-3"
+                        )}>
+                          {n.title}
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-1 pl-3.5">{n.desc}</p>
+                    </div>
+                    {/* Time */}
+                    <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5 ds-tabular">{n.time}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Footer */}
+            <DropdownMenuSeparator className="my-0" />
+            <div className="px-4 py-2.5">
+              <button
+                onClick={() => { setNotifOpen(false); router.push("/service-schedule") }}
+                className="w-full text-center text-xs font-medium text-primary hover:underline cursor-pointer"
+              >
+                View all notifications
+              </button>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -182,7 +333,7 @@ export function AppTopbar() {
           ref={triggerRef}
           onClick={() => setHubOpen((v) => !v)}
           className={cn(
-            "flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
+            "flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors cursor-pointer",
             hubOpen ? "bg-muted" : "hover:bg-muted"
           )}
           aria-label="Account menu"
@@ -209,7 +360,7 @@ export function AppTopbar() {
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
             autoFocus
           />
-          <button onClick={() => setSearchOpen(false)} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => setSearchOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>

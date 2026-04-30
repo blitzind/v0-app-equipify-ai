@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 
@@ -10,6 +11,7 @@ interface StatCardProps {
   iconBg?: string
   trend?: { value: string; positive?: boolean }
   urgent?: boolean
+  href?: string
 }
 
 export function StatCard({
@@ -21,14 +23,17 @@ export function StatCard({
   iconBg = "bg-primary/10",
   trend,
   urgent,
+  href,
 }: StatCardProps) {
-  return (
+  const inner = (
     <div className={cn(
       "group bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col gap-3 sm:gap-4",
       "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
       "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] hover:-translate-y-px",
-      "transition-all duration-200 cursor-default select-none",
-      urgent && "border-destructive/40"
+      "transition-all duration-200 select-none",
+      href ? "cursor-pointer" : "cursor-default",
+      urgent && "border-destructive/40",
+      href && "hover:border-primary/30",
     )}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold text-muted-foreground leading-snug tracking-wider uppercase">{title}</p>
@@ -57,4 +62,9 @@ export function StatCard({
       )}
     </div>
   )
+
+  if (href) {
+    return <Link href={href} className="block">{inner}</Link>
+  }
+  return inner
 }
