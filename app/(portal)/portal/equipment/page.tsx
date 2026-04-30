@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import {
   Wrench, ChevronRight, Search, CalendarClock,
-  ShieldCheck, MapPin, FileDown, Clock, ArrowUpRight,
+  ShieldCheck, MapPin, Clock,
 } from "lucide-react"
 import { equipment, workOrders } from "@/lib/mock-data"
 

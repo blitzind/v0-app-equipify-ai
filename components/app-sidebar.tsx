@@ -29,7 +29,7 @@ const navItems = [
   { label: "Maintenance Plans", href: "/maintenance-plans", icon: ShieldCheck },
   { label: "Technicians", href: "/technicians", icon: HardHat },
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Customer Portal", href: "/customer-portal", icon: Globe },
+  { label: "Customer Portal", href: "/portal", icon: Globe },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
 ]

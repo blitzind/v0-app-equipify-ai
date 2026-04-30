@@ -5,8 +5,7 @@ import { Check, X, ChevronDown, FileText, MessageSquare, FilePen, Clock } from "
 import { portalQuotes } from "@/lib/mock-data"
 import type { Quote } from "@/lib/mock-data"
 
-const CUSTOMER_ID = "CUS-001"
-// Show quotes for multiple customers so the demo is richer
+// Show all quotes so the demo is richer across all statuses
 const allQuotes = portalQuotes
 
 function fmtDate(d: string) {
