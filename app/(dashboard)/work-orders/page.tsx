@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
