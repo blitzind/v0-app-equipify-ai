@@ -1147,14 +1147,6 @@ export default function TechniciansPage() {
     <>
       <div className="flex flex-col gap-6">
 
-        {/* CTA + KPI cards */}
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-end">
-            <Button className="gap-2 shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
-              <Plus className="w-4 h-4" /> Add Technician
-            </Button>
-          </div>
-
         {/* KPI cards — clickable filters */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
@@ -1185,7 +1177,6 @@ export default function TechniciansPage() {
             active={kpiFilter === "expiring"} onClick={() => toggleKpi("expiring")}
           />
         </div>
-        </div>{/* end CTA + KPI group */}
 
         {/* Active KPI label */}
         {kpiFilter && (
@@ -1241,7 +1232,10 @@ export default function TechniciansPage() {
             </SelectContent>
           </Select>
 
-          <div className="ml-auto flex items-center gap-1 border border-border rounded-md p-0.5 bg-background">
+          <Button className="gap-2 shrink-0 cursor-pointer h-9 ml-auto" onClick={() => setShowAddModal(true)}>
+            <Plus className="w-4 h-4" /> Add Technician
+          </Button>
+          <div className="flex items-center gap-1 border border-border rounded-md p-0.5 bg-background">
             <button
               onClick={() => setView("card")}
               className={cn("p-1.5 rounded transition-colors cursor-pointer", view === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}

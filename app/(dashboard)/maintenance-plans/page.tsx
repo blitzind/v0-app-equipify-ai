@@ -360,7 +360,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ──────���─────────────────���������───────────────────────────────
+// ─── Plan Detail Sheet ──────�����─────────────────���������───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -772,14 +772,6 @@ export default function MaintenancePlansPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* CTA + Stats group */}
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-end">
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" /> New Plan
-          </Button>
-        </div>
-
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
@@ -797,7 +789,6 @@ export default function MaintenancePlansPage() {
           </Card>
         ))}
       </div>
-      </div>{/* end CTA + Stats group */}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
@@ -824,7 +815,10 @@ export default function MaintenancePlansPage() {
             {(["Annual", "Semi-Annual", "Quarterly", "Monthly", "Custom"] as PlanInterval[]).map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-1 border border-border rounded-md p-0.5 ml-auto">
+        <Button onClick={() => setCreateOpen(true)} className="gap-2 h-9 ml-auto">
+          <Plus className="w-4 h-4" /> New Plan
+        </Button>
+        <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
           {([
             { key: "cards", label: "Cards" },
             { key: "table", label: "Table" },
