@@ -299,7 +299,7 @@ export default function InsightsPage() {
   return (
     <div className="min-h-full flex flex-col">
       {/* ── Executive hero header ─────────────────────────────────────────── */}
-      <div className="shrink-0" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #162032 100%)" }}>
+      <div className="shrink-0 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #162032 100%)" }}>
         <div className="px-6 pt-6 pb-0">
           {/* Title row */}
           <div className="flex items-start justify-between gap-4 mb-6">
