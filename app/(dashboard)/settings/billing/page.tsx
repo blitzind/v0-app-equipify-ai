@@ -11,8 +11,10 @@ import { createCheckoutSession } from "@/app/actions/stripe"
 import {
   CreditCard, Check, ArrowRight, AlertTriangle,
   Download, Zap, X, Phone, Sparkles,
+  Users, Package, Activity, MoreHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
@@ -41,14 +43,86 @@ function PlanBadge({ planId }: { planId: PlanId }) {
   )
 }
 
+interface UsageBarProps {
+  label: string
+  icon: React.ElementType
+  used: number
+  limit: number
+  unit?: string
+}
+
+function UsageBar({ label, icon: Icon, used, limit, unit = "" }: UsageBarProps) {
+  const isUnlimited = limit === -1
+  const pct = isUnlimited ? 0 : Math.min((used / limit) * 100, 100)
+  const isWarning = !isUnlimited && pct >= 80
+  const isCritical = !isUnlimited && pct >= 95
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon size={13} className="text-muted-foreground shrink-0" />
+          <span className="text-xs font-medium text-foreground">{label}</span>
+        </div>
+        <span className={cn("text-xs font-semibold tabular-nums",
+          isCritical ? "text-destructive" : isWarning ? "text-[color:var(--status-warning)]" : "text-muted-foreground"
+        )}>
+          {isUnlimited
+            ? `${used.toLocaleString()}${unit} / Unlimited`
+            : `${used.toLocaleString()}${unit} / ${limit.toLocaleString()}${unit}`}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+        {!isUnlimited && (
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              isCritical ? "bg-destructive" : isWarning ? "bg-[color:var(--status-warning)]" : "bg-primary"
+            )}
+            style={{ width: `${pct}%` }}
+          />
+        )}
+        {isUnlimited && <div className="h-full rounded-full bg-primary/30 w-[15%]" />}
+      </div>
+      {isWarning && !isCritical && (
+        <p className="text-[10px] text-[color:var(--status-warning)]">Approaching limit — consider upgrading.</p>
+      )}
+      {isCritical && (
+        <p className="text-[10px] text-destructive">At limit — upgrade to add more.</p>
+      )}
+    </div>
+  )
+}
+
+// Richer invoice data
+const RICH_INVOICE_HISTORY = [
+  { id: "INV-S005", date: "2026-05-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (May 2026)" },
+  { id: "INV-S004", date: "2026-04-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Apr 2026)" },
+  { id: "INV-S003", date: "2026-03-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Mar 2026)" },
+  { id: "INV-S002", date: "2026-02-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Feb 2026)" },
+  { id: "INV-S001", date: "2026-01-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Jan 2026)" },
+  { id: "INV-A012", date: "2025-12-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Dec 2025)" },
+  { id: "INV-A011", date: "2025-11-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Nov 2025)" },
+  { id: "INV-A010", date: "2025-10-01", amount: 31800, status: "Paid",    description: "Growth Plan — Annual (Oct 2025)" },
+  { id: "INV-A009", date: "2025-09-01", amount: 39700, status: "Paid",    description: "Growth Plan — Monthly (Sep 2025)" },
+  { id: "INV-A008", date: "2025-08-01", amount: 39700, status: "Paid",    description: "Growth Plan — Monthly (Aug 2025)" },
+  { id: "INV-A007", date: "2025-07-14", amount: 19700, status: "Paid",    description: "Starter Plan — Monthly (Jul 2025)" },
+  { id: "INV-A006", date: "2025-07-01", amount: 0,     status: "Credit",  description: "Prorated credit — Starter to Growth" },
+]
+
 export default function BillingPage() {
   const { workspace, dispatch, plan, workspaceUsers } = useTenant()
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(workspace.billingCycle)
   const [checkoutPlan, setCheckoutPlan] = useState<PlanId | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [checkoutError, setCheckoutError] = useState("")
+  const [showAllInvoices, setShowAllInvoices] = useState(false)
 
   const usedSeats = workspaceUsers.filter((u) => u.status === "Active").length
+  // Mock usage numbers
+  const usedEquipment = 847
+  const usedApiCalls = 14200
+  const apiCallLimit = plan.id === "starter" ? 5000 : plan.id === "growth" ? 25000 : -1
 
   const fetchClientSecret = useCallback(async () => {
     if (!checkoutPlan) return ""
@@ -85,10 +159,12 @@ export default function BillingPage() {
     ? currentPlanData.priceAnnual
     : currentPlanData.priceMonthly
 
+  const visibleInvoices = showAllInvoices ? RICH_INVOICE_HISTORY : RICH_INVOICE_HISTORY.slice(0, 5)
+
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Current plan */}
+      {/* ── Current subscription ─────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Current subscription</h3>
@@ -178,7 +254,90 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Plan selector */}
+      {/* ── Usage metrics ────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Usage</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Current billing period</p>
+          </div>
+          <button
+            onClick={() => openCheckout(workspace.planId === "starter" ? "growth" : workspace.planId === "growth" ? "scale" : "enterprise")}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Upgrade plan
+          </button>
+        </div>
+        <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-border">
+          <div className="pb-5 sm:pb-0 sm:pr-6">
+            <UsageBar
+              label="Team seats"
+              icon={Users}
+              used={usedSeats}
+              limit={currentPlanData.seats}
+            />
+          </div>
+          <div className="pt-5 sm:pt-0 sm:px-6">
+            <UsageBar
+              label="Equipment records"
+              icon={Package}
+              used={usedEquipment}
+              limit={currentPlanData.equipmentLimit}
+            />
+          </div>
+          <div className="pt-5 sm:pt-0 sm:pl-6">
+            <UsageBar
+              label="API calls"
+              icon={Activity}
+              used={usedApiCalls}
+              limit={apiCallLimit}
+              unit=" calls"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Card on file ─────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">Payment method</h3>
+        </div>
+        <div className="px-6 py-5">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              {/* Card tile */}
+              <div className="w-14 h-9 rounded-md border border-border bg-gradient-to-br from-secondary to-secondary/60 flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 38 24" className="w-8 h-5">
+                  <rect width="38" height="24" rx="4" fill="#1a1f71" />
+                  <circle cx="15" cy="12" r="7" fill="#eb001b" fillOpacity="0.9" />
+                  <circle cx="23" cy="12" r="7" fill="#f79e1b" fillOpacity="0.9" />
+                  <path d="M19 7.3a7 7 0 0 1 0 9.4A7 7 0 0 1 19 7.3z" fill="#ff5f00" fillOpacity="0.85" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Mastercard ending in 4242</p>
+                <p className="text-xs text-muted-foreground">Expires 09 / 2028 &bull; Billing email: {workspace.companyEmail}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openCheckout(workspace.planId)}
+                className="h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors"
+              >
+                Update card
+              </button>
+              <button className="h-8 px-3 text-xs font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors">
+                Remove
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Your card is charged automatically each billing cycle. We accept Visa, Mastercard, American Express, and Discover.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Plan selector ────────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -207,7 +366,6 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Trust microcopy */}
         <div className="px-6 pt-5 pb-1">
           <p className="text-xs text-muted-foreground">
             Equipify helps reduce admin work, recover missed service revenue, and automate operations with built-in AI.
@@ -240,12 +398,7 @@ export default function BillingPage() {
                     {p.badge}
                   </span>
                 )}
-                {isCurrent && !p.badge && (
-                  <span className="absolute top-3 right-3 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
-                    Current
-                  </span>
-                )}
-                {isCurrent && p.badge && (
+                {isCurrent && (
                   <span className="absolute top-3 right-3 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
                     Current
                   </span>
@@ -283,7 +436,6 @@ export default function BillingPage() {
                   ))}
                 </ul>
 
-                {/* AI section */}
                 {p.aiLabel && p.aiFeatures ? (
                   <div className="mb-4 rounded-lg border border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] p-3">
                     <div className="flex items-center gap-1.5 mb-2.5">
@@ -322,9 +474,9 @@ export default function BillingPage() {
                       ? "bg-primary/10 text-primary cursor-default"
                       : p.isCustomPricing
                       ? "bg-foreground text-background hover:opacity-90"
-                      : isPopular
-                      ? "bg-primary text-primary-foreground hover:opacity-90 shadow-sm"
-                      : "bg-primary text-primary-foreground hover:opacity-90"
+                      : isDowngrade
+                      ? "bg-secondary text-foreground border border-border hover:bg-secondary/80"
+                      : "bg-primary text-primary-foreground hover:opacity-90 shadow-sm"
                   }`}
                 >
                   {isCurrent ? (
@@ -342,7 +494,6 @@ export default function BillingPage() {
           })}
         </div>
 
-        {/* Bottom trust copy */}
         <div className="px-6 pb-5">
           <p className="text-xs text-muted-foreground text-center">
             No long-term contracts. Cancel anytime. Annual plans save 20%. AI features available on Growth plans and above.
@@ -350,47 +501,67 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Invoice history */}
+      {/* ── Invoice history ──────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">Invoice history</h3>
+          <Button variant="outline" size="sm" className="text-xs h-7 gap-1.5">
+            <Download size={12} /> Download all
+          </Button>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/40">
               {["Invoice", "Date", "Description", "Amount", "Status", ""].map((h) => (
-                <th key={h} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">{h}</th>
+                <th key={h} className="text-left px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {INVOICE_HISTORY.map((inv) => (
+            {visibleInvoices.map((inv) => (
               <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
                 <td className="px-6 py-3 text-xs font-mono text-foreground">{inv.id}</td>
-                <td className="px-6 py-3 text-xs text-muted-foreground">{fmtIsoDate(inv.date)}</td>
+                <td className="px-6 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtIsoDate(inv.date)}</td>
                 <td className="px-6 py-3 text-xs text-foreground">{inv.description}</td>
-                <td className="px-6 py-3 text-xs font-medium text-foreground">
-                  ${(inv.amount / 100).toFixed(2)}
+                <td className="px-6 py-3 text-xs font-medium text-foreground tabular-nums">
+                  {inv.amount === 0 ? "—" : `$${(inv.amount / 100).toFixed(2)}`}
                 </td>
                 <td className="px-6 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                    inv.status === "Paid" ? "ds-badge-success" : "ds-badge-warning"
-                  }`}>
+                  <span className={cn(
+                    "text-xs font-medium px-2 py-0.5 rounded-full border",
+                    inv.status === "Paid"   ? "ds-badge-success" :
+                    inv.status === "Credit" ? "ds-badge-info" :
+                    "ds-badge-warning"
+                  )}>
                     {inv.status}
                   </span>
                 </td>
                 <td className="px-6 py-3 text-right">
-                  <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
-                    <Download size={12} /> PDF
-                  </Button>
+                  {inv.status !== "Credit" && (
+                    <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
+                      <Download size={12} /> PDF
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {RICH_INVOICE_HISTORY.length > 5 && (
+          <div className="px-6 py-3 border-t border-border">
+            <button
+              onClick={() => setShowAllInvoices((v) => !v)}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              {showAllInvoices
+                ? "Show fewer invoices"
+                : `Show all ${RICH_INVOICE_HISTORY.length} invoices`}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Stripe Checkout modal */}
+      {/* ── Stripe Checkout modal ────────────────────────────────────────────── */}
       {checkoutOpen && checkoutPlan && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">
           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
@@ -404,7 +575,6 @@ export default function BillingPage() {
               </Button>
             </div>
             <div className="p-5">
-              {/* Enterprise contact form stub */}
               {checkoutPlan === "enterprise" ? (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-700">
