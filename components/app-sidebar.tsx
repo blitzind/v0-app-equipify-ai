@@ -182,19 +182,24 @@ function SidebarBody({
                     href={href}
                     title={isCollapsed ? label : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg text-sm transition-all duration-100 group relative",
+                      "flex items-center gap-3 rounded-lg text-sm transition-all duration-150 group relative",
                       isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
                       active
-                        ? "bg-primary text-white font-medium shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                        ? "bg-blue-500/[0.18] text-white font-medium"
+                        : "text-sidebar-foreground/75 hover:bg-blue-500/[0.10] hover:text-sidebar-foreground",
                     )}
                   >
+                    {/* Left accent bar — active only, desktop only */}
                     {active && !isCollapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-white/60" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-400" />
+                    )}
+                    {/* Collapsed active: dot indicator at bottom */}
+                    {active && isCollapsed && (
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
                     )}
                     <Icon className={cn(
-                      "w-[17px] h-[17px] shrink-0 transition-all duration-100",
-                      active ? "text-white" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground"
+                      "w-[17px] h-[17px] shrink-0 transition-all duration-150",
+                      active ? "text-blue-300" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80"
                     )} />
                     {!isCollapsed && (
                       <>
