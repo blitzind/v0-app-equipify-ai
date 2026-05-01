@@ -1,7 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { AppTopbar } from "@/components/app-topbar"
+import { MobileBottomNav } from "@/components/mobile-bottom-nav"
+import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
@@ -154,16 +157,27 @@ function PageHero({ title, subtitle, icon: Icon }: { title: string; subtitle: st
 export function PageShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const meta = resolveMeta(pathname)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   return (
     <>
       <AppTopbar />
       {meta && <PageHero title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-[1440px] mx-auto p-3 sm:p-6">
+        {/* pb-24 on mobile gives clearance above the fixed bottom nav (≈80px bar + safe area) */}
+        <div className="max-w-[1440px] mx-auto p-3 sm:p-6 pb-24 lg:pb-6">
           {children}
         </div>
       </main>
+
+      {/* Mobile-only bottom navigation — hidden at lg+ */}
+      <MobileBottomNav onScheduleService={() => setScheduleOpen(true)} />
+
+      {/* Schedule Service drawer triggered from Quick Add */}
+      <ScheduleServiceDrawer
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+      />
     </>
   )
 }
