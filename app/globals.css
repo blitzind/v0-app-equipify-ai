@@ -159,6 +159,16 @@
   --shadow-dropdown:     0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
 }
 
+/* ─── Drawer panel slide animation ───────────────────────────────────────────
+   The global `* { transition-duration: 150ms }` in @layer base would override
+   Tailwind's duration-300 utility. This rule ensures the drawer panel always
+   uses a 300ms transform transition regardless of the global reset.          */
+[role="dialog"][aria-modal="true"] {
+  transition-property: transform !important;
+  transition-duration: 300ms !important;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
 /* Kill all animations on Radix floating content — prevents fly-in glitches */
 [data-radix-popper-content-wrapper] *,
 [data-radix-select-content],
@@ -174,7 +184,7 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
