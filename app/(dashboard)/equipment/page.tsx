@@ -184,6 +184,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 
 function EquipmentPageInner() {
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [refreshToken, setRefreshToken] = useState(0)
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -292,7 +293,7 @@ function EquipmentPageInner() {
     return () => {
       active = false
     }
-  }, [])
+  }, [refreshToken])
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -593,6 +594,7 @@ function EquipmentPageInner() {
       <AddEquipmentModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+        onSuccess={() => setRefreshToken((v) => v + 1)}
       />
 
       <AIScanModal

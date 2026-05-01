@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useEquipment } from "@/lib/equipment-store"
-import { useCustomers } from "@/lib/customer-store"
-import type { Equipment } from "@/lib/mock-data"
+import { useEffect, useState } from "react"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,8 +19,8 @@ const EQUIPMENT_TYPES = [
 ]
 
 const STATUSES = ["Active", "Needs Service", "In Repair", "Out of Service"] as const
-
-let idCounter = 1000
+type EquipmentStatus = (typeof STATUSES)[number]
+type CustomerOption = { id: string; company_name: string }
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -92,7 +90,7 @@ const INITIAL_FORM = {
   lastServiceDate: "",
   nextServiceDue: "",
   serviceInterval: "",
-  status: "Active" as Equipment["status"],
+  status: "Active" as EquipmentStatus,
   notes: "",
 }
 
@@ -108,11 +106,46 @@ function validate(form: FormState): FormErrors {
 }
 
 export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModalProps) {
-  const { addEquipment } = useEquipment()
-  const { customers } = useCustomers()
+  const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setCustomers([])
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (!profile?.default_organization_id) {
+        setCustomers([])
+        return
+      }
+
+      const { data } = await supabase
+        .from("customers")
+        .select("id, company_name")
+        .eq("organization_id", profile.default_organization_id)
+        .eq("status", "active")
+        .eq("is_archived", false)
+        .order("company_name", { ascending: true })
+
+      setCustomers((data as CustomerOption[] | null) ?? [])
+    })()
+  }, [open])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -125,38 +158,70 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
     onClose()
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate(form)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
       return
     }
 
-    const customer = customers.find((c) => c.id === form.customerId)
-    const newId = `EQ-${String(++idCounter).padStart(4, "0")}`
-    const today = new Date().toISOString().slice(0, 10)
+    setSaving(true)
+    const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    const newEquipment: Equipment = {
-      id: newId,
-      customerId: form.customerId,
-      customerName: customer?.company ?? "",
-      model: form.model || form.name,
-      manufacturer: form.manufacturer,
-      category: form.equipmentType,
-      serialNumber: form.serialNumber,
-      installDate: form.installDate || today,
-      warrantyExpiration: form.warrantyExpiration || "",
-      lastServiceDate: form.lastServiceDate || today,
-      nextDueDate: form.nextServiceDue || today,
-      status: form.status,
-      notes: form.notes,
-      location: form.location,
-      photos: [],
-      manuals: [],
-      serviceHistory: [],
+    if (!user) {
+      setSaving(false)
+      setToastMsg("You must be logged in.")
+      setTimeout(() => setToastMsg(null), 3500)
+      return
     }
 
-    addEquipment(newEquipment)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("default_organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.default_organization_id) {
+      setSaving(false)
+      setToastMsg("No default organization found.")
+      setTimeout(() => setToastMsg(null), 3500)
+      return
+    }
+
+    const statusMap: Record<EquipmentStatus, "active" | "needs_service" | "in_repair" | "out_of_service"> = {
+      Active: "active",
+      "Needs Service": "needs_service",
+      "In Repair": "in_repair",
+      "Out of Service": "out_of_service",
+    }
+
+    const { error } = await supabase.from("equipment").insert({
+      organization_id: profile.default_organization_id,
+      customer_id: form.customerId,
+      name: (form.model || form.name).trim(),
+      manufacturer: form.manufacturer.trim() || null,
+      category: form.equipmentType.trim(),
+      serial_number: form.serialNumber.trim() || null,
+      status: statusMap[form.status],
+      install_date: form.installDate || null,
+      warranty_expires_at: form.warrantyExpiration || null,
+      last_service_at: form.lastServiceDate || null,
+      next_due_at: form.nextServiceDue || null,
+      location_label: form.location.trim() || null,
+      notes: form.notes.trim() || null,
+    })
+
+    if (error) {
+      setSaving(false)
+      setToastMsg(error.message)
+      setTimeout(() => setToastMsg(null), 3500)
+      return
+    }
+
+    setSaving(false)
     setToastMsg("Equipment added successfully")
     setTimeout(() => setToastMsg(null), 3500)
     handleClose()
@@ -242,7 +307,7 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
                 <Label required>Customer</Label>
                 <Select value={form.customerId} onChange={(e) => set("customerId", e.target.value)}>
                   <option value="">Select customer...</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
                 </Select>
                 {errors.customerId && <p className="text-xs text-destructive mt-1">{errors.customerId}</p>}
               </Field>
@@ -282,7 +347,7 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
               </Field>
               <Field>
                 <Label>Status</Label>
-                <Select value={form.status} onChange={(e) => set("status", e.target.value as Equipment["status"])}>
+                <Select value={form.status} onChange={(e) => set("status", e.target.value as EquipmentStatus)}>
                   {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </Select>
               </Field>
@@ -298,7 +363,9 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
           {/* Footer */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border shrink-0">
             <Button variant="outline" onClick={handleClose} className="cursor-pointer">Cancel</Button>
-            <Button onClick={handleSave} className="cursor-pointer">Save Equipment</Button>
+            <Button onClick={handleSave} className="cursor-pointer" disabled={saving}>
+              {saving ? "Saving..." : "Save Equipment"}
+            </Button>
           </div>
         </div>
       </div>
