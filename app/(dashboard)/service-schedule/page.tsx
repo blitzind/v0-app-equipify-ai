@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
@@ -400,6 +401,16 @@ export default function ServiceSchedulePage() {
   const [createdIds, setCreatedIds]     = useState<Set<string>>(new Set())
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId) {
+      setSelectedPlanId(openId)
+      router.replace("/service-schedule", { scroll: false })
+    }
+  }, [searchParams, router])
 
   // today is captured once on the client to avoid SSR/client date mismatch.
   // During SSR we use a fixed epoch so monthKeys are stable; on mount we update

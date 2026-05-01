@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { useWorkspaceData } from "@/lib/tenant-store"
@@ -1054,6 +1055,20 @@ export default function TechniciansPage() {
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null)
 
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId && wsTechs.length > 0) {
+      const match = wsTechs.find((t) => t.id === openId)
+      if (match) {
+        setSelectedTech(match)
+        router.replace("/technicians", { scroll: false })
+      }
+    }
+  }, [searchParams, wsTechs, router])
+
   const [scheduleTech, setScheduleTech] = useState<Technician | null>(null)
   const [messageTech, setMessageTech] = useState<Technician | null>(null)
   const [deleteTech, setDeleteTech] = useState<Technician | null>(null)

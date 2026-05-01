@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useCustomers } from "@/lib/customer-store"
 import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
@@ -135,6 +136,16 @@ export default function CustomersPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId) {
+      setSelectedCustomerId(openId)
+      router.replace("/customers", { scroll: false })
+    }
+  }, [searchParams, router])
 
   const filtered = useMemo(() => {
     let list = [...customers]
