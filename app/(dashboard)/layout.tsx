@@ -10,6 +10,7 @@ import { TenantProvider } from "@/lib/tenant-store"
 import { EquipmentProvider } from "@/lib/equipment-store"
 import { CustomerProvider } from "@/lib/customer-store"
 import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
+import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
@@ -54,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <EquipmentProvider>
               <CustomerProvider>
                 <QuoteInvoiceProvider>
+                  <PurchaseOrderProvider>
                   <EquipmentTypeProvider>
                     <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
                       <div className="flex flex-col h-dvh overflow-hidden bg-background">
@@ -67,6 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </div>
                     </SidebarContext.Provider>
                   </EquipmentTypeProvider>
+                  </PurchaseOrderProvider>
                 </QuoteInvoiceProvider>
               </CustomerProvider>
             </EquipmentProvider>

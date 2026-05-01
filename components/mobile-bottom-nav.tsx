@@ -9,7 +9,7 @@ import type { QuickAddAction } from "@/lib/quick-add-context"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
-  Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText,
+  Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart,
 } from "lucide-react"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,9 +130,10 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const items = [
     { icon: Wrench,        label: "Equipment",  href: "/equipment" },
     { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
-    { icon: FileText,      label: "Quotes",      href: "/quotes" },
-    { icon: Receipt,       label: "Invoices",    href: "/invoices" },
-    { icon: BarChart3,     label: "Reports",     href: "/reports" },
+    { icon: FileText,      label: "Quotes",           href: "/quotes" },
+    { icon: Receipt,       label: "Invoices",         href: "/invoices" },
+    { icon: ShoppingCart,  label: "Purchase Orders",  href: "/purchase-orders" },
+    { icon: BarChart3,     label: "Reports",          href: "/reports" },
     { icon: Sparkles,      label: "AI Insights", href: "/insights" },
     { icon: Settings,      label: "Settings",    href: "/settings/workspace" },
   ]

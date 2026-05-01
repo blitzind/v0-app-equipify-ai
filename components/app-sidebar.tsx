@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
-  Building2, X, FileText, Receipt,
+  Building2, X, FileText, Receipt, ShoppingCart,
 } from "lucide-react"
 
 type NavItem = {
@@ -42,9 +42,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Sales & Finance",
     items: [
-      { label: "Quotes",    href: "/quotes",    icon: FileText },
-      { label: "Invoices",  href: "/invoices",  icon: Receipt },
-      { label: "Reports",   href: "/reports",   icon: BarChart3 },
+      { label: "Quotes",           href: "/quotes",           icon: FileText },
+      { label: "Invoices",         href: "/invoices",         icon: Receipt },
+      { label: "Purchase Orders",  href: "/purchase-orders",  icon: ShoppingCart },
+      { label: "Reports",          href: "/reports",          icon: BarChart3 },
     ],
   },
   {
