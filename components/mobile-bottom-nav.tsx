@@ -2,15 +2,17 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useQuickAddDispatch } from "@/lib/quick-add-context"
+import type { QuickAddAction } from "@/lib/quick-add-context"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
   Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText,
 } from "lucide-react"
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ACCENT = "#f59f1c"
 
@@ -19,20 +21,11 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href)
 }
 
-// ─── Sub-sheets ───────────────────────────────────────────────────────────────
+// ─── BottomSheet ──────────────────────────────────────────────────────────────
 
-function BottomSheet({
-  open,
-  onClose,
-  children,
-}: {
-  open: boolean
-  onClose: () => void
-  children: React.ReactNode
-}) {
+function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   return (
     <>
-      {/* Backdrop */}
       <div
         className={cn(
           "fixed inset-0 z-[90] bg-black/40 transition-opacity duration-200 lg:hidden",
@@ -41,14 +34,11 @@ function BottomSheet({
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Sheet */}
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[91] lg:hidden",
           "bg-background rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.15)]",
           "transition-transform duration-300 ease-out",
-          // extra bottom padding for home indicator
-          "pb-safe",
           open ? "translate-y-0" : "translate-y-full",
         )}
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
@@ -59,50 +49,24 @@ function BottomSheet({
   )
 }
 
-// ─── Quick Add Sheet ──────────────────────────────────────────────────────────
+// ─── QuickAddSheet ────────────────────────────────────────────────────────────
 
-function QuickAddSheet({
-  open,
-  onClose,
-  onSchedule,
-}: {
-  open: boolean
-  onClose: () => void
-  onSchedule: () => void
-}) {
-  const router = useRouter()
+function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const dispatch = useQuickAddDispatch()
 
-  const items = [
-    {
-      icon: UserPlus,
-      label: "Add Customer",
-      action: () => { router.push("/customers"); onClose() },
-    },
-    {
-      icon: Wrench,
-      label: "Add Equipment",
-      action: () => { router.push("/equipment"); onClose() },
-    },
-    {
-      icon: CalendarPlus,
-      label: "Schedule Service",
-      action: () => { onClose(); onSchedule() },
-    },
-    {
-      icon: ClipboardPlus,
-      label: "New Work Order",
-      action: () => { router.push("/work-orders"); onClose() },
-    },
-    {
-      icon: FilePlus,
-      label: "Create Quote",
-      action: () => { router.push("/quotes"); onClose() },
-    },
-    {
-      icon: ReceiptText,
-      label: "Create Invoice",
-      action: () => { router.push("/invoices"); onClose() },
-    },
+  function fire(action: QuickAddAction) {
+    onClose()
+    // Tiny delay so the sheet can begin closing before the modal opens
+    setTimeout(() => dispatch(action), 80)
+  }
+
+  const items: { icon: React.ElementType; label: string; action: QuickAddAction }[] = [
+    { icon: UserPlus,     label: "Add Customer",    action: "customer" },
+    { icon: Wrench,       label: "Add Equipment",   action: "equipment" },
+    { icon: CalendarPlus, label: "Schedule Service", action: "schedule-service" },
+    { icon: ClipboardPlus,label: "New Work Order",  action: "work-order" },
+    { icon: FilePlus,     label: "Create Quote",    action: "quote" },
+    { icon: ReceiptText,  label: "Create Invoice",  action: "invoice" },
   ]
 
   return (
@@ -122,7 +86,7 @@ function QuickAddSheet({
           {items.map(({ icon: Icon, label, action }) => (
             <button
               key={label}
-              onClick={action}
+              onClick={() => fire(action)}
               className="flex flex-col items-center gap-2 p-3.5 rounded-xl border border-border bg-muted/30 active:scale-95 transition-transform"
             >
               <div
@@ -140,19 +104,19 @@ function QuickAddSheet({
   )
 }
 
-// ─── More Sheet ───────────────────────────────────────────────────────────────
+// ─── MoreSheet ────────────────────────────────────────────────────────────────
 
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
 
   const items = [
-    { icon: Wrench,        label: "Equipment",   href: "/equipment" },
-    { icon: ClipboardList, label: "Work Orders",  href: "/work-orders" },
-    { icon: FileText,      label: "Quotes",       href: "/quotes" },
-    { icon: Receipt,       label: "Invoices",     href: "/invoices" },
-    { icon: BarChart3,     label: "Reports",      href: "/reports" },
-    { icon: Sparkles,      label: "AI Insights",  href: "/insights" },
-    { icon: Settings,      label: "Settings",     href: "/settings/workspace" },
+    { icon: Wrench,        label: "Equipment",  href: "/equipment" },
+    { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
+    { icon: FileText,      label: "Quotes",      href: "/quotes" },
+    { icon: Receipt,       label: "Invoices",    href: "/invoices" },
+    { icon: BarChart3,     label: "Reports",     href: "/reports" },
+    { icon: Sparkles,      label: "AI Insights", href: "/insights" },
+    { icon: Settings,      label: "Settings",    href: "/settings/workspace" },
   ]
 
   return (
@@ -176,14 +140,11 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 key={href}
                 href={href}
                 onClick={onClose}
-                className={cn(
-                  "flex items-center gap-3 py-3.5 transition-colors",
-                  active ? "font-semibold" : "text-foreground",
-                )}
+                className="flex items-center gap-3 py-3.5 transition-colors"
                 style={active ? { color: ACCENT } : undefined}
               >
-                <Icon className="w-4.5 h-4.5 shrink-0" style={active ? { color: ACCENT } : { color: "var(--muted-foreground)" }} />
-                <span className="text-sm">{label}</span>
+                <Icon className="w-4 h-4 shrink-0" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
+                <span className={cn("text-sm", active && "font-semibold")}>{label}</span>
               </Link>
             )
           })}
@@ -193,28 +154,23 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   )
 }
 
-// ─── Main Nav ─────────────────────────────────────────────────────────────────
+// ─── MobileBottomNav ──────────────────────────────────────────────────────────
 
-export function MobileBottomNav({
-  onScheduleService,
-}: {
-  onScheduleService?: () => void
-}) {
+export function MobileBottomNav() {
   const pathname = usePathname()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
 
-  const navItems = [
-    { icon: LayoutDashboard, label: "Home",     href: "/" },
-    { icon: CalendarClock,   label: "Schedule", href: "/service-schedule" },
-    null, // center fab placeholder
+  const navItems: ({ icon: React.ElementType; label: string; href: string } | null)[] = [
+    { icon: LayoutDashboard, label: "Home",      href: "/" },
+    { icon: CalendarClock,   label: "Schedule",  href: "/service-schedule" },
+    null, // center FAB
     { icon: Users,           label: "Customers", href: "/customers" },
-    { icon: MoreHorizontal,  label: "More",     href: null as string | null },
+    { icon: MoreHorizontal,  label: "More",      href: "" },
   ]
 
   return (
     <>
-      {/* Nav bar */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden"
         aria-label="Mobile navigation"
@@ -225,7 +181,6 @@ export function MobileBottomNav({
         >
           <div className="flex items-center justify-around px-2 pt-2">
             {navItems.map((item, i) => {
-              // Center FAB
               if (item === null) {
                 return (
                   <div key="fab" className="flex flex-col items-center" style={{ marginTop: "-18px" }}>
@@ -237,39 +192,29 @@ export function MobileBottomNav({
                     >
                       <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
                     </button>
-                    <span className="text-[10px] font-medium mt-1" style={{ color: ACCENT }}>
-                      Add
-                    </span>
+                    <span className="text-[10px] font-medium mt-1" style={{ color: ACCENT }}>Add</span>
                   </div>
                 )
               }
 
               const { icon: Icon, label, href } = item
-              const active = href ? isActive(pathname, href) : moreOpen
 
-              if (href === null) {
-                // More button
+              if (href === "") {
+                const active = moreOpen
                 return (
                   <button
-                    key={label}
+                    key="more"
                     onClick={() => setMoreOpen(true)}
                     className="flex flex-col items-center gap-1 px-3 py-1 min-w-[52px] active:opacity-70 transition-opacity"
-                    aria-label={label}
+                    aria-label="More"
                   >
-                    <Icon
-                      className="w-5 h-5"
-                      style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
-                    />
-                    <span
-                      className="text-[10px] font-medium"
-                      style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
-                    >
-                      {label}
-                    </span>
+                    <Icon className="w-5 h-5" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
+                    <span className="text-[10px] font-medium" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>More</span>
                   </button>
                 )
               }
 
+              const active = isActive(pathname, href)
               return (
                 <Link
                   key={href}
@@ -277,16 +222,8 @@ export function MobileBottomNav({
                   className="flex flex-col items-center gap-1 px-3 py-1 min-w-[52px] active:opacity-70 transition-opacity"
                   aria-label={label}
                 >
-                  <Icon
-                    className="w-5 h-5"
-                    style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
-                  />
-                  <span
-                    className="text-[10px] font-medium"
-                    style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
-                  >
-                    {label}
-                  </span>
+                  <Icon className="w-5 h-5" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
+                  <span className="text-[10px] font-medium" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>{label}</span>
                 </Link>
               )
             })}
@@ -294,17 +231,7 @@ export function MobileBottomNav({
         </div>
       </nav>
 
-      {/* Quick Add sheet */}
-      <QuickAddSheet
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        onSchedule={() => {
-          setQuickAddOpen(false)
-          onScheduleService?.()
-        }}
-      />
-
-      {/* More sheet */}
+      <QuickAddSheet open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </>
   )

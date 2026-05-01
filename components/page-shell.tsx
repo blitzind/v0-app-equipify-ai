@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { AppTopbar } from "@/components/app-topbar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
+import { useQuickAdd } from "@/lib/quick-add-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
@@ -158,6 +159,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const meta = resolveMeta(pathname)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  useQuickAdd("schedule-service", () => setScheduleOpen(true))
 
   return (
     <>
@@ -171,7 +173,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile-only bottom navigation — hidden at lg+ */}
-      <MobileBottomNav onScheduleService={() => setScheduleOpen(true)} />
+      <MobileBottomNav />
 
       {/* Schedule Service drawer triggered from Quick Add */}
       <ScheduleServiceDrawer
