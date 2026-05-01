@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useRef } from "react"
+import { createContext, useCallback, useContext, useEffect, useRef, Suspense } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -73,9 +73,19 @@ export function useQuickAdd(action: QuickAddAction, handler: () => void) {
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx, action])
+}
 
-  // 2. Cross-page URL param: ?action=<action>
-  //    Read on mount, fire handler, then strip the param from the URL.
+// ─── QuickAddParamListener ─────────────────────────────────────────────────────
+// Separated into its own component so it can be wrapped in <Suspense>.
+// useSearchParams() requires Suspense during static prerendering in Next.js.
+
+function QuickAddParamListener({
+  action,
+  handlerRef,
+}: {
+  action: QuickAddAction
+  handlerRef: React.MutableRefObject<() => void>
+}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -84,10 +94,36 @@ export function useQuickAdd(action: QuickAddAction, handler: () => void) {
     const param = searchParams.get("action")
     if (param === action) {
       handlerRef.current()
-      // Replace the URL without the ?action param so back/refresh doesn't re-trigger
       router.replace(pathname, { scroll: false })
     }
-  // Only run once on mount (searchParams reference is stable on first render)
+  // Run once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  return null
+}
+
+/**
+ * Drop this inside any page that should respond to ?action=<action> URL params.
+ * It is separated from useQuickAdd so that useSearchParams lives behind a
+ * Suspense boundary, satisfying Next.js static prerendering requirements.
+ *
+ * Usage:
+ *   <QuickAddParamBridge action="new-work-order" onTrigger={() => setOpen(true)} />
+ */
+export function QuickAddParamBridge({
+  action,
+  onTrigger,
+}: {
+  action: QuickAddAction
+  onTrigger: () => void
+}) {
+  const handlerRef = useRef(onTrigger)
+  handlerRef.current = onTrigger
+
+  return (
+    <Suspense fallback={null}>
+      <QuickAddParamListener action={action} handlerRef={handlerRef} />
+    </Suspense>
+  )
 }
