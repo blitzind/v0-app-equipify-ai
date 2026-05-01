@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  MapPin, Mail, Phone, MessageSquare, Apple, MoreHorizontal,
+  MapPin, Mail, Phone, MessageSquare, MoreHorizontal,
   ExternalLink, Copy, Check, ChevronDown,
 } from "lucide-react"
 
@@ -116,13 +116,23 @@ function NavigateDropdown({ address }: { address: string }) {
       <DropdownMenuContent align="start" sideOffset={6} className="w-52 z-[200]">
         <DropdownMenuItem asChild>
           <a href={googleMapsUrl(address)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 cursor-pointer">
-            <ExternalLink className="w-3.5 h-3.5 text-[#4285F4] shrink-0" />
+            {/* Google Maps pin icon */}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0" aria-hidden="true">
+              <path d="M8 1C5.24 1 3 3.24 3 6c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5z" fill="#EA4335"/>
+              <path d="M8 1C5.24 1 3 3.24 3 6c0 1.38.5 2.64 1.32 3.61L8 1z" fill="#FBBC04"/>
+              <path d="M8 1c2.76 0 5 2.24 5 5 0 1.38-.5 2.64-1.32 3.61L8 1z" fill="#4285F4"/>
+              <circle cx="8" cy="6" r="2" fill="white"/>
+            </svg>
             Open in Google Maps
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href={appleMapsUrl(address)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 cursor-pointer">
-            <Apple className="w-3.5 h-3.5 shrink-0" />
+            {/* Apple logo icon */}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0" aria-hidden="true">
+              <path d="M11.18 8.5c-.02-1.7 1.38-2.52 1.44-2.56-0.78-1.15-2-1.3-2.44-1.32-1.04-.1-2.02.6-2.55.6-.52 0-1.34-.58-2.2-.57-1.13.02-2.17.66-2.75 1.67-1.17 2.04-.3 5.06.84 6.72.56.81 1.22 1.72 2.1 1.69.84-.03 1.16-.54 2.18-.54 1.01 0 1.3.54 2.19.53.91-.02 1.48-.82 2.04-1.63.64-.93.9-1.84.92-1.88-.02-.01-1.76-.68-1.77-2.71z" fill="currentColor"/>
+              <path d="M9.6 3.2c.46-.56.77-1.35.69-2.13-.66.03-1.47.44-1.94 1-.43.49-.8 1.29-.7 2.05.73.06 1.48-.37 1.95-.92z" fill="currentColor"/>
+            </svg>
             Open in Apple Maps
           </a>
         </DropdownMenuItem>
