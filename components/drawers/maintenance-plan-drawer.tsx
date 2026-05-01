@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import type { MaintenancePlan, PlanStatus } from "@/lib/mock-data"
@@ -108,8 +109,16 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
       >
         {/* Details */}
         <DrawerSection title="Plan Details">
-          <DrawerRow label="Customer" value={plan.customerName} />
-          <DrawerRow label="Equipment" value={plan.equipmentName} />
+          <DrawerRow label="Customer" value={
+            <Link href={`/customers?open=${plan.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {plan.customerName}
+            </Link>
+          } />
+          <DrawerRow label="Equipment" value={
+            <Link href={`/equipment?open=${plan.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {plan.equipmentName}
+            </Link>
+          } />
           <DrawerRow label="Category" value={plan.equipmentCategory} />
           <DrawerRow label="Location" value={plan.location} />
           {plan.location && (
@@ -120,7 +129,11 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
               />
             </div>
           )}
-          <DrawerRow label="Technician" value={plan.technicianName} />
+          <DrawerRow label="Technician" value={
+            <Link href={`/technicians?open=${plan.technicianId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {plan.technicianName}
+            </Link>
+          } />
           <DrawerRow label="Interval" value={plan.interval === "Custom" ? `Every ${plan.customIntervalDays} days` : plan.interval} />
           <DrawerRow label="Start Date" value={fmtDate(plan.startDate)} />
           <DrawerRow label="Last Service" value={fmtDate(plan.lastServiceDate)} />

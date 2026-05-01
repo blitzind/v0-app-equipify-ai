@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
@@ -619,14 +620,24 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
         )}
 
         <DrawerSection title="Invoice Details">
-          <DrawerRow label="Customer" value={invoice.customerName} />
+          <DrawerRow label="Customer" value={
+            <Link href={`/customers?open=${invoice.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {invoice.customerName}
+            </Link>
+          } />
           <div className="py-1">
             <ContactActions
               email={{ customerName: invoice.customerName }}
             />
           </div>
           <DrawerRow label="Equipment" value={invoice.equipmentName} />
-          {invoice.workOrderId && <DrawerRow label="Work Order" value={<span className="text-primary font-mono">{invoice.workOrderId}</span>} />}
+          {invoice.workOrderId && (
+            <DrawerRow label="Work Order" value={
+              <Link href={`/work-orders?open=${invoice.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
+                {invoice.workOrderId}
+              </Link>
+            } />
+          )}
           <DrawerRow label="Issued" value={fmtDate(invoice.issueDate)} />
           <EditRow label="Due Date" view={
             <span className={invoice.status === "Overdue" ? "text-destructive font-semibold" : ""}>{fmtDate(invoice.dueDate)}</span>

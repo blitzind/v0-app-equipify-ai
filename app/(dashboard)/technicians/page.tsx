@@ -835,7 +835,7 @@ function ProfileDrawer({
               ) : (
                 <div className="space-y-3">
                   {tech.schedule.map((entry) => (
-                    <div key={entry.woId} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 transition-colors">
+                    <Link key={entry.woId} href={`/work-orders?open=${entry.woId}`} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 hover:border-primary/30 transition-colors cursor-pointer group">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex flex-col items-center justify-center shrink-0">
                         <span className="text-[10px] font-bold text-primary leading-none">
                           {new Date(entry.date + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }).toUpperCase()}
@@ -846,15 +846,15 @@ function ProfileDrawer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-foreground truncate">{entry.jobType}</p>
+                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">{entry.jobType}</p>
                           <Badge variant="secondary" className={cn("text-[10px] shrink-0 border", SCHEDULE_STYLE[entry.status])}>
                             {entry.status}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">{entry.customer}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.time} &bull; {entry.woId}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.time} &bull; <span className="font-mono text-primary">{entry.woId}</span></p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -914,11 +914,11 @@ function ProfileDrawer({
               ) : (
                 <div className="space-y-2">
                   {tech.history.map((entry) => (
-                    <div key={entry.woId} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 transition-colors">
+                    <Link key={entry.woId} href={`/work-orders?open=${entry.woId}`} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 hover:border-primary/30 transition-colors cursor-pointer group">
                       <CheckCircle2 className="w-4 h-4 text-[color:var(--status-success)] shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-foreground truncate">{entry.jobType}</p>
+                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">{entry.jobType}</p>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {[1, 2, 3, 4, 5].map((n) => (
                               <Star key={n} className={cn("w-3 h-3", n <= entry.rating ? "fill-amber-400 text-amber-400" : "text-muted")} />
@@ -926,9 +926,9 @@ function ProfileDrawer({
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground">{entry.customer}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.completedDate} &bull; {entry.duration} &bull; {entry.woId}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.completedDate} &bull; {entry.duration} &bull; <span className="font-mono text-primary">{entry.woId}</span></p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

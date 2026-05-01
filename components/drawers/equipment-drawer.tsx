@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useEquipment } from "@/lib/equipment-store"
 import { useCustomers } from "@/lib/customer-store"
@@ -11,7 +12,7 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check, ShieldCheck } from "lucide-react"
+import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check, ShieldCheck, ExternalLink } from "lucide-react"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { ContactActions } from "@/components/contact-actions"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
@@ -269,6 +270,7 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
   const timelineItems = eq.serviceHistory.slice(0, 6).map((h) => ({
     date: h.date,
     label: `${h.type} — ${h.workOrderId}`,
+    href: `/work-orders?open=${h.workOrderId}`,
     description: h.description + (h.technician ? ` · ${h.technician}` : ""),
     accent: (h.status === "Completed" ? "success" : "muted") as "success" | "muted",
   }))
@@ -349,7 +351,14 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
           <EditableRow label="Serial Number" value={eq.serialNumber} editing={editing}>
             <EditInput value={draft.serialNumber ?? ""} onChange={(v) => setField("serialNumber", v)} />
           </EditableRow>
-          <EditableRow label="Customer" value={eq.customerName} editing={editing}>
+          <EditableRow label="Customer" value={
+            <Link
+              href={`/customers?open=${eq.customerId}`}
+              className="text-primary hover:underline cursor-pointer font-medium"
+            >
+              {eq.customerName}
+            </Link>
+          } editing={editing}>
             <select
               value={draft.customerId ?? ""}
               onChange={(e) => setField("customerId", e.target.value)}
@@ -404,13 +413,20 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
         <DrawerSection title={`Work Orders`}>
           <div className="space-y-1.5">
             {eq.serviceHistory.slice(0, 5).map((h) => (
-              <div key={h.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+              <Link
+                key={h.id}
+                href={`/work-orders?open=${h.workOrderId}`}
+                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+              >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">{h.workOrderId}</p>
                   <p className="text-[10px] text-muted-foreground">{h.type} · {h.technician}</p>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{h.status}</Badge>
-              </div>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">{h.status}</Badge>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </div>
+              </Link>
             ))}
             {eq.serviceHistory.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No work orders for this equipment.</p>

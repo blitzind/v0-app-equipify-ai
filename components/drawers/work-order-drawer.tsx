@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
@@ -13,7 +14,7 @@ import {
 import {
   CheckCircle2, FileText, Printer, Pencil, X, Check,
   AlertTriangle, Sparkles, Mic, Upload, RefreshCw,
-  Wrench, ClipboardList, Clock, DollarSign, ChevronDown, ChevronUp,
+  Wrench, ClipboardList, Clock, DollarSign, ChevronDown, ChevronUp, ExternalLink,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 
@@ -719,8 +720,16 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
 
         {/* Details */}
         <DrawerSection title="Work Order Details">
-          <DrawerRow label="Customer" value={wo.customerName} />
-          <DrawerRow label="Equipment" value={wo.equipmentName} />
+          <DrawerRow label="Customer" value={
+            <Link href={`/customers?open=${wo.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {wo.customerName}
+            </Link>
+          } />
+          <DrawerRow label="Equipment" value={
+            <Link href={`/equipment?open=${wo.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {wo.equipmentName}
+            </Link>
+          } />
           <DrawerRow label="Location" value={wo.location} />
           {wo.location && (
             <div className="py-1">
@@ -739,7 +748,11 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
           } editing={editing}>
             <EditSelect value={draft.status ?? wo.status} onChange={(v) => setField("status", v as WorkOrderStatus)} options={ALL_STATUSES} />
           </EditRow>
-          <EditRow label="Technician" view={wo.technicianName} editing={editing}>
+          <EditRow label="Technician" view={
+            <Link href={`/technicians?open=${wo.technicianId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {wo.technicianName}
+            </Link>
+          } editing={editing}>
             <EditInput value={draft.technicianName ?? ""} onChange={(v) => setField("technicianName", v)} placeholder="Technician name" />
           </EditRow>
           <EditRow
@@ -753,7 +766,13 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
             </div>
           </EditRow>
           {wo.completedDate && <DrawerRow label="Completed" value={fmtDate(wo.completedDate)} />}
-          {wo.invoiceNumber && <DrawerRow label="Invoice" value={<span className="text-primary font-mono">{wo.invoiceNumber}</span>} />}
+          {wo.invoiceNumber && (
+            <DrawerRow label="Invoice" value={
+              <Link href={`/invoices?open=${wo.invoiceNumber}`} className="text-primary font-mono hover:underline cursor-pointer">
+                {wo.invoiceNumber}
+              </Link>
+            } />
+          )}
         </DrawerSection>
 
         {/* Description */}

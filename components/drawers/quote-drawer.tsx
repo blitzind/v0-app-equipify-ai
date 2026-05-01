@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
@@ -620,13 +621,21 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
         )}
 
         <DrawerSection title="Quote Details">
-          <DrawerRow label="Customer" value={quote.customerName} />
+          <DrawerRow label="Customer" value={
+            <Link href={`/customers?open=${quote.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {quote.customerName}
+            </Link>
+          } />
           <div className="py-1">
             <ContactActions
               email={{ customerName: quote.customerName }}
             />
           </div>
-          <DrawerRow label="Equipment" value={quote.equipmentName} />
+          <DrawerRow label="Equipment" value={
+            <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
+              {quote.equipmentName}
+            </Link>
+          } />
           <DrawerRow label="Created By" value={quote.createdBy} />
           <DrawerRow label="Created" value={fmtDate(quote.createdDate)} />
           <EditRow label="Expires" view={
@@ -639,7 +648,13 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           } editing={editing}>
             <EditSelect value={draft.status ?? quote.status} onChange={(v) => setField("status", v as QuoteStatus)} options={ALL_STATUSES} />
           </EditRow>
-          {quote.workOrderId && <DrawerRow label="Work Order" value={<span className="text-primary font-mono">{quote.workOrderId}</span>} />}
+          {quote.workOrderId && (
+            <DrawerRow label="Work Order" value={
+              <Link href={`/work-orders?open=${quote.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
+                {quote.workOrderId}
+              </Link>
+            } />
+          )}
         </DrawerSection>
 
         <DrawerSection title="Description">
