@@ -231,21 +231,31 @@ export function AppTopbar() {
   useEffect(() => { setHubOpen(false) }, [pathname])
 
   return (
-    <header className="flex items-center h-14 md:h-16 px-3 md:px-6 bg-card border-b border-border gap-3 shrink-0 relative z-30">
+    <header className="flex items-center h-14 md:h-16 px-3 md:px-6 bg-sidebar md:bg-card border-b border-sidebar-border md:border-border gap-3 shrink-0 relative z-30 sticky top-0">
       {/* Hamburger — mobile only */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors shrink-0"
+        className="md:hidden flex items-center justify-center w-10 h-10 rounded-md hover:bg-sidebar-accent/60 transition-colors shrink-0"
         aria-label="Open menu"
       >
-        <Menu className="w-5 h-5 text-muted-foreground" />
+        <Menu className="w-5 h-5 text-sidebar-foreground" />
       </button>
 
-      {/* Search — hidden on mobile unless expanded */}
+      {/* Mobile logo — centered absolutely so it doesn't shift layout */}
+      <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none">
+        <img
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
+          alt="Equipify.ai"
+          className="h-7 w-auto object-contain"
+          draggable={false}
+        />
+      </div>
+
+      {/* Search — desktop only (sm+), hidden on mobile */}
       <div
         className={cn(
           "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 bg-background",
-          "hidden sm:flex",
+          "hidden md:flex",
           "transition-all duration-150",
           searchFocused
             ? "border-primary ring-2 ring-primary/20 shadow-[0_0_0_3px_rgba(15,122,229,0.08)]"
@@ -262,24 +272,15 @@ export function AppTopbar() {
         />
       </div>
 
-      {/* Mobile search icon */}
-      <button
-        className="sm:hidden flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors"
-        aria-label="Search"
-        onClick={() => setSearchOpen((v) => !v)}
-      >
-        <Search className="w-4 h-4 text-muted-foreground" />
-      </button>
-
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-1 ml-auto">
         {/* Notifications */}
         <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="relative flex items-center justify-center w-9 h-9 rounded-md hover:bg-muted transition-colors cursor-pointer"
+              className="relative flex items-center justify-center w-10 h-10 rounded-md hover:bg-sidebar-accent/60 md:hover:bg-muted transition-colors cursor-pointer"
               aria-label={`Notifications — ${unreadCount} unread`}
             >
-              <Bell className="w-4 h-4 text-muted-foreground" />
+              <Bell className="w-5 h-5 text-sidebar-foreground md:text-muted-foreground" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-30" />
@@ -371,7 +372,9 @@ export function AppTopbar() {
           onClick={() => setHubOpen((v) => !v)}
           className={cn(
             "flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors cursor-pointer",
-            hubOpen ? "bg-muted" : "hover:bg-muted"
+            hubOpen
+              ? "bg-sidebar-accent/60 md:bg-muted"
+              : "hover:bg-sidebar-accent/60 md:hover:bg-muted"
           )}
           aria-label="Account menu"
           aria-expanded={hubOpen}
@@ -379,25 +382,25 @@ export function AppTopbar() {
           <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-semibold shrink-0">
             AJ
           </div>
-          <div className="hidden sm:block text-left">
+          <div className="hidden md:block text-left">
             <p className="text-sm font-medium text-foreground leading-tight">Alex Johnson</p>
             <p className="text-xs text-muted-foreground leading-tight">Admin</p>
           </div>
-          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground hidden sm:block transition-transform duration-150", hubOpen && "rotate-180")} />
+          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground hidden md:block transition-transform duration-150", hubOpen && "rotate-180")} />
         </button>
       </div>
 
       {/* Mobile search bar — full-width dropdown */}
       {searchOpen && (
-        <div className="sm:hidden absolute top-full left-0 right-0 z-40 bg-card border-b border-border px-4 py-2 flex items-center gap-2 shadow-md">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+        <div className="md:hidden absolute top-full left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border px-4 py-2 flex items-center gap-2 shadow-md">
+          <Search className="w-4 h-4 text-sidebar-foreground/60 shrink-0" />
           <input
             type="text"
             placeholder="Search equipment, work orders..."
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-sidebar-foreground/40 text-sidebar-foreground"
             autoFocus
           />
-          <button onClick={() => setSearchOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
+          <button onClick={() => setSearchOpen(false)} className="text-sidebar-foreground/60 hover:text-sidebar-foreground cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
