@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuickAddDispatch } from "@/lib/quick-add-context"
 import type { QuickAddAction } from "@/lib/quick-add-context"
@@ -51,22 +51,40 @@ function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () =
 
 // ─── QuickAddSheet ────────────────────────────────────────────────────────────
 
+// Map each action to the page it lives on
+const ACTION_ROUTES: Record<QuickAddAction, string> = {
+  "new-customer":    "/customers",
+  "new-equipment":   "/equipment",
+  "new-work-order":  "/work-orders",
+  "new-quote":       "/quotes",
+  "new-invoice":     "/invoices",
+  "schedule-service": "/service-schedule",
+}
+
 function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dispatch = useQuickAddDispatch()
+  const router = useRouter()
+  const pathname = usePathname()
 
   function fire(action: QuickAddAction) {
     onClose()
-    // Tiny delay so the sheet can begin closing before the modal opens
-    setTimeout(() => dispatch(action), 80)
+    const target = ACTION_ROUTES[action]
+    if (pathname === target) {
+      // Already on the right page — use context broadcast
+      setTimeout(() => dispatch(action), 80)
+    } else {
+      // Navigate to the target page with ?action= param so it opens the modal on mount
+      router.push(`${target}?action=${action}`)
+    }
   }
 
   const items: { icon: React.ElementType; label: string; action: QuickAddAction }[] = [
-    { icon: UserPlus,     label: "Add Customer",    action: "new-customer" },
-    { icon: Wrench,       label: "Add Equipment",   action: "new-equipment" },
-    { icon: CalendarPlus, label: "Schedule Service", action: "schedule-service" },
-    { icon: ClipboardPlus,label: "New Work Order",  action: "new-work-order" },
-    { icon: FilePlus,     label: "Create Quote",    action: "new-quote" },
-    { icon: ReceiptText,  label: "Create Invoice",  action: "new-invoice" },
+    { icon: UserPlus,      label: "Add Customer",    action: "new-customer" },
+    { icon: Wrench,        label: "Add Equipment",   action: "new-equipment" },
+    { icon: CalendarPlus,  label: "Schedule Service", action: "schedule-service" },
+    { icon: ClipboardPlus, label: "New Work Order",  action: "new-work-order" },
+    { icon: FilePlus,      label: "Create Quote",    action: "new-quote" },
+    { icon: ReceiptText,   label: "Create Invoice",  action: "new-invoice" },
   ]
 
   return (

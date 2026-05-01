@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useRef } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,23 +54,40 @@ export function useQuickAddDispatch() {
 // ─── useQuickAdd — for pages to listen for a specific action ──────────────────
 
 /**
- * Subscribe to a QuickAdd action. When `MobileBottomNav` dispatches `action`,
- * `handler` is called. The subscription is cleaned up when the component unmounts.
+ * Subscribe to a QuickAdd action via context broadcast (same-page) OR via
+ * the `?action=` URL search param (cross-page navigation).
  *
  * Usage:
- *   useQuickAdd("work-order", () => setCreateOpen(true))
+ *   useQuickAdd("new-work-order", () => setCreateOpen(true))
  */
 export function useQuickAdd(action: QuickAddAction, handler: () => void) {
   const ctx = useContext(QuickAddContext)
   const handlerRef = useRef(handler)
   handlerRef.current = handler
 
+  // 1. Same-page context broadcast (e.g. schedule-service from PageShell)
   useEffect(() => {
     if (!ctx) return
     return ctx.subscribe((dispatched) => {
       if (dispatched === action) handlerRef.current()
     })
-  // subscribe is stable (useCallback), action is a string literal — safe deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx, action])
+
+  // 2. Cross-page URL param: ?action=<action>
+  //    Read on mount, fire handler, then strip the param from the URL.
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    const param = searchParams.get("action")
+    if (param === action) {
+      handlerRef.current()
+      // Replace the URL without the ?action param so back/refresh doesn't re-trigger
+      router.replace(pathname, { scroll: false })
+    }
+  // Only run once on mount (searchParams reference is stable on first render)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }
