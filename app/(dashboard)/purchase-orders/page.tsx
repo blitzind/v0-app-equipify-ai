@@ -18,13 +18,13 @@ import { cn } from "@/lib/utils"
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<POStatus, { icon: React.ElementType; className: string }> = {
-  Draft:     { icon: Clock,        className: "text-muted-foreground border-border" },
-  Submitted: { icon: ShoppingCart, className: "text-[color:var(--ds-info-text)] border-[color:var(--ds-info-subtle)]" },
-  Approved:  { icon: CheckCircle2, className: "text-[color:var(--ds-success-text)] border-[color:var(--ds-success-subtle)]" },
-  Ordered:   { icon: Truck,        className: "text-[color:var(--ds-warning-text)] border-[color:var(--ds-warning-subtle)]" },
-  Received:  { icon: CheckCircle2, className: "text-[color:var(--ds-success-text)] border-[color:var(--ds-success-subtle)]" },
-  Cancelled: { icon: XCircle,      className: "text-destructive border-destructive/30" },
-  Overdue:   { icon: AlertTriangle,className: "text-destructive border-destructive/30" },
+  Draft:               { icon: Clock,         className: "text-muted-foreground border-border" },
+  Sent:                { icon: ShoppingCart,  className: "text-[color:var(--ds-info-text)] border-[color:var(--ds-info-subtle)]" },
+  Approved:            { icon: CheckCircle2,  className: "text-[color:var(--ds-success-text)] border-[color:var(--ds-success-subtle)]" },
+  Ordered:             { icon: Truck,         className: "text-[color:var(--ds-warning-text)] border-[color:var(--ds-warning-subtle)]" },
+  "Partially Received":{ icon: AlertTriangle, className: "text-[color:var(--ds-warning-text)] border-[color:var(--ds-warning-subtle)]" },
+  Received:            { icon: CheckCircle2,  className: "text-[color:var(--ds-success-text)] border-[color:var(--ds-success-subtle)]" },
+  Closed:              { icon: XCircle,       className: "text-muted-foreground border-border" },
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function PurchaseOrdersPageInner() {
   }, [searchParams, router])
 
   const vendors = useMemo(() => {
-    const set = new Set(orders.map(o => o.vendorName))
+    const set = new Set(orders.map(o => o.vendor))
     return ["All Vendors", ...Array.from(set).sort()]
   }, [orders])
 
@@ -72,21 +72,21 @@ function PurchaseOrdersPageInner() {
       const q = search.toLowerCase()
       list = list.filter(o =>
         o.id.toLowerCase().includes(q) ||
-        o.vendorName.toLowerCase().includes(q) ||
+        o.vendor.toLowerCase().includes(q) ||
         o.workOrderId?.toLowerCase().includes(q) ||
         o.lineItems.some(li => li.description.toLowerCase().includes(q))
       )
     }
     if (statusFilter !== "All") list = list.filter(o => o.status === statusFilter)
-    if (vendorFilter !== "All Vendors") list = list.filter(o => o.vendorName === vendorFilter)
+    if (vendorFilter !== "All Vendors") list = list.filter(o => o.vendor === vendorFilter)
 
     list.sort((a, b) => {
       let av: string | number = 0, bv: string | number = 0
       if (sortKey === "id") { av = a.id; bv = b.id }
-      else if (sortKey === "vendor") { av = a.vendorName; bv = b.vendorName }
+      else if (sortKey === "vendor") { av = a.vendor; bv = b.vendor }
       else if (sortKey === "amount") { av = a.amount; bv = b.amount }
-      else if (sortKey === "orderDate") { av = a.orderDate; bv = b.orderDate }
-      else if (sortKey === "expectedDate") { av = a.expectedDate; bv = b.expectedDate }
+      else if (sortKey === "orderDate") { av = a.orderedDate; bv = b.orderedDate }
+      else if (sortKey === "expectedDate") { av = a.eta; bv = b.eta }
       else if (sortKey === "status") { av = a.status; bv = b.status }
       if (av < bv) return sortAsc ? -1 : 1
       if (av > bv) return sortAsc ? 1 : -1
@@ -104,11 +104,11 @@ function PurchaseOrdersPageInner() {
 
   // Summary stats
   const stats = useMemo(() => {
-    const totalOpen = orders.filter(o => ["Submitted", "Approved", "Ordered"].includes(o.status))
+    const totalOpen = orders.filter(o => ["Sent", "Approved", "Ordered", "Partially Received"].includes(o.status))
     const totalValue = totalOpen.reduce((s, o) => s + o.amount, 0)
-    const overdue = orders.filter(o => o.status === "Overdue").length
+    const partialCount = orders.filter(o => o.status === "Partially Received").length
     const received = orders.filter(o => o.status === "Received").length
-    return { openCount: totalOpen.length, totalValue, overdue, received }
+    return { openCount: totalOpen.length, totalValue, partialCount, received }
   }, [orders])
 
   function SortBtn({ col }: { col: SortKey }) {
@@ -130,10 +130,10 @@ function PurchaseOrdersPageInner() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Open Orders", value: stats.openCount, sub: "Submitted / Approved / Ordered" },
-          { label: "Open Value",  value: fmtCurrency(stats.totalValue), sub: "Across all open POs" },
-          { label: "Overdue",     value: stats.overdue,   sub: "Past expected date" },
-          { label: "Received",    value: stats.received,  sub: "Completed this period" },
+          { label: "Open Orders",       value: stats.openCount,              sub: "Sent / Approved / Ordered" },
+          { label: "Open Value",        value: fmtCurrency(stats.totalValue), sub: "Across all open POs" },
+          { label: "Partially Received",value: stats.partialCount,            sub: "Awaiting remaining items" },
+          { label: "Received",          value: stats.received,               sub: "Fully received" },
         ].map(({ label, value, sub }) => (
           <div key={label} className="bg-card rounded-xl border border-border px-4 py-3 flex flex-col gap-0.5">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -201,7 +201,7 @@ function PurchaseOrdersPageInner() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{po.id}</p>
-                    <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{po.vendorName}</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{po.vendor}</p>
                   </div>
                   <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
                     <StatusIcon className="w-3 h-3" />
@@ -215,9 +215,9 @@ function PurchaseOrdersPageInner() {
                 <div className="flex items-center justify-between pt-1 border-t border-border">
                   <span className="text-lg font-bold text-foreground ds-tabular">{fmtCurrency(po.amount)}</span>
                   <div className="text-right">
-                    <p className="text-[10px] text-muted-foreground">Expected</p>
-                    <p className={cn("text-xs font-medium ds-tabular", po.status === "Overdue" ? "text-destructive font-semibold" : "text-foreground")}>
-                      {fmtDate(po.expectedDate)}
+                    <p className="text-[10px] text-muted-foreground">ETA</p>
+                    <p className={cn("text-xs font-medium ds-tabular", "text-foreground")}>
+                      {fmtDate(po.eta)}
                     </p>
                   </div>
                 </div>
@@ -273,13 +273,13 @@ function PurchaseOrdersPageInner() {
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 whitespace-nowrap">
                         {po.id}
                       </td>
-                      <td className="px-4 py-3 font-medium text-foreground max-w-[160px] truncate">{po.vendorName}</td>
+                      <td className="px-4 py-3 font-medium text-foreground max-w-[160px] truncate">{po.vendor}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">
-                        {po.workOrderId ?? "—"}
+                        {po.workOrderId || "—"}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap ds-tabular">{fmtDate(po.orderDate)}</td>
-                      <td className={cn("px-4 py-3 whitespace-nowrap ds-tabular hidden lg:table-cell", po.status === "Overdue" ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                        {fmtDate(po.expectedDate)}
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap ds-tabular">{fmtDate(po.orderedDate)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap ds-tabular hidden lg:table-cell text-muted-foreground">
+                        {fmtDate(po.eta)}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-foreground ds-tabular whitespace-nowrap">
                         {fmtCurrency(po.amount)}
