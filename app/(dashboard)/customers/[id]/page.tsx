@@ -38,9 +38,14 @@ type CustomerLocation = {
   id: string
   name: string
   address: string
+  addressLine2: string
   city: string
   state: string
   zip: string
+  phone: string
+  contactPerson: string
+  notes: string
+  isDefault: boolean
 }
 
 type CustomerContract = {
@@ -162,6 +167,7 @@ export default function CustomerDetailPage() {
   const router = useRouter()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshToken, setRefreshToken] = useState(0)
   const [editOpen, setEditOpen] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
   const [archiving, setArchiving] = useState(false)
@@ -170,6 +176,22 @@ export default function CustomerDetailPage() {
     company: "",
     status: "Active" as CustomerStatus,
     notes: "",
+  })
+  const [locationModalOpen, setLocationModalOpen] = useState(false)
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+  const [locationSaving, setLocationSaving] = useState(false)
+  const [locationError, setLocationError] = useState("")
+  const [locationForm, setLocationForm] = useState({
+    name: "",
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    phone: "",
+    contact_person: "",
+    notes: "",
+    is_default: false,
   })
 
   useEffect(() => {
@@ -228,7 +250,7 @@ export default function CustomerDetailPage() {
             .order("is_primary", { ascending: false }),
           supabase
             .from("customer_locations")
-            .select("id, name, address_line1, city, state, postal_code")
+            .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
             .eq("customer_id", id)
             .eq("organization_id", profile.default_organization_id)
             .eq("is_archived", false),
@@ -260,9 +282,14 @@ export default function CustomerDetailPage() {
             id: l.id,
             name: l.name,
             address: l.address_line1,
+            addressLine2: l.address_line2 ?? "",
             city: l.city,
             state: l.state,
             zip: l.postal_code,
+            phone: l.phone ?? "",
+            contactPerson: l.contact_person ?? "",
+            notes: l.notes ?? "",
+            isDefault: Boolean(l.is_default),
           })) ?? [],
         contracts:
           contractRows?.map((contract) => ({
@@ -291,7 +318,7 @@ export default function CustomerDetailPage() {
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, refreshToken])
 
   const customerEquipment = useMemo(
     () => [],
@@ -377,6 +404,123 @@ export default function CustomerDetailPage() {
     } finally {
       setArchiving(false)
     }
+  }
+
+  function resetLocationForm() {
+    setLocationForm({
+      name: "",
+      address_line1: "",
+      address_line2: "",
+      city: "",
+      state: "",
+      postal_code: "",
+      phone: "",
+      contact_person: "",
+      notes: "",
+      is_default: false,
+    })
+    setEditingLocationId(null)
+    setLocationError("")
+  }
+
+  function openCreateLocationModal() {
+    resetLocationForm()
+    setLocationModalOpen(true)
+  }
+
+  function openEditLocationModal(location: CustomerLocation) {
+    setEditingLocationId(location.id)
+    setLocationError("")
+    setLocationForm({
+      name: location.name,
+      address_line1: location.address,
+      address_line2: location.addressLine2,
+      city: location.city,
+      state: location.state,
+      postal_code: location.zip,
+      phone: location.phone,
+      contact_person: location.contactPerson,
+      notes: location.notes,
+      is_default: location.isDefault,
+    })
+    setLocationModalOpen(true)
+  }
+
+  async function handleSaveLocation(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customer) return
+
+    setLocationError("")
+    if (
+      !locationForm.name.trim() ||
+      !locationForm.address_line1.trim() ||
+      !locationForm.city.trim() ||
+      !locationForm.state.trim() ||
+      !locationForm.postal_code.trim()
+    ) {
+      setLocationError("Name, address, city, state, and postal code are required.")
+      return
+    }
+
+    setLocationSaving(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const payload = {
+        organization_id: customer.organizationId,
+        customer_id: customer.id,
+        name: locationForm.name.trim(),
+        address_line1: locationForm.address_line1.trim(),
+        address_line2: locationForm.address_line2.trim() || null,
+        city: locationForm.city.trim(),
+        state: locationForm.state.trim(),
+        postal_code: locationForm.postal_code.trim(),
+        phone: locationForm.phone.trim() || null,
+        contact_person: locationForm.contact_person.trim() || null,
+        notes: locationForm.notes.trim() || null,
+        is_default: locationForm.is_default,
+      }
+
+      const query = editingLocationId
+        ? supabase
+            .from("customer_locations")
+            .update(payload)
+            .eq("id", editingLocationId)
+            .eq("organization_id", customer.organizationId)
+            .eq("customer_id", customer.id)
+        : supabase.from("customer_locations").insert(payload)
+
+      const { error } = await query
+      if (error) {
+        setLocationError(error.message)
+        return
+      }
+
+      setLocationModalOpen(false)
+      resetLocationForm()
+      setRefreshToken((v) => v + 1)
+    } finally {
+      setLocationSaving(false)
+    }
+  }
+
+  async function handleArchiveLocation(locationId: string) {
+    if (!customer) return
+
+    setLocationError("")
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase
+      .from("customer_locations")
+      .update({ is_archived: true })
+      .eq("id", locationId)
+      .eq("organization_id", customer.organizationId)
+      .eq("customer_id", customer.id)
+
+    if (error) {
+      setLocationError(error.message)
+      return
+    }
+
+    setRefreshToken((v) => v + 1)
   }
 
   if (loading) {
@@ -554,7 +698,12 @@ export default function CustomerDetailPage() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Locations</CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">Locations</CardTitle>
+                  <Button type="button" variant="outline" size="sm" onClick={openCreateLocationModal}>
+                    Add Location
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {customer.locations.map((loc) => (
@@ -563,10 +712,42 @@ export default function CustomerDetailPage() {
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{loc.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground">{loc.name}</p>
+                        {loc.isDefault && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            Default
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {loc.address}, {loc.city}, {loc.state} {loc.zip}
+                        {loc.address}
+                        {loc.addressLine2 ? `, ${loc.addressLine2}` : ""}
+                        , {loc.city}, {loc.state} {loc.zip}
                       </p>
+                      {(loc.contactPerson || loc.phone) && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {loc.contactPerson ? `Contact: ${loc.contactPerson}` : ""}
+                          {loc.contactPerson && loc.phone ? " · " : ""}
+                          {loc.phone ? `Phone: ${loc.phone}` : ""}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditLocationModal(loc)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveLocation(loc.id)}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          Archive
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -672,6 +853,118 @@ export default function CustomerDetailPage() {
                 </Button>
                 <Button type="submit" className="flex-1" disabled={savingEdit}>
                   {savingEdit ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {locationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setLocationModalOpen(false)} />
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-xl">
+            <form onSubmit={handleSaveLocation} className="p-5 space-y-4">
+              <h3 className="text-base font-semibold text-foreground">
+                {editingLocationId ? "Edit Location" : "Add Location"}
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Name</label>
+                  <input
+                    value={locationForm.name}
+                    onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Address</label>
+                  <input
+                    value={locationForm.address_line1}
+                    onChange={(e) => setLocationForm((f) => ({ ...f, address_line1: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Address Line 2</label>
+                  <input
+                    value={locationForm.address_line2}
+                    onChange={(e) => setLocationForm((f) => ({ ...f, address_line2: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">City</label>
+                    <input
+                      value={locationForm.city}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, city: e.target.value }))}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">State</label>
+                    <input
+                      value={locationForm.state}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, state: e.target.value }))}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Postal Code</label>
+                    <input
+                      value={locationForm.postal_code}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, postal_code: e.target.value }))}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Phone</label>
+                    <input
+                      value={locationForm.phone}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, phone: e.target.value }))}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Contact Person</label>
+                    <input
+                      value={locationForm.contact_person}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, contact_person: e.target.value }))}
+                      className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Notes</label>
+                  <textarea
+                    rows={3}
+                    value={locationForm.notes}
+                    onChange={(e) => setLocationForm((f) => ({ ...f, notes: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground resize-none"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={locationForm.is_default}
+                    onChange={(e) => setLocationForm((f) => ({ ...f, is_default: e.target.checked }))}
+                  />
+                  Set as default location
+                </label>
+              </div>
+
+              {locationError && <p className="text-xs text-destructive">{locationError}</p>}
+
+              <div className="flex gap-2 pt-1">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setLocationModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={locationSaving}>
+                  {locationSaving ? "Saving..." : "Save Location"}
                 </Button>
               </div>
             </form>
