@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useCustomers } from "@/lib/customer-store"
@@ -335,6 +335,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [openLocationMenu, setOpenLocationMenu] = useState<string | null>(null)
 
   const [portalEnabled, setPortalEnabled] = useState(true)
+  const [open, setOpen] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [portalModules, setPortalModules] = useState({
     workOrders: true,
     invoices: true,
@@ -354,6 +356,30 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     setEditing(false)
     setDraft({})
   }, [customerId])
+
+  useEffect(() => {
+    if (customerId) {
+      setOpen(true)
+    }
+  }, [customerId])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
+  function handleClose() {
+    setOpen(false)
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+    }
+    closeTimerRef.current = setTimeout(() => {
+      onClose()
+    }, 420)
+  }
 
   function toast(message: string) {
     const id = ++toastCounter
@@ -397,7 +423,27 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     setDraft((prev) => ({ ...prev, contacts }))
   }
 
-  if (!customer) return null
+  if (!customer) {
+    return (
+      <>
+        <DetailDrawer
+          open={open}
+          onClose={handleClose}
+          title="Customer"
+          subtitle="Details unavailable"
+          width="lg"
+          transitionMs={400}
+        >
+          <p className="text-sm text-muted-foreground">Customer details are unavailable.</p>
+        </DetailDrawer>
+
+        <DrawerToastStack
+          toasts={toasts}
+          onRemove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+        />
+      </>
+    )
+  }
 
   const currentStatus = (draft.status ?? customer.status)
   const statusCls = currentStatus === "Active"
@@ -411,11 +457,12 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   return (
     <>
       <DetailDrawer
-        open={!!customerId}
-        onClose={onClose}
+        open={open}
+        onClose={handleClose}
         title={draft.company ?? customer.company}
         subtitle={draft.name ?? customer.name}
         width="lg"
+        transitionMs={400}
         badge={
           <Badge variant="secondary" className={cn("text-xs border", statusCls)}>
             {currentStatus}
