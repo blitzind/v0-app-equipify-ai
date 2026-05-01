@@ -1,10 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { useWorkOrders } from "@/lib/work-order-store"
-import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import type {
+  WorkOrder,
+  WorkOrderStatus,
+  WorkOrderPriority,
+  WorkOrderType,
+  RepairLog,
+} from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,7 +20,7 @@ import {
 import {
   CheckCircle2, FileText, Printer, Pencil, X, Check,
   AlertTriangle, Sparkles, Mic, Upload, RefreshCw,
-  Wrench, ClipboardList, Clock, DollarSign, ChevronDown, ChevronUp, ExternalLink,
+  Wrench, ClipboardList, Clock, DollarSign,   ChevronDown, ChevronUp, ExternalLink, AlertOctagon,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 
@@ -39,6 +45,128 @@ const PRIORITY_COLOR: Record<WorkOrderPriority, string> = {
 
 const ALL_STATUSES: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "Completed", "Invoiced"]
 const ALL_PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
+const ALL_TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
+
+function uiStatusToDb(s: WorkOrderStatus): string {
+  const m: Record<WorkOrderStatus, string> = {
+    Open: "open",
+    Scheduled: "scheduled",
+    "In Progress": "in_progress",
+    Completed: "completed",
+    Invoiced: "invoiced",
+  }
+  return m[s]
+}
+
+function uiPriorityToDb(p: WorkOrderPriority): string {
+  const m: Record<WorkOrderPriority, string> = {
+    Low: "low",
+    Normal: "normal",
+    High: "high",
+    Critical: "critical",
+  }
+  return m[p]
+}
+
+function uiTypeToDb(t: WorkOrderType): string {
+  const m: Record<WorkOrderType, string> = {
+    Repair: "repair",
+    PM: "pm",
+    Inspection: "inspection",
+    Install: "install",
+    Emergency: "emergency",
+  }
+  return m[t]
+}
+
+function mapDbStatus(status: string): WorkOrderStatus {
+  switch (status) {
+    case "open":
+      return "Open"
+    case "scheduled":
+      return "Scheduled"
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "invoiced":
+      return "Invoiced"
+    default:
+      return "Open"
+  }
+}
+
+function mapDbPriority(priority: string): WorkOrderPriority {
+  switch (priority) {
+    case "low":
+      return "Low"
+    case "normal":
+      return "Normal"
+    case "high":
+      return "High"
+    case "critical":
+      return "Critical"
+    default:
+      return "Normal"
+  }
+}
+
+function mapDbType(type: string): WorkOrderType {
+  switch (type) {
+    case "repair":
+      return "Repair"
+    case "pm":
+      return "PM"
+    case "inspection":
+      return "Inspection"
+    case "install":
+      return "Install"
+    case "emergency":
+      return "Emergency"
+    default:
+      return "Repair"
+  }
+}
+
+function normalizeTimeForDb(time: string): string | null {
+  if (!time || !time.trim()) return null
+  const t = time.trim()
+  if (t.length === 5 && t.includes(":")) return `${t}:00`
+  return t
+}
+
+function formatScheduledTime(isoOrTime: string | null): string {
+  if (!isoOrTime) return ""
+  const t = isoOrTime.includes("T") ? isoOrTime.slice(11, 16) : isoOrTime.slice(0, 5)
+  return t || ""
+}
+
+function parseRepairLog(raw: unknown): RepairLog {
+  const empty: RepairLog = {
+    problemReported: "",
+    diagnosis: "",
+    partsUsed: [],
+    laborHours: 0,
+    technicianNotes: "",
+    photos: [],
+    signatureDataUrl: "",
+    signedBy: "",
+    signedAt: "",
+  }
+  if (!raw || typeof raw !== "object") return empty
+  const o = raw as Record<string, unknown>
+  return {
+    problemReported: typeof o.problemReported === "string" ? o.problemReported : "",
+    diagnosis: typeof o.diagnosis === "string" ? o.diagnosis : "",
+    partsUsed: Array.isArray(o.partsUsed) ? (o.partsUsed as RepairLog["partsUsed"]) : [],
+    laborHours: typeof o.laborHours === "number" ? o.laborHours : 0,
+    technicianNotes: typeof o.technicianNotes === "string" ? o.technicianNotes : "",
+    photos: Array.isArray(o.photos) ? (o.photos as string[]) : [],
+    signatureDataUrl: typeof o.signatureDataUrl === "string" ? o.signatureDataUrl : "",
+    signedBy: typeof o.signedBy === "string" ? o.signedBy : "",
+    signedAt: typeof o.signedAt === "string" ? o.signedAt : "",
+  }
+}
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -560,24 +688,198 @@ function AIToolsPanel({ wo, onApplyNotes, onApplySummary }: AIToolsPanelProps) {
 interface WorkOrderDrawerProps {
   workOrderId: string | null
   onClose: () => void
+  onUpdated?: () => void
 }
+
+type DbWorkOrderRow = {
+  id: string
+  organization_id: string
+  customer_id: string
+  equipment_id: string
+  title: string
+  status: string
+  priority: string
+  type: string
+  scheduled_on: string | null
+  scheduled_time: string | null
+  completed_at: string | null
+  assigned_user_id: string | null
+  created_at: string
+  invoice_number: string | null
+  total_labor_cents: number
+  total_parts_cents: number
+  notes: string | null
+  repair_log: unknown
+}
+
+type TechnicianOption = { id: string; label: string }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) {
-  const { workOrders, updateWorkOrder, updateRepairLog } = useWorkOrders()
+export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDrawerProps) {
+  const [wo, setWo] = useState<WorkOrder | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [dbNotes, setDbNotes] = useState("")
+  const [technicianOptions, setTechnicianOptions] = useState<TechnicianOption[]>([])
+  const [loading, setLoading] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<WorkOrder>>({})
-  const [draftNotes, setDraftNotes] = useState("")
+  const [draftNotesDb, setDraftNotesDb] = useState("")
   const [draftDiagnosis, setDraftDiagnosis] = useState("")
+  const [draftNotes, setDraftNotes] = useState("")
+  const [draftLaborDollars, setDraftLaborDollars] = useState("")
+  const [draftPartsDollars, setDraftPartsDollars] = useState("")
 
-  const wo = workOrderId ? workOrders.find((w) => w.id === workOrderId) ?? null : null
+  const loadWorkOrder = useCallback(async () => {
+    if (!workOrderId) {
+      setWo(null)
+      setOrganizationId(null)
+      return
+    }
+
+    setLoading(true)
+    const supabase = createBrowserSupabaseClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setWo(null)
+      setOrganizationId(null)
+      setLoading(false)
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("default_organization_id")
+      .eq("id", user.id)
+      .single()
+
+    const orgId = profile?.default_organization_id ?? null
+    setOrganizationId(orgId)
+    if (!orgId) {
+      setWo(null)
+      setLoading(false)
+      return
+    }
+
+    const { data: members } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", orgId)
+      .eq("status", "active")
+      .in("role", ["owner", "admin", "manager", "tech"])
+
+    const userIds = [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))]
+    let techOpts: TechnicianOption[] = []
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds)
+      techOpts =
+        ((profs as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []).map(
+          (p) => ({
+            id: p.id,
+            label:
+              (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8),
+          })
+        )
+      techOpts.sort((a, b) => a.label.localeCompare(b.label))
+    }
+    setTechnicianOptions(techOpts)
+
+    const { data: row, error } = await supabase
+      .from("work_orders")
+      .select(
+        "id, organization_id, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log"
+      )
+      .eq("id", workOrderId)
+      .eq("organization_id", orgId)
+      .eq("is_archived", false)
+      .maybeSingle()
+
+    if (error || !row) {
+      setWo(null)
+      setLoading(false)
+      return
+    }
+
+    const w = row as DbWorkOrderRow
+
+    const [{ data: cust }, { data: eq }, { data: assigneeProf }] = await Promise.all([
+      supabase
+        .from("customers")
+        .select("company_name")
+        .eq("id", w.customer_id)
+        .eq("organization_id", orgId)
+        .maybeSingle(),
+      supabase
+        .from("equipment")
+        .select("name, location_label")
+        .eq("id", w.equipment_id)
+        .eq("organization_id", orgId)
+        .maybeSingle(),
+      w.assigned_user_id
+        ? supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", w.assigned_user_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
+
+    const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
+    const eqRow = eq as { name: string; location_label: string | null } | null
+    const equipmentName = eqRow?.name ?? "Equipment"
+    const location = eqRow?.location_label ?? ""
+    const ap = assigneeProf as { full_name: string | null; email: string | null } | null
+    const techName = w.assigned_user_id
+      ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
+      : "Unassigned"
+    const techId = w.assigned_user_id ?? "unassigned"
+
+    const mapped: WorkOrder = {
+      id: w.id,
+      customerId: w.customer_id,
+      customerName,
+      equipmentId: w.equipment_id,
+      equipmentName,
+      location,
+      type: mapDbType(w.type),
+      status: mapDbStatus(w.status),
+      priority: mapDbPriority(w.priority),
+      technicianId: techId,
+      technicianName: techName,
+      scheduledDate: w.scheduled_on ?? "",
+      scheduledTime: formatScheduledTime(w.scheduled_time),
+      completedDate: w.completed_at ? w.completed_at.slice(0, 10) : "",
+      createdAt: w.created_at,
+      createdBy: "",
+      description: w.title,
+      repairLog: parseRepairLog(w.repair_log),
+      totalLaborCost: w.total_labor_cents / 100,
+      totalPartsCost: w.total_parts_cents / 100,
+      invoiceNumber: w.invoice_number ?? "",
+    }
+
+    setDbNotes(w.notes ?? "")
+    setWo(mapped)
+    setLoading(false)
+  }, [workOrderId])
 
   useEffect(() => {
     setEditing(false)
     setDraft({})
-  }, [workOrderId])
+    setDraftNotesDb("")
+    setDraftDiagnosis("")
+    setDraftNotes("")
+    setDraftLaborDollars("")
+    setDraftPartsDollars("")
+    void loadWorkOrder()
+  }, [workOrderId, loadWorkOrder])
 
   function toast(message: string) {
     const id = ++toastCounter
@@ -588,53 +890,147 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
   function startEdit() {
     if (!wo) return
     setDraft({
+      description: wo.description,
+      type: wo.type,
+      technicianId: wo.technicianId,
       technicianName: wo.technicianName,
       priority: wo.priority,
       status: wo.status,
       scheduledDate: wo.scheduledDate ?? "",
       scheduledTime: wo.scheduledTime ?? "",
     })
+    setDraftNotesDb(dbNotes)
     setDraftNotes(wo.repairLog.technicianNotes ?? "")
     setDraftDiagnosis(wo.repairLog.diagnosis ?? "")
+    setDraftLaborDollars(String(wo.totalLaborCost ?? 0))
+    setDraftPartsDollars(String(wo.totalPartsCost ?? 0))
     setEditing(true)
   }
 
   function cancelEdit() {
     setEditing(false)
     setDraft({})
+    setDraftNotesDb(dbNotes)
+    if (wo) {
+      setDraftNotes(wo.repairLog.technicianNotes ?? "")
+      setDraftDiagnosis(wo.repairLog.diagnosis ?? "")
+    }
   }
 
-  function saveEdit() {
-    if (!wo) return
-    updateWorkOrder(wo.id, draft)
-    updateRepairLog(wo.id, {
-      technicianNotes: draftNotes,
-      diagnosis: draftDiagnosis,
-    })
+  async function saveEdit() {
+    if (!wo || !organizationId) return
+    const supabase = createBrowserSupabaseClient()
+
+    const laborCents = Math.max(0, Math.round(parseFloat(draftLaborDollars || "0") * 100))
+    const partsCents = Math.max(0, Math.round(parseFloat(draftPartsDollars || "0") * 100))
+
+    const tid = (draft.technicianId ?? wo.technicianId) === "unassigned" ? null : (draft.technicianId ?? wo.technicianId)
+
+    const updatePayload = {
+      title: (draft.description ?? wo.description).trim(),
+      status: uiStatusToDb((draft.status ?? wo.status) as WorkOrderStatus),
+      priority: uiPriorityToDb((draft.priority ?? wo.priority) as WorkOrderPriority),
+      type: uiTypeToDb((draft.type ?? wo.type) as WorkOrderType),
+      scheduled_on: (draft.scheduledDate ?? wo.scheduledDate) || null,
+      scheduled_time: normalizeTimeForDb(draft.scheduledTime ?? wo.scheduledTime ?? ""),
+      assigned_user_id: tid,
+      notes: draftNotesDb.trim() || null,
+      total_labor_cents: laborCents,
+      total_parts_cents: partsCents,
+      repair_log: {
+        ...wo.repairLog,
+        diagnosis: draftDiagnosis,
+        technicianNotes: draftNotes,
+      },
+    }
+
+    const { error } = await supabase
+      .from("work_orders")
+      .update(updatePayload)
+      .eq("id", wo.id)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      toast(`Update failed: ${error.message}`)
+      return
+    }
+
     setEditing(false)
     setDraft({})
     toast("Work order updated successfully")
+    await loadWorkOrder()
+    onUpdated?.()
+  }
+
+  async function markComplete() {
+    if (!wo || !organizationId) return
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase
+      .from("work_orders")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", wo.id)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      toast(`Update failed: ${error.message}`)
+      return
+    }
+    toast("Work order marked complete")
+    await loadWorkOrder()
+    onUpdated?.()
+  }
+
+  async function archiveWorkOrder() {
+    if (!wo || !organizationId) return
+    if (!window.confirm("Archive this work order?")) return
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase
+      .from("work_orders")
+      .update({
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+      })
+      .eq("id", wo.id)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      toast(`Archive failed: ${error.message}`)
+      return
+    }
+    toast("Work order archived")
+    onUpdated?.()
+    onClose()
   }
 
   function setField<K extends keyof WorkOrder>(field: K, value: WorkOrder[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Apply AI-generated notes into the repair log draft (opens edit mode automatically)
   function applyAINotes(notes: string) {
     if (!wo) return
     if (!editing) {
       setDraft({
+        description: wo.description,
+        type: wo.type,
+        technicianId: wo.technicianId,
         technicianName: wo.technicianName,
         priority: wo.priority,
         status: wo.status,
         scheduledDate: wo.scheduledDate ?? "",
         scheduledTime: wo.scheduledTime ?? "",
       })
+      setDraftNotesDb(dbNotes ? `${dbNotes}\n\n${notes}` : notes)
+      setDraftNotes(wo.repairLog.technicianNotes ?? "")
       setDraftDiagnosis(wo.repairLog.diagnosis ?? "")
+      setDraftLaborDollars(String(wo.totalLaborCost ?? 0))
+      setDraftPartsDollars(String(wo.totalPartsCost ?? 0))
       setEditing(true)
+    } else {
+      setDraftNotesDb((prev) => (prev ? `${prev}\n\n${notes}` : notes))
     }
-    setDraftNotes(notes)
     toast("AI notes applied — review and save when ready")
   }
 
@@ -642,20 +1038,45 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
     if (!wo) return
     if (!editing) {
       setDraft({
+        description: wo.description,
+        type: wo.type,
+        technicianId: wo.technicianId,
         technicianName: wo.technicianName,
         priority: wo.priority,
         status: wo.status,
         scheduledDate: wo.scheduledDate ?? "",
         scheduledTime: wo.scheduledTime ?? "",
       })
+      setDraftNotesDb(dbNotes ? `${dbNotes}\n\n${summary}` : summary)
+      setDraftNotes(wo.repairLog.technicianNotes ?? "")
       setDraftDiagnosis(wo.repairLog.diagnosis ?? "")
+      setDraftLaborDollars(String(wo.totalLaborCost ?? 0))
+      setDraftPartsDollars(String(wo.totalPartsCost ?? 0))
       setEditing(true)
+    } else {
+      setDraftNotesDb((prev) => (prev ? `${prev}\n\n${summary}` : summary))
     }
-    setDraftNotes((prev) => prev ? `${prev}\n\n${summary}` : summary)
     toast("AI job summary applied — review and save when ready")
   }
 
-  if (!wo) return null
+  if (!workOrderId) return null
+
+  if (!wo) {
+    return (
+      <DetailDrawer
+        open={!!workOrderId}
+        onClose={onClose}
+        title={loading ? "Loading work order…" : "Work order not found"}
+        subtitle={loading ? "Fetching details" : "It may be archived or unavailable"}
+        width="lg"
+        transitionMs={400}
+      >
+        <div className="px-5 py-6 text-sm text-muted-foreground">
+          {loading ? "Loading…" : "Unable to load this work order."}
+        </div>
+      </DetailDrawer>
+    )
+  }
 
   const currentStatus = (draft.status ?? wo.status) as WorkOrderStatus
   const currentPriority = (draft.priority ?? wo.priority) as WorkOrderPriority
@@ -675,6 +1096,7 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
         title={wo.id}
         subtitle={`${wo.type} · ${wo.customerName}`}
         width="lg"
+        transitionMs={400}
         badge={
           <Badge variant="secondary" className={cn("text-xs border", STATUS_STYLE[currentStatus])}>
             {currentStatus}
@@ -683,7 +1105,7 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
         actions={
           editing ? (
             <>
-              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={saveEdit}>
+              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
                 <Check className="w-3.5 h-3.5" /> Save Changes
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>
@@ -696,7 +1118,7 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {wo.status !== "Completed" && wo.status !== "Invoiced" && (
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order marked complete")}>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => void markComplete()}>
                   <CheckCircle2 className="w-3.5 h-3.5" /> Mark Complete
                 </Button>
               )}
@@ -705,6 +1127,14 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order PDF downloaded")}>
                 <Printer className="w-3.5 h-3.5" /> Print
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs cursor-pointer border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => void archiveWorkOrder()}
+              >
+                <AlertOctagon className="w-3.5 h-3.5" /> Archive
               </Button>
             </>
           )
@@ -739,7 +1169,13 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
               />
             </div>
           )}
-          <DrawerRow label="Type" value={wo.type} />
+          <EditRow label="Type" view={wo.type} editing={editing}>
+            <EditSelect
+              value={(draft.type ?? wo.type) as string}
+              onChange={(v) => setField("type", v as WorkOrderType)}
+              options={ALL_TYPES}
+            />
+          </EditRow>
           <EditRow label="Priority" view={<span className={PRIORITY_COLOR[wo.priority]}>{wo.priority}</span>} editing={editing}>
             <EditSelect value={draft.priority ?? wo.priority} onChange={(v) => setField("priority", v as WorkOrderPriority)} options={ALL_PRIORITIES} />
           </EditRow>
@@ -748,12 +1184,31 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
           } editing={editing}>
             <EditSelect value={draft.status ?? wo.status} onChange={(v) => setField("status", v as WorkOrderStatus)} options={ALL_STATUSES} />
           </EditRow>
-          <EditRow label="Technician" view={
-            <Link href={`/technicians?open=${wo.technicianId}`} className="text-primary hover:underline cursor-pointer font-medium">
-              {wo.technicianName}
-            </Link>
-          } editing={editing}>
-            <EditInput value={draft.technicianName ?? ""} onChange={(v) => setField("technicianName", v)} placeholder="Technician name" />
+          <EditRow
+            label="Technician"
+            view={
+              wo.technicianId !== "unassigned" ? (
+                <Link href={`/technicians?open=${wo.technicianId}`} className="text-primary hover:underline cursor-pointer font-medium">
+                  {wo.technicianName}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground">{wo.technicianName}</span>
+              )
+            }
+            editing={editing}
+          >
+            <select
+              value={draft.technicianId ?? wo.technicianId ?? "unassigned"}
+              onChange={(e) => setField("technicianId", e.target.value)}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+            >
+              <option value="unassigned">Unassigned</option>
+              {technicianOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
           </EditRow>
           <EditRow
             label="Scheduled"
@@ -775,11 +1230,43 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
           )}
         </DrawerSection>
 
-        {/* Description */}
+        {/* Title & notes (DB) */}
         <DrawerSection title="Description">
-          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
-            {wo.description}
-          </p>
+          {editing ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Title</p>
+                <EditInput
+                  value={draft.description ?? wo.description}
+                  onChange={(v) => setField("description", v)}
+                  placeholder="Work order title"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Notes</p>
+                <EditTextarea
+                  value={draftNotesDb}
+                  onChange={setDraftNotesDb}
+                  placeholder="Internal notes…"
+                  rows={4}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
+                {wo.description}
+              </p>
+              {dbNotes && (
+                <div className="space-y-1 mt-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Notes</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border whitespace-pre-wrap">
+                    {dbNotes}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </DrawerSection>
 
         {/* AI Tools — shown when not editing */}
@@ -857,9 +1344,47 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
         {/* Cost summary */}
         <DrawerSection title="Cost Summary">
           <DrawerRow label="Labor Hours" value={wo.repairLog.laborHours > 0 ? `${wo.repairLog.laborHours} hrs` : "—"} />
-          <DrawerRow label="Labor Cost" value={wo.totalLaborCost > 0 ? fmtCurrency(wo.totalLaborCost) : "—"} />
-          <DrawerRow label="Parts Cost" value={wo.totalPartsCost > 0 ? fmtCurrency(wo.totalPartsCost) : "—"} />
-          <DrawerRow label="Total" value={<span className="font-bold text-foreground">{fmtCurrency(wo.totalLaborCost + wo.totalPartsCost)}</span>} />
+          {editing ? (
+            <>
+              <EditRow label="Labor Cost" view={fmtCurrency(wo.totalLaborCost)} editing={editing}>
+                <EditInput
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={draftLaborDollars}
+                  onChange={setDraftLaborDollars}
+                  placeholder="0"
+                />
+              </EditRow>
+              <EditRow label="Parts Cost" view={fmtCurrency(wo.totalPartsCost)} editing={editing}>
+                <EditInput
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={draftPartsDollars}
+                  onChange={setDraftPartsDollars}
+                  placeholder="0"
+                />
+              </EditRow>
+            </>
+          ) : (
+            <>
+              <DrawerRow label="Labor Cost" value={wo.totalLaborCost > 0 ? fmtCurrency(wo.totalLaborCost) : "—"} />
+              <DrawerRow label="Parts Cost" value={wo.totalPartsCost > 0 ? fmtCurrency(wo.totalPartsCost) : "—"} />
+            </>
+          )}
+          <DrawerRow
+            label="Total"
+            value={
+              <span className="font-bold text-foreground">
+                {fmtCurrency(
+                  (editing
+                    ? parseFloat(draftLaborDollars || "0") + parseFloat(draftPartsDollars || "0")
+                    : wo.totalLaborCost + wo.totalPartsCost)
+                )}
+              </span>
+            }
+          />
         </DrawerSection>
 
         {/* Signature */}

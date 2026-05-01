@@ -808,6 +808,7 @@ function WorkOrdersPageInner() {
       <WorkOrderDrawer
         workOrderId={selectedWoId}
         onClose={() => setSelectedWoId(null)}
+        onUpdated={() => setRefreshToken((v) => v + 1)}
       />
 
       <QuickAddParamBridge action="new-work-order" onTrigger={() => setCreateOpen(true)} />
