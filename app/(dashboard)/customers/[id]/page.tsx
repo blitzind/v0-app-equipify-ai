@@ -1,10 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
-import { useWorkspaceData } from "@/lib/tenant-store"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +23,48 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+
+type CustomerStatus = "Active" | "Inactive"
+
+type CustomerContact = {
+  name: string
+  role: string
+  email: string
+  phone: string
+}
+
+type CustomerLocation = {
+  id: string
+  name: string
+  address: string
+  city: string
+  state: string
+  zip: string
+}
+
+type CustomerContract = {
+  id: string
+  name: string
+  type: "PM Plan" | "Full Coverage" | "Labor Only" | "Parts & Labor"
+  startDate: string
+  endDate: string
+  value: number
+}
+
+type CustomerDetail = {
+  id: string
+  organizationId: string
+  company: string
+  name: string
+  status: CustomerStatus
+  joinedDate: string
+  openWorkOrders: number
+  notes: string
+  contacts: CustomerContact[]
+  locations: CustomerLocation[]
+  contracts: CustomerContract[]
+}
 
 const statusColors: Record<Equipment["status"], string> = {
   "Active": "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
@@ -118,11 +159,143 @@ function ServiceTimeline({ entries }: { entries: ServiceHistoryEntry[] }) {
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { customers, equipment } = useWorkspaceData()
-  const customer = customers.find((c) => c.id === id)
+  const router = useRouter()
+  const [customer, setCustomer] = useState<CustomerDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editOpen, setEditOpen] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [actionError, setActionError] = useState("")
+  const [editForm, setEditForm] = useState({
+    company: "",
+    status: "Active" as CustomerStatus,
+    notes: "",
+  })
+
+  useEffect(() => {
+    let active = true
+
+    async function loadCustomer() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) {
+          setCustomer(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (active) {
+          setCustomer(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: customerRow, error: customerError } = await supabase
+        .from("customers")
+        .select("id, company_name, status, joined_at, notes")
+        .eq("id", id)
+        .eq("organization_id", profile.default_organization_id)
+        .single()
+
+      if (customerError || !customerRow) {
+        if (active) {
+          setCustomer(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      const [{ data: contactsRows }, { data: locationsRows }, { data: contractRows }] =
+        await Promise.all([
+          supabase
+            .from("customer_contacts")
+            .select("id, full_name, role, email, phone")
+            .eq("customer_id", id)
+            .eq("organization_id", profile.default_organization_id)
+            .order("is_primary", { ascending: false }),
+          supabase
+            .from("customer_locations")
+            .select("id, name, address_line1, city, state, postal_code")
+            .eq("customer_id", id)
+            .eq("organization_id", profile.default_organization_id)
+            .eq("is_archived", false),
+          supabase
+            .from("customer_contracts")
+            .select("id, name, contract_type, start_date, end_date, value_cents")
+            .eq("customer_id", id)
+            .eq("organization_id", profile.default_organization_id),
+        ])
+
+      const mapped: CustomerDetail = {
+        id: customerRow.id,
+        organizationId: profile.default_organization_id,
+        company: customerRow.company_name,
+        name: contactsRows?.[0]?.full_name ?? customerRow.company_name,
+        status: customerRow.status === "inactive" ? "Inactive" : "Active",
+        joinedDate: customerRow.joined_at ?? new Date().toISOString().slice(0, 10),
+        openWorkOrders: 0,
+        notes: customerRow.notes ?? "",
+        contacts:
+          contactsRows?.map((c) => ({
+            name: c.full_name ?? "Unknown",
+            role: c.role ?? "Contact",
+            email: c.email ?? "",
+            phone: c.phone ?? "",
+          })) ?? [],
+        locations:
+          locationsRows?.map((l) => ({
+            id: l.id,
+            name: l.name,
+            address: l.address_line1,
+            city: l.city,
+            state: l.state,
+            zip: l.postal_code,
+          })) ?? [],
+        contracts:
+          contractRows?.map((contract) => ({
+            id: contract.id,
+            name: contract.name ?? "Contract",
+            type: (contract.contract_type ?? "PM Plan") as CustomerContract["type"],
+            startDate: contract.start_date ?? new Date().toISOString().slice(0, 10),
+            endDate: contract.end_date ?? new Date().toISOString().slice(0, 10),
+            value: Math.floor((contract.value_cents ?? 0) / 100),
+          })) ?? [],
+      }
+
+      if (active) {
+        setCustomer(mapped)
+        setEditForm({
+          company: mapped.company,
+          status: mapped.status,
+          notes: mapped.notes,
+        })
+        setLoading(false)
+      }
+    }
+
+    void loadCustomer()
+
+    return () => {
+      active = false
+    }
+  }, [id])
+
   const customerEquipment = useMemo(
-    () => equipment.filter((e) => e.customerId === id),
-    [equipment, id]
+    () => [],
+    []
   )
 
   const allServiceHistory = useMemo(() => {
@@ -134,6 +307,85 @@ export default function CustomerDetailPage() {
   }, [customerEquipment])
 
   const totalContractValue = customer?.contracts.reduce((sum, c) => sum + c.value, 0) ?? 0
+
+  async function handleSaveCustomerEdits(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customer) return
+
+    setActionError("")
+    if (!editForm.company.trim()) {
+      setActionError("Company name is required.")
+      return
+    }
+
+    setSavingEdit(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          company_name: editForm.company.trim(),
+          status: editForm.status.toLowerCase(),
+          notes: editForm.notes.trim(),
+        })
+        .eq("id", customer.id)
+        .eq("organization_id", customer.organizationId)
+
+      if (error) {
+        setActionError(error.message)
+        return
+      }
+
+      setCustomer((prev) =>
+        prev
+          ? {
+              ...prev,
+              company: editForm.company.trim(),
+              status: editForm.status,
+              notes: editForm.notes.trim(),
+            }
+          : prev,
+      )
+      setEditOpen(false)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function handleArchiveCustomer() {
+    if (!customer) return
+
+    setActionError("")
+    setArchiving(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+        })
+        .eq("id", customer.id)
+        .eq("organization_id", customer.organizationId)
+
+      if (error) {
+        setActionError(error.message)
+        return
+      }
+
+      router.push("/customers")
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <p className="text-muted-foreground text-sm">Loading customer...</p>
+      </div>
+    )
+  }
 
   if (!customer) {
     return (
@@ -192,7 +444,10 @@ export default function CustomerDetailPage() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" size="sm">Edit</Button>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>Edit</Button>
+              <Button variant="outline" size="sm" onClick={handleArchiveCustomer} disabled={archiving}>
+                {archiving ? "Archiving..." : "Archive"}
+              </Button>
               <Button size="sm">+ Work Order</Button>
             </div>
           </div>
@@ -370,6 +625,59 @@ export default function CustomerDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEditOpen(false)} />
+          <div className="relative w-full max-w-md bg-card border border-border rounded-xl shadow-xl">
+            <form onSubmit={handleSaveCustomerEdits} className="p-5 space-y-4">
+              <h3 className="text-base font-semibold text-foreground">Edit Customer</h3>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Company Name</label>
+                <input
+                  value={editForm.company}
+                  onChange={(e) => setEditForm((f) => ({ ...f, company: e.target.value }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as CustomerStatus }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Notes</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={4}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground resize-none"
+                />
+              </div>
+
+              {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+
+              <div className="flex gap-2 pt-1">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={savingEdit}>
+                  {savingEdit ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -198,6 +198,7 @@ function CustomersPageInner() {
         .from("customers")
         .select("id, company_name, status, joined_at")
         .eq("organization_id", profile.default_organization_id)
+        .eq("is_archived", false)
         .order("created_at", { ascending: false })
 
       if (error || !data) {
@@ -287,6 +288,10 @@ function CustomersPageInner() {
         )}
       />
     )
+  }
+
+  function openCustomerDetail(customerId: string) {
+    router.push(`/customers/${customerId}`)
   }
 
   return (
@@ -385,7 +390,7 @@ function CustomersPageInner() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedCustomerId(c.id)}>
+                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => openCustomerDetail(c.id)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">
@@ -440,7 +445,7 @@ function CustomersPageInner() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((c) => (
-                <CustomerCard key={c.id} customer={c} onOpen={() => setSelectedCustomerId(c.id)} />
+                <CustomerCard key={c.id} customer={c} onOpen={() => openCustomerDetail(c.id)} />
               ))}
             </div>
           )}
