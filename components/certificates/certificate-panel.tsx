@@ -6,7 +6,7 @@ import { useCertificates } from "@/lib/certificate-store"
 import type { CalibrationCertificate } from "@/lib/mock-data"
 import { Button } from "@/components/ui/button"
 import {
-  Upload, FileText, Trash2, Download, Link2, LinkSlash,
+  Upload, FileText, Trash2, Download, Link2, Unlink,
   ShieldCheck, Calendar, AlertTriangle,
 } from "lucide-react"
 
@@ -118,7 +118,7 @@ function CertRow({
               title="Detach from invoice"
               aria-label="Detach from invoice"
             >
-              <LinkSlash className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+              <Unlink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
             </button>
           ) : (
             <button

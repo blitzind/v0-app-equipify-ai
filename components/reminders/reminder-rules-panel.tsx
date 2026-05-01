@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { useMaintenancePlans } from "@/lib/maintenance-store"
 import type { NotificationRule, NotificationChannel, WeekdayTrigger } from "@/lib/mock-data"
 import {
   Bell, Plus, Trash2, Mail, MessageSquare, AlertCircle,
