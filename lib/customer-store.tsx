@@ -20,6 +20,9 @@ type Action =
   | { type: "ADD"; payload: Customer }
   | { type: "UPDATE"; id: string; payload: Partial<Customer> }
   | { type: "ADD_LOCATION"; customerId: string; location: Location }
+  | { type: "UPDATE_LOCATION"; customerId: string; locationId: string; payload: Partial<Location> }
+  | { type: "REMOVE_LOCATION"; customerId: string; locationId: string }
+  | { type: "ARCHIVE_LOCATION"; customerId: string; locationId: string }
   | { type: "RESET"; customers: Customer[] }
 
 function reducer(state: State, action: Action): State {
@@ -42,6 +45,43 @@ function reducer(state: State, action: Action): State {
             : c
         ),
       }
+    case "UPDATE_LOCATION":
+      return {
+        ...state,
+        customers: state.customers.map((c) =>
+          c.id === action.customerId
+            ? {
+                ...c,
+                locations: c.locations.map((l) =>
+                  l.id === action.locationId ? { ...l, ...action.payload } : l
+                ),
+              }
+            : c
+        ),
+      }
+    case "REMOVE_LOCATION":
+      return {
+        ...state,
+        customers: state.customers.map((c) =>
+          c.id === action.customerId
+            ? { ...c, locations: c.locations.filter((l) => l.id !== action.locationId) }
+            : c
+        ),
+      }
+    case "ARCHIVE_LOCATION":
+      return {
+        ...state,
+        customers: state.customers.map((c) =>
+          c.id === action.customerId
+            ? {
+                ...c,
+                locations: c.locations.map((l) =>
+                  l.id === action.locationId ? { ...l, archived: true } : l
+                ),
+              }
+            : c
+        ),
+      }
     case "RESET":
       return { customers: action.customers }
     default:
@@ -54,6 +94,9 @@ interface CustomerContextValue {
   addCustomer: (c: Customer) => void
   updateCustomer: (id: string, payload: Partial<Customer>) => void
   addLocation: (customerId: string, location: Location) => void
+  updateLocation: (customerId: string, locationId: string, payload: Partial<Location>) => void
+  removeLocation: (customerId: string, locationId: string) => void
+  archiveLocation: (customerId: string, locationId: string) => void
   getById: (id: string) => Customer | undefined
 }
 
@@ -70,10 +113,13 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const addCustomer = useCallback((c: Customer) => dispatch({ type: "ADD", payload: c }), [])
   const updateCustomer = useCallback((id: string, payload: Partial<Customer>) => dispatch({ type: "UPDATE", id, payload }), [])
   const addLocation = useCallback((customerId: string, location: Location) => dispatch({ type: "ADD_LOCATION", customerId, location }), [])
+  const updateLocation = useCallback((customerId: string, locationId: string, payload: Partial<Location>) => dispatch({ type: "UPDATE_LOCATION", customerId, locationId, payload }), [])
+  const removeLocation = useCallback((customerId: string, locationId: string) => dispatch({ type: "REMOVE_LOCATION", customerId, locationId }), [])
+  const archiveLocation = useCallback((customerId: string, locationId: string) => dispatch({ type: "ARCHIVE_LOCATION", customerId, locationId }), [])
   const getById = useCallback((id: string) => state.customers.find((c) => c.id === id), [state.customers])
 
   return (
-    <CustomerContext.Provider value={{ customers: state.customers, addCustomer, updateCustomer, addLocation, getById }}>
+    <CustomerContext.Provider value={{ customers: state.customers, addCustomer, updateCustomer, addLocation, updateLocation, removeLocation, archiveLocation, getById }}>
       {children}
     </CustomerContext.Provider>
   )

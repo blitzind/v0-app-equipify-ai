@@ -111,14 +111,19 @@ export function DrawerSection({
   title,
   children,
   className,
+  action,
 }: {
   title: string
   children: React.ReactNode
   className?: string
+  action?: React.ReactNode
 }) {
   return (
     <div className={cn("space-y-3", className)}>
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        {action && <div>{action}</div>}
+      </div>
       {children}
     </div>
   )

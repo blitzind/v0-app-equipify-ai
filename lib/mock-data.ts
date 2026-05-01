@@ -14,9 +14,15 @@ export interface Location {
   id: string
   name: string
   address: string
+  addressLine2?: string
   city: string
   state: string
   zip: string
+  phone?: string
+  contactPerson?: string
+  notes?: string
+  isDefault?: boolean
+  archived?: boolean
 }
 
 export interface Contract {
@@ -1635,7 +1641,7 @@ export const adminQuotes: AdminQuote[] = [
   },
 ]
 
-// ─── Admin Invoices ────────────────────────────────────────────────────────────
+// ─── Admin Invoices ────���───────────────────────────────────────────────────────
 
 export type InvoiceStatus = "Draft" | "Sent" | "Paid" | "Unpaid" | "Overdue" | "Void"
 

@@ -16,10 +16,12 @@ import {
 } from "@/components/detail-drawer"
 import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
-  ExternalLink, Pencil, X, Check,
+  ExternalLink, Pencil, X, Check, Plus, Trash2, Archive,
+  MoreHorizontal, Star,
   Globe, Send, Link2, RotateCcw, Clock, Activity,
   Paintbrush, LayoutGrid, UserCog, ShieldOff, ShieldCheck,
 } from "lucide-react"
+import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
@@ -72,6 +74,241 @@ function EditRow({ label, view, editing, children }: { label: string; view: Reac
   )
 }
 
+// ─── Location form ────────────────────────────────────────────────────────────
+
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+  "VA","WA","WV","WI","WY","DC",
+]
+
+type LocationDraft = {
+  name: string
+  address: string
+  addressLine2: string
+  city: string
+  state: string
+  zip: string
+  phone: string
+  contactPerson: string
+  notes: string
+  isDefault: boolean
+}
+
+const EMPTY_LOCATION_DRAFT: LocationDraft = {
+  name: "", address: "", addressLine2: "", city: "", state: "", zip: "",
+  phone: "", contactPerson: "", notes: "", isDefault: false,
+}
+
+interface LocationFormProps {
+  title: string
+  initial?: LocationDraft
+  onSave: (draft: LocationDraft) => void
+  onCancel: () => void
+}
+
+function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel }: LocationFormProps) {
+  const [d, setD] = useState<LocationDraft>(initial)
+  const [errors, setErrors] = useState<Partial<Record<keyof LocationDraft, string>>>({})
+
+  function set<K extends keyof LocationDraft>(k: K, v: LocationDraft[K]) {
+    setD((prev) => ({ ...prev, [k]: v }))
+    setErrors((prev) => ({ ...prev, [k]: undefined }))
+  }
+
+  function validate(): boolean {
+    const e: typeof errors = {}
+    if (!d.name.trim())    e.name    = "Location name is required"
+    if (!d.address.trim()) e.address = "Street address is required"
+    if (!d.city.trim())    e.city    = "City is required"
+    if (!d.state.trim())   e.state   = "State is required"
+    if (!d.zip.trim())     e.zip     = "ZIP is required"
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  function handleSave() {
+    if (validate()) onSave(d)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+          {/* Location Name */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Location Name <span className="text-[color:var(--status-danger)]">*</span>
+            </label>
+            <EditInput value={d.name} onChange={(v) => set("name", v)} placeholder="e.g. Main Office, Warehouse A" />
+            {errors.name && <p className="text-[10px] text-[color:var(--status-danger)] mt-1">{errors.name}</p>}
+          </div>
+
+          {/* Street */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Street Address <span className="text-[color:var(--status-danger)]">*</span>
+            </label>
+            <EditInput value={d.address} onChange={(v) => set("address", v)} placeholder="123 Main St" />
+            {errors.address && <p className="text-[10px] text-[color:var(--status-danger)] mt-1">{errors.address}</p>}
+          </div>
+
+          {/* Address Line 2 */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Address Line 2</label>
+            <EditInput value={d.addressLine2} onChange={(v) => set("addressLine2", v)} placeholder="Suite, Floor, Unit..." />
+          </div>
+
+          {/* City / State / ZIP */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-1">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                City <span className="text-[color:var(--status-danger)]">*</span>
+              </label>
+              <EditInput value={d.city} onChange={(v) => set("city", v)} placeholder="City" />
+              {errors.city && <p className="text-[10px] text-[color:var(--status-danger)] mt-1">{errors.city}</p>}
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                State <span className="text-[color:var(--status-danger)]">*</span>
+              </label>
+              <EditSelect value={d.state} onChange={(v) => set("state", v)} options={["", ...US_STATES]} />
+              {errors.state && <p className="text-[10px] text-[color:var(--status-danger)] mt-1">{errors.state}</p>}
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                ZIP <span className="text-[color:var(--status-danger)]">*</span>
+              </label>
+              <EditInput value={d.zip} onChange={(v) => set("zip", v)} placeholder="00000" />
+              {errors.zip && <p className="text-[10px] text-[color:var(--status-danger)] mt-1">{errors.zip}</p>}
+            </div>
+          </div>
+
+          {/* Phone / Contact */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Main Phone</label>
+              <EditInput value={d.phone} onChange={(v) => set("phone", v)} placeholder="(555) 000-0000" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Contact Person</label>
+              <EditInput value={d.contactPerson} onChange={(v) => set("contactPerson", v)} placeholder="Name" />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Notes</label>
+            <EditTextarea value={d.notes} onChange={(v) => set("notes", v)} placeholder="Access instructions, hours, etc." />
+          </div>
+
+          {/* Default toggle */}
+          <div className="flex items-center justify-between py-2 border-t border-border/50">
+            <div>
+              <p className="text-xs font-medium text-foreground">Set as Default Location</p>
+              <p className="text-[10px] text-muted-foreground">Used as the default in work orders and equipment</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => set("isDefault", !d.isDefault)}
+              className={cn(
+                "relative w-9 h-5 rounded-full transition-colors shrink-0",
+                d.isDefault ? "bg-primary" : "bg-muted-foreground/25"
+              )}
+              role="switch"
+              aria-checked={d.isDefault}
+            >
+              <span className={cn(
+                "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform",
+                d.isDefault ? "translate-x-4" : "translate-x-0.5"
+              )} />
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
+          <button
+            onClick={onCancel}
+            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90 transition-colors"
+          >
+            Save Location
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Delete confirmation ──────────────────────────────────────────────────────
+
+interface DeleteConfirmProps {
+  hasRelatedRecords: boolean
+  onArchive: () => void
+  onDelete: () => void
+  onCancel: () => void
+}
+
+function DeleteConfirm({ hasRelatedRecords, onArchive, onDelete, onCancel }: DeleteConfirmProps) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">
+            {hasRelatedRecords ? "Archive Location?" : "Delete Location?"}
+          </h3>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {hasRelatedRecords
+              ? "This location has related records (equipment, work orders, or invoices). It cannot be permanently deleted. Archive instead to hide it from active dropdowns?"
+              : "Are you sure you want to delete this location? This action cannot be undone."}
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
+          <button
+            onClick={onCancel}
+            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 transition-colors"
+          >
+            Cancel
+          </button>
+          {hasRelatedRecords ? (
+            <button
+              onClick={onArchive}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-md bg-amber-500 text-white hover:bg-amber-500/90 transition-colors"
+            >
+              <Archive size={12} /> Archive Location
+            </button>
+          ) : (
+            <button
+              onClick={onDelete}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-md bg-[color:var(--status-danger)] text-white hover:bg-[color:var(--status-danger)]/90 transition-colors"
+            >
+              <Trash2 size={12} /> Delete Location
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Props / component ────────────────────────────────────────────────────────
 
 interface CustomerDrawerProps {
@@ -80,7 +317,7 @@ interface CustomerDrawerProps {
 }
 
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
-  const { customers, updateCustomer } = useCustomers()
+  const { customers, updateCustomer, addLocation, updateLocation, removeLocation, archiveLocation } = useCustomers()
   const { equipment } = useEquipment()
   const { workOrders } = useWorkOrders()
   const { quotes: adminQuotes } = useQuotes()
@@ -88,6 +325,13 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Customer>>({})
+
+  // Location modal state
+  const [locationModal, setLocationModal] = useState<"add" | "edit" | null>(null)
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [openLocationMenu, setOpenLocationMenu] = useState<string | null>(null)
+
   const [portalEnabled, setPortalEnabled] = useState(true)
   const [portalModules, setPortalModules] = useState({
     workOrders: true,
@@ -286,24 +530,109 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         </DrawerSection>
 
         {/* Locations */}
-        <DrawerSection title="Locations">
+        <DrawerSection
+          title="Locations"
+          action={
+            <button
+              onClick={() => setLocationModal("add")}
+              className="flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <Plus size={12} /> Add Location
+            </button>
+          }
+        >
           <div className="space-y-2">
-            {customer.locations.map((loc) => (
-              <div key={loc.id} className="flex flex-col gap-2 p-3 rounded-lg bg-muted/30 border border-border">
-                <div className="flex items-start gap-2.5">
+            {customer.locations.filter((l) => !l.archived).map((loc) => (
+              <div key={loc.id} className="rounded-lg bg-muted/30 border border-border overflow-hidden">
+                {/* Location card header */}
+                <div className="flex items-start gap-2.5 p-3">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">{loc.name}</p>
-                    <p className="text-xs text-muted-foreground">{loc.address}, {loc.city}, {loc.state} {loc.zip}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-foreground truncate">{loc.name}</p>
+                      {loc.isDefault && (
+                        <span className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+                          <Star size={8} /> Default
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {loc.address}{loc.addressLine2 ? `, ${loc.addressLine2}` : ""}, {loc.city}, {loc.state} {loc.zip}
+                    </p>
+                    {loc.contactPerson && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Contact: {loc.contactPerson}</p>
+                    )}
+                    {loc.phone && (
+                      <p className="text-[10px] text-muted-foreground">Phone: {loc.phone}</p>
+                    )}
+                  </div>
+
+                  {/* Per-location actions */}
+                  <div className="flex items-center gap-1 shrink-0 relative">
+                    <button
+                      onClick={() => {
+                        setEditingLocationId(loc.id)
+                        setLocationModal("edit")
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/60 transition-colors"
+                    >
+                      <Pencil size={11} /> Edit
+                    </button>
+                    <button
+                      onClick={() => setOpenLocationMenu(openLocationMenu === loc.id ? null : loc.id)}
+                      className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="More options"
+                    >
+                      <MoreHorizontal size={13} />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {openLocationMenu === loc.id && (
+                      <div className="absolute right-0 top-8 z-50 w-44 rounded-lg border border-border bg-background shadow-lg py-1 text-xs">
+                        <button
+                          onClick={() => {
+                            setOpenLocationMenu(null)
+                            updateLocation(customer.id, loc.id, { isDefault: true })
+                            // Clear default from other locations
+                            customer.locations.forEach((l) => {
+                              if (l.id !== loc.id && l.isDefault) {
+                                updateLocation(customer.id, l.id, { isDefault: false })
+                              }
+                            })
+                            toast("Default location updated")
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 text-foreground transition-colors"
+                        >
+                          <Star size={12} className="text-muted-foreground" /> Set as Default
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenLocationMenu(null)
+                            setDeleteTarget(loc.id)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[color:var(--status-danger)]/10 text-[color:var(--status-danger)] transition-colors"
+                        >
+                          <Trash2 size={12} /> Delete / Archive
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <ContactActions
-                  address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
-                  email={customer.contacts[0] ? { customerName: customer.company, customerEmail: customer.contacts[0].email } : undefined}
-                  phone={customer.contacts[0]?.phone}
-                />
+
+                {/* Navigate / contact actions */}
+                <div className="px-3 pb-3">
+                  <ContactActions
+                    address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
+                    email={customer.contacts[0] ? { customerName: customer.company, customerEmail: customer.contacts[0].email } : undefined}
+                    phone={loc.phone ?? customer.contacts[0]?.phone}
+                  />
+                </div>
               </div>
             ))}
+
+            {customer.locations.filter((l) => !l.archived).length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-3">No locations. Add one to get started.</p>
+            )}
           </div>
         </DrawerSection>
 
@@ -549,6 +878,116 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       </DetailDrawer>
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
+      {/* Click-outside to close location menu */}
+      {openLocationMenu && (
+        <div className="fixed inset-0 z-40" onClick={() => setOpenLocationMenu(null)} />
+      )}
+
+      {/* Add Location modal */}
+      {locationModal === "add" && (
+        <LocationForm
+          title="Add Location"
+          onCancel={() => setLocationModal(null)}
+          onSave={(d) => {
+            const newLoc: Location = {
+              id: `loc-${Date.now()}`,
+              name: d.name,
+              address: d.address,
+              addressLine2: d.addressLine2 || undefined,
+              city: d.city,
+              state: d.state,
+              zip: d.zip,
+              phone: d.phone || undefined,
+              contactPerson: d.contactPerson || undefined,
+              notes: d.notes || undefined,
+              isDefault: d.isDefault,
+            }
+            // If this is set as default, clear others
+            if (d.isDefault) {
+              customer.locations.forEach((l) => {
+                if (l.isDefault) updateLocation(customer.id, l.id, { isDefault: false })
+              })
+            }
+            addLocation(customer.id, newLoc)
+            setLocationModal(null)
+            toast("Location added successfully")
+          }}
+        />
+      )}
+
+      {/* Edit Location modal */}
+      {locationModal === "edit" && editingLocationId && (() => {
+        const loc = customer.locations.find((l) => l.id === editingLocationId)
+        if (!loc) return null
+        return (
+          <LocationForm
+            title="Edit Location"
+            initial={{
+              name: loc.name,
+              address: loc.address,
+              addressLine2: loc.addressLine2 ?? "",
+              city: loc.city,
+              state: loc.state,
+              zip: loc.zip,
+              phone: loc.phone ?? "",
+              contactPerson: loc.contactPerson ?? "",
+              notes: loc.notes ?? "",
+              isDefault: loc.isDefault ?? false,
+            }}
+            onCancel={() => { setLocationModal(null); setEditingLocationId(null) }}
+            onSave={(d) => {
+              if (d.isDefault) {
+                customer.locations.forEach((l) => {
+                  if (l.id !== editingLocationId && l.isDefault) {
+                    updateLocation(customer.id, l.id, { isDefault: false })
+                  }
+                })
+              }
+              updateLocation(customer.id, editingLocationId, {
+                name: d.name,
+                address: d.address,
+                addressLine2: d.addressLine2 || undefined,
+                city: d.city,
+                state: d.state,
+                zip: d.zip,
+                phone: d.phone || undefined,
+                contactPerson: d.contactPerson || undefined,
+                notes: d.notes || undefined,
+                isDefault: d.isDefault,
+              })
+              setLocationModal(null)
+              setEditingLocationId(null)
+              toast("Location updated successfully")
+            }}
+          />
+        )
+      })()}
+
+      {/* Delete / Archive confirmation */}
+      {deleteTarget && (() => {
+        const loc = customer.locations.find((l) => l.id === deleteTarget)
+        if (!loc) return null
+        const hasRelated =
+          equipment.some((e) => e.customerId === customer.id) ||
+          workOrders.some((w) => w.customerId === customer.id)
+        return (
+          <DeleteConfirm
+            hasRelatedRecords={hasRelated}
+            onCancel={() => setDeleteTarget(null)}
+            onArchive={() => {
+              archiveLocation(customer.id, deleteTarget)
+              setDeleteTarget(null)
+              toast("Location archived")
+            }}
+            onDelete={() => {
+              removeLocation(customer.id, deleteTarget)
+              setDeleteTarget(null)
+              toast("Location deleted")
+            }}
+          />
+        )
+      })()}
     </>
   )
 }
