@@ -75,6 +75,23 @@ type DbCustomerRow = {
   joined_at: string | null
 }
 
+type DbContactRow = {
+  customer_id: string
+  email: string | null
+  phone: string | null
+  is_primary: boolean | null
+}
+
+type DbLocationRow = {
+  customer_id: string
+  id: string
+  address_line1: string
+  city: string
+  state: string
+  postal_code: string
+  is_default: boolean | null
+}
+
 function StatusBadge({ status }: { status: Customer["status"] }) {
   return (
     <Badge
@@ -208,13 +225,59 @@ function CustomersPageInner() {
         return
       }
 
-      const mapped = (data as DbCustomerRow[]).map((row) => ({
+      const customerRows = data as DbCustomerRow[]
+      const customerIds = customerRows.map((row) => row.id)
+
+      let contactsByCustomer = new Map<string, { email: string; phone: string }>()
+      let locationsByCustomer = new Map<string, { id: string; address: string; city: string; state: string; zip: string }>()
+
+      if (customerIds.length > 0) {
+        const [{ data: contactRows }, { data: locationRows }] = await Promise.all([
+          supabase
+            .from("customer_contacts")
+            .select("customer_id, email, phone, is_primary")
+            .eq("organization_id", profile.default_organization_id)
+            .eq("is_archived", false)
+            .in("customer_id", customerIds)
+            .order("is_primary", { ascending: false }),
+          supabase
+            .from("customer_locations")
+            .select("customer_id, id, address_line1, city, state, postal_code, is_default")
+            .eq("organization_id", profile.default_organization_id)
+            .eq("is_archived", false)
+            .in("customer_id", customerIds)
+            .order("is_default", { ascending: false }),
+        ])
+
+        ;(contactRows as DbContactRow[] | null)?.forEach((row) => {
+          if (!contactsByCustomer.has(row.customer_id)) {
+            contactsByCustomer.set(row.customer_id, {
+              email: row.email ?? "",
+              phone: row.phone ?? "",
+            })
+          }
+        })
+
+        ;(locationRows as DbLocationRow[] | null)?.forEach((row) => {
+          if (!locationsByCustomer.has(row.customer_id)) {
+            locationsByCustomer.set(row.customer_id, {
+              id: row.id,
+              address: row.address_line1,
+              city: row.city,
+              state: row.state,
+              zip: row.postal_code,
+            })
+          }
+        })
+      }
+
+      const mapped = customerRows.map((row) => ({
         id: row.id,
         company: row.company_name,
         name: row.company_name,
         status: row.status === "inactive" ? "Inactive" : "Active",
-        locations: [],
-        contacts: [],
+        locations: locationsByCustomer.has(row.id) ? [locationsByCustomer.get(row.id)!] : [],
+        contacts: contactsByCustomer.has(row.id) ? [contactsByCustomer.get(row.id)!] : [],
         contracts: [],
         equipmentCount: 0,
         openWorkOrders: 0,
@@ -457,11 +520,24 @@ function CustomersPageInner() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="w-[200px] whitespace-nowrap">
                       <div className="flex justify-end">
+                        {(() => {
+                          const primaryLocation = c.locations[0]
+                          const primaryContact = c.contacts[0]
+                          return (
                         <ContactActions
-                          address={c.locations[0] ? `${c.locations[0].address}, ${c.locations[0].city}, ${c.locations[0].state} ${c.locations[0].zip}` : undefined}
-                          email={c.contacts[0] ? { customerName: c.company, customerEmail: c.contacts[0].email } : undefined}
-                          phone={c.contacts[0]?.phone}
+                          address={
+                            primaryLocation
+                              ? `${primaryLocation.address}, ${primaryLocation.city}, ${primaryLocation.state} ${primaryLocation.zip}`
+                              : undefined
+                          }
+                          email={{
+                            customerName: c.company,
+                            customerEmail: primaryContact?.email || undefined,
+                          }}
+                          phone={primaryContact?.phone}
                         />
+                          )
+                        })()}
                       </div>
                     </TableCell>
                   </TableRow>

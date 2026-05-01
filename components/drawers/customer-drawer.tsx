@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 let toastCounter = 0
 
@@ -223,14 +224,14 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
               type="button"
               onClick={() => set("isDefault", !d.isDefault)}
               className={cn(
-                "relative w-9 h-5 rounded-full transition-colors shrink-0",
+                "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
                 d.isDefault ? "bg-primary" : "bg-muted-foreground/25"
               )}
               role="switch"
               aria-checked={d.isDefault}
             >
               <span className={cn(
-                "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform",
+                "absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform",
                 d.isDefault ? "translate-x-4" : "translate-x-0.5"
               )} />
             </button>
@@ -317,8 +318,20 @@ interface CustomerDrawerProps {
   onClose: () => void
 }
 
+type DbContact = {
+  id: string
+  customer_id: string
+  full_name: string
+  first_name: string | null
+  last_name: string | null
+  role: string | null
+  email: string | null
+  phone: string | null
+  is_primary: boolean | null
+}
+
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
-  const { customers, updateCustomer, addLocation, updateLocation, removeLocation, archiveLocation } = useCustomers()
+  const { customers, updateCustomer } = useCustomers()
   const { equipment } = useEquipment()
   const { workOrders } = useWorkOrders()
   const { quotes: adminQuotes } = useQuotes()
@@ -337,6 +350,21 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [portalEnabled, setPortalEnabled] = useState(true)
   const [open, setOpen] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [drawerContacts, setDrawerContacts] = useState<Contact[]>([])
+  const [drawerLocations, setDrawerLocations] = useState<Location[]>([])
+  const [contactModalOpen, setContactModalOpen] = useState(false)
+  const [editingContactId, setEditingContactId] = useState<string | null>(null)
+  const [contactForm, setContactForm] = useState({
+    full_name: "",
+    first_name: "",
+    last_name: "",
+    role: "",
+    email: "",
+    phone: "",
+    is_primary: false,
+  })
+  const [contactBusy, setContactBusy] = useState(false)
   const [portalModules, setPortalModules] = useState({
     workOrders: true,
     invoices: true,
@@ -361,6 +389,92 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     if (customerId) {
       setOpen(true)
     }
+  }, [customerId])
+
+  useEffect(() => {
+    async function loadOrgAndRelated() {
+      if (!customerId) {
+        setDrawerContacts([])
+        setDrawerLocations([])
+        return
+      }
+
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      const orgId = profile?.default_organization_id ?? null
+      setOrganizationId(orgId)
+      if (!orgId) return
+
+      const [{ data: contacts }, { data: locations }] = await Promise.all([
+        supabase
+          .from("customer_contacts")
+          .select("id, customer_id, full_name, first_name, last_name, role, email, phone, is_primary")
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId)
+          .eq("is_archived", false)
+          .order("is_primary", { ascending: false }),
+        supabase
+          .from("customer_locations")
+          .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId)
+          .eq("is_archived", false)
+          .order("is_default", { ascending: false }),
+      ])
+
+      setDrawerContacts(
+        ((contacts as DbContact[] | null) ?? []).map((c) => ({
+          id: c.id,
+          name: c.full_name,
+          firstName: c.first_name ?? "",
+          lastName: c.last_name ?? "",
+          role: c.role ?? "Contact",
+          email: c.email ?? "",
+          phone: c.phone ?? "",
+          isPrimary: Boolean(c.is_primary),
+        })),
+      )
+
+      setDrawerLocations(
+        (((locations as Array<{
+          id: string
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          phone: string | null
+          contact_person: string | null
+          notes: string | null
+          is_default: boolean | null
+        }> | null) ?? [])).map((l) => ({
+          id: l.id,
+          name: l.name,
+          address: l.address_line1,
+          addressLine2: l.address_line2 ?? undefined,
+          city: l.city,
+          state: l.state,
+          zip: l.postal_code,
+          phone: l.phone ?? undefined,
+          contactPerson: l.contact_person ?? undefined,
+          notes: l.notes ?? undefined,
+          isDefault: Boolean(l.is_default),
+        })),
+      )
+    }
+
+    void loadOrgAndRelated()
   }, [customerId])
 
   useEffect(() => {
@@ -452,7 +566,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
   const openWOs = custWOs.filter((w) => w.status !== "Completed" && w.status !== "Invoiced")
 
-  const contacts = draft.contacts ?? customer.contacts
+  const contacts = drawerContacts
 
   return (
     <>
@@ -530,10 +644,32 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         </DrawerSection>
 
         {/* Contacts */}
-        <DrawerSection title="Contacts">
+        <DrawerSection
+          title="Contacts"
+          action={
+            <button
+              onClick={() => {
+                setEditingContactId(null)
+                setContactForm({
+                  full_name: "",
+                  first_name: "",
+                  last_name: "",
+                  role: "",
+                  email: "",
+                  phone: "",
+                  is_primary: false,
+                })
+                setContactModalOpen(true)
+              }}
+              className="flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <Plus size={12} /> Add Contact
+            </button>
+          }
+        >
           <div className="space-y-2.5">
             {contacts.map((c, idx) => (
-              <div key={c.email} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/30 border border-border">
+              <div key={c.id ?? `${c.email}-${idx}`} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center justify-between">
                   {editing ? (
                     <div className="flex flex-col gap-1.5 w-full">
@@ -545,10 +681,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                       <EditInput value={c.phone} onChange={(v) => setContact(idx, "phone", v)} placeholder="Phone" />
                     </div>
                   ) : (
-                    <>
+                    <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-foreground">{c.name}</span>
+                      {c.isPrimary && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                          Primary
+                        </span>
+                      )}
                       <span className="text-[10px] text-muted-foreground">{c.role}</span>
-                    </>
+                    </div>
                   )}
                 </div>
                 {!editing && (
@@ -565,10 +706,54 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                         phone={c.phone}
                       />
                     </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingContactId(c.id)
+                          setContactForm({
+                            full_name: c.name,
+                            first_name: c.firstName ?? "",
+                            last_name: c.lastName ?? "",
+                            role: c.role,
+                            email: c.email,
+                            phone: c.phone,
+                            is_primary: Boolean(c.isPrimary),
+                          })
+                          setContactModalOpen(true)
+                        }}
+                        className="text-[11px] text-primary hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!organizationId || !customerId) return
+                          const supabase = createBrowserSupabaseClient()
+                          const { error } = await supabase
+                            .from("customer_contacts")
+                            .update({ is_archived: true, archived_at: new Date().toISOString() })
+                            .eq("id", c.id)
+                            .eq("organization_id", organizationId)
+                            .eq("customer_id", customerId)
+                          if (!error) {
+                            setDrawerContacts((prev) => prev.filter((x) => x.id !== c.id))
+                            toast("Contact archived")
+                          }
+                        }}
+                        className="text-[11px] text-destructive hover:underline"
+                      >
+                        Archive
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
             ))}
+            {contacts.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-3">No contacts yet.</p>
+            )}
           </div>
         </DrawerSection>
 
@@ -585,7 +770,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           }
         >
           <div className="space-y-2">
-            {customer.locations.filter((l) => !l.archived).map((loc) => (
+            {drawerLocations.map((loc) => (
               <div key={loc.id} className="rounded-lg bg-muted/30 border border-border overflow-hidden">
                 {/* Location card header */}
                 <div className="flex items-start gap-2.5 p-3">
@@ -635,14 +820,27 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                         <button
                           onClick={() => {
                             setOpenLocationMenu(null)
-                            updateLocation(customer.id, loc.id, { isDefault: true })
-                            // Clear default from other locations
-                            customer.locations.forEach((l) => {
-                              if (l.id !== loc.id && l.isDefault) {
-                                updateLocation(customer.id, l.id, { isDefault: false })
+                            if (!organizationId || !customerId) return
+                            const supabase = createBrowserSupabaseClient()
+                            void (async () => {
+                              await supabase
+                                .from("customer_locations")
+                                .update({ is_default: false })
+                                .eq("organization_id", organizationId)
+                                .eq("customer_id", customerId)
+                              const { error } = await supabase
+                                .from("customer_locations")
+                                .update({ is_default: true })
+                                .eq("id", loc.id)
+                                .eq("organization_id", organizationId)
+                                .eq("customer_id", customerId)
+                              if (!error) {
+                                setDrawerLocations((prev) =>
+                                  prev.map((x) => ({ ...x, isDefault: x.id === loc.id })),
+                                )
+                                toast("Default location updated")
                               }
-                            })
-                            toast("Default location updated")
+                            })()
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 text-foreground transition-colors"
                         >
@@ -666,14 +864,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <div className="px-3 pb-3">
                   <ContactActions
                     address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
-                    email={customer.contacts[0] ? { customerName: customer.company, customerEmail: customer.contacts[0].email } : undefined}
-                    phone={loc.phone ?? customer.contacts[0]?.phone}
+                    email={contacts[0] ? { customerName: customer.company, customerEmail: contacts[0].email } : undefined}
+                    phone={loc.phone ?? contacts[0]?.phone}
                   />
                 </div>
               </div>
             ))}
 
-            {customer.locations.filter((l) => !l.archived).length === 0 && (
+            {drawerLocations.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No locations. Add one to get started.</p>
             )}
           </div>
@@ -1021,6 +1219,128 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
 
+      {contactModalOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground">
+                {editingContactId ? "Edit Contact" : "Add Contact"}
+              </h3>
+              <button onClick={() => setContactModalOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <form
+              className="px-5 py-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!organizationId || !customerId || !contactForm.full_name.trim()) return
+                setContactBusy(true)
+                const supabase = createBrowserSupabaseClient()
+                const payload = {
+                  organization_id: organizationId,
+                  customer_id: customerId,
+                  full_name: contactForm.full_name.trim(),
+                  first_name: contactForm.first_name.trim() || null,
+                  last_name: contactForm.last_name.trim() || null,
+                  role: contactForm.role.trim() || null,
+                  email: contactForm.email.trim() || null,
+                  phone: contactForm.phone.trim() || null,
+                  is_primary: contactForm.is_primary,
+                }
+                void (async () => {
+                  if (contactForm.is_primary) {
+                    await supabase
+                      .from("customer_contacts")
+                      .update({ is_primary: false })
+                      .eq("organization_id", organizationId)
+                      .eq("customer_id", customerId)
+                  }
+
+                  const query = editingContactId
+                    ? supabase
+                        .from("customer_contacts")
+                        .update(payload)
+                        .eq("id", editingContactId)
+                        .eq("organization_id", organizationId)
+                        .eq("customer_id", customerId)
+                        .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
+                        .single()
+                    : supabase
+                        .from("customer_contacts")
+                        .insert(payload)
+                        .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
+                        .single()
+
+                  const { data, error } = await query
+                  if (!error && data) {
+                    const nextContact: Contact = {
+                      id: data.id,
+                      name: data.full_name,
+                      firstName: data.first_name ?? "",
+                      lastName: data.last_name ?? "",
+                      role: data.role ?? "Contact",
+                      email: data.email ?? "",
+                      phone: data.phone ?? "",
+                      isPrimary: Boolean(data.is_primary),
+                    }
+                    setDrawerContacts((prev) => {
+                      const base = editingContactId
+                        ? prev.map((x) => (x.id === editingContactId ? nextContact : x))
+                        : [nextContact, ...prev]
+                      return base.map((x) =>
+                        nextContact.isPrimary ? { ...x, isPrimary: x.id === nextContact.id } : x,
+                      )
+                    })
+                    setContactModalOpen(false)
+                    setEditingContactId(null)
+                    setContactForm({
+                      full_name: "",
+                      first_name: "",
+                      last_name: "",
+                      role: "",
+                      email: "",
+                      phone: "",
+                      is_primary: false,
+                    })
+                    toast(editingContactId ? "Contact updated successfully" : "Contact added successfully")
+                  }
+                  setContactBusy(false)
+                })()
+              }}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <EditInput value={contactForm.full_name} onChange={(v) => setContactForm((f) => ({ ...f, full_name: v }))} placeholder="Full Name" />
+                <EditInput value={contactForm.role} onChange={(v) => setContactForm((f) => ({ ...f, role: v }))} placeholder="Role" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <EditInput value={contactForm.first_name} onChange={(v) => setContactForm((f) => ({ ...f, first_name: v }))} placeholder="First Name" />
+                <EditInput value={contactForm.last_name} onChange={(v) => setContactForm((f) => ({ ...f, last_name: v }))} placeholder="Last Name" />
+              </div>
+              <EditInput value={contactForm.email} onChange={(v) => setContactForm((f) => ({ ...f, email: v }))} placeholder="Email" />
+              <EditInput value={contactForm.phone} onChange={(v) => setContactForm((f) => ({ ...f, phone: v }))} placeholder="Phone" />
+              <label className="flex items-center gap-2 text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  checked={contactForm.is_primary}
+                  onChange={(e) => setContactForm((f) => ({ ...f, is_primary: e.target.checked }))}
+                />
+                Set as primary contact
+              </label>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" size="sm" variant="outline" onClick={() => setContactModalOpen(false)} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={contactBusy} className="text-xs">
+                  {contactBusy ? "Saving..." : "Save Contact"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Click-outside to close location menu */}
       {openLocationMenu && (
         <div className="fixed inset-0 z-40" onClick={() => setOpenLocationMenu(null)} />
@@ -1032,35 +1352,62 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           title="Add Location"
           onCancel={() => setLocationModal(null)}
           onSave={(d) => {
-            const newLoc: Location = {
-              id: `loc-${Date.now()}`,
-              name: d.name,
-              address: d.address,
-              addressLine2: d.addressLine2 || undefined,
-              city: d.city,
-              state: d.state,
-              zip: d.zip,
-              phone: d.phone || undefined,
-              contactPerson: d.contactPerson || undefined,
-              notes: d.notes || undefined,
-              isDefault: d.isDefault,
-            }
-            // If this is set as default, clear others
-            if (d.isDefault) {
-              customer.locations.forEach((l) => {
-                if (l.isDefault) updateLocation(customer.id, l.id, { isDefault: false })
-              })
-            }
-            addLocation(customer.id, newLoc)
-            setLocationModal(null)
-            toast("Location added successfully")
+            if (!organizationId || !customerId) return
+            const supabase = createBrowserSupabaseClient()
+            void (async () => {
+              if (d.isDefault) {
+                await supabase
+                  .from("customer_locations")
+                  .update({ is_default: false })
+                  .eq("organization_id", organizationId)
+                  .eq("customer_id", customerId)
+              }
+              const { data, error } = await supabase
+                .from("customer_locations")
+                .insert({
+                  organization_id: organizationId,
+                  customer_id: customerId,
+                  name: d.name,
+                  address_line1: d.address,
+                  address_line2: d.addressLine2 || null,
+                  city: d.city,
+                  state: d.state,
+                  postal_code: d.zip,
+                  phone: d.phone || null,
+                  contact_person: d.contactPerson || null,
+                  notes: d.notes || null,
+                  is_default: d.isDefault,
+                })
+                .select("id")
+                .single()
+              if (!error && data) {
+                setDrawerLocations((prev) => [
+                  {
+                    id: data.id,
+                    name: d.name,
+                    address: d.address,
+                    addressLine2: d.addressLine2 || undefined,
+                    city: d.city,
+                    state: d.state,
+                    zip: d.zip,
+                    phone: d.phone || undefined,
+                    contactPerson: d.contactPerson || undefined,
+                    notes: d.notes || undefined,
+                    isDefault: d.isDefault,
+                  },
+                  ...prev.map((loc) => ({ ...loc, isDefault: d.isDefault ? false : loc.isDefault })),
+                ])
+                setLocationModal(null)
+                toast("Location added successfully")
+              }
+            })()
           }}
         />
       )}
 
       {/* Edit Location modal */}
       {locationModal === "edit" && editingLocationId && (() => {
-        const loc = customer.locations.find((l) => l.id === editingLocationId)
+        const loc = drawerLocations.find((l) => l.id === editingLocationId)
         if (!loc) return null
         return (
           <LocationForm
@@ -1079,28 +1426,58 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             }}
             onCancel={() => { setLocationModal(null); setEditingLocationId(null) }}
             onSave={(d) => {
-              if (d.isDefault) {
-                customer.locations.forEach((l) => {
-                  if (l.id !== editingLocationId && l.isDefault) {
-                    updateLocation(customer.id, l.id, { isDefault: false })
-                  }
-                })
-              }
-              updateLocation(customer.id, editingLocationId, {
-                name: d.name,
-                address: d.address,
-                addressLine2: d.addressLine2 || undefined,
-                city: d.city,
-                state: d.state,
-                zip: d.zip,
-                phone: d.phone || undefined,
-                contactPerson: d.contactPerson || undefined,
-                notes: d.notes || undefined,
-                isDefault: d.isDefault,
-              })
-              setLocationModal(null)
-              setEditingLocationId(null)
-              toast("Location updated successfully")
+              if (!organizationId || !customerId) return
+              const supabase = createBrowserSupabaseClient()
+              void (async () => {
+                if (d.isDefault) {
+                  await supabase
+                    .from("customer_locations")
+                    .update({ is_default: false })
+                    .eq("organization_id", organizationId)
+                    .eq("customer_id", customerId)
+                }
+                const { error } = await supabase
+                  .from("customer_locations")
+                  .update({
+                    name: d.name,
+                    address_line1: d.address,
+                    address_line2: d.addressLine2 || null,
+                    city: d.city,
+                    state: d.state,
+                    postal_code: d.zip,
+                    phone: d.phone || null,
+                    contact_person: d.contactPerson || null,
+                    notes: d.notes || null,
+                    is_default: d.isDefault,
+                  })
+                  .eq("id", editingLocationId)
+                  .eq("organization_id", organizationId)
+                  .eq("customer_id", customerId)
+                if (!error) {
+                  setDrawerLocations((prev) =>
+                    prev.map((x) =>
+                      x.id === editingLocationId
+                        ? {
+                            ...x,
+                            name: d.name,
+                            address: d.address,
+                            addressLine2: d.addressLine2 || undefined,
+                            city: d.city,
+                            state: d.state,
+                            zip: d.zip,
+                            phone: d.phone || undefined,
+                            contactPerson: d.contactPerson || undefined,
+                            notes: d.notes || undefined,
+                            isDefault: d.isDefault,
+                          }
+                        : { ...x, isDefault: d.isDefault ? false : x.isDefault },
+                    ),
+                  )
+                  setLocationModal(null)
+                  setEditingLocationId(null)
+                  toast("Location updated successfully")
+                }
+              })()
             }}
           />
         )
@@ -1108,7 +1485,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
       {/* Delete / Archive confirmation */}
       {deleteTarget && (() => {
-        const loc = customer.locations.find((l) => l.id === deleteTarget)
+        const loc = drawerLocations.find((l) => l.id === deleteTarget)
         if (!loc) return null
         const hasRelated =
           equipment.some((e) => e.customerId === customer.id) ||
@@ -1118,14 +1495,38 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             hasRelatedRecords={hasRelated}
             onCancel={() => setDeleteTarget(null)}
             onArchive={() => {
-              archiveLocation(customer.id, deleteTarget)
-              setDeleteTarget(null)
-              toast("Location archived")
+              if (!organizationId || !customerId) return
+              const supabase = createBrowserSupabaseClient()
+              void (async () => {
+                const { error } = await supabase
+                  .from("customer_locations")
+                  .update({ is_archived: true })
+                  .eq("id", deleteTarget)
+                  .eq("organization_id", organizationId)
+                  .eq("customer_id", customerId)
+                if (!error) {
+                  setDrawerLocations((prev) => prev.filter((x) => x.id !== deleteTarget))
+                  setDeleteTarget(null)
+                  toast("Location archived")
+                }
+              })()
             }}
             onDelete={() => {
-              removeLocation(customer.id, deleteTarget)
-              setDeleteTarget(null)
-              toast("Location deleted")
+              if (!organizationId || !customerId) return
+              const supabase = createBrowserSupabaseClient()
+              void (async () => {
+                const { error } = await supabase
+                  .from("customer_locations")
+                  .update({ is_archived: true })
+                  .eq("id", deleteTarget)
+                  .eq("organization_id", organizationId)
+                  .eq("customer_id", customerId)
+                if (!error) {
+                  setDrawerLocations((prev) => prev.filter((x) => x.id !== deleteTarget))
+                  setDeleteTarget(null)
+                  toast("Location archived")
+                }
+              })()
             }}
           />
         )
