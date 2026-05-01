@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Zap, Eye, EyeOff, ArrowRight } from "lucide-react"
+import { Eye, EyeOff, ArrowRight } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 const DEMO_ACCOUNTS = [
   { name: "Sarah Mitchell", role: "Admin", email: "sarah@acme.com", workspace: "Acme Field Services" },
@@ -20,19 +21,51 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError("")
-    if (!email || !password) { setError("Please enter your email and password."); return }
-    setLoading(true)
-    setTimeout(() => { router.push("/") }, 900)
+  async function signInWithEmailPassword(nextEmail: string, nextPassword: string) {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: nextEmail,
+      password: nextPassword,
+    })
+
+    if (error) {
+      throw new Error(error.message)
+    }
   }
 
-  function loginAs(demoEmail: string) {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError("")
+    if (!email || !password) {
+      setError("Please enter your email and password.")
+      return
+    }
+
+    setLoading(true)
+    try {
+      await signInWithEmailPassword(email, password)
+      router.push("/")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to sign in."
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loginAs(demoEmail: string) {
+    setError("")
     setEmail(demoEmail)
     setPassword("demo1234")
     setLoading(true)
-    setTimeout(() => { router.push("/") }, 800)
+    try {
+      await signInWithEmailPassword(demoEmail, "demo1234")
+      router.push("/")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to sign in."
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -41,10 +74,12 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12"
         style={{ background: "#0f172a" }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#2563eb" }}>
-            <Zap size={16} className="text-white" />
-          </div>
-          <span className="text-white font-semibold text-lg tracking-tight">Equipify.ai</span>
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
+            alt="Equipify.ai"
+            className="h-8 w-auto object-contain"
+            draggable={false}
+          />
         </div>
         <div>
           <blockquote className="text-2xl font-medium leading-relaxed mb-6" style={{ color: "#e2e8f0" }}>
@@ -73,10 +108,12 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#2563eb" }}>
-              <Zap size={14} className="text-white" />
-            </div>
-            <span className="font-semibold text-gray-900">Equipify.ai</span>
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
+              alt="Equipify.ai"
+              className="h-7 w-auto object-contain"
+              draggable={false}
+            />
           </div>
 
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome back</h1>
