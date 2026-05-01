@@ -169,7 +169,7 @@ const ACCOUNT_SECTIONS = [
     items: [
       { icon: User,    label: "My Profile",          sub: "Edit your name & contact info", href: "/settings/workspace" },
       { icon: Lock,    label: "Password & Security",  sub: "Two-factor auth, password reset", href: "/settings/workspace" },
-      { icon: BellRing,label: "Notifications",        sub: "Alerts, digests & preferences", href: "/settings/workspace" },
+      { icon: BellRing,label: "Notifications",        sub: "Alerts, digests & preferences", href: "/settings/notifications" },
     ],
   },
   {
