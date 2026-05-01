@@ -97,6 +97,10 @@ export interface Equipment {
   photos: string[]
   manuals: string[]
   serviceHistory: ServiceHistoryEntry[]
+  /** Estimated replacement cost in USD */
+  replacementCost?: number
+  /** Technician ID primarily responsible for this equipment */
+  assignedTechnician?: string
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -240,6 +244,8 @@ export const equipment: Equipment[] = [
     status: "Needs Service",
     location: "Main Warehouse",
     notes: "Engine oil slightly dark. Recommend full PM at next visit.",
+    replacementCost: 28000,
+    assignedTechnician: "Marcus Webb",
     photos: [],
     manuals: ["Toyota_8FGU25_Service_Manual.pdf"],
     serviceHistory: [
@@ -263,6 +269,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Plant A",
     notes: "Scheduled for filter replacement. No issues noted.",
+    replacementCost: 6500,
+    assignedTechnician: "Sandra Liu",
     photos: [],
     manuals: ["IR_UP6-15_Manual.pdf"],
     serviceHistory: [
@@ -285,6 +293,8 @@ export const equipment: Equipment[] = [
     status: "In Repair",
     location: "Plant A",
     notes: "Repeat motor overheating issue. Pending root cause analysis. 4th repair this year.",
+    replacementCost: 145000,
+    assignedTechnician: "Sandra Liu",
     photos: [],
     manuals: ["Haas_VF2_SS_Operators_Manual.pdf"],
     serviceHistory: [
@@ -309,6 +319,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Equipment Yard",
     notes: "Warranty just expired. Recommend enrolling in PM plan.",
+    replacementCost: 72000,
+    assignedTechnician: "Priya Mehta",
     photos: [],
     manuals: ["JLG_600S_Safety_Manual.pdf", "JLG_600S_Service_Manual.pdf"],
     serviceHistory: [
@@ -331,6 +343,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Distribution Center",
     notes: "",
+    replacementCost: 4800,
+    assignedTechnician: "Tyler Oakes",
     photos: [],
     manuals: [],
     serviceHistory: [
@@ -352,6 +366,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Cold Storage Annex",
     notes: "Out-of-warranty. Refrigerant R-410A. Compliant with EPA 608.",
+    replacementCost: 18500,
+    assignedTechnician: "Tyler Oakes",
     photos: [],
     manuals: ["Carrier_50XCZ_Service_Manual.pdf"],
     serviceHistory: [
@@ -374,6 +390,8 @@ export const equipment: Equipment[] = [
     status: "In Repair",
     location: "Equipment Yard",
     notes: "Cable tension repeat issue. Third occurrence this year. Engineering review scheduled.",
+    replacementCost: 1200000,
+    assignedTechnician: "Priya Mehta",
     photos: [],
     manuals: ["Liebherr_LTM1050_Operations_Manual.pdf"],
     serviceHistory: [
@@ -397,6 +415,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Processing Plant",
     notes: "Warranty just expired. Pump failure flagged 3x this cycle.",
+    replacementCost: 22000,
+    assignedTechnician: "James Torres",
     photos: [],
     manuals: ["Heatcraft_LCE060_Installation_Manual.pdf"],
     serviceHistory: [
@@ -420,6 +440,8 @@ export const equipment: Equipment[] = [
     status: "Active",
     location: "Equipment Yard",
     notes: "Warranty expires in 15 days. Schedule pre-warranty inspection.",
+    replacementCost: 265000,
+    assignedTechnician: "Priya Mehta",
     photos: [],
     manuals: ["Cat_320GC_Operation_Manual.pdf"],
     serviceHistory: [
