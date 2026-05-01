@@ -16,7 +16,9 @@ interface DetailDrawerProps {
   badge?: React.ReactNode
   actions?: React.ReactNode
   children: React.ReactNode
-  width?: "md" | "lg" | "xl"
+  width?: "md" | "lg" | "xl" | "2xl"
+  /** When true, disables the built-in scrollable body so children can manage their own scroll */
+  noScroll?: boolean
 }
 
 export function DetailDrawer({
@@ -28,7 +30,9 @@ export function DetailDrawer({
   actions,
   children,
   width = "md",
+  noScroll = false,
 }: DetailDrawerProps) {
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => { if (e.key === "Escape") onClose() },
     [onClose]
@@ -45,7 +49,7 @@ export function DetailDrawer({
     }
   }, [open, handleKey])
 
-  const widthClass = width === "xl" ? "max-w-2xl" : width === "lg" ? "max-w-xl" : "max-w-lg"
+  const widthClass = width === "2xl" ? "max-w-4xl" : width === "xl" ? "max-w-2xl" : width === "lg" ? "max-w-xl" : "max-w-lg"
 
   return (
     <>
@@ -96,8 +100,8 @@ export function DetailDrawer({
           </div>
         )}
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        {/* Body */}
+        <div className={noScroll ? "flex flex-col flex-1 min-h-0 overflow-hidden" : "flex-1 overflow-y-auto px-5 py-5 space-y-5"}>
           {children}
         </div>
       </div>

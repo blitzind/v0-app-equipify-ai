@@ -1650,6 +1650,7 @@ export interface AdminInvoice {
   customerId: string
   customerName: string
   workOrderId: string
+  equipmentId: string
   equipmentName: string
   issueDate: string
   dueDate: string
@@ -1667,6 +1668,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-002",
     customerName: "Apex Fabricators",
     workOrderId: "WO-1995",
+    equipmentId: "EQ-304",
     equipmentName: "Haas VF-2SS CNC Machine",
     issueDate: "2026-04-29",
     dueDate: "2026-05-29",
@@ -1685,6 +1687,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-003",
     customerName: "Metro Warehousing",
     workOrderId: "WO-2039",
+    equipmentId: "EQ-500",
     equipmentName: "Carrier 50XCZ060 HVAC",
     issueDate: "2026-04-29",
     dueDate: "2026-05-29",
@@ -1704,6 +1707,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-004",
     customerName: "Summit Construction",
     workOrderId: "WO-2036",
+    equipmentId: "EQ-820",
     equipmentName: "Cat 320 GC Excavator",
     issueDate: "2026-04-25",
     dueDate: "2026-05-25",
@@ -1724,6 +1728,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-005",
     customerName: "Clearfield Foods",
     workOrderId: "WO-2025",
+    equipmentId: "EQ-712",
     equipmentName: "Heatcraft LCE060 Refrigeration",
     issueDate: "2026-04-10",
     dueDate: "2026-04-25",
@@ -1742,6 +1747,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-004",
     customerName: "Summit Construction",
     workOrderId: "WO-1970",
+    equipmentId: "EQ-601",
     equipmentName: "Liebherr LTM 1050 Crane",
     issueDate: "2026-03-05",
     dueDate: "2026-04-05",
@@ -1760,6 +1766,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-001",
     customerName: "Riverstone Logistics",
     workOrderId: "WO-1980",
+    equipmentId: "EQ-188",
     equipmentName: "Toyota 8FGU25 Forklift",
     issueDate: "2026-01-20",
     dueDate: "2026-02-20",
@@ -1780,6 +1787,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-002",
     customerName: "Apex Fabricators",
     workOrderId: "WO-1940",
+    equipmentId: "EQ-304",
     equipmentName: "Haas VF-2SS CNC Machine",
     issueDate: "2026-02-05",
     dueDate: "2026-03-05",
@@ -1798,6 +1806,7 @@ export const adminInvoices: AdminInvoice[] = [
     customerId: "CUS-006",
     customerName: "Lakefront Printing",
     workOrderId: "WO-1840",
+    equipmentId: "EQ-900",
     equipmentName: "Printing Press",
     issueDate: "2025-12-15",
     dueDate: "2026-01-15",
