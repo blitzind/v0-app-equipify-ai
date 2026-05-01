@@ -94,16 +94,17 @@ function MonthSection({
   onCreateWo,
   createdIds,
   onOpenPlan,
+  today,
 }: {
   monthKey: string
   plans: MaintenancePlan[]
   onCreateWo: (plan: MaintenancePlan) => void
   createdIds: Set<string>
   onOpenPlan: (id: string) => void
+  today: Date
 }) {
   const [year, month] = monthKey.split("-").map(Number)
   const label = `${MONTHS[month]} ${year}`
-  const today = new Date()
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month
   const isPast = new Date(year, month + 1, 0) < today && !isCurrentMonth
 
@@ -344,9 +345,7 @@ function viewModeMonths(mode: ViewMode): number {
 }
 
 /** Returns the date-range label for the current offset + mode */
-function dateRangeLabel(mode: ViewMode, offset: number): string {
-  const today = new Date()
-
+function dateRangeLabel(mode: ViewMode, offset: number, today: Date): string {
   if (mode === "year") {
     const year = today.getFullYear() + offset
     return String(year)
@@ -366,8 +365,7 @@ function dateRangeLabel(mode: ViewMode, offset: number): string {
 }
 
 /** Build ordered month keys for the current window */
-function buildMonthKeys(mode: ViewMode, offset: number): string[] {
-  const today = new Date()
+function buildMonthKeys(mode: ViewMode, offset: number, today: Date): string[] {
   const count = viewModeMonths(mode)
 
   if (mode === "year") {
@@ -403,13 +401,25 @@ export default function ServiceSchedulePage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
 
+  // today is captured once on the client to avoid SSR/client date mismatch.
+  // During SSR we use a fixed epoch so monthKeys are stable; on mount we update
+  // to the real date which triggers a single reconcile with correct data.
+  const [today, setToday] = useState<Date>(() => new Date(0))
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    setToday(now)
+    setMounted(true)
+  }, [])
+
   // Reset offset when mode changes so we don't land on an unexpected window
   function handleModeChange(m: ViewMode) {
     setViewMode(m)
     setOffset(0)
   }
 
-  const monthKeys = useMemo(() => buildMonthKeys(viewMode, offset), [viewMode, offset])
+  const monthKeys = useMemo(() => buildMonthKeys(viewMode, offset, today), [viewMode, offset, today])
 
   const customers = useMemo(() => {
     return ["All", ...Array.from(new Set(plans.map((p) => p.customerName))).sort()]
@@ -561,9 +571,13 @@ export default function ServiceSchedulePage() {
             <ChevronLeft className="w-4 h-4" />
           </Button>
 
-          {/* Date range pill */}
-          <div className="inline-flex items-center h-9 px-3 rounded-md border border-border bg-background text-sm font-medium text-foreground min-w-[144px] justify-center select-none">
-            {dateRangeLabel(viewMode, offset)}
+          {/* Date range pill — suppressHydrationWarning because the label depends on
+              new Date() which differs between SSR (server time) and client (browser time) */}
+          <div
+            className="inline-flex items-center h-9 px-3 rounded-md border border-border bg-background text-sm font-medium text-foreground min-w-[144px] justify-center select-none"
+            suppressHydrationWarning
+          >
+            {mounted ? dateRangeLabel(viewMode, offset, today) : ""}
           </div>
 
           <Button
@@ -604,6 +618,7 @@ export default function ServiceSchedulePage() {
                 onCreateWo={handleCreateWo}
                 createdIds={createdIds}
                 onOpenPlan={setSelectedPlanId}
+                today={today}
               />
             )
           })}
