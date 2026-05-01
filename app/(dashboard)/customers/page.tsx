@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useCustomers } from "@/lib/customer-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -157,6 +158,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
 function CustomersPageInner() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const { customers: drawerCustomers, addCustomer } = useCustomers()
   const [refreshToken, setRefreshToken] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   useQuickAdd("new-customer", () => setShowAddModal(true))
@@ -290,8 +292,42 @@ function CustomersPageInner() {
     )
   }
 
-  function openCustomerDetail(customerId: string) {
-    router.push(`/customers/${customerId}`)
+  function openCustomerDrawer(customer: Customer) {
+    const existsInDrawerStore = drawerCustomers.some((c) => c.id === customer.id)
+    if (!existsInDrawerStore) {
+      addCustomer({
+        id: customer.id,
+        name: customer.name,
+        company: customer.company,
+        status: customer.status,
+        locations: customer.locations.map((loc) => ({
+          id: loc.id,
+          name: "Location",
+          address: loc.address,
+          city: loc.city,
+          state: loc.state,
+          zip: loc.zip,
+          isPrimary: false,
+        })),
+        contacts: customer.contacts.map((contact, idx) => ({
+          id: `${customer.id}-contact-${idx}`,
+          name: customer.name,
+          firstName: customer.name.split(" ")[0] ?? "",
+          lastName: customer.name.split(" ").slice(1).join(" "),
+          role: "Contact",
+          email: contact.email,
+          phone: contact.phone,
+          isPrimary: idx === 0,
+        })),
+        notes: "",
+        contracts: [],
+        equipmentCount: customer.equipmentCount,
+        openWorkOrders: customer.openWorkOrders,
+        joinedDate: customer.joinedDate,
+      })
+    }
+
+    setSelectedCustomerId(customer.id)
   }
 
   return (
@@ -390,7 +426,7 @@ function CustomersPageInner() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => openCustomerDetail(c.id)}>
+                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => openCustomerDrawer(c)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">
@@ -445,7 +481,7 @@ function CustomersPageInner() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((c) => (
-                <CustomerCard key={c.id} customer={c} onOpen={() => openCustomerDetail(c.id)} />
+                <CustomerCard key={c.id} customer={c} onOpen={() => openCustomerDrawer(c)} />
               ))}
             </div>
           )}
