@@ -46,7 +46,7 @@ function EquipmentRow({ eq }: { eq: Equipment }) {
   const dueSoon = daysToDue >= 0 && daysToDue <= 14
 
   return (
-    <Link href={`/equipment/${eq.id}`}>
+    <Link href={`/equipment?open=${eq.id}`}>
       <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group cursor-pointer">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
           <Wrench className="w-4 h-4" />

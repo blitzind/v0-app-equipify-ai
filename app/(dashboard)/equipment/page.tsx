@@ -411,10 +411,10 @@ function EquipmentPageInner() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Link href={`/equipment/${eq.id}`} className="flex flex-col">
+                      <div className="flex flex-col">
                         <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{eq.model}</span>
                         <span className="text-xs text-muted-foreground">{eq.id} &middot; S/N: {eq.serialNumber}</span>
-                      </Link>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Link href={`/customers/${eq.customerId}`} className="text-sm text-foreground hover:text-primary transition-colors">
