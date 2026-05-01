@@ -334,7 +334,7 @@ export default function CustomersPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(c.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "short" })}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()} className="w-[160px]">
+                    <TableCell onClick={(e) => e.stopPropagation()} className="w-[200px] whitespace-nowrap">
                       <div className="flex justify-end">
                         <ContactActions
                           address={c.locations[0] ? `${c.locations[0].address}, ${c.locations[0].city}, ${c.locations[0].state} ${c.locations[0].zip}` : undefined}

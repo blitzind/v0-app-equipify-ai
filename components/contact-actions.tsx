@@ -258,7 +258,7 @@ export function ContactActions({ address, email, phone, className }: ContactActi
 
   return (
     <div
-      className={cn("flex items-center gap-1.5 flex-wrap", className)}
+      className={cn("flex items-center gap-1.5 flex-nowrap", className)}
       onClick={(e) => e.stopPropagation()}
     >
       {address && <NavigateDropdown address={address} />}
