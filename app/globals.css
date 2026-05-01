@@ -163,14 +163,6 @@
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  /* Elements using tw-animate-css (animate-in / animate-out) must not have a
-     CSS transition on transform/opacity — the @keyframes animation handles
-     those properties itself. A competing transition causes the "fly-in" glitch. */
-  [data-state],
-  [data-side] {
-    transition-property: color, background-color, border-color, box-shadow;
-    transition-duration: 150ms;
-  }
   /* Don't animate layout-affecting properties globally */
   *, *::before, *::after {
     box-sizing: border-box;
