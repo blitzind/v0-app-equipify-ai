@@ -11,4 +11,19 @@ if (!supabaseAnonKey) {
   throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY")
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+function normalizeSupabaseProjectUrl(url: string) {
+  let parsed: URL
+
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error("Invalid NEXT_PUBLIC_SUPABASE_URL: must be a valid absolute URL")
+  }
+
+  return parsed.origin
+}
+
+export const supabase = createClient(
+  normalizeSupabaseProjectUrl(supabaseUrl),
+  supabaseAnonKey,
+)
