@@ -287,38 +287,38 @@ export default function EquipmentPage() {
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
           <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2 shrink-0 cursor-pointer">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Equipment</span>
-              <span className="sm:hidden">Add</span>
-              <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem
-              className="gap-2.5 cursor-pointer py-2.5"
-              onClick={() => setAddModalOpen(true)}
-            >
-              <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Manual Entry</p>
-                <p className="text-xs text-muted-foreground">Fill in details by hand</p>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2.5 cursor-pointer py-2.5"
-              onClick={() => setScanModalOpen(true)}
-            >
-              <Sparkles className="w-4 h-4 text-[color:var(--ds-info-subtle)] shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-[color:var(--ds-info-text)]">Scan with AI</p>
-                <p className="text-xs text-muted-foreground">Upload a photo to auto-fill</p>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-2 shrink-0 cursor-pointer">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Equipment</span>
+                <span className="sm:hidden">Add</span>
+                <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                className="gap-2.5 cursor-pointer py-2.5"
+                onClick={() => setAddModalOpen(true)}
+              >
+                <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Manual Entry</p>
+                  <p className="text-xs text-muted-foreground">Fill in details by hand</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2.5 cursor-pointer py-2.5"
+                onClick={() => setScanModalOpen(true)}
+              >
+                <Sparkles className="w-4 h-4 text-[color:var(--ds-info-subtle)] shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-[color:var(--ds-info-text)]">Scan with AI</p>
+                  <p className="text-xs text-muted-foreground">Upload a photo to auto-fill</p>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

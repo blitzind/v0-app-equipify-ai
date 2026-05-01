@@ -370,7 +370,8 @@ export default function QuotesPage() {
             </TableBody>
           </Table>
         </div>
-      </Card>}
+      </Card>
+      }
 
       <QuoteDrawer
         quoteId={selectedQuoteId}

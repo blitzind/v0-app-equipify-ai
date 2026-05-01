@@ -386,7 +386,8 @@ export default function InvoicesPage() {
             </TableBody>
           </Table>
         </div>
-      </Card>}
+      </Card>
+      }
 
       <InvoiceDrawer
         invoiceId={selectedInvoiceId}
