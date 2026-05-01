@@ -45,13 +45,13 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Quotes",           href: "/quotes",           icon: FileText },
       { label: "Invoices",         href: "/invoices",         icon: Receipt },
       { label: "Purchase Orders",  href: "/purchase-orders",  icon: ShoppingCart },
-      { label: "Reports",          href: "/reports",          icon: BarChart3 },
     ],
   },
   {
     label: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
+      { label: "Reports",     href: "/reports",  icon: BarChart3 },
     ],
   },
 ]
