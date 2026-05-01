@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 const DEMO_ACCOUNTS = [
   { name: "Sarah Mitchell", role: "Admin", email: "sarah@acme.com", workspace: "Acme Field Services" },
@@ -15,6 +15,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter()
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)

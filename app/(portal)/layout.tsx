@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useMemo } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
   LayoutDashboard,
   Wrench,
@@ -66,6 +68,14 @@ function NavLink({ href, label, icon: Icon, exact }: (typeof NAV_ITEMS)[number])
 }
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push("/login")
+  }
+
   return (
     <div className="min-h-screen" style={{ background: "var(--portal-bg)" }}>
       {/* Top bar */}
@@ -147,9 +157,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/" className="flex items-center gap-2 text-destructive">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 text-destructive"
+                  >
                     <LogOut size={14} /> Sign out
-                  </Link>
+                  </button>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useContext } from "react"
+import { useState, useRef, useEffect, useContext, useMemo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarContext } from "@/components/app-sidebar"
 import { useTenant } from "@/lib/tenant-store"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { LucideIcon } from "lucide-react"
 
 // ─── Notification data ────────────────────────────────────────────────────────
@@ -178,6 +179,7 @@ const LAUNCHER_LINKS = [
 export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
+  const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { workspace } = useTenant()
   const workspaceNotifs = NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"]
   const [notifications, setNotifications] = useState<Notification[]>(workspaceNotifs)
@@ -207,6 +209,12 @@ export function AppTopbar() {
   // Mark all as read
   function markAllRead() {
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setHubOpen(false)
+    router.push("/login")
   }
 
   // Close account hub on outside click or ESC
@@ -451,14 +459,14 @@ export function AppTopbar() {
             <p className="text-[10px] text-muted-foreground">
               Equipify.ai &middot; Growth Plan &middot; <span className="font-medium" style={{ color: "var(--status-success)" }}>Active</span>
             </p>
-            <Link
-              href="/login"
-              onClick={() => setHubOpen(false)}
+            <button
+              type="button"
+              onClick={handleLogout}
               className="flex items-center gap-1.5 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
               Logout
-            </Link>
+            </button>
           </div>
         </div>
       )}
