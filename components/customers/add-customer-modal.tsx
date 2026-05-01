@@ -1,18 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { useCustomers } from "@/lib/customer-store"
-import type { Customer } from "@/lib/mock-data"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 interface AddCustomerModalProps {
   open: boolean
   onClose: () => void
+  onCreated?: () => void
 }
-
-let _id = 9000
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -51,11 +49,11 @@ const INITIAL = {
   zip: "",
 }
 
-export function AddCustomerModal({ open, onClose }: AddCustomerModalProps) {
-  const { addCustomer } = useCustomers()
+export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalProps) {
   const [form, setForm] = useState(INITIAL)
   const [errors, setErrors] = useState<Partial<typeof INITIAL>>({})
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState("")
 
   if (!open) return null
 
@@ -72,55 +70,54 @@ export function AddCustomerModal({ open, onClose }: AddCustomerModalProps) {
     return errs
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitError("")
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
 
     setSaving(true)
-    const id = `CUS-${String(++_id).padStart(4, "0")}`
-    const [firstName = "", ...rest] = form.contactName.trim().split(" ")
-    const lastName = rest.join(" ")
 
-    const newCustomer: Customer = {
-      id,
-      company: form.company.trim(),
-      status: "Active",
-      joinedDate: new Date().toISOString().split("T")[0],
-      totalEquipment: 0,
-      totalWorkOrders: 0,
-      totalSpent: 0,
-      lastService: "",
-      rating: 0,
-      locations: form.address ? [{
-        id: `LOC-${id}-1`,
-        name: "Primary Location",
-        address: form.address,
-        city: form.city,
-        state: form.state,
-        zip: form.zip,
-        isPrimary: true,
-      }] : [],
-      contacts: [{
-        id: `CON-${id}-1`,
-        name: form.contactName.trim(),
-        firstName,
-        lastName,
-        role: "Primary Contact",
-        email: form.email.trim(),
-        phone: form.phone,
-        isPrimary: true,
-      }],
-      equipment: [],
-      workOrders: [],
-      invoices: [],
-      notes: "",
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        setSubmitError("You must be logged in to create a customer.")
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        setSubmitError(profileError?.message ?? "No default organization found.")
+        return
+      }
+
+      const { error: insertError } = await supabase.from("customers").insert({
+        company_name: form.company.trim(),
+        status: "active",
+        organization_id: profile.default_organization_id,
+        created_by: user.id,
+      })
+
+      if (insertError) {
+        setSubmitError(insertError.message)
+        return
+      }
+
+      setForm(INITIAL)
+      onClose()
+      onCreated?.()
+    } finally {
+      setSaving(false)
     }
-
-    addCustomer(newCustomer)
-    setSaving(false)
-    setForm(INITIAL)
-    onClose()
   }
 
   return (
@@ -216,6 +213,7 @@ export function AddCustomerModal({ open, onClose }: AddCustomerModalProps) {
               {saving ? "Adding..." : "Add Customer"}
             </Button>
           </div>
+          {submitError && <p className="text-xs text-destructive">{submitError}</p>}
         </form>
       </div>
     </div>

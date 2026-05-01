@@ -157,6 +157,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
 function CustomersPageInner() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [refreshToken, setRefreshToken] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   useQuickAdd("new-customer", () => setShowAddModal(true))
   const [search, setSearch] = useState("")
@@ -225,7 +226,7 @@ function CustomersPageInner() {
     return () => {
       active = false
     }
-  }, [])
+  }, [refreshToken])
 
   useEffect(() => {
     const openId = searchParams.get("open")
@@ -454,6 +455,7 @@ function CustomersPageInner() {
       <AddCustomerModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
+        onCreated={() => setRefreshToken((v) => v + 1)}
       />
 
       <QuickAddParamBridge action="new-customer" onTrigger={() => setShowAddModal(true)} />
