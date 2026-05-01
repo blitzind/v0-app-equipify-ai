@@ -28,10 +28,14 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 type CustomerStatus = "Active" | "Inactive"
 
 type CustomerContact = {
+  id: string
   name: string
+  firstName: string
+  lastName: string
   role: string
   email: string
   phone: string
+  isPrimary: boolean
 }
 
 type CustomerLocation = {
@@ -193,6 +197,19 @@ export default function CustomerDetailPage() {
     notes: "",
     is_default: false,
   })
+  const [contactModalOpen, setContactModalOpen] = useState(false)
+  const [editingContactId, setEditingContactId] = useState<string | null>(null)
+  const [contactSaving, setContactSaving] = useState(false)
+  const [contactError, setContactError] = useState("")
+  const [contactForm, setContactForm] = useState({
+    full_name: "",
+    first_name: "",
+    last_name: "",
+    role: "",
+    email: "",
+    phone: "",
+    is_primary: false,
+  })
 
   useEffect(() => {
     let active = true
@@ -244,9 +261,10 @@ export default function CustomerDetailPage() {
         await Promise.all([
           supabase
             .from("customer_contacts")
-            .select("id, full_name, role, email, phone")
+            .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
             .eq("customer_id", id)
             .eq("organization_id", profile.default_organization_id)
+            .eq("is_archived", false)
             .order("is_primary", { ascending: false }),
           supabase
             .from("customer_locations")
@@ -272,10 +290,14 @@ export default function CustomerDetailPage() {
         notes: customerRow.notes ?? "",
         contacts:
           contactsRows?.map((c) => ({
+            id: c.id,
             name: c.full_name ?? "Unknown",
+            firstName: c.first_name ?? "",
+            lastName: c.last_name ?? "",
             role: c.role ?? "Contact",
             email: c.email ?? "",
             phone: c.phone ?? "",
+            isPrimary: Boolean(c.is_primary),
           })) ?? [],
         locations:
           locationsRows?.map((l) => ({
@@ -523,6 +545,111 @@ export default function CustomerDetailPage() {
     setRefreshToken((v) => v + 1)
   }
 
+  function resetContactForm() {
+    setContactForm({
+      full_name: "",
+      first_name: "",
+      last_name: "",
+      role: "",
+      email: "",
+      phone: "",
+      is_primary: false,
+    })
+    setEditingContactId(null)
+    setContactError("")
+  }
+
+  function openCreateContactModal() {
+    resetContactForm()
+    setContactModalOpen(true)
+  }
+
+  function openEditContactModal(contact: CustomerContact) {
+    setEditingContactId(contact.id)
+    setContactError("")
+    setContactForm({
+      full_name: contact.name,
+      first_name: contact.firstName,
+      last_name: contact.lastName,
+      role: contact.role,
+      email: contact.email,
+      phone: contact.phone,
+      is_primary: contact.isPrimary,
+    })
+    setContactModalOpen(true)
+  }
+
+  async function handleSaveContact(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customer) return
+
+    setContactError("")
+    if (!contactForm.full_name.trim()) {
+      setContactError("Full name is required.")
+      return
+    }
+
+    setContactSaving(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const payload = {
+        organization_id: customer.organizationId,
+        customer_id: customer.id,
+        full_name: contactForm.full_name.trim(),
+        first_name: contactForm.first_name.trim() || null,
+        last_name: contactForm.last_name.trim() || null,
+        role: contactForm.role.trim() || null,
+        email: contactForm.email.trim() || null,
+        phone: contactForm.phone.trim() || null,
+        is_primary: contactForm.is_primary,
+      }
+
+      const query = editingContactId
+        ? supabase
+            .from("customer_contacts")
+            .update(payload)
+            .eq("id", editingContactId)
+            .eq("organization_id", customer.organizationId)
+            .eq("customer_id", customer.id)
+        : supabase.from("customer_contacts").insert(payload)
+
+      const { error } = await query
+      if (error) {
+        setContactError(error.message)
+        return
+      }
+
+      setContactModalOpen(false)
+      resetContactForm()
+      setRefreshToken((v) => v + 1)
+    } finally {
+      setContactSaving(false)
+    }
+  }
+
+  async function handleArchiveContact(contactId: string) {
+    if (!customer) return
+
+    setContactError("")
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase
+      .from("customer_contacts")
+      .update({
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+      })
+      .eq("id", contactId)
+      .eq("organization_id", customer.organizationId)
+      .eq("customer_id", customer.id)
+
+    if (error) {
+      setContactError(error.message)
+      return
+    }
+
+    setRefreshToken((v) => v + 1)
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -671,7 +798,12 @@ export default function CustomerDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Contacts</CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">Contacts</CardTitle>
+                  <Button type="button" variant="outline" size="sm" onClick={openCreateContactModal}>
+                    Add Contact
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {customer.contacts.map((contact, i) => (
@@ -681,7 +813,14 @@ export default function CustomerDetailPage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">{contact.name}</p>
-                      <p className="text-xs text-muted-foreground">{contact.role}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">{contact.role}</p>
+                        {contact.isPrimary && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            Primary
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-col gap-1 mt-2">
                         <a href={`mailto:${contact.email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                           <Mail className="w-3.5 h-3.5" />{contact.email}
@@ -689,6 +828,22 @@ export default function CustomerDetailPage() {
                         <a href={`tel:${contact.phone}`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
                           <Phone className="w-3.5 h-3.5" />{contact.phone}
                         </a>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditContactModal(contact)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveContact(contact.id)}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          Archive
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -965,6 +1120,92 @@ export default function CustomerDetailPage() {
                 </Button>
                 <Button type="submit" className="flex-1" disabled={locationSaving}>
                   {locationSaving ? "Saving..." : "Save Location"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {contactModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setContactModalOpen(false)} />
+          <div className="relative w-full max-w-md bg-card border border-border rounded-xl shadow-xl">
+            <form onSubmit={handleSaveContact} className="p-5 space-y-4">
+              <h3 className="text-base font-semibold text-foreground">
+                {editingContactId ? "Edit Contact" : "Add Contact"}
+              </h3>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Full Name</label>
+                <input
+                  value={contactForm.full_name}
+                  onChange={(e) => setContactForm((f) => ({ ...f, full_name: e.target.value }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">First Name</label>
+                  <input
+                    value={contactForm.first_name}
+                    onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Last Name</label>
+                  <input
+                    value={contactForm.last_name}
+                    onChange={(e) => setContactForm((f) => ({ ...f, last_name: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Role</label>
+                <input
+                  value={contactForm.role}
+                  onChange={(e) => setContactForm((f) => ({ ...f, role: e.target.value }))}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">Phone</label>
+                  <input
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={contactForm.is_primary}
+                  onChange={(e) => setContactForm((f) => ({ ...f, is_primary: e.target.checked }))}
+                />
+                Set as primary contact
+              </label>
+
+              {contactError && <p className="text-xs text-destructive">{contactError}</p>}
+
+              <div className="flex gap-2 pt-1">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setContactModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={contactSaving}>
+                  {contactSaving ? "Saving..." : "Save Contact"}
                 </Button>
               </div>
             </form>
