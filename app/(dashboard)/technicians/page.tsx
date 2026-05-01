@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { useWorkspaceData } from "@/lib/tenant-store"
