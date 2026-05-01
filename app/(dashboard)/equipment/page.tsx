@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useEquipment } from "@/lib/equipment-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { Equipment } from "@/lib/mock-data"
@@ -157,6 +158,8 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 export default function EquipmentPage() {
   const { equipment } = useEquipment()
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -166,6 +169,15 @@ export default function EquipmentPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
+
+  // Auto-open drawer from ?open= query param
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId) {
+      setSelectedEquipmentId(openId)
+      router.replace("/equipment", { scroll: false })
+    }
+  }, [searchParams, router])
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [scanModalOpen, setScanModalOpen] = useState(false)
   useQuickAdd("new-equipment", () => setAddModalOpen(true))

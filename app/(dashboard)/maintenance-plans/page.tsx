@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
@@ -360,7 +361,7 @@ function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void
   )
 }
 
-// ─── Plan Detail Sheet ──────�����─────────────────���������───────────────────────────────
+// ─── Plan Detail Sheet ──────�������─────────────────���������───────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
@@ -745,12 +746,26 @@ function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => voi
 
 export default function MaintenancePlansPage() {
   const { plans } = useMaintenancePlans()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<PlanStatus | "All">("All")
   const [intervalFilter, setIntervalFilter] = useState<PlanInterval | "All">("All")
   const [selectedPlan, setSelectedPlan] = useState<MaintenancePlan | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [view, setView] = useState<"cards" | "table">("cards")
+
+  // Auto-open drawer from ?open= query param
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId && plans.length > 0) {
+      const match = plans.find((p) => p.id === openId)
+      if (match) {
+        setSelectedPlan(match)
+        router.replace("/maintenance-plans", { scroll: false })
+      }
+    }
+  }, [searchParams, plans, router])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()

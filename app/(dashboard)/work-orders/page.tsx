@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -395,6 +396,17 @@ export default function WorkOrdersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   useQuickAdd("new-work-order", () => setCreateOpen(true))
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Auto-open drawer from ?open= query param
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId) {
+      setSelectedWoId(openId)
+      router.replace("/work-orders", { scroll: false })
+    }
+  }, [searchParams, router])
 
   const allTechs = useMemo(() => {
     const seen = new Set<string>()

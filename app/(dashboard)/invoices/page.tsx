@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -118,6 +119,17 @@ export default function InvoicesPage() {
   const [sortKey, setSortKey]         = useState<SortKey>("issueDate")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Auto-open drawer from ?open= query param
+  useEffect(() => {
+    const openId = searchParams.get("open")
+    if (openId) {
+      setSelectedInvoiceId(openId)
+      router.replace("/invoices", { scroll: false })
+    }
+  }, [searchParams, router])
 
   const filtered = useMemo(() => {
     let list = [...invoices]

@@ -7,11 +7,12 @@ import { useCustomers } from "@/lib/customer-store"
 import { useEquipment } from "@/lib/equipment-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { useQuotes, useInvoices } from "@/lib/quote-invoice-store"
+import { useMaintenancePlans } from "@/lib/maintenance-store"
 import type { Customer, Contact } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
+  DetailDrawer, DrawerSection, DrawerRow, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -322,6 +323,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const { workOrders } = useWorkOrders()
   const { quotes: adminQuotes } = useQuotes()
   const { invoices: adminInvoices } = useInvoices()
+  const { plans: allPlans } = useMaintenancePlans()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Customer>>({})
@@ -346,6 +348,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const custWOs = customer ? workOrders.filter((w) => w.customerId === customer.id) : []
   const custQuotes = customer ? adminQuotes.filter((q) => q.customerId === customer.id) : []
   const custInvoices = customer ? adminInvoices.filter((i) => i.customerId === customer.id) : []
+  const custPlans = customer ? allPlans.filter((p) => p.customerId === customer.id) : []
 
   useEffect(() => {
     setEditing(false)
@@ -402,13 +405,6 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     : "bg-muted text-muted-foreground border-border"
 
   const openWOs = custWOs.filter((w) => w.status !== "Completed" && w.status !== "Invoiced")
-
-  const timelineItems = custWOs.slice(0, 6).map((wo) => ({
-    date: wo.scheduledDate || wo.createdAt.slice(0, 10),
-    label: `${wo.type} — ${wo.equipmentName}`,
-    description: wo.description,
-    accent: (wo.status === "Completed" ? "success" : wo.priority === "Critical" ? "danger" : "muted") as "success" | "danger" | "muted",
-  }))
 
   const contacts = draft.contacts ?? customer.contacts
 
@@ -639,15 +635,29 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         {/* Contracts */}
         <DrawerSection title="Contracts">
           <div className="space-y-2">
-            {customer.contracts.map((con) => (
-              <div key={con.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
-                <div>
-                  <p className="text-xs font-semibold text-foreground">{con.name}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{con.type} · {con.startDate} – {con.endDate}</p>
-                </div>
-                <span className="text-xs font-bold text-foreground">${con.value.toLocaleString()}</span>
-              </div>
-            ))}
+            {customer.contracts.map((con) => {
+              const planMatch = custPlans.find((p) =>
+                p.name.toLowerCase().includes(con.name.toLowerCase()) ||
+                con.name.toLowerCase().includes(p.name.toLowerCase())
+              )
+              const href = planMatch ? `/maintenance-plans?open=${planMatch.id}` : `/maintenance-plans`
+              return (
+                <Link
+                  key={con.id}
+                  href={href}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                >
+                  <div>
+                    <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{con.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{con.type} · {con.startDate} – {con.endDate}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-foreground">${con.value.toLocaleString()}</span>
+                    <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                  </div>
+                </Link>
+              )
+            })}
             {customer.contracts.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No contracts on file.</p>
             )}
@@ -658,15 +668,28 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         <DrawerSection title={`Equipment (${custEquipment.length})`}>
           <div className="space-y-1.5">
             {custEquipment.slice(0, 5).map((eq) => (
-              <div key={eq.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+              <Link
+                key={eq.id}
+                href={`/equipment?open=${eq.id}`}
+                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+              >
                 <div>
-                  <p className="text-xs font-medium text-foreground">{eq.model}</p>
-                  <p className="text-[10px] text-muted-foreground">{eq.id} · {eq.category}</p>
+                  <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{eq.model}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    <span className="text-primary font-mono">{eq.id}</span> · {eq.category}
+                  </p>
                 </div>
-                <Badge variant="secondary" className="text-[10px]">{eq.status}</Badge>
-              </div>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[10px]">{eq.status}</Badge>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </div>
+              </Link>
             ))}
-            {custEquipment.length > 5 && <p className="text-xs text-muted-foreground text-center pt-1">+{custEquipment.length - 5} more</p>}
+            {custEquipment.length > 5 && (
+              <Link href="/equipment" className="block text-xs text-primary hover:text-primary/80 transition-colors text-center pt-1">
+                +{custEquipment.length - 5} more
+              </Link>
+            )}
             {custEquipment.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No equipment registered.</p>}
           </div>
         </DrawerSection>
@@ -675,13 +698,20 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         <DrawerSection title={`Open Work Orders (${openWOs.length})`}>
           <div className="space-y-1.5">
             {openWOs.slice(0, 4).map((wo) => (
-              <div key={wo.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+              <Link
+                key={wo.id}
+                href={`/work-orders?open=${wo.id}`}
+                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+              >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">{wo.id}</p>
                   <p className="text-[10px] text-muted-foreground truncate max-w-[220px]">{wo.description}</p>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{wo.status}</Badge>
-              </div>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[10px] shrink-0">{wo.status}</Badge>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </div>
+              </Link>
             ))}
             {openWOs.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No open work orders.</p>}
           </div>
@@ -691,13 +721,20 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         <DrawerSection title={`Quotes (${custQuotes.length})`}>
           <div className="space-y-1.5">
             {custQuotes.slice(0, 3).map((q) => (
-              <div key={q.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+              <Link
+                key={q.id}
+                href={`/quotes?open=${q.id}`}
+                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+              >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">{q.id}</p>
                   <p className="text-[10px] text-muted-foreground">{q.status} · {q.createdDate}</p>
                 </div>
-                <span className="text-xs font-bold text-foreground">${q.amount.toLocaleString()}</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground">${q.amount.toLocaleString()}</span>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </div>
+              </Link>
             ))}
             {custQuotes.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No quotes on file.</p>}
           </div>
@@ -707,22 +744,80 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         <DrawerSection title={`Invoices (${custInvoices.length})`}>
           <div className="space-y-1.5">
             {custInvoices.slice(0, 3).map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
+              <Link
+                key={inv.id}
+                href={`/invoices?open=${inv.id}`}
+                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+              >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">{inv.id}</p>
                   <p className="text-[10px] text-muted-foreground">{inv.status} · Due {inv.dueDate}</p>
                 </div>
-                <span className="text-xs font-bold text-foreground">${inv.amount.toLocaleString()}</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground">${inv.amount.toLocaleString()}</span>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </div>
+              </Link>
             ))}
             {custInvoices.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No invoices on file.</p>}
           </div>
         </DrawerSection>
 
+        {/* Maintenance Plans */}
+        {custPlans.length > 0 && (
+          <DrawerSection title={`Maintenance Plans (${custPlans.length})`}>
+            <div className="space-y-1.5">
+              {custPlans.slice(0, 3).map((plan) => (
+                <Link
+                  key={plan.id}
+                  href={`/maintenance-plans?open=${plan.id}`}
+                  className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                >
+                  <div>
+                    <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{plan.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      <span className="text-primary font-mono">{plan.id}</span> · {plan.interval} · {plan.status}
+                    </p>
+                  </div>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </Link>
+              ))}
+              {custPlans.length > 3 && (
+                <Link href="/maintenance-plans" className="block text-xs text-primary hover:text-primary/80 transition-colors text-center pt-1">
+                  +{custPlans.length - 3} more
+                </Link>
+              )}
+            </div>
+          </DrawerSection>
+        )}
+
         {/* Service history */}
         <DrawerSection title="Service History">
-          {timelineItems.length > 0 ? (
-            <DrawerTimeline items={timelineItems} />
+          {custWOs.length > 0 ? (
+            <div className="space-y-1">
+              {custWOs.slice(0, 6).map((wo) => (
+                <Link
+                  key={wo.id}
+                  href={`/work-orders?open=${wo.id}`}
+                  className="flex items-center gap-3 py-2 px-2.5 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group"
+                >
+                  <div className={cn(
+                    "w-2 h-2 rounded-full shrink-0",
+                    wo.status === "Completed" ? "bg-[color:var(--status-success)]"
+                    : wo.priority === "Critical" ? "bg-[color:var(--status-danger)]"
+                    : "bg-muted-foreground/40"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-primary shrink-0">{wo.id}</span>
+                      <span className="text-[10px] text-muted-foreground truncate">{wo.scheduledDate || wo.createdAt.slice(0, 10)}</span>
+                    </div>
+                    <p className="text-xs text-foreground group-hover:text-primary transition-colors truncate">{wo.type} — {wo.equipmentName}</p>
+                  </div>
+                  <ExternalLink size={11} className="text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+                </Link>
+              ))}
+            </div>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No service history.</p>
           )}
