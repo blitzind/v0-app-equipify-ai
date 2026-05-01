@@ -589,6 +589,7 @@ function EquipmentPageInner() {
       <EquipmentDrawer
         equipmentId={selectedEquipmentId}
         onClose={() => setSelectedEquipmentId(null)}
+        onUpdated={() => setRefreshToken((v) => v + 1)}
       />
 
       <AddEquipmentModal

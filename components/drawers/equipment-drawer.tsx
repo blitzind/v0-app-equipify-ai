@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { useEquipment } from "@/lib/equipment-store"
-import { useCustomers } from "@/lib/customer-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import type { Equipment } from "@/lib/mock-data"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -255,26 +254,176 @@ function buildAIRecommendations(eq: Equipment): AIRecommendation[] {
 interface EquipmentDrawerProps {
   equipmentId: string | null
   onClose: () => void
+  onUpdated?: () => void
+}
+
+type DbEquipmentRow = {
+  id: string
+  organization_id: string
+  customer_id: string
+  name: string
+  manufacturer: string | null
+  category: string | null
+  serial_number: string | null
+  status: "active" | "needs_service" | "out_of_service" | "in_repair"
+  install_date: string | null
+  warranty_expires_at: string | null
+  last_service_at: string | null
+  next_due_at: string | null
+  location_label: string | null
+  notes: string | null
+}
+
+type DrawerCustomer = {
+  id: string
+  company_name: string
+}
+
+function mapDbStatusToUiStatus(status: DbEquipmentRow["status"]): Equipment["status"] {
+  switch (status) {
+    case "active":
+      return "Active"
+    case "needs_service":
+      return "Needs Service"
+    case "in_repair":
+      return "In Repair"
+    case "out_of_service":
+      return "Out of Service"
+    default:
+      return "Active"
+  }
+}
+
+function mapUiStatusToDbStatus(status: Equipment["status"]): DbEquipmentRow["status"] {
+  switch (status) {
+    case "Active":
+      return "active"
+    case "Needs Service":
+      return "needs_service"
+    case "In Repair":
+      return "in_repair"
+    case "Out of Service":
+      return "out_of_service"
+    default:
+      return "active"
+  }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) {
-  const { equipment, updateEquipment } = useEquipment()
-  const { customers } = useCustomers()
+export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDrawerProps) {
   const { workOrders } = useWorkOrders()
   const { plans } = useMaintenancePlans()
+  const [eq, setEq] = useState<Equipment | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [customers, setCustomers] = useState<DrawerCustomer[]>([])
+  const [loading, setLoading] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Equipment>>({})
   const [activeTab, setActiveTab] = useState<TabId>("overview")
 
-  const eq = equipmentId ? equipment.find((e) => e.id === equipmentId) ?? null : null
+  const loadDrawerData = useCallback(async () => {
+    if (!equipmentId) {
+      setEq(null)
+      setOrganizationId(null)
+      setCustomers([])
+      return
+    }
+
+    setLoading(true)
+    const supabase = createBrowserSupabaseClient()
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setEq(null)
+        setOrganizationId(null)
+        setCustomers([])
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      const orgId = profile?.default_organization_id ?? null
+      setOrganizationId(orgId)
+      if (!orgId) {
+        setEq(null)
+        setCustomers([])
+        return
+      }
+
+      const { data: customerRows } = await supabase
+        .from("customers")
+        .select("id, company_name")
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .order("company_name", { ascending: true })
+
+      setCustomers((customerRows ?? []) as DrawerCustomer[])
+
+      const { data: row, error } = await supabase
+        .from("equipment")
+        .select(
+          "id, organization_id, customer_id, name, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
+        )
+        .eq("id", equipmentId)
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .maybeSingle()
+
+      if (error || !row) {
+        setEq(null)
+        return
+      }
+
+      const equipmentRow = row as DbEquipmentRow
+      const customerName =
+        (customerRows as DrawerCustomer[] | null)?.find((c) => c.id === equipmentRow.customer_id)?.company_name ?? "Unknown Customer"
+
+      setEq({
+        id: equipmentRow.id,
+        customerId: equipmentRow.customer_id,
+        customerName,
+        model: equipmentRow.name,
+        manufacturer: equipmentRow.manufacturer ?? "",
+        category: equipmentRow.category ?? "",
+        serialNumber: equipmentRow.serial_number ?? "",
+        installDate: equipmentRow.install_date ?? "",
+        warrantyExpiration: equipmentRow.warranty_expires_at ?? "",
+        lastServiceDate: equipmentRow.last_service_at ?? "",
+        nextDueDate: equipmentRow.next_due_at ?? "",
+        status: mapDbStatusToUiStatus(equipmentRow.status),
+        notes: equipmentRow.notes ?? "",
+        location: equipmentRow.location_label ?? "",
+        photos: [],
+        manuals: [],
+        serviceHistory: [],
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [equipmentId])
 
   useEffect(() => {
     setEditing(false)
     setDraft({})
     setActiveTab("overview")
+    void loadDrawerData()
+  }, [equipmentId, loadDrawerData])
+
+  useEffect(() => {
+    if (!equipmentId) {
+      setEq(null)
+      setOrganizationId(null)
+      setCustomers([])
+    }
   }, [equipmentId])
 
   function toast(message: string) {
@@ -287,35 +436,94 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
     if (!eq) return
     setDraft({
       model: eq.model, manufacturer: eq.manufacturer, category: eq.category,
-      serialNumber: eq.serialNumber, customerId: eq.customerId, location: eq.location,
+      serialNumber: eq.serialNumber, location: eq.location,
       installDate: eq.installDate, warrantyExpiration: eq.warrantyExpiration,
       lastServiceDate: eq.lastServiceDate, nextDueDate: eq.nextDueDate,
       status: eq.status, notes: eq.notes,
-      assignedTechnician: eq.assignedTechnician ?? "",
-      replacementCost: eq.replacementCost,
     })
     setEditing(true)
   }
 
   function cancelEdit() { setEditing(false); setDraft({}) }
 
-  function saveEdit() {
-    if (!eq) return
-    const selectedCustomer = draft.customerId ? customers.find((c) => c.id === draft.customerId) : null
-    updateEquipment(eq.id, {
-      ...draft,
-      customerName: selectedCustomer ? selectedCustomer.company : eq.customerName,
-    })
+  async function saveEdit() {
+    if (!eq || !organizationId) return
+    const supabase = createBrowserSupabaseClient()
+
+    const updatePayload = {
+      name: (draft.model ?? eq.model).trim(),
+      manufacturer: (draft.manufacturer ?? eq.manufacturer).trim() || null,
+      category: (draft.category ?? eq.category).trim() || null,
+      serial_number: (draft.serialNumber ?? eq.serialNumber).trim() || null,
+      status: mapUiStatusToDbStatus((draft.status ?? eq.status) as Equipment["status"]),
+      install_date: (draft.installDate ?? eq.installDate) || null,
+      warranty_expires_at: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
+      last_service_at: (draft.lastServiceDate ?? eq.lastServiceDate) || null,
+      next_due_at: (draft.nextDueDate ?? eq.nextDueDate) || null,
+      location_label: (draft.location ?? eq.location).trim() || null,
+      notes: (draft.notes ?? eq.notes).trim() || null,
+    }
+
+    const { error } = await supabase
+      .from("equipment")
+      .update(updatePayload)
+      .eq("id", eq.id)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      toast(`Update failed: ${error.message}`)
+      return
+    }
+
     setEditing(false)
     setDraft({})
     toast("Equipment updated successfully")
+    await loadDrawerData()
+    onUpdated?.()
+  }
+
+  async function archiveEquipment() {
+    if (!eq || !organizationId) return
+    if (!window.confirm("Archive this equipment?")) return
+    const supabase = createBrowserSupabaseClient()
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({ is_archived: true, archived_at: new Date().toISOString() })
+      .eq("id", eq.id)
+      .eq("organization_id", organizationId)
+
+    if (error) {
+      toast(`Archive failed: ${error.message}`)
+      return
+    }
+
+    toast("Equipment archived")
+    onUpdated?.()
+    onClose()
   }
 
   function setField<K extends keyof Equipment>(field: K, value: Equipment[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
-  if (!eq) return null
+  if (!equipmentId) return null
+
+  if (!eq) {
+    return (
+      <DetailDrawer
+        open={!!equipmentId}
+        onClose={onClose}
+        title={loading ? "Loading equipment..." : "Equipment not found"}
+        subtitle={loading ? "Fetching latest equipment data" : "This record may be archived or outside your organization"}
+        width="xl"
+      >
+        <div className="px-5 py-6 text-sm text-muted-foreground">
+          {loading ? "Loading..." : "Unable to load this equipment."}
+        </div>
+      </DetailDrawer>
+    )
+  }
 
   // Derived values
   const days         = daysToDue(eq.nextDueDate)
@@ -383,6 +591,14 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Email composed")}>
                 <Mail className="w-3.5 h-3.5" /> Email Customer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs cursor-pointer border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={archiveEquipment}
+              >
+                <AlertOctagon className="w-3.5 h-3.5" /> Archive
               </Button>
             </>
           )
@@ -473,13 +689,9 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
                     {eq.customerName}
                   </Link>
                 } editing={editing}>
-                  <select
-                    value={draft.customerId ?? ""}
-                    onChange={(e) => setField("customerId", e.target.value)}
-                    className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
-                  >
-                    {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
-                  </select>
+                  <div className="w-full rounded border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
+                    {customers.find((c) => c.id === eq.customerId)?.company_name ?? eq.customerName}
+                  </div>
                 </EditableRow>
                 <EditableRow label="Location" value={eq.location || "—"} editing={editing}>
                   <EditInput value={draft.location ?? ""} onChange={(v) => setField("location", v)} />
@@ -512,16 +724,6 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
                 } editing={editing}>
                   <EditInput type="date" value={draft.nextDueDate ?? ""} onChange={(v) => setField("nextDueDate", v)} />
                 </EditableRow>
-                {editing && (
-                  <EditableRow label="Replacement Cost" value={eq.replacementCost ? fmtCurrency(eq.replacementCost) : "—"} editing={editing}>
-                    <EditInput
-                      type="number"
-                      value={String(draft.replacementCost ?? "")}
-                      onChange={(v) => setField("replacementCost", Number(v))}
-                      placeholder="0"
-                    />
-                  </EditableRow>
-                )}
               </DrawerSection>
             </>
           )}
