@@ -18,6 +18,7 @@ import {
   Bell,
   Filter,
   ArrowRight,
+  Plus,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { MaintenancePlanDrawer } from "@/components/drawers/maintenance-plan-drawer"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
+import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -399,6 +401,7 @@ export default function ServiceSchedulePage() {
   const [statusFilter, setStatusFilter] = useState("All")
   const [createdIds, setCreatedIds]     = useState<Set<string>>(new Set())
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   // Reset offset when mode changes so we don't land on an unexpected window
   function handleModeChange(m: ViewMode) {
@@ -532,6 +535,16 @@ export default function ServiceSchedulePage() {
         {/* Spacer */}
         <span className="flex-1 hidden sm:block" />
 
+        {/* Schedule Service CTA */}
+        <Button
+          size="sm"
+          className="gap-1.5 shrink-0 h-9"
+          onClick={() => setScheduleOpen(true)}
+        >
+          <Plus className="w-4 h-4" />
+          Schedule Service
+        </Button>
+
         {/* Services-in-view count */}
         <span className="text-xs text-muted-foreground shrink-0 sm:hidden">
           {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
@@ -650,6 +663,11 @@ export default function ServiceSchedulePage() {
       <MaintenancePlanDrawer
         planId={selectedPlanId}
         onClose={() => setSelectedPlanId(null)}
+      />
+
+      <ScheduleServiceDrawer
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
       />
     </div>
   )
