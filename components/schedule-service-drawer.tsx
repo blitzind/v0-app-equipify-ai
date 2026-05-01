@@ -7,12 +7,7 @@ import { useWorkOrders } from "@/lib/work-order-store"
 import { technicians } from "@/lib/mock-data"
 import type { WorkOrder, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+import { DetailDrawer } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -26,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {
-  CalendarPlus, User, Wrench, MapPin, Clock,
+  User, Wrench, MapPin, Clock,
   AlertTriangle, CheckCircle2, Lightbulb, Mail, Bell, Repeat, Plus, X,
 } from "lucide-react"
 
@@ -354,42 +349,37 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-[520px] flex flex-col gap-0 p-0 overflow-hidden"
-      >
-        {/* Header */}
-        <SheetHeader className="px-6 py-4 border-b border-border shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <CalendarPlus className="w-4 h-4 text-primary" />
-            Schedule Service
-          </SheetTitle>
-        </SheetHeader>
-
-        {submitted ? (
-          /* ── Success state ── */
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-[var(--ds-success-subtle)] flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-[var(--ds-success)]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Service Scheduled</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {form.createWorkOrder ? "Work order created and added to the queue." : "Appointment saved without a work order."}
-              </p>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <Button variant="outline" size="sm" onClick={() => { setForm(BLANK); setSubmitted(false) }}>
-                Schedule Another
-              </Button>
-              <Button size="sm" onClick={onClose}>Done</Button>
-            </div>
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title="Schedule Service"
+      width="md"
+      noScroll
+    >
+      {submitted ? (
+        /* ── Success state ── */
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-[var(--ds-success-subtle)] flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6 text-[var(--ds-success)]" />
           </div>
-        ) : (
-          /* ── Form ── */
+          <div>
+            <p className="text-sm font-semibold text-foreground">Service Scheduled</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {form.createWorkOrder ? "Work order created and added to the queue." : "Appointment saved without a work order."}
+            </p>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => { setForm(BLANK); setSubmitted(false) }}>
+              Schedule Another
+            </Button>
+            <Button size="sm" onClick={onClose}>Done</Button>
+          </div>
+        </div>
+      ) : (
+        /* ── Form + footer ── */
+        <>
           <div className="flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-5 px-6 py-5">
+            <div className="flex flex-col gap-5 px-5 py-5">
 
               {/* Customer */}
               <div className="flex flex-col gap-1.5">
@@ -700,9 +690,8 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
           </div>
         )}
 
-        {/* Footer */}
-        {!submitted && (
-          <div className="shrink-0 px-6 py-4 border-t border-border flex items-center justify-between gap-3">
+          {/* Footer */}
+          <div className="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
             <Button variant="outline" className="flex-1" onClick={onClose}>
               Cancel
             </Button>
@@ -710,8 +699,8 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
               Schedule Service
             </Button>
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+        </>
+      )}
+    </DetailDrawer>
   )
 }
