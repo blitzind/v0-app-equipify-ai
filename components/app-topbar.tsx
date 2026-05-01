@@ -6,8 +6,8 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Bell, Search, ChevronDown,
   User, Lock, BellRing,
-  Building2, Palette, MapPin, Users,
-  CreditCard, Receipt, Wallet, BarChart3,
+  Building2, MapPin, Users,
+  CreditCard, BarChart3,
   Plug, KeyRound, ScrollText,
   LogOut, ChevronRight, Menu, X,
   AlertCircle, Repeat2, ShieldAlert, CheckCircle2, CalendarClock, UserCog,
@@ -167,35 +167,32 @@ const ACCOUNT_SECTIONS = [
   {
     label: "Account",
     items: [
-      { icon: User,    label: "My Profile",          sub: "Edit your name & contact info", href: "/settings/workspace" },
-      { icon: Lock,    label: "Password & Security",  sub: "Two-factor auth, password reset", href: "/settings/workspace" },
-      { icon: BellRing,label: "Notifications",        sub: "Alerts, digests & preferences", href: "/settings/notifications" },
+      { icon: User,     label: "My Profile",    sub: "Edit your name & contact info",      href: "/settings/workspace" },
+      { icon: Lock,     label: "Security",      sub: "Two-factor auth & password reset",   href: "/settings/workspace" },
+      { icon: BellRing, label: "Notifications", sub: "Alerts, digests & preferences",      href: "/settings/notifications" },
     ],
   },
   {
-    label: "Company",
+    label: "Workspace",
     items: [
-      { icon: Building2, label: "Company Settings", sub: "Name, timezone, date formats", href: "/settings/workspace" },
-      { icon: Palette,   label: "Branding",         sub: "Logo, colors & white-label", href: "/settings/workspace" },
-      { icon: MapPin,    label: "Locations",         sub: "Manage service regions & sites", href: "/settings/workspace" },
-      { icon: Users,     label: "Team Members",      sub: "Invite, roles & seat limits", href: "/settings/team" },
+      { icon: Building2, label: "Company Settings", sub: "Name, branding & timezone",        href: "/settings/workspace" },
+      { icon: Users,     label: "Team Members",      sub: "Invite, roles & seat limits",      href: "/settings/team" },
+      { icon: MapPin,    label: "Locations",          sub: "Service regions & sites",          href: "/settings/workspace" },
     ],
   },
   {
     label: "Billing",
     items: [
-      { icon: CreditCard, label: "Subscription Plan", sub: "Starter · Growth · Enterprise", href: "/settings/billing" },
-      { icon: Receipt,    label: "Invoices",           sub: "Download past invoices", href: "/settings/billing" },
-      { icon: Wallet,     label: "Payment Methods",    sub: "Cards, ACH & billing email", href: "/settings/billing" },
-      { icon: BarChart3,  label: "Usage",              sub: "Seats, equipment & API calls", href: "/settings/billing" },
+      { icon: CreditCard, label: "Plan & Billing", sub: "Subscription, invoices & payments", href: "/settings/billing" },
+      { icon: BarChart3,  label: "Usage",           sub: "Seats, equipment & API calls",      href: "/settings/billing" },
     ],
   },
   {
     label: "System",
     items: [
-      { icon: Plug,       label: "Integrations", sub: "Connect third-party apps", href: "/integrations" },
-      { icon: KeyRound,   label: "API Keys",     sub: "Generate & manage API tokens", href: "/settings/workspace" },
-      { icon: ScrollText, label: "Audit Log",    sub: "All user actions & changes", href: "/settings/workspace" },
+      { icon: Plug,       label: "Integrations", sub: "Connect third-party apps",        href: "/integrations" },
+      { icon: KeyRound,   label: "API Keys",     sub: "Generate & manage API tokens",    href: "/settings/workspace" },
+      { icon: ScrollText, label: "Audit Log",    sub: "All user actions & changes",      href: "/settings/workspace" },
     ],
   },
 ]
