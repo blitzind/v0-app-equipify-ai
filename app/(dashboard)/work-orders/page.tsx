@@ -479,6 +479,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 
 function WorkOrdersPageInner() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
+  const [refreshToken, setRefreshToken] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -612,7 +613,7 @@ function WorkOrdersPageInner() {
     return () => {
       active = false
     }
-  }, [])
+  }, [refreshToken])
 
   const [view, setView] = useState<ViewMode>("kanban")
   const [search, setSearch] = useState("")
@@ -798,7 +799,11 @@ function WorkOrdersPageInner() {
         {view === "calendar" && <CalendarView workOrders={filtered} onOpen={setSelectedWoId} />}
       </div>
 
-      <CreateWorkOrderModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateWorkOrderModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => setRefreshToken((v) => v + 1)}
+      />
 
       <WorkOrderDrawer
         workOrderId={selectedWoId}
