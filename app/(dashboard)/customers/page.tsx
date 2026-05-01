@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useCustomers } from "@/lib/customer-store"
 import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
-import { useQuickAdd } from "@/lib/quick-add-context"
+import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -376,6 +376,8 @@ export default function CustomersPage() {
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
       />
+
+      <QuickAddParamBridge action="new-customer" onTrigger={() => setShowAddModal(true)} />
     </div>
   )
 }

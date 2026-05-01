@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
-import { useQuickAdd } from "@/lib/quick-add-context"
+import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -336,6 +336,7 @@ export default function InvoicesPage() {
         }}
       />
       <Toaster />
+      <QuickAddParamBridge action="new-invoice" onTrigger={() => setNewModalOpen(true)} />
     </div>
   )
 }

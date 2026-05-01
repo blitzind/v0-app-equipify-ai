@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
-import { useQuickAdd } from "@/lib/quick-add-context"
+import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
@@ -564,6 +564,8 @@ export default function WorkOrdersPage() {
         workOrderId={selectedWoId}
         onClose={() => setSelectedWoId(null)}
       />
+
+      <QuickAddParamBridge action="new-work-order" onTrigger={() => setCreateOpen(true)} />
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import Link from "next/link"
 import { useEquipment } from "@/lib/equipment-store"
-import { useQuickAdd } from "@/lib/quick-add-context"
+import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { Equipment } from "@/lib/mock-data"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { AIScanModal } from "@/components/equipment/ai-scan-modal"
@@ -495,6 +495,8 @@ export default function EquipmentPage() {
         open={scanModalOpen}
         onClose={() => setScanModalOpen(false)}
       />
+
+      <QuickAddParamBridge action="new-equipment" onTrigger={() => setAddModalOpen(true)} />
     </div>
   )
 }
