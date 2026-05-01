@@ -368,7 +368,7 @@ export const medEquipment: Equipment[] = [
   },
 ]
 
-// ─── Work Orders ──────────────────────────────────────────────────────────────
+// ─── Work Orders ───────────���──────────────────────────────────────────────────
 
 export const medWorkOrders: WorkOrder[] = [
   {
@@ -961,6 +961,7 @@ export const medInvoices: AdminInvoice[] = [
     id: "MINV-3001",
     customerId: "MC-001",
     customerName: "Los Angeles Hearing Center",
+    equipmentId: "MEQ-101",
     equipmentName: "GSI AudioStar Pro Audiometer",
     workOrderId: "MWO-2034",
     issueDate: "2026-04-10",
@@ -978,6 +979,7 @@ export const medInvoices: AdminInvoice[] = [
     id: "MINV-3002",
     customerId: "MC-002",
     customerName: "San Diego Audiology Clinic",
+    equipmentId: "MEQ-205",
     equipmentName: "Interacoustics Titan Tympanometer",
     workOrderId: "MWO-2040",
     issueDate: "2026-05-03",
@@ -996,6 +998,7 @@ export const medInvoices: AdminInvoice[] = [
     id: "MINV-3003",
     customerId: "MC-005",
     customerName: "Sacramento Pediatric Audiology",
+    equipmentId: "MEQ-312",
     equipmentName: "Otodynamics ILO292 OAE System",
     workOrderId: "MWO-1040",
     issueDate: "2025-04-10",
@@ -1015,6 +1018,7 @@ export const medInvoices: AdminInvoice[] = [
     id: "MINV-3004",
     customerId: "MC-008",
     customerName: "Sierra Balance Center",
+    equipmentId: "MEQ-418",
     equipmentName: "Interacoustics EyeSeeCam VNG System",
     workOrderId: "MWO-1050",
     issueDate: "2025-12-21",
