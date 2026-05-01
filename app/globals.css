@@ -163,6 +163,14 @@
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
+  /* Elements using tw-animate-css (animate-in / animate-out) must not have a
+     CSS transition on transform/opacity — the @keyframes animation handles
+     those properties itself. A competing transition causes the "fly-in" glitch. */
+  [data-state],
+  [data-side] {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 150ms;
+  }
   /* Don't animate layout-affecting properties globally */
   *, *::before, *::after {
     box-sizing: border-box;
@@ -350,7 +358,7 @@
     font-feature-settings: "tnum";
   }
 
-  /* ── Table sort header button ─────────────────────────────��────���───���──────
+  /* ── Table sort header button ────────────────────────���────��────���───���──────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {
     @apply inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;
