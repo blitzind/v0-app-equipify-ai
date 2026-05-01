@@ -5,10 +5,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Bell, Search, ChevronDown,
-  User, Lock, BellRing,
-  Building2, MapPin, Users,
-  CreditCard, BarChart3,
-  Plug, KeyRound, ScrollText,
+  User, BellRing, Shield,
+  Building2, Users,
+  CreditCard, Plug, Settings,
   LogOut, ChevronRight, Menu, X,
   AlertCircle, Repeat2, ShieldAlert, CheckCircle2, CalendarClock, UserCog,
 } from "lucide-react"
@@ -163,38 +162,15 @@ const NOTIFICATIONS_BY_WORKSPACE: Record<string, Notification[]> = {
 
 // ─── Account hub sections ─────────────────────────────────────────────────────
 
-const ACCOUNT_SECTIONS = [
-  {
-    label: "Account",
-    items: [
-      { icon: User,     label: "My Profile",    sub: "Edit your name & contact info",      href: "/settings/workspace" },
-      { icon: Lock,     label: "Security",      sub: "Two-factor auth & password reset",   href: "/settings/workspace" },
-      { icon: BellRing, label: "Notifications", sub: "Alerts, digests & preferences",      href: "/settings/notifications" },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [
-      { icon: Building2, label: "Company Settings", sub: "Name, branding & timezone",        href: "/settings/workspace" },
-      { icon: Users,     label: "Team Members",      sub: "Invite, roles & seat limits",      href: "/settings/team" },
-      { icon: MapPin,    label: "Locations",          sub: "Service regions & sites",          href: "/settings/workspace" },
-    ],
-  },
-  {
-    label: "Billing",
-    items: [
-      { icon: CreditCard, label: "Plan & Billing", sub: "Subscription, invoices & payments", href: "/settings/billing" },
-      { icon: BarChart3,  label: "Usage",           sub: "Seats, equipment & API calls",      href: "/settings/billing" },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { icon: Plug,       label: "Integrations", sub: "Connect third-party apps",        href: "/integrations" },
-      { icon: KeyRound,   label: "API Keys",     sub: "Generate & manage API tokens",    href: "/settings/workspace" },
-      { icon: ScrollText, label: "Audit Log",    sub: "All user actions & changes",      href: "/settings/workspace" },
-    ],
-  },
+const LAUNCHER_LINKS = [
+  { icon: User,       label: "My Profile",    href: "/settings/general" },
+  { icon: BellRing,   label: "Notifications", href: "/settings/notifications" },
+  { icon: Shield,     label: "Security",      href: "/settings/security" },
+  { icon: Settings,   label: "Settings",      href: "/settings/general" },
+  { icon: Users,      label: "Team",          href: "/settings/team" },
+  { icon: CreditCard, label: "Billing",       href: "/settings/billing" },
+  { icon: Plug,       label: "Integrations",  href: "/settings/integrations" },
+  { icon: Building2,  label: "Workspace",     href: "/settings/workspace" },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -449,31 +425,21 @@ export function AppTopbar() {
             </span>
           </div>
 
-          {/* Sections grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-border max-h-[70vh] overflow-y-auto">
-            {ACCOUNT_SECTIONS.map((section) => (
-              <div key={section.label} className="py-3">
-                <p className="px-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  {section.label}
-                </p>
-                {section.items.map(({ icon: Icon, label, sub, href }) => (
-                  <Link
-                    key={label}
-                    href={href}
-                    onClick={() => setHubOpen(false)}
-                    className="group flex items-center gap-3 px-4 py-2 hover:bg-secondary/60 transition-colors"
-                  >
-                    <div className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary border border-border shrink-0 group-hover:border-primary/30 group-hover:bg-primary/5 transition-colors">
-                      <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground leading-tight">{label}</p>
-                      <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">{sub}</p>
-                    </div>
-                    <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                ))}
-              </div>
+          {/* Launcher grid */}
+          <div className="grid grid-cols-2 gap-1 p-3">
+            {LAUNCHER_LINKS.map(({ icon: Icon, label, href }) => (
+              <Link
+                key={label}
+                href={href}
+                onClick={() => setHubOpen(false)}
+                className="group flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-secondary/70 transition-colors"
+              >
+                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary border border-border shrink-0 group-hover:border-primary/30 group-hover:bg-primary/5 transition-colors">
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{label}</span>
+                <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
             ))}
           </div>
 

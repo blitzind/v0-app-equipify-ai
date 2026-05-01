@@ -1,119 +1,79 @@
 "use client"
 
 import { useState } from "react"
-import { Mail, Clock, Send, Eye, Edit3, Check, ChevronDown, ChevronUp } from "lucide-react"
+import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, ShieldAlert, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface DayTiming {
-  days: number
-  direction: "before" | "after"
-  time: string
-}
-
-interface CadenceSection {
+interface NotifPreference {
   id: string
-  title: string
+  label: string
   description: string
-  enabled: boolean
-  timings: DayTiming[]
-  template: string
-  sendDay?: string   // for weekly reminders
-  sendTime?: string  // for weekly reminders
-  weekly?: boolean
+  icon: React.ComponentType<{ size?: number; className?: string }>
+  iconColor: string
+  channels: {
+    inApp: boolean
+    email: boolean
+    sms: boolean
+  }
 }
 
-// ─── Defaults (Medology presets) ─────────────────────────────────────────────
+// ─── Defaults ─────────────────────────────────────────────────────────────────
 
-const INITIAL_SECTIONS: CadenceSection[] = [
+const INITIAL_PREFS: NotifPreference[] = [
   {
-    id: "appointment-confirmation",
-    title: "Appointment Confirmations",
-    description: "Send a confirmation email when a service appointment or work order is scheduled.",
-    enabled: true,
-    timings: [{ days: 0, direction: "before", time: "09:00" }],
-    template: "appointment-confirmation",
+    id: "overdue-wo",
+    label: "Overdue work orders",
+    description: "When a work order passes its due date without being closed.",
+    icon: AlertCircle,
+    iconColor: "text-destructive",
+    channels: { inApp: true, email: true, sms: false },
   },
   {
-    id: "weekly-reminders",
-    title: "Weekly Upcoming Service Reminders",
-    description: "A digest sent each week listing all upcoming service appointments for the following week.",
-    enabled: true,
-    timings: [],
-    template: "weekly-service-digest",
-    weekly: true,
-    sendDay: "Thursday",
-    sendTime: "09:00",
+    id: "repeat-repair",
+    label: "Repeat repair alerts",
+    description: "When the same equipment is flagged for repeated repairs.",
+    icon: Repeat2,
+    iconColor: "text-destructive",
+    channels: { inApp: true, email: true, sms: false },
   },
   {
-    id: "maintenance-due",
-    title: "Maintenance Due Reminders",
-    description: "Notify customers when scheduled maintenance is approaching based on configured lead times.",
-    enabled: true,
-    timings: [
-      { days: 30, direction: "before", time: "09:00" },
-      { days: 14, direction: "before", time: "09:00" },
-      { days: 7,  direction: "before", time: "09:00" },
-      { days: 1,  direction: "before", time: "09:00" },
-    ],
-    template: "maintenance-reminder",
+    id: "warranty-expiring",
+    label: "Warranty expiring",
+    description: "When equipment warranties are approaching expiration.",
+    icon: ShieldAlert,
+    iconColor: "text-[oklch(0.50_0.12_70)]",
+    channels: { inApp: true, email: true, sms: false },
   },
   {
-    id: "quote-followup",
-    title: "Quote Follow-Up",
-    description: "Automatically follow up on open quotes that haven't been accepted.",
-    enabled: true,
-    timings: [
-      { days: 3,  direction: "after", time: "10:00" },
-      { days: 7,  direction: "after", time: "10:00" },
-      { days: 14, direction: "after", time: "10:00" },
-    ],
-    template: "quote-followup",
+    id: "pm-due",
+    label: "Maintenance due",
+    description: "When scheduled preventive maintenance is upcoming.",
+    icon: CalendarClock,
+    iconColor: "text-primary",
+    channels: { inApp: true, email: false, sms: false },
   },
   {
-    id: "invoice-followup",
-    title: "Invoice Follow-Up",
-    description: "Send reminders for unpaid invoices before and after the due date.",
-    enabled: true,
-    timings: [
-      { days: 3, direction: "before", time: "09:00" },
-      { days: 3, direction: "after",  time: "09:00" },
-      { days: 7, direction: "after",  time: "09:00" },
-    ],
-    template: "invoice-followup",
+    id: "wo-completed",
+    label: "Work order completed",
+    description: "When a technician closes a work order.",
+    icon: CheckCircle2,
+    iconColor: "text-[oklch(0.42_0.17_145)]",
+    channels: { inApp: true, email: false, sms: false },
   },
   {
-    id: "customer-portal",
-    title: "Customer Portal Notifications",
-    description: "Email notifications sent when customers take actions in the customer portal.",
-    enabled: true,
-    timings: [{ days: 0, direction: "before", time: "09:00" }],
-    template: "portal-activity",
+    id: "schedule-change",
+    label: "Schedule changes",
+    description: "When a technician is reassigned or an appointment is rescheduled.",
+    icon: UserCog,
+    iconColor: "text-primary",
+    channels: { inApp: true, email: false, sms: false },
   },
 ]
 
-const TEMPLATES = [
-  { id: "appointment-confirmation", label: "Appointment Confirmation" },
-  { id: "weekly-service-digest",    label: "Weekly Service Digest" },
-  { id: "maintenance-reminder",     label: "Maintenance Reminder" },
-  { id: "quote-followup",           label: "Quote Follow-Up" },
-  { id: "invoice-followup",         label: "Invoice Follow-Up" },
-  { id: "portal-activity",          label: "Portal Activity" },
-]
-
-const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-const TIMES = [
-  "06:00","07:00","08:00","09:00","10:00","11:00",
-  "12:00","13:00","14:00","15:00","16:00","17:00","18:00",
-]
-
-const DAY_OPTIONS_BEFORE = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60]
-const DAY_OPTIONS_AFTER  = [1, 2, 3, 5, 7, 10, 14, 21, 30]
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Toggle ───────────────────────────────────────────────────────────────────
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -128,363 +88,188 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         checked ? "bg-primary" : "bg-border"
       )}
     >
-      <span
-        className={cn(
-          "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm",
-          "transform transition-transform duration-150",
-          checked ? "translate-x-4" : "translate-x-0"
-        )}
-      />
+      <span className={cn(
+        "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm",
+        "transform transition-transform duration-150",
+        checked ? "translate-x-4" : "translate-x-0"
+      )} />
     </button>
-  )
-}
-
-function NativeSelect({
-  value,
-  onChange,
-  children,
-  className,
-}: {
-  value: string
-  onChange: (v: string) => void
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        "h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground",
-        "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary",
-        "transition-colors appearance-none pr-7 bg-no-repeat",
-        "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")] bg-[right_8px_center]",
-        className
-      )}
-    >
-      {children}
-    </select>
-  )
-}
-
-function TimingRow({
-  timing,
-  onChange,
-  onRemove,
-  canRemove,
-  isQuote,
-}: {
-  timing: DayTiming
-  onChange: (t: DayTiming) => void
-  onRemove: () => void
-  canRemove: boolean
-  isQuote?: boolean
-}) {
-  const dayOptions = timing.direction === "before" ? DAY_OPTIONS_BEFORE : DAY_OPTIONS_AFTER
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <NativeSelect
-        value={String(timing.days)}
-        onChange={(v) => onChange({ ...timing, days: Number(v) })}
-        className="w-20"
-      >
-        {dayOptions.map((d) => (
-          <option key={d} value={d}>{d} {d === 1 ? "day" : "days"}</option>
-        ))}
-      </NativeSelect>
-
-      <NativeSelect
-        value={timing.direction}
-        onChange={(v) => onChange({ ...timing, direction: v as "before" | "after" })}
-        className="w-24"
-      >
-        <option value="before">before</option>
-        <option value="after">after</option>
-      </NativeSelect>
-
-      <span className="text-xs text-muted-foreground">due date at</span>
-
-      <NativeSelect
-        value={timing.time}
-        onChange={(v) => onChange({ ...timing, time: v })}
-        className="w-24"
-      >
-        {TIMES.map((t) => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </NativeSelect>
-
-      {canRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-[11px] font-medium text-muted-foreground hover:text-destructive transition-colors ml-1 cursor-pointer"
-        >
-          Remove
-        </button>
-      )}
-    </div>
-  )
-}
-
-function TemplateActions({ onPreview, onEdit, onTest }: {
-  onPreview: () => void
-  onEdit: () => void
-  onTest: () => void
-}) {
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <button
-        type="button"
-        onClick={onPreview}
-        className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer"
-      >
-        <Eye className="w-3 h-3" />
-        Preview Email
-      </button>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer"
-      >
-        <Edit3 className="w-3 h-3" />
-        Edit Template
-      </button>
-      <button
-        type="button"
-        onClick={onTest}
-        className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer"
-      >
-        <Send className="w-3 h-3" />
-        Send Test Email
-      </button>
-    </div>
-  )
-}
-
-// ─── Main card component ──────────────────────────────────────────────────────
-
-function CadenceCard({
-  section,
-  onChange,
-}: {
-  section: CadenceSection
-  onChange: (s: CadenceSection) => void
-}) {
-  const [expanded, setExpanded] = useState(true)
-  const [testSent, setTestSent] = useState(false)
-
-  function handleTest() {
-    setTestSent(true)
-    setTimeout(() => setTestSent(false), 2500)
-  }
-
-  function addTiming() {
-    const last = section.timings[section.timings.length - 1]
-    onChange({
-      ...section,
-      timings: [
-        ...section.timings,
-        { days: 7, direction: last?.direction ?? "before", time: "09:00" },
-      ],
-    })
-  }
-
-  function updateTiming(i: number, t: DayTiming) {
-    const timings = [...section.timings]
-    timings[i] = t
-    onChange({ ...section, timings })
-  }
-
-  function removeTiming(i: number) {
-    onChange({ ...section, timings: section.timings.filter((_, idx) => idx !== i) })
-  }
-
-  return (
-    <div className={cn(
-      "bg-card border border-border rounded-xl overflow-hidden transition-shadow duration-150",
-      section.enabled ? "shadow-sm" : "opacity-60"
-    )}>
-      {/* Header */}
-      <div className="flex items-center gap-4 px-5 py-4 border-b border-border">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 shrink-0">
-          <Mail className="w-4 h-4 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">{section.title}</p>
-          <p className="text-xs text-muted-foreground leading-snug mt-0.5">{section.description}</p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Toggle
-            checked={section.enabled}
-            onChange={(v) => onChange({ ...section, enabled: v })}
-          />
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-muted transition-colors cursor-pointer"
-            aria-label={expanded ? "Collapse" : "Expand"}
-          >
-            {expanded
-              ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              : <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            }
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      {expanded && (
-        <div className="px-5 py-5 flex flex-col gap-5">
-          {/* Timing controls */}
-          {section.weekly ? (
-            <div>
-              <p className="text-xs font-semibold text-foreground mb-3">Send schedule</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">Every</span>
-                <NativeSelect
-                  value={section.sendDay ?? "Thursday"}
-                  onChange={(v) => onChange({ ...section, sendDay: v })}
-                  className="w-32"
-                >
-                  {DAYS_OF_WEEK.map((d) => <option key={d} value={d}>{d}</option>)}
-                </NativeSelect>
-                <span className="text-xs text-muted-foreground">at</span>
-                <NativeSelect
-                  value={section.sendTime ?? "09:00"}
-                  onChange={(v) => onChange({ ...section, sendTime: v })}
-                  className="w-24"
-                >
-                  {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </NativeSelect>
-                <span className="text-xs text-muted-foreground">covering the following week</span>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-foreground">Timing</p>
-                {section.timings.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={addTiming}
-                    className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
-                  >
-                    + Add reminder
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {section.timings.map((t, i) => (
-                  <TimingRow
-                    key={i}
-                    timing={t}
-                    onChange={(updated) => updateTiming(i, updated)}
-                    onRemove={() => removeTiming(i)}
-                    canRemove={section.timings.length > 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Template selector */}
-          <div>
-            <p className="text-xs font-semibold text-foreground mb-2">Email template</p>
-            <NativeSelect
-              value={section.template}
-              onChange={(v) => onChange({ ...section, template: v })}
-              className="w-64"
-            >
-              {TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </NativeSelect>
-          </div>
-
-          {/* Template actions */}
-          <div>
-            <TemplateActions
-              onPreview={() => {}}
-              onEdit={() => {}}
-              onTest={handleTest}
-            />
-            {testSent && (
-              <p className="flex items-center gap-1.5 text-[11px] text-[oklch(0.42_0.17_145)] mt-2 font-medium">
-                <Check className="w-3 h-3" />
-                Test email sent to alex.johnson@acmecorp.com
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
-  const [sections, setSections] = useState<CadenceSection[]>(INITIAL_SECTIONS)
+  const [prefs, setPrefs] = useState<NotifPreference[]>(INITIAL_PREFS)
   const [saved, setSaved] = useState(false)
+  const [digestEmail, setDigestEmail] = useState(true)
+  const [digestFrequency, setDigestFrequency] = useState<"daily" | "weekly">("daily")
+  const [quietStart, setQuietStart] = useState("22:00")
+  const [quietEnd, setQuietEnd]   = useState("07:00")
 
-  function updateSection(id: string, updated: CadenceSection) {
-    setSections((prev) => prev.map((s) => s.id === id ? updated : s))
+  function updateChannel(id: string, channel: keyof NotifPreference["channels"], value: boolean) {
+    setPrefs((prev) =>
+      prev.map((p) => p.id === id ? { ...p, channels: { ...p.channels, [channel]: value } } : p)
+    )
   }
 
-  function handleSave() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-  }
+  function handleSave() { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+
+  const TIMES = [
+    "00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00",
+    "08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00",
+    "16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00",
+  ]
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {/* Page header */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Notifications &amp; Email Cadence</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Customize when Equipify sends reminders, follow-ups, and service notifications.
+          <div className="flex items-center gap-2 mb-1">
+            <Bell size={16} className="text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Choose which alerts you receive and how they are delivered. These are personal settings — they only affect your account.
           </p>
         </div>
         <Button size="sm" onClick={handleSave} className="shrink-0">
-          {saved ? (
-            <span className="flex items-center gap-1.5">
-              <Check className="w-3.5 h-3.5" />
-              Saved
-            </span>
-          ) : (
-            "Save Changes"
-          )}
+          {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save changes"}
         </Button>
       </div>
 
-      {/* Cadence cards */}
-      {sections.map((section) => (
-        <CadenceCard
-          key={section.id}
-          section={section}
-          onChange={(updated) => updateSection(section.id, updated)}
-        />
-      ))}
+      {/* Alert matrix */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">Alert preferences</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Control which events trigger notifications and on which channels.
+          </p>
+        </div>
 
-      {/* Global send window note */}
-      <div className="rounded-lg border border-border bg-secondary/40 px-5 py-4">
-        <div className="flex items-start gap-3">
-          <Clock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-semibold text-foreground">Global Send Window</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              All emails respect your workspace timezone (America/Los_Angeles) and are only sent between
-              8:00 AM and 6:00 PM on business days, regardless of the time configured above.
-              Adjust your timezone in{" "}
-              <a href="/settings/workspace" className="text-primary hover:underline font-medium">
-                Workspace Settings
-              </a>.
-            </p>
+        {/* Channel header */}
+        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-6 py-3 bg-secondary/40 border-b border-border">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Alert type</span>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-16 justify-center">
+            <Monitor size={12} /> In-app
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-14 justify-center">
+            <Mail size={12} /> Email
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-12 justify-center">
+            <Smartphone size={12} /> SMS
           </div>
         </div>
+
+        <div className="divide-y divide-border">
+          {prefs.map((pref) => {
+            const Icon = pref.icon
+            return (
+              <div
+                key={pref.id}
+                className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-6 py-4 hover:bg-secondary/20 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-secondary border border-border flex items-center justify-center shrink-0">
+                    <Icon size={14} className={pref.iconColor} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{pref.label}</p>
+                    <p className="text-xs text-muted-foreground leading-snug mt-0.5">{pref.description}</p>
+                  </div>
+                </div>
+                <div className="w-16 flex justify-center">
+                  <Toggle
+                    checked={pref.channels.inApp}
+                    onChange={(v) => updateChannel(pref.id, "inApp", v)}
+                  />
+                </div>
+                <div className="w-14 flex justify-center">
+                  <Toggle
+                    checked={pref.channels.email}
+                    onChange={(v) => updateChannel(pref.id, "email", v)}
+                  />
+                </div>
+                <div className="w-12 flex justify-center">
+                  <Toggle
+                    checked={pref.channels.sms}
+                    onChange={(v) => updateChannel(pref.id, "sms", v)}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Email digest */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Email digest</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Receive a summary of activity instead of individual emails for each event.</p>
+          </div>
+          <Toggle checked={digestEmail} onChange={setDigestEmail} />
+        </div>
+        {digestEmail && (
+          <div className="px-6 py-4">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Digest frequency</p>
+            <div className="flex items-center gap-2">
+              {(["daily", "weekly"] as const).map((freq) => (
+                <button
+                  key={freq}
+                  type="button"
+                  onClick={() => setDigestFrequency(freq)}
+                  className={cn(
+                    "px-4 py-2 rounded-lg border text-sm font-medium capitalize transition-all",
+                    digestFrequency === freq
+                      ? "border-primary bg-primary/8 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {freq}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Quiet hours */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">Quiet hours</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Suppress all notifications during these hours. Applies to email and SMS only — in-app alerts are still recorded.</p>
+        </div>
+        <div className="px-6 py-4 flex items-center gap-3 flex-wrap">
+          <span className="text-sm text-muted-foreground">From</span>
+          <select
+            value={quietStart}
+            onChange={(e) => setQuietStart(e.target.value)}
+            className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <span className="text-sm text-muted-foreground">to</span>
+          <select
+            value={quietEnd}
+            onChange={(e) => setQuietEnd(e.target.value)}
+            className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">(your local time)</span>
+        </div>
+      </div>
+
+      {/* Link to automations */}
+      <div className="rounded-lg border border-dashed border-border bg-secondary/30 px-5 py-4">
+        <p className="text-sm font-medium text-foreground">Looking for email automation cadences?</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Configure appointment confirmations, maintenance reminders, quote follow-ups, and invoice follow-up sequences in{" "}
+          <a href="/settings/automations" className="text-primary hover:underline font-medium">Automations</a>.
+        </p>
       </div>
     </div>
   )
