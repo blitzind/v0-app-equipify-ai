@@ -9,7 +9,7 @@ import { useQuickAdd } from "@/lib/quick-add-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
-  CreditCard, Shield, Sparkles, FileText, Receipt, Plug,
+  CreditCard, Shield, Sparkles, FileText, Receipt, Plug, ShoppingCart,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -74,6 +74,12 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Manage all invoices, track outstanding balances, and record payments.",
     icon: Receipt,
     cta: { label: "+ New Invoice" },
+  },
+  "/purchase-orders": {
+    title: "Purchase Orders",
+    subtitle: "Track vendor orders for parts, materials, equipment, and supplies.",
+    icon: ShoppingCart,
+    cta: { label: "+ New PO" },
   },
   "/reports": {
     title: "Reports",

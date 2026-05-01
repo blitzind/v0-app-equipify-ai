@@ -120,13 +120,7 @@ function PurchaseOrdersPageInner() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-4 md:p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">Purchase Orders</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Track vendor orders for parts, materials, and supplies</p>
-      </div>
-
+    <div className="flex flex-col gap-5">
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -304,7 +298,7 @@ function PurchaseOrdersPageInner() {
 
       {/* Drawer */}
       <PurchaseOrderDrawer
-        purchaseOrderId={selectedId}
+        orderId={selectedId}
         onClose={() => setSelectedId(null)}
       />
     </div>
