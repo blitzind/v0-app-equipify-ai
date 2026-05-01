@@ -44,6 +44,7 @@ import {
   Save,
   X,
 } from "lucide-react"
+import { AppointmentActions } from "@/components/appointments/appointment-actions"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -582,6 +583,23 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           </div>
         ))}
       </div>
+
+      {/* Appointment navigation + email actions */}
+      {wo.location && (
+        <AppointmentActions
+          address={wo.location}
+          emailParams={{
+            customerName:  wo.customerName,
+            equipmentName: wo.equipmentName,
+            technicianName: wo.technicianName,
+            scheduledDate:  wo.scheduledDate,
+            scheduledTime:  wo.scheduledTime,
+            address:        wo.location,
+            workOrderId:    wo.id,
+            ccEmails:       ["service@equipify.ai"],
+          }}
+        />
+      )}
 
       {/* Cost summary */}
       <div className="grid grid-cols-3 gap-3">

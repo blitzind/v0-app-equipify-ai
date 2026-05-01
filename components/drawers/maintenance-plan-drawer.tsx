@@ -13,6 +13,7 @@ import {
 import {
   Play, Pause, Zap, Bell, CheckCircle2, ClipboardList, Calendar, Wrench,
 } from "lucide-react"
+import { ReminderRulesPanel } from "@/components/reminders/reminder-rules-panel"
 
 let toastCounter = 0
 
@@ -39,7 +40,7 @@ interface MaintenancePlanDrawerProps {
 }
 
 export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawerProps) {
-  const { plans, setStatus } = useMaintenancePlans()
+  const { plans, setStatus, updateRules } = useMaintenancePlans()
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const plan = planId ? plans.find((p) => p.id === planId) ?? null : null
@@ -151,25 +152,16 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
           )}
         </DrawerSection>
 
-        {/* Notifications */}
-        <DrawerSection title={`Notification Rules (${enabledRules.length} active)`}>
-          {enabledRules.length > 0 ? (
-            <div className="space-y-1.5">
-              {enabledRules.slice(0, 6).map((rule) => (
-                <div key={rule.id} className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", CHANNEL_STYLE[rule.channel] ?? "bg-muted text-muted-foreground border-border")}>
-                      {rule.channel}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{rule.triggerDays}d before</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{rule.recipients[0]}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center py-3">No active notification rules.</p>
-          )}
+        {/* Notification Rules — editable */}
+        <DrawerSection title={`Reminder Rules (${enabledRules.length} active)`}>
+          <ReminderRulesPanel
+            planId={plan.id}
+            rules={plan.notificationRules}
+            onSave={(rules) => {
+              updateRules(plan.id, rules)
+              toast("Reminder rules saved")
+            }}
+          />
         </DrawerSection>
 
         {/* Notes */}

@@ -13,8 +13,9 @@ import {
 import {
   CheckCircle2, Download, DollarSign, AlertTriangle, Pencil, X, Check,
   Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp, ThumbsDown,
-  Mail, ShieldAlert,
+  Mail, ShieldAlert, ShieldCheck,
 } from "lucide-react"
+import { CertificatePanel } from "@/components/certificates/certificate-panel"
 
 let toastCounter = 0
 
@@ -660,6 +661,19 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
             <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
           )}
         </DrawerSection>
+
+        {/* Calibration Certificates */}
+        {!editing && invoice.equipmentId && (
+          <DrawerSection title="Calibration Certificates">
+            <CertificatePanel
+              equipmentId={invoice.equipmentId}
+              equipmentName={invoice.equipmentName ?? ""}
+              customerId={invoice.customerId}
+              customerName={invoice.customerName}
+              invoiceId={invoice.id}
+            />
+          </DrawerSection>
+        )}
 
         <DrawerSection title="Payment History">
           <DrawerTimeline items={timelineItems} />

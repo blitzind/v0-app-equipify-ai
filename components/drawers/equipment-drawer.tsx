@@ -11,7 +11,8 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check } from "lucide-react"
+import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check, ShieldCheck } from "lucide-react"
+import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
 
 let toastCounter = 0
@@ -416,6 +417,18 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
             <p className="text-xs text-muted-foreground text-center py-3">No service history on record.</p>
           )}
         </DrawerSection>
+
+        {/* Calibration Certificates */}
+        {!editing && (
+          <DrawerSection title="Calibration Certificates">
+            <CertificatePanel
+              equipmentId={eq.id}
+              equipmentName={eq.model}
+              customerId={eq.customerId}
+              customerName={eq.customerName}
+            />
+          </DrawerSection>
+        )}
 
         {/* Documents */}
         <DrawerSection title="Documents & Photos">

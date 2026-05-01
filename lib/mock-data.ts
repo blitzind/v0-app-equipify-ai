@@ -42,6 +42,26 @@ export interface Customer {
   joinedDate: string
 }
 
+// ─── Calibration Certificates ─────────────────────────────────────────────────
+
+export interface CalibrationCertificate {
+  id: string
+  equipmentId: string
+  equipmentName: string
+  customerId: string
+  customerName: string
+  fileName: string
+  fileSize: number        // bytes
+  fileType: string        // e.g. "application/pdf"
+  dataUrl: string         // base64 data URL (client-only demo)
+  uploadedAt: string      // ISO datetime
+  uploadedBy: string
+  expiryDate: string      // ISO date — empty string = no expiry
+  notes: string
+  /** Invoice IDs this certificate is attached to */
+  attachedToInvoices: string[]
+}
+
 export interface ServiceHistoryEntry {
   id: string
   date: string
@@ -747,12 +767,16 @@ export const workOrders: WorkOrder[] = [
 export type PlanInterval = "Annual" | "Semi-Annual" | "Quarterly" | "Monthly" | "Custom"
 export type PlanStatus = "Active" | "Paused" | "Expired"
 export type NotificationChannel = "Email" | "SMS" | "Internal Alert"
-export type NotificationTriggerDays = 30 | 14 | 7 | 1
+export type NotificationTriggerDays = 30 | 14 | 7 | 1 | number
+
+export type WeekdayTrigger = "thursday" | "monday" | "friday" | null
 
 export interface NotificationRule {
   id: string
   channel: NotificationChannel
   triggerDays: NotificationTriggerDays
+  /** When set, fires on every occurrence of this weekday until the service date */
+  weekdayTrigger?: WeekdayTrigger
   enabled: boolean
   recipients: string[]   // email addresses or phone numbers
 }

@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronDown,
   Settings,
+  ShieldCheck,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { href: "/portal/invoices", label: "Invoices", icon: Receipt },
   { href: "/portal/quotes", label: "Quotes", icon: FilePen },
   { href: "/portal/reports", label: "Reports", icon: FileText },
+  { href: "/portal/certificates", label: "Certificates", icon: ShieldCheck },
 ]
 
 function NavLink({ href, label, icon: Icon, exact }: (typeof NAV_ITEMS)[number]) {

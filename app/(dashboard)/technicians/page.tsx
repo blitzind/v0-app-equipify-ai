@@ -1232,6 +1232,12 @@ export default function TechniciansPage() {
             </SelectContent>
           </Select>
 
+          <Link
+            href="/technicians/daily"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+          >
+            <CalendarDays className="w-4 h-4" /> Daily View
+          </Link>
           <Button className="gap-2 shrink-0 cursor-pointer h-9 ml-auto" onClick={() => setShowAddModal(true)}>
             <Plus className="w-4 h-4" /> Add Technician
           </Button>

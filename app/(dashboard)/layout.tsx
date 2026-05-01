@@ -11,6 +11,7 @@ import { CustomerProvider } from "@/lib/customer-store"
 import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 

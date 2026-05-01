@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MaintenancePlanDrawer } from "@/components/drawers/maintenance-plan-drawer"
+import { AppointmentActions } from "@/components/appointments/appointment-actions"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -173,6 +174,7 @@ function MonthSection({
                     <p className="text-xs text-muted-foreground truncate">{plan.customerName} — {plan.equipmentName} — {plan.location}</p>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       <span className="text-xs text-muted-foreground">Technician: <span className="text-foreground font-medium">{plan.technicianName}</span></span>
+
                       {plan.services.length > 0 && (
                         <span className="text-xs text-muted-foreground">{plan.services.length} service{plan.services.length !== 1 ? "s" : ""}</span>
                       )}
@@ -180,6 +182,22 @@ function MonthSection({
                         Est. ${plan.services.reduce((a, s) => a + s.estimatedCost, 0).toLocaleString()}
                       </span>
                     </div>
+                    {plan.location && (
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <AppointmentActions
+                          address={plan.location}
+                          emailParams={{
+                            customerName:  plan.customerName,
+                            equipmentName: plan.equipmentName,
+                            technicianName: plan.technicianName,
+                            scheduledDate:  plan.nextDueDate,
+                            address:        plan.location,
+                            workOrderId:    plan.id,
+                            ccEmails:       ["service@equipify.ai"],
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Notification chips */}
