@@ -3,9 +3,15 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useWorkOrders } from "@/lib/work-order-store"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
-import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
+import type {
+  WorkOrder,
+  WorkOrderStatus,
+  WorkOrderPriority,
+  WorkOrderType,
+  RepairLog,
+} from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +80,94 @@ const KANBAN_HEADER: Record<WorkOrderStatus, string> = {
 
 type ViewMode = "kanban" | "table" | "calendar"
 type SortKey = "id" | "customerName" | "scheduledDate" | "priority" | "status"
+
+type DbWorkOrderRow = {
+  id: string
+  customer_id: string
+  equipment_id: string
+  title: string
+  status: string
+  priority: string
+  type: string
+  scheduled_on: string | null
+  scheduled_time: string | null
+  completed_at: string | null
+  assigned_user_id: string | null
+  created_at: string
+  invoice_number: string | null
+  total_labor_cents: number
+  total_parts_cents: number
+  notes: string | null
+}
+
+function emptyRepairLog(): RepairLog {
+  return {
+    problemReported: "",
+    diagnosis: "",
+    partsUsed: [],
+    laborHours: 0,
+    technicianNotes: "",
+    photos: [],
+    signatureDataUrl: "",
+    signedBy: "",
+    signedAt: "",
+  }
+}
+
+function mapDbStatus(status: string): WorkOrderStatus {
+  switch (status) {
+    case "open":
+      return "Open"
+    case "scheduled":
+      return "Scheduled"
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "invoiced":
+      return "Invoiced"
+    default:
+      return "Open"
+  }
+}
+
+function mapDbPriority(priority: string): WorkOrderPriority {
+  switch (priority) {
+    case "low":
+      return "Low"
+    case "normal":
+      return "Normal"
+    case "high":
+      return "High"
+    case "critical":
+      return "Critical"
+    default:
+      return "Normal"
+  }
+}
+
+function mapDbType(type: string): WorkOrderType {
+  switch (type) {
+    case "repair":
+      return "Repair"
+    case "pm":
+      return "PM"
+    case "inspection":
+      return "Inspection"
+    case "install":
+      return "Install"
+    case "emergency":
+      return "Emergency"
+    default:
+      return "Repair"
+  }
+}
+
+function formatScheduledTime(isoOrTime: string | null): string {
+  if (!isoOrTime) return ""
+  const t = isoOrTime.includes("T") ? isoOrTime.slice(11, 16) : isoOrTime.slice(0, 5)
+  return t || ""
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -384,7 +478,141 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 // ─── Main page ─────────────────────────────────────────��──────────────────────
 
 function WorkOrdersPageInner() {
-  const { workOrders } = useWorkOrders()
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadWorkOrders() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) setWorkOrders([])
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (active) setWorkOrders([])
+        return
+      }
+
+      const orgId = profile.default_organization_id
+
+      const { data: rows, error: woError } = await supabase
+        .from("work_orders")
+        .select(
+          "id, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes"
+        )
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+
+      if (woError || !rows) {
+        if (active) setWorkOrders([])
+        return
+      }
+
+      const list = rows as DbWorkOrderRow[]
+      const customerIds = [...new Set(list.map((r) => r.customer_id))]
+      const equipmentIds = [...new Set(list.map((r) => r.equipment_id))]
+      const assigneeIds = [
+        ...new Set(list.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
+      ]
+
+      const customerMap = new Map<string, string>()
+      if (customerIds.length > 0) {
+        const { data: custRows } = await supabase
+          .from("customers")
+          .select("id, company_name")
+          .eq("organization_id", orgId)
+          .in("id", customerIds)
+
+        ;((custRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((c) => {
+          customerMap.set(c.id, c.company_name)
+        })
+      }
+
+      const equipmentMap = new Map<string, { name: string; location: string }>()
+      if (equipmentIds.length > 0) {
+        const { data: eqRows } = await supabase
+          .from("equipment")
+          .select("id, name, location_label")
+          .eq("organization_id", orgId)
+          .in("id", equipmentIds)
+
+        ;((eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ?? []).forEach(
+          (e) => {
+            equipmentMap.set(e.id, { name: e.name, location: e.location_label ?? "" })
+          }
+        )
+      }
+
+      const profileMap = new Map<string, string>()
+      if (assigneeIds.length > 0) {
+        const { data: profRows } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", assigneeIds)
+
+        ;(
+          (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []
+        ).forEach((p) => {
+          const label =
+            (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician"
+          profileMap.set(p.id, label)
+        })
+      }
+
+      const mapped: WorkOrder[] = list.map((row) => {
+        const eq = equipmentMap.get(row.equipment_id)
+        const techId = row.assigned_user_id ?? "unassigned"
+        const techName = row.assigned_user_id
+          ? (profileMap.get(row.assigned_user_id) ?? "Unknown")
+          : "Unassigned"
+
+        return {
+          id: row.id,
+          customerId: row.customer_id,
+          customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
+          equipmentId: row.equipment_id,
+          equipmentName: eq?.name ?? "Equipment",
+          location: eq?.location ?? "",
+          type: mapDbType(row.type),
+          status: mapDbStatus(row.status),
+          priority: mapDbPriority(row.priority),
+          technicianId: techId,
+          technicianName: techName,
+          scheduledDate: row.scheduled_on ?? "",
+          scheduledTime: formatScheduledTime(row.scheduled_time),
+          completedDate: row.completed_at ? row.completed_at.slice(0, 10) : "",
+          createdAt: row.created_at,
+          createdBy: "",
+          description: row.title,
+          repairLog: emptyRepairLog(),
+          totalLaborCost: row.total_labor_cents / 100,
+          totalPartsCost: row.total_parts_cents / 100,
+          invoiceNumber: row.invoice_number ?? "",
+        }
+      })
+
+      if (active) setWorkOrders(mapped)
+    }
+
+    void loadWorkOrders()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const [view, setView] = useState<ViewMode>("kanban")
   const [search, setSearch] = useState("")
