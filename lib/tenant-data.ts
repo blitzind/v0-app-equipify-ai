@@ -1,6 +1,6 @@
 import type { PlanId } from "./plans"
 
-export type UserRole = "Admin" | "Manager" | "Tech" | "Read Only"
+export type UserRole = "Owner" | "Admin" | "Dispatcher" | "Technician" | "Billing" | "Sales" | "Read Only"
 
 export const ROLE_PERMISSIONS: Record<UserRole, {
   canManageWorkspace: boolean
@@ -16,7 +16,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, {
   canViewBilling: boolean
   canAccessPortal: boolean
 }> = {
-  Admin: {
+  Owner: {
     canManageWorkspace: true,
     canManageBilling: true,
     canManageTeam: true,
@@ -30,7 +30,21 @@ export const ROLE_PERMISSIONS: Record<UserRole, {
     canViewBilling: true,
     canAccessPortal: true,
   },
-  Manager: {
+  Admin: {
+    canManageWorkspace: true,
+    canManageBilling: false,
+    canManageTeam: true,
+    canCreateWorkOrders: true,
+    canEditWorkOrders: true,
+    canDeleteWorkOrders: true,
+    canCreateEquipment: true,
+    canEditEquipment: true,
+    canViewInsights: true,
+    canManagePlans: true,
+    canViewBilling: true,
+    canAccessPortal: true,
+  },
+  Dispatcher: {
     canManageWorkspace: false,
     canManageBilling: false,
     canManageTeam: false,
@@ -41,10 +55,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, {
     canEditEquipment: true,
     canViewInsights: true,
     canManagePlans: true,
-    canViewBilling: true,
+    canViewBilling: false,
     canAccessPortal: true,
   },
-  Tech: {
+  Technician: {
     canManageWorkspace: false,
     canManageBilling: false,
     canManageTeam: false,
@@ -57,6 +71,34 @@ export const ROLE_PERMISSIONS: Record<UserRole, {
     canManagePlans: false,
     canViewBilling: false,
     canAccessPortal: false,
+  },
+  Billing: {
+    canManageWorkspace: false,
+    canManageBilling: true,
+    canManageTeam: false,
+    canCreateWorkOrders: false,
+    canEditWorkOrders: false,
+    canDeleteWorkOrders: false,
+    canCreateEquipment: false,
+    canEditEquipment: false,
+    canViewInsights: false,
+    canManagePlans: false,
+    canViewBilling: true,
+    canAccessPortal: false,
+  },
+  Sales: {
+    canManageWorkspace: false,
+    canManageBilling: false,
+    canManageTeam: false,
+    canCreateWorkOrders: true,
+    canEditWorkOrders: false,
+    canDeleteWorkOrders: false,
+    canCreateEquipment: false,
+    canEditEquipment: false,
+    canViewInsights: true,
+    canManagePlans: false,
+    canViewBilling: false,
+    canAccessPortal: true,
   },
   "Read Only": {
     canManageWorkspace: false,
@@ -183,19 +225,19 @@ export const MOCK_USERS: TenantUser[] = [
   // Acme workspace
   {
     id: "u-01", name: "Sarah Mitchell", email: "sarah@acme.com",
-    role: "Admin", avatar: "", joinedAt: "2024-01-15", lastActive: "2026-04-30", status: "Active",
+    role: "Owner", avatar: "", joinedAt: "2024-01-15", lastActive: "2026-04-30", status: "Active",
   },
   {
     id: "u-02", name: "Marcus Webb", email: "marcus@acme.com",
-    role: "Tech", avatar: "", joinedAt: "2024-02-01", lastActive: "2026-04-30", status: "Active",
+    role: "Technician", avatar: "", joinedAt: "2024-02-01", lastActive: "2026-04-30", status: "Active",
   },
   {
     id: "u-03", name: "Sandra Liu", email: "sandra@acme.com",
-    role: "Tech", avatar: "", joinedAt: "2024-02-01", lastActive: "2026-04-29", status: "Active",
+    role: "Technician", avatar: "", joinedAt: "2024-02-01", lastActive: "2026-04-29", status: "Active",
   },
   {
     id: "u-04", name: "Tyler Oakes", email: "tyler@acme.com",
-    role: "Manager", avatar: "", joinedAt: "2024-03-15", lastActive: "2026-04-28", status: "Active",
+    role: "Dispatcher", avatar: "", joinedAt: "2024-03-15", lastActive: "2026-04-28", status: "Active",
   },
   {
     id: "u-05", name: "Jordan Kim", email: "jordan@acme.com",
@@ -204,28 +246,28 @@ export const MOCK_USERS: TenantUser[] = [
   // Zephyr workspace
   {
     id: "u-06", name: "Priya Mehta", email: "priya@zephyr.com",
-    role: "Admin", avatar: "", joinedAt: "2026-04-14", lastActive: "2026-04-30", status: "Active",
+    role: "Owner", avatar: "", joinedAt: "2026-04-14", lastActive: "2026-04-30", status: "Active",
   },
   {
     id: "u-07", name: "James Torres", email: "james@zephyr.com",
-    role: "Tech", avatar: "", joinedAt: "2026-04-14", lastActive: "2026-04-30", status: "Active",
+    role: "Technician", avatar: "", joinedAt: "2026-04-14", lastActive: "2026-04-30", status: "Active",
   },
   // Medology Solutions workspace
   {
     id: "u-08", name: "Megan Brooks", email: "m.brooks@medology.com",
-    role: "Admin", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
+    role: "Owner", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
   },
   {
     id: "u-09", name: "Josh Reynolds", email: "j.reynolds@medology.com",
-    role: "Tech", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
+    role: "Technician", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-30", status: "Active",
   },
   {
     id: "u-10", name: "Emily Carter", email: "e.carter@medology.com",
-    role: "Tech", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-29", status: "Active",
+    role: "Dispatcher", avatar: "", joinedAt: "2024-06-01", lastActive: "2026-04-29", status: "Active",
   },
   {
     id: "u-11", name: "Brandon Ellis", email: "b.ellis@medology.com",
-    role: "Tech", avatar: "", joinedAt: "2024-07-15", lastActive: "2026-04-28", status: "Active",
+    role: "Technician", avatar: "", joinedAt: "2024-07-15", lastActive: "2026-04-28", status: "Active",
   },
 ]
 

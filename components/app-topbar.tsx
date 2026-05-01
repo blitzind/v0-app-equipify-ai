@@ -7,7 +7,7 @@ import {
   Bell, Search, ChevronDown,
   User, BellRing, Shield,
   Building2, Users,
-  CreditCard, Plug, Settings,
+  CreditCard, Plug, Settings, ShieldCheck,
   LogOut, ChevronRight, Menu, X,
   AlertCircle, Repeat2, ShieldAlert, CheckCircle2, CalendarClock, UserCog,
 } from "lucide-react"
@@ -163,14 +163,14 @@ const NOTIFICATIONS_BY_WORKSPACE: Record<string, Notification[]> = {
 // ─── Account hub sections ─────────────────────────────────────────────────────
 
 const LAUNCHER_LINKS = [
-  { icon: User,       label: "My Profile",    href: "/settings/general" },
-  { icon: BellRing,   label: "Notifications", href: "/settings/notifications" },
-  { icon: Shield,     label: "Security",      href: "/settings/security" },
-  { icon: Settings,   label: "Settings",      href: "/settings/general" },
-  { icon: Users,      label: "Team",          href: "/settings/team" },
-  { icon: CreditCard, label: "Billing",       href: "/settings/billing" },
-  { icon: Plug,       label: "Integrations",  href: "/settings/integrations" },
-  { icon: Building2,  label: "Workspace",     href: "/settings/workspace" },
+  { icon: User,        label: "My Profile",      href: "/settings/general" },
+  { icon: BellRing,    label: "Notifications",   href: "/settings/notifications" },
+  { icon: Shield,      label: "Security",        href: "/settings/security" },
+  { icon: Settings,    label: "Settings",        href: "/settings/general" },
+  { icon: Users,       label: "Team",            href: "/settings/team" },
+  { icon: CreditCard,  label: "Billing",         href: "/settings/billing" },
+  { icon: Plug,        label: "Integrations",    href: "/settings/integrations" },
+  { icon: ShieldCheck, label: "Platform Admin",  href: "/admin" },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────

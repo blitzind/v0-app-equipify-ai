@@ -4,14 +4,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   User, Building2, Users, CreditCard, Bell,
-  Zap, Plug, Shield, Code2, ScrollText, Wrench,
+  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
   { label: "General",         href: "/settings/general",         icon: User },
   { label: "Workspace",       href: "/settings/workspace",       icon: Building2 },
   { label: "Team",            href: "/settings/team",            icon: Users },
+  { label: "Permissions",     href: "/settings/permissions",     icon: Lock },
   { label: "Billing",         href: "/settings/billing",         icon: CreditCard },
   { label: "Notifications",   href: "/settings/notifications",   icon: Bell },
   { label: "Automations",     href: "/settings/automations",     icon: Zap },

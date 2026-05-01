@@ -77,7 +77,7 @@ interface TenantContextValue extends TenantState {
   plan: ReturnType<typeof getPlan>
   workspaceUsers: TenantUser[]
   workspaceData: WorkspaceDataBundle
-  can: (permission: keyof typeof import("./tenant-data").ROLE_PERMISSIONS["Admin"]) => boolean
+  can: (permission: keyof typeof import("./tenant-data").ROLE_PERMISSIONS["Owner"]) => boolean
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null)
@@ -98,16 +98,19 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const plan = getPlan(state.workspace.planId)
   const workspaceData = getWorkspaceData(state.workspace.id)
 
-  // Import inline to avoid circular — permissions table
+  // Permissions map — mirrors ROLE_PERMISSIONS in tenant-data.ts
   const PERMS = {
-    Admin:       { canManageWorkspace:true, canManageBilling:true, canManageTeam:true, canCreateWorkOrders:true, canEditWorkOrders:true, canDeleteWorkOrders:true, canCreateEquipment:true, canEditEquipment:true, canViewInsights:true, canManagePlans:true, canViewBilling:true, canAccessPortal:true },
-    Manager:     { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:true, canEditWorkOrders:true, canDeleteWorkOrders:false, canCreateEquipment:true, canEditEquipment:true, canViewInsights:true, canManagePlans:true, canViewBilling:true, canAccessPortal:true },
-    Tech:        { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:false, canEditWorkOrders:true, canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:false, canManagePlans:false, canViewBilling:false, canAccessPortal:false },
-    "Read Only": { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:false, canEditWorkOrders:false, canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:true, canManagePlans:false, canViewBilling:false, canAccessPortal:true },
+    Owner:       { canManageWorkspace:true,  canManageBilling:true,  canManageTeam:true,  canCreateWorkOrders:true,  canEditWorkOrders:true,  canDeleteWorkOrders:true,  canCreateEquipment:true,  canEditEquipment:true,  canViewInsights:true,  canManagePlans:true,  canViewBilling:true,  canAccessPortal:true },
+    Admin:       { canManageWorkspace:true,  canManageBilling:false, canManageTeam:true,  canCreateWorkOrders:true,  canEditWorkOrders:true,  canDeleteWorkOrders:true,  canCreateEquipment:true,  canEditEquipment:true,  canViewInsights:true,  canManagePlans:true,  canViewBilling:true,  canAccessPortal:true },
+    Dispatcher:  { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:true,  canEditWorkOrders:true,  canDeleteWorkOrders:false, canCreateEquipment:true,  canEditEquipment:true,  canViewInsights:true,  canManagePlans:true,  canViewBilling:false, canAccessPortal:true },
+    Technician:  { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:false, canEditWorkOrders:true,  canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:false, canManagePlans:false, canViewBilling:false, canAccessPortal:false },
+    Billing:     { canManageWorkspace:false, canManageBilling:true,  canManageTeam:false, canCreateWorkOrders:false, canEditWorkOrders:false, canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:false, canManagePlans:false, canViewBilling:true,  canAccessPortal:false },
+    Sales:       { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:true,  canEditWorkOrders:false, canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:true,  canManagePlans:false, canViewBilling:false, canAccessPortal:true },
+    "Read Only": { canManageWorkspace:false, canManageBilling:false, canManageTeam:false, canCreateWorkOrders:false, canEditWorkOrders:false, canDeleteWorkOrders:false, canCreateEquipment:false, canEditEquipment:false, canViewInsights:true,  canManagePlans:false, canViewBilling:false, canAccessPortal:true },
   } as const
 
   const can = useCallback(
-    (permission: keyof typeof PERMS["Admin"]) =>
+    (permission: keyof typeof PERMS["Owner"]) =>
       PERMS[state.currentUser.role]?.[permission] ?? false,
     [state.currentUser.role]
   )
