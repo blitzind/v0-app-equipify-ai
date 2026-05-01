@@ -394,7 +394,7 @@ export default function ServiceSchedulePage() {
   const { plans } = useMaintenancePlans()
   const { createWorkOrder, workOrders } = useWorkOrders()
 
-  const [viewMode, setViewMode]         = useState<ViewMode>("4")
+  const [viewMode, setViewMode]         = useState<ViewMode>("1")
   const [offset, setOffset]             = useState(0)
   const [customerFilter, setCustomerFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
@@ -553,26 +553,8 @@ export default function ServiceSchedulePage() {
           </SelectContent>
         </Select>
 
-        {/* Spacer */}
-        <span className="flex-1 hidden sm:block" />
-
-        {/* Schedule Service CTA */}
-        <Button
-          size="sm"
-          className="gap-1.5 shrink-0 h-9"
-          onClick={() => setScheduleOpen(true)}
-        >
-          <Plus className="w-4 h-4" />
-          Schedule Service
-        </Button>
-
-        {/* Services-in-view count */}
-        <span className="text-xs text-muted-foreground shrink-0 sm:hidden">
-          {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
-        </span>
-
         {/* Date navigation group */}
-        <div className="flex items-center gap-1 shrink-0 ml-auto sm:ml-0">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="outline"
             size="icon-sm"
@@ -607,11 +589,24 @@ export default function ServiceSchedulePage() {
           )}
         </div>
 
-        {/* Services count — desktop only */}
-        <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
-          {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
-        </span>
+        {/* Spacer — pushes CTA to far right */}
+        <span className="flex-1" />
+
+        {/* Schedule Service CTA — primary action, flush right */}
+        <Button
+          size="sm"
+          className="gap-1.5 shrink-0 h-9"
+          onClick={() => setScheduleOpen(true)}
+        >
+          <Plus className="w-4 h-4" />
+          Schedule Service
+        </Button>
       </div>
+
+      {/* Services-in-view count — below toolbar, left-aligned */}
+      <p className="text-xs text-muted-foreground -mt-3">
+        {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
+      </p>
 
       {/* ── Two-column layout: timeline + sidebar ─────────────────────────── */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
