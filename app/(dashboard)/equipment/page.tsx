@@ -3,12 +3,11 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useEquipment } from "@/lib/equipment-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
-import type { Equipment } from "@/lib/mock-data"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { AIScanModal } from "@/components/equipment/ai-scan-modal"
 import { cn } from "@/lib/utils"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -57,6 +56,35 @@ import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 type SortKey = "model" | "customerName" | "nextDueDate" | "lastServiceDate" | "category"
 type SortDir = "asc" | "desc"
 type ViewMode = "table" | "card"
+
+type EquipmentStatus = "Active" | "Needs Service" | "Out of Service" | "In Repair"
+
+type Equipment = {
+  id: string
+  customerId: string
+  customerName: string
+  model: string
+  manufacturer: string
+  category: string
+  serialNumber: string
+  lastServiceDate: string
+  nextDueDate: string
+  status: EquipmentStatus
+  location: string
+}
+
+type DbEquipmentRow = {
+  id: string
+  customer_id: string
+  name: string
+  manufacturer: string | null
+  category: string | null
+  serial_number: string | null
+  status: "active" | "needs_service" | "out_of_service" | "in_repair"
+  last_service_at: string | null
+  next_due_at: string | null
+  location_label: string | null
+}
 
 const statusColors: Record<Equipment["status"], string> = {
   "Active": "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
@@ -155,7 +183,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 }
 
 function EquipmentPageInner() {
-  const { equipment } = useEquipment()
+  const [equipment, setEquipment] = useState<Equipment[]>([])
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -180,6 +208,91 @@ function EquipmentPageInner() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [scanModalOpen, setScanModalOpen] = useState(false)
   useQuickAdd("new-equipment", () => setAddModalOpen(true))
+
+  useEffect(() => {
+    let active = true
+
+    async function loadEquipment() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) setEquipment([])
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (active) setEquipment([])
+        return
+      }
+
+      const orgId = profile.default_organization_id
+
+      const { data: equipmentRows, error: equipmentError } = await supabase
+        .from("equipment")
+        .select("id, customer_id, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label")
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+
+      if (equipmentError || !equipmentRows) {
+        if (active) setEquipment([])
+        return
+      }
+
+      const customerIds = [...new Set((equipmentRows as DbEquipmentRow[]).map((row) => row.customer_id))]
+      let customerMap = new Map<string, string>()
+
+      if (customerIds.length > 0) {
+        const { data: customerRows } = await supabase
+          .from("customers")
+          .select("id, company_name")
+          .eq("organization_id", orgId)
+          .in("id", customerIds)
+
+        ;((customerRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((row) => {
+          customerMap.set(row.id, row.company_name)
+        })
+      }
+
+      const statusMap: Record<DbEquipmentRow["status"], EquipmentStatus> = {
+        active: "Active",
+        needs_service: "Needs Service",
+        out_of_service: "Out of Service",
+        in_repair: "In Repair",
+      }
+
+      const mapped = (equipmentRows as DbEquipmentRow[]).map((row) => ({
+        id: row.id,
+        customerId: row.customer_id,
+        customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
+        model: row.name,
+        manufacturer: row.manufacturer ?? "",
+        category: row.category ?? "General",
+        serialNumber: row.serial_number ?? "",
+        lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
+        nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
+        status: statusMap[row.status] ?? "Active",
+        location: row.location_label ?? "—",
+      }))
+
+      if (active) setEquipment(mapped)
+    }
+
+    void loadEquipment()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -210,7 +323,7 @@ function EquipmentPageInner() {
     })
 
     return list
-  }, [search, statusFilter, categoryFilter, sortKey, sortDir])
+  }, [equipment, search, statusFilter, categoryFilter, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
