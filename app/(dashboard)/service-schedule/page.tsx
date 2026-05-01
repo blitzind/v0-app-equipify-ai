@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
