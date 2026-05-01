@@ -41,13 +41,13 @@ export function RecentWorkOrders() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">WO #</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Customer</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Equipment</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Technician</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Priority</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Status</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Due</th>
+                <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">WO #</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Customer</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Equipment</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Technician</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Priority</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Status</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Due</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

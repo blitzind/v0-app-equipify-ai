@@ -154,6 +154,10 @@
   --portal-shadow-sm:    0 1px 2px 0 rgb(0 0 0 / 0.05);
   --portal-shadow:       0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
   --portal-shadow-md:    0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  /* Elevation tokens */
+  --shadow-card:         0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card-hover:   0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-dropdown:     0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
 }
 
 @layer base {
@@ -350,7 +354,7 @@
     font-feature-settings: "tnum";
   }
 
-  /* ── Table sort header button ────────────────────────���────��────���───���──────
+  /* ── Table sort header button ────────────────────────�����────��────���───���──────
      Used inside <TableHead> for sortable columns.                           */
   .ds-btn-sort {
     @apply inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none;
