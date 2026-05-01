@@ -128,27 +128,14 @@ function nextOpenSlot(
   return null
 }
 
-// ─── Drawer-safe SelectContent ───────────────────────────────────────────────
-// Removes the slide-from-left/right animations that fire inside a right Sheet.
-
+// DrawerSelectContent — thin alias with popper positioning
 function DrawerSelectContent({
   children,
   className,
   ...props
 }: React.ComponentProps<typeof SelectContent>) {
   return (
-    <SelectContent
-      className={cn(
-        // Remove left/right slide-ins; keep only vertical fade+slide
-        "[&[data-side=right]]:slide-in-from-left-0 [&[data-side=left]]:slide-in-from-right-0",
-        "data-[side=right]:translate-x-0 data-[side=left]:translate-x-0",
-        className,
-      )}
-      position="popper"
-      side="bottom"
-      align="start"
-      {...props}
-    >
+    <SelectContent position="popper" side="bottom" align="start" className={className} {...props}>
       {children}
     </SelectContent>
   )
