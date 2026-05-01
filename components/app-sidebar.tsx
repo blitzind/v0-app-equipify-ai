@@ -8,7 +8,7 @@ import { useTenant } from "@/lib/tenant-store"
 import { MOCK_WORKSPACES } from "@/lib/tenant-data"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
-  ShieldCheck, HardHat, BarChart3, Globe,
+  ShieldCheck, HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
   Building2, X, FileText, Receipt,
 } from "lucide-react"
@@ -51,12 +51,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
-    ],
-  },
-  {
-    label: "Customer Experience",
-    items: [
-      { label: "Customer Portal", href: "/portal", icon: Globe, requirePerm: "canAccessPortal" },
     ],
   },
 ]

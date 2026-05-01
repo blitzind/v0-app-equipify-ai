@@ -17,6 +17,8 @@ import {
 import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
   ExternalLink, Pencil, X, Check,
+  Globe, Send, Link2, RotateCcw, Clock, Activity,
+  Paintbrush, LayoutGrid, UserCog, ShieldOff, ShieldCheck,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 
@@ -86,6 +88,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Customer>>({})
+  const [portalEnabled, setPortalEnabled] = useState(true)
+  const [portalModules, setPortalModules] = useState({
+    workOrders: true,
+    invoices: true,
+    equipment: true,
+    quotes: false,
+    documents: false,
+  })
 
   const customer = customerId ? customers.find((c) => c.id === customerId) ?? null : null
   const custEquipment = customer ? equipment.filter((e) => e.customerId === customer.id) : []
@@ -387,6 +397,139 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No service history.</p>
           )}
+        </DrawerSection>
+
+        {/* Portal Access */}
+        <DrawerSection title="Portal Access">
+          {/* Status bar */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border mb-3">
+            <div className="flex items-center gap-2.5">
+              <div className={cn(
+                "w-2 h-2 rounded-full shrink-0",
+                portalEnabled ? "bg-[color:var(--status-success)]" : "bg-muted-foreground/40"
+              )} />
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  {portalEnabled ? "Portal Active" : "Portal Disabled"}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Last login: Apr 28, 2026 at 3:14 PM
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setPortalEnabled((v) => !v); toast(portalEnabled ? "Portal access disabled" : "Portal access enabled") }}
+              className={cn(
+                "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors",
+                portalEnabled
+                  ? "border-[color:var(--status-danger)]/30 text-[color:var(--status-danger)] hover:bg-[color:var(--status-danger)]/8"
+                  : "border-[color:var(--status-success)]/30 text-[color:var(--status-success)] hover:bg-[color:var(--status-success)]/8"
+              )}
+            >
+              {portalEnabled ? <ShieldOff size={12} /> : <ShieldCheck size={12} />}
+              {portalEnabled ? "Disable" : "Enable"}
+            </button>
+          </div>
+
+          {/* Quick actions */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[
+              { icon: Globe,      label: "View as Customer",   action: "Opened portal preview" },
+              { icon: Send,       label: "Send Portal Invite", action: "Portal invite sent" },
+              { icon: Link2,      label: "Copy Magic Link",    action: "Magic login link copied" },
+              { icon: RotateCcw,  label: "Reset Portal Access",action: "Portal access reset" },
+            ].map(({ icon: Icon, label, action }) => (
+              <button
+                key={label}
+                onClick={() => toast(action)}
+                disabled={!portalEnabled && label !== "Send Portal Invite"}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icon size={13} className="text-muted-foreground shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Activity */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => toast("Viewing portal activity log")}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Activity size={12} />
+              View portal activity log
+            </button>
+            <span className="text-muted-foreground/40">·</span>
+            <button
+              onClick={() => toast("Opening last login details")}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Clock size={12} />
+              Last login details
+            </button>
+          </div>
+
+          {/* Admin controls */}
+          <div className="border-t border-border pt-3 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">Admin Controls</p>
+
+            {/* Branding + contacts */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => toast("Opening branding editor")}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors"
+              >
+                <Paintbrush size={12} className="text-muted-foreground" />
+                Edit Branding
+              </button>
+              <button
+                onClick={() => toast("Managing portal contacts")}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors"
+              >
+                <UserCog size={12} className="text-muted-foreground" />
+                Portal Contacts
+              </button>
+            </div>
+
+            {/* Module toggles */}
+            <div className="pt-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">Enabled Modules</p>
+              <div className="space-y-1.5">
+                {(Object.entries(portalModules) as [keyof typeof portalModules, boolean][]).map(([key, enabled]) => {
+                  const labels: Record<keyof typeof portalModules, string> = {
+                    workOrders: "Work Orders",
+                    invoices: "Invoices",
+                    equipment: "Equipment",
+                    quotes: "Quotes",
+                    documents: "Documents",
+                  }
+                  return (
+                    <div key={key} className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid size={11} className="text-muted-foreground" />
+                        <span className="text-xs text-foreground">{labels[key]}</span>
+                      </div>
+                      <button
+                        onClick={() => setPortalModules((m) => ({ ...m, [key]: !m[key] }))}
+                        className={cn(
+                          "relative w-8 h-4 rounded-full transition-colors shrink-0",
+                          enabled ? "bg-primary" : "bg-muted-foreground/25"
+                        )}
+                        role="switch"
+                        aria-checked={enabled}
+                      >
+                        <span className={cn(
+                          "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
+                          enabled ? "translate-x-4" : "translate-x-0.5"
+                        )} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         </DrawerSection>
 
         {/* Notes */}

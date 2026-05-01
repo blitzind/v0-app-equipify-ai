@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   User, Building2, Users, CreditCard, Bell,
-  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock,
+  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { label: "Billing",         href: "/settings/billing",         icon: CreditCard },
   { label: "Notifications",   href: "/settings/notifications",   icon: Bell },
   { label: "Automations",     href: "/settings/automations",     icon: Zap },
+  { label: "Customer Portal", href: "/settings/portal",          icon: Globe },
   { label: "Integrations",    href: "/settings/integrations",    icon: Plug },
   { label: "Security",        href: "/settings/security",        icon: Shield },
   { label: "API / Developers",href: "/settings/api",             icon: Code2 },
