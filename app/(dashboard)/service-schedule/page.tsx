@@ -603,11 +603,6 @@ export default function ServiceSchedulePage() {
         </Button>
       </div>
 
-      {/* Services-in-view count — below toolbar, left-aligned */}
-      <p className="text-xs text-muted-foreground -mt-3">
-        {totalVisible} service{totalVisible !== 1 ? "s" : ""} in view
-      </p>
-
       {/* ── Two-column layout: timeline + sidebar ─────────────────────────── */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
