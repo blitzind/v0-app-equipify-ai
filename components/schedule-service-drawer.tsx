@@ -688,7 +688,6 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
 
             </div>
           </div>
-        )}
 
           {/* Footer */}
           <div className="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
