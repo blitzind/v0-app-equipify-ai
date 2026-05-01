@@ -13,25 +13,52 @@ import {
   Building2, X, FileText, Receipt,
 } from "lucide-react"
 
-const NAV_ITEMS: {
+type NavItem = {
   label: string
   href: string
   icon: React.ElementType
   highlight?: boolean
   requirePerm?: "canViewInsights" | "canAccessPortal" | "canViewBilling"
-}[] = [
-  { label: "Dashboard",         href: "/",                   icon: LayoutDashboard },
-  { label: "Customers",         href: "/customers",          icon: Users },
-  { label: "Equipment",         href: "/equipment",          icon: Wrench },
-  { label: "Work Orders",       href: "/work-orders",        icon: ClipboardList },
-  { label: "Service Schedule",  href: "/service-schedule",   icon: CalendarClock },
-  { label: "Maintenance Plans", href: "/maintenance-plans",  icon: ShieldCheck },
-  { label: "Technicians",       href: "/technicians",        icon: HardHat },
-  { label: "Quotes",             href: "/quotes",             icon: FileText },
-  { label: "Invoices",          href: "/invoices",           icon: Receipt },
-  { label: "Reports",           href: "/reports",            icon: BarChart3 },
-  { label: "AI Insights",       href: "/insights",           icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
-  { label: "Customer Portal",   href: "/portal",             icon: Globe, requirePerm: "canAccessPortal" },
+}
+
+type NavGroup = {
+  label: string
+  items: NavItem[]
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Operations",
+    items: [
+      { label: "Dashboard",         href: "/",                  icon: LayoutDashboard },
+      { label: "Customers",         href: "/customers",         icon: Users },
+      { label: "Equipment",         href: "/equipment",         icon: Wrench },
+      { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },
+      { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
+      { label: "Maintenance Plans", href: "/maintenance-plans", icon: ShieldCheck },
+      { label: "Technicians",       href: "/technicians",       icon: HardHat },
+    ],
+  },
+  {
+    label: "Sales & Finance",
+    items: [
+      { label: "Quotes",    href: "/quotes",    icon: FileText },
+      { label: "Invoices",  href: "/invoices",  icon: Receipt },
+      { label: "Reports",   href: "/reports",   icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
+    ],
+  },
+  {
+    label: "Customer Experience",
+    items: [
+      { label: "Customer Portal", href: "/portal", icon: Globe, requirePerm: "canAccessPortal" },
+    ],
+  },
 ]
 
 const PLAN_META: Record<string, { label: string; color: string }> = {
@@ -61,10 +88,10 @@ function SidebarBody({
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
   const planMeta = PLAN_META[workspace.planId] ?? PLAN_META["growth"]
 
-  const visibleNav = NAV_ITEMS.filter((item) => {
-    if (!item.requirePerm) return true
-    return can(item.requirePerm)
-  })
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.requirePerm || can(item.requirePerm)),
+  })).filter((group) => group.items.length > 0)
 
   // In mobile mode always show expanded; desktop respects collapsed state
   const isCollapsed = isMobile ? false : collapsed
@@ -139,37 +166,56 @@ function SidebarBody({
       </div>
 
       {/* ── Navigation ────────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-        {visibleNav.map(({ label, href, icon: Icon, highlight }) => {
-          const active = pathname === href || (href !== "/" && pathname.startsWith(href))
-          return (
-            <Link key={href} href={href} title={isCollapsed ? label : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-lg text-sm transition-all duration-100 group relative",
-                isCollapsed ? "justify-center h-11 w-11 mx-auto" : "h-11 px-3",
-                active
-                  ? "bg-primary text-white font-medium shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-              )}
-            >
-              {active && !isCollapsed && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-white/60" />
-              )}
-              <Icon className={cn(
-                "w-[18px] h-[18px] shrink-0 transition-all duration-100",
-                active ? "text-white" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground"
-              )} />
-              {!isCollapsed && (
-                <>
-                  <span className="truncate flex-1 font-medium">{label}</span>
-                  {highlight && !active && (
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">AI</span>
-                  )}
-                </>
-              )}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 overflow-y-auto py-2 px-3">
+        {visibleGroups.map((group, gi) => (
+          <div key={group.label} className={cn(gi > 0 && "mt-4")}>
+            {/* Group label — hidden when collapsed */}
+            {!isCollapsed && (
+              <p className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/35 select-none">
+                {group.label}
+              </p>
+            )}
+            {/* Collapsed: thin divider between groups instead of label */}
+            {isCollapsed && gi > 0 && (
+              <div className="my-2 mx-auto w-5 border-t border-sidebar-border" />
+            )}
+            <div className="space-y-0.5">
+              {group.items.map(({ label, href, icon: Icon, highlight }) => {
+                const active = pathname === href || (href !== "/" && pathname.startsWith(href))
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    title={isCollapsed ? label : undefined}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg text-sm transition-all duration-100 group relative",
+                      isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
+                      active
+                        ? "bg-primary text-white font-medium shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    {active && !isCollapsed && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-white/60" />
+                    )}
+                    <Icon className={cn(
+                      "w-[17px] h-[17px] shrink-0 transition-all duration-100",
+                      active ? "text-white" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground"
+                    )} />
+                    {!isCollapsed && (
+                      <>
+                        <span className="truncate flex-1 font-medium">{label}</span>
+                        {highlight && !active && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">AI</span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* ── Footer ────────────────────────────────────────────── */}
