@@ -26,9 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import {
-  LayoutGrid,
-  List,
   Search,
   Plus,
   ArrowUpDown,
@@ -226,34 +225,14 @@ export default function CustomersPage() {
           </SelectContent>
         </Select>
 
-        <div className="flex items-center gap-1 ml-auto">
-          <button
-            onClick={() => setViewMode("table")}
-            className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-              viewMode === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-            )}
-            aria-label="Table view"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("card")}
-            className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-              viewMode === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-            )}
-            aria-label="Card view"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setShowAddModal(true)}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Customer</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
         </div>
-
-        <Button size="sm" className="gap-2 shrink-0" onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Customer</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
       </div>
 
       {/* Count */}

@@ -35,9 +35,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import {
-  LayoutGrid,
-  List,
   Search,
   Plus,
   ArrowUpDown,
@@ -285,30 +284,9 @@ export default function EquipmentPage() {
           </Select>
         </div>
 
-        <div className="flex items-center gap-1 ml-auto">
-          <button
-            onClick={() => setViewMode("table")}
-            className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-              viewMode === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-            )}
-            aria-label="Table view"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("card")}
-            className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-              viewMode === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-            )}
-            aria-label="Card view"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-        </div>
-
-        <DropdownMenu>
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" className="gap-2 shrink-0 cursor-pointer">
               <Plus className="w-4 h-4" />
@@ -341,6 +319,7 @@ export default function EquipmentPage() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       {/* Bulk action bar */}

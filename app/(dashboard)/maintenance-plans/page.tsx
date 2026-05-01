@@ -60,6 +60,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ViewToggle } from "@/components/ui/view-toggle"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -753,7 +754,7 @@ export default function MaintenancePlansPage() {
   const [intervalFilter, setIntervalFilter] = useState<PlanInterval | "All">("All")
   const [selectedPlan, setSelectedPlan] = useState<MaintenancePlan | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [view, setView] = useState<"cards" | "table">("cards")
+  const [view, setView] = useState<"cards" | "table">("table")
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
@@ -830,22 +831,14 @@ export default function MaintenancePlansPage() {
             {(["Annual", "Semi-Annual", "Quarterly", "Monthly", "Custom"] as PlanInterval[]).map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 h-9 ml-auto">
-          <Plus className="w-4 h-4" /> New Plan
-        </Button>
-        <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
-          {([
-            { key: "cards", label: "Cards" },
-            { key: "table", label: "Table" },
-          ] as const).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setView(key)}
-              className={cn("px-3 py-1.5 text-xs rounded font-medium transition-colors", view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <ViewToggle
+            view={view === "cards" ? "card" : "table"}
+            onViewChange={(v) => setView(v === "card" ? "cards" : "table")}
+          />
+          <Button onClick={() => setCreateOpen(true)} className="gap-2 h-9">
+            <Plus className="w-4 h-4" /> New Plan
+          </Button>
         </div>
       </div>
 

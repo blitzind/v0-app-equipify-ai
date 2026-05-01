@@ -15,9 +15,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Card } from "@/components/ui/card"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
-  FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban,
+  FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban, Building2,
 } from "lucide-react"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
@@ -116,6 +117,7 @@ export default function QuotesPage() {
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc")
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"table" | "card">("table")
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -194,11 +196,14 @@ export default function QuotesPage() {
           </SelectContent>
         </Select>
 
-        <Button size="sm" className="gap-2 ml-auto shrink-0 cursor-pointer" onClick={() => setNewModalOpen(true)}>
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Quote</span>
-          <span className="sm:hidden">New</span>
-        </Button>
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setNewModalOpen(true)}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New Quote</span>
+            <span className="sm:hidden">New</span>
+          </Button>
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground -mt-1">
@@ -218,8 +223,51 @@ export default function QuotesPage() {
         </div>
       )}
 
+      {/* Card view */}
+      {viewMode === "card" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.length === 0 ? (
+            <div className="col-span-full text-center py-16 text-muted-foreground text-sm">No quotes match the current filters.</div>
+          ) : filtered.map(qt => {
+            const cfg = STATUS_CONFIG[qt.status]
+            const StatusIcon = cfg.icon
+            return (
+              <div
+                key={qt.id}
+                className="bg-card rounded-xl border border-border p-4 flex flex-col gap-3 cursor-pointer hover:border-primary/30 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-150 group"
+                onClick={() => setSelectedQuoteId(qt.id)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{qt.id}</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{qt.customerName}</p>
+                  </div>
+                  <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
+                    <StatusIcon className="w-3 h-3" />
+                    {qt.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{qt.equipmentName}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-border">
+                  <span className="text-lg font-bold text-foreground ds-tabular">{fmtCurrency(qt.amount)}</span>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground">Expires</p>
+                    <p className={cn("text-xs font-medium ds-tabular", qt.status === "Expired" ? "text-destructive" : "text-foreground")}>
+                      {fmtDate(qt.expiresDate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Table */}
-      <Card className="overflow-hidden p-0">
+      {viewMode === "table" && <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -322,7 +370,7 @@ export default function QuotesPage() {
             </TableBody>
           </Table>
         </div>
-      </Card>
+      </Card>}
 
       <QuoteDrawer
         quoteId={selectedQuoteId}

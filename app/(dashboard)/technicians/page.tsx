@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
+import { ViewToggle } from "@/components/ui/view-toggle"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,8 +38,6 @@ import {
 import {
   Plus,
   Search,
-  LayoutGrid,
-  List,
   Star,
   MapPin,
   Phone,
@@ -1047,7 +1046,7 @@ export default function TechniciansPage() {
   useEffect(() => {
     setTechs(wsTechs)
   }, [wsTechs])
-  const [view, setView] = useState<ViewMode>("card")
+  const [view, setView] = useState<ViewMode>("table")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [skillFilter, setSkillFilter] = useState<string>("all")
@@ -1254,18 +1253,11 @@ export default function TechniciansPage() {
           >
             <CalendarDays className="w-4 h-4" /> Daily View
           </Link>
-          <Button className="gap-2 shrink-0 cursor-pointer h-9 ml-auto" onClick={() => setShowAddModal(true)}>
-            <Plus className="w-4 h-4" /> Add Technician
-          </Button>
-          <div className="flex items-center gap-1 border border-border rounded-md p-0.5 bg-background">
-            <button
-              onClick={() => setView("card")}
-              className={cn("p-1.5 rounded transition-colors cursor-pointer", view === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            ><LayoutGrid className="w-4 h-4" /></button>
-            <button
-              onClick={() => setView("table")}
-              className={cn("p-1.5 rounded transition-colors cursor-pointer", view === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            ><List className="w-4 h-4" /></button>
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <ViewToggle view={view} onViewChange={setView} />
+            <Button className="gap-2 cursor-pointer h-9" onClick={() => setShowAddModal(true)}>
+              <Plus className="w-4 h-4" /> Add Technician
+            </Button>
           </div>
 
           {(statusFilter !== "all" || skillFilter !== "all" || regionFilter !== "all" || search) && (
