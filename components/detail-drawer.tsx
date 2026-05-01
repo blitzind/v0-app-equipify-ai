@@ -19,6 +19,8 @@ interface DetailDrawerProps {
   width?: "md" | "lg" | "xl" | "2xl"
   /** When true, disables the built-in scrollable body so children can manage their own scroll */
   noScroll?: boolean
+  /** Transition duration in milliseconds */
+  transitionMs?: number
 }
 
 export function DetailDrawer({
@@ -31,6 +33,7 @@ export function DetailDrawer({
   children,
   width = "md",
   noScroll = false,
+  transitionMs = 300,
 }: DetailDrawerProps) {
 
   const handleKey = useCallback(
@@ -59,9 +62,10 @@ export function DetailDrawer({
         onClick={onClose}
         className={cn(
           "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]",
-          "transition-opacity duration-300 ease-in-out",
+          "transition-opacity ease-in-out",
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
+        style={{ transitionDuration: `${transitionMs}ms` }}
       />
 
       {/* Drawer panel */}
@@ -71,10 +75,11 @@ export function DetailDrawer({
         aria-label={title}
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-full bg-background border-l border-border shadow-2xl",
-          "flex flex-col transition-transform duration-300 ease-in-out will-change-transform",
+          "flex flex-col transition-transform ease-in-out will-change-transform",
           widthClass,
           open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"
         )}
+        style={{ transitionDuration: `${transitionMs}ms` }}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
