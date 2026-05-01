@@ -170,8 +170,8 @@ export default function BillingPage() {
           <h3 className="text-sm font-semibold text-foreground">Current subscription</h3>
         </div>
         <div className="px-6 py-5">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="space-y-3">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
                   <Zap size={16} className="text-primary-foreground" />
@@ -192,41 +192,43 @@ export default function BillingPage() {
                   </p>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <p className="text-xs text-muted-foreground">Seats used</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">
-                    {usedSeats} / {currentPlanData.seats === -1 ? "\u221e" : currentPlanData.seats}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Equipment limit</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">
-                    {currentPlanData.equipmentLimit === -1
-                      ? "Unlimited"
-                      : currentPlanData.equipmentLimit.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Monthly cost</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">
-                    {currentPlanData.isCustomPricing
-                      ? "Custom"
-                      : `$${(currentMonthlyRate / 100).toFixed(0)}/mo`}
-                  </p>
-                </div>
+            {/* Stats — 1 col on mobile, 3 on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 rounded-lg border border-border bg-secondary/40 p-4">
+              <div className="min-h-[44px] flex flex-col justify-center">
+                <p className="text-xs text-muted-foreground">Seats used</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">
+                  {usedSeats} / {currentPlanData.seats === -1 ? "\u221e" : currentPlanData.seats}
+                </p>
+              </div>
+              <div className="min-h-[44px] flex flex-col justify-center sm:border-l sm:border-border sm:pl-6">
+                <p className="text-xs text-muted-foreground">Equipment limit</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">
+                  {currentPlanData.equipmentLimit === -1
+                    ? "Unlimited"
+                    : currentPlanData.equipmentLimit.toLocaleString()}
+                </p>
+              </div>
+              <div className="min-h-[44px] flex flex-col justify-center sm:border-l sm:border-border sm:pl-6">
+                <p className="text-xs text-muted-foreground">Monthly cost</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">
+                  {currentPlanData.isCustomPricing
+                    ? "Custom"
+                    : `$${(currentMonthlyRate / 100).toFixed(0)}/mo`}
+                </p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 shrink-0">
+            {/* Action buttons — full width on mobile, inline on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => openCheckout(workspace.planId)}
-                className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors">
+                className="flex items-center justify-center gap-1.5 min-h-[44px] sm:h-8 px-3 text-sm font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto">
                 <CreditCard size={13} /> Manage payment
               </button>
               <button
-                className="flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors">
+                className="flex items-center justify-center gap-1.5 min-h-[44px] sm:h-8 px-3 text-sm font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors w-full sm:w-auto">
                 Cancel subscription
               </button>
             </div>
@@ -268,8 +270,8 @@ export default function BillingPage() {
             Upgrade plan
           </button>
         </div>
-        <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-border">
-          <div className="pb-5 sm:pb-0 sm:pr-6">
+        <div className="px-4 md:px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-0 sm:divide-x divide-border">
+          <div className="sm:pr-6">
             <UsageBar
               label="Team seats"
               icon={Users}
@@ -277,7 +279,7 @@ export default function BillingPage() {
               limit={currentPlanData.seats}
             />
           </div>
-          <div className="pt-5 sm:pt-0 sm:px-6">
+          <div className="sm:px-6">
             <UsageBar
               label="Equipment records"
               icon={Package}
@@ -285,7 +287,7 @@ export default function BillingPage() {
               limit={currentPlanData.equipmentLimit}
             />
           </div>
-          <div className="pt-5 sm:pt-0 sm:pl-6">
+          <div className="sm:pl-6">
             <UsageBar
               label="API calls"
               icon={Activity}
@@ -303,7 +305,7 @@ export default function BillingPage() {
           <h3 className="text-sm font-semibold text-foreground">Payment method</h3>
         </div>
         <div className="px-6 py-5">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
               {/* Card tile */}
               <div className="w-14 h-9 rounded-md border border-border bg-gradient-to-br from-secondary to-secondary/60 flex items-center justify-center shrink-0">
@@ -319,14 +321,14 @@ export default function BillingPage() {
                 <p className="text-xs text-muted-foreground">Expires 09 / 2028 &bull; Billing email: {workspace.companyEmail}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <button
                 onClick={() => openCheckout(workspace.planId)}
-                className="h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors"
+                className="flex items-center justify-center min-h-[44px] sm:h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto"
               >
                 Update card
               </button>
-              <button className="h-8 px-3 text-xs font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors">
+              <button className="flex items-center justify-center min-h-[44px] sm:h-8 px-3 text-xs font-medium rounded-md border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors w-full sm:w-auto">
                 Remove
               </button>
             </div>
