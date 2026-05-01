@@ -293,7 +293,7 @@ export default function CustomersPage() {
                     Joined <SortIcon col="joinedDate" />
                   </button>
                 </TableHead>
-                <TableHead />
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground text-right w-[160px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -334,8 +334,8 @@ export default function CustomersPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(c.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "short" })}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()} className="min-w-[160px]">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <TableCell onClick={(e) => e.stopPropagation()} className="w-[160px]">
+                      <div className="flex justify-end">
                         <ContactActions
                           address={c.locations[0] ? `${c.locations[0].address}, ${c.locations[0].city}, ${c.locations[0].state} ${c.locations[0].zip}` : undefined}
                           email={c.contacts[0] ? { customerName: c.company, customerEmail: c.contacts[0].email } : undefined}
