@@ -15,6 +15,7 @@ import {
   FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
   ThumbsDown, DollarSign, FileEdit,
 } from "lucide-react"
+import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
 
@@ -620,6 +621,11 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
         <DrawerSection title="Quote Details">
           <DrawerRow label="Customer" value={quote.customerName} />
+          <div className="py-1">
+            <ContactActions
+              email={{ customerName: quote.customerName }}
+            />
+          </div>
           <DrawerRow label="Equipment" value={quote.equipmentName} />
           <DrawerRow label="Created By" value={quote.createdBy} />
           <DrawerRow label="Created" value={fmtDate(quote.createdDate)} />

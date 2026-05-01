@@ -13,6 +13,7 @@ import {
 } from "@/components/detail-drawer"
 import { Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check, ShieldCheck } from "lucide-react"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
+import { ContactActions } from "@/components/contact-actions"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
 
 let toastCounter = 0
@@ -360,6 +361,14 @@ export function EquipmentDrawer({ equipmentId, onClose }: EquipmentDrawerProps) 
           <EditableRow label="Location" value={eq.location} editing={editing}>
             <EditInput value={draft.location ?? ""} onChange={(v) => setField("location", v)} />
           </EditableRow>
+          {!editing && eq.location && (
+            <div className="py-1">
+              <ContactActions
+                address={eq.location}
+                email={{ customerName: eq.customerName }}
+              />
+            </div>
+          )}
           <EditableRow label="Status" value={
             <Badge variant="secondary" className={cn("text-[10px] border", STATUS_COLORS[eq.status])}>{eq.status}</Badge>
           } editing={editing}>

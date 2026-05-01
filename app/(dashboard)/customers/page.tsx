@@ -36,6 +36,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { CustomerDrawer } from "@/components/drawers/customer-drawer"
+import { ContactActions } from "@/components/contact-actions"
 
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
 type SortDir = "asc" | "desc"
@@ -97,7 +98,21 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+          {/* Quick contact actions */}
+          {(customer.locations[0] || customer.contacts[0]) && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <ContactActions
+                address={customer.locations[0] ? `${customer.locations[0].address}, ${customer.locations[0].city}, ${customer.locations[0].state} ${customer.locations[0].zip}` : undefined}
+                email={customer.contacts[0] ? {
+                  customerName: customer.company,
+                  customerEmail: customer.contacts[0].email,
+                } : undefined}
+                phone={customer.contacts[0]?.phone}
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
             <span className="text-xs text-muted-foreground">
               Since {new Date(customer.joinedDate).getFullYear()}
             </span>
@@ -315,14 +330,14 @@ export default function CustomersPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(c.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "short" })}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost" size="sm"
-                        className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => setSelectedCustomerId(c.id)}
-                      >
-                        View <ChevronRight className="w-3.5 h-3.5" />
-                      </Button>
+                    <TableCell onClick={(e) => e.stopPropagation()} className="min-w-[160px]">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ContactActions
+                          address={c.locations[0] ? `${c.locations[0].address}, ${c.locations[0].city}, ${c.locations[0].state} ${c.locations[0].zip}` : undefined}
+                          email={c.contacts[0] ? { customerName: c.company, customerEmail: c.contacts[0].email } : undefined}
+                          phone={c.contacts[0]?.phone}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

@@ -14,6 +14,7 @@ import {
   Play, Pause, Zap, Bell, CheckCircle2, ClipboardList, Calendar, Wrench,
 } from "lucide-react"
 import { ReminderRulesPanel } from "@/components/reminders/reminder-rules-panel"
+import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
 
@@ -111,6 +112,14 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
           <DrawerRow label="Equipment" value={plan.equipmentName} />
           <DrawerRow label="Category" value={plan.equipmentCategory} />
           <DrawerRow label="Location" value={plan.location} />
+          {plan.location && (
+            <div className="py-1">
+              <ContactActions
+                address={plan.location}
+                email={{ customerName: plan.customerName }}
+              />
+            </div>
+          )}
           <DrawerRow label="Technician" value={plan.technicianName} />
           <DrawerRow label="Interval" value={plan.interval === "Custom" ? `Every ${plan.customIntervalDays} days` : plan.interval} />
           <DrawerRow label="Start Date" value={fmtDate(plan.startDate)} />

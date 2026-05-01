@@ -18,6 +18,7 @@ import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
   ExternalLink, Pencil, X, Check,
 } from "lucide-react"
+import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
 
@@ -261,6 +262,12 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Phone className="w-3 h-3" />{c.phone}
                     </div>
+                    <div className="mt-2">
+                      <ContactActions
+                        email={{ customerName: customer.company, customerEmail: c.email }}
+                        phone={c.phone}
+                      />
+                    </div>
                   </>
                 )}
               </div>
@@ -272,12 +279,19 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         <DrawerSection title="Locations">
           <div className="space-y-2">
             {customer.locations.map((loc) => (
-              <div key={loc.id} className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/30 border border-border">
-                <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-foreground">{loc.name}</p>
-                  <p className="text-xs text-muted-foreground">{loc.address}, {loc.city}, {loc.state} {loc.zip}</p>
+              <div key={loc.id} className="flex flex-col gap-2 p-3 rounded-lg bg-muted/30 border border-border">
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">{loc.name}</p>
+                    <p className="text-xs text-muted-foreground">{loc.address}, {loc.city}, {loc.state} {loc.zip}</p>
+                  </div>
                 </div>
+                <ContactActions
+                  address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
+                  email={customer.contacts[0] ? { customerName: customer.company, customerEmail: customer.contacts[0].email } : undefined}
+                  phone={customer.contacts[0]?.phone}
+                />
               </div>
             ))}
           </div>

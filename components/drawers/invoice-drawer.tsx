@@ -16,6 +16,7 @@ import {
   Mail, ShieldAlert, ShieldCheck,
 } from "lucide-react"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
+import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
 
@@ -619,6 +620,11 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
 
         <DrawerSection title="Invoice Details">
           <DrawerRow label="Customer" value={invoice.customerName} />
+          <div className="py-1">
+            <ContactActions
+              email={{ customerName: invoice.customerName }}
+            />
+          </div>
           <DrawerRow label="Equipment" value={invoice.equipmentName} />
           {invoice.workOrderId && <DrawerRow label="Work Order" value={<span className="text-primary font-mono">{invoice.workOrderId}</span>} />}
           <DrawerRow label="Issued" value={fmtDate(invoice.issueDate)} />

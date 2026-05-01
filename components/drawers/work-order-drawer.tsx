@@ -15,6 +15,7 @@ import {
   AlertTriangle, Sparkles, Mic, Upload, RefreshCw,
   Wrench, ClipboardList, Clock, DollarSign, ChevronDown, ChevronUp,
 } from "lucide-react"
+import { ContactActions } from "@/components/contact-actions"
 
 let toastCounter = 0
 
@@ -721,6 +722,14 @@ export function WorkOrderDrawer({ workOrderId, onClose }: WorkOrderDrawerProps) 
           <DrawerRow label="Customer" value={wo.customerName} />
           <DrawerRow label="Equipment" value={wo.equipmentName} />
           <DrawerRow label="Location" value={wo.location} />
+          {wo.location && (
+            <div className="py-1">
+              <ContactActions
+                address={wo.location}
+                email={{ customerName: wo.customerName }}
+              />
+            </div>
+          )}
           <DrawerRow label="Type" value={wo.type} />
           <EditRow label="Priority" view={<span className={PRIORITY_COLOR[wo.priority]}>{wo.priority}</span>} editing={editing}>
             <EditSelect value={draft.priority ?? wo.priority} onChange={(v) => setField("priority", v as WorkOrderPriority)} options={ALL_PRIORITIES} />
