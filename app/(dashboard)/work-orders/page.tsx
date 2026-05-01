@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
+import { useQuickAdd } from "@/lib/quick-add-context"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
@@ -392,6 +393,7 @@ export default function WorkOrdersPage() {
   const [sortKey, setSortKey] = useState<SortKey>("scheduledDate")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [createOpen, setCreateOpen] = useState(false)
+  useQuickAdd("new-work-order", () => setCreateOpen(true))
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
 
   const allTechs = useMemo(() => {

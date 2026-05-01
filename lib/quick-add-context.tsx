@@ -5,11 +5,11 @@ import { createContext, useCallback, useContext, useEffect, useRef } from "react
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export type QuickAddAction =
-  | "work-order"
-  | "customer"
-  | "equipment"
-  | "quote"
-  | "invoice"
+  | "new-work-order"
+  | "new-customer"
+  | "new-equipment"
+  | "new-quote"
+  | "new-invoice"
   | "schedule-service"
 
 type Listener = (action: QuickAddAction) => void

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
+import { useQuickAdd } from "@/lib/quick-add-context"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -108,6 +109,7 @@ export default function QuotesPage() {
   const { quotes } = useQuotes()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
+  useQuickAdd("new-quote", () => setNewModalOpen(true))
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | QuoteStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")

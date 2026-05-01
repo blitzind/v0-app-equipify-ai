@@ -4,6 +4,10 @@ import { useState, useMemo } from "react"
 import { useCustomers } from "@/lib/customer-store"
 import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
+import { useQuickAdd } from "@/lib/quick-add-context"
+import { AddCustomerModal } from "@/components/customers/add-customer-modal"
+import type { Customer } from "@/lib/mock-data"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -125,6 +129,8 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
 export default function CustomersPage() {
   const { customers } = useCustomers()
+  const [showAddModal, setShowAddModal] = useState(false)
+  useQuickAdd("new-customer", () => setShowAddModal(true))
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "Inactive">("all")
   const [sortKey, setSortKey] = useState<SortKey>("company")
@@ -234,7 +240,7 @@ export default function CustomersPage() {
           </button>
         </div>
 
-        <Button size="sm" className="gap-2 shrink-0">
+        <Button size="sm" className="gap-2 shrink-0" onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add Customer</span>
           <span className="sm:hidden">Add</span>
@@ -366,6 +372,11 @@ export default function CustomersPage() {
       <CustomerDrawer
         customerId={selectedCustomerId}
         onClose={() => setSelectedCustomerId(null)}
+      />
+
+      <AddCustomerModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
       />
     </div>
   )

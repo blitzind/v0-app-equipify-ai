@@ -61,12 +61,12 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   }
 
   const items: { icon: React.ElementType; label: string; action: QuickAddAction }[] = [
-    { icon: UserPlus,     label: "Add Customer",    action: "customer" },
-    { icon: Wrench,       label: "Add Equipment",   action: "equipment" },
+    { icon: UserPlus,     label: "Add Customer",    action: "new-customer" },
+    { icon: Wrench,       label: "Add Equipment",   action: "new-equipment" },
     { icon: CalendarPlus, label: "Schedule Service", action: "schedule-service" },
-    { icon: ClipboardPlus,label: "New Work Order",  action: "work-order" },
-    { icon: FilePlus,     label: "Create Quote",    action: "quote" },
-    { icon: ReceiptText,  label: "Create Invoice",  action: "invoice" },
+    { icon: ClipboardPlus,label: "New Work Order",  action: "new-work-order" },
+    { icon: FilePlus,     label: "Create Quote",    action: "new-quote" },
+    { icon: ReceiptText,  label: "Create Invoice",  action: "new-invoice" },
   ]
 
   return (

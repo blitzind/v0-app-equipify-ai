@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
+import { useQuickAdd } from "@/lib/quick-add-context"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -111,6 +112,7 @@ export default function InvoicesPage() {
   const { invoices } = useInvoices()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
+  useQuickAdd("new-invoice", () => setNewModalOpen(true))
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("issueDate")

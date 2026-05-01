@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import Link from "next/link"
 import { useEquipment } from "@/lib/equipment-store"
+import { useQuickAdd } from "@/lib/quick-add-context"
 import type { Equipment } from "@/lib/mock-data"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { AIScanModal } from "@/components/equipment/ai-scan-modal"
@@ -167,6 +168,7 @@ export default function EquipmentPage() {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [scanModalOpen, setScanModalOpen] = useState(false)
+  useQuickAdd("new-equipment", () => setAddModalOpen(true))
 
   const filtered = useMemo(() => {
     let list = [...equipment]
