@@ -2,11 +2,10 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useCustomers } from "@/lib/customer-store"
-import type { Customer } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,6 +42,37 @@ import { ContactActions } from "@/components/contact-actions"
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
 type SortDir = "asc" | "desc"
 type ViewMode = "table" | "card"
+
+type CustomerStatus = "Active" | "Inactive"
+
+type Customer = {
+  id: string
+  company: string
+  name: string
+  status: CustomerStatus
+  locations: Array<{
+    id: string
+    address: string
+    city: string
+    state: string
+    zip: string
+  }>
+  contacts: Array<{
+    email: string
+    phone: string
+  }>
+  contracts: Array<{ id: string }>
+  equipmentCount: number
+  openWorkOrders: number
+  joinedDate: string
+}
+
+type DbCustomerRow = {
+  id: string
+  company_name: string
+  status: "active" | "inactive"
+  joined_at: string | null
+}
 
 function StatusBadge({ status }: { status: Customer["status"] }) {
   return (
@@ -126,7 +156,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 }
 
 function CustomersPageInner() {
-  const { customers } = useCustomers()
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
   useQuickAdd("new-customer", () => setShowAddModal(true))
   const [search, setSearch] = useState("")
@@ -137,6 +167,65 @@ function CustomersPageInner() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  useEffect(() => {
+    let active = true
+
+    async function loadCustomers() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) setCustomers([])
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (active) setCustomers([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, company_name, status, joined_at")
+        .eq("organization_id", profile.default_organization_id)
+        .order("created_at", { ascending: false })
+
+      if (error || !data) {
+        if (active) setCustomers([])
+        return
+      }
+
+      const mapped = (data as DbCustomerRow[]).map((row) => ({
+        id: row.id,
+        company: row.company_name,
+        name: row.company_name,
+        status: row.status === "inactive" ? "Inactive" : "Active",
+        locations: [],
+        contacts: [],
+        contracts: [],
+        equipmentCount: 0,
+        openWorkOrders: 0,
+        joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
+      }))
+
+      if (active) setCustomers(mapped)
+    }
+
+    void loadCustomers()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     const openId = searchParams.get("open")
@@ -176,7 +265,7 @@ function CustomersPageInner() {
     })
 
     return list
-  }, [search, statusFilter, sortKey, sortDir])
+  }, [customers, search, statusFilter, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
