@@ -58,7 +58,8 @@ export function DetailDrawer({
         aria-hidden="true"
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200",
+          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]",
+          "transition-opacity duration-300 ease-in-out",
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
       />
@@ -70,9 +71,9 @@ export function DetailDrawer({
         aria-label={title}
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-full bg-background border-l border-border shadow-2xl",
-          "flex flex-col transition-transform duration-300 ease-in-out",
+          "flex flex-col transition-transform duration-300 ease-in-out will-change-transform",
           widthClass,
-          open ? "translate-x-0" : "translate-x-full"
+          open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"
         )}
       >
         {/* Header */}
@@ -225,7 +226,7 @@ export interface ToastItem { id: number; message: string; type?: "success" | "in
 
 export function DrawerToastStack({ toasts, onRemove }: { toasts: ToastItem[]; onRemove: (id: number) => void }) {
   return (
-    <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none" aria-live="polite">
+    <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-[200] flex flex-col gap-2 pointer-events-none" aria-live="polite">
       {toasts.map((t) => (
         <div
           key={t.id}
