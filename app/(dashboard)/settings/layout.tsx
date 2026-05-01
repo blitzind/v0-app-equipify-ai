@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
 import {
   User, Building2, Users, CreditCard, Bell,
   Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock,
