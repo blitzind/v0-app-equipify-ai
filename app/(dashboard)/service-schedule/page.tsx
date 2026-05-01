@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
@@ -390,7 +390,7 @@ function summaryTitle(mode: ViewMode): string {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ServiceSchedulePage() {
+function ServiceSchedulePageInner() {
   const { plans } = useMaintenancePlans()
   const { createWorkOrder, workOrders } = useWorkOrders()
 
@@ -687,4 +687,8 @@ export default function ServiceSchedulePage() {
       />
     </div>
   )
+}
+
+export default function ServiceSchedulePage() {
+  return <Suspense fallback={null}><ServiceSchedulePageInner /></Suspense>
 }

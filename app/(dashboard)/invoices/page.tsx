@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useInvoices } from "@/lib/quote-invoice-store"
@@ -110,7 +110,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function InvoicesPage() {
+function InvoicesPageInner() {
   const { invoices } = useInvoices()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
@@ -408,4 +408,8 @@ export default function InvoicesPage() {
       <QuickAddParamBridge action="new-invoice" onTrigger={() => setNewModalOpen(true)} />
     </div>
   )
+}
+
+export default function InvoicesPage() {
+  return <Suspense fallback={null}><InvoicesPageInner /></Suspense>
 }

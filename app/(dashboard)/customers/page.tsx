@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useCustomers } from "@/lib/customer-store"
 import type { Customer } from "@/lib/mock-data"
@@ -125,7 +125,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
   )
 }
 
-export default function CustomersPage() {
+function CustomersPageInner() {
   const { customers } = useCustomers()
   const [showAddModal, setShowAddModal] = useState(false)
   useQuickAdd("new-customer", () => setShowAddModal(true))
@@ -370,4 +370,8 @@ export default function CustomersPage() {
       <QuickAddParamBridge action="new-customer" onTrigger={() => setShowAddModal(true)} />
     </div>
   )
+}
+
+export default function CustomersPage() {
+  return <Suspense fallback={null}><CustomersPageInner /></Suspense>
 }

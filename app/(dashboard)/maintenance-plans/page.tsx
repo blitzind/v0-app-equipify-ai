@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
@@ -745,7 +745,7 @@ function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => voi
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function MaintenancePlansPage() {
+function MaintenancePlansPageInner() {
   const { plans } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -906,4 +906,8 @@ export default function MaintenancePlansPage() {
       )}
     </div>
   )
+}
+
+export default function MaintenancePlansPage() {
+  return <Suspense fallback={null}><MaintenancePlansPageInner /></Suspense>
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
@@ -107,7 +107,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function QuotesPage() {
+function QuotesPageInner() {
   const { quotes } = useQuotes()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
@@ -392,4 +392,8 @@ export default function QuotesPage() {
       <QuickAddParamBridge action="new-quote" onTrigger={() => setNewModalOpen(true)} />
     </div>
   )
+}
+
+export default function QuotesPage() {
+  return <Suspense fallback={null}><QuotesPageInner /></Suspense>
 }

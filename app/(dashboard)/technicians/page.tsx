@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -1039,7 +1039,7 @@ function ProfileDrawer({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function TechniciansPage() {
+function TechniciansPageInner() {
   const { technicians: wsTechs } = useWorkspaceData()
   const [techs, setTechs] = useState<Technician[]>(wsTechs)
 
@@ -1411,4 +1411,8 @@ export default function TechniciansPage() {
       <ToastStack toasts={toasts} onRemove={removeToast} />
     </>
   )
+}
+
+export default function TechniciansPage() {
+  return <Suspense fallback={null}><TechniciansPageInner /></Suspense>
 }

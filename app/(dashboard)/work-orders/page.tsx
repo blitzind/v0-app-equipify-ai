@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
@@ -383,7 +383,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 
 // ─── Main page ─────────────────────────────────────────��──────────────────────
 
-export default function WorkOrdersPage() {
+function WorkOrdersPageInner() {
   const { workOrders } = useWorkOrders()
 
   const [view, setView] = useState<ViewMode>("kanban")
@@ -580,4 +580,8 @@ export default function WorkOrdersPage() {
       <QuickAddParamBridge action="new-work-order" onTrigger={() => setCreateOpen(true)} />
     </div>
   )
+}
+
+export default function WorkOrdersPage() {
+  return <Suspense fallback={null}><WorkOrdersPageInner /></Suspense>
 }

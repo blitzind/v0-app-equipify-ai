@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEquipment } from "@/lib/equipment-store"
@@ -154,7 +154,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
   )
 }
 
-export default function EquipmentPage() {
+function EquipmentPageInner() {
   const { equipment } = useEquipment()
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
   const searchParams = useSearchParams()
@@ -490,4 +490,8 @@ export default function EquipmentPage() {
       <QuickAddParamBridge action="new-equipment" onTrigger={() => setAddModalOpen(true)} />
     </div>
   )
+}
+
+export default function EquipmentPage() {
+  return <Suspense fallback={null}><EquipmentPageInner /></Suspense>
 }
