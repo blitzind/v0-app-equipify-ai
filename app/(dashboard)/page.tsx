@@ -17,6 +17,7 @@ import { ExpiringWarranties } from "@/components/dashboard/expiring-warranties"
 import { RevenueChart } from "@/components/dashboard/revenue-chart"
 import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
 import { AIInsightsWidget } from "@/components/dashboard/ai-insights-widget"
+import { MaintenanceAutomationStats } from "@/components/dashboard/maintenance-automation-stats"
 
 export default function DashboardPage() {
   const { stats } = useWorkspaceData()
@@ -95,6 +96,8 @@ export default function DashboardPage() {
           <WorkOrderStatus />
         </div>
       </div>
+
+      <MaintenanceAutomationStats />
 
       {/* AI Insights widget */}
       <AIInsightsWidget />

@@ -3,8 +3,9 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Zap, Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
+import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
 import { PLANS } from "@/lib/plans"
+import { BrandLogoOnLight } from "@/components/brand-logo"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 
@@ -35,12 +36,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex flex-col" style={{ background: "#f5f6f8" }}>
       {/* Top bar */}
       <header className="h-14 flex items-center justify-between px-6 border-b bg-white" style={{ borderColor: "#e5e7eb" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#2563eb" }}>
-            <Zap size={14} className="text-white" />
-          </div>
-          <span className="font-semibold text-gray-900 text-sm">Equipify.ai</span>
-        </div>
+        <BrandLogoOnLight />
         <p className="text-sm text-gray-500">
           Already have an account?{" "}
           <Link href="/login" className="font-medium" style={{ color: "#2563eb" }}>Sign in</Link>

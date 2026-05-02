@@ -4,11 +4,11 @@ import { useState, useMemo, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
-import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
+import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
-import type { WorkOrder } from "@/lib/mock-data"
 import {
   ChevronLeft,
   ChevronRight,
@@ -195,18 +195,21 @@ function RescheduleModal({ plan, onClose }: ReschedulePlan) {
   const [sendUpdate, setSendUpdate] = useState(true)
   const [saved, setSaved] = useState(false)
 
-  function handleSave() {
-    updatePlan(plan.id, { nextDueDate: date })
+  async function handleSave() {
+    const res = await updatePlan(plan.id, { nextDueDate: date })
+    if (res.error) return
     setSaved(true)
     setTimeout(onClose, 1200)
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" aria-modal="true">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+    <div
+      className={cn("fixed inset-0 flex items-center justify-center p-4", DRAWER_BACKDROP_Z)}
+      aria-modal="true"
+    >
+      <div className={cn("absolute inset-0", EQUIPIFY_SCRIM)} onClick={onClose} aria-hidden />
 
-      <div className="relative bg-background rounded-xl border border-border shadow-2xl w-full max-w-md flex flex-col">
+      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-md flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
@@ -297,7 +300,7 @@ function RescheduleModal({ plan, onClose }: ReschedulePlan) {
             {/* Footer */}
             <div className="flex items-center gap-2 px-5 py-4 border-t border-border">
               <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-              <Button className="flex-1" onClick={handleSave} disabled={!date}>
+              <Button className="flex-1" onClick={() => void handleSave()} disabled={!date}>
                 {sendUpdate ? "Reschedule & Notify" : "Reschedule"}
               </Button>
             </div>
@@ -1194,8 +1197,7 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function ServiceSchedulePageInner() {
-  const { plans } = useMaintenancePlans()
-  const { createWorkOrder, workOrders } = useWorkOrders()
+  const { plans, organizationId } = useMaintenancePlans()
 
   const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWorkOrderDisplay[]>([])
   const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
@@ -1415,37 +1417,13 @@ function ServiceSchedulePageInner() {
   const criticalSoon = useMemo(() =>
     plans.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) >= 0 && daysUntil(p.nextDueDate) <= 7), [plans])
 
-  function handleCreateWo(plan: MaintenancePlan) {
-    const existingIds = workOrders.map((w) => parseInt(w.id.replace("WO-", ""))).filter((n) => !isNaN(n))
-    const maxId = Math.max(...existingIds, 2041)
-    const wo: WorkOrder = {
-      id: `WO-${maxId + 1}`,
-      customerId: plan.customerId,
-      customerName: plan.customerName,
-      equipmentId: plan.equipmentId,
-      equipmentName: plan.equipmentName,
-      location: plan.location,
-      type: plan.workOrderType,
-      status: "Open",
-      priority: plan.workOrderPriority,
-      technicianId: plan.technicianId,
-      technicianName: plan.technicianName,
-      scheduledDate: plan.nextDueDate,
-      scheduledTime: "08:00",
-      completedDate: "",
-      createdAt: new Date().toISOString(),
-      createdBy: "Service Schedule",
-      description: `Auto-created from plan "${plan.name}". Services: ${plan.services.map((s) => s.name).join(", ") || "See plan details"}.`,
-      repairLog: {
-        problemReported: `Scheduled ${plan.interval} service per maintenance plan ${plan.id}.`,
-        diagnosis: "", partsUsed: [], laborHours: 0, technicianNotes: "",
-        photos: [], signatureDataUrl: "", signedBy: "", signedAt: "",
-      },
-      totalLaborCost: 0,
-      totalPartsCost: 0,
-      invoiceNumber: "",
-    }
-    createWorkOrder(wo)
+  async function handleCreateWo(plan: MaintenancePlan) {
+    if (!organizationId) return
+    const { error } = await createWorkOrderFromMaintenancePlan({
+      organizationId,
+      plan,
+    })
+    if (error) return
     setCreatedIds((prev) => new Set([...prev, plan.id]))
   }
 

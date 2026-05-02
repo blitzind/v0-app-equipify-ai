@@ -3,9 +3,28 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
-import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
-import { useWorkspaceData } from "@/lib/tenant-store"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
+import { computeNextDueDate } from "@/lib/maintenance-plans/db-map"
+import { DrawerViewport } from "@/components/detail-drawer"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type {
   MaintenancePlan,
   PlanInterval,
@@ -16,7 +35,6 @@ import type {
   WorkOrderPriority,
   NotificationRule,
 } from "@/lib/mock-data"
-import type { WorkOrder } from "@/lib/mock-data"
 import {
   Search,
   Plus,
@@ -40,16 +58,16 @@ import {
   Edit3,
   Save,
   BadgeCheck,
+  Loader2,
+  Pencil,
+  Play,
+  Pause,
+  MoreHorizontal,
+  Archive,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -61,6 +79,10 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ViewToggle } from "@/components/ui/view-toggle"
+import { EditMaintenancePlanDialog } from "@/components/maintenance-plans/edit-maintenance-plan-dialog"
+import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
+import { Toaster } from "@/components/ui/toaster"
+import { toast } from "@/hooks/use-toast"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +121,14 @@ function urgencyClass(days: number): string {
   return "text-muted-foreground"
 }
 
+/** Visual accent for plan list/card when next due is in the past or today. */
+function planDueAccent(days: number): "overdue" | "dueToday" | null {
+  if (Number.isNaN(days)) return null
+  if (days < 0) return "overdue"
+  if (days === 0) return "dueToday"
+  return null
+}
+
 function formatDays(days: number): string {
   if (days < 0)  return `${Math.abs(days)}d overdue`
   if (days === 0) return "Due today"
@@ -106,271 +136,44 @@ function formatDays(days: number): string {
   return `Due in ${days}d`
 }
 
-function nextWoId(count: number): string {
-  return `WO-${2050 + count}`
-}
-
-// ─── Create Plan Modal ────────────────────────────────────────────────────────
-
-function CreatePlanModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { createPlan } = useMaintenancePlans()
-  const { customers, equipment, technicians } = useWorkspaceData()
-  const [form, setForm] = useState({
-    name: "",
-    customerId: "",
-    equipmentId: "",
-    technicianId: "",
-    interval: "Quarterly" as PlanInterval,
-    customIntervalDays: 90,
-    startDate: new Date().toISOString().split("T")[0],
-    lastServiceDate: new Date().toISOString().split("T")[0],
-    workOrderType: "PM" as WorkOrderType,
-    workOrderPriority: "Normal" as WorkOrderPriority,
-    autoCreateWorkOrder: true,
-    notes: "",
-    emailEnabled: true,
-    smsEnabled: false,
-    internalEnabled: true,
-  })
-
-  const custEquipment = equipment.filter((e) => e.customerId === form.customerId)
-  const selectedCustomer = customers.find((c) => c.id === form.customerId)
-  const selectedEquipment = equipment.find((e) => e.id === form.equipmentId)
-  const selectedTech = technicians.find((t) => t.id === form.technicianId)
-
-  function computeNext(last: string, interval: PlanInterval, custom: number): string {
-    const d = new Date(last)
-    switch (interval) {
-      case "Annual":       d.setFullYear(d.getFullYear() + 1); break
-      case "Semi-Annual":  d.setMonth(d.getMonth() + 6); break
-      case "Quarterly":    d.setMonth(d.getMonth() + 3); break
-      case "Monthly":      d.setMonth(d.getMonth() + 1); break
-      case "Custom":       d.setDate(d.getDate() + (custom || 90)); break
-    }
-    return d.toISOString().split("T")[0]
-  }
-
-  function buildRules(): NotificationRule[] {
-    const days: NotificationTriggerDays[] = [30, 14, 7, 1]
-    const rules: NotificationRule[] = []
-    const emails = selectedCustomer?.contacts.map((c) => c.email) ?? []
-    const phones = selectedCustomer?.contacts.map((c) => c.phone).filter(Boolean) ?? []
-
-    days.forEach((d) => {
-      if (form.emailEnabled)    rules.push({ id: `r-email-${d}`,    channel: "Email",          triggerDays: d, enabled: true,      recipients: emails })
-      if (form.smsEnabled)      rules.push({ id: `r-sms-${d}`,      channel: "SMS",            triggerDays: d, enabled: d <= 7,    recipients: phones })
-      if (form.internalEnabled) rules.push({ id: `r-internal-${d}`, channel: "Internal Alert", triggerDays: d, enabled: d <= 14,  recipients: ["admin@equipify.ai"] })
-    })
-    return rules
-  }
-
-  function handleSubmit() {
-    if (!form.name || !form.customerId || !form.equipmentId || !form.technicianId) return
-    const nextDue = computeNext(form.lastServiceDate, form.interval, form.customIntervalDays)
-    const newPlan: MaintenancePlan = {
-      id: `MP-${String(Date.now()).slice(-4)}`,
-      name: form.name,
-      customerId: form.customerId,
-      customerName: selectedCustomer?.company ?? "",
-      equipmentId: form.equipmentId,
-      equipmentName: selectedEquipment ? `${selectedEquipment.model}` : "",
-      equipmentCategory: selectedEquipment?.category ?? "",
-      location: selectedEquipment?.location ?? "",
-      technicianId: form.technicianId,
-      technicianName: selectedTech?.name ?? "",
-      interval: form.interval,
-      customIntervalDays: form.customIntervalDays,
-      status: "Active",
-      startDate: form.startDate,
-      lastServiceDate: form.lastServiceDate,
-      nextDueDate: nextDue,
-      services: [],
-      notificationRules: buildRules(),
-      autoCreateWorkOrder: form.autoCreateWorkOrder,
-      workOrderType: form.workOrderType,
-      workOrderPriority: form.workOrderPriority,
-      notes: form.notes,
-      createdAt: new Date().toISOString(),
-      totalServicesCompleted: 0,
-    }
-    createPlan(newPlan)
-    onClose()
-  }
-
-  const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }))
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>New Maintenance Plan</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4 mt-2">
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Plan Name *</label>
-            <input className="input-base" placeholder="e.g. Quarterly Compressor PM" value={form.name} onChange={(e) => set("name", e.target.value)} />
-          </div>
-          {/* Customer */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Customer *</label>
-            <Select value={form.customerId} onValueChange={(v) => set("customerId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-              <SelectContent>
-                {customers.filter((c) => c.status === "Active").map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.company}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Equipment */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Equipment *</label>
-            <Select value={form.equipmentId} onValueChange={(v) => set("equipmentId", v)} disabled={!form.customerId}>
-              <SelectTrigger><SelectValue placeholder="Select equipment" /></SelectTrigger>
-              <SelectContent>
-                {custEquipment.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.model} — {e.location}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Technician */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Assigned Technician *</label>
-            <Select value={form.technicianId} onValueChange={(v) => set("technicianId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select technician" /></SelectTrigger>
-              <SelectContent>
-                {technicians.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Interval */}
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1.5 flex-1">
-              <label className="text-sm font-medium text-foreground">Service Interval *</label>
-              <Select value={form.interval} onValueChange={(v) => set("interval", v as PlanInterval)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(INTERVAL_LABELS) as PlanInterval[]).map((k) => (
-                    <SelectItem key={k} value={k}>{INTERVAL_LABELS[k]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {form.interval === "Custom" && (
-              <div className="flex flex-col gap-1.5 w-32">
-                <label className="text-sm font-medium text-foreground">Every (days)</label>
-                <input type="number" min={1} className="input-base" value={form.customIntervalDays} onChange={(e) => set("customIntervalDays", +e.target.value)} />
-              </div>
-            )}
-          </div>
-          {/* Dates */}
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1.5 flex-1">
-              <label className="text-sm font-medium text-foreground">Plan Start Date</label>
-              <input type="date" className="input-base" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5 flex-1">
-              <label className="text-sm font-medium text-foreground">Last Service Date</label>
-              <input type="date" className="input-base" value={form.lastServiceDate} onChange={(e) => set("lastServiceDate", e.target.value)} />
-            </div>
-          </div>
-          {/* Next due preview */}
-          <p className="text-xs text-muted-foreground -mt-1">
-            Next due: <span className="font-medium text-foreground">{computeNext(form.lastServiceDate, form.interval, form.customIntervalDays)}</span>
-          </p>
-
-          <Separator />
-
-          {/* Auto work order */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Auto-Create Work Order</p>
-              <p className="text-xs text-muted-foreground">Create a WO automatically when due date arrives</p>
-            </div>
-            <Switch checked={form.autoCreateWorkOrder} onCheckedChange={(v) => set("autoCreateWorkOrder", v)} />
-          </div>
-          {form.autoCreateWorkOrder && (
-            <div className="flex gap-3">
-              <div className="flex flex-col gap-1.5 flex-1">
-                <label className="text-sm font-medium text-foreground">WO Type</label>
-                <Select value={form.workOrderType} onValueChange={(v) => set("workOrderType", v as WorkOrderType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(["PM", "Inspection", "Repair", "Install"] as WorkOrderType[]).map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5 flex-1">
-                <label className="text-sm font-medium text-foreground">Priority</label>
-                <Select value={form.workOrderPriority} onValueChange={(v) => set("workOrderPriority", v as WorkOrderPriority)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(["Low", "Normal", "High", "Critical"] as WorkOrderPriority[]).map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Notification channels */}
-          <p className="text-sm font-semibold">Notification Channels</p>
-          <p className="text-xs text-muted-foreground -mt-2">Alerts fire at 30, 14, 7, and 1 day before due date.</p>
-          {[
-            { key: "emailEnabled",    label: "Email",          sub: "Send to customer contacts",       Icon: Mail },
-            { key: "smsEnabled",      label: "SMS",            sub: "Send to customer phone numbers",  Icon: MessageSquare },
-            { key: "internalEnabled", label: "Internal Alert", sub: "Alert Equipify.ai admin users",   Icon: MonitorCheck },
-          ].map(({ key, label, sub, Icon }) => (
-            <div key={key} className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Icon className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{sub}</p>
-                </div>
-              </div>
-              <Switch checked={form[key as keyof typeof form] as boolean} onCheckedChange={(v) => set(key, v)} />
-            </div>
-          ))}
-
-          <Separator />
-
-          {/* Notes */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Notes</label>
-            <textarea rows={2} className="input-base resize-none" placeholder="Special instructions, access notes..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" onClick={handleSubmit} disabled={!form.name || !form.customerId || !form.equipmentId || !form.technicianId}>
-              Create Plan
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Plan Detail Sheet ──────�������─────────────────���������───────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────────────────────────────────────────────────
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
-  const { updatePlan, setStatus, updateRules, fireNotifications, notificationLog } = useMaintenancePlans()
-  const { createWorkOrder, workOrders } = useWorkOrders()
+  const planHasEquipment = Boolean(plan.equipmentId?.trim())
+  const {
+    updatePlan,
+    setStatus,
+    updateRules,
+    fireNotifications,
+    notificationLog,
+    organizationId,
+    archivePlan,
+    deletePlan,
+    refreshPlans,
+  } = useMaintenancePlans()
   const [editNotes, setEditNotes] = useState(plan.notes)
   const [saving, setSaving] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [woError, setWoError] = useState<string | null>(null)
   const [fired, setFired] = useState(false)
   const [woCreated, setWoCreated] = useState(false)
+  const [detailSheetTab, setDetailSheetTab] = useState("services")
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [headerWoBusy, setHeaderWoBusy] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+
+  useEffect(() => {
+    console.info("[Equipify] PlanDetailSheet (maintenance-plans/page.tsx)", { planId: plan.id })
+  }, [plan.id])
+
+  useEffect(() => {
+    setEditNotes(plan.notes)
+    setDetailError(null)
+    setWoError(null)
+    setDetailSheetTab("services")
+  }, [plan.id, plan.notes])
 
   const planLogs = useMemo(
     () => notificationLog.filter((l) => l.planId === plan.id).slice(0, 20),
@@ -379,17 +182,21 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
 
   const days = daysUntil(plan.nextDueDate)
 
-  function handleSaveNotes() {
+  async function handleSaveNotes() {
     setSaving(true)
-    updatePlan(plan.id, { notes: editNotes })
-    setTimeout(() => setSaving(false), 600)
+    setDetailError(null)
+    const res = await updatePlan(plan.id, { notes: editNotes })
+    setSaving(false)
+    if (res.error) setDetailError(res.error)
   }
 
-  function handleToggleRule(ruleId: string) {
+  async function handleToggleRule(ruleId: string) {
+    setDetailError(null)
     const updated = plan.notificationRules.map((r) =>
       r.id === ruleId ? { ...r, enabled: !r.enabled } : r
     )
-    updateRules(plan.id, updated)
+    const res = await updateRules(plan.id, updated)
+    if (res.error) setDetailError(res.error)
   }
 
   function handleFireAll() {
@@ -398,46 +205,104 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
     setTimeout(() => setFired(false), 2000)
   }
 
-  function handleAutoCreateWo() {
-    const existingIds = workOrders.map((w) => parseInt(w.id.replace("WO-", "")))
-    const maxId = Math.max(...existingIds, 2041)
-    const newId = `WO-${maxId + 1}`
-    const wo: WorkOrder = {
-      id: newId,
-      customerId: plan.customerId,
-      customerName: plan.customerName,
-      equipmentId: plan.equipmentId,
-      equipmentName: plan.equipmentName,
-      location: plan.location,
-      type: plan.workOrderType,
-      status: "Open",
-      priority: plan.workOrderPriority,
-      technicianId: plan.technicianId,
-      technicianName: plan.technicianName,
-      scheduledDate: plan.nextDueDate,
-      scheduledTime: "08:00",
-      completedDate: "",
-      createdAt: new Date().toISOString(),
-      createdBy: "Maintenance Engine",
-      description: `Auto-created from plan "${plan.name}". Services: ${plan.services.map((s) => s.name).join(", ") || "See plan details"}.`,
-      repairLog: {
-        problemReported: `Scheduled ${plan.interval} service per maintenance plan ${plan.id}.`,
-        diagnosis: "",
-        partsUsed: [],
-        laborHours: 0,
-        technicianNotes: "",
-        photos: [],
-        signatureDataUrl: "",
-        signedBy: "",
-        signedAt: "",
-      },
-      totalLaborCost: 0,
-      totalPartsCost: 0,
-      invoiceNumber: "",
+  async function handleAutoCreateWo() {
+    setWoError(null)
+    if (!organizationId) {
+      setWoError("No default organization.")
+      return
     }
-    createWorkOrder(wo)
+    if (!planHasEquipment) {
+      setWoError("Attach equipment to this plan before creating a work order.")
+      return
+    }
+    const { error } = await createWorkOrderFromMaintenancePlan({
+      organizationId,
+      plan,
+    })
+    if (error) {
+      setWoError(error)
+      return
+    }
+    toast({
+      title: "Work order created",
+      description: `Linked to ${plan.customerName} — ${plan.equipmentName}.`,
+    })
+    void refreshPlans({ silent: true })
     setWoCreated(true)
     setTimeout(() => setWoCreated(false), 2500)
+  }
+
+  async function handleHeaderCreateWo() {
+    console.info("[Equipify] PlanDetailSheet click → Create WO", { planId: plan.id })
+    setWoError(null)
+    if (!organizationId) {
+      setWoError("No default organization.")
+      return
+    }
+    if (!planHasEquipment) {
+      setWoError("Attach equipment to this plan before creating a work order.")
+      return
+    }
+    setHeaderWoBusy(true)
+    const { error } = await createWorkOrderFromMaintenancePlan({ organizationId, plan })
+    setHeaderWoBusy(false)
+    if (error) {
+      setWoError(error)
+      return
+    }
+    toast({
+      title: "Work order created",
+      description: `Linked to ${plan.customerName} — ${plan.equipmentName}.`,
+    })
+    void refreshPlans({ silent: true })
+    setWoCreated(true)
+    setTimeout(() => setWoCreated(false), 2500)
+  }
+
+  async function handlePauseResumeSheet() {
+    console.info("[Equipify] PlanDetailSheet click → Pause/Resume", {
+      planId: plan.id,
+      currentStatus: plan.status,
+    })
+    setDetailError(null)
+    const next: PlanStatus = plan.status === "Active" ? "Paused" : "Active"
+    const res = await setStatus(plan.id, next)
+    if (res.error) {
+      setDetailError(res.error)
+      return
+    }
+    toast({
+      title: next === "Paused" ? "Plan paused" : "Plan resumed",
+      description: plan.name,
+    })
+  }
+
+  async function handleConfirmArchive() {
+    console.info("[Equipify] PlanDetailSheet confirm → Archive", { planId: plan.id })
+    setActionBusy(true)
+    const res = await archivePlan(plan.id)
+    setActionBusy(false)
+    setArchiveOpen(false)
+    if (res.error) {
+      setDetailError(res.error)
+      return
+    }
+    toast({ title: "Plan archived", description: plan.name })
+    onClose()
+  }
+
+  async function handleConfirmDelete() {
+    console.info("[Equipify] PlanDetailSheet confirm → Delete", { planId: plan.id })
+    setActionBusy(true)
+    const res = await deletePlan(plan.id)
+    setActionBusy(false)
+    setDeleteOpen(false)
+    if (res.error) {
+      setDetailError(res.error)
+      return
+    }
+    toast({ title: "Plan removed", description: `${plan.name} was archived and expired.` })
+    onClose()
   }
 
   const groupedRules = useMemo(() => {
@@ -449,14 +314,18 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
   }, [plan.notificationRules])
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="flex-1 bg-black/30" onClick={onClose} />
-      {/* Panel */}
-      <div className="w-full max-w-2xl bg-card border-l border-border flex flex-col overflow-hidden shadow-2xl">
+    <>
+    <DrawerViewport
+      open
+      onClose={onClose}
+      width="xl"
+      ariaLabel={plan.name}
+      panelClassName="bg-card shadow-2xl"
+    >
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-border shrink-0">
-          <div className="flex flex-col gap-1 min-w-0 pr-4">
+        <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-border shrink-0 relative isolate">
+          <div className="flex flex-col gap-1 min-w-0 pr-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono text-muted-foreground">{plan.id}</span>
               <StatusBadge status={plan.status} />
@@ -467,9 +336,81 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               )}
             </div>
             <h2 className="text-lg font-semibold text-foreground leading-tight">{plan.name}</h2>
-            <p className="text-sm text-muted-foreground">{plan.customerName} — {plan.equipmentName}</p>
+            <p className="text-sm text-muted-foreground">
+              {plan.customerName}
+              {planHasEquipment ? ` — ${plan.equipmentName}` : " — No equipment attached yet"}
+            </p>
           </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose}><X className="w-4 h-4" /></Button>
+          <div
+            role="toolbar"
+            aria-label="Plan actions"
+            className="relative z-10 flex flex-wrap items-center justify-end gap-1.5 shrink-0 pointer-events-auto"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => setEditDialogOpen(true)}
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void handlePauseResumeSheet()}>
+              {plan.status === "Active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {plan.status === "Active" ? "Pause" : "Resume"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              disabled={headerWoBusy || !organizationId || !planHasEquipment}
+              onClick={() => void handleHeaderCreateWo()}
+            >
+              {headerWoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              Create WO
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-8 p-0"
+                  aria-label="More actions"
+                  onPointerDown={() =>
+                    console.info("[Equipify] PlanDetailSheet pointer → More menu trigger", { planId: plan.id })
+                  }
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onSelect={() => {
+                    console.info("[Equipify] PlanDetailSheet select → Archive plan", { planId: plan.id })
+                    setArchiveOpen(true)
+                  }}
+                >
+                  <Archive className="w-4 h-4" /> Archive plan
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  onSelect={() => {
+                    console.info("[Equipify] PlanDetailSheet select → Delete plan", { planId: plan.id })
+                    setDeleteOpen(true)
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" /> Delete plan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} aria-label="Close">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Stat strip */}
@@ -487,8 +428,25 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           ))}
         </div>
 
+        {(detailError || woError) && (
+          <div className="px-6 py-3 border-b border-border shrink-0 space-y-2 bg-muted/20">
+            {detailError && (
+              <Alert variant="destructive">
+                <AlertTitle>Could not save</AlertTitle>
+                <AlertDescription>{detailError}</AlertDescription>
+              </Alert>
+            )}
+            {woError && (
+              <Alert variant="destructive">
+                <AlertTitle>Work order</AlertTitle>
+                <AlertDescription>{woError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
-        <Tabs defaultValue="services" className="flex flex-col flex-1 overflow-hidden">
+        <Tabs value={detailSheetTab} onValueChange={setDetailSheetTab} className="flex flex-col flex-1 overflow-hidden">
           <TabsList className="rounded-none border-b border-border bg-transparent px-6 justify-start gap-1 h-auto py-0 shrink-0">
             {[
               { value: "services",      label: "Services" },
@@ -506,7 +464,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             ))}
           </TabsList>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {/* Services */}
             <TabsContent value="services" className="p-6 mt-0 flex flex-col gap-4">
               {plan.services.length === 0 ? (
@@ -540,7 +498,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Notes</label>
-                  <Button variant="ghost" size="sm" onClick={handleSaveNotes} className="text-xs h-7 gap-1 text-primary hover:text-primary">
+                  <Button variant="ghost" size="sm" onClick={() => void handleSaveNotes()} className="text-xs h-7 gap-1 text-primary hover:text-primary">
                     <Save className="w-3 h-3" /> {saving ? "Saved" : "Save"}
                   </Button>
                 </div>
@@ -626,7 +584,12 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   {(["Active", "Paused", "Expired"] as PlanStatus[]).map((s) => (
                     <button
                       key={s}
-                      onClick={() => setStatus(plan.id, s)}
+                      type="button"
+                      onClick={() => {
+                        void setStatus(plan.id, s).then((r) => {
+                          if (r.error) setDetailError(r.error)
+                        })
+                      }}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors",
                         plan.status === s ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-muted"
@@ -645,7 +608,12 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 </div>
                 <Switch
                   checked={plan.autoCreateWorkOrder}
-                  onCheckedChange={(v) => updatePlan(plan.id, { autoCreateWorkOrder: v })}
+                  disabled={!planHasEquipment}
+                  onCheckedChange={(v) => {
+                    void updatePlan(plan.id, { autoCreateWorkOrder: v }).then((r) => {
+                      if (r.error) setDetailError(r.error)
+                    })
+                  }}
                 />
               </div>
               <Separator />
@@ -653,8 +621,18 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 <p className="text-sm font-semibold mb-2">Manual Work Order Creation</p>
                 <p className="text-xs text-muted-foreground mb-3">
                   Creates a work order right now using this plan&apos;s template — type <strong>{plan.workOrderType}</strong>, priority <strong>{plan.workOrderPriority}</strong>.
+                  {!planHasEquipment && (
+                    <span className="block mt-2 text-[color:var(--status-warning)]">
+                      Attach equipment to this plan before creating a work order.
+                    </span>
+                  )}
                 </p>
-                <Button onClick={handleAutoCreateWo} variant="outline" className="gap-2">
+                <Button
+                  onClick={() => void handleAutoCreateWo()}
+                  variant="outline"
+                  className="gap-2"
+                  disabled={!planHasEquipment}
+                >
                   <Wrench className="w-4 h-4" />
                   {woCreated ? "Work Order Created!" : "Create Work Order Now"}
                 </Button>
@@ -675,7 +653,51 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           </div>
         </Tabs>
       </div>
-    </div>
+    </DrawerViewport>
+
+    <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Archive this plan?</AlertDialogTitle>
+          <AlertDialogDescription>
+            It will disappear from maintenance schedules and plan lists. Historical records may remain in your database.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={actionBusy}>Cancel</AlertDialogCancel>
+          <Button type="button" disabled={actionBusy} onClick={() => void handleConfirmArchive()} className="gap-2">
+            {actionBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+            Archive
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this maintenance plan?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This archives the plan, marks it expired, and turns off automatic work order creation. It will no longer
+            appear in active maintenance views.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={actionBusy}>Cancel</AlertDialogCancel>
+          <Button type="button" variant="destructive" disabled={actionBusy} onClick={() => void handleConfirmDelete()} className="gap-2">
+            {actionBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete plan
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <EditMaintenancePlanDialog
+      open={editDialogOpen}
+      onClose={() => setEditDialogOpen(false)}
+      plan={plan}
+    />
+    </>
   )
 }
 
@@ -695,19 +717,39 @@ function StatusBadge({ status }: { status: PlanStatus }) {
 
 function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => void }) {
   const days = daysUntil(plan.nextDueDate)
+  const accent = planDueAccent(days)
   const activeRules = plan.notificationRules.filter((r) => r.enabled).length
 
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 hover:shadow-sm transition-all"
+      className={cn(
+        "group w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 hover:shadow-sm transition-all",
+        accent === "overdue" && "border-destructive/45 ring-1 ring-destructive/25",
+        accent === "dueToday" && "border-amber-500/45 ring-1 ring-amber-500/25",
+      )}
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{plan.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{plan.customerName} — {plan.equipmentName}</p>
         </div>
-        <StatusBadge status={plan.status} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {accent === "overdue" && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5 font-semibold">
+              Overdue
+            </Badge>
+          )}
+          {accent === "dueToday" && (
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 h-5 font-semibold border-amber-500/60 text-amber-800 dark:text-amber-300 bg-amber-500/10"
+            >
+              Due today
+            </Badge>
+          )}
+          <StatusBadge status={plan.status} />
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-3">
@@ -746,7 +788,7 @@ function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => voi
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function MaintenancePlansPageInner() {
-  const { plans } = useMaintenancePlans()
+  const { plans, loading, error } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [search, setSearch] = useState("")
@@ -756,17 +798,38 @@ function MaintenancePlansPageInner() {
   const [createOpen, setCreateOpen] = useState(false)
   const [view, setView] = useState<"cards" | "table">("table")
 
+  const prefillCustomerId = searchParams.get("customerId")
+  const prefillEquipmentId = searchParams.get("equipmentId")
+
+  function handleCloseCreateModal() {
+    setCreateOpen(false)
+    const sp = new URLSearchParams(searchParams.toString())
+    if (sp.has("new")) {
+      sp.delete("new")
+      sp.delete("customerId")
+      sp.delete("equipmentId")
+      const q = sp.toString()
+      router.replace(q ? `/maintenance-plans?${q}` : "/maintenance-plans", { scroll: false })
+    }
+  }
+
+  // Open create modal from Customer / Equipment quick actions (?new=1&customerId=&equipmentId=)
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setCreateOpen(true)
+    }
+  }, [searchParams])
+
   // Auto-open drawer from ?open= query param
   useEffect(() => {
     const openId = searchParams.get("open")
-    if (openId && plans.length > 0) {
-      const match = plans.find((p) => p.id === openId)
-      if (match) {
-        setSelectedPlan(match)
-        router.replace("/maintenance-plans", { scroll: false })
-      }
+    if (!openId || loading) return
+    const match = plans.find((p) => p.id === openId)
+    if (match) {
+      setSelectedPlan(match)
+      router.replace("/maintenance-plans", { scroll: false })
     }
-  }, [searchParams, plans, router])
+  }, [searchParams, plans, router, loading])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -786,8 +849,40 @@ function MaintenancePlansPageInner() {
     return { active, due7, due30, autoWo }
   }, [plans])
 
+  const initialLoading = loading && plans.length === 0
+  const listEmpty = !loading && plans.length === 0
+  const filteredEmpty = filtered.length === 0 && plans.length > 0
+
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border border-border">
+              <CardContent className="pt-5 pb-4">
+                <div className="h-3 w-24 bg-muted animate-pulse rounded mb-2" />
+                <div className="h-8 w-16 bg-muted animate-pulse rounded mb-2" />
+                <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading maintenance plans…
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Could not load plans</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
@@ -843,13 +938,26 @@ function MaintenancePlansPageInner() {
       </div>
 
       {/* Content */}
-      {view === "cards" ? (
+      {listEmpty ? (
+        <Card className="border border-border border-dashed">
+          <CardContent className="py-16 text-center flex flex-col gap-3 items-center">
+            <p className="text-sm text-muted-foreground max-w-sm">
+              No maintenance plans yet. Create a plan to schedule recurring service and reminders for customer equipment.
+            </p>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" /> New Plan
+            </Button>
+          </CardContent>
+        </Card>
+      ) : view === "cards" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((plan) => (
             <PlanCard key={plan.id} plan={plan} onClick={() => setSelectedPlan(plan)} />
           ))}
-          {filtered.length === 0 && (
-            <div className="col-span-full text-center py-16 text-muted-foreground text-sm">No plans match the current filters.</div>
+          {filteredEmpty && (
+            <div className="col-span-full text-center py-16 text-muted-foreground text-sm">
+              No plans match the current filters.
+            </div>
           )}
         </div>
       ) : (
@@ -865,11 +973,33 @@ function MaintenancePlansPageInner() {
             <tbody className="divide-y divide-border">
               {filtered.map((plan) => {
                 const days = daysUntil(plan.nextDueDate)
+                const accent = planDueAccent(days)
                 return (
-                  <tr key={plan.id} className="bg-card hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => setSelectedPlan(plan)}>
+                  <tr
+                    key={plan.id}
+                    className={cn(
+                      "bg-card hover:bg-muted/30 cursor-pointer transition-colors",
+                      accent === "overdue" && "bg-destructive/[0.06]",
+                      accent === "dueToday" && "bg-amber-500/[0.06]",
+                    )}
+                    onClick={() => setSelectedPlan(plan)}
+                  >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-foreground">{plan.name}</span>
+                        {accent === "overdue" && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5 font-semibold shrink-0">
+                            Overdue
+                          </Badge>
+                        )}
+                        {accent === "dueToday" && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-5 font-semibold shrink-0 border-amber-500/60 text-amber-800 dark:text-amber-300 bg-amber-500/10"
+                          >
+                            Due today
+                          </Badge>
+                        )}
                         {plan.autoCreateWorkOrder && <Zap className="w-3 h-3 text-blue-500 shrink-0" />}
                       </div>
                     </td>
@@ -888,8 +1018,12 @@ function MaintenancePlansPageInner() {
                   </tr>
                 )
               })}
-              {filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">No plans match the current filters.</td></tr>
+              {filteredEmpty && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    No plans match the current filters.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -897,13 +1031,20 @@ function MaintenancePlansPageInner() {
       )}
 
       {/* Modals */}
-      <CreatePlanModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateMaintenancePlanDialog
+        open={createOpen}
+        onClose={handleCloseCreateModal}
+        prefillCustomerId={prefillCustomerId}
+        prefillEquipmentId={prefillEquipmentId}
+      />
       {selectedPlan && (
         <PlanDetailSheet
           plan={plans.find((p) => p.id === selectedPlan.id) ?? selectedPlan}
           onClose={() => setSelectedPlan(null)}
         />
       )}
+
+      <Toaster />
     </div>
   )
 }

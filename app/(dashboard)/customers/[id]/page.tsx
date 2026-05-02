@@ -22,8 +22,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
+import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -73,6 +77,66 @@ type CustomerDetail = {
   contacts: CustomerContact[]
   locations: CustomerLocation[]
   contracts: CustomerContract[]
+}
+
+type CustomerPlanRow = {
+  id: string
+  name: string
+  status: string
+  interval_value: number
+  interval_unit: string
+  next_due_date: string | null
+  equipment_id: string | null
+}
+
+type CustomerPlanWoRow = {
+  id: string
+  title: string
+  status: string
+  type: string
+  scheduled_on: string | null
+  maintenance_plan_id: string | null
+  created_at: string
+}
+
+function planIntervalLabel(row: CustomerPlanRow): string {
+  const u = row.interval_unit as MaintenancePlanRow["interval_unit"]
+  const { interval, customIntervalDays } = intervalFromDb(row.interval_value, u)
+  return interval === "Custom" ? `${customIntervalDays} day cycle` : interval
+}
+
+function planEquipmentSubtitle(
+  row: CustomerPlanRow,
+  equipmentNames: Record<string, string>
+): string {
+  if (!row.equipment_id) return "No equipment attached"
+  return equipmentNames[row.equipment_id] ?? "Equipment"
+}
+
+function woDbStatusLabel(s: string) {
+  const m: Record<string, string> = {
+    open: "Open",
+    scheduled: "Scheduled",
+    in_progress: "In Progress",
+    completed: "Completed",
+    invoiced: "Invoiced",
+  }
+  return m[s] ?? s
+}
+
+function woDbTypeLabel(s: string) {
+  if (!s) return "—"
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function fmtIsoDate(iso: string | null) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
 }
 
 const statusColors: Record<Equipment["status"], string> = {
@@ -211,6 +275,11 @@ export default function CustomerDetailPage() {
     is_primary: false,
   })
 
+  const [customerPlans, setCustomerPlans] = useState<CustomerPlanRow[]>([])
+  const [planEquipmentNames, setPlanEquipmentNames] = useState<Record<string, string>>({})
+  const [planLinkedWOs, setPlanLinkedWOs] = useState<CustomerPlanWoRow[]>([])
+  const [plansSectionLoading, setPlansSectionLoading] = useState(false)
+
   useEffect(() => {
     let active = true
 
@@ -342,6 +411,80 @@ export default function CustomerDetailPage() {
     }
   }, [id, refreshToken])
 
+  useEffect(() => {
+    if (!customer) return
+    let active = true
+
+    void (async () => {
+      setPlansSectionLoading(true)
+      const supabase = createBrowserSupabaseClient()
+
+      const { data: planRows, error: planError } = await supabase
+        .from("maintenance_plans")
+        .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id")
+        .eq("organization_id", customer.organizationId)
+        .eq("customer_id", customer.id)
+        .eq("is_archived", false)
+        .order("next_due_date", { ascending: true, nullsFirst: false })
+
+      if (!active) return
+
+      if (planError) {
+        setCustomerPlans([])
+        setPlanEquipmentNames({})
+        setPlanLinkedWOs([])
+        setPlansSectionLoading(false)
+        return
+      }
+
+      const plans = (planRows ?? []) as CustomerPlanRow[]
+      setCustomerPlans(plans)
+
+      const eqIds = [
+        ...new Set(plans.map((p) => p.equipment_id).filter((id): id is string => Boolean(id))),
+      ]
+      const names: Record<string, string> = {}
+      if (eqIds.length > 0) {
+        const { data: eqRows } = await supabase
+          .from("equipment")
+          .select("id, name")
+          .eq("organization_id", customer.organizationId)
+          .in("id", eqIds)
+
+        for (const r of (eqRows ?? []) as Array<{ id: string; name: string }>) {
+          names[r.id] = r.name
+        }
+      }
+      if (!active) return
+      setPlanEquipmentNames(names)
+
+      const planIds = plans.map((p) => p.id)
+      if (planIds.length === 0) {
+        setPlanLinkedWOs([])
+        setPlansSectionLoading(false)
+        return
+      }
+
+      const { data: woRows } = await supabase
+        .from("work_orders")
+        .select("id, title, status, type, scheduled_on, maintenance_plan_id, created_at")
+        .eq("organization_id", customer.organizationId)
+        .eq("customer_id", customer.id)
+        .in("maintenance_plan_id", planIds)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (!active) return
+      setPlanLinkedWOs((woRows ?? []) as CustomerPlanWoRow[])
+      setPlansSectionLoading(false)
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [customer, refreshToken])
+
   const customerEquipment = useMemo(
     () => [],
     []
@@ -356,6 +499,21 @@ export default function CustomerDetailPage() {
   }, [customerEquipment])
 
   const totalContractValue = customer?.contracts.reduce((sum, c) => sum + c.value, 0) ?? 0
+
+  const activeCustomerPlans = useMemo(
+    () => customerPlans.filter((p) => planStatusDbToUi(p.status) === "Active"),
+    [customerPlans],
+  )
+  const inactiveCustomerPlans = useMemo(
+    () => customerPlans.filter((p) => planStatusDbToUi(p.status) !== "Active"),
+    [customerPlans],
+  )
+
+  const planNameById = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const p of customerPlans) m[p.id] = p.name
+    return m
+  }, [customerPlans])
 
   async function handleSaveCustomerEdits(e: React.FormEvent) {
     e.preventDefault()
@@ -716,6 +874,14 @@ export default function CustomerDetailPage() {
             </div>
             <div className="flex gap-2 flex-wrap">
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>Edit</Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link
+                  href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
+                  className="gap-1.5 inline-flex items-center"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" /> Maintenance Plan
+                </Link>
+              </Button>
               <Button variant="outline" size="sm" onClick={handleArchiveCustomer} disabled={archiving}>
                 {archiving ? "Archiving..." : "Archive"}
               </Button>
@@ -749,6 +915,7 @@ export default function CustomerDetailPage() {
       <Tabs defaultValue="equipment">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="equipment">Equipment ({customerEquipment.length})</TabsTrigger>
+          <TabsTrigger value="maintenance-plans">Maintenance Plans ({customerPlans.length})</TabsTrigger>
           <TabsTrigger value="history">Service History ({allServiceHistory.length})</TabsTrigger>
           <TabsTrigger value="contacts">Contacts & Locations</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
@@ -764,6 +931,149 @@ export default function CustomerDetailPage() {
               {customerEquipment.map((eq) => (
                 <EquipmentRow key={eq.id} eq={eq} />
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Maintenance Plans tab */}
+        <TabsContent value="maintenance-plans" className="mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-sm text-muted-foreground">
+              Preventive maintenance agreements and work orders generated from plans for this customer.
+            </p>
+            <Button size="sm" variant="outline" className="shrink-0 gap-1.5" asChild>
+              <Link
+                href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
+                className="inline-flex items-center gap-1.5"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" /> Create maintenance plan
+              </Link>
+            </Button>
+          </div>
+
+          {plansSectionLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading plans…
+            </div>
+          ) : customerPlans.length === 0 ? (
+            <Card className="border border-border border-dashed">
+              <CardContent className="py-12 text-center">
+                <p className="text-sm text-muted-foreground mb-4">No maintenance plans for this customer yet.</p>
+                <Button size="sm" asChild>
+                  <Link href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}>
+                    Create maintenance plan
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-4">
+                {activeCustomerPlans.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active</h3>
+                    <div className="flex flex-col gap-2">
+                      {activeCustomerPlans.map((plan) => (
+                        <Link
+                          key={plan.id}
+                          href={`/maintenance-plans?open=${plan.id}`}
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group"
+                        >
+                          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                                {plan.name}
+                              </p>
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] shrink-0 bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30"
+                              >
+                                Active
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {planEquipmentSubtitle(plan, planEquipmentNames)} · {planIntervalLabel(plan)} · Next{" "}
+                              {fmtIsoDate(plan.next_due_date)}
+                            </p>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {inactiveCustomerPlans.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Inactive</h3>
+                    <div className="flex flex-col gap-2">
+                      {inactiveCustomerPlans.map((plan) => (
+                        <Link
+                          key={plan.id}
+                          href={`/maintenance-plans?open=${plan.id}`}
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group opacity-95"
+                        >
+                          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-muted text-muted-foreground shrink-0">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm text-foreground truncate">{plan.name}</p>
+                              <Badge variant="secondary" className="text-[10px] shrink-0">
+                                {planStatusDbToUi(plan.status)}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {planEquipmentSubtitle(plan, planEquipmentNames)} · {planIntervalLabel(plan)} · Next{" "}
+                              {fmtIsoDate(plan.next_due_date)}
+                            </p>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Card className="border border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Plan work order history</CardTitle>
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Work orders linked to this customer&apos;s maintenance plans.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {planLinkedWOs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No plan-linked work orders yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {planLinkedWOs.map((wo) => (
+                        <Link
+                          key={wo.id}
+                          href={`/work-orders?open=${wo.id}`}
+                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 transition-colors group"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono text-primary truncate">{wo.id}</p>
+                            <p className="text-sm font-medium text-foreground truncate">{wo.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {wo.maintenance_plan_id ? planNameById[wo.maintenance_plan_id] ?? "Plan" : "Plan"} ·{" "}
+                              {woDbTypeLabel(wo.type)} · {fmtIsoDate(wo.scheduled_on ?? wo.created_at.slice(0, 10))}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px] shrink-0">
+                            {woDbStatusLabel(wo.status)}
+                          </Badge>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>

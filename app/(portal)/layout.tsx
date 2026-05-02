@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { BrandLogoOnLight } from "@/components/brand-logo"
 
 // Simulated logged-in customer — Riverstone Logistics (CUS-001)
 const PORTAL_CUSTOMER = {
@@ -86,19 +87,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="max-w-screen-xl mx-auto px-6 flex items-center justify-between h-14">
           {/* Brand */}
           <div className="flex items-center gap-6">
-            <Link href="/portal" className="flex items-center gap-2 mr-2">
-              <span
-                className="flex items-center justify-center w-7 h-7 rounded-md text-white text-xs font-bold"
-                style={{ background: "var(--portal-accent)" }}
-              >
-                E
-              </span>
-              <span className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
-                Equipify
-                <span className="font-normal ml-0.5" style={{ color: "var(--portal-accent)" }}>
-                  .ai
-                </span>
-              </span>
+            <Link href="/portal" className="flex items-center mr-2 shrink-0">
+              <BrandLogoOnLight logoClassName="h-6 sm:h-7" />
             </Link>
 
             {/* Nav */}

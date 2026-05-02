@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DrawerToastStack, type ToastItem } from "@/components/detail-drawer"
+import { DrawerViewport, DrawerToastStack, type ToastItem } from "@/components/detail-drawer"
 import {
   Mail,
   Calendar,
@@ -495,8 +495,7 @@ export function TechnicianDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-      <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-lg bg-background border-l border-border shadow-2xl flex flex-col">
+      <DrawerViewport open={!!techId} onClose={onClose} width="lg" ariaLabel={displayName}>
         <div className="flex items-start justify-between gap-2 p-6 border-b border-border shrink-0">
           <div className="flex items-center gap-4 min-w-0">
             <div
@@ -550,7 +549,7 @@ export function TechnicianDrawer({
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
           {loadError && (
             <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{loadError}</p>
           )}
@@ -731,7 +730,7 @@ export function TechnicianDrawer({
             )}
           </div>
         )}
-      </aside>
+      </DrawerViewport>
 
       <WorkOrderDrawer
         workOrderId={openScheduleWoId}

@@ -8,6 +8,7 @@ import { useEquipment } from "@/lib/equipment-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { useQuotes, useInvoices } from "@/lib/quote-invoice-store"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
+import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
 import type { Customer, Contact } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,16 @@ import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 let toastCounter = 0
+
+function fmtPlanNextDue(iso: string) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+}
 
 // ─── Shared edit controls ─────────────────────────────────────────────────────
 
@@ -336,7 +347,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const { workOrders } = useWorkOrders()
   const { quotes: adminQuotes } = useQuotes()
   const { invoices: adminInvoices } = useInvoices()
-  const { plans: allPlans } = useMaintenancePlans()
+  const { plans: allPlans, refreshPlans } = useMaintenancePlans()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Customer>>({})
@@ -379,6 +390,9 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const custQuotes = customer ? adminQuotes.filter((q) => q.customerId === customer.id) : []
   const custInvoices = customer ? adminInvoices.filter((i) => i.customerId === customer.id) : []
   const custPlans = customer ? allPlans.filter((p) => p.customerId === customer.id) : []
+  const activeCustPlans = customer ? custPlans.filter((p) => p.status === "Active") : []
+
+  const [createPlanModalOpen, setCreatePlanModalOpen] = useState(false)
 
   useEffect(() => {
     setEditing(false)
@@ -603,6 +617,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("New quote drafted")}>
                 <FileText className="w-3.5 h-3.5" /> New Quote
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs cursor-pointer"
+                onClick={() => setCreatePlanModalOpen(true)}
+              >
+                <Plus className="w-3.5 h-3.5" /> New Maintenance Plan
+              </Button>
               <Link href={`/customers/${customer.id}`}>
                 <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer">
                   <ExternalLink className="w-3.5 h-3.5" /> Full Profile
@@ -641,6 +663,31 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           </EditRow>
           <DrawerRow label="Customer Since" value={new Date(customer.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "long" })} />
           <DrawerRow label="Locations" value={customer.locations.map((l) => l.city).join(", ")} />
+        </DrawerSection>
+
+        {/* Active maintenance plans */}
+        <DrawerSection title={`Maintenance Plans (${activeCustPlans.length} active)`}>
+          {activeCustPlans.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No active maintenance plans for this customer.</p>
+          ) : (
+            <div className="space-y-2">
+              {activeCustPlans.map((plan) => (
+                <Link
+                  key={plan.id}
+                  href={`/maintenance-plans?open=${plan.id}`}
+                  className="flex items-start justify-between gap-2 p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {plan.equipmentName} · {plan.interval} · Next {fmtPlanNextDue(plan.nextDueDate)}
+                    </p>
+                  </div>
+                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+                </Link>
+              ))}
+            </div>
+          )}
         </DrawerSection>
 
         {/* Contacts */}
@@ -1531,6 +1578,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           />
         )
       })()}
+
+      <CreateMaintenancePlanDialog
+        open={createPlanModalOpen}
+        onClose={() => setCreatePlanModalOpen(false)}
+        prefillCustomerId={customer.id}
+        lockCustomer
+        lockedCustomerName={customer.company}
+        onCreated={() => void refreshPlans({ silent: true })}
+      />
     </>
   )
 }

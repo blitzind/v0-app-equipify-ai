@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { BrandLogoOnLight } from "@/components/brand-logo"
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -424,12 +425,7 @@ export default function PlatformAdminPage() {
       {/* Top nav */}
       <header className="flex items-center h-14 px-6 bg-card border-b border-border gap-4 shrink-0">
         <div className="flex items-center gap-2">
-          <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
-            alt="Equipify.ai"
-            className="h-7 w-auto object-contain"
-            draggable={false}
-          />
+          <BrandLogoOnLight logoClassName="h-7" />
           <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#7c3aed] border border-[#7c3aed]/20">
             Platform Admin
           </span>

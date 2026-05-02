@@ -12,10 +12,8 @@ export const metadata: Metadata = {
   description: 'Modern SaaS platform for managing equipment, work orders, service schedules, and field technicians.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      { url: '/favicon.jpg', type: 'image/jpeg' },
-    ],
-    apple: '/favicon.jpg',
+    icon: [{ url: '/brand/equipify-logo.png', type: 'image/png', sizes: 'any' }],
+    apple: '/brand/equipify-logo.png',
   },
 }
 

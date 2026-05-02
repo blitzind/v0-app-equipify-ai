@@ -61,6 +61,8 @@ type Customer = {
   contacts: Array<{
     email: string
     phone: string
+    /** Primary contact display name from `customer_contacts.full_name` */
+    name: string
   }>
   contracts: Array<{ id: string }>
   equipmentCount: number
@@ -77,6 +79,7 @@ type DbCustomerRow = {
 
 type DbContactRow = {
   customer_id: string
+  full_name: string | null
   email: string | null
   phone: string | null
   is_primary: boolean | null
@@ -228,14 +231,14 @@ function CustomersPageInner() {
       const customerRows = data as DbCustomerRow[]
       const customerIds = customerRows.map((row) => row.id)
 
-      let contactsByCustomer = new Map<string, { email: string; phone: string }>()
+      let contactsByCustomer = new Map<string, { email: string; phone: string; name: string }>()
       let locationsByCustomer = new Map<string, { id: string; address: string; city: string; state: string; zip: string }>()
 
       if (customerIds.length > 0) {
         const [{ data: contactRows }, { data: locationRows }] = await Promise.all([
           supabase
             .from("customer_contacts")
-            .select("customer_id, email, phone, is_primary")
+            .select("customer_id, full_name, email, phone, is_primary")
             .eq("organization_id", profile.default_organization_id)
             .eq("is_archived", false)
             .in("customer_id", customerIds)
@@ -254,6 +257,7 @@ function CustomersPageInner() {
             contactsByCustomer.set(row.customer_id, {
               email: row.email ?? "",
               phone: row.phone ?? "",
+              name: (row.full_name ?? "").trim(),
             })
           }
         })
@@ -271,18 +275,31 @@ function CustomersPageInner() {
         })
       }
 
-      const mapped = customerRows.map((row) => ({
-        id: row.id,
-        company: row.company_name,
-        name: row.company_name,
-        status: row.status === "inactive" ? "Inactive" : "Active",
-        locations: locationsByCustomer.has(row.id) ? [locationsByCustomer.get(row.id)!] : [],
-        contacts: contactsByCustomer.has(row.id) ? [contactsByCustomer.get(row.id)!] : [],
-        contracts: [],
-        equipmentCount: 0,
-        openWorkOrders: 0,
-        joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
-      }))
+      const mapped = customerRows.map((row) => {
+        const primaryContact = contactsByCustomer.get(row.id)
+        const displayName =
+          primaryContact?.name?.trim() ? primaryContact.name.trim() : row.company_name
+        return {
+          id: row.id,
+          company: row.company_name,
+          name: displayName,
+          status: row.status === "inactive" ? "Inactive" : "Active",
+          locations: locationsByCustomer.has(row.id) ? [locationsByCustomer.get(row.id)!] : [],
+          contacts: primaryContact
+            ? [
+                {
+                  email: primaryContact.email,
+                  phone: primaryContact.phone,
+                  name: displayName,
+                },
+              ]
+            : [],
+          contracts: [],
+          equipmentCount: 0,
+          openWorkOrders: 0,
+          joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
+        }
+      })
 
       if (active) setCustomers(mapped)
     }
@@ -374,9 +391,9 @@ function CustomersPageInner() {
         })),
         contacts: customer.contacts.map((contact, idx) => ({
           id: `${customer.id}-contact-${idx}`,
-          name: customer.name,
-          firstName: customer.name.split(" ")[0] ?? "",
-          lastName: customer.name.split(" ").slice(1).join(" "),
+          name: contact.name,
+          firstName: contact.name.split(" ")[0] ?? "",
+          lastName: contact.name.split(" ").slice(1).join(" ") ?? "",
           role: "Contact",
           email: contact.email,
           phone: contact.phone,

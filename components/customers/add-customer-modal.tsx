@@ -100,16 +100,71 @@ export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalP
         return
       }
 
-      const { error: insertError } = await supabase.from("customers").insert({
-        company_name: form.company.trim(),
-        status: "active",
-        organization_id: profile.default_organization_id,
-        created_by: user.id,
+      const orgId = profile.default_organization_id
+
+      const { data: created, error: insertError } = await supabase
+        .from("customers")
+        .insert({
+          company_name: form.company.trim(),
+          status: "active",
+          organization_id: orgId,
+          created_by: user.id,
+        })
+        .select("id")
+        .single()
+
+      if (insertError || !created?.id) {
+        setSubmitError(insertError?.message ?? "Could not create customer.")
+        return
+      }
+
+      const cn = form.contactName.trim()
+      const parts = cn.split(/\s+/).filter(Boolean)
+      const firstName = parts[0] ?? ""
+      const lastName = parts.length > 1 ? parts.slice(1).join(" ") : ""
+
+      const { error: contactError } = await supabase.from("customer_contacts").insert({
+        organization_id: orgId,
+        customer_id: created.id,
+        full_name: cn,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        role: "Primary",
+        email: form.email.trim(),
+        phone: form.phone.trim() || null,
+        is_primary: true,
       })
 
-      if (insertError) {
-        setSubmitError(insertError.message)
+      if (contactError) {
+        await supabase.from("customers").delete().eq("id", created.id).eq("organization_id", orgId)
+        setSubmitError(contactError.message)
         return
+      }
+
+      const hasAddress =
+        form.address.trim() &&
+        form.city.trim() &&
+        form.state.trim() &&
+        form.zip.trim()
+
+      if (hasAddress) {
+        const { error: locError } = await supabase.from("customer_locations").insert({
+          organization_id: orgId,
+          customer_id: created.id,
+          name: "Primary",
+          address_line1: form.address.trim(),
+          address_line2: null,
+          city: form.city.trim(),
+          state: form.state.trim().slice(0, 2),
+          postal_code: form.zip.trim(),
+          phone: form.phone.trim() || null,
+          contact_person: cn,
+          is_default: true,
+        })
+        if (locError) {
+          setSubmitError(locError.message)
+          return
+        }
       }
 
       setForm(INITIAL)

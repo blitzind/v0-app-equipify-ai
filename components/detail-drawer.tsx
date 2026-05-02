@@ -1,12 +1,124 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useLayoutEffect, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { X, ChevronRight, ExternalLink, CheckCircle2, Clock, AlertTriangle, Download, FileText, Printer } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-// ─── Shared drawer shell ──────────────────────────────────────────────────────
+// ─── Canonical slide-out tokens (shared across drawers + Sheet) ─────────────────
+
+/** Single overlay appearance for all app drawers and Sheet. */
+export const EQUIPIFY_SCRIM =
+  "bg-black/40 backdrop-blur-[2px]"
+
+/** Backdrop sits below the panel; above main app chrome. */
+export const DRAWER_BACKDROP_Z = "z-[100]"
+/** Sliding panel above backdrop. */
+export const DRAWER_PANEL_Z = "z-[101]"
+
+export const DRAWER_TRANSITION_MS = 300
+
+export type DrawerShellWidth = "md" | "lg" | "xl" | "2xl"
+
+export function drawerShellWidthClass(width: DrawerShellWidth): string {
+  return width === "2xl"
+    ? "max-w-4xl"
+    : width === "xl"
+      ? "max-w-2xl"
+      : width === "lg"
+        ? "max-w-xl"
+        : "max-w-lg"
+}
+
+export function useDrawerChrome(open: boolean, onClose: () => void) {
+  const handleKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    },
+    [onClose]
+  )
+
+  useEffect(() => {
+    if (open) {
+      document.addEventListener("keydown", handleKey)
+      document.body.style.overflow = "hidden"
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKey)
+      document.body.style.overflow = ""
+    }
+  }, [open, handleKey])
+}
+
+/**
+ * Canonical right slide-out shell: scrim + panel, ESC, body scroll lock, smooth translate.
+ * Use for custom drawer layouts; prefer DetailDrawer when standard header/body fits.
+ */
+export function DrawerViewport({
+  open,
+  onClose,
+  width = "md",
+  transitionMs = DRAWER_TRANSITION_MS,
+  ariaLabel = "Details",
+  panelClassName,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  width?: DrawerShellWidth
+  transitionMs?: number
+  ariaLabel?: string
+  panelClassName?: string
+  children: ReactNode
+}) {
+  useDrawerChrome(open, onClose)
+
+  const [mounted, setMounted] = useState(false)
+  useLayoutEffect(() => setMounted(true), [])
+
+  const widthClass = drawerShellWidthClass(width)
+
+  const shell = (
+    <>
+      <div
+        aria-hidden="true"
+        onClick={onClose}
+        className={cn(
+          "fixed inset-0 transition-opacity ease-in-out",
+          DRAWER_BACKDROP_Z,
+          EQUIPIFY_SCRIM,
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        style={{ transitionDuration: `${transitionMs}ms` }}
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        className={cn(
+          "fixed top-0 right-0 h-full max-h-dvh w-full bg-background border-l border-border shadow-2xl",
+          "flex flex-col min-h-0 transition-transform ease-in-out will-change-transform",
+          DRAWER_PANEL_Z,
+          widthClass,
+          open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none",
+          panelClassName
+        )}
+        style={{ transitionDuration: `${transitionMs}ms` }}
+      >
+        {children}
+      </div>
+    </>
+  )
+
+  if (!mounted) return null
+
+  return createPortal(shell, document.body)
+}
+
+// ─── Shared drawer shell (standard header + optional actions + scroll body) ───
 
 interface DetailDrawerProps {
   open: boolean
@@ -16,7 +128,7 @@ interface DetailDrawerProps {
   badge?: React.ReactNode
   actions?: React.ReactNode
   children: React.ReactNode
-  width?: "md" | "lg" | "xl" | "2xl"
+  width?: DrawerShellWidth
   /** When true, disables the built-in scrollable body so children can manage their own scroll */
   noScroll?: boolean
   /** Transition duration in milliseconds */
@@ -33,85 +145,42 @@ export function DetailDrawer({
   children,
   width = "md",
   noScroll = false,
-  transitionMs = 300,
+  transitionMs = DRAWER_TRANSITION_MS,
 }: DetailDrawerProps) {
-
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => { if (e.key === "Escape") onClose() },
-    [onClose]
-  )
-
-  useEffect(() => {
-    if (open) {
-      document.addEventListener("keydown", handleKey)
-      document.body.style.overflow = "hidden"
-    }
-    return () => {
-      document.removeEventListener("keydown", handleKey)
-      document.body.style.overflow = ""
-    }
-  }, [open, handleKey])
-
-  const widthClass = width === "2xl" ? "max-w-4xl" : width === "xl" ? "max-w-2xl" : width === "lg" ? "max-w-xl" : "max-w-lg"
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        aria-hidden="true"
-        onClick={onClose}
-        className={cn(
-          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]",
-          "transition-opacity ease-in-out",
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-        style={{ transitionDuration: `${transitionMs}ms` }}
-      />
-
-      {/* Drawer panel */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cn(
-          "fixed top-0 right-0 z-50 h-full w-full bg-background border-l border-border shadow-2xl",
-          "flex flex-col transition-transform ease-in-out will-change-transform",
-          widthClass,
-          open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"
-        )}
-        style={{ transitionDuration: `${transitionMs}ms` }}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-foreground leading-tight truncate">{title}</h2>
-              {badge}
-            </div>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+    <DrawerViewport open={open} onClose={onClose} width={width} transitionMs={transitionMs} ariaLabel={title}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-foreground leading-tight truncate">{title}</h2>
+            {badge}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-
-        {/* Action buttons row */}
-        {actions && (
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-border shrink-0 flex-wrap">
-            {actions}
-          </div>
-        )}
-
-        {/* Body */}
-        <div className={noScroll ? "flex flex-col flex-1 min-h-0 overflow-hidden" : "flex-1 overflow-y-auto px-5 py-5 space-y-5"}>
-          {children}
-        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
-    </>
+
+      {actions && (
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-border shrink-0 flex-wrap">{actions}</div>
+      )}
+
+      <div
+        className={
+          noScroll
+            ? "flex flex-col flex-1 min-h-0 overflow-hidden"
+            : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 py-5 space-y-5"
+        }
+      >
+        {children}
+      </div>
+    </DrawerViewport>
   )
 }
 
@@ -160,7 +229,6 @@ export function DrawerTimeline({ items }: {
 
   return (
     <div className="relative pl-4">
-      {/* Vertical line */}
       <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border" />
       <div className="flex flex-col gap-4">
         {items.map((item, i) => (

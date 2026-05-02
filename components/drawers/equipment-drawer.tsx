@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
@@ -40,7 +40,7 @@ const TABS = [
   { id: "overview",      label: "Overview",      icon: Cpu },
   { id: "service",       label: "Service History",icon: Wrench },
   { id: "workorders",    label: "Open WOs",       icon: ClipboardList },
-  { id: "plans",         label: "PM Plans",       icon: Calendar },
+  { id: "plans",         label: "Maintenance Plans", icon: Calendar },
   { id: "certs",         label: "Certificates",   icon: ShieldCheck },
   { id: "warranty",      label: "Warranty",       icon: HardHat },
   { id: "files",         label: "Files",          icon: FileText },
@@ -51,6 +51,16 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"]
 
+type PlanWoRow = {
+  id: string
+  title: string
+  status: string
+  type: string
+  scheduled_on: string | null
+  maintenance_plan_id: string | null
+  created_at: string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string) {
@@ -60,6 +70,22 @@ function fmtDate(iso: string) {
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
+}
+
+function woDbStatusLabel(s: string) {
+  const m: Record<string, string> = {
+    open: "Open",
+    scheduled: "Scheduled",
+    in_progress: "In Progress",
+    completed: "Completed",
+    invoiced: "Invoiced",
+  }
+  return m[s] ?? s
+}
+
+function woDbTypeLabel(s: string) {
+  if (!s) return "—"
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function daysToDue(dateStr: string) {
@@ -322,6 +348,53 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Equipment>>({})
   const [activeTab, setActiveTab] = useState<TabId>("overview")
+  const [planLinkedWOs, setPlanLinkedWOs] = useState<PlanWoRow[]>([])
+  const [planWoLoading, setPlanWoLoading] = useState(false)
+
+  const eqPlans = useMemo(
+    () => (eq ? plans.filter((p) => p.equipmentId === eq.id) : []),
+    [plans, eq?.id],
+  )
+  const eqPlanIdsKey = useMemo(() => eqPlans.map((p) => p.id).sort().join(","), [eqPlans])
+
+  useEffect(() => {
+    if (activeTab !== "plans" || !eq || !organizationId) return
+    if (!eqPlanIdsKey) {
+      setPlanLinkedWOs([])
+      setPlanWoLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setPlanWoLoading(true)
+    const planIds = eqPlanIdsKey.split(",").filter(Boolean)
+
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("work_orders")
+        .select("id, title, status, type, scheduled_on, maintenance_plan_id, created_at")
+        .eq("organization_id", organizationId)
+        .eq("equipment_id", eq.id)
+        .in("maintenance_plan_id", planIds)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(40)
+
+      if (cancelled) return
+      if (error) {
+        setPlanLinkedWOs([])
+        setPlanWoLoading(false)
+        return
+      }
+      setPlanLinkedWOs((data ?? []) as PlanWoRow[])
+      setPlanWoLoading(false)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, eq, organizationId, eqPlanIdsKey])
 
   const loadDrawerData = useCallback(async () => {
     if (!equipmentId) {
@@ -539,7 +612,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const openWOs = workOrders.filter(
     (wo) => wo.equipmentId === eq.id && !["Completed", "Invoiced"].includes(wo.status)
   )
-  const eqPlans = plans.filter((p) => p.equipmentId === eq.id)
+  const activeMaintenancePlans = eqPlans.filter((p) => p.status === "Active")
+  const inactiveMaintenancePlans = eqPlans.filter((p) => p.status !== "Active")
   const totalRepairCost = eq.serviceHistory.filter(h => h.type === "Repair").reduce((s, h) => s + h.cost, 0)
   const totalServiceCost= eq.serviceHistory.reduce((s, h) => s + h.cost, 0)
 
@@ -791,35 +865,130 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
           {/* ── MAINTENANCE PLANS ── */}
           {activeTab === "plans" && !editing && (
-            <DrawerSection title={`Maintenance Plans (${eqPlans.length})`}>
-              {eqPlans.length > 0 ? (
-                <div className="space-y-2">
-                  {eqPlans.map((plan) => (
+            <>
+              <DrawerSection
+                title={`Maintenance Plans (${eqPlans.length})`}
+                action={
+                  <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" asChild>
                     <Link
-                      key={plan.id}
-                      href={`/service-schedule?open=${plan.id}`}
-                      className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                      href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
                     >
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">{plan.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{plan.interval} · Next: {fmtDate(plan.nextDueDate)}</p>
-                        <Badge variant="secondary" className={cn("text-[10px] mt-1",
-                          plan.status === "Active" ? "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border border-[color:var(--status-success)]/20" : ""
-                        )}>{plan.status}</Badge>
-                      </div>
-                      <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                      <CalendarPlus className="w-3 h-3" /> New plan
                     </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 text-center">
-                  <p className="text-xs text-muted-foreground">No maintenance plans linked to this equipment.</p>
-                  <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" onClick={() => toast("Maintenance plan created")}>
-                    <Calendar className="w-3.5 h-3.5" /> Create PM Plan
                   </Button>
-                </div>
-              )}
-            </DrawerSection>
+                }
+              >
+                {eqPlans.length > 0 ? (
+                  <div className="space-y-4">
+                    {activeMaintenancePlans.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active</p>
+                        <div className="space-y-2">
+                          {activeMaintenancePlans.map((plan) => (
+                            <Link
+                              key={plan.id}
+                              href={`/maintenance-plans?open=${plan.id}`}
+                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {plan.interval} · Next: {fmtDate(plan.nextDueDate)}
+                                </p>
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "text-[10px] mt-1",
+                                    "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border border-[color:var(--status-success)]/20",
+                                  )}
+                                >
+                                  {plan.status}
+                                </Badge>
+                              </div>
+                              <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {inactiveMaintenancePlans.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Inactive</p>
+                        <div className="space-y-2">
+                          {inactiveMaintenancePlans.map((plan) => (
+                            <Link
+                              key={plan.id}
+                              href={`/maintenance-plans?open=${plan.id}`}
+                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group opacity-90"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {plan.interval} · Next: {fmtDate(plan.nextDueDate)}
+                                </p>
+                                <Badge variant="secondary" className="text-[10px] mt-1 text-muted-foreground border-border">
+                                  {plan.status}
+                                </Badge>
+                              </div>
+                              <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-xs text-muted-foreground">No maintenance plans linked to this equipment.</p>
+                    <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" asChild>
+                      <Link
+                        href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
+                      >
+                        <CalendarPlus className="w-3.5 h-3.5" /> Create maintenance plan
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </DrawerSection>
+
+              <DrawerSection title={`Plan work order history (${planLinkedWOs.length})`}>
+                {planWoLoading ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+                ) : planLinkedWOs.length > 0 ? (
+                  <div className="space-y-2">
+                    {planLinkedWOs.map((wo) => {
+                      const planName =
+                        eqPlans.find((p) => p.id === wo.maintenance_plan_id)?.name ?? "Maintenance plan"
+                      return (
+                        <Link
+                          key={wo.id}
+                          href={`/work-orders?open=${wo.id}`}
+                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                        >
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <p className="text-xs font-semibold font-mono text-primary truncate">{wo.id}</p>
+                            <p className="text-xs text-foreground font-medium truncate">{wo.title}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {planName} · {woDbTypeLabel(wo.type)} · {fmtDate(wo.scheduled_on ?? wo.created_at.slice(0, 10))}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="secondary" className="text-[10px]">{woDbStatusLabel(wo.status)}</Badge>
+                            <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    {eqPlans.length === 0
+                      ? "Create a maintenance plan to generate linked work orders from this asset."
+                      : "No work orders from these plans yet."}
+                  </p>
+                )}
+              </DrawerSection>
+            </>
           )}
 
           {/* ── CERTIFICATES ── */}

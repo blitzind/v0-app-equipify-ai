@@ -12,6 +12,7 @@ import {
   ChevronLeft, Sparkles, ChevronDown, Check,
   Building2, X, FileText, Receipt, ShoppingCart,
 } from "lucide-react"
+import { BrandLogo, BrandMark } from "@/components/brand-logo"
 
 type NavItem = {
   label: string
@@ -93,18 +94,47 @@ function SidebarBody({
 
   return (
     <>
-      {/* ── Logo hero ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-center border-b border-sidebar-border shrink-0 px-3 py-4">
-        <img
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
-          alt="Equipify.ai"
-          className={cn(
-            "object-contain select-none transition-all duration-200",
-            isCollapsed ? "w-9 h-9" : "h-9 w-auto max-w-[168px]"
-          )}
-          style={isCollapsed ? { objectPosition: "left center" } : undefined}
-          draggable={false}
-        />
+      {/* ── Logo hero (full wordmark expanded · square mark collapsed) ─ */}
+      <div
+        className={cn(
+          "relative grid min-h-[52px] w-full shrink-0 place-items-center border-b border-sidebar-border [grid-template-areas:'stack'] px-3",
+          isCollapsed ? "py-2" : "py-3.5"
+        )}
+      >
+        <Link
+          href="/"
+          className="relative grid min-h-[2.5rem] w-full place-items-center [grid-template-areas:'stack'] rounded-md outline-none ring-sidebar-ring focus-visible:ring-2"
+          aria-label="Equipify — Home"
+        >
+          {/* Expanded: full logo (also mobile drawer — always expanded) */}
+          <span
+            className={cn(
+              "[grid-area:stack] flex w-full max-w-full items-center justify-center px-0.5 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+              isCollapsed ? "pointer-events-none opacity-0" : "opacity-100"
+            )}
+            aria-hidden={isCollapsed}
+          >
+            <BrandLogo
+              priority
+              sizes="(min-width: 768px) 208px, 192px"
+              className="min-h-0 min-w-0 max-h-11 w-full select-none object-contain object-center sm:max-h-12"
+            />
+          </span>
+          {/* Collapsed desktop only: icon mark */}
+          <span
+            className={cn(
+              "[grid-area:stack] flex items-center justify-center transition-opacity duration-200 ease-out motion-reduce:transition-none",
+              isCollapsed ? "opacity-100" : "pointer-events-none opacity-0"
+            )}
+            aria-hidden={!isCollapsed}
+          >
+            <BrandMark
+              priority
+              sizes="40px"
+              className="h-10 w-10 max-h-10 max-w-10 select-none"
+            />
+          </span>
+        </Link>
       </div>
 
       {/* ── Workspace selector ────────────────────────────────── */}

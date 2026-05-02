@@ -9,7 +9,10 @@ import { cn } from "@/lib/utils"
 interface AddEquipmentModalProps {
   open: boolean
   onClose: () => void
-  onSuccess?: () => void
+  /** Called with new row id after a successful insert (before modal closes). */
+  onSuccess?: (equipmentId?: string) => void
+  /** When set, customer field is prefilled (e.g. creating equipment from customer context). */
+  prefilledCustomerId?: string | null
 }
 
 const EQUIPMENT_TYPES = [
@@ -105,7 +108,12 @@ function validate(form: FormState): FormErrors {
   return errors
 }
 
-export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModalProps) {
+export function AddEquipmentModal({
+  open,
+  onClose,
+  onSuccess,
+  prefilledCustomerId = null,
+}: AddEquipmentModalProps) {
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -146,6 +154,15 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
       setCustomers((data as CustomerOption[] | null) ?? [])
     })()
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    setForm({
+      ...INITIAL_FORM,
+      ...(prefilledCustomerId ? { customerId: prefilledCustomerId } : {}),
+    })
+    setErrors({})
+  }, [open, prefilledCustomerId])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -198,21 +215,25 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
       "Out of Service": "out_of_service",
     }
 
-    const { error } = await supabase.from("equipment").insert({
-      organization_id: profile.default_organization_id,
-      customer_id: form.customerId,
-      name: (form.model || form.name).trim(),
-      manufacturer: form.manufacturer.trim() || null,
-      category: form.equipmentType.trim(),
-      serial_number: form.serialNumber.trim() || null,
-      status: statusMap[form.status],
-      install_date: form.installDate || null,
-      warranty_expires_at: form.warrantyExpiration || null,
-      last_service_at: form.lastServiceDate || null,
-      next_due_at: form.nextServiceDue || null,
-      location_label: form.location.trim() || null,
-      notes: form.notes.trim() || null,
-    })
+    const { data: inserted, error } = await supabase
+      .from("equipment")
+      .insert({
+        organization_id: profile.default_organization_id,
+        customer_id: form.customerId,
+        name: (form.model || form.name).trim(),
+        manufacturer: form.manufacturer.trim() || null,
+        category: form.equipmentType.trim(),
+        serial_number: form.serialNumber.trim() || null,
+        status: statusMap[form.status],
+        install_date: form.installDate || null,
+        warranty_expires_at: form.warrantyExpiration || null,
+        last_service_at: form.lastServiceDate || null,
+        next_due_at: form.nextServiceDue || null,
+        location_label: form.location.trim() || null,
+        notes: form.notes.trim() || null,
+      })
+      .select("id")
+      .single()
 
     if (error) {
       setSaving(false)
@@ -221,11 +242,13 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
       return
     }
 
+    const newId = (inserted as { id: string } | null)?.id
+
     setSaving(false)
     setToastMsg("Equipment added successfully")
     setTimeout(() => setToastMsg(null), 3500)
+    onSuccess?.(newId)
     handleClose()
-    onSuccess?.()
   }
 
   if (!open) return null
@@ -236,7 +259,7 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
       <div
         aria-hidden="true"
         onClick={handleClose}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
+        className="fixed inset-0 z-[230] bg-black/50 backdrop-blur-[2px]"
       />
 
       {/* Modal */}
@@ -244,7 +267,7 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
         role="dialog"
         aria-modal="true"
         aria-label="Add Equipment"
-        className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 pb-8"
+        className="fixed inset-0 z-[230] flex items-start justify-center pt-12 px-4 pb-8"
       >
         <div className="relative w-full max-w-2xl bg-background rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
           {/* Header */}
@@ -372,7 +395,7 @@ export function AddEquipmentModal({ open, onClose, onSuccess }: AddEquipmentModa
 
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[200] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium bg-[color:var(--status-success)] text-white animate-in slide-in-from-right-4 fade-in duration-200">
+        <div className="fixed bottom-6 right-6 z-[240] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium bg-[color:var(--status-success)] text-white animate-in slide-in-from-right-4 fade-in duration-200">
           {toastMsg}
         </div>
       )}

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { BrandLogo, BrandLogoOnLight } from "@/components/brand-logo"
 
 const DEMO_ACCOUNTS = [
   { name: "Sarah Mitchell", role: "Admin", email: "sarah@acme.com", workspace: "Acme Field Services" },
@@ -75,12 +76,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12"
         style={{ background: "#0f172a" }}>
         <div className="flex items-center gap-2.5">
-          <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
-            alt="Equipify.ai"
-            className="h-8 w-auto object-contain"
-            draggable={false}
-          />
+          <BrandLogo className="h-8 w-auto max-h-8" priority />
         </div>
         <div>
           <blockquote className="text-2xl font-medium leading-relaxed mb-6" style={{ color: "#e2e8f0" }}>
@@ -108,13 +104,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
-              alt="Equipify.ai"
-              className="h-7 w-auto object-contain"
-              draggable={false}
-            />
+          <div className="mb-8 lg:hidden">
+            <BrandLogoOnLight logoClassName="h-7" />
           </div>
 
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome back</h1>

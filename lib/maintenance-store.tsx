@@ -2,147 +2,44 @@
 
 import {
   createContext,
-  useContext,
-  useReducer,
   useCallback,
+  useContext,
   useEffect,
+  useState,
   type ReactNode,
 } from "react"
-import {
-  maintenancePlans as initialPlans,
-  notificationLog as initialLog,
-} from "@/lib/mock-data"
 import type {
   MaintenancePlan,
   NotificationLogEntry,
-  PlanStatus,
   NotificationRule,
+  PlanStatus,
+  NotificationTriggerDays,
 } from "@/lib/mock-data"
-import { useWorkspaceData } from "@/lib/tenant-store"
-
-// ─── State ────────────────────────────────────────────────────────────────────
-
-interface State {
-  plans: MaintenancePlan[]
-  notificationLog: NotificationLogEntry[]
-}
-
-type Action =
-  | { type: "CREATE_PLAN"; payload: MaintenancePlan }
-  | { type: "UPDATE_PLAN"; id: string; payload: Partial<MaintenancePlan> }
-  | { type: "SET_STATUS"; id: string; status: PlanStatus }
-  | { type: "UPDATE_RULES"; id: string; rules: NotificationRule[] }
-  | { type: "LOG_NOTIFICATION"; entry: NotificationLogEntry }
-  | { type: "FIRE_NOTIFICATIONS"; planId: string }
-  | { type: "RESET"; plans: MaintenancePlan[]; notificationLog: NotificationLogEntry[] }
-
-function computeNextDueDate(lastServiceDate: string, interval: MaintenancePlan["interval"], customDays: number): string {
-  const base = new Date(lastServiceDate)
-  switch (interval) {
-    case "Annual":       base.setFullYear(base.getFullYear() + 1); break
-    case "Semi-Annual":  base.setMonth(base.getMonth() + 6); break
-    case "Quarterly":    base.setMonth(base.getMonth() + 3); break
-    case "Monthly":      base.setMonth(base.getMonth() + 1); break
-    case "Custom":       base.setDate(base.getDate() + (customDays || 90)); break
-  }
-  return base.toISOString().split("T")[0]
-}
-
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case "CREATE_PLAN":
-      return { ...state, plans: [action.payload, ...state.plans] }
-
-    case "UPDATE_PLAN":
-      return {
-        ...state,
-        plans: state.plans.map((p) => {
-          if (p.id !== action.id) return p
-          const updated = { ...p, ...action.payload }
-          // Recompute nextDueDate if interval-related fields changed
-          if (action.payload.interval || action.payload.lastServiceDate || action.payload.customIntervalDays !== undefined) {
-            updated.nextDueDate = computeNextDueDate(
-              updated.lastServiceDate,
-              updated.interval,
-              updated.customIntervalDays,
-            )
-          }
-          return updated
-        }),
-      }
-
-    case "SET_STATUS":
-      return {
-        ...state,
-        plans: state.plans.map((p) =>
-          p.id === action.id ? { ...p, status: action.status } : p
-        ),
-      }
-
-    case "UPDATE_RULES":
-      return {
-        ...state,
-        plans: state.plans.map((p) =>
-          p.id === action.id ? { ...p, notificationRules: action.rules } : p
-        ),
-      }
-
-    case "LOG_NOTIFICATION":
-      return { ...state, notificationLog: [action.entry, ...state.notificationLog] }
-
-    case "FIRE_NOTIFICATIONS": {
-      const plan = state.plans.find((p) => p.id === action.planId)
-      if (!plan) return state
-      const now = new Date().toISOString()
-      const dueDate = new Date(plan.nextDueDate)
-      const today = new Date()
-      const daysUntilDue = Math.round((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-      const thresholds = [30, 14, 7, 1] as const
-      const newEntries: NotificationLogEntry[] = []
-
-      thresholds.forEach((days) => {
-        if (daysUntilDue <= days) {
-          plan.notificationRules
-            .filter((r) => r.enabled && r.triggerDays === days)
-            .forEach((rule) => {
-              rule.recipients.forEach((recipient) => {
-                newEntries.push({
-                  id: `NL-SIM-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                  planId: plan.id,
-                  planName: plan.name,
-                  equipmentName: plan.equipmentName,
-                  customerName: plan.customerName,
-                  channel: rule.channel,
-                  triggerDays: days,
-                  sentAt: now,
-                  recipient,
-                  message: `${rule.channel === "SMS" ? "Equipify: " : "Reminder: "}${plan.equipmentName} — "${plan.name}" is due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} (${plan.nextDueDate}).`,
-                  status: "Simulated",
-                })
-              })
-            })
-        }
-      })
-
-      return { ...state, notificationLog: [...newEntries, ...state.notificationLog] }
-    }
-
-    case "RESET":
-      return { plans: action.plans, notificationLog: action.notificationLog }
-    default:
-      return state
-  }
-}
-
-// ─── Context ──────────────────────────────────────────────────────────────────
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { loadMaintenancePlansForOrg } from "@/lib/maintenance-plans/load-plans"
+import {
+  computeNextDueDate,
+  intervalToDb,
+  notificationRulesToJsonb,
+  planStatusUiToDb,
+  serializeServicesForDb,
+} from "@/lib/maintenance-plans/db-map"
 
 interface MaintenanceContextValue {
   plans: MaintenancePlan[]
   notificationLog: NotificationLogEntry[]
-  createPlan: (plan: MaintenancePlan) => void
-  updatePlan: (id: string, payload: Partial<MaintenancePlan>) => void
-  setStatus: (id: string, status: PlanStatus) => void
-  updateRules: (id: string, rules: NotificationRule[]) => void
+  loading: boolean
+  error: string | null
+  organizationId: string | null
+  refreshPlans: (opts?: { silent?: boolean }) => Promise<void>
+  createPlan: (plan: MaintenancePlan) => Promise<{ error?: string }>
+  updatePlan: (id: string, payload: Partial<MaintenancePlan>) => Promise<{ error?: string }>
+  setStatus: (id: string, status: PlanStatus) => Promise<{ error?: string }>
+  updateRules: (id: string, rules: NotificationRule[]) => Promise<{ error?: string }>
+  /** Soft-archive: hides plan from active lists (sets `is_archived`, `archived_at`). */
+  archivePlan: (id: string) => Promise<{ error?: string }>
+  /** Soft-remove: archives and marks plan expired; disables auto work orders. */
+  deletePlan: (id: string) => Promise<{ error?: string }>
   fireNotifications: (planId: string) => void
   getById: (id: string) => MaintenancePlan | undefined
 }
@@ -150,25 +47,285 @@ interface MaintenanceContextValue {
 const MaintenanceContext = createContext<MaintenanceContextValue | null>(null)
 
 export function MaintenanceProvider({ children }: { children: ReactNode }) {
-  const { maintenancePlans: wsPlans, notificationLog: wsLog } = useWorkspaceData()
-  const [state, dispatch] = useReducer(reducer, {
-    plans: wsPlans,
-    notificationLog: wsLog,
-  })
+  const [plans, setPlans] = useState<MaintenancePlan[]>([])
+  const [notificationLog, setNotificationLog] = useState<NotificationLogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+
+  const refreshPlans = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (!silent) setLoading(true)
+    setError(null)
+    const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      setOrganizationId(null)
+      setPlans([])
+      if (!silent) setLoading(false)
+      return
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("default_organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile?.default_organization_id) {
+      setOrganizationId(null)
+      setPlans([])
+      setError(profileError?.message ?? "No default organization.")
+      if (!silent) setLoading(false)
+      return
+    }
+
+    const orgId = profile.default_organization_id
+    setOrganizationId(orgId)
+
+    const { plans: loaded, error: loadErr } = await loadMaintenancePlansForOrg(supabase, orgId)
+    setPlans(loaded)
+    setError(loadErr)
+    if (!silent) setLoading(false)
+  }, [])
 
   useEffect(() => {
-    dispatch({ type: "RESET", plans: wsPlans, notificationLog: wsLog })
-  }, [wsPlans, wsLog])
+    void refreshPlans()
+  }, [refreshPlans])
 
-  const createPlan   = useCallback((plan: MaintenancePlan) => dispatch({ type: "CREATE_PLAN", payload: plan }), [])
-  const updatePlan   = useCallback((id: string, payload: Partial<MaintenancePlan>) => dispatch({ type: "UPDATE_PLAN", id, payload }), [])
-  const setStatus    = useCallback((id: string, status: PlanStatus) => dispatch({ type: "SET_STATUS", id, status }), [])
-  const updateRules  = useCallback((id: string, rules: NotificationRule[]) => dispatch({ type: "UPDATE_RULES", id, rules }), [])
-  const fireNotifications = useCallback((planId: string) => dispatch({ type: "FIRE_NOTIFICATIONS", planId }), [])
-  const getById      = useCallback((id: string) => state.plans.find((p) => p.id === id), [state.plans])
+  const createPlan = useCallback(
+    async (plan: MaintenancePlan) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const { interval_value, interval_unit } = intervalToDb(plan.interval, plan.customIntervalDays)
+      const nextDue =
+        plan.nextDueDate ||
+        computeNextDueDate(plan.lastServiceDate, plan.interval, plan.customIntervalDays)
+
+      const { error: insertError } = await supabase.from("maintenance_plans").insert({
+        organization_id: organizationId,
+        customer_id: plan.customerId,
+        equipment_id: plan.equipmentId?.trim() ? plan.equipmentId : null,
+        assigned_user_id: plan.technicianId?.trim() ? plan.technicianId : null,
+        name: plan.name.trim(),
+        status: planStatusUiToDb(plan.status),
+        priority: "normal",
+        interval_value,
+        interval_unit,
+        last_service_date: plan.lastServiceDate?.trim() ? plan.lastServiceDate : null,
+        next_due_date: nextDue?.trim() ? nextDue : null,
+        auto_create_work_order: plan.autoCreateWorkOrder,
+        notes: plan.notes?.trim() ? plan.notes : null,
+        services: serializeServicesForDb(plan.services, plan.workOrderType, plan.workOrderPriority),
+        notification_rules: notificationRulesToJsonb(plan.notificationRules),
+      })
+
+      if (insertError) return { error: insertError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const updatePlan = useCallback(
+    async (id: string, payload: Partial<MaintenancePlan>) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const current = plans.find((p) => p.id === id)
+      if (!current) return { error: "Plan not found." }
+
+      const merged: MaintenancePlan = { ...current, ...payload }
+
+      const scheduleInputsChanged =
+        payload.lastServiceDate !== undefined ||
+        payload.interval !== undefined ||
+        payload.customIntervalDays !== undefined
+
+      if (scheduleInputsChanged && payload.nextDueDate === undefined) {
+        merged.nextDueDate = computeNextDueDate(
+          merged.lastServiceDate,
+          merged.interval,
+          merged.customIntervalDays
+        )
+      }
+
+      const { interval_value, interval_unit } = intervalToDb(merged.interval, merged.customIntervalDays)
+
+      const supabase = createBrowserSupabaseClient()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({
+          customer_id: merged.customerId,
+          equipment_id: merged.equipmentId?.trim() ? merged.equipmentId : null,
+          status: planStatusUiToDb(merged.status),
+          assigned_user_id: merged.technicianId?.trim() ? merged.technicianId : null,
+          name: merged.name.trim(),
+          interval_value,
+          interval_unit,
+          last_service_date: merged.lastServiceDate?.trim() ? merged.lastServiceDate : null,
+          next_due_date: merged.nextDueDate?.trim() ? merged.nextDueDate : null,
+          auto_create_work_order: merged.autoCreateWorkOrder,
+          notes: merged.notes?.trim() ? merged.notes : null,
+          services: serializeServicesForDb(
+            merged.services,
+            merged.workOrderType,
+            merged.workOrderPriority
+          ),
+          notification_rules: notificationRulesToJsonb(merged.notificationRules),
+        })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, plans, refreshPlans]
+  )
+
+  const setStatus = useCallback(
+    async (id: string, status: PlanStatus) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({ status: planStatusUiToDb(status) })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const updateRules = useCallback(
+    async (id: string, rules: NotificationRule[]) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({ notification_rules: notificationRulesToJsonb(rules) })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const archivePlan = useCallback(
+    async (id: string) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const archivedAt = new Date().toISOString()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({
+          is_archived: true,
+          archived_at: archivedAt,
+        })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const deletePlan = useCallback(
+    async (id: string) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const archivedAt = new Date().toISOString()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({
+          is_archived: true,
+          archived_at: archivedAt,
+          status: "expired",
+          auto_create_work_order: false,
+        })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const fireNotifications = useCallback((planId: string) => {
+    const plan = plans.find((p) => p.id === planId)
+    if (!plan) return
+    const now = new Date().toISOString()
+    const dueDate = new Date(plan.nextDueDate)
+    const today = new Date()
+    const daysUntilDue = Math.round((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    const thresholds = [30, 14, 7, 1] as const
+    const newEntries: NotificationLogEntry[] = []
+
+    thresholds.forEach((days) => {
+      if (daysUntilDue <= days) {
+        plan.notificationRules
+          .filter((r) => r.enabled && r.triggerDays === days)
+          .forEach((rule) => {
+            rule.recipients.forEach((recipient) => {
+              newEntries.push({
+                id: `NL-SIM-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                planId: plan.id,
+                planName: plan.name,
+                equipmentName: plan.equipmentName,
+                customerName: plan.customerName,
+                channel: rule.channel,
+                triggerDays: days as NotificationTriggerDays,
+                sentAt: now,
+                recipient,
+                message: `${rule.channel === "SMS" ? "Equipify: " : "Reminder: "}${plan.equipmentName} — "${plan.name}" is due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} (${plan.nextDueDate}).`,
+                status: "Simulated",
+              })
+            })
+          })
+      }
+    })
+
+    if (newEntries.length > 0) {
+      setNotificationLog((prev) => [...newEntries, ...prev])
+    }
+  }, [plans])
+
+  const getById = useCallback(
+    (id: string) => plans.find((p) => p.id === id),
+    [plans]
+  )
 
   return (
-    <MaintenanceContext.Provider value={{ plans: state.plans, notificationLog: state.notificationLog, createPlan, updatePlan, setStatus, updateRules, fireNotifications, getById }}>
+    <MaintenanceContext.Provider
+      value={{
+        plans,
+        notificationLog,
+        loading,
+        error,
+        organizationId,
+        refreshPlans,
+        createPlan,
+        updatePlan,
+        setStatus,
+        updateRules,
+        archivePlan,
+        deletePlan,
+        fireNotifications,
+        getById,
+      }}
+    >
       {children}
     </MaintenanceContext.Provider>
   )

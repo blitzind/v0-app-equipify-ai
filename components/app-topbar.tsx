@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SidebarContext } from "@/components/app-sidebar"
+import { BrandLogo } from "@/components/brand-logo"
 import { useTenant } from "@/lib/tenant-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { LucideIcon } from "lucide-react"
@@ -251,12 +252,7 @@ export function AppTopbar() {
 
       {/* Mobile logo — centered absolutely so it doesn't shift layout */}
       <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none">
-        <img
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/equipify-ai-logo-8FdWqyqT52Rmed0yjY565GPp5xlQsK.png"
-          alt="Equipify.ai"
-          className="h-7 w-auto object-contain"
-          draggable={false}
-        />
+        <BrandLogo className="h-7 w-auto max-h-7" priority />
       </div>
 
       {/* Search — desktop only (sm+), hidden on mobile */}
