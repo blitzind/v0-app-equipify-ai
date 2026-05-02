@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,7 +43,6 @@ import {
   MapPin,
   Phone,
   Mail,
-  Briefcase,
   CalendarDays,
   CheckCircle2,
   Clock,
@@ -50,9 +50,6 @@ import {
   ShieldCheck,
   X,
   ChevronRight,
-  BarChart3,
-  AlertTriangle,
-  Award,
   User,
   MoreHorizontal,
   MessageSquare,
@@ -61,14 +58,12 @@ import {
   Copy,
   Trash2,
   Eye,
-  StickyNote,
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ViewMode = "card" | "table"
 type KpiFilter = "active" | "today" | "performance" | "expiring" | null
-type DrawerTab = "overview" | "schedule" | "certifications" | "history" | "performance" | "notes"
 type MessageTab = "sms" | "email" | "note"
 
 const ALL_STATUSES: TechStatus[] = ["Available", "On Job", "Off", "Vacation"]
@@ -216,12 +211,6 @@ const STATUS_DOT: Record<TechStatus, string> = {
   "On Job":    "bg-[color:var(--status-warning)]",
   "Off":       "bg-muted-foreground",
   "Vacation":  "bg-[var(--ds-accent-subtle)]",
-}
-
-const SCHEDULE_STYLE: Record<string, string> = {
-  "Confirmed":  "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
-  "Tentative":  "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
-  "Completed":  "bg-muted text-muted-foreground border-border",
 }
 
 const AVATAR_COLORS = [
@@ -829,366 +818,6 @@ function TechCard({
   )
 }
 
-// ─── Profile Drawer ───────────────────────────────────────────────────────────
-
-function ProfileDrawer({
-  tech, onClose, onSchedule, onMessage,
-}: {
-  tech: Technician
-  onClose: () => void
-  onSchedule: () => void
-  onMessage: () => void
-}) {
-  const [tab, setTab] = useState<DrawerTab>("overview")
-  const [notes, setNotes] = useState("")
-  const [savedNotes, setSavedNotes] = useState<{ text: string; ts: string }[]>([])
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [onClose])
-
-  const certExpiringSoon = tech.certifications.filter((c) => {
-    const diff = (new Date(c.expiryDate).getTime() - Date.now()) / 86400000
-    return diff <= 180 && diff >= 0
-  })
-
-  function saveNote() {
-    if (!notes.trim()) return
-    setSavedNotes((prev) => [{ text: notes.trim(), ts: new Date().toLocaleString() }, ...prev])
-    setNotes("")
-  }
-
-  const TABS: DrawerTab[] = ["overview", "schedule", "certifications", "history", "performance", "notes"]
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px]" onClick={onClose} />
-      <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-lg bg-background border-l border-border shadow-2xl flex flex-col">
-
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-border shrink-0">
-          <div className="flex items-center gap-4">
-            <TechAvatar tech={tech} size="lg" />
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-lg font-bold text-foreground">{tech.name}</h2>
-                <StatusBadge status={tech.status} />
-              </div>
-              <p className="text-sm text-muted-foreground">{tech.role}</p>
-              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{tech.region}</span>
-                <StarRating rating={tech.rating} />
-                <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />Since {tech.hireDate && tech.hireDate !== "—" && !Number.isNaN(Date.parse(tech.hireDate)) ? new Date(tech.hireDate).getFullYear() : "—"}</span>
-              </div>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-0 border-b border-border shrink-0 px-2 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                "capitalize text-sm py-3 px-2.5 border-b-2 font-medium transition-colors whitespace-nowrap cursor-pointer",
-                tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t === "notes" ? <span className="flex items-center gap-1"><StickyNote className="w-3.5 h-3.5" />Notes</span> : t}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-          {/* ── Overview ── */}
-          {tab === "overview" && (
-            <>
-              <p className="text-sm text-muted-foreground leading-relaxed">{tech.bio}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Email", value: tech.email, icon: Mail },
-                  { label: "Phone", value: tech.phone, icon: Phone },
-                  {
-                    label: "Hire Date",
-                    value:
-                      tech.hireDate && tech.hireDate !== "—" && !Number.isNaN(Date.parse(tech.hireDate))
-                        ? new Date(tech.hireDate + "T00:00:00Z").toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            timeZone: "UTC",
-                          })
-                        : "—",
-                    icon: CalendarDays,
-                  },
-                  { label: "Region", value: tech.region, icon: MapPin },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div key={label} className="bg-secondary/50 rounded-lg p-3">
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
-                      <Icon className="w-3 h-3" />{label}
-                    </div>
-                    <p className="text-xs font-medium text-foreground truncate">{value}</p>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wide mb-2">Skills</p>
-                <div className="flex flex-wrap gap-2">
-                  {tech.skills.length === 0
-                    ? <p className="text-xs text-muted-foreground">No skills listed.</p>
-                    : tech.skills.map((s) => (
-                      <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-full bg-primary/8 text-primary border border-primary/20">{s}</span>
-                    ))}
-                </div>
-              </div>
-              {certExpiringSoon.length > 0 && (
-                <div className="rounded-lg border border-[color:var(--status-warning)]/40 bg-[color:var(--status-warning)]/5 p-3">
-                  <div className="flex items-center gap-2 text-[color:var(--status-warning)] text-xs font-semibold mb-2">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    {certExpiringSoon.length} certification{certExpiringSoon.length > 1 ? "s" : ""} expiring within 6 months
-                  </div>
-                  {certExpiringSoon.map((c) => (
-                    <p key={c.name} className="text-xs text-muted-foreground">
-                      {c.name} — expires {new Date(c.expiryDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" })}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Total Jobs", value: tech.totalCompleted, icon: ClipboardList },
-                  { label: "Completion", value: `${tech.completionPct}%`, icon: CheckCircle2 },
-                  { label: "Avg Duration", value: `${tech.avgJobDurationHrs}h`, icon: Clock },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div key={label} className="text-center bg-secondary/50 rounded-lg py-4">
-                    <Icon className="w-4 h-4 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-lg font-bold text-foreground">{value}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ── Schedule ── */}
-          {tab === "schedule" && (
-            <>
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Upcoming Assignments</p>
-              {tech.schedule.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">No upcoming assignments scheduled.</div>
-              ) : (
-                <div className="space-y-3">
-                  {tech.schedule.map((entry) => (
-                    <Link key={entry.woId} href={`/work-orders?open=${entry.woId}`} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 hover:border-primary/30 transition-colors cursor-pointer group">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex flex-col items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-primary leading-none">
-                          {new Date(entry.date + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }).toUpperCase()}
-                        </span>
-                        <span className="text-sm font-bold text-primary leading-none">
-                          {new Date(entry.date + "T00:00:00Z").getUTCDate()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">{entry.jobType}</p>
-                          <Badge variant="secondary" className={cn("text-[10px] shrink-0 border", SCHEDULE_STYLE[entry.status])}>
-                            {entry.status}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{entry.customer}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.time} &bull; <span className="font-mono text-primary">{entry.woId}</span></p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Certifications ── */}
-          {tab === "certifications" && (
-            <>
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Certifications &amp; Licenses</p>
-              {tech.certifications.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">No certifications on file.</div>
-              ) : (
-                <div className="space-y-3">
-                  {tech.certifications.map((cert) => {
-                    const daysLeft = Math.round((new Date(cert.expiryDate).getTime() - Date.now()) / 86400000)
-                    const isExpired = daysLeft < 0
-                    const isExpiringSoon = daysLeft >= 0 && daysLeft <= 180
-                    return (
-                      <div key={cert.name} className={cn(
-                        "p-4 rounded-lg border transition-colors",
-                        isExpired ? "border-destructive/40 bg-destructive/5"
-                          : isExpiringSoon ? "border-[color:var(--status-warning)]/40 bg-[color:var(--status-warning)]/5"
-                          : "border-border bg-secondary/30"
-                      )}>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <Award className={cn("w-4 h-4 shrink-0",
-                              isExpired ? "text-destructive" : isExpiringSoon ? "text-[color:var(--status-warning)]" : "text-[color:var(--status-success)]"
-                            )} />
-                            <p className="text-sm font-semibold text-foreground">{cert.name}</p>
-                          </div>
-                          {isExpired && <Badge variant="secondary" className="text-[10px] border bg-destructive/10 text-destructive border-destructive/30 shrink-0">Expired</Badge>}
-                          {isExpiringSoon && !isExpired && <Badge variant="secondary" className="text-[10px] border bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30 shrink-0">Expiring Soon</Badge>}
-                          {!isExpired && !isExpiringSoon && <Badge variant="secondary" className="text-[10px] border bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30 shrink-0">Valid</Badge>}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{cert.issuer}</p>
-                        <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
-                          <span>Issued: {new Date(cert.issuedDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</span>
-                          <span>Expires: {new Date(cert.expiryDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</span>
-                          {!isExpired && <span className={isExpiringSoon ? "text-[color:var(--status-warning)] font-medium" : ""}>{daysLeft} days left</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── History ── */}
-          {tab === "history" && (
-            <>
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Recent Job History</p>
-              {tech.history.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">No job history yet.</div>
-              ) : (
-                <div className="space-y-2">
-                  {tech.history.map((entry) => (
-                    <Link key={entry.woId} href={`/work-orders?open=${entry.woId}`} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/30 hover:border-primary/30 transition-colors cursor-pointer group">
-                      <CheckCircle2 className="w-4 h-4 text-[color:var(--status-success)] shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">{entry.jobType}</p>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <Star key={n} className={cn("w-3 h-3", n <= entry.rating ? "fill-amber-400 text-amber-400" : "text-muted")} />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{entry.customer}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{entry.completedDate} &bull; {entry.duration} &bull; <span className="font-mono text-primary">{entry.woId}</span></p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Performance ── */}
-          {tab === "performance" && (
-            <>
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Performance Summary</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Total Jobs Completed", value: tech.totalCompleted, sub: "all time" },
-                  { label: "Completion Rate", value: `${tech.completionPct}%`, sub: "first-visit close" },
-                  { label: "Customer Rating", value: `${tech.rating}/5.0`, sub: "avg from reviews" },
-                  { label: "Utilization", value: `${tech.utilizationPct}%`, sub: "billed time / capacity" },
-                  { label: "Jobs This Week", value: tech.jobsThisWeek, sub: "scheduled & active" },
-                  { label: "Avg Job Duration", value: `${tech.avgJobDurationHrs}h`, sub: "per work order" },
-                ].map(({ label, value, sub }) => (
-                  <div key={label} className="bg-secondary/50 rounded-lg p-4">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-                    <p className="text-xl font-bold text-foreground">{value}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                  <span className="font-medium text-foreground">Utilization Rate</span>
-                  <span>{tech.utilizationPct}%</span>
-                </div>
-                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
-                  <div className={cn("h-full rounded-full", tech.utilizationPct >= 90 ? "bg-[color:var(--status-danger)]" : tech.utilizationPct >= 75 ? "bg-[color:var(--status-warning)]" : "bg-primary")}
-                    style={{ width: `${tech.utilizationPct}%` }} />
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                  <span>0%</span><span className="text-[color:var(--status-warning)]">75% target</span><span>100%</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-foreground mb-2">Job Completion Rate</p>
-                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-[color:var(--status-success)]" style={{ width: `${tech.completionPct}%` }} />
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-1">{tech.completionPct}% of assigned jobs completed on first visit</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-foreground mb-2">Customer Rating</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Star key={n} className={cn("w-5 h-5", n <= Math.round(tech.rating) ? "fill-amber-400 text-amber-400" : "text-muted")} />
-                    ))}
-                  </div>
-                  <span className="text-xl font-bold text-foreground">{tech.rating.toFixed(1)}</span>
-                  <span className="text-xs text-muted-foreground">/ 5.0 average</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── Notes ── */}
-          {tab === "notes" && (
-            <>
-              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Internal Notes</p>
-              <div className="space-y-2">
-                <Textarea
-                  placeholder={`Add a note about ${tech.name}…`}
-                  rows={4} value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-                <Button size="sm" className="w-full" onClick={saveNote} disabled={!notes.trim()}>
-                  Save Note
-                </Button>
-              </div>
-              {savedNotes.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">No notes yet. Add the first one above.</div>
-              ) : (
-                <div className="space-y-3">
-                  {savedNotes.map((n, i) => (
-                    <div key={i} className="p-3 rounded-lg border border-border bg-secondary/30">
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{n.text}</p>
-                      <p className="text-[10px] text-muted-foreground mt-2">{n.ts}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Drawer footer */}
-        <div className="p-4 border-t border-border flex gap-2 shrink-0">
-          <Button size="sm" variant="outline" className="flex-1 gap-1.5 cursor-pointer" onClick={onMessage}>
-            <MessageSquare className="w-3.5 h-3.5" /> Message
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1 gap-1.5 cursor-pointer" onClick={onSchedule}>
-            <Calendar className="w-3.5 h-3.5" /> Schedule
-          </Button>
-          <Button size="sm" variant="default" className="flex-1 gap-1.5 cursor-pointer" onClick={onSchedule}>
-            <ClipboardList className="w-3.5 h-3.5" /> Assign Job
-          </Button>
-        </div>
-      </aside>
-    </>
-  )
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function TechniciansPageInner() {
@@ -1205,6 +834,7 @@ function TechniciansPageInner() {
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null)
 
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null)
+  const [rosterRefresh, setRosterRefresh] = useState(0)
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -1329,7 +959,7 @@ function TechniciansPageInner() {
     return () => {
       active = false
     }
-  }, [])
+  }, [rosterRefresh])
 
   useEffect(() => {
     const openId = searchParams.get("open")
@@ -1653,11 +1283,20 @@ function TechniciansPageInner() {
       {/* ── Overlays ── */}
 
       {selectedTech && (
-        <ProfileDrawer
-          tech={selectedTech}
+        <TechnicianDrawer
+          techId={selectedTech.id}
           onClose={() => setSelectedTech(null)}
-          onSchedule={() => { setScheduleTech(selectedTech); setSelectedTech(null) }}
-          onMessage={() => { setMessageTech(selectedTech); setSelectedTech(null) }}
+          onUpdated={() => setRosterRefresh((n) => n + 1)}
+          onSchedule={({ id }) => {
+            const t = techs.find((x) => x.id === id)
+            if (t) setScheduleTech(t)
+            setSelectedTech(null)
+          }}
+          onMessage={({ id }) => {
+            const t = techs.find((x) => x.id === id)
+            if (t) setMessageTech(t)
+            setSelectedTech(null)
+          }}
         />
       )}
 
