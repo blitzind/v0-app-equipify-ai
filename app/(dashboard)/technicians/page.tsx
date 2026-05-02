@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
-import { useWorkspaceData } from "@/lib/tenant-store"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -81,6 +81,126 @@ const ALL_ROLES = [
   "Senior Field Technician", "Lead Calibration Specialist", "Industrial Repair Technician",
   "Field Technician II", "Field Technician I",
 ]
+
+const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
+
+function formatMemberRole(role: string): string {
+  if (!role) return "Member"
+  return role.charAt(0).toUpperCase() + role.slice(1)
+}
+
+function localDateString(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+/** Monday–Sunday week containing `d`, as YYYY-MM-DD bounds (local). */
+function weekBoundsStrings(d: Date): { start: string; end: string } {
+  const day = d.getDay()
+  const diffFromMonday = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diffFromMonday)
+  monday.setHours(0, 0, 0, 0)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return { start: localDateString(monday), end: localDateString(sunday) }
+}
+
+function dateStrInRangeInclusive(dateStr: string, start: string, end: string): boolean {
+  return dateStr >= start && dateStr <= end
+}
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+type WoRow = { assigned_user_id: string | null; status: string; scheduled_on: string | null }
+
+function aggregateWoStats(
+  rows: WoRow[],
+  userId: string,
+  weekStart: string,
+  weekEnd: string,
+  todayStr: string
+): {
+  jobsThisWeek: number
+  totalCompleted: number
+  completionPct: number
+  hasJobsToday: boolean
+} {
+  let jobsThisWeek = 0
+  let completed = 0
+  let totalForRate = 0
+  let hasJobsToday = false
+
+  for (const r of rows) {
+    if (r.assigned_user_id !== userId) continue
+    if (r.scheduled_on === todayStr) hasJobsToday = true
+    if (r.scheduled_on && dateStrInRangeInclusive(r.scheduled_on, weekStart, weekEnd)) {
+      jobsThisWeek++
+    }
+    if (r.status === "completed" || r.status === "invoiced") {
+      completed++
+    }
+    if (
+      r.status === "open" ||
+      r.status === "scheduled" ||
+      r.status === "in_progress" ||
+      r.status === "completed" ||
+      r.status === "invoiced"
+    ) {
+      totalForRate++
+    }
+  }
+
+  const completionPct =
+    totalForRate > 0 ? Math.round((completed / totalForRate) * 100) : 0
+
+  return { jobsThisWeek, totalCompleted: completed, completionPct, hasJobsToday }
+}
+
+function buildTechnicianFromProfile(
+  profile: { id: string; email: string | null; full_name: string | null; created_at: string },
+  memberRole: string,
+  stats: ReturnType<typeof aggregateWoStats>
+): Technician {
+  const name =
+    (profile.full_name && profile.full_name.trim()) ||
+    (profile.email && profile.email.trim()) ||
+    profile.id.slice(0, 8)
+  const hireDate =
+    profile.created_at && /^\d{4}-\d{2}-\d{2}/.test(profile.created_at)
+      ? profile.created_at.slice(0, 10)
+      : "—"
+
+  return {
+    id: profile.id,
+    name,
+    avatar: initialsFromName(name),
+    role: formatMemberRole(memberRole),
+    region: "—",
+    email: profile.email ?? "",
+    phone: "—",
+    hireDate,
+    status: "Available",
+    skills: [] as TechSkill[],
+    jobsThisWeek: stats.jobsThisWeek,
+    completionPct: stats.completionPct,
+    rating: 0,
+    utilizationPct: 0,
+    totalCompleted: stats.totalCompleted,
+    avgJobDurationHrs: 0,
+    certifications: [],
+    schedule: [],
+    history: [],
+    bio: `${name} (${formatMemberRole(memberRole)}). Performance metrics below reflect assigned work orders when available.`,
+  }
+}
 
 // ─── Style maps ───────────────────────────────────────────────────────────────
 
@@ -572,6 +692,7 @@ function KpiCard({
 
 function TechCard({
   tech, onSelect, onSchedule, onMessage, onStatusChange, onDuplicate, onDelete,
+  rosterEditsEnabled = true,
 }: {
   tech: Technician
   onSelect: () => void
@@ -580,6 +701,7 @@ function TechCard({
   onStatusChange: (s: TechStatus) => void
   onDuplicate: () => void
   onDelete: () => void
+  rosterEditsEnabled?: boolean
 }) {
   return (
     <Card className="hover:border-primary/40 hover:shadow-sm transition-all group">
@@ -661,24 +783,42 @@ function TechCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={onSelect}>
+              <DropdownMenuItem
+                className={cn("gap-2", rosterEditsEnabled ? "cursor-pointer" : "opacity-50 pointer-events-none")}
+                onClick={rosterEditsEnabled ? onSelect : undefined}
+              >
                 <Eye className="w-3.5 h-3.5" /> Edit Technician
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={onDuplicate}>
+              <DropdownMenuItem
+                className={cn("gap-2", rosterEditsEnabled ? "cursor-pointer" : "opacity-50 pointer-events-none")}
+                onClick={rosterEditsEnabled ? onDuplicate : undefined}
+              >
                 <Copy className="w-3.5 h-3.5" /> Duplicate Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => onStatusChange("Available")}>
+              <DropdownMenuItem
+                className={cn("gap-2", rosterEditsEnabled ? "cursor-pointer" : "opacity-50 pointer-events-none")}
+                onClick={rosterEditsEnabled ? () => onStatusChange("Available") : undefined}
+              >
                 <span className="w-2 h-2 rounded-full bg-[color:var(--status-success)] inline-block" /> Mark Available
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => onStatusChange("Off")}>
+              <DropdownMenuItem
+                className={cn("gap-2", rosterEditsEnabled ? "cursor-pointer" : "opacity-50 pointer-events-none")}
+                onClick={rosterEditsEnabled ? () => onStatusChange("Off") : undefined}
+              >
                 <span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" /> Mark Off Duty
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer gap-2" onClick={onSchedule}>
                 <Calendar className="w-3.5 h-3.5" /> View Schedule
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2 text-destructive focus:text-destructive" onClick={onDelete}>
+              <DropdownMenuItem
+                className={cn(
+                  "gap-2 text-destructive focus:text-destructive",
+                  rosterEditsEnabled ? "cursor-pointer" : "opacity-50 pointer-events-none"
+                )}
+                onClick={rosterEditsEnabled ? onDelete : undefined}
+              >
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -710,8 +850,8 @@ function ProfileDrawer({
   }, [onClose])
 
   const certExpiringSoon = tech.certifications.filter((c) => {
-    const diff = (new Date(c.expiryDate).getTime() - new Date("2026-04-30").getTime()) / 86400000
-    return diff <= 180
+    const diff = (new Date(c.expiryDate).getTime() - Date.now()) / 86400000
+    return diff <= 180 && diff >= 0
   })
 
   function saveNote() {
@@ -740,7 +880,7 @@ function ProfileDrawer({
               <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{tech.region}</span>
                 <StarRating rating={tech.rating} />
-                <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />Since {new Date(tech.hireDate).getFullYear()}</span>
+                <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />Since {tech.hireDate && tech.hireDate !== "—" && !Number.isNaN(Date.parse(tech.hireDate)) ? new Date(tech.hireDate).getFullYear() : "—"}</span>
               </div>
             </div>
           </div>
@@ -776,7 +916,19 @@ function ProfileDrawer({
                 {[
                   { label: "Email", value: tech.email, icon: Mail },
                   { label: "Phone", value: tech.phone, icon: Phone },
-                  { label: "Hire Date", value: new Date(tech.hireDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }), icon: CalendarDays },
+                  {
+                    label: "Hire Date",
+                    value:
+                      tech.hireDate && tech.hireDate !== "—" && !Number.isNaN(Date.parse(tech.hireDate))
+                        ? new Date(tech.hireDate + "T00:00:00Z").toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            timeZone: "UTC",
+                          })
+                        : "—",
+                    icon: CalendarDays,
+                  },
                   { label: "Region", value: tech.region, icon: MapPin },
                 ].map(({ label, value, icon: Icon }) => (
                   <div key={label} className="bg-secondary/50 rounded-lg p-3">
@@ -870,7 +1022,7 @@ function ProfileDrawer({
               ) : (
                 <div className="space-y-3">
                   {tech.certifications.map((cert) => {
-                    const daysLeft = Math.round((new Date(cert.expiryDate).getTime() - new Date("2026-04-30").getTime()) / 86400000)
+                    const daysLeft = Math.round((new Date(cert.expiryDate).getTime() - Date.now()) / 86400000)
                     const isExpired = daysLeft < 0
                     const isExpiringSoon = daysLeft >= 0 && daysLeft <= 180
                     return (
@@ -1040,12 +1192,11 @@ function ProfileDrawer({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function TechniciansPageInner() {
-  const { technicians: wsTechs } = useWorkspaceData()
-  const [techs, setTechs] = useState<Technician[]>(wsTechs)
+  const [techs, setTechs] = useState<Technician[]>([])
+  const [woRows, setWoRows] = useState<WoRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  useEffect(() => {
-    setTechs(wsTechs)
-  }, [wsTechs])
   const [view, setView] = useState<ViewMode>("table")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -1058,20 +1209,141 @@ function TechniciansPageInner() {
   const router = useRouter()
 
   useEffect(() => {
+    let active = true
+
+    async function loadRoster() {
+      setLoading(true)
+      setLoadError(null)
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) {
+          setTechs([])
+          setWoRows([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: userProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !userProfile?.default_organization_id) {
+        if (active) {
+          setTechs([])
+          setWoRows([])
+          setLoadError(profileError?.message ?? "No default organization.")
+          setLoading(false)
+        }
+        return
+      }
+
+      const orgId = userProfile.default_organization_id
+
+      const { data: members, error: memError } = await supabase
+        .from("organization_members")
+        .select("user_id, role")
+        .eq("organization_id", orgId)
+        .eq("status", "active")
+        .in("role", [...ROSTER_MEMBER_ROLES])
+
+      if (memError) {
+        if (active) {
+          setLoadError(memError.message)
+          setTechs([])
+          setWoRows([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const memberList = (members ?? []) as Array<{ user_id: string; role: string }>
+      const userIds = [...new Set(memberList.map((m) => m.user_id))]
+      const roleByUser = new Map(memberList.map((m) => [m.user_id, m.role]))
+
+      if (userIds.length === 0) {
+        if (active) {
+          setTechs([])
+          setWoRows([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: profRows, error: profError } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, created_at")
+        .in("id", userIds)
+
+      if (profError) {
+        if (active) {
+          setLoadError(profError.message)
+          setTechs([])
+          setWoRows([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data: woData, error: woError } = await supabase
+        .from("work_orders")
+        .select("assigned_user_id, status, scheduled_on")
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+
+      const woList = (woError ? [] : ((woData ?? []) as WoRow[])) as WoRow[]
+
+      const todayStr = localDateString(new Date())
+      const { start: weekStart, end: weekEnd } = weekBoundsStrings(new Date())
+
+      const list: Technician[] = (
+        (profRows ?? []) as Array<{
+          id: string
+          email: string | null
+          full_name: string | null
+          created_at: string
+        }>
+      )
+        .filter((p) => roleByUser.has(p.id))
+        .map((p) => {
+          const role = roleByUser.get(p.id) ?? "tech"
+          const stats = aggregateWoStats(woList, p.id, weekStart, weekEnd, todayStr)
+          return buildTechnicianFromProfile(p, role, stats)
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      if (active) {
+        setWoRows(woList)
+        setTechs(list)
+        setLoading(false)
+      }
+    }
+
+    void loadRoster()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
     const openId = searchParams.get("open")
-    if (openId && wsTechs.length > 0) {
-      const match = wsTechs.find((t) => t.id === openId)
+    if (openId && techs.length > 0) {
+      const match = techs.find((t) => t.id === openId)
       if (match) {
         setSelectedTech(match)
         router.replace("/technicians", { scroll: false })
       }
     }
-  }, [searchParams, wsTechs, router])
+  }, [searchParams, techs, router])
 
   const [scheduleTech, setScheduleTech] = useState<Technician | null>(null)
   const [messageTech, setMessageTech] = useState<Technician | null>(null)
-  const [deleteTech, setDeleteTech] = useState<Technician | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
 
   const [toasts, setToasts] = useState<ToastMsg[]>([])
   let toastId = 0
@@ -1086,109 +1358,98 @@ function TechniciansPageInner() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
+  const todayStr = localDateString(new Date())
+
+  const jobsTodaySet = useMemo(() => {
+    const s = new Set<string>()
+    for (const r of woRows) {
+      if (r.scheduled_on === todayStr && r.assigned_user_id) {
+        s.add(r.assigned_user_id)
+      }
+    }
+    return s
+  }, [woRows, todayStr])
+
   // KPI derived values
   const activeTechs = techs.filter((t) => t.status !== "Off" && t.status !== "Vacation").length
-  const scheduledToday = techs.reduce((acc, t) => acc + t.schedule.filter((s) => s.date === "2026-04-30" && s.status !== "Completed").length, 0)
-  const avgCompletion = techs.length ? Math.round(techs.reduce((a, t) => a + t.completionPct, 0) / techs.length) : 0
-  const certExpiring = techs.reduce((acc, t) => {
-    return acc + t.certifications.filter((c) => {
-      const diff = (new Date(c.expiryDate).getTime() - new Date("2026-04-30").getTime()) / 86400000
-      return diff >= 0 && diff <= 90
-    }).length
-  }, 0)
+  const scheduledToday = woRows.filter((r) => r.scheduled_on === todayStr).length
+  const avgCompletion = techs.length
+    ? Math.round(techs.reduce((a, t) => a + t.completionPct, 0) / techs.length)
+    : 0
+  const certExpiring = 0
 
   const filtered = useMemo(() => {
-    return techs.filter((t) => {
-      // KPI quick filter
-      if (kpiFilter === "active" && (t.status === "Off" || t.status === "Vacation")) return false
-      if (kpiFilter === "today" && !t.schedule.some((s) => s.date === "2026-04-30")) return false
-      if (kpiFilter === "expiring" && !t.certifications.some((c) => {
-        const diff = (new Date(c.expiryDate).getTime() - new Date("2026-04-30").getTime()) / 86400000
-        return diff >= 0 && diff <= 90
-      })) return false
-      // Text search — name, role, region, skills
-      if (search) {
-        const q = search.toLowerCase()
-        const match =
-          t.name.toLowerCase().includes(q) ||
-          t.role.toLowerCase().includes(q) ||
-          t.region.toLowerCase().includes(q) ||
-          t.skills.some((s) => s.toLowerCase().includes(q))
-        if (!match) return false
-      }
-      if (statusFilter !== "all" && t.status !== statusFilter) return false
-      if (skillFilter !== "all" && !t.skills.includes(skillFilter as TechSkill)) return false
-      if (regionFilter !== "all" && t.region !== regionFilter) return false
-      return true
-    }).sort((a, b) => {
-      if (kpiFilter === "performance") return b.completionPct - a.completionPct
-      return 0
-    })
-  }, [techs, search, statusFilter, skillFilter, regionFilter, kpiFilter])
+    return techs
+      .filter((t) => {
+        if (kpiFilter === "active" && (t.status === "Off" || t.status === "Vacation")) return false
+        if (kpiFilter === "today" && !jobsTodaySet.has(t.id)) return false
+        if (
+          kpiFilter === "expiring" &&
+          !t.certifications.some((c) => {
+            const diff = (new Date(c.expiryDate).getTime() - Date.now()) / 86400000
+            return diff >= 0 && diff <= 90
+          })
+        ) {
+          return false
+        }
+        if (search) {
+          const q = search.toLowerCase()
+          const match =
+            t.name.toLowerCase().includes(q) ||
+            t.role.toLowerCase().includes(q) ||
+            t.region.toLowerCase().includes(q) ||
+            t.skills.some((s) => s.toLowerCase().includes(q))
+          if (!match) return false
+        }
+        if (statusFilter !== "all" && t.status !== statusFilter) return false
+        if (skillFilter !== "all" && !t.skills.includes(skillFilter as TechSkill)) return false
+        if (regionFilter !== "all" && t.region !== regionFilter) return false
+        return true
+      })
+      .sort((a, b) => {
+        if (kpiFilter === "performance") return b.completionPct - a.completionPct
+        return 0
+      })
+  }, [techs, search, statusFilter, skillFilter, regionFilter, kpiFilter, jobsTodaySet])
 
   function toggleKpi(f: KpiFilter) {
     setKpiFilter((prev) => (prev === f ? null : f))
   }
 
-  function handleAddTech(t: Technician) {
-    setTechs((prev) => [t, ...prev])
-    setShowAddModal(false)
-    addToast(`${t.name} added to the team`)
-  }
-
-  function handleDelete(id: string) {
-    const tech = techs.find((t) => t.id === id)
-    setTechs((prev) => prev.filter((t) => t.id !== id))
-    setDeleteTech(null)
-    if (selectedTech?.id === id) setSelectedTech(null)
-    addToast(`${tech?.name ?? "Technician"} removed from roster`)
-  }
-
-  function handleStatusChange(id: string, status: TechStatus) {
-    setTechs((prev) => prev.map((t) => t.id === id ? { ...t, status } : t))
-    if (selectedTech?.id === id) setSelectedTech((prev) => prev ? { ...prev, status } : prev)
-    const tech = techs.find((t) => t.id === id)
-    addToast(`${tech?.name} marked as ${status}`)
-  }
-
-  function handleDuplicate(tech: Technician) {
-    const newId = `T-0${Math.floor(Math.random() * 900 + 100)}`
-    const copy: Technician = { ...tech, id: newId, name: `${tech.name} (Copy)`, status: "Available", jobsThisWeek: 0, totalCompleted: 0 }
-    setTechs((prev) => [copy, ...prev])
-    addToast(`${tech.name} profile duplicated`)
-  }
-
   return (
     <>
       <div className="flex flex-col gap-6">
+        {loadError && (
+          <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+            {loadError}
+          </p>
+        )}
 
         {/* KPI cards — clickable filters */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
             label="Active Techs" value={activeTechs}
-            sub={`${techs.length - activeTechs} off / vacation`}
+            sub={loading ? "Loading…" : `${techs.length - activeTechs} off / vacation`}
             icon={User} iconClass="bg-primary/10 text-primary"
             active={kpiFilter === "active"} onClick={() => toggleKpi("active")}
           />
           <KpiCard
-            label="Scheduled Today" value={scheduledToday}
-            sub="confirmed & tentative"
+            label="Scheduled Today" value={loading ? "—" : scheduledToday}
+            sub="work orders for today (org)"
             icon={CalendarDays} iconClass="bg-[color:var(--status-info)]/10 text-[color:var(--status-info)]"
             active={kpiFilter === "today"} onClick={() => toggleKpi("today")}
           />
           <KpiCard
-            label="Avg Completion Rate" value={`${avgCompletion}%`}
-            sub="click to sort by performance"
+            label="Avg Completion Rate" value={loading ? "—" : `${avgCompletion}%`}
+            sub="from assigned work orders"
             icon={CheckCircle2} iconClass="bg-[color:var(--status-success)]/10 text-[color:var(--status-success)]"
             active={kpiFilter === "performance"} onClick={() => toggleKpi("performance")}
           />
           <KpiCard
             label="Certifications Expiring" value={certExpiring}
-            sub="within 90 days"
+            sub="not tracked in app yet"
             icon={ShieldCheck}
-            iconClass={certExpiring > 0
-              ? "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)]"
-              : "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)]"}
+            iconClass="bg-[color:var(--status-success)]/10 text-[color:var(--status-success)]"
             active={kpiFilter === "expiring"} onClick={() => toggleKpi("expiring")}
           />
         </div>
@@ -1255,7 +1516,12 @@ function TechniciansPageInner() {
           </Link>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <ViewToggle view={view} onViewChange={setView} />
-            <Button className="gap-2 cursor-pointer h-9" onClick={() => setShowAddModal(true)}>
+            <Button
+              type="button"
+              className="gap-2 h-9"
+              disabled
+              title="Invite team members from Settings — roster edits coming soon."
+            >
               <Plus className="w-4 h-4" /> Add Technician
             </Button>
           </div>
@@ -1270,24 +1536,31 @@ function TechniciansPageInner() {
 
         {/* Result count */}
         <p className="text-xs text-muted-foreground -mt-3">
-          {filtered.length} of {techs.length} technicians
+          {loading ? "Loading team…" : `${filtered.length} of ${techs.length} technicians`}
         </p>
 
         {/* ── Card view ── */}
         {view === "card" && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((tech) => (
+            {loading && (
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                <p className="text-sm">Loading team…</p>
+              </div>
+            )}
+            {!loading && filtered.map((tech) => (
               <TechCard
                 key={tech.id} tech={tech}
                 onSelect={() => setSelectedTech(tech)}
                 onSchedule={() => setScheduleTech(tech)}
                 onMessage={() => setMessageTech(tech)}
-                onStatusChange={(s) => handleStatusChange(tech.id, s)}
-                onDuplicate={() => handleDuplicate(tech)}
-                onDelete={() => setDeleteTech(tech)}
+                onStatusChange={() => {}}
+                onDuplicate={() => {}}
+                onDelete={() => {}}
+                rosterEditsEnabled={false}
               />
             ))}
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <div className="col-span-full py-16 text-center">
                 <User className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-sm font-medium text-foreground mb-1">No technicians found</p>
@@ -1315,7 +1588,15 @@ function TechniciansPageInner() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((tech) => (
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                      Loading team…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && filtered.map((tech) => (
                   <TableRow key={tech.id} className="cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedTech(tech)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -1356,7 +1637,7 @@ function TechniciansPageInner() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filtered.length === 0 && (
+                {!loading && filtered.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-12 text-muted-foreground text-sm">
                       No technicians match your filters.
@@ -1380,10 +1661,6 @@ function TechniciansPageInner() {
         />
       )}
 
-      {showAddModal && (
-        <AddTechModal onClose={() => setShowAddModal(false)} onAdd={handleAddTech} />
-      )}
-
       {scheduleTech && (
         <ScheduleModal
           tech={scheduleTech}
@@ -1397,14 +1674,6 @@ function TechniciansPageInner() {
           tech={messageTech}
           onClose={() => setMessageTech(null)}
           onSend={(msg) => { setMessageTech(null); addToast(msg) }}
-        />
-      )}
-
-      {deleteTech && (
-        <ConfirmDeleteModal
-          tech={deleteTech}
-          onConfirm={() => handleDelete(deleteTech.id)}
-          onCancel={() => setDeleteTech(null)}
         />
       )}
 
