@@ -1,12 +1,10 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
-import { useCustomers } from "@/lib/customer-store"
-import { useEquipment } from "@/lib/equipment-store"
-import { useWorkOrders } from "@/lib/work-order-store"
-import { technicians } from "@/lib/mock-data"
-import type { WorkOrder, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
+import { useState, useEffect, type ComponentProps, type ElementType } from "react"
+import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
+import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { DetailDrawer } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,8 +19,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {
-  User, Wrench, MapPin, Clock,
-  AlertTriangle, CheckCircle2, Lightbulb, Mail, Bell, Repeat, Plus, X,
+  User,
+  Wrench,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  Mail,
+  Bell,
+  Repeat,
+  Plus,
+  X,
 } from "lucide-react"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -30,13 +36,15 @@ import {
 interface Props {
   open: boolean
   onClose: () => void
+  /** Called after a work order is successfully inserted (when “Create Work Order” is on). */
+  onScheduled?: () => void
 }
 
 interface FormState {
   customerId: string
   equipmentId: string
-  locationId: string       // "id" from customer.locations, or "manual" for free-text
-  locationText: string     // resolved display string
+  locationId: string       // uuid from customer_locations, or "manual"
+  locationText: string
   serviceType: WorkOrderType | ""
   date: string
   timeWindow: string
@@ -55,6 +63,16 @@ interface NewLocForm {
   city: string
   state: string
   zip: string
+}
+
+type CustomerOption = { id: string; company_name: string }
+type EquipmentOption = { id: string; name: string; location_label: string | null }
+type TechnicianOption = { id: string; label: string }
+type LocationOption = {
+  id: string
+  name: string
+  city: string
+  state: string
 }
 
 const SERVICE_TYPES: WorkOrderType[] = ["PM", "Inspection", "Repair", "Install", "Emergency"]
@@ -96,31 +114,8 @@ function windowStartTime(window: string): string {
   return window.split(" – ")[0] ?? "08:00"
 }
 
-function isTechBooked(
-  techId: string,
-  date: string,
-  time: string,
-  workOrders: WorkOrder[]
-): boolean {
-  return workOrders.some(
-    (wo) =>
-      wo.technicianId === techId &&
-      wo.scheduledDate === date &&
-      wo.scheduledTime === time &&
-      wo.status !== "Completed" &&
-      wo.status !== "Cancelled"
-  )
-}
-
-function nextOpenSlot(
-  techId: string,
-  date: string,
-  workOrders: WorkOrder[]
-): string | null {
-  for (const win of TIME_WINDOWS) {
-    if (!isTechBooked(techId, date, windowStartTime(win), workOrders)) return win
-  }
-  return null
+function locationLabel(loc: LocationOption): string {
+  return `${loc.name}, ${loc.city}, ${loc.state}`
 }
 
 // DrawerSelectContent — thin alias with popper positioning
@@ -128,7 +123,7 @@ function DrawerSelectContent({
   children,
   className,
   ...props
-}: React.ComponentProps<typeof SelectContent>) {
+}: ComponentProps<typeof SelectContent>) {
   return (
     <SelectContent position="popper" side="bottom" align="start" className={className} {...props}>
       {children}
@@ -138,15 +133,21 @@ function DrawerSelectContent({
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function ScheduleServiceDrawer({ open, onClose }: Props) {
-  const { customers, addLocation } = useCustomers()
-  const { equipment } = useEquipment()
-  const { workOrders, createWorkOrder } = useWorkOrders()
+export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([])
+  const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
+  const [technicianOptions, setTechnicianOptions] = useState<TechnicianOption[]>([])
+  const [customerLocations, setCustomerLocations] = useState<LocationOption[]>([])
+
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [locSaveError, setLocSaveError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState<FormState>(BLANK)
   const [submitted, setSubmitted] = useState(false)
 
-  // Add-new-location inline form
   const [showAddLoc, setShowAddLoc] = useState(false)
   const [newLoc, setNewLoc] = useState<NewLocForm>(BLANK_LOC)
   const [locSaved, setLocSaved] = useState(false)
@@ -159,8 +160,174 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
       setShowAddLoc(false)
       setNewLoc(BLANK_LOC)
       setLocSaved(false)
+      setSubmitError(null)
+      setLocSaveError(null)
+      setLoadError(null)
     }
   }, [open])
+
+  // Load org, customers, technicians when drawer opens
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    const supabase = createBrowserSupabaseClient()
+
+    void (async () => {
+      setLoadError(null)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user || cancelled) {
+        if (!cancelled) {
+          setOrganizationId(null)
+          setCustomerOptions([])
+          setTechnicianOptions([])
+        }
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (!cancelled) {
+          setOrganizationId(null)
+          setCustomerOptions([])
+          setTechnicianOptions([])
+          setLoadError(profileError?.message ?? "No default organization.")
+        }
+        return
+      }
+
+      const orgId = profile.default_organization_id
+      if (!cancelled) setOrganizationId(orgId)
+
+      const { data: custRows, error: custError } = await supabase
+        .from("customers")
+        .select("id, company_name")
+        .eq("organization_id", orgId)
+        .eq("status", "active")
+        .eq("is_archived", false)
+        .order("company_name")
+
+      if (custError || cancelled) {
+        if (!cancelled) setLoadError(custError?.message ?? "Failed to load customers.")
+        return
+      }
+
+      if (!cancelled) setCustomerOptions((custRows as CustomerOption[]) ?? [])
+
+      const { data: memberRows, error: memberError } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId)
+        .eq("status", "active")
+        .in("role", ["owner", "admin", "manager", "tech"])
+
+      if (memberError || cancelled) {
+        if (!cancelled && memberError) setLoadError(memberError.message)
+        return
+      }
+
+      const userIds = [...new Set((memberRows ?? []).map((m: { user_id: string }) => m.user_id))]
+      let techOptions: TechnicianOption[] = []
+
+      if (userIds.length > 0) {
+        const { data: profRows } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds)
+
+        techOptions =
+          ((profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []).map(
+            (p) => ({
+              id: p.id,
+              label:
+                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8),
+            })
+          )
+        techOptions.sort((a, b) => a.label.localeCompare(b.label))
+      }
+
+      if (!cancelled) setTechnicianOptions(techOptions)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  // Equipment + customer_locations when customer selected
+  useEffect(() => {
+    if (!open || !organizationId || !form.customerId) {
+      if (!form.customerId) {
+        setEquipmentList([])
+        setCustomerLocations([])
+      }
+      return
+    }
+
+    let cancelled = false
+    const supabase = createBrowserSupabaseClient()
+
+    void (async () => {
+      const { data: eqRows, error: eqError } = await supabase
+        .from("equipment")
+        .select("id, name, location_label")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", form.customerId)
+        .eq("status", "active")
+        .eq("is_archived", false)
+        .order("name")
+
+      if (cancelled) return
+      if (eqError) {
+        setEquipmentList([])
+      } else {
+        setEquipmentList((eqRows as EquipmentOption[]) ?? [])
+      }
+
+      const { data: locRows, error: locError } = await supabase
+        .from("customer_locations")
+        .select("id, name, city, state")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", form.customerId)
+        .eq("is_archived", false)
+        .order("is_default", { ascending: false })
+        .order("name")
+
+      if (cancelled) return
+      if (locError) {
+        setCustomerLocations([])
+      } else {
+        setCustomerLocations((locRows as LocationOption[]) ?? [])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, form.customerId])
+
+  // Auto-fill location from equipment.location_label when possible
+  useEffect(() => {
+    if (!form.equipmentId || equipmentList.length === 0) return
+    const eq = equipmentList.find((e) => e.id === form.equipmentId)
+    if (!eq?.location_label?.trim()) return
+
+    const lb = eq.location_label.trim()
+    const matched = customerLocations.find((l) => locationLabel(l) === lb)
+    setForm((prev) => ({
+      ...prev,
+      locationId: matched ? matched.id : "manual",
+      locationText: matched ? locationLabel(matched) : lb,
+    }))
+  }, [form.equipmentId, equipmentList, customerLocations])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -170,38 +337,6 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
     setNewLoc((prev) => ({ ...prev, [key]: value }))
   }
 
-  // Selected customer object
-  const customer = useMemo(
-    () => customers.find((c) => c.id === form.customerId) ?? null,
-    [form.customerId, customers]
-  )
-
-  // Equipment filtered by customer
-  const customerEquipment = useMemo(
-    () => (form.customerId ? equipment.filter((e) => e.customerId === form.customerId) : []),
-    [form.customerId, equipment]
-  )
-
-  // Auto-fill location when equipment is selected (prefer the equipment's location as free-text)
-  useEffect(() => {
-    const eq = equipment.find((e) => e.id === form.equipmentId)
-    if (eq && eq.location) {
-      // Try to match to a saved customer location
-      const matched = customer?.locations.find(
-        (l) => `${l.name}, ${l.city}, ${l.state}` === eq.location ||
-                `${l.address}` === eq.location
-      )
-      if (matched) {
-        set("locationId", matched.id)
-        set("locationText", `${matched.name}, ${matched.city}, ${matched.state}`)
-      } else {
-        set("locationId", "manual")
-        set("locationText", eq.location)
-      }
-    }
-  }, [form.equipmentId, equipment]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear location when customer changes
   function handleCustomerChange(v: string) {
     setForm((prev) => ({
       ...prev,
@@ -213,111 +348,120 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
     setShowAddLoc(false)
     setNewLoc(BLANK_LOC)
     setLocSaved(false)
+    setLocSaveError(null)
   }
 
-  // Handle location select (including the "add new" sentinel)
   function handleLocationChange(v: string) {
     if (v === "__add_new__") {
       setShowAddLoc(true)
       return
     }
-    const loc = customer?.locations.find((l) => l.id === v)
+    const loc = customerLocations.find((l) => l.id === v)
     if (loc) {
       set("locationId", loc.id)
-      set("locationText", `${loc.name}, ${loc.city}, ${loc.state}`)
+      set("locationText", locationLabel(loc))
     }
   }
 
-  // Save new location
-  function handleSaveNewLoc() {
-    if (!customer || !newLoc.name || !newLoc.address) return
-    const id = `LOC-${Date.now()}`
-    const locObj = { id, ...newLoc }
-    // Add to customer store if the hook exposes addLocation; otherwise mutate locally
-    if (typeof addLocation === "function") {
-      addLocation(customer.id, locObj)
+  async function handleSaveNewLoc() {
+    if (!organizationId || !form.customerId || !newLoc.name.trim() || !newLoc.address.trim()) return
+    if (!newLoc.city.trim() || !newLoc.state.trim() || !newLoc.zip.trim()) {
+      setLocSaveError("City, state, and ZIP are required.")
+      return
     }
-    set("locationId", id)
-    set("locationText", `${newLoc.name}, ${newLoc.city}, ${newLoc.state}`)
+
+    setLocSaveError(null)
+    const supabase = createBrowserSupabaseClient()
+
+    const { data, error } = await supabase
+      .from("customer_locations")
+      .insert({
+        organization_id: organizationId,
+        customer_id: form.customerId,
+        name: newLoc.name.trim(),
+        address_line1: newLoc.address.trim(),
+        city: newLoc.city.trim(),
+        state: newLoc.state.trim().slice(0, 2),
+        postal_code: newLoc.zip.trim(),
+      })
+      .select("id, name, city, state")
+      .single()
+
+    if (error) {
+      setLocSaveError(error.message)
+      return
+    }
+
+    const row = data as LocationOption
+    setCustomerLocations((prev) =>
+      [...prev, row].sort((a, b) => a.name.localeCompare(b.name))
+    )
+    set("locationId", row.id)
+    set("locationText", locationLabel(row))
     setShowAddLoc(false)
     setLocSaved(true)
     setNewLoc(BLANK_LOC)
   }
 
-  // Technician availability
-  const technicianAvailability = useMemo(() => {
-    if (!form.date || !form.timeWindow) return {}
-    const startTime = windowStartTime(form.timeWindow)
-    return Object.fromEntries(
-      technicians.map((t) => [t.id, !isTechBooked(t.id, form.date, startTime, workOrders)])
-    )
-  }, [form.date, form.timeWindow, workOrders])
-
-  const isDoubleBooked = useMemo(() => {
-    if (!form.technicianId || !form.date || !form.timeWindow) return false
-    return isTechBooked(form.technicianId, form.date, windowStartTime(form.timeWindow), workOrders)
-  }, [form.technicianId, form.date, form.timeWindow, workOrders])
-
-  const suggestedSlot = useMemo(() => {
-    if (!form.technicianId || !form.date || !isDoubleBooked) return null
-    return nextOpenSlot(form.technicianId, form.date, workOrders)
-  }, [form.technicianId, form.date, isDoubleBooked, workOrders])
-
   const canSubmit =
-    form.customerId &&
-    form.serviceType &&
-    form.date &&
-    form.timeWindow &&
-    form.technicianId &&
-    !isDoubleBooked
+    !!organizationId &&
+    !!form.customerId &&
+    !!form.equipmentId &&
+    !!form.serviceType &&
+    !!form.date &&
+    !!form.timeWindow &&
+    !!form.technicianId &&
+    !submitting &&
+    !loadError
 
-  function handleSubmit() {
-    if (!canSubmit) return
+  async function handleSubmit() {
+    if (!canSubmit || !organizationId) return
 
-    const existingIds = workOrders
-      .map((w) => parseInt(w.id.replace("WO-", "")))
-      .filter((n) => !isNaN(n))
-    const maxId = Math.max(...existingIds, 2041)
+    setSubmitError(null)
 
-    const eq = equipment.find((e) => e.id === form.equipmentId)
-    const tech = technicians.find((t) => t.id === form.technicianId)
-
-    const wo: WorkOrder = {
-      id: `WO-${maxId + 1}`,
-      customerId: form.customerId,
-      customerName: customer?.company ?? "",
-      equipmentId: form.equipmentId || "",
-      equipmentName: eq?.model ?? "",
-      location: form.locationText,
-      type: form.serviceType as WorkOrderType,
-      status: "Scheduled",
-      priority: form.priority,
-      technicianId: form.technicianId,
-      technicianName: tech?.name ?? "",
-      scheduledDate: form.date,
-      scheduledTime: windowStartTime(form.timeWindow),
-      completedDate: "",
-      createdAt: new Date().toISOString(),
-      createdBy: "Service Schedule",
-      description: form.notes || `${form.serviceType} service scheduled via Service Schedule.`,
-      repairLog: {
-        problemReported: form.notes || "",
-        diagnosis: "",
-        partsUsed: [],
-        laborHours: 0,
-        technicianNotes: "",
-        photos: [],
-        signatureDataUrl: "",
-        signedBy: "",
-        signedAt: "",
-      },
-      totalLaborCost: 0,
-      totalPartsCost: 0,
-      invoiceNumber: "",
+    if (!form.createWorkOrder) {
+      setSubmitted(true)
+      return
     }
 
-    if (form.createWorkOrder) createWorkOrder(wo)
+    setSubmitting(true)
+    const supabase = createBrowserSupabaseClient()
+
+    const title =
+      form.notes.trim().slice(0, 500) ||
+      `${form.serviceType} service — scheduled via Service Schedule`
+
+    const notesParts = [form.notes.trim()]
+    if (form.locationText.trim()) {
+      notesParts.push(`Location: ${form.locationText.trim()}`)
+    }
+    const notesCombined = notesParts.filter(Boolean).join("\n\n") || null
+
+    const scheduledTime = normalizeTimeForDb(windowStartTime(form.timeWindow))
+
+    const { error: insertError } = await supabase.from("work_orders").insert({
+      organization_id: organizationId,
+      customer_id: form.customerId,
+      equipment_id: form.equipmentId,
+      title,
+      status: "scheduled",
+      priority: uiPriorityToDb(form.priority as WorkOrderPriority),
+      type: uiTypeToDb(form.serviceType as WorkOrderType),
+      scheduled_on: form.date,
+      scheduled_time: scheduledTime,
+      assigned_user_id: form.technicianId,
+      notes: notesCombined,
+    })
+
+    setSubmitting(false)
+
+    if (insertError) {
+      setSubmitError(insertError.message)
+      return
+    }
+
     setSubmitted(true)
+    onScheduled?.()
   }
 
   function ToggleChip({
@@ -327,7 +471,7 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
     onChange,
   }: {
     label: string
-    icon: React.ElementType
+    icon: ElementType
     checked: boolean
     onChange: (v: boolean) => void
   }) {
@@ -357,7 +501,6 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
       noScroll
     >
       {submitted ? (
-        /* ── Success state ── */
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <div className="w-12 h-12 rounded-full bg-[var(--ds-success-subtle)] flex items-center justify-center">
             <CheckCircle2 className="w-6 h-6 text-[var(--ds-success)]" />
@@ -365,21 +508,37 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
           <div>
             <p className="text-sm font-semibold text-foreground">Service Scheduled</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {form.createWorkOrder ? "Work order created and added to the queue." : "Appointment saved without a work order."}
+              {form.createWorkOrder
+                ? "Work order created and added to the queue."
+                : "Appointment saved without a work order."}
             </p>
           </div>
           <div className="flex gap-2 mt-2">
-            <Button variant="outline" size="sm" onClick={() => { setForm(BLANK); setSubmitted(false) }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setForm(BLANK)
+                setSubmitted(false)
+                setSubmitError(null)
+              }}
+            >
               Schedule Another
             </Button>
-            <Button size="sm" onClick={onClose}>Done</Button>
+            <Button size="sm" onClick={onClose}>
+              Done
+            </Button>
           </div>
         </div>
       ) : (
-        /* ── Form + footer ── */
         <>
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col gap-5 px-5 py-5">
+              {loadError && (
+                <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {loadError}
+                </p>
+              )}
 
               {/* Customer */}
               <div className="flex flex-col gap-1.5">
@@ -391,14 +550,16 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                     <SelectValue placeholder="Select customer…" />
                   </SelectTrigger>
                   <DrawerSelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.company}</SelectItem>
+                    {customerOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.company_name}
+                      </SelectItem>
                     ))}
                   </DrawerSelectContent>
                 </Select>
               </div>
 
-              {/* Location — customer-specific */}
+              {/* Location */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-medium flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> Location
@@ -411,21 +572,17 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                   <SelectTrigger className="h-9 text-sm w-full">
                     <SelectValue
                       placeholder={
-                        form.customerId
-                          ? "Select location…"
-                          : "Select a customer first"
+                        form.customerId ? "Select location…" : "Select a customer first"
                       }
                     />
                   </SelectTrigger>
                   <DrawerSelectContent>
-                    {(customer?.locations ?? []).map((loc) => (
+                    {customerLocations.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name}, {loc.city}, {loc.state}
+                        {locationLabel(loc)}
                       </SelectItem>
                     ))}
-                    {customer && customer.locations.length > 0 && (
-                      <SelectSeparator />
-                    )}
+                    {customerLocations.length > 0 && <SelectSeparator />}
                     <SelectItem value="__add_new__">
                       <span className="flex items-center gap-1.5 text-primary font-medium">
                         <Plus className="w-3.5 h-3.5" /> Add New Location
@@ -434,19 +591,25 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                   </DrawerSelectContent>
                 </Select>
 
-                {/* Inline add-new-location form */}
                 {showAddLoc && (
                   <div className="mt-1 p-3 rounded-md border border-border bg-muted/30 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold text-foreground">New Location</p>
                       <button
                         type="button"
-                        onClick={() => { setShowAddLoc(false); setNewLoc(BLANK_LOC) }}
+                        onClick={() => {
+                          setShowAddLoc(false)
+                          setNewLoc(BLANK_LOC)
+                          setLocSaveError(null)
+                        }}
                         className="text-muted-foreground hover:text-foreground"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    {locSaveError && (
+                      <p className="text-xs text-destructive">{locSaveError}</p>
+                    )}
                     <div className="grid grid-cols-1 gap-2">
                       <Input
                         className="h-8 text-xs"
@@ -479,15 +642,21 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                           placeholder="ZIP"
                           value={newLoc.zip}
                           onChange={(e) => setLoc("zip", e.target.value)}
-                          maxLength={5}
+                          maxLength={10}
                         />
                       </div>
                     </div>
                     <Button
                       size="sm"
                       className="self-end h-7 text-xs"
-                      disabled={!newLoc.name || !newLoc.address}
-                      onClick={handleSaveNewLoc}
+                      disabled={
+                        !newLoc.name.trim() ||
+                        !newLoc.address.trim() ||
+                        !newLoc.city.trim() ||
+                        !newLoc.state.trim() ||
+                        !newLoc.zip.trim()
+                      }
+                      onClick={() => void handleSaveNewLoc()}
                     >
                       Save Location
                     </Button>
@@ -504,7 +673,8 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
               {/* Equipment */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5 text-muted-foreground" /> Equipment
+                  <Wrench className="w-3.5 h-3.5 text-muted-foreground" /> Equipment{" "}
+                  <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={form.equipmentId}
@@ -512,11 +682,15 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                   disabled={!form.customerId}
                 >
                   <SelectTrigger className="h-9 text-sm w-full">
-                    <SelectValue placeholder={form.customerId ? "Select equipment…" : "Select customer first"} />
+                    <SelectValue
+                      placeholder={form.customerId ? "Select equipment…" : "Select customer first"}
+                    />
                   </SelectTrigger>
                   <DrawerSelectContent>
-                    {customerEquipment.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.model}</SelectItem>
+                    {equipmentList.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.name}
+                      </SelectItem>
                     ))}
                   </DrawerSelectContent>
                 </Select>
@@ -528,26 +702,36 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                   <Label className="text-xs font-medium">
                     Service Type <span className="text-destructive">*</span>
                   </Label>
-                  <Select value={form.serviceType} onValueChange={(v) => set("serviceType", v as WorkOrderType)}>
+                  <Select
+                    value={form.serviceType}
+                    onValueChange={(v) => set("serviceType", v as WorkOrderType)}
+                  >
                     <SelectTrigger className="h-9 text-sm w-full">
                       <SelectValue placeholder="Type…" />
                     </SelectTrigger>
                     <DrawerSelectContent>
                       {SERVICE_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
                       ))}
                     </DrawerSelectContent>
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-medium">Priority</Label>
-                  <Select value={form.priority} onValueChange={(v) => set("priority", v as WorkOrderPriority)}>
+                  <Select
+                    value={form.priority}
+                    onValueChange={(v) => set("priority", v as WorkOrderPriority)}
+                  >
                     <SelectTrigger className="h-9 text-sm w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <DrawerSelectContent>
                       {PRIORITIES.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
                       ))}
                     </DrawerSelectContent>
                   </Select>
@@ -578,7 +762,9 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                     </SelectTrigger>
                     <DrawerSelectContent>
                       {TIME_WINDOWS.map((w) => (
-                        <SelectItem key={w} value={w}>{w}</SelectItem>
+                        <SelectItem key={w} value={w}>
+                          {w}
+                        </SelectItem>
                       ))}
                     </DrawerSelectContent>
                   </Select>
@@ -596,52 +782,13 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                     <SelectValue placeholder="Assign technician…" />
                   </SelectTrigger>
                   <DrawerSelectContent>
-                    {technicians.map((t) => {
-                      const available = form.date && form.timeWindow
-                        ? (technicianAvailability[t.id] ?? true)
-                        : null
-                      return (
-                        <SelectItem key={t.id} value={t.id}>
-                          <span className="flex items-center gap-2">
-                            {t.name}
-                            {available === true && (
-                              <span className="text-[10px] text-[var(--ds-success)] font-medium">Available</span>
-                            )}
-                            {available === false && (
-                              <span className="text-[10px] text-[var(--ds-warning)] font-medium">Busy</span>
-                            )}
-                          </span>
-                        </SelectItem>
-                      )
-                    })}
+                    {technicianOptions.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
                   </DrawerSelectContent>
                 </Select>
-
-                {isDoubleBooked && (
-                  <div className="flex flex-col gap-2 p-3 rounded-md border border-[var(--ds-warning-border)] bg-[var(--ds-warning-subtle)]">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[var(--ds-warning)] shrink-0 mt-0.5" />
-                      <p className="text-xs text-[var(--ds-warning-foreground)] font-medium">
-                        This technician is already booked at this time.
-                      </p>
-                    </div>
-                    {suggestedSlot && (
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="w-3.5 h-3.5 text-[var(--ds-warning)] shrink-0" />
-                        <p className="text-xs text-[var(--ds-warning-foreground)]">
-                          Next open slot:{" "}
-                          <button
-                            type="button"
-                            className="font-semibold underline underline-offset-2 cursor-pointer"
-                            onClick={() => set("timeWindow", suggestedSlot)}
-                          >
-                            {suggestedSlot}
-                          </button>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Notes */}
@@ -686,16 +833,20 @@ export function ScheduleServiceDrawer({ open, onClose }: Props) {
                 </div>
               </div>
 
+              {submitError && (
+                <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                  {submitError}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Footer */}
           <div className="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button className="flex-1" disabled={!canSubmit} onClick={handleSubmit}>
-              Schedule Service
+            <Button className="flex-1" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+              {submitting ? "Saving…" : "Schedule Service"}
             </Button>
           </div>
         </>

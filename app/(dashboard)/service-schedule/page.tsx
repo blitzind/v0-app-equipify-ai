@@ -1199,6 +1199,7 @@ function ServiceSchedulePageInner() {
 
   const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWorkOrderDisplay[]>([])
   const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
+  const [scheduledWoRefresh, setScheduledWoRefresh] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -1329,7 +1330,7 @@ function ServiceSchedulePageInner() {
     return () => {
       active = false
     }
-  }, [])
+  }, [scheduledWoRefresh])
 
   // View state
   const [viewTab, setViewTab]             = useState<ViewTab>("list")
@@ -1716,7 +1717,11 @@ function ServiceSchedulePageInner() {
 
       {/* Drawers + Modals */}
       <MaintenancePlanDrawer planId={selectedPlanId} onClose={() => setSelectedPlanId(null)} />
-      <ScheduleServiceDrawer open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
+      <ScheduleServiceDrawer
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        onScheduled={() => setScheduledWoRefresh((n) => n + 1)}
+      />
       {reschedulePlan && (
         <RescheduleModal plan={reschedulePlan} onClose={() => setReschedulePlan(null)} />
       )}
