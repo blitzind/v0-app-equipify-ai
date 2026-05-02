@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useMemo, useEffect, Suspense } from "react"
+import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { cn } from "@/lib/utils"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import type { WorkOrder } from "@/lib/mock-data"
 import {
@@ -19,7 +21,7 @@ import {
   Bell,
   Plus,
   List,
-  Map,
+  Map as MapIcon,
   CalendarDays,
   Users,
   User,
@@ -34,6 +36,7 @@ import {
   BellRing,
   BellOff,
   Send,
+  ClipboardList,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -987,6 +990,134 @@ function MapView({
   )
 }
 
+// ─── Scheduled work orders (Supabase) ──────────────────────────────────────────
+
+type DbScheduledWoRow = {
+  id: string
+  customer_id: string
+  equipment_id: string
+  title: string
+  status: string
+  scheduled_on: string
+  scheduled_time: string | null
+  assigned_user_id: string | null
+}
+
+type ScheduledWorkOrderDisplay = {
+  id: string
+  title: string
+  status: string
+  scheduled_on: string
+  scheduled_time: string | null
+  customerName: string
+  equipmentName: string
+  location: string
+  assigneeName: string | null
+}
+
+function formatScheduleTimeHm(t: string | null): string {
+  if (!t) return ""
+  const s = t.trim()
+  return s.length >= 5 ? s.slice(0, 5) : s
+}
+
+function formatWoStatusLabel(status: string): string {
+  return status.split("_").map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : "")).join(" ")
+}
+
+function ScheduledWorkOrdersSection({
+  rows,
+  loading,
+}: {
+  rows: ScheduledWorkOrderDisplay[]
+  loading: boolean
+}) {
+  return (
+    <Card className="border border-border">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-muted-foreground" />
+          Scheduled Work Orders
+        </CardTitle>
+        <p className="text-xs text-muted-foreground font-normal pt-0.5">
+          From Supabase: active work orders with a scheduled date in your default organization.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 flex flex-col gap-3">
+        {loading && (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading scheduled work orders…</p>
+        )}
+        {!loading && rows.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">No scheduled work orders yet.</p>
+        )}
+        {!loading &&
+          rows.map((wo) => {
+            const days = daysUntil(wo.scheduled_on)
+            const timeStr = formatScheduleTimeHm(wo.scheduled_time)
+            return (
+              <div
+                key={wo.id}
+                className={cn(
+                  "flex items-stretch gap-0 bg-card rounded-lg border border-border overflow-hidden hover:shadow-sm transition-shadow",
+                  urgencyBg(days)
+                )}
+              >
+                <div className="flex flex-col items-center justify-center px-4 py-3 border-r border-border bg-muted/30 min-w-[72px] shrink-0">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide leading-none">
+                    {new Date(wo.scheduled_on + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
+                  </span>
+                  <span className="text-2xl font-bold text-foreground leading-tight">
+                    {new Date(wo.scheduled_on + "T12:00:00").getDate()}
+                  </span>
+                  {timeStr && (
+                    <span className="text-xs mt-1 text-muted-foreground tabular-nums">{timeStr}</span>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col gap-1 px-4 py-3 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/work-orders?open=${wo.id}`}
+                      className="text-sm font-semibold text-foreground hover:text-primary truncate min-w-0"
+                    >
+                      {wo.title}
+                    </Link>
+                    <span
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0",
+                        "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30"
+                      )}
+                    >
+                      {formatWoStatusLabel(wo.status)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                    <span className="truncate">{wo.customerName}</span>
+                    <span className="flex items-center gap-1 min-w-0">
+                      <Wrench className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{wo.equipmentName}</span>
+                    </span>
+                    {wo.location && (
+                      <span className="flex items-center gap-1 min-w-0">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{wo.location}</span>
+                      </span>
+                    )}
+                    {wo.assigneeName && (
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3 shrink-0" />
+                        {wo.assigneeName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Notification Timeline ────────────────────────────────────────────────────
 
 function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
@@ -1065,6 +1196,140 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
 function ServiceSchedulePageInner() {
   const { plans } = useMaintenancePlans()
   const { createWorkOrder, workOrders } = useWorkOrders()
+
+  const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWorkOrderDisplay[]>([])
+  const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadScheduledWorkOrders() {
+      setScheduledWoLoading(true)
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        if (active) {
+          setScheduledWoRows([])
+          setScheduledWoLoading(false)
+        }
+        return
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile?.default_organization_id) {
+        if (active) {
+          setScheduledWoRows([])
+          setScheduledWoLoading(false)
+        }
+        return
+      }
+
+      const orgId = profile.default_organization_id
+
+      const { data: rows, error: woError } = await supabase
+        .from("work_orders")
+        .select(
+          "id, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
+        )
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .not("scheduled_on", "is", null)
+        .order("scheduled_on", { ascending: true })
+        .order("scheduled_time", { ascending: true, nullsFirst: false })
+
+      if (woError || !rows || !active) {
+        if (active) {
+          setScheduledWoRows([])
+          setScheduledWoLoading(false)
+        }
+        return
+      }
+
+      const list = rows as DbScheduledWoRow[]
+      const customerIds = [...new Set(list.map((r) => r.customer_id))]
+      const equipmentIds = [...new Set(list.map((r) => r.equipment_id))]
+      const assigneeIds = [
+        ...new Set(list.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
+      ]
+
+      const customerMap = new Map<string, string>()
+      if (customerIds.length > 0) {
+        const { data: custRows } = await supabase
+          .from("customers")
+          .select("id, company_name")
+          .eq("organization_id", orgId)
+          .in("id", customerIds)
+
+        ;((custRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((c) => {
+          customerMap.set(c.id, c.company_name)
+        })
+      }
+
+      const equipmentMap = new Map<string, { name: string; location: string }>()
+      if (equipmentIds.length > 0) {
+        const { data: eqRows } = await supabase
+          .from("equipment")
+          .select("id, name, location_label")
+          .eq("organization_id", orgId)
+          .in("id", equipmentIds)
+
+        ;(
+          (eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ?? []
+        ).forEach((e) => {
+          equipmentMap.set(e.id, { name: e.name, location: e.location_label ?? "" })
+        })
+      }
+
+      const profileMap = new Map<string, string>()
+      if (assigneeIds.length > 0) {
+        const { data: profRows } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", assigneeIds)
+
+        ;(
+          (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []
+        ).forEach((p) => {
+          const label =
+            (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician"
+          profileMap.set(p.id, label)
+        })
+      }
+
+      if (!active) return
+
+      const mapped: ScheduledWorkOrderDisplay[] = list.map((row) => {
+        const eq = equipmentMap.get(row.equipment_id)
+        return {
+          id: row.id,
+          title: row.title,
+          status: row.status,
+          scheduled_on: row.scheduled_on,
+          scheduled_time: row.scheduled_time,
+          customerName: customerMap.get(row.customer_id) ?? "Unknown customer",
+          equipmentName: eq?.name ?? "Equipment",
+          location: eq?.location ?? "",
+          assigneeName: row.assigned_user_id ? profileMap.get(row.assigned_user_id) ?? null : null,
+        }
+      })
+
+      setScheduledWoRows(mapped)
+      setScheduledWoLoading(false)
+    }
+
+    loadScheduledWorkOrders()
+    return () => {
+      active = false
+    }
+  }, [])
 
   // View state
   const [viewTab, setViewTab]             = useState<ViewTab>("list")
@@ -1211,7 +1476,7 @@ function ServiceSchedulePageInner() {
           {([ 
             { id: "list",     label: "List",     Icon: List },
             { id: "calendar", label: "Calendar", Icon: CalendarDays },
-            { id: "map",      label: "Map",      Icon: Map },
+            { id: "map",      label: "Map",      Icon: MapIcon },
           ] as { id: ViewTab; label: string; Icon: React.ElementType }[]).map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -1347,7 +1612,8 @@ function ServiceSchedulePageInner() {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Main content area */}
-        <div className="flex-1 min-w-0 w-full">
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-6">
+          <ScheduledWorkOrdersSection rows={scheduledWoRows} loading={scheduledWoLoading} />
 
           {viewTab === "list" && (
             <>
