@@ -21,6 +21,7 @@ const DASHBOARD_PREFIXES = [
 
 function isProtectedRoute(pathname: string) {
   if (pathname === "/") return true
+  if (pathname === "/test-maintenance-plan-create") return true
   if (pathname.startsWith("/portal")) return true
   if (pathname.startsWith("/admin")) return true
   return DASHBOARD_PREFIXES.some((prefix) => pathname.startsWith(prefix))

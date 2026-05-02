@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
+import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 interface Props {
@@ -34,34 +35,6 @@ const TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emerge
 type CustomerOption = { id: string; company_name: string }
 type EquipmentOption = { id: string; name: string }
 type TechnicianOption = { id: string; label: string }
-
-function uiPriorityToDb(priority: WorkOrderPriority): string {
-  const m: Record<WorkOrderPriority, string> = {
-    Low: "low",
-    Normal: "normal",
-    High: "high",
-    Critical: "critical",
-  }
-  return m[priority]
-}
-
-function uiTypeToDb(type: WorkOrderType): string {
-  const m: Record<WorkOrderType, string> = {
-    Repair: "repair",
-    PM: "pm",
-    Inspection: "inspection",
-    Install: "install",
-    Emergency: "emergency",
-  }
-  return m[type]
-}
-
-function normalizeTimeForDb(time: string): string | null {
-  if (!time || !time.trim()) return null
-  const t = time.trim()
-  if (t.length === 5 && t.includes(":")) return `${t}:00`
-  return t
-}
 
 export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
   const [organizationId, setOrganizationId] = useState<string | null>(null)
