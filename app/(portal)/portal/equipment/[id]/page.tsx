@@ -8,6 +8,7 @@ import {
   FileDown, ArrowUpRight,
 } from "lucide-react"
 import { equipment, workOrders } from "@/lib/mock-data"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 function fmtDate(d: string) {
   if (!d) return "—"
@@ -188,7 +189,7 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded text-xs font-medium"
                               style={{ background: tc.bg, color: tc.text }}>{h.type}</span>
-                            <span className="text-xs font-mono" style={{ color: "var(--portal-nav-text)" }}>{h.workOrderId}</span>
+                            <span className="text-xs font-mono" style={{ color: "var(--portal-nav-text)" }}>{getWorkOrderDisplay({ id: h.workOrderId })}</span>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-semibold tabular-nums"

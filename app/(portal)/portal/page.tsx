@@ -10,6 +10,7 @@ import {
   customers, equipment, workOrders, portalInvoices,
   portalQuotes, maintenancePlans,
 } from "@/lib/mock-data"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 // Portal is scoped to CUS-001 — Riverstone Logistics
 const CUSTOMER_ID = "CUS-001"
@@ -205,7 +206,7 @@ export default function PortalHomePage() {
                 className="flex items-center justify-between px-5 py-3.5 hover:bg-[--portal-surface-2] transition-colors group">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-medium" style={{ color: "var(--portal-nav-text)" }}>{wo.id}</span>
+                    <span className="text-xs font-mono font-medium" style={{ color: "var(--portal-nav-text)" }}>{getWorkOrderDisplay(wo)}</span>
                     <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{
                       background: wo.type === "Repair" ? "#fef3c7" : "var(--portal-accent-muted)",
                       color: wo.type === "Repair" ? "#92400e" : "var(--portal-accent-text)",

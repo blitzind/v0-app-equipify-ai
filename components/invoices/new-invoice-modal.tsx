@@ -7,6 +7,7 @@ import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import { useCustomers } from "@/lib/customer-store"
 import { useEquipment } from "@/lib/equipment-store"
 import { useWorkOrders } from "@/lib/work-order-store"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 
 // ─── Primitive field components ───────────────────────────────────────────────
@@ -324,7 +325,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
               <FieldSelect value={workOrderId} onChange={e => setWorkOrderId(e.target.value)}>
                 <option value="">None</option>
                 {filteredWorkOrders.map(wo => (
-                  <option key={wo.id} value={wo.id}>{wo.id} — {wo.title}</option>
+                  <option key={wo.id} value={wo.id}>{getWorkOrderDisplay(wo)} — {wo.title}</option>
                 ))}
               </FieldSelect>
             </div>

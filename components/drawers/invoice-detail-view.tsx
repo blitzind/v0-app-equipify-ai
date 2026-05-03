@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { useInvoices } from "@/lib/quote-invoice-store"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
@@ -434,7 +435,7 @@ function InvoicePreview({
               {invoice.workOrderId && (
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-0.5">Work Order</span>
-                  <span className="text-[10px] font-mono text-gray-700">{invoice.workOrderId}</span>
+                  <span className="text-[10px] font-mono text-gray-700">{getWorkOrderDisplay({ id: invoice.workOrderId })}</span>
                 </div>
               )}
             </div>
@@ -882,7 +883,7 @@ function InfoTab({
         {invoice.workOrderId && (
           <Row label="Work Order" value={
             <Link href={`/work-orders?open=${invoice.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
-              {invoice.workOrderId}
+              {getWorkOrderDisplay({ id: invoice.workOrderId })}
             </Link>
           } />
         )}
@@ -1119,7 +1120,7 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
             <ClipboardList className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <p className="text-xs font-semibold font-mono text-primary">{invoice.workOrderId}</p>
+            <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay({ id: invoice.workOrderId })}</p>
             <p className="text-[10px] text-muted-foreground">{invoice.equipmentName}</p>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban, Building2,
 } from "lucide-react"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
+import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -135,10 +136,20 @@ function QuotesPageInner() {
 
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(qt =>
-        qt.id.toLowerCase().includes(q) ||
-        qt.customerName.toLowerCase().includes(q) ||
-        qt.equipmentName.toLowerCase().includes(q)
+      list = list.filter(
+        (qt) =>
+          qt.id.toLowerCase().includes(q) ||
+          qt.customerName.toLowerCase().includes(q) ||
+          qt.equipmentName.toLowerCase().includes(q) ||
+          (qt.workOrderId
+            ? workOrderMatchesSearch(search, {
+                id: qt.workOrderId,
+                customerName: qt.customerName,
+                equipmentName: qt.equipmentName,
+                technicianName: "",
+                description: qt.description ?? "",
+              })
+            : false),
       )
     }
     if (statusFilter !== "all") {
@@ -350,7 +361,7 @@ function QuotesPageInner() {
                     </TableCell>
                     <TableCell>
                       {qt.workOrderId ? (
-                        <span className="font-mono text-xs text-muted-foreground ds-tabular">{qt.workOrderId}</span>
+                        <span className="font-mono text-xs text-muted-foreground ds-tabular">{getWorkOrderDisplay({ id: qt.workOrderId, workOrderNumber: qt.workOrderNumber })}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>
                       )}

@@ -21,6 +21,7 @@ import {
   Receipt, CheckCircle2, AlertTriangle, Clock, FilePen, Ban, Send, Building2, Wrench,
 } from "lucide-react"
 import { InvoiceDrawer } from "@/components/drawers/invoice-drawer"
+import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -138,11 +139,18 @@ function InvoicesPageInner() {
 
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(inv =>
-        inv.id.toLowerCase().includes(q) ||
-        inv.customerName.toLowerCase().includes(q) ||
-        inv.equipmentName.toLowerCase().includes(q) ||
-        inv.workOrderId.toLowerCase().includes(q)
+      list = list.filter(
+        (inv) =>
+          inv.id.toLowerCase().includes(q) ||
+          inv.customerName.toLowerCase().includes(q) ||
+          inv.equipmentName.toLowerCase().includes(q) ||
+          workOrderMatchesSearch(search, {
+            id: inv.workOrderId,
+            customerName: inv.customerName,
+            equipmentName: inv.equipmentName,
+            technicianName: "",
+            description: inv.notes ?? "",
+          }),
       )
     }
     if (statusFilter !== "all") {
@@ -259,7 +267,7 @@ function InvoicesPageInner() {
                   {inv.workOrderId && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Wrench className="w-3.5 h-3.5 shrink-0" />
-                      <span className="font-mono">{inv.workOrderId}</span>
+                      <span className="font-mono">{getWorkOrderDisplay({ id: inv.workOrderId })}</span>
                     </div>
                   )}
                 </div>
@@ -354,7 +362,7 @@ function InvoicesPageInner() {
                     <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">{inv.equipmentName}</TableCell>
                     <TableCell>
                       {inv.workOrderId ? (
-                        <span className="font-mono text-xs text-muted-foreground ds-tabular">{inv.workOrderId}</span>
+                        <span className="font-mono text-xs text-muted-foreground ds-tabular">{getWorkOrderDisplay({ id: inv.workOrderId })}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>
                       )}

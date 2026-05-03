@@ -26,8 +26,12 @@ import {
   Loader2,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { useQuotes } from "@/lib/quote-invoice-store"
+import type { QuoteStatus } from "@/lib/mock-data"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -91,6 +95,7 @@ type CustomerPlanRow = {
 
 type CustomerPlanWoRow = {
   id: string
+  work_order_number?: number | null
   title: string
   status: string
   type: string
@@ -127,6 +132,20 @@ function woDbStatusLabel(s: string) {
 function woDbTypeLabel(s: string) {
   if (!s) return "—"
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+const QUOTE_STATUS_CLASS: Record<QuoteStatus, string> = {
+  Draft: "bg-muted text-muted-foreground border-border",
+  Sent: "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
+  "Pending Approval":
+    "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
+  Approved: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
+  Declined: "bg-destructive/10 text-destructive border-destructive/30",
+  Expired: "bg-muted text-muted-foreground border-border",
+}
+
+function fmtQuoteCurrency(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
 }
 
 function fmtIsoDate(iso: string | null) {
@@ -211,7 +230,7 @@ function ServiceTimeline({ entries }: { entries: ServiceHistoryEntry[] }) {
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {entry.type}
                   </span>
-                  <Badge variant="secondary" className="text-xs">{entry.workOrderId}</Badge>
+                  <Badge variant="secondary" className="text-xs">{getWorkOrderDisplay({ id: entry.workOrderId })}</Badge>
                 </div>
                 <p className="text-sm font-medium text-foreground mt-1">{entry.description}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -233,6 +252,7 @@ function ServiceTimeline({ entries }: { entries: ServiceHistoryEntry[] }) {
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { quotes } = useQuotes()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -465,9 +485,13 @@ export default function CustomerDetailPage() {
         return
       }
 
-      const { data: woRows } = await supabase
+      const custPlanWoSelWithNum =
+        "id, work_order_number, title, status, type, scheduled_on, maintenance_plan_id, created_at"
+      const custPlanWoSel = custPlanWoSelWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
         .from("work_orders")
-        .select("id, title, status, type, scheduled_on, maintenance_plan_id, created_at")
+        .select(custPlanWoSelWithNum)
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
         .in("maintenance_plan_id", planIds)
@@ -475,8 +499,20 @@ export default function CustomerDetailPage() {
         .order("created_at", { ascending: false })
         .limit(50)
 
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(custPlanWoSel)
+          .eq("organization_id", customer.organizationId)
+          .eq("customer_id", customer.id)
+          .in("maintenance_plan_id", planIds)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+          .limit(50)
+      }
+
       if (!active) return
-      setPlanLinkedWOs((woRows ?? []) as CustomerPlanWoRow[])
+      setPlanLinkedWOs((woRes.data ?? []) as CustomerPlanWoRow[])
       setPlansSectionLoading(false)
     })()
 
@@ -514,6 +550,13 @@ export default function CustomerDetailPage() {
     for (const p of customerPlans) m[p.id] = p.name
     return m
   }, [customerPlans])
+
+  const customerQuotes = useMemo(() => {
+    if (!customer) return []
+    return [...quotes]
+      .filter((q) => q.customerId === customer.id)
+      .sort((a, b) => b.createdDate.localeCompare(a.createdDate))
+  }, [quotes, customer])
 
   async function handleSaveCustomerEdits(e: React.FormEvent) {
     e.preventDefault()
@@ -915,6 +958,7 @@ export default function CustomerDetailPage() {
       <Tabs defaultValue="equipment">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="equipment">Equipment ({customerEquipment.length})</TabsTrigger>
+          <TabsTrigger value="quotes">Quotes ({customerQuotes.length})</TabsTrigger>
           <TabsTrigger value="maintenance-plans">Maintenance Plans ({customerPlans.length})</TabsTrigger>
           <TabsTrigger value="history">Service History ({allServiceHistory.length})</TabsTrigger>
           <TabsTrigger value="contacts">Contacts & Locations</TabsTrigger>
@@ -931,6 +975,77 @@ export default function CustomerDetailPage() {
               {customerEquipment.map((eq) => (
                 <EquipmentRow key={eq.id} eq={eq} />
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Quotes tab — in-app quote store (same customer id as Supabase) */}
+        <TabsContent value="quotes" className="mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-sm text-muted-foreground">
+              Quotes created for this customer from the Quotes workspace. Open a row to view details or create a work order.
+            </p>
+            <Button size="sm" variant="outline" className="shrink-0 gap-1.5" asChild>
+              <Link href="/quotes" className="inline-flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> All quotes
+              </Link>
+            </Button>
+          </div>
+          {customerQuotes.length === 0 ? (
+            <Card className="border border-border border-dashed">
+              <CardContent className="py-12 text-center">
+                <p className="text-sm text-muted-foreground">No quotes linked to this customer yet.</p>
+                <Button size="sm" className="mt-4" asChild>
+                  <Link href="/quotes">Create quote</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 border-b border-border">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Quote
+                    </th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Status
+                    </th>
+                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Amount
+                    </th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Expires
+                    </th>
+                    <th className="w-28" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {customerQuotes.map((q) => (
+                    <tr key={q.id} className="bg-card hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-foreground line-clamp-1">{q.description}</p>
+                        <p className="text-xs font-mono text-muted-foreground mt-0.5">{q.id}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          variant="outline"
+                          className={cn("text-[10px] font-semibold", QUOTE_STATUS_CLASS[q.status])}
+                        >
+                          {q.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums">{fmtQuoteCurrency(q.amount)}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{fmtIsoDate(q.expiresDate)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+                          <Link href={`/quotes?open=${encodeURIComponent(q.id)}`}>Open</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </TabsContent>
@@ -1058,7 +1173,7 @@ export default function CustomerDetailPage() {
                           className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 transition-colors group"
                         >
                           <div className="min-w-0">
-                            <p className="text-xs font-mono text-primary truncate">{wo.id}</p>
+                            <p className="text-xs font-mono text-primary truncate">{formatWorkOrderDisplay(wo.work_order_number, wo.id)}</p>
                             <p className="text-sm font-medium text-foreground truncate">{wo.title}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {wo.maintenance_plan_id ? planNameById[wo.maintenance_plan_id] ?? "Plan" : "Plan"} ·{" "}

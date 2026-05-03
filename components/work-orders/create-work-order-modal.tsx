@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 
 interface Props {
   open: boolean
@@ -40,10 +41,12 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
   const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
+  const [equipmentLoading, setEquipmentLoading] = useState(false)
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [addEquipmentOpen, setAddEquipmentOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState("")
   const [equipmentId, setEquipmentId] = useState("")
@@ -151,36 +154,61 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
   }, [open])
 
   useEffect(() => {
-    if (!open || !organizationId || !customerId) {
-      if (!customerId) setEquipmentList([])
-      return
+    if (!open) {
+      setAddEquipmentOpen(false)
     }
+  }, [open])
 
-    let cancelled = false
-    const supabase = createBrowserSupabaseClient()
+  const refreshEquipmentForCustomer = useCallback(
+    async (opts?: { organizationId: string; customerId: string; selectEquipmentId?: string }) => {
+      const orgId = opts?.organizationId ?? organizationId
+      const custId = opts?.customerId ?? customerId
+      const selectId = opts?.selectEquipmentId
+      if (!orgId || !custId) return
 
-    void (async () => {
+      const supabase = createBrowserSupabaseClient()
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
         .select("id, name")
-        .eq("organization_id", organizationId)
-        .eq("customer_id", customerId)
+        .eq("organization_id", orgId)
+        .eq("customer_id", custId)
         .eq("status", "active")
         .eq("is_archived", false)
         .order("name")
 
-      if (cancelled) return
       if (eqError) {
         setEquipmentList([])
         return
       }
-      setEquipmentList((eqRows as EquipmentOption[]) ?? [])
+      const list = (eqRows as EquipmentOption[]) ?? []
+      setEquipmentList(list)
+      if (selectId && list.some((e) => e.id === selectId)) {
+        setEquipmentId(selectId)
+      }
+    },
+    [organizationId, customerId]
+  )
+
+  useEffect(() => {
+    if (!open || !organizationId || !customerId) {
+      if (!customerId) {
+        setEquipmentList([])
+        setEquipmentLoading(false)
+      }
+      return
+    }
+
+    let cancelled = false
+    setEquipmentLoading(true)
+    void (async () => {
+      await refreshEquipmentForCustomer({ organizationId, customerId })
+      if (!cancelled) setEquipmentLoading(false)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, customerId])
+  }, [open, organizationId, customerId, refreshEquipmentForCustomer])
 
   async function handleSubmit() {
     if (!customerId || !equipmentId || !technicianId || !scheduledDate || !description.trim()) return
@@ -219,6 +247,7 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
   }
 
   function handleClose() {
+    setAddEquipmentOpen(false)
     setCustomerId("")
     setEquipmentId("")
     setTechnicianId("")
@@ -233,6 +262,25 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
     onClose()
   }
 
+  function handleOpenAddEquipment() {
+    if (!customerId) return
+    setAddEquipmentOpen(true)
+  }
+
+  function handleAddEquipmentClose() {
+    setAddEquipmentOpen(false)
+  }
+
+  async function handleAddEquipmentSuccess(newId?: string) {
+    if (organizationId && customerId) {
+      await refreshEquipmentForCustomer({
+        organizationId,
+        customerId,
+        selectEquipmentId: newId,
+      })
+    }
+  }
+
   const valid =
     organizationId &&
     customerId &&
@@ -242,8 +290,16 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
     description.trim() &&
     !loadError
 
+  const woDialogOpen = open && !addEquipmentOpen
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+    <>
+    <Dialog
+      open={woDialogOpen}
+      onOpenChange={(v) => {
+        if (!v && !addEquipmentOpen) handleClose()
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Work Order</DialogTitle>
@@ -285,9 +341,23 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
               <Label>
                 Equipment <span className="text-destructive">*</span>
               </Label>
-              <Select value={equipmentId} onValueChange={setEquipmentId} disabled={!customerId}>
+              <Select
+                value={equipmentId}
+                onValueChange={setEquipmentId}
+                disabled={!customerId || equipmentLoading || equipmentList.length === 0}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={customerId ? "Select equipment" : "Select customer first"} />
+                  <SelectValue
+                    placeholder={
+                      !customerId
+                        ? "Select customer first"
+                        : equipmentLoading
+                          ? "Loading equipment…"
+                          : equipmentList.length === 0
+                            ? "No equipment yet"
+                            : "Select equipment"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {equipmentList.map((e) => (
@@ -297,6 +367,20 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              {customerId && !equipmentLoading && equipmentList.length === 0 && (
+                <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 space-y-2">
+                  <p className="text-sm text-muted-foreground">No equipment found for this customer.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={handleOpenAddEquipment}
+                  >
+                    + Add Equipment
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -420,5 +504,14 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AddEquipmentModal
+      open={addEquipmentOpen}
+      onClose={handleAddEquipmentClose}
+      onSuccess={(id) => handleAddEquipmentSuccess(id)}
+      prefilledCustomerId={customerId || null}
+      offerMaintenancePlanNext={false}
+    />
+    </>
   )
 }

@@ -7,6 +7,8 @@ import { useWorkOrders } from "@/lib/work-order-store"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import type { Equipment } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,6 +55,7 @@ type TabId = (typeof TABS)[number]["id"]
 
 type PlanWoRow = {
   id: string
+  work_order_number?: number | null
   title: string
   status: string
   type: string
@@ -371,15 +374,33 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
     void (async () => {
       const supabase = createBrowserSupabaseClient()
-      const { data, error } = await supabase
+      const eqPlanWoSelWithNum =
+        "id, work_order_number, title, status, type, scheduled_on, maintenance_plan_id, created_at"
+      const eqPlanWoSel = eqPlanWoSelWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
         .from("work_orders")
-        .select("id, title, status, type, scheduled_on, maintenance_plan_id, created_at")
+        .select(eqPlanWoSelWithNum)
         .eq("organization_id", organizationId)
         .eq("equipment_id", eq.id)
         .in("maintenance_plan_id", planIds)
         .eq("is_archived", false)
         .order("created_at", { ascending: false })
         .limit(40)
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(eqPlanWoSel)
+          .eq("organization_id", organizationId)
+          .eq("equipment_id", eq.id)
+          .in("maintenance_plan_id", planIds)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+          .limit(40)
+      }
+
+      const { data, error } = woRes
 
       if (cancelled) return
       if (error) {
@@ -620,7 +641,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   // Timeline items for service history tab
   const timelineItems = eq.serviceHistory.map((h) => ({
     date: h.date,
-    label: `${h.type} — ${h.workOrderId}`,
+    label: `${h.type} — ${getWorkOrderDisplay({ id: h.workOrderId })}`,
     href: `/work-orders?open=${h.workOrderId}`,
     description: h.description + (h.technician ? ` · ${h.technician}` : "") + ` · ${fmtCurrency(h.cost)}`,
     accent: (h.status === "Completed" ? "success" : "muted") as "success" | "muted",
@@ -653,6 +674,14 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
             <>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
                 <Pencil className="w-3.5 h-3.5" /> Edit
+              </Button>
+              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                <Link
+                  href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
+                  className="flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> New Maintenance Plan
+                </Link>
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order created")}>
                 <ClipboardList className="w-3.5 h-3.5" /> Create WO
@@ -841,7 +870,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                       className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
                     >
                       <div className="flex flex-col gap-0.5">
-                        <p className="text-xs font-semibold font-mono text-primary">{wo.id}</p>
+                        <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay(wo)}</p>
                         <p className="text-xs text-foreground font-medium">{wo.type} — {wo.description.slice(0, 60)}{wo.description.length > 60 ? "…" : ""}</p>
                         <p className="text-[10px] text-muted-foreground">{wo.technicianName} · {fmtDate(wo.scheduledDate)}</p>
                       </div>
@@ -966,7 +995,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                           className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
                         >
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <p className="text-xs font-semibold font-mono text-primary truncate">{wo.id}</p>
+                            <p className="text-xs font-semibold font-mono text-primary truncate">{formatWorkOrderDisplay(wo.work_order_number, wo.id)}</p>
                             <p className="text-xs text-foreground font-medium truncate">{wo.title}</p>
                             <p className="text-[10px] text-muted-foreground">
                               {planName} · {woDbTypeLabel(wo.type)} · {fmtDate(wo.scheduled_on ?? wo.created_at.slice(0, 10))}

@@ -3,16 +3,24 @@
 import { useEffect, useState } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import { CheckCircle2, ShieldCheck, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
 
 interface AddEquipmentModalProps {
   open: boolean
   onClose: () => void
-  /** Called with new row id after a successful insert (before modal closes). */
-  onSuccess?: (equipmentId?: string) => void
+  /** Called with new row id after a successful insert (before modal closes). May return a Promise. */
+  onSuccess?: (equipmentId?: string) => void | Promise<void>
   /** When set, customer field is prefilled (e.g. creating equipment from customer context). */
   prefilledCustomerId?: string | null
+  /**
+   * When true (default), after save show a compact next-step choice (maintenance plan vs done).
+   * Set false when this modal is opened from Create/Edit Maintenance Plan (already in that flow).
+   */
+  offerMaintenancePlanNext?: boolean
+  /** Called when user chooses “Create Maintenance Plan” on the success step. Modal closes after this. */
+  onCreateMaintenancePlan?: (ctx: { customerId: string; equipmentId: string }) => void
 }
 
 const EQUIPMENT_TYPES = [
@@ -113,12 +121,15 @@ export function AddEquipmentModal({
   onClose,
   onSuccess,
   prefilledCustomerId = null,
+  offerMaintenancePlanNext = true,
+  onCreateMaintenancePlan,
 }: AddEquipmentModalProps) {
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -157,6 +168,7 @@ export function AddEquipmentModal({
 
   useEffect(() => {
     if (!open) return
+    setPostSave(null)
     setForm({
       ...INITIAL_FORM,
       ...(prefilledCustomerId ? { customerId: prefilledCustomerId } : {}),
@@ -170,9 +182,21 @@ export function AddEquipmentModal({
   }
 
   function handleClose() {
+    setPostSave(null)
     setForm(INITIAL_FORM)
     setErrors({})
     onClose()
+  }
+
+  function handleDoneAfterSave() {
+    handleClose()
+  }
+
+  function handleCreatePlanAfterSave() {
+    if (postSave) {
+      onCreateMaintenancePlan?.(postSave)
+    }
+    handleClose()
   }
 
   async function handleSave() {
@@ -245,9 +269,26 @@ export function AddEquipmentModal({
     const newId = (inserted as { id: string } | null)?.id
 
     setSaving(false)
-    setToastMsg("Equipment added successfully")
-    setTimeout(() => setToastMsg(null), 3500)
-    onSuccess?.(newId)
+    await Promise.resolve(onSuccess?.(newId))
+
+    if (offerMaintenancePlanNext && newId && form.customerId && onCreateMaintenancePlan) {
+      toast({
+        title: "Equipment added",
+        description: "You can start a maintenance plan for this asset next.",
+      })
+      setPostSave({ customerId: form.customerId, equipmentId: newId })
+      return
+    }
+
+    if (!offerMaintenancePlanNext) {
+      handleClose()
+      return
+    }
+
+    toast({
+      title: "Equipment added",
+      description: "The new asset is available in your equipment list.",
+    })
     handleClose()
   }
 
@@ -266,15 +307,21 @@ export function AddEquipmentModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Add Equipment"
+        aria-label={postSave ? "Equipment saved" : "Add Equipment"}
         className="fixed inset-0 z-[230] flex items-start justify-center pt-12 px-4 pb-8"
       >
         <div className="relative w-full max-w-2xl bg-background rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
             <div>
-              <h2 className="text-base font-semibold text-foreground">Add Equipment</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Fill in the details to register new equipment.</p>
+              <h2 className="text-base font-semibold text-foreground">
+                {postSave ? "Equipment saved" : "Add Equipment"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {postSave
+                  ? "Choose what you'd like to do next."
+                  : "Fill in the details to register new equipment."}
+              </p>
             </div>
             <button
               onClick={handleClose}
@@ -285,7 +332,19 @@ export function AddEquipmentModal({
             </button>
           </div>
 
-          {/* Scrollable body */}
+          {/* Success step (no form clutter) */}
+          {postSave ? (
+            <div className="flex flex-col items-center text-center px-6 py-10 sm:py-12">
+              <CheckCircle2 className="w-12 h-12 text-[color:var(--status-success)] mb-4 shrink-0" aria-hidden />
+              <p className="text-sm font-medium text-foreground max-w-sm">
+                {(form.model || form.name).trim() || "Equipment"} is registered.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 max-w-sm">
+                Create a maintenance plan now, or return to your workspace.
+              </p>
+            </div>
+          ) : (
+          /* Scrollable body */
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             {/* Row 1 */}
             <div className="grid grid-cols-2 gap-4">
@@ -382,13 +441,30 @@ export function AddEquipmentModal({
               <Textarea placeholder="Any additional notes about this equipment..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
             </Field>
           </div>
+          )}
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border shrink-0">
-            <Button variant="outline" onClick={handleClose} className="cursor-pointer">Cancel</Button>
-            <Button onClick={handleSave} className="cursor-pointer" disabled={saving}>
-              {saving ? "Saving..." : "Save Equipment"}
-            </Button>
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 px-6 py-4 border-t border-border shrink-0">
+            {postSave ? (
+              <>
+                <Button variant="outline" onClick={handleDoneAfterSave} className="cursor-pointer w-full sm:w-auto">
+                  Done
+                </Button>
+                <Button onClick={handleCreatePlanAfterSave} className="cursor-pointer gap-2 w-full sm:w-auto">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  Create Maintenance Plan
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={handleClose} className="cursor-pointer">
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} className="cursor-pointer" disabled={saving}>
+                  {saving ? "Saving..." : "Save Equipment"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

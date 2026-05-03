@@ -12,6 +12,7 @@ interface StatCardProps {
   trend?: { value: string; positive?: boolean }
   urgent?: boolean
   href?: string
+  loading?: boolean
 }
 
 export function StatCard({
@@ -24,16 +25,17 @@ export function StatCard({
   trend,
   urgent,
   href,
+  loading,
 }: StatCardProps) {
   const inner = (
     <div className={cn(
       "group bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col h-full min-h-[160px]",
       "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
-      "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] hover:-translate-y-px",
+      !loading && "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] hover:-translate-y-px",
       "transition-all duration-200 select-none",
-      href ? "cursor-pointer" : "cursor-default",
+      href && !loading ? "cursor-pointer" : "cursor-default",
       urgent && "border-destructive/40",
-      href && "hover:border-primary/30",
+      href && !loading && "hover:border-primary/30",
     )}>
       {/* Title row — fixed min-height so wrapping titles don't shift content below */}
       <div className="flex items-start justify-between gap-2 min-h-[2rem]">
@@ -49,16 +51,20 @@ export function StatCard({
       </div>
       {/* Value + subtitle — anchored below the title row */}
       <div className="mt-3">
-        <p className={cn(
-          "text-2xl sm:text-3xl font-bold tracking-tight ds-tabular",
-          urgent ? "text-destructive" : "text-foreground"
-        )}>
-          {value}
-        </p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{subtitle}</p>}
+        {loading ? (
+          <div className="h-8 sm:h-9 w-24 rounded-md bg-muted animate-pulse" aria-hidden />
+        ) : (
+          <p className={cn(
+            "text-2xl sm:text-3xl font-bold tracking-tight ds-tabular",
+            urgent ? "text-destructive" : "text-foreground"
+          )}>
+            {value}
+          </p>
+        )}
+        {subtitle && !loading && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{subtitle}</p>}
       </div>
       {/* Trend text — always pinned to the bottom */}
-      {trend && (
+      {trend && !loading && (
         <p className={cn("text-xs font-semibold mt-auto pt-3", trend.positive ? "text-[oklch(0.42_0.17_145)]" : "text-destructive")}>
           {trend.value}
         </p>
@@ -66,7 +72,7 @@ export function StatCard({
     </div>
   )
 
-  if (href) {
+  if (href && !loading) {
     return <Link href={href} className="block h-full">{inner}</Link>
   }
   return inner

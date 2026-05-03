@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { WO_DETAIL_SELECT, WO_DETAIL_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import type {
   WorkOrder,
   WorkOrderStatus,
@@ -282,7 +285,7 @@ function mockLaborEstimate(wo: WorkOrder): { task: string; hours: number; rate: 
 
 function mockJobSummary(wo: WorkOrder): string {
   const total = wo.totalLaborCost + wo.totalPartsCost
-  return `Work order ${wo.id} for ${wo.customerName} (${wo.equipmentName} at ${wo.location}) was completed successfully. The primary issue — ${wo.repairLog.diagnosis ?? "low refrigerant and worn contactors"} — was resolved by the assigned technician ${wo.technicianName}.
+  return `Work order ${getWorkOrderDisplay(wo)} for ${wo.customerName} (${wo.equipmentName} at ${wo.location}) was completed successfully. The primary issue — ${wo.repairLog.diagnosis ?? "low refrigerant and worn contactors"} — was resolved by the assigned technician ${wo.technicianName}.
 
 Total job duration: approximately 3.5 hours on site. Parts used: refrigerant R-410A, Schrader valve cores, and a replacement capacitor. Total job value: ${total > 0 ? fmtCurrency(total) : "$762"}.
 
@@ -693,6 +696,7 @@ interface WorkOrderDrawerProps {
 
 type DbWorkOrderRow = {
   id: string
+  work_order_number?: number | null
   organization_id: string
   customer_id: string
   equipment_id: string
@@ -710,6 +714,7 @@ type DbWorkOrderRow = {
   total_parts_cents: number
   notes: string | null
   repair_log: unknown
+  maintenance_plan_id: string | null
 }
 
 type TechnicianOption = { id: string; label: string }
@@ -791,15 +796,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
     }
     setTechnicianOptions(techOpts)
 
-    const { data: row, error } = await supabase
+    let woRes = await supabase
       .from("work_orders")
-      .select(
-        "id, organization_id, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log"
-      )
+      .select(WO_DETAIL_SELECT_WITH_NUM)
       .eq("id", workOrderId)
       .eq("organization_id", orgId)
       .eq("is_archived", false)
       .maybeSingle()
+
+    if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+      woRes = await supabase
+        .from("work_orders")
+        .select(WO_DETAIL_SELECT)
+        .eq("id", workOrderId)
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .maybeSingle()
+    }
+
+    const { data: row, error } = woRes
 
     if (error || !row) {
       setWo(null)
@@ -809,7 +824,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
 
     const w = row as DbWorkOrderRow
 
-    const [{ data: cust }, { data: eq }, { data: assigneeProf }] = await Promise.all([
+    const [{ data: cust }, { data: eq }, { data: assigneeProf }, { data: planRow }] = await Promise.all([
       supabase
         .from("customers")
         .select("company_name")
@@ -829,6 +844,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
             .eq("id", w.assigned_user_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      w.maintenance_plan_id
+        ? supabase
+            .from("maintenance_plans")
+            .select("name")
+            .eq("id", w.maintenance_plan_id)
+            .eq("organization_id", orgId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
 
     const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
@@ -841,8 +864,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       : "Unassigned"
     const techId = w.assigned_user_id ?? "unassigned"
 
+    const planMeta = planRow as { name: string } | null
+    const planName = w.maintenance_plan_id ? (planMeta?.name ?? null) : null
+
     const mapped: WorkOrder = {
       id: w.id,
+      workOrderNumber: w.work_order_number ?? undefined,
       customerId: w.customer_id,
       customerName,
       equipmentId: w.equipment_id,
@@ -863,6 +890,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       totalLaborCost: w.total_labor_cents / 100,
       totalPartsCost: w.total_parts_cents / 100,
       invoiceNumber: w.invoice_number ?? "",
+      maintenancePlanId: w.maintenance_plan_id,
+      maintenancePlanName: planName,
     }
 
     setDbNotes(w.notes ?? "")
@@ -1093,14 +1122,26 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       <DetailDrawer
         open={!!workOrderId}
         onClose={onClose}
-        title={wo.id}
-        subtitle={`${wo.type} · ${wo.customerName}`}
+        title={getWorkOrderDisplay(wo)}
+        subtitle={`${wo.customerName} · ${wo.equipmentName}`}
         width="lg"
         transitionMs={400}
         badge={
-          <Badge variant="secondary" className={cn("text-xs border", STATUS_STYLE[currentStatus])}>
-            {currentStatus}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-1.5 justify-end">
+            {wo.maintenancePlanId && (
+              <>
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/25">
+                  Preventive Maintenance
+                </span>
+                <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/25">
+                  PM
+                </span>
+              </>
+            )}
+            <Badge variant="secondary" className={cn("text-xs border", STATUS_STYLE[currentStatus])}>
+              {currentStatus}
+            </Badge>
+          </div>
         }
         actions={
           editing ? (
@@ -1145,6 +1186,23 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
           <div className="flex items-center gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             Critical priority — immediate attention required
+          </div>
+        )}
+
+        {wo.maintenancePlanId && (
+          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Maintenance plan</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/maintenance-plans?open=${wo.maintenancePlanId}`}
+                className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+              >
+                {wo.maintenancePlanName?.trim() || "View plan"}
+                <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+              </Link>
+              <span className="text-xs text-muted-foreground">·</span>
+              <span className="text-xs text-muted-foreground">Work order generated from this plan</span>
+            </div>
           </div>
         )}
 

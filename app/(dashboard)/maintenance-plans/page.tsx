@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useMemo, useEffect, Suspense } from "react"
+import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import { computeNextDueDate } from "@/lib/maintenance-plans/db-map"
 import { DrawerViewport } from "@/components/detail-drawer"
@@ -64,6 +67,7 @@ import {
   Pause,
   MoreHorizontal,
   Archive,
+  ClipboardList,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -78,6 +82,14 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { EditMaintenancePlanDialog } from "@/components/maintenance-plans/edit-maintenance-plan-dialog"
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
@@ -129,6 +141,36 @@ function planDueAccent(days: number): "overdue" | "dueToday" | null {
   return null
 }
 
+const WO_FROM_PLAN_STATUS_CLASS: Record<string, string> = {
+  open: "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
+  scheduled: "bg-[color:var(--status-info)]/15 text-[color:var(--status-info)] border-[color:var(--status-info)]/25",
+  in_progress: "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
+  completed: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
+  invoiced: "bg-muted text-muted-foreground border-border",
+}
+
+function workOrderDbStatusLabel(status: string): string {
+  switch (status) {
+    case "open":
+      return "Open"
+    case "scheduled":
+      return "Scheduled"
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "invoiced":
+      return "Invoiced"
+    default:
+      return status
+  }
+}
+
+function formatShortDate(iso: string) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 function formatDays(days: number): string {
   if (days < 0)  return `${Math.abs(days)}d overdue`
   if (days === 0) return "Due today"
@@ -163,10 +205,87 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
   const [actionBusy, setActionBusy] = useState(false)
   const [headerWoBusy, setHeaderWoBusy] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [planWorkOrders, setPlanWorkOrders] = useState<
+    Array<{
+      id: string
+      work_order_number?: number | null
+      title: string
+      status: string
+      scheduled_on: string | null
+      created_at: string
+    }>
+  >([])
+  const [planWoHistoryLoading, setPlanWoHistoryLoading] = useState(false)
+  const [planWoHistoryError, setPlanWoHistoryError] = useState<string | null>(null)
+  const [planWoHistoryToken, setPlanWoHistoryToken] = useState(0)
 
   useEffect(() => {
     console.info("[Equipify] PlanDetailSheet (maintenance-plans/page.tsx)", { planId: plan.id })
   }, [plan.id])
+
+  useEffect(() => {
+    if (!organizationId) return
+    let cancelled = false
+    setPlanWoHistoryLoading(true)
+    setPlanWoHistoryError(null)
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const planHistSelWithNum = "id, work_order_number, title, status, scheduled_on, created_at"
+      const planHistSel = planHistSelWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
+        .from("work_orders")
+        .select(planHistSelWithNum)
+        .eq("organization_id", organizationId)
+        .eq("maintenance_plan_id", plan.id)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(planHistSel)
+          .eq("organization_id", organizationId)
+          .eq("maintenance_plan_id", plan.id)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+      }
+
+      const { data, error } = woRes
+      if (cancelled) return
+      if (error) {
+        setPlanWoHistoryError(error.message)
+        setPlanWorkOrders([])
+      } else {
+        setPlanWorkOrders(
+          (data ?? []) as Array<{
+            id: string
+            work_order_number?: number | null
+            title: string
+            status: string
+            scheduled_on: string | null
+            created_at: string
+          }>
+        )
+      }
+      setPlanWoHistoryLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [plan.id, organizationId, planWoHistoryToken])
+
+  const planWoStats = useMemo(() => {
+    const completed = planWorkOrders.filter((w) => w.status === "completed" || w.status === "invoiced").length
+    const lastGenerated =
+      planWorkOrders.length === 0
+        ? null
+        : planWorkOrders.reduce<string | null>((acc, w) => {
+            if (!acc) return w.created_at
+            return new Date(w.created_at) > new Date(acc) ? w.created_at : acc
+          }, null)
+    return { completed, lastGenerated }
+  }, [planWorkOrders])
 
   useEffect(() => {
     setEditNotes(plan.notes)
@@ -228,6 +347,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
       description: `Linked to ${plan.customerName} — ${plan.equipmentName}.`,
     })
     void refreshPlans({ silent: true })
+    setPlanWoHistoryToken((n) => n + 1)
     setWoCreated(true)
     setTimeout(() => setWoCreated(false), 2500)
   }
@@ -255,6 +375,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
       description: `Linked to ${plan.customerName} — ${plan.equipmentName}.`,
     })
     void refreshPlans({ silent: true })
+    setPlanWoHistoryToken((n) => n + 1)
     setWoCreated(true)
     setTimeout(() => setWoCreated(false), 2500)
   }
@@ -450,6 +571,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           <TabsList className="rounded-none border-b border-border bg-transparent px-6 justify-start gap-1 h-auto py-0 shrink-0">
             {[
               { value: "services",      label: "Services" },
+              { value: "work_orders",   label: "Work Orders" },
               { value: "notifications", label: "Notifications" },
               { value: "log",           label: "Notification Log" },
               { value: "settings",      label: "Settings" },
@@ -504,6 +626,96 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 </div>
                 <textarea rows={3} className="input-base resize-none text-sm" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
               </div>
+            </TabsContent>
+
+            {/* Work orders generated from this plan */}
+            <TabsContent value="work_orders" className="p-6 mt-0 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Generated work orders</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <span className="font-medium text-foreground">{planWoStats.completed}</span> completed
+                    {planWoStats.lastGenerated ? (
+                      <>
+                        <span className="mx-1.5">·</span>
+                        Last generated {formatShortDate(planWoStats.lastGenerated)}
+                      </>
+                    ) : (
+                      <>
+                        <span className="mx-1.5">·</span>
+                        No work orders yet
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+              {planWoHistoryError && (
+                <Alert variant="destructive">
+                  <AlertTitle>Could not load work orders</AlertTitle>
+                  <AlertDescription>{planWoHistoryError}</AlertDescription>
+                </Alert>
+              )}
+              {planWoHistoryLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading history…
+                </div>
+              ) : planWorkOrders.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  No work orders have been created from this plan yet. Use <strong>Create WO</strong> or enable auto-create to generate one.
+                </p>
+              ) : (
+                <div className="rounded-lg border border-border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead className="text-xs">Title</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Scheduled</TableHead>
+                        <TableHead className="text-xs">Created</TableHead>
+                        <TableHead className="text-xs w-[140px] text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {planWorkOrders.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="text-sm font-medium max-w-[220px]">
+                            <span className="block truncate" title={row.title}>
+                              {row.title}
+                            </span>
+                            <span className="text-[10px] font-mono text-muted-foreground">{formatWorkOrderDisplay(row.work_order_number, row.id)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] border",
+                                WO_FROM_PLAN_STATUS_CLASS[row.status] ?? "bg-muted text-muted-foreground border-border"
+                              )}
+                            >
+                              {workOrderDbStatusLabel(row.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {row.scheduled_on ? formatShortDate(row.scheduled_on) : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatShortDate(row.created_at)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+                              <Link href={`/work-orders?open=${row.id}`}>
+                                <ClipboardList className="w-3.5 h-3.5" />
+                                Open Work Order
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </TabsContent>
 
             {/* Notification Rules */}

@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { ChevronRight, Search, ClipboardList, Filter } from "lucide-react"
 import { workOrders } from "@/lib/mock-data"
+import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 
 const CUSTOMER_ID = "CUS-001"
 const myWOs = workOrders.filter((w) => w.customerId === CUSTOMER_ID)
@@ -107,7 +108,7 @@ export default function PortalWorkOrdersPage() {
                     className="transition-colors hover:bg-[var(--portal-surface-2)] cursor-pointer"
                     style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--portal-border-light)" : "none" }}>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs font-medium" style={{ color: "var(--portal-accent)" }}>{wo.id}</span>
+                      <span className="font-mono text-xs font-medium" style={{ color: "var(--portal-accent)" }}>{getWorkOrderDisplay(wo)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-xs" style={{ color: "var(--portal-foreground)" }}>{wo.equipmentName}</p>

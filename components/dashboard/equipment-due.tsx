@@ -2,12 +2,19 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { CalendarClock, ChevronRight } from "lucide-react"
-import { useWorkspaceData } from "@/lib/tenant-store"
+import { CalendarClock, ChevronRight, AlertTriangle } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
+import type { EquipmentDueRow } from "@/lib/dashboard/use-supabase-dashboard"
 
-export function EquipmentDue() {
-  const { equipmentDueSoon } = useWorkspaceData()
+export function EquipmentDue({
+  items,
+  loading,
+  error,
+}: {
+  items: EquipmentDueRow[]
+  loading?: boolean
+  error?: string | null
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   return (
@@ -22,14 +29,31 @@ export function EquipmentDue() {
             View schedule
           </Link>
         </div>
-        {equipmentDueSoon.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+        {error && (
+          <div className="px-5 py-2 text-xs text-destructive border-b border-border flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            Could not refresh. Showing last loaded data if any.
+          </div>
+        )}
+        {loading && items.length === 0 ? (
+          <ul className="divide-y divide-border">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <li key={i} className="px-5 py-3.5">
+                <div className="h-4 rounded bg-muted animate-pulse w-4/5" />
+              </li>
+            ))}
+          </ul>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center px-4">
             <CalendarClock className="w-8 h-8 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">No services due this month</p>
+            <p className="text-xs text-muted-foreground/80 max-w-[260px] leading-relaxed">
+              Active equipment with a next service date in the current calendar month appears here.
+            </p>
           </div>
         ) : (
           <ul className="divide-y divide-border">
-            {equipmentDueSoon.map((item) => (
+            {items.map((item) => (
               <li
                 key={item.id}
                 onClick={() => setSelectedId(item.id)}

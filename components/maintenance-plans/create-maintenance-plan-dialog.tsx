@@ -1018,6 +1018,7 @@ export function CreateMaintenancePlanDialog({
       open={addEquipmentOpen}
       onClose={endAddEquipmentFlow}
       prefilledCustomerId={form.customerId || null}
+      offerMaintenancePlanNext={false}
       onSuccess={(newEquipmentId) => {
         setEquipmentRefresh((n) => n + 1);
         if (newEquipmentId) {

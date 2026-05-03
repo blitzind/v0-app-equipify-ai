@@ -5,6 +5,10 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,9 +16,9 @@ import {
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
-  CheckCircle2, ClipboardList, Download, Send, Pencil, X, Check,
+  CheckCircle2, Download, Send, Pencil, X, Check,
   FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
-  ThumbsDown, DollarSign, FileEdit,
+  ThumbsDown, DollarSign, FileEdit, Loader2, Wrench,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 
@@ -482,6 +486,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<AdminQuote>>({})
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
+  const [convertingToWo, setConvertingToWo] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
 
@@ -499,7 +504,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
   function startEdit() {
     if (!quote) return
-    setDraft({ status: quote.status, expiresDate: quote.expiresDate, notes: quote.notes })
+    setDraft({
+      status: quote.status,
+      expiresDate: quote.expiresDate,
+      notes: quote.notes,
+      internalNotes: quote.internalNotes ?? "",
+    })
     setDraftItems(quote.lineItems.map((li) => ({ ...li })))
     setEditing(true)
   }
@@ -513,7 +523,13 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   function saveEdit() {
     if (!quote) return
     const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
-    updateQuote(quote.id, { ...draft, lineItems: draftItems, amount: newTotal })
+    const internal = (draft.internalNotes ?? "").trim()
+    updateQuote(quote.id, {
+      ...draft,
+      lineItems: draftItems,
+      amount: newTotal,
+      internalNotes: internal || undefined,
+    })
     setEditing(false)
     setDraft({})
     setDraftItems([])
@@ -526,9 +542,85 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
   // AI apply callbacks
   function handleApplyDraft(text: string) {
-    setDraft((prev) => ({ ...prev, notes: text }))
-    if (!editing) startEdit()
+    if (!quote) return
+    if (!editing) {
+      setDraft({
+        status: quote.status,
+        expiresDate: quote.expiresDate,
+        notes: text,
+        internalNotes: quote.internalNotes ?? "",
+      })
+      setDraftItems(quote.lineItems.map((li) => ({ ...li })))
+      setEditing(true)
+    } else {
+      setDraft((prev) => ({ ...prev, notes: text }))
+    }
     toast("Draft applied to notes — review and save")
+  }
+
+  async function handleConvertToWorkOrder() {
+    if (!quote || quote.workOrderId) return
+    if (!quote.customerId || !quote.equipmentId) {
+      toast("Link equipment on this quote before creating a work order.")
+      return
+    }
+    setConvertingToWo(true)
+    const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      toast("You must be signed in to create a work order.")
+      setConvertingToWo(false)
+      return
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("default_organization_id")
+      .eq("id", user.id)
+      .single()
+    const orgId = profile?.default_organization_id
+    if (!orgId) {
+      toast("No default organization.")
+      setConvertingToWo(false)
+      return
+    }
+    const scheduled = quote.expiresDate || new Date().toISOString().slice(0, 10)
+    const priority: WorkOrderPriority = "Normal"
+    const woType: WorkOrderType = "Repair"
+    const { data: inserted, error } = await supabase
+      .from("work_orders")
+      .insert({
+        organization_id: orgId,
+        customer_id: quote.customerId,
+        equipment_id: quote.equipmentId,
+        title: quote.description.trim().slice(0, 500) || "Work from quote",
+        status: "open",
+        priority: uiPriorityToDb(priority),
+        type: uiTypeToDb(woType),
+        scheduled_on: scheduled,
+        scheduled_time: normalizeTimeForDb("08:00"),
+        notes: quote.notes?.trim() || null,
+        assigned_user_id: user.id,
+      })
+      .select("id, work_order_number")
+      .single()
+    setConvertingToWo(false)
+    if (error) {
+      toast(`Could not create work order: ${error.message}`)
+      return
+    }
+    const row = inserted as { id: string; work_order_number?: number | null } | null
+    const newId = row?.id
+    if (!newId) {
+      toast("Work order was not created.")
+      return
+    }
+    updateQuote(quote.id, {
+      workOrderId: newId,
+      ...(row.work_order_number != null ? { workOrderNumber: row.work_order_number } : {}),
+    })
+    toast(`Work order ${formatWorkOrderDisplay(row.work_order_number, newId)} created from quote`)
   }
 
   function handleApplyPricing(amount: number) {
@@ -540,7 +632,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       unit: Math.round(li.unit * scale),
     }))
     if (!editing) {
-      setDraft({ status: quote.status, expiresDate: quote.expiresDate, notes: quote.notes })
+      setDraft({
+        status: quote.status,
+        expiresDate: quote.expiresDate,
+        notes: quote.notes,
+        internalNotes: quote.internalNotes ?? "",
+      })
       setDraftItems(scaledItems)
       setEditing(true)
     } else {
@@ -550,6 +647,13 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   }
 
   if (!quote) return null
+
+  const canCreateWorkOrder =
+    !quote.workOrderId &&
+    Boolean(quote.customerId) &&
+    Boolean(quote.equipmentId) &&
+    quote.status !== "Declined" &&
+    quote.status !== "Expired"
 
   const currentStatus = (draft.status ?? quote.status) as QuoteStatus
 
@@ -567,7 +671,11 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
         open={!!quoteId}
         onClose={onClose}
         title={quote.id}
-        subtitle={`${quote.customerName} · ${quote.equipmentName}`}
+        subtitle={
+          quote.equipmentName
+            ? `${quote.customerName} · ${quote.equipmentName}`
+            : quote.customerName
+        }
         width="lg"
         badge={
           <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[currentStatus].className)}>
@@ -594,9 +702,20 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   <Send className="w-3.5 h-3.5" /> Send to Customer
                 </Button>
               )}
-              {quote.status === "Approved" && (
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order created from quote")}>
-                  <ClipboardList className="w-3.5 h-3.5" /> Convert to WO
+              {canCreateWorkOrder && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs cursor-pointer"
+                  disabled={convertingToWo}
+                  onClick={() => void handleConvertToWorkOrder()}
+                >
+                  {convertingToWo ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Wrench className="w-3.5 h-3.5" />
+                  )}
+                  Create Work Order
                 </Button>
               )}
               {quote.status === "Approved" && (
@@ -631,11 +750,18 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               email={{ customerName: quote.customerName }}
             />
           </div>
-          <DrawerRow label="Equipment" value={
-            <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
-              {quote.equipmentName}
-            </Link>
-          } />
+          <DrawerRow
+            label="Equipment"
+            value={
+              quote.equipmentId ? (
+                <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
+                  {quote.equipmentName || quote.equipmentId}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground text-sm">No equipment on this quote</span>
+              )
+            }
+          />
           <DrawerRow label="Created By" value={quote.createdBy} />
           <DrawerRow label="Created" value={fmtDate(quote.createdDate)} />
           <EditRow label="Expires" view={
@@ -651,7 +777,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           {quote.workOrderId && (
             <DrawerRow label="Work Order" value={
               <Link href={`/work-orders?open=${quote.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
-                {quote.workOrderId}
+                {getWorkOrderDisplay({ id: quote.workOrderId, workOrderNumber: quote.workOrderNumber })}
               </Link>
             } />
           )}
@@ -678,6 +804,22 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
             <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">{quote.notes}</p>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
+          )}
+        </DrawerSection>
+
+        <DrawerSection title="Internal Notes">
+          {editing ? (
+            <EditTextarea
+              value={draft.internalNotes ?? ""}
+              onChange={(v) => setField("internalNotes", v)}
+              placeholder="Internal team notes…"
+            />
+          ) : quote.internalNotes ? (
+            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
+              {quote.internalNotes}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-3">No internal notes.</p>
           )}
         </DrawerSection>
 

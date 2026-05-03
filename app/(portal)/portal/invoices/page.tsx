@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Receipt, FileDown, ChevronDown, ExternalLink, CheckCircle2, AlertTriangle, Clock, CreditCard } from "lucide-react"
 import { portalInvoices } from "@/lib/mock-data"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { Invoice } from "@/lib/mock-data"
 
 const CUSTOMER_ID = "CUS-001"
@@ -111,7 +112,7 @@ function InvoiceRow({ inv, expanded, onToggle, onPay }: {
                 <FileDown size={13} /> Download PDF
               </button>
               <button className="portal-btn-secondary text-xs h-8 px-3">
-                <ExternalLink size={13} /> Work Order {inv.workOrderId}
+                <ExternalLink size={13} /> Work Order {getWorkOrderDisplay({ id: inv.workOrderId })}
               </button>
             </div>
             {inv.status !== "Paid" && (

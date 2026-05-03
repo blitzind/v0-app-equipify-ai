@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -182,6 +184,7 @@ export function TechnicianDrawer({
   const [scheduleRows, setScheduleRows] = useState<
     Array<{
       id: string
+      workOrderNumber: number
       title: string
       typeLabel: string
       statusDb: string
@@ -307,15 +310,29 @@ export function TechnicianDrawer({
       setScheduleError(null)
       const supabase = createBrowserSupabaseClient()
 
-      const { data: woRows, error: woError } = await supabase
+      const techSchedSelectWithNum =
+        "id, work_order_number, title, status, type, scheduled_on, scheduled_time, customer_id, equipment_id"
+      const techSchedSelect = techSchedSelectWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
         .from("work_orders")
-        .select(
-          "id, title, status, type, scheduled_on, scheduled_time, customer_id, equipment_id"
-        )
+        .select(techSchedSelectWithNum)
         .eq("organization_id", orgId)
         .eq("assigned_user_id", techId)
         .eq("is_archived", false)
         .not("scheduled_on", "is", null)
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(techSchedSelect)
+          .eq("organization_id", orgId)
+          .eq("assigned_user_id", techId)
+          .eq("is_archived", false)
+          .not("scheduled_on", "is", null)
+      }
+
+      const { data: woRows, error: woError } = woRes
 
       if (woError || cancelled) {
         if (!cancelled) {
@@ -328,6 +345,7 @@ export function TechnicianDrawer({
 
       const raw = (woRows ?? []) as Array<{
         id: string
+        work_order_number?: number | null
         title: string
         status: string
         type: string
@@ -385,6 +403,7 @@ export function TechnicianDrawer({
           eq && loc ? `${eq.name} · ${loc}` : eq?.name ?? "Equipment"
         return {
           id: r.id,
+          workOrderNumber: r.work_order_number ?? undefined,
           title: r.title,
           typeLabel: mapDbTypeToLabel(r.type),
           statusDb: r.status,
@@ -645,7 +664,7 @@ export function TechnicianDrawer({
                         <p className="text-xs text-muted-foreground">{entry.customerName}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">{entry.equipmentLine}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {entry.typeLabel} · {entry.timeLabel} · <span className="font-mono text-primary">{entry.id.slice(0, 8)}…</span>
+                          {entry.typeLabel} · {entry.timeLabel} · <span className="font-mono text-primary">{formatWorkOrderDisplay(entry.workOrderNumber, entry.id)}</span>
                         </p>
                       </div>
                       <Button

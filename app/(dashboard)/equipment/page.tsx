@@ -596,6 +596,14 @@ function EquipmentPageInner() {
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSuccess={() => setRefreshToken((v) => v + 1)}
+        onCreateMaintenancePlan={({ customerId, equipmentId }) => {
+          const q = new URLSearchParams({
+            new: "1",
+            customerId,
+            equipmentId,
+          })
+          router.push(`/maintenance-plans?${q.toString()}`)
+        }}
       />
 
       <AIScanModal

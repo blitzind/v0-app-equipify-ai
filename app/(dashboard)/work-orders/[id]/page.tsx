@@ -1,10 +1,21 @@
 "use client"
 
-import { use, useState, useRef, useEffect, useCallback } from "react"
+import { use, useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useWorkOrders } from "@/lib/work-order-store"
-import type { WorkOrderStatus, WorkOrderPriority, Part } from "@/lib/mock-data"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { WO_DETAIL_PAGE_SELECT, WO_DETAIL_PAGE_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import type {
+  WorkOrder,
+  WorkOrderStatus,
+  WorkOrderPriority,
+  WorkOrderType,
+  Part,
+  RepairLog,
+} from "@/lib/mock-data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -43,6 +54,7 @@ import {
   AlertTriangle,
   Save,
   X,
+  ExternalLink,
 } from "lucide-react"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 
@@ -73,6 +85,88 @@ function formatDate(d: string) {
 function formatDateTime(d: string) {
   if (!d) return "—"
   return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
+function mapDbStatus(status: string): WorkOrderStatus {
+  switch (status) {
+    case "open":
+      return "Open"
+    case "scheduled":
+      return "Scheduled"
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "invoiced":
+      return "Invoiced"
+    default:
+      return "Open"
+  }
+}
+
+function mapDbPriority(priority: string): WorkOrderPriority {
+  switch (priority) {
+    case "low":
+      return "Low"
+    case "normal":
+      return "Normal"
+    case "high":
+      return "High"
+    case "critical":
+      return "Critical"
+    default:
+      return "Normal"
+  }
+}
+
+function mapDbType(type: string): WorkOrderType {
+  switch (type) {
+    case "repair":
+      return "Repair"
+    case "pm":
+      return "PM"
+    case "inspection":
+      return "Inspection"
+    case "install":
+      return "Install"
+    case "emergency":
+      return "Emergency"
+    default:
+      return "Repair"
+  }
+}
+
+function formatScheduledTime(isoOrTime: string | null): string {
+  if (!isoOrTime) return ""
+  const t = isoOrTime.includes("T") ? isoOrTime.slice(11, 16) : isoOrTime.slice(0, 5)
+  return t || ""
+}
+
+function parseRepairLog(raw: unknown): RepairLog {
+  const empty: RepairLog = {
+    problemReported: "",
+    diagnosis: "",
+    partsUsed: [],
+    laborHours: 0,
+    technicianNotes: "",
+    photos: [],
+    signatureDataUrl: "",
+    signedBy: "",
+    signedAt: "",
+  }
+  if (!raw || typeof raw !== "object") return empty
+  const o = raw as Record<string, unknown>
+  return {
+    problemReported: typeof o.problemReported === "string" ? o.problemReported : "",
+    diagnosis: typeof o.diagnosis === "string" ? o.diagnosis : "",
+    partsUsed: Array.isArray(o.partsUsed) ? (o.partsUsed as RepairLog["partsUsed"]) : [],
+    laborHours: typeof o.laborHours === "number" ? o.laborHours : 0,
+    technicianNotes: typeof o.technicianNotes === "string" ? o.technicianNotes : "",
+    photos: Array.isArray(o.photos) ? (o.photos as string[]) : [],
+    signatureDataUrl: typeof o.signatureDataUrl === "string" ? o.signatureDataUrl : "",
+    signedBy: typeof o.signedBy === "string" ? o.signedBy : "",
+    signedAt: typeof o.signedAt === "string" ? o.signedAt : "",
+  }
 }
 
 // ─── Signature canvas ─────────────────────────────────────────────────────────
@@ -420,7 +514,167 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
   const { id } = use(params)
   const { getById, updateStatus, updateRepairLog, updateWorkOrder } = useWorkOrders()
 
-  const wo = getById(id)
+  const storeWo = getById(id)
+  const [dbWo, setDbWo] = useState<WorkOrder | null | undefined>(undefined)
+  const [dbLoadFailed, setDbLoadFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setDbWo(undefined)
+    setDbLoadFailed(false)
+
+    async function loadFromSupabase() {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        if (active) setDbWo(null)
+        return
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_organization_id")
+        .eq("id", user.id)
+        .single()
+      const orgId = profile?.default_organization_id
+      if (!orgId) {
+        if (active) setDbWo(null)
+        return
+      }
+
+      let woRes = await supabase
+        .from("work_orders")
+        .select(WO_DETAIL_PAGE_SELECT_WITH_NUM)
+        .eq("id", id)
+        .eq("organization_id", orgId)
+        .eq("is_archived", false)
+        .maybeSingle()
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(WO_DETAIL_PAGE_SELECT)
+          .eq("id", id)
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .maybeSingle()
+      }
+
+      const { data: row, error } = woRes
+
+      if (!active) return
+      if (error || !row) {
+        setDbWo(null)
+        if (error) setDbLoadFailed(true)
+        return
+      }
+
+      const w = row as {
+        id: string
+        work_order_number?: number | null
+        customer_id: string
+        equipment_id: string
+        title: string
+        status: string
+        priority: string
+        type: string
+        scheduled_on: string | null
+        scheduled_time: string | null
+        completed_at: string | null
+        assigned_user_id: string | null
+        created_at: string
+        invoice_number: string | null
+        total_labor_cents: number
+        total_parts_cents: number
+        notes: string | null
+        repair_log: unknown
+        maintenance_plan_id: string | null
+      }
+
+      const [{ data: cust }, { data: eq }, { data: assigneeProf }, { data: planRow }] = await Promise.all([
+        supabase
+          .from("customers")
+          .select("company_name")
+          .eq("id", w.customer_id)
+          .eq("organization_id", orgId)
+          .maybeSingle(),
+        supabase
+          .from("equipment")
+          .select("name, location_label")
+          .eq("id", w.equipment_id)
+          .eq("organization_id", orgId)
+          .maybeSingle(),
+        w.assigned_user_id
+          ? supabase
+              .from("profiles")
+              .select("full_name, email")
+              .eq("id", w.assigned_user_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        w.maintenance_plan_id
+          ? supabase
+              .from("maintenance_plans")
+              .select("name")
+              .eq("id", w.maintenance_plan_id)
+              .eq("organization_id", orgId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+
+      if (!active) return
+
+      const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
+      const eqRow = eq as { name: string; location_label: string | null } | null
+      const equipmentName = eqRow?.name ?? "Equipment"
+      const location = eqRow?.location_label ?? ""
+      const ap = assigneeProf as { full_name: string | null; email: string | null } | null
+      const techName = w.assigned_user_id
+        ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
+        : "Unassigned"
+      const techId = w.assigned_user_id ?? "unassigned"
+      const planMeta = planRow as { name: string } | null
+      const planName = w.maintenance_plan_id ? (planMeta?.name ?? null) : null
+
+      const mapped: WorkOrder = {
+        id: w.id,
+        workOrderNumber: w.work_order_number ?? undefined,
+        customerId: w.customer_id,
+        customerName,
+        equipmentId: w.equipment_id,
+        equipmentName,
+        location,
+        type: mapDbType(w.type),
+        status: mapDbStatus(w.status),
+        priority: mapDbPriority(w.priority),
+        technicianId: techId,
+        technicianName: techName,
+        scheduledDate: w.scheduled_on ?? "",
+        scheduledTime: formatScheduledTime(w.scheduled_time),
+        completedDate: w.completed_at ? w.completed_at.slice(0, 10) : "",
+        createdAt: w.created_at,
+        createdBy: "",
+        description: w.title,
+        repairLog: parseRepairLog(w.repair_log),
+        totalLaborCost: w.total_labor_cents / 100,
+        totalPartsCost: w.total_parts_cents / 100,
+        invoiceNumber: w.invoice_number ?? "",
+        maintenancePlanId: w.maintenance_plan_id,
+        maintenancePlanName: planName,
+      }
+
+      setDbWo(mapped)
+    }
+
+    void loadFromSupabase()
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  const wo = dbWo ?? storeWo
+  const resolved = dbWo !== undefined || Boolean(storeWo)
+  const loading = !resolved
 
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -451,11 +705,21 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
     setSignedAt(rl.signedAt)
   }, [wo?.id])
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-sm text-muted-foreground">Loading work order…</p>
+      </div>
+    )
+  }
+
   if (!wo) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <AlertTriangle className="w-8 h-8 text-muted-foreground" />
-        <p className="text-muted-foreground">Work order not found.</p>
+        <p className="text-muted-foreground">
+          {dbLoadFailed ? "Could not load this work order." : "Work order not found."}
+        </p>
         <Link href="/work-orders">
           <Button variant="outline">Back to Work Orders</Button>
         </Link>
@@ -463,13 +727,15 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
     )
   }
 
+  const workOrder = wo
+
   const partsCost = parts.reduce((s, p) => s + p.quantity * p.unitCost, 0)
   const laborCost = laborHours * 95 // $95/hr rate
 
-  const editable = editing && ["Open", "Scheduled", "In Progress"].includes(wo.status)
+  const editable = editing && ["Open", "Scheduled", "In Progress"].includes(workOrder.status)
 
   function handleSave() {
-    updateRepairLog(wo.id, {
+    updateRepairLog(workOrder.id, {
       problemReported,
       diagnosis,
       partsUsed: parts,
@@ -480,7 +746,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
       signedBy,
       signedAt,
     })
-    updateWorkOrder(wo.id, {
+    updateWorkOrder(workOrder.id, {
       totalLaborCost: laborCost,
       totalPartsCost: partsCost,
     })
@@ -514,15 +780,34 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           </Link>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl font-bold text-foreground">{wo.id}</h1>
-              <Badge variant="secondary" className={cn("border text-xs", STATUS_STYLE[wo.status])}>
-                {wo.status}
+              <h1 className="text-xl font-bold text-foreground">{getWorkOrderDisplay(workOrder)}</h1>
+              {workOrder.maintenancePlanId && (
+                <>
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] border bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/25"
+                  >
+                    Preventive Maintenance
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] font-mono border bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/25"
+                  >
+                    PM
+                  </Badge>
+                </>
+              )}
+              <Badge variant="secondary" className={cn("border text-xs", STATUS_STYLE[workOrder.status])}>
+                {workOrder.status}
               </Badge>
-              <span className={cn("text-xs font-medium", PRIORITY_STYLE[wo.priority])}>
-                {wo.priority} priority
+              <span className={cn("text-xs font-medium", PRIORITY_STYLE[workOrder.priority])}>
+                {workOrder.priority} priority
               </span>
+              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                {workOrder.type}
+              </Badge>
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5">{wo.description}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{workOrder.description}</p>
           </div>
         </div>
 
@@ -535,16 +820,16 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           )}
           {!editing ? (
             <>
-              {nextStatus[wo.status] && (
+              {nextStatus[workOrder.status] && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => updateStatus(wo.id, nextStatus[wo.status]!)}
+                  onClick={() => updateStatus(workOrder.id, nextStatus[workOrder.status]!)}
                 >
-                  Move to {nextStatus[wo.status]}
+                  Move to {nextStatus[workOrder.status]}
                 </Button>
               )}
-              {["Open", "Scheduled", "In Progress"].includes(wo.status) && (
+              {["Open", "Scheduled", "In Progress"].includes(workOrder.status) && (
                 <Button size="sm" onClick={() => setEditing(true)}>
                   <PenLine className="w-3.5 h-3.5 mr-1.5" />
                   Edit Repair Log
@@ -563,13 +848,57 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
+      {workOrder.maintenancePlanId && (
+        <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Maintenance plan</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/maintenance-plans?open=${workOrder.maintenancePlanId}`}
+              className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+            >
+              {workOrder.maintenancePlanName?.trim() || "View plan"}
+              <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            </Link>
+            <span className="text-xs text-muted-foreground">· Created from this plan</span>
+          </div>
+        </div>
+      )}
+
+      {/* Customer & equipment — explicit links */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-card border border-border">
+          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+            <User className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Customer</p>
+            <Link href={`/customers?open=${workOrder.customerId}`} className="text-sm font-medium text-primary hover:underline block truncate">
+              {workOrder.customerName}
+            </Link>
+            <p className="text-xs text-muted-foreground font-mono truncate">{workOrder.customerId}</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-card border border-border">
+          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+            <Wrench className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Equipment</p>
+            <Link href={`/equipment?open=${workOrder.equipmentId}`} className="text-sm font-medium text-primary hover:underline block truncate">
+              {workOrder.equipmentName}
+            </Link>
+            <p className="text-xs text-muted-foreground font-mono truncate">{workOrder.equipmentId}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Info strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: Wrench, label: "Equipment", value: wo.equipmentName, sub: wo.equipmentId },
-          { icon: User, label: "Technician", value: wo.technicianName, sub: wo.type },
-          { icon: MapPin, label: "Location", value: wo.customerName, sub: wo.location },
-          { icon: Calendar, label: "Scheduled", value: formatDate(wo.scheduledDate), sub: wo.scheduledTime ? `at ${wo.scheduledTime}` : "" },
+          { icon: MapPin, label: "Site / location", value: workOrder.location || "—", sub: "" },
+          { icon: User, label: "Technician", value: workOrder.technicianName, sub: "" },
+          { icon: Calendar, label: "Scheduled", value: formatDate(workOrder.scheduledDate), sub: workOrder.scheduledTime ? `at ${workOrder.scheduledTime}` : "" },
+          { icon: Clock, label: "Created", value: formatDate(workOrder.createdAt.slice(0, 10)), sub: "" },
         ].map(({ icon: Icon, label, value, sub }) => (
           <div key={label} className="flex items-start gap-2.5 p-3 rounded-lg bg-card border border-border">
             <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -585,17 +914,17 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       {/* Appointment navigation + email actions */}
-      {wo.location && (
+      {workOrder.location && (
         <AppointmentActions
-          address={wo.location}
+          address={workOrder.location}
           emailParams={{
-            customerName:  wo.customerName,
-            equipmentName: wo.equipmentName,
-            technicianName: wo.technicianName,
-            scheduledDate:  wo.scheduledDate,
-            scheduledTime:  wo.scheduledTime,
-            address:        wo.location,
-            workOrderId:    wo.id,
+            customerName:  workOrder.customerName,
+            equipmentName: workOrder.equipmentName,
+            technicianName: workOrder.technicianName,
+            scheduledDate:  workOrder.scheduledDate,
+            scheduledTime:  workOrder.scheduledTime,
+            address:        workOrder.location,
+            workOrderId:    workOrder.id,
             ccEmails:       ["service@equipify.ai"],
           }}
         />

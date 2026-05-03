@@ -478,6 +478,8 @@ export interface RepairLog {
 
 export interface WorkOrder {
   id: string
+  /** Supabase monotonic per org; UI shows `WO-` + 7 digits. Optional on legacy mock rows that use `WO-####` ids. */
+  workOrderNumber?: number
   customerId: string
   customerName: string
   equipmentId: string
@@ -498,6 +500,9 @@ export interface WorkOrder {
   totalLaborCost: number
   totalPartsCost: number
   invoiceNumber: string
+  /** Set when this work order was created from a maintenance plan (Supabase `maintenance_plan_id`). */
+  maintenancePlanId?: string | null
+  maintenancePlanName?: string | null
 }
 
 const emptyRepairLog = (): RepairLog => ({
@@ -1508,8 +1513,12 @@ export interface AdminQuote {
   description: string
   createdBy: string
   workOrderId: string
+  /** When linked to a Supabase work order, enables WO-####### display without an extra fetch. */
+  workOrderNumber?: number
   lineItems: { description: string; qty: number; unit: number }[]
   notes: string
+  /** Team-only notes (not shown on customer-facing materials). */
+  internalNotes?: string
 }
 
 export const adminQuotes: AdminQuote[] = [

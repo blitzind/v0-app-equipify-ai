@@ -26,6 +26,7 @@ import {
 import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 let toastCounter = 0
 
@@ -996,7 +997,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
               >
                 <div>
-                  <p className="text-xs font-semibold font-mono text-primary">{wo.id}</p>
+                  <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay(wo)}</p>
                   <p className="text-[10px] text-muted-foreground truncate max-w-[220px]">{wo.description}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1101,7 +1102,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                   )} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono text-primary shrink-0">{wo.id}</span>
+                      <span className="text-[10px] font-mono text-primary shrink-0">{getWorkOrderDisplay(wo)}</span>
                       <span className="text-[10px] text-muted-foreground truncate">{wo.scheduledDate || wo.createdAt.slice(0, 10)}</span>
                     </div>
                     <p className="text-xs text-foreground group-hover:text-primary transition-colors truncate">{wo.type} — {wo.equipmentName}</p>

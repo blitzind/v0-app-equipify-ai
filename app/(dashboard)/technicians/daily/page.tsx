@@ -5,6 +5,8 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType, RepairLog } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import {
   ChevronLeft, MapPin, Clock, Wrench,
@@ -234,7 +236,7 @@ function JobCard({
           )}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Package className="w-3.5 h-3.5 shrink-0 text-primary" />
-            <span className="font-mono text-[10px] text-primary break-all">{wo.id}</span>
+            <span className="font-mono text-[10px] text-primary">{getWorkOrderDisplay(wo)}</span>
             <span className="text-muted-foreground/60">· {wo.priority} priority</span>
           </div>
         </div>
@@ -401,6 +403,7 @@ type RosterTech = {
 
 type DbWoRow = {
   id: string
+  work_order_number?: number | null
   customer_id: string
   equipment_id: string
   title: string
@@ -575,15 +578,29 @@ export default function TechnicianDailySchedulePage() {
       setWoError(null)
       const supabase = createBrowserSupabaseClient()
 
-      const { data: rows, error: woErr } = await supabase
+      const dailyWoSelectWithNum =
+        "id, work_order_number, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, notes, assigned_user_id"
+      const dailyWoSelect = dailyWoSelectWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
         .from("work_orders")
-        .select(
-          "id, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, notes, assigned_user_id"
-        )
+        .select(dailyWoSelectWithNum)
         .eq("organization_id", organizationId)
         .eq("is_archived", false)
         .eq("assigned_user_id", selectedTechId)
         .eq("scheduled_on", selectedDate)
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(dailyWoSelect)
+          .eq("organization_id", organizationId)
+          .eq("is_archived", false)
+          .eq("assigned_user_id", selectedTechId)
+          .eq("scheduled_on", selectedDate)
+      }
+
+      const { data: rows, error: woErr } = woRes
 
       if (woErr || cancelled) {
         if (!cancelled) {
@@ -633,6 +650,7 @@ export default function TechnicianDailySchedulePage() {
 
         return {
           id: row.id,
+          workOrderNumber: row.work_order_number ?? undefined,
           customerId: row.customer_id,
           customerName: customerMap.get(row.customer_id) ?? "Customer",
           equipmentId: row.equipment_id,

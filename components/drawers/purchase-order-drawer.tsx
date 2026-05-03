@@ -14,6 +14,7 @@ import {
   Wrench, User, Plus, Trash2, ChevronRight, Pencil, Check,
 } from "lucide-react"
 import Link from "next/link"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 let toastCounter = 0
 
@@ -328,7 +329,7 @@ export function PurchaseOrderDrawer({ orderId, onClose }: Props) {
                   className="flex items-center gap-1 text-primary hover:underline"
                 >
                   <Wrench className="w-3 h-3" />
-                  {order.workOrderId}
+                  {getWorkOrderDisplay({ id: order.workOrderId })}
                   <ChevronRight className="w-3 h-3" />
                 </Link>
               } />

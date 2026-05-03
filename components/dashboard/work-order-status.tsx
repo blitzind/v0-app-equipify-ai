@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { useWorkspaceData } from "@/lib/tenant-store"
+import type { WorkOrderStatusSlice } from "@/lib/dashboard/use-supabase-dashboard"
+import { AlertTriangle } from "lucide-react"
 
 const COLORS = [
   "oklch(0.52 0.18 231)",
@@ -12,7 +13,6 @@ const COLORS = [
   "oklch(0.75 0.16 70)",
 ]
 
-// Center label rendered inside the donut hole
 function CenterLabel({ cx, cy, total }: { cx: number; cy: number; total: number }) {
   return (
     <g>
@@ -26,10 +26,17 @@ function CenterLabel({ cx, cy, total }: { cx: number; cy: number; total: number 
   )
 }
 
-export function WorkOrderStatus() {
+export function WorkOrderStatus({
+  slices,
+  loading,
+  error,
+}: {
+  slices: WorkOrderStatusSlice[]
+  loading?: boolean
+  error?: string | null
+}) {
   const router = useRouter()
-  const { workOrdersByStatus } = useWorkspaceData()
-  const total  = workOrdersByStatus.reduce((s, d) => s + d.count, 0)
+  const total = slices.reduce((s, d) => s + d.count, 0)
 
   function handleSliceClick(data: { status: string }) {
     router.push(`/work-orders?status=${encodeURIComponent(data.status)}`)
@@ -47,49 +54,59 @@ export function WorkOrderStatus() {
           {total} total
         </Link>
       </div>
+      {error && (
+        <div className="px-5 py-2 text-xs text-destructive border-b border-border flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          Could not refresh chart.
+        </div>
+      )}
       <div className="px-4 py-2">
-        <ResponsiveContainer width="100%" height={188}>
-          <PieChart>
-            <Pie
-              data={workOrdersByStatus}
-              dataKey="count"
-              nameKey="status"
-              cx="50%"
-              cy="46%"
-              innerRadius={50}
-              outerRadius={74}
-              paddingAngle={2}
-              strokeWidth={2}
-              stroke="var(--card)"
-              onClick={handleSliceClick}
-              style={{ cursor: "pointer" }}
-            >
-              {workOrdersByStatus.map((_, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
-              {/* @ts-expect-error — Recharts passes cx/cy via render prop into children */}
-              <CenterLabel total={total} />
-            </Pie>
-            <Tooltip
-              formatter={(v: number, name: string) => [v, name]}
-              contentStyle={{
-                backgroundColor: "oklch(1 0 0)",
-                border: "1px solid oklch(0.88 0.008 240)",
-                borderRadius: "8px",
-                fontSize: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-              }}
-            />
-            <Legend
-              iconType="circle"
-              iconSize={7}
-              wrapperStyle={{ paddingTop: 4, fontSize: 11 }}
-              formatter={(value) => (
-                <span style={{ fontSize: 11, color: "oklch(0.45 0.01 240)", fontWeight: 500 }}>{value}</span>
-              )}
-            />
-          </PieChart>
-        </ResponsiveContainer>
+        {loading && total === 0 ? (
+          <div className="h-[188px] rounded-lg bg-muted/50 animate-pulse" />
+        ) : (
+          <ResponsiveContainer width="100%" height={188}>
+            <PieChart>
+              <Pie
+                data={slices}
+                dataKey="count"
+                nameKey="status"
+                cx="50%"
+                cy="46%"
+                innerRadius={50}
+                outerRadius={74}
+                paddingAngle={2}
+                strokeWidth={2}
+                stroke="var(--card)"
+                onClick={handleSliceClick}
+                style={{ cursor: "pointer" }}
+              >
+                {slices.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+                {/* @ts-expect-error — Recharts passes cx/cy via render prop into children */}
+                <CenterLabel total={total} />
+              </Pie>
+              <Tooltip
+                formatter={(v: number, name: string) => [v, name]}
+                contentStyle={{
+                  backgroundColor: "oklch(1 0 0)",
+                  border: "1px solid oklch(0.88 0.008 240)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                }}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={7}
+                wrapperStyle={{ paddingTop: 4, fontSize: 11 }}
+                formatter={(value) => (
+                  <span style={{ fontSize: 11, color: "oklch(0.45 0.01 240)", fontWeight: 500 }}>{value}</span>
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   )

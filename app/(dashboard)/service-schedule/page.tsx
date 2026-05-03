@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
@@ -997,6 +999,7 @@ function MapView({
 
 type DbScheduledWoRow = {
   id: string
+  work_order_number?: number | null
   customer_id: string
   equipment_id: string
   title: string
@@ -1008,6 +1011,7 @@ type DbScheduledWoRow = {
 
 type ScheduledWorkOrderDisplay = {
   id: string
+  workOrderNumber?: number
   title: string
   status: string
   scheduled_on: string
@@ -1078,12 +1082,15 @@ function ScheduledWorkOrdersSection({
                 </div>
                 <div className="flex flex-1 flex-col gap-1 px-4 py-3 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <Link
-                      href={`/work-orders?open=${wo.id}`}
-                      className="text-sm font-semibold text-foreground hover:text-primary truncate min-w-0"
-                    >
-                      {wo.title}
-                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-mono text-muted-foreground">{formatWorkOrderDisplay(wo.workOrderNumber, wo.id)}</p>
+                      <Link
+                        href={`/work-orders?open=${wo.id}`}
+                        className="text-sm font-semibold text-foreground hover:text-primary truncate min-w-0 block"
+                      >
+                        {wo.title}
+                      </Link>
+                    </div>
                     <span
                       className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0",
@@ -1237,16 +1244,31 @@ function ServiceSchedulePageInner() {
 
       const orgId = profile.default_organization_id
 
-      const { data: rows, error: woError } = await supabase
+      const schedWoSelWithNum =
+        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
+      const schedWoSel = schedWoSelWithNum.replace("work_order_number, ", "")
+
+      let woRes = await supabase
         .from("work_orders")
-        .select(
-          "id, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
-        )
+        .select(schedWoSelWithNum)
         .eq("organization_id", orgId)
         .eq("is_archived", false)
         .not("scheduled_on", "is", null)
         .order("scheduled_on", { ascending: true })
         .order("scheduled_time", { ascending: true, nullsFirst: false })
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(schedWoSel)
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .not("scheduled_on", "is", null)
+          .order("scheduled_on", { ascending: true })
+          .order("scheduled_time", { ascending: true, nullsFirst: false })
+      }
+
+      const { data: rows, error: woError } = woRes
 
       if (woError || !rows || !active) {
         if (active) {
@@ -1313,6 +1335,7 @@ function ServiceSchedulePageInner() {
         const eq = equipmentMap.get(row.equipment_id)
         return {
           id: row.id,
+          workOrderNumber: row.work_order_number ?? undefined,
           title: row.title,
           status: row.status,
           scheduled_on: row.scheduled_on,

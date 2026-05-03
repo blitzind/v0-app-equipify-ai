@@ -13,6 +13,9 @@ import type {
   RepairLog,
 } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
+import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -83,6 +86,7 @@ type SortKey = "id" | "customerName" | "scheduledDate" | "priority" | "status"
 
 type DbWorkOrderRow = {
   id: string
+  work_order_number?: number | null
   customer_id: string
   equipment_id: string
   title: string
@@ -98,6 +102,7 @@ type DbWorkOrderRow = {
   total_labor_cents: number
   total_parts_cents: number
   notes: string | null
+  maintenance_plan_id: string | null
 }
 
 function emptyRepairLog(): RepairLog {
@@ -200,7 +205,7 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
   return (
     <div onClick={onOpen} className="bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-mono text-muted-foreground">{wo.id}</span>
+          <span className="text-xs font-mono text-muted-foreground">{getWorkOrderDisplay(wo)}</span>
           <div className="flex items-center gap-1.5">
             <PriorityDot priority={wo.priority} />
             <span className={cn("text-xs", PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
@@ -317,7 +322,7 @@ function TableView({
           {workOrders.map((wo) => (
             <TableRow key={wo.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => onOpen(wo.id)}>
               <TableCell>
-                <span className="font-mono text-xs text-primary hover:underline">{wo.id}</span>
+                <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
               </TableCell>
               <TableCell className="font-medium text-sm">{wo.customerName}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{wo.equipmentName}</TableCell>
@@ -457,7 +462,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
                           "text-[10px] px-1.5 py-0.5 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity",
                           STATUS_STYLE[wo.status]
                         )}>
-                          {wo.id} · {wo.technicianName.split(" ")[0]}
+                          {getWorkOrderDisplay(wo)} · {wo.technicianName.split(" ")[0]}
                         </div>
                       </button>
                     ))}
@@ -508,14 +513,23 @@ function WorkOrdersPageInner() {
 
       const orgId = profile.default_organization_id
 
-      const { data: rows, error: woError } = await supabase
+      let woRes = await supabase
         .from("work_orders")
-        .select(
-          "id, customer_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes"
-        )
+        .select(WO_LIST_SELECT_WITH_NUM)
         .eq("organization_id", orgId)
         .eq("is_archived", false)
         .order("created_at", { ascending: false })
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(WO_LIST_SELECT)
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+      }
+
+      const { data: rows, error: woError } = woRes
 
       if (woError || !rows) {
         if (active) setWorkOrders([])
@@ -573,6 +587,20 @@ function WorkOrdersPageInner() {
         })
       }
 
+      const planIds = [...new Set(list.map((r) => r.maintenance_plan_id).filter((pid): pid is string => Boolean(pid)))]
+      const planNameById = new Map<string, string>()
+      if (planIds.length > 0) {
+        const { data: planRows } = await supabase
+          .from("maintenance_plans")
+          .select("id, name")
+          .eq("organization_id", orgId)
+          .in("id", planIds)
+
+        ;((planRows as Array<{ id: string; name: string }> | null) ?? []).forEach((p) => {
+          planNameById.set(p.id, p.name)
+        })
+      }
+
       const mapped: WorkOrder[] = list.map((row) => {
         const eq = equipmentMap.get(row.equipment_id)
         const techId = row.assigned_user_id ?? "unassigned"
@@ -582,6 +610,7 @@ function WorkOrdersPageInner() {
 
         return {
           id: row.id,
+          workOrderNumber: row.work_order_number ?? undefined,
           customerId: row.customer_id,
           customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
           equipmentId: row.equipment_id,
@@ -602,6 +631,10 @@ function WorkOrdersPageInner() {
           totalLaborCost: row.total_labor_cents / 100,
           totalPartsCost: row.total_parts_cents / 100,
           invoiceNumber: row.invoice_number ?? "",
+          maintenancePlanId: row.maintenance_plan_id,
+          maintenancePlanName: row.maintenance_plan_id
+            ? (planNameById.get(row.maintenance_plan_id) ?? null)
+            : null,
         }
       })
 
@@ -637,6 +670,13 @@ function WorkOrdersPageInner() {
     }
   }, [searchParams, router])
 
+  useEffect(() => {
+    const s = searchParams.get("status")
+    if (s && (ALL_STATUSES as readonly string[]).includes(s)) {
+      setStatusFilter(s as WorkOrderStatus)
+    }
+  }, [searchParams])
+
   const allTechs = useMemo(() => {
     const seen = new Set<string>()
     return workOrders
@@ -648,15 +688,7 @@ function WorkOrdersPageInner() {
     let list = [...workOrders]
 
     if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (wo) =>
-          wo.id.toLowerCase().includes(q) ||
-          wo.customerName.toLowerCase().includes(q) ||
-          wo.equipmentName.toLowerCase().includes(q) ||
-          wo.technicianName.toLowerCase().includes(q) ||
-          wo.description.toLowerCase().includes(q)
-      )
+      list = list.filter((wo) => workOrderMatchesSearch(search, wo))
     }
     if (statusFilter !== "all") list = list.filter((wo) => wo.status === statusFilter)
     if (priorityFilter !== "all") list = list.filter((wo) => wo.priority === priorityFilter)
@@ -667,6 +699,20 @@ function WorkOrdersPageInner() {
       let av: string | number = a[sortKey] ?? ""
       let bv: string | number = b[sortKey] ?? ""
       if (sortKey === "priority") { av = priorityOrder[a.priority]; bv = priorityOrder[b.priority] }
+      if (sortKey === "id") {
+        const an = effectiveWorkOrderNumber(a)
+        const bn = effectiveWorkOrderNumber(b)
+        if (an != null && bn != null) {
+          av = an
+          bv = bn
+        } else if (an != null) {
+          av = an
+          bv = -Infinity
+        } else if (bn != null) {
+          av = -Infinity
+          bv = bn
+        }
+      }
       if (av < bv) return sortDir === "asc" ? -1 : 1
       if (av > bv) return sortDir === "asc" ? 1 : -1
       return 0

@@ -15,6 +15,7 @@ import {
   ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<POStatus, { icon: React.ElementType; className: string }> = {
@@ -269,7 +270,7 @@ function PurchaseOrdersPageInner() {
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground max-w-[160px] truncate">{po.vendor}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">
-                        {po.workOrderId || "—"}
+                        {po.workOrderId ? getWorkOrderDisplay({ id: po.workOrderId }) : "—"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap ds-tabular">{fmtDate(po.orderedDate)}</td>
                       <td className="px-4 py-3 whitespace-nowrap ds-tabular hidden lg:table-cell text-muted-foreground">

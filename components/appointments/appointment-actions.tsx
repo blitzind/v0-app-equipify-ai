@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { MapPin, Mail, Apple, ChevronDown, Copy, Check, ExternalLink } from "lucide-react"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 // ─── Map URL builders ─────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ APPOINTMENT DETAILS
 Equipment:    ${params.equipmentName}
 Date:         ${dateStr}${timeStr}
 Address:      ${params.address}
-Technician:   ${params.technicianName}${params.workOrderId ? `\nWork Order:   ${params.workOrderId}` : ""}
+Technician:   ${params.technicianName}${woLabel ? `\nWork Order:   ${woLabel}` : ""}
 
 Please ensure the equipment is accessible at the time of service. If you need to reschedule, contact us at least 24 hours in advance.
 
