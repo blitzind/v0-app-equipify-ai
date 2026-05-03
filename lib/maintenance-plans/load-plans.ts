@@ -1,5 +1,6 @@
 import type { MaintenancePlan } from "@/lib/mock-data"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { rowToMaintenancePlan, type MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 
 export async function loadMaintenancePlansForOrg(
@@ -41,11 +42,14 @@ export async function loadMaintenancePlansForOrg(
     })
   }
 
-  const equipmentMap = new Map<string, { name: string; category: string; location: string }>()
+  const equipmentMap = new Map<
+    string,
+    { name: string; category: string; location: string; equipment_code: string | null; serial_number: string | null }
+  >()
   if (equipmentIds.length > 0) {
     const { data: eqRows } = await supabase
       .from("equipment")
-      .select("id, name, category, location_label")
+      .select("id, name, category, location_label, equipment_code, serial_number")
       .eq("organization_id", organizationId)
       .in("id", equipmentIds)
 
@@ -55,12 +59,16 @@ export async function loadMaintenancePlansForOrg(
         name: string
         category: string | null
         location_label: string | null
+        equipment_code: string | null
+        serial_number: string | null
       }> | null) ?? []
     ).forEach((e) => {
       equipmentMap.set(e.id, {
         name: e.name,
         category: e.category ?? "",
         location: e.location_label ?? "",
+        equipment_code: e.equipment_code,
+        serial_number: e.serial_number,
       })
     })
   }
@@ -83,9 +91,18 @@ export async function loadMaintenancePlansForOrg(
 
   const plans: MaintenancePlan[] = list.map((row) => {
     const eq = row.equipment_id ? equipmentMap.get(row.equipment_id) : undefined
+    const customerNameResolved = customerMap.get(row.customer_id) ?? "Unknown customer"
     return rowToMaintenancePlan(row, {
-      customerName: customerMap.get(row.customer_id) ?? "Unknown customer",
-      equipmentName: eq?.name ?? "Equipment",
+      customerName: customerNameResolved,
+      equipmentName: eq
+        ? getEquipmentDisplayPrimary({
+            id: row.equipment_id!,
+            name: eq.name,
+            equipment_code: eq.equipment_code,
+            serial_number: eq.serial_number,
+            category: eq.category,
+          })
+        : "Equipment",
       equipmentCategory: eq?.category ?? "",
       location: eq?.location ?? "",
       technicianName: row.assigned_user_id ? profileMap.get(row.assigned_user_id) ?? "—" : "—",

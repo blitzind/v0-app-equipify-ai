@@ -52,6 +52,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
+import { equipmentMatchesSearch, getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 type SortKey = "model" | "customerName" | "nextDueDate" | "lastServiceDate" | "category"
 type SortDir = "asc" | "desc"
@@ -63,6 +64,7 @@ type Equipment = {
   id: string
   customerId: string
   customerName: string
+  equipmentCode: string
   model: string
   manufacturer: string
   category: string
@@ -76,6 +78,7 @@ type Equipment = {
 type DbEquipmentRow = {
   id: string
   customer_id: string
+  equipment_code: string | null
   name: string
   manufacturer: string | null
   category: string | null
@@ -138,8 +141,28 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
         <div className="pl-7">
           <div className="flex items-start justify-between gap-2 mb-3">
             <div>
-              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{eq.model}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{eq.id} &middot; {eq.manufacturer}</p>
+              <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                {getEquipmentDisplayPrimary({
+                  id: eq.id,
+                  name: eq.model,
+                  equipment_code: eq.equipmentCode,
+                  serial_number: eq.serialNumber,
+                  category: eq.category,
+                })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getEquipmentSecondaryLine(
+                  {
+                    id: eq.id,
+                    name: eq.model,
+                    equipment_code: eq.equipmentCode,
+                    serial_number: eq.serialNumber,
+                    category: eq.category,
+                  },
+                  eq.customerName,
+                )}
+                {eq.manufacturer ? ` · ${eq.manufacturer}` : ""}
+              </p>
             </div>
             <Badge variant="secondary" className={cn("text-xs shrink-0", statusColors[eq.status])}>
               {eq.status}
@@ -239,7 +262,7 @@ function EquipmentPageInner() {
 
       const { data: equipmentRows, error: equipmentError } = await supabase
         .from("equipment")
-        .select("id, customer_id, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label")
+        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label")
         .eq("organization_id", orgId)
         .eq("is_archived", false)
         .order("created_at", { ascending: false })
@@ -275,6 +298,7 @@ function EquipmentPageInner() {
         id: row.id,
         customerId: row.customer_id,
         customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
+        equipmentCode: row.equipment_code ?? "",
         model: row.name,
         manufacturer: row.manufacturer ?? "",
         category: row.category ?? "General",
@@ -299,13 +323,18 @@ function EquipmentPageInner() {
     let list = [...equipment]
 
     if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (e) =>
-          e.model.toLowerCase().includes(q) ||
-          e.customerName.toLowerCase().includes(q) ||
-          e.serialNumber.toLowerCase().includes(q) ||
-          e.category.toLowerCase().includes(q)
+      list = list.filter((e) =>
+        equipmentMatchesSearch(
+          search,
+          {
+            id: e.id,
+            name: e.model,
+            equipment_code: e.equipmentCode,
+            serial_number: e.serialNumber,
+            category: e.category,
+          },
+          e.customerName,
+        ),
       )
     }
 
@@ -526,8 +555,27 @@ function EquipmentPageInner() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{eq.model}</span>
-                        <span className="text-xs text-muted-foreground">{eq.id} &middot; S/N: {eq.serialNumber}</span>
+                        <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                          {getEquipmentDisplayPrimary({
+                            id: eq.id,
+                            name: eq.model,
+                            equipment_code: eq.equipmentCode,
+                            serial_number: eq.serialNumber,
+                            category: eq.category,
+                          })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {getEquipmentSecondaryLine(
+                            {
+                              id: eq.id,
+                              name: eq.model,
+                              equipment_code: eq.equipmentCode,
+                              serial_number: eq.serialNumber,
+                              category: eq.category,
+                            },
+                            eq.customerName,
+                          )}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>

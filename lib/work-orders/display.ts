@@ -44,6 +44,7 @@ export function workOrderMatchesSearch(
     workOrderNumber?: number | null
     customerName?: string
     equipmentName?: string
+    equipmentId?: string
     technicianName?: string
     description?: string
   },
@@ -51,6 +52,8 @@ export function workOrderMatchesSearch(
   const q = queryRaw.trim().toLowerCase()
   if (!q) return true
   if (wo.id.toLowerCase().includes(q)) return true
+  const eqId = wo.equipmentId?.toLowerCase() ?? ""
+  if (eqId && (eqId.includes(q) || eqId.replace(/-/g, "").includes(q.replace(/-/g, "")))) return true
   if (wo.customerName?.toLowerCase().includes(q)) return true
   if (wo.equipmentName?.toLowerCase().includes(q)) return true
   if (wo.technicianName?.toLowerCase().includes(q)) return true

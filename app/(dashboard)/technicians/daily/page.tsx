@@ -7,6 +7,7 @@ import type { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType, Repa
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import {
   ChevronLeft, MapPin, Clock, Wrench,
@@ -627,17 +628,39 @@ export default function TechnicianDailySchedulePage() {
         })
       }
 
-      const equipmentMap = new Map<string, { name: string; location: string }>()
+      const equipmentMap = new Map<
+        string,
+        {
+          name: string
+          location: string
+          equipment_code: string | null
+          serial_number: string | null
+          category: string | null
+        }
+      >()
       if (equipmentIds.length > 0) {
         const { data: eqRows } = await supabase
           .from("equipment")
-          .select("id, name, location_label")
+          .select("id, name, location_label, equipment_code, serial_number, category")
           .eq("organization_id", organizationId)
           .in("id", equipmentIds)
         ;(
-          (eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ?? []
+          (eqRows as Array<{
+            id: string
+            name: string
+            location_label: string | null
+            equipment_code: string | null
+            serial_number: string | null
+            category: string | null
+          }> | null) ?? []
         ).forEach((e) => {
-          equipmentMap.set(e.id, { name: e.name, location: e.location_label ?? "" })
+          equipmentMap.set(e.id, {
+            name: e.name,
+            location: e.location_label ?? "",
+            equipment_code: e.equipment_code,
+            serial_number: e.serial_number,
+            category: e.category,
+          })
         })
       }
 
@@ -647,6 +670,15 @@ export default function TechnicianDailySchedulePage() {
         const eq = equipmentMap.get(row.equipment_id)
         const scheduledTime = formatScheduledTime(row.scheduled_time)
         const desc = [row.title, row.notes?.trim()].filter(Boolean).join("\n\n") || row.title
+        const equipmentName = eq
+          ? getEquipmentDisplayPrimary({
+              id: row.equipment_id,
+              name: eq.name,
+              equipment_code: eq.equipment_code,
+              serial_number: eq.serial_number,
+              category: eq.category,
+            })
+          : "Equipment"
 
         return {
           id: row.id,
@@ -654,7 +686,7 @@ export default function TechnicianDailySchedulePage() {
           customerId: row.customer_id,
           customerName: customerMap.get(row.customer_id) ?? "Customer",
           equipmentId: row.equipment_id,
-          equipmentName: eq?.name ?? "Equipment",
+          equipmentName,
           location: eq?.location ?? "",
           type: mapDbType(row.type),
           status: mapDbStatus(row.status),

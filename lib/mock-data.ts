@@ -83,6 +83,8 @@ export interface Equipment {
   id: string
   customerId: string
   customerName: string
+  /** Tenant asset code from Supabase `equipment_code`; optional on legacy mock rows. */
+  equipmentCode?: string
   model: string
   manufacturer: string
   category: string

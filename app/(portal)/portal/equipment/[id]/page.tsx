@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { equipment, workOrders } from "@/lib/mock-data"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 function fmtDate(d: string) {
   if (!d) return "—"
@@ -57,7 +58,15 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
           <ChevronLeft size={14} /> Equipment
         </Link>
         <span style={{ color: "var(--portal-nav-icon)" }}>/</span>
-        <span style={{ color: "var(--portal-nav-text)" }}>{eq.model}</span>
+        <span style={{ color: "var(--portal-nav-text)" }}>
+          {getEquipmentDisplayPrimary({
+            id: eq.id,
+            name: eq.model,
+            equipment_code: eq.equipmentCode,
+            serial_number: eq.serialNumber,
+            category: eq.category,
+          })}
+        </span>
       </div>
 
       {/* Header card */}
@@ -70,8 +79,6 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-mono px-2 py-0.5 rounded"
-                  style={{ background: "var(--portal-hover)", color: "var(--portal-nav-text)" }}>{eq.id}</span>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                   style={{
                     background: eq.status === "Active" ? "#f0fdf4" : eq.status === "Needs Service" ? "#fffbeb" : "#fef2f2",
@@ -80,7 +87,27 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
                   {eq.status}
                 </span>
               </div>
-              <h1 className="text-xl font-semibold text-balance" style={{ color: "var(--portal-foreground)" }}>{eq.model}</h1>
+              <h1 className="text-xl font-semibold text-balance" style={{ color: "var(--portal-foreground)" }}>
+                {getEquipmentDisplayPrimary({
+                  id: eq.id,
+                  name: eq.model,
+                  equipment_code: eq.equipmentCode,
+                  serial_number: eq.serialNumber,
+                  category: eq.category,
+                })}
+              </h1>
+              <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+                {getEquipmentSecondaryLine(
+                  {
+                    id: eq.id,
+                    name: eq.model,
+                    equipment_code: eq.equipmentCode,
+                    serial_number: eq.serialNumber,
+                    category: eq.category,
+                  },
+                  eq.customerName,
+                )}
+              </p>
               <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>{eq.manufacturer} &bull; {eq.category}</p>
             </div>
             <div className="flex gap-2 shrink-0">

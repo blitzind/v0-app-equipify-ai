@@ -34,6 +34,7 @@ import { Switch } from "@/components/ui/switch"
 import { Loader2, Mail, MessageSquare, MonitorCheck, Plus, Trash2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 const EQUIP_NONE = "__none__"
 
@@ -301,7 +302,7 @@ export function EditMaintenancePlanDialog({
       setEquipmentLoading(true)
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name, category, location_label")
+        .select("id, name, category, location_label, equipment_code, serial_number")
         .eq("organization_id", organizationId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
@@ -320,6 +321,8 @@ export function EditMaintenancePlanDialog({
           name: string
           category: string | null
           location_label: string | null
+          equipment_code: string | null
+          serial_number: string | null
         }>) ?? []
       )
     })()
@@ -381,7 +384,9 @@ export function EditMaintenancePlanDialog({
       customerName: selectedCustomer?.company_name ?? plan.customerName,
       equipmentId: form.equipmentId?.trim() ?? "",
       equipmentName: hasEquipment
-        ? (selectedEquipment?.name ?? plan.equipmentName)
+        ? (selectedEquipment
+            ? getEquipmentDisplayPrimary(selectedEquipment)
+            : plan.equipmentName)
         : "",
       equipmentCategory: hasEquipment
         ? (selectedEquipment?.category ?? plan.equipmentCategory)
@@ -514,7 +519,9 @@ export function EditMaintenancePlanDialog({
             <p className="text-xs text-muted-foreground">You can attach equipment later.</p>
             {equipmentLocked ? (
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground">
-                {selectedEquipment?.name ?? plan.equipmentName ?? "—"}
+                {selectedEquipment
+                  ? getEquipmentDisplayPrimary(selectedEquipment)
+                  : plan.equipmentName ?? "—"}
                 {selectedEquipment?.location_label
                   ? ` — ${selectedEquipment.location_label}`
                   : plan.location
@@ -556,9 +563,14 @@ export function EditMaintenancePlanDialog({
                   <SelectContent>
                     <SelectItem value={EQUIP_NONE}>None — attach later</SelectItem>
                     {equipmentList.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
-                        {e.location_label ? ` — ${e.location_label}` : ""}
+                      <SelectItem key={e.id} value={e.id} textValue={getEquipmentDisplayPrimary(e)}>
+                        <span className="block font-medium leading-tight">
+                          {getEquipmentDisplayPrimary(e)}
+                        </span>
+                        <span className="block text-xs text-muted-foreground leading-tight mt-0.5">
+                          {getEquipmentSecondaryLine(e, selectedCustomer?.company_name)}
+                          {e.location_label ? ` · ${e.location_label}` : ""}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

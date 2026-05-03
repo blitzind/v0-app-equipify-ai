@@ -23,6 +23,7 @@ import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 interface Props {
   open: boolean
@@ -34,7 +35,13 @@ const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
 const TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
 
 type CustomerOption = { id: string; company_name: string }
-type EquipmentOption = { id: string; name: string }
+type EquipmentOption = {
+  id: string
+  name: string
+  equipment_code: string | null
+  serial_number: string | null
+  category: string | null
+}
 type TechnicianOption = { id: string; label: string }
 
 export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
@@ -169,7 +176,7 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
       const supabase = createBrowserSupabaseClient()
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name")
+        .select("id, name, equipment_code, serial_number, category")
         .eq("organization_id", orgId)
         .eq("customer_id", custId)
         .eq("status", "active")
@@ -209,6 +216,8 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
       cancelled = true
     }
   }, [open, organizationId, customerId, refreshEquipmentForCustomer])
+
+  const selectedCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
 
   async function handleSubmit() {
     if (!customerId || !equipmentId || !technicianId || !scheduledDate || !description.trim()) return
@@ -361,8 +370,13 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {equipmentList.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name} ({e.id})
+                    <SelectItem key={e.id} value={e.id} textValue={getEquipmentDisplayPrimary(e)}>
+                      <span className="block font-medium leading-tight">
+                        {getEquipmentDisplayPrimary(e)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground leading-tight mt-0.5">
+                        {getEquipmentSecondaryLine(e, selectedCustomerName)}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

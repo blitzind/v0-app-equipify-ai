@@ -755,7 +755,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
             value={
               quote.equipmentId ? (
                 <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
-                  {quote.equipmentName || quote.equipmentId}
+                  {quote.equipmentName?.trim() || "Equipment"}
                 </Link>
               ) : (
                 <span className="text-muted-foreground text-sm">No equipment on this quote</span>

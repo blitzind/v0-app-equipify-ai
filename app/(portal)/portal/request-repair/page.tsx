@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { ChevronLeft, CheckCircle2, Wrench, Upload, X } from "lucide-react"
 import { equipment } from "@/lib/mock-data"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 const CUSTOMER_ID = "CUS-001"
 const myEquipment = equipment.filter((e) => e.customerId === CUSTOMER_ID)
@@ -180,7 +181,26 @@ export default function RequestRepairPage() {
           <select className="portal-select" value={form.equipmentId} onChange={e => set("equipmentId", e.target.value)}>
             <option value="">Select equipment...</option>
             {myEquipment.map((eq) => (
-              <option key={eq.id} value={eq.id}>{eq.model} — {eq.location} ({eq.id})</option>
+              <option key={eq.id} value={eq.id}>
+                {getEquipmentDisplayPrimary({
+                  id: eq.id,
+                  name: eq.model,
+                  equipment_code: eq.equipmentCode,
+                  serial_number: eq.serialNumber,
+                  category: eq.category,
+                })}
+                {" — "}
+                {getEquipmentSecondaryLine(
+                  {
+                    id: eq.id,
+                    name: eq.model,
+                    equipment_code: eq.equipmentCode,
+                    serial_number: eq.serialNumber,
+                    category: eq.category,
+                  },
+                  eq.customerName,
+                )}
+              </option>
             ))}
           </select>
           {errors.equipmentId && <p className="text-xs mt-1" style={{ color: "var(--portal-danger)" }}>{errors.equipmentId}</p>}

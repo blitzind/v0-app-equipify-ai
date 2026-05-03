@@ -27,6 +27,7 @@ import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 let toastCounter = 0
 
@@ -967,9 +968,26 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
               >
                 <div>
-                  <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{eq.model}</p>
+                  <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                    {getEquipmentDisplayPrimary({
+                      id: eq.id,
+                      name: eq.model,
+                      equipment_code: eq.equipmentCode,
+                      serial_number: eq.serialNumber,
+                      category: eq.category,
+                    })}
+                  </p>
                   <p className="text-[10px] text-muted-foreground">
-                    <span className="text-primary font-mono">{eq.id}</span> · {eq.category}
+                    {getEquipmentSecondaryLine(
+                      {
+                        id: eq.id,
+                        name: eq.model,
+                        equipment_code: eq.equipmentCode,
+                        serial_number: eq.serialNumber,
+                        category: eq.category,
+                      },
+                      customer?.company,
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { AiInsight } from "@/lib/mock-data"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -615,14 +616,26 @@ export function useSupabaseDashboard() {
           ? supabase.from("customers").select("id, company_name").eq("organization_id", orgId).in("id", rcIds)
           : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
         reIds.length
-          ? supabase.from("equipment").select("id, name").eq("organization_id", orgId).in("id", reIds)
+          ? supabase
+              .from("equipment")
+              .select("id, name, equipment_code, serial_number, category")
+              .eq("organization_id", orgId)
+              .in("id", reIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
         rtIds.length
           ? supabase.from("profiles").select("id, full_name, email").in("id", rtIds)
           : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string | null }[] }),
       ])
       const cm = new Map(((rcData.data ?? []) as { id: string; company_name: string }[]).map((c) => [c.id, c.company_name]))
-      const em = new Map(((reData.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]))
+      const em = new Map(
+        ((reData.data ?? []) as Array<{
+          id: string
+          name: string
+          equipment_code: string | null
+          serial_number: string | null
+          category: string | null
+        }>).map((e) => [e.id, e]),
+      )
       const tm = new Map(
         ((rtData.data ?? []) as { id: string; full_name: string | null; email: string | null }[]).map((p) => [
           p.id,
@@ -633,7 +646,18 @@ export function useSupabaseDashboard() {
         id: r.id,
         workOrderNumber: r.work_order_number ?? undefined,
         customer: cm.get(r.customer_id) ?? "—",
-        equipment: em.get(r.equipment_id) ?? "—",
+        equipment: (() => {
+          const e = em.get(r.equipment_id)
+          return e
+            ? getEquipmentDisplayPrimary({
+                id: r.equipment_id,
+                name: e.name,
+                equipment_code: e.equipment_code,
+                serial_number: e.serial_number,
+                category: e.category,
+              })
+            : "—"
+        })(),
         technician: r.assigned_user_id ? tm.get(r.assigned_user_id) ?? "—" : "Unassigned",
         priority: woDbPriorityToUi(r.priority),
         status: woDbStatusToUi(r.status),

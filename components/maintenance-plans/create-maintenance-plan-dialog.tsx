@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal";
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display";
 
 const EQUIP_NONE = "__none__";
 
@@ -297,7 +298,7 @@ export function CreateMaintenancePlanDialog({
       setEquipmentLoading(true);
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name, category, location_label")
+        .select("id, name, category, location_label, equipment_code, serial_number")
         .eq("organization_id", organizationId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
@@ -316,6 +317,8 @@ export function CreateMaintenancePlanDialog({
           name: string;
           category: string | null;
           location_label: string | null;
+          equipment_code: string | null;
+          serial_number: string | null;
         }>) ?? [],
       );
     })();
@@ -425,7 +428,9 @@ export function CreateMaintenancePlanDialog({
       customerId: form.customerId,
       customerName: lockedCustomerName ?? selectedCustomer?.company_name ?? "",
       equipmentId: form.equipmentId?.trim() ?? "",
-      equipmentName: selectedEquipment?.name ?? "",
+      equipmentName: selectedEquipment
+        ? getEquipmentDisplayPrimary(selectedEquipment)
+        : "",
       equipmentCategory: selectedEquipment?.category ?? "",
       location: selectedEquipment?.location_label ?? "",
       technicianId: form.technicianId,
@@ -603,9 +608,18 @@ export function CreateMaintenancePlanDialog({
               <SelectContent>
                 <SelectItem value={EQUIP_NONE}>None — attach later</SelectItem>
                 {equipmentList.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                    {e.location_label ? ` — ${e.location_label}` : ""}
+                  <SelectItem
+                    key={e.id}
+                    value={e.id}
+                    textValue={getEquipmentDisplayPrimary(e)}
+                  >
+                    <span className="block font-medium leading-tight">
+                      {getEquipmentDisplayPrimary(e)}
+                    </span>
+                    <span className="block text-xs text-muted-foreground leading-tight mt-0.5">
+                      {getEquipmentSecondaryLine(e, selectedCustomer?.company_name)}
+                      {e.location_label ? ` · ${e.location_label}` : ""}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

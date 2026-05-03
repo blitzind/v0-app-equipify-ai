@@ -8,6 +8,7 @@ import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 
 // ─── Primitive field components (match add-equipment-modal style) ─────────────
@@ -93,7 +94,13 @@ const SERVICE_TYPES = [
 ]
 
 type CustomerOption = { id: string; company_name: string }
-type EquipmentOption = { id: string; name: string }
+type EquipmentOption = {
+  id: string
+  name: string
+  equipment_code: string | null
+  serial_number: string | null
+  category: string | null
+}
 type WorkOrderOption = { id: string; work_order_number?: number | null; title: string }
 
 function newQuoteId(): string {
@@ -147,7 +154,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
       const supabase = createBrowserSupabaseClient()
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name")
+        .select("id, name, equipment_code, serial_number, category")
         .eq("organization_id", orgId)
         .eq("customer_id", custId)
         .eq("status", "active")
@@ -273,7 +280,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
       const [eqRes, woResFirst] = await Promise.all([
         supabase
           .from("equipment")
-          .select("id, name")
+          .select("id, name, equipment_code, serial_number, category")
           .eq("organization_id", organizationId)
           .eq("customer_id", customerId)
           .eq("status", "active")
@@ -373,7 +380,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
       customerId,
       customerName: customer?.company_name ?? "",
       equipmentId: equipmentId || "",
-      equipmentName: eq?.name ?? "",
+      equipmentName: eq ? getEquipmentDisplayPrimary(eq) : "",
       createdDate: now,
       expiresDate,
       sentDate: submitStatus === "Sent" ? now : "",
@@ -422,6 +429,8 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
   }
 
   if (!open) return null
+
+  const quoteEquipmentCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
 
   const quotePanelVisible = open && !addEquipmentOpen
 
@@ -498,7 +507,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
                     </option>
                     {equipmentList.map((e) => (
                       <option key={e.id} value={e.id}>
-                        {e.name}
+                        {getEquipmentDisplayPrimary(e)} — {getEquipmentSecondaryLine(e, quoteEquipmentCustomerName)}
                       </option>
                     ))}
                   </FieldSelect>

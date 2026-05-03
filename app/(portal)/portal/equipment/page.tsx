@@ -7,6 +7,7 @@ import {
   ShieldCheck, MapPin, Clock,
 } from "lucide-react"
 import { equipment, workOrders } from "@/lib/mock-data"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
 const CUSTOMER_ID = "CUS-001"
 const myEquipment = equipment.filter((e) => e.customerId === CUSTOMER_ID)
@@ -52,11 +53,29 @@ function EquipmentCard({ eq }: { eq: typeof myEquipment[number] }) {
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono px-1.5 py-0.5 rounded"
-                style={{ background: "var(--portal-hover)", color: "var(--portal-nav-text)" }}>{eq.id}</span>
               <StatusPill status={eq.status} />
             </div>
-            <h3 className="text-sm font-semibold text-pretty" style={{ color: "var(--portal-foreground)" }}>{eq.model}</h3>
+            <h3 className="text-sm font-semibold text-pretty" style={{ color: "var(--portal-foreground)" }}>
+              {getEquipmentDisplayPrimary({
+                id: eq.id,
+                name: eq.model,
+                equipment_code: eq.equipmentCode,
+                serial_number: eq.serialNumber,
+                category: eq.category,
+              })}
+            </h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+              {getEquipmentSecondaryLine(
+                {
+                  id: eq.id,
+                  name: eq.model,
+                  equipment_code: eq.equipmentCode,
+                  serial_number: eq.serialNumber,
+                  category: eq.category,
+                },
+                eq.customerName,
+              )}
+            </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--portal-nav-text)" }}>{eq.manufacturer} &bull; {eq.category}</p>
           </div>
         </div>

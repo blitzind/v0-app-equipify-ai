@@ -28,6 +28,7 @@ import {
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { useQuotes } from "@/lib/quote-invoice-store"
@@ -172,7 +173,7 @@ const historyTypeIcon: Record<ServiceHistoryEntry["type"], React.ReactNode> = {
   Install: <CheckCircle2 className="w-4 h-4 text-muted-foreground" />,
 }
 
-function EquipmentRow({ eq }: { eq: Equipment }) {
+function EquipmentRow({ eq, customerName }: { eq: Equipment; customerName?: string }) {
   const daysToDue = Math.ceil(
     (new Date(eq.nextDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
@@ -186,13 +187,30 @@ function EquipmentRow({ eq }: { eq: Equipment }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">{eq.model}</p>
+            <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
+              {getEquipmentDisplayPrimary({
+                id: eq.id,
+                name: eq.model,
+                equipment_code: eq.equipmentCode,
+                serial_number: eq.serialNumber,
+                category: eq.category,
+              })}
+            </p>
             <Badge variant="secondary" className={cn("text-xs shrink-0", statusColors[eq.status])}>
               {eq.status}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {eq.id} &middot; {eq.category} &middot; S/N: {eq.serialNumber}
+            {getEquipmentSecondaryLine(
+              {
+                id: eq.id,
+                name: eq.model,
+                equipment_code: eq.equipmentCode,
+                serial_number: eq.serialNumber,
+                category: eq.category,
+              },
+              customerName,
+            )}
           </p>
         </div>
         <div className="hidden sm:flex flex-col items-end text-right shrink-0">
@@ -973,7 +991,7 @@ export default function CustomerDetailPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {customerEquipment.map((eq) => (
-                <EquipmentRow key={eq.id} eq={eq} />
+                <EquipmentRow key={eq.id} eq={eq} customerName={customer?.company} />
               ))}
             </div>
           )}
@@ -1206,8 +1224,27 @@ export default function CustomerDetailPage() {
                     <div key={eq.id}>
                       <div className="flex items-center gap-2 mb-3">
                         <Wrench className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-semibold text-foreground">{eq.model}</span>
-                        <span className="text-xs text-muted-foreground">{eq.id}</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {getEquipmentDisplayPrimary({
+                            id: eq.id,
+                            name: eq.model,
+                            equipment_code: eq.equipmentCode,
+                            serial_number: eq.serialNumber,
+                            category: eq.category,
+                          })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {getEquipmentSecondaryLine(
+                            {
+                              id: eq.id,
+                              name: eq.model,
+                              equipment_code: eq.equipmentCode,
+                              serial_number: eq.serialNumber,
+                              category: eq.category,
+                            },
+                            customer?.company,
+                          )}
+                        </span>
                       </div>
                       <ServiceTimeline entries={eq.serviceHistory} />
                     </div>

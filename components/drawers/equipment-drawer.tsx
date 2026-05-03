@@ -9,6 +9,7 @@ import type { Equipment } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -290,6 +291,7 @@ type DbEquipmentRow = {
   id: string
   organization_id: string
   customer_id: string
+  equipment_code: string | null
   name: string
   manufacturer: string | null
   category: string | null
@@ -465,7 +467,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, name, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
         )
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
@@ -485,6 +487,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         id: equipmentRow.id,
         customerId: equipmentRow.customer_id,
         customerName,
+        equipmentCode: equipmentRow.equipment_code ?? undefined,
         model: equipmentRow.name,
         manufacturer: equipmentRow.manufacturer ?? "",
         category: equipmentRow.category ?? "",
@@ -652,8 +655,23 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       <DetailDrawer
         open={!!equipmentId}
         onClose={onClose}
-        title={eq.model}
-        subtitle={`${eq.id} · ${eq.manufacturer} · ${eq.category}`}
+        title={getEquipmentDisplayPrimary({
+          id: eq.id,
+          name: eq.model,
+          equipment_code: eq.equipmentCode,
+          serial_number: eq.serialNumber,
+          category: eq.category,
+        })}
+        subtitle={`${getEquipmentSecondaryLine(
+          {
+            id: eq.id,
+            name: eq.model,
+            equipment_code: eq.equipmentCode,
+            serial_number: eq.serialNumber,
+            category: eq.category,
+          },
+          eq.customerName,
+        )}${eq.manufacturer ? ` · ${eq.manufacturer}` : ""}`}
         width="xl"
         badge={
           <Badge variant="secondary" className={cn("text-xs border", STATUS_COLORS[currentStatus])}>

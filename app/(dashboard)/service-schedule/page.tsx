@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
@@ -1298,18 +1299,40 @@ function ServiceSchedulePageInner() {
         })
       }
 
-      const equipmentMap = new Map<string, { name: string; location: string }>()
+      const equipmentMap = new Map<
+        string,
+        {
+          name: string
+          location: string
+          equipment_code: string | null
+          serial_number: string | null
+          category: string | null
+        }
+      >()
       if (equipmentIds.length > 0) {
         const { data: eqRows } = await supabase
           .from("equipment")
-          .select("id, name, location_label")
+          .select("id, name, location_label, equipment_code, serial_number, category")
           .eq("organization_id", orgId)
           .in("id", equipmentIds)
 
         ;(
-          (eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ?? []
+          (eqRows as Array<{
+            id: string
+            name: string
+            location_label: string | null
+            equipment_code: string | null
+            serial_number: string | null
+            category: string | null
+          }> | null) ?? []
         ).forEach((e) => {
-          equipmentMap.set(e.id, { name: e.name, location: e.location_label ?? "" })
+          equipmentMap.set(e.id, {
+            name: e.name,
+            location: e.location_label ?? "",
+            equipment_code: e.equipment_code,
+            serial_number: e.serial_number,
+            category: e.category,
+          })
         })
       }
 
@@ -1333,6 +1356,15 @@ function ServiceSchedulePageInner() {
 
       const mapped: ScheduledWorkOrderDisplay[] = list.map((row) => {
         const eq = equipmentMap.get(row.equipment_id)
+        const equipmentName = eq
+          ? getEquipmentDisplayPrimary({
+              id: row.equipment_id,
+              name: eq.name,
+              equipment_code: eq.equipment_code,
+              serial_number: eq.serial_number,
+              category: eq.category,
+            })
+          : "Equipment"
         return {
           id: row.id,
           workOrderNumber: row.work_order_number ?? undefined,
@@ -1341,7 +1373,7 @@ function ServiceSchedulePageInner() {
           scheduled_on: row.scheduled_on,
           scheduled_time: row.scheduled_time,
           customerName: customerMap.get(row.customer_id) ?? "Unknown customer",
-          equipmentName: eq?.name ?? "Equipment",
+          equipmentName,
           location: eq?.location ?? "",
           assigneeName: row.assigned_user_id ? profileMap.get(row.assigned_user_id) ?? null : null,
         }

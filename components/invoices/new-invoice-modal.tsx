@@ -8,6 +8,7 @@ import { useCustomers } from "@/lib/customer-store"
 import { useEquipment } from "@/lib/equipment-store"
 import { useWorkOrders } from "@/lib/work-order-store"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 
 // ─── Primitive field components ───────────────────────────────────────────────
@@ -246,6 +247,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
   if (!open) return null
 
   const filteredEquipment = customerId ? equipment.filter(e => e.customerId === customerId) : equipment
+  const invoiceEquipmentCustomerName = customers.find((c) => c.id === customerId)?.company ?? customers.find((c) => c.id === customerId)?.name
   const filteredWorkOrders = customerId ? workOrders.filter(wo => wo.customerId === customerId) : workOrders
   const filteredQuotes = customerId ? quotes.filter(q => q.customerId === customerId) : quotes
 
@@ -312,7 +314,26 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
               >
                 <option value="">Select equipment…</option>
                 {filteredEquipment.map(e => (
-                  <option key={e.id} value={e.id}>{e.name}</option>
+                  <option key={e.id} value={e.id}>
+                    {getEquipmentDisplayPrimary({
+                      id: e.id,
+                      name: e.model,
+                      equipment_code: e.equipmentCode,
+                      serial_number: e.serialNumber,
+                      category: e.category,
+                    })}
+                    {" — "}
+                    {getEquipmentSecondaryLine(
+                      {
+                        id: e.id,
+                        name: e.model,
+                        equipment_code: e.equipmentCode,
+                        serial_number: e.serialNumber,
+                        category: e.category,
+                      },
+                      invoiceEquipmentCustomerName,
+                    )}
+                  </option>
                 ))}
               </FieldSelect>
             </div>

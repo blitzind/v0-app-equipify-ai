@@ -8,6 +8,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_DETAIL_PAGE_SELECT, WO_DETAIL_PAGE_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import type {
   WorkOrder,
   WorkOrderStatus,
@@ -601,7 +602,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           .maybeSingle(),
         supabase
           .from("equipment")
-          .select("name, location_label")
+          .select("name, location_label, equipment_code, serial_number, category")
           .eq("id", w.equipment_id)
           .eq("organization_id", orgId)
           .maybeSingle(),
@@ -625,8 +626,22 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
       if (!active) return
 
       const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
-      const eqRow = eq as { name: string; location_label: string | null } | null
-      const equipmentName = eqRow?.name ?? "Equipment"
+      const eqRow = eq as {
+        name: string
+        location_label: string | null
+        equipment_code: string | null
+        serial_number: string | null
+        category: string | null
+      } | null
+      const equipmentName = eqRow
+        ? getEquipmentDisplayPrimary({
+            id: w.equipment_id,
+            name: eqRow.name,
+            equipment_code: eqRow.equipment_code,
+            serial_number: eqRow.serial_number,
+            category: eqRow.category,
+          })
+        : "Equipment"
       const location = eqRow?.location_label ?? ""
       const ap = assigneeProf as { full_name: string | null; email: string | null } | null
       const techName = w.assigned_user_id
@@ -887,7 +902,9 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
             <Link href={`/equipment?open=${workOrder.equipmentId}`} className="text-sm font-medium text-primary hover:underline block truncate">
               {workOrder.equipmentName}
             </Link>
-            <p className="text-xs text-muted-foreground font-mono truncate">{workOrder.equipmentId}</p>
+            {workOrder.location ? (
+              <p className="text-xs text-muted-foreground truncate">{workOrder.location}</p>
+            ) : null}
           </div>
         </div>
       </div>

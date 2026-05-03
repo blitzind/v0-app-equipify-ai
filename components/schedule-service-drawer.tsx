@@ -5,6 +5,7 @@ import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { DetailDrawer } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
 import {
@@ -66,7 +67,14 @@ interface NewLocForm {
 }
 
 type CustomerOption = { id: string; company_name: string }
-type EquipmentOption = { id: string; name: string; location_label: string | null }
+type EquipmentOption = {
+  id: string
+  name: string
+  location_label: string | null
+  equipment_code: string | null
+  serial_number: string | null
+  category: string | null
+}
 type TechnicianOption = { id: string; label: string }
 type LocationOption = {
   id: string
@@ -278,7 +286,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     void (async () => {
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name, location_label")
+        .select("id, name, location_label, equipment_code, serial_number, category")
         .eq("organization_id", organizationId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
@@ -463,6 +471,9 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     setSubmitted(true)
     onScheduled?.()
   }
+
+  const scheduleEquipmentCustomerName =
+    customerOptions.find((c) => c.id === form.customerId)?.company_name ?? ""
 
   function ToggleChip({
     label,
@@ -688,8 +699,11 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
                   </SelectTrigger>
                   <DrawerSelectContent>
                     {equipmentList.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.name}
+                      <SelectItem key={e.id} value={e.id} textValue={getEquipmentDisplayPrimary(e)}>
+                        <span className="block font-medium leading-tight">{getEquipmentDisplayPrimary(e)}</span>
+                        <span className="block text-xs text-muted-foreground leading-tight mt-0.5">
+                          {getEquipmentSecondaryLine(e, scheduleEquipmentCustomerName)}
+                        </span>
                       </SelectItem>
                     ))}
                   </DrawerSelectContent>

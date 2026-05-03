@@ -15,6 +15,7 @@ import type {
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
@@ -556,19 +557,41 @@ function WorkOrdersPageInner() {
         })
       }
 
-      const equipmentMap = new Map<string, { name: string; location: string }>()
+      const equipmentMap = new Map<
+        string,
+        {
+          name: string
+          location: string
+          equipment_code: string | null
+          serial_number: string | null
+          category: string | null
+        }
+      >()
       if (equipmentIds.length > 0) {
         const { data: eqRows } = await supabase
           .from("equipment")
-          .select("id, name, location_label")
+          .select("id, name, location_label, equipment_code, serial_number, category")
           .eq("organization_id", orgId)
           .in("id", equipmentIds)
 
-        ;((eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ?? []).forEach(
-          (e) => {
-            equipmentMap.set(e.id, { name: e.name, location: e.location_label ?? "" })
-          }
-        )
+        ;(
+          (eqRows as Array<{
+            id: string
+            name: string
+            location_label: string | null
+            equipment_code: string | null
+            serial_number: string | null
+            category: string | null
+          }> | null) ?? []
+        ).forEach((e) => {
+          equipmentMap.set(e.id, {
+            name: e.name,
+            location: e.location_label ?? "",
+            equipment_code: e.equipment_code,
+            serial_number: e.serial_number,
+            category: e.category,
+          })
+        })
       }
 
       const profileMap = new Map<string, string>()
@@ -608,13 +631,23 @@ function WorkOrdersPageInner() {
           ? (profileMap.get(row.assigned_user_id) ?? "Unknown")
           : "Unassigned"
 
+        const equipmentName = eq
+          ? getEquipmentDisplayPrimary({
+              id: row.equipment_id,
+              name: eq.name,
+              equipment_code: eq.equipment_code,
+              serial_number: eq.serial_number,
+              category: eq.category,
+            })
+          : "Equipment"
+
         return {
           id: row.id,
           workOrderNumber: row.work_order_number ?? undefined,
           customerId: row.customer_id,
           customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
           equipmentId: row.equipment_id,
-          equipmentName: eq?.name ?? "Equipment",
+          equipmentName,
           location: eq?.location ?? "",
           type: mapDbType(row.type),
           status: mapDbStatus(row.status),

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -379,18 +380,39 @@ export function TechnicianDrawer({
         })
       }
 
-      const equipmentMap = new Map<string, { name: string; location: string }>()
+      const equipmentMap = new Map<
+        string,
+        {
+          name: string
+          location: string
+          equipment_code: string | null
+          serial_number: string | null
+          category: string | null
+        }
+      >()
       if (equipmentIds.length > 0) {
         const { data: eqRows } = await supabase
           .from("equipment")
-          .select("id, name, location_label")
+          .select("id, name, location_label, equipment_code, serial_number, category")
           .eq("organization_id", orgId)
           .in("id", equipmentIds)
         ;(
-          (eqRows as Array<{ id: string; name: string; location_label: string | null }> | null) ??
-          []
+          (eqRows as Array<{
+            id: string
+            name: string
+            location_label: string | null
+            equipment_code: string | null
+            serial_number: string | null
+            category: string | null
+          }> | null) ?? []
         ).forEach((e) => {
-          equipmentMap.set(e.id, { name: e.name, location: e.location_label?.trim() ?? "" })
+          equipmentMap.set(e.id, {
+            name: e.name,
+            location: e.location_label?.trim() ?? "",
+            equipment_code: e.equipment_code,
+            serial_number: e.serial_number,
+            category: e.category,
+          })
         })
       }
 
@@ -399,8 +421,16 @@ export function TechnicianDrawer({
       const mapped = upcoming.map((r) => {
         const eq = equipmentMap.get(r.equipment_id)
         const loc = eq?.location
-        const equipmentLine =
-          eq && loc ? `${eq.name} · ${loc}` : eq?.name ?? "Equipment"
+        const primary = eq
+          ? getEquipmentDisplayPrimary({
+              id: r.equipment_id,
+              name: eq.name,
+              equipment_code: eq.equipment_code,
+              serial_number: eq.serial_number,
+              category: eq.category,
+            })
+          : "Equipment"
+        const equipmentLine = eq && loc ? `${primary} · ${loc}` : primary
         return {
           id: r.id,
           workOrderNumber: r.work_order_number ?? undefined,
