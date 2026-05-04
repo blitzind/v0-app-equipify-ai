@@ -84,7 +84,7 @@ export async function loadMaintenancePlansForOrg(
       (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []
     ).forEach((p) => {
       const label =
-        (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8)
+        (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member"
       profileMap.set(p.id, label)
     })
   }

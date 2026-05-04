@@ -3,13 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { useCustomers } from "@/lib/customer-store"
-import { useEquipment } from "@/lib/equipment-store"
-import { useWorkOrders } from "@/lib/work-order-store"
-import { useQuotes, useInvoices } from "@/lib/quote-invoice-store"
-import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
-import type { Customer, Contact } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,7 +12,7 @@ import {
 } from "@/components/detail-drawer"
 import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
-  ExternalLink, Pencil, X, Check, Plus, Trash2, Archive,
+  ExternalLink, Pencil, X, Plus, Trash2, Archive,
   MoreHorizontal, Star,
   Globe, Send, Link2, RotateCcw, Clock, Activity,
   Paintbrush, LayoutGrid, UserCog, ShieldOff, ShieldCheck,
@@ -26,8 +20,13 @@ import {
 import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
-import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
+import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
+import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 
 let toastCounter = 0
 
@@ -261,7 +260,7 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
           </button>
           <button
             onClick={handleSave}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-primary text-white hover:bg-primary/90 transition-colors"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors"
           >
             Save Location
           </button>
@@ -343,16 +342,86 @@ type DbContact = {
   is_primary: boolean | null
 }
 
+type DrawerContact = {
+  id: string
+  name: string
+  firstName: string
+  lastName: string
+  role: string
+  email: string
+  phone: string
+  isPrimary: boolean
+}
+
+type DrawerHeader = {
+  id: string
+  organizationId: string
+  company: string
+  displayName: string
+  status: "Active" | "Inactive"
+  joinedDate: string
+  notes: string
+}
+
+type DrawerEquipmentRow = {
+  id: string
+  name: string
+  equipment_code: string | null
+  serial_number: string | null
+  category: string | null
+  status: string
+}
+
+type DrawerWoRow = {
+  id: string
+  work_order_number?: number | null
+  title: string
+  status: string
+  type: string
+  created_at: string
+}
+
+type DrawerPlanRow = {
+  id: string
+  name: string
+  status: string
+  interval_value: number
+  interval_unit: string
+  next_due_date: string | null
+  equipment_id: string
+}
+
+function drawerPlanIntervalLabel(row: DrawerPlanRow): string {
+  const u = row.interval_unit as MaintenancePlanRow["interval_unit"]
+  const { interval, customIntervalDays } = intervalFromDb(row.interval_value, u)
+  return interval === "Custom" ? `${customIntervalDays} day cycle` : interval
+}
+
+function drawerEquipmentStatusLabel(db: string): string {
+  const m: Record<string, string> = {
+    active: "Active",
+    needs_service: "Needs Service",
+    out_of_service: "Out of Service",
+    in_repair: "In Repair",
+  }
+  return m[db] ?? db
+}
+
+function drawerWoStatusLabel(s: string): string {
+  const m: Record<string, string> = {
+    open: "Open",
+    scheduled: "Scheduled",
+    in_progress: "In Progress",
+    completed: "Completed",
+    invoiced: "Invoiced",
+  }
+  return m[s] ?? s
+}
+
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
-  const { customers, updateCustomer } = useCustomers()
-  const { equipment } = useEquipment()
-  const { workOrders } = useWorkOrders()
-  const { quotes: adminQuotes } = useQuotes()
-  const { invoices: adminInvoices } = useInvoices()
-  const { plans: allPlans, refreshPlans } = useMaintenancePlans()
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [toasts, setToasts] = useState<ToastItem[]>([])
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<Partial<Customer>>({})
+  const [drawerRefresh, setDrawerRefresh] = useState(0)
 
   // Location modal state
   const [locationModal, setLocationModal] = useState<"add" | "edit" | null>(null)
@@ -363,8 +432,16 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const [portalEnabled, setPortalEnabled] = useState(true)
   const [open, setOpen] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-  const [drawerContacts, setDrawerContacts] = useState<Contact[]>([])
+  const [header, setHeader] = useState<DrawerHeader | null>(null)
+  const [drawerLoading, setDrawerLoading] = useState(false)
+  const [drawerEquipment, setDrawerEquipment] = useState<DrawerEquipmentRow[]>([])
+  const [drawerWOs, setDrawerWOs] = useState<DrawerWoRow[]>([])
+  const [drawerPlans, setDrawerPlans] = useState<DrawerPlanRow[]>([])
+  const [planEquipmentNames, setPlanEquipmentNames] = useState<Record<string, string>>({})
+  const [drawerContracts, setDrawerContracts] = useState<
+    Array<{ id: string; name: string; type: string; startDate: string; endDate: string; value: number }>
+  >([])
+  const [drawerContacts, setDrawerContacts] = useState<DrawerContact[]>([])
   const [drawerLocations, setDrawerLocations] = useState<Location[]>([])
   const [contactModalOpen, setContactModalOpen] = useState(false)
   const [editingContactId, setEditingContactId] = useState<string | null>(null)
@@ -386,20 +463,9 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     documents: false,
   })
 
-  const customer = customerId ? customers.find((c) => c.id === customerId) ?? null : null
-  const custEquipment = customer ? equipment.filter((e) => e.customerId === customer.id) : []
-  const custWOs = customer ? workOrders.filter((w) => w.customerId === customer.id) : []
-  const custQuotes = customer ? adminQuotes.filter((q) => q.customerId === customer.id) : []
-  const custInvoices = customer ? adminInvoices.filter((i) => i.customerId === customer.id) : []
-  const custPlans = customer ? allPlans.filter((p) => p.customerId === customer.id) : []
-  const activeCustPlans = customer ? custPlans.filter((p) => p.status === "Active") : []
+  const activeCustPlans = drawerPlans.filter((p) => planStatusDbToUi(p.status) === "Active")
 
   const [createPlanModalOpen, setCreatePlanModalOpen] = useState(false)
-
-  useEffect(() => {
-    setEditing(false)
-    setDraft({})
-  }, [customerId])
 
   useEffect(() => {
     if (customerId) {
@@ -410,28 +476,53 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   useEffect(() => {
     async function loadOrgAndRelated() {
       if (!customerId) {
+        setHeader(null)
         setDrawerContacts([])
         setDrawerLocations([])
+        setDrawerEquipment([])
+        setDrawerWOs([])
+        setDrawerPlans([])
+        setPlanEquipmentNames({})
+        setDrawerContracts([])
         return
       }
 
+      setDrawerLoading(true)
       const supabase = createBrowserSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setDrawerLoading(false)
+        return
+      }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
+      const orgId = orgStatus === "ready" ? activeOrgId : null
+      if (!orgId) {
+        setDrawerLoading(false)
+        return
+      }
+
+      const { data: custRow, error: custErr } = await supabase
+        .from("customers")
+        .select("id, company_name, status, joined_at, notes")
+        .eq("organization_id", orgId)
+        .eq("id", customerId)
         .single()
 
-      const orgId = profile?.default_organization_id ?? null
-      setOrganizationId(orgId)
-      if (!orgId) return
+      if (custErr || !custRow) {
+        setHeader(null)
+        setDrawerLoading(false)
+        return
+      }
 
-      const [{ data: contacts }, { data: locations }] = await Promise.all([
+      const [
+        { data: contacts },
+        { data: locations },
+        { data: eqRows },
+        { data: contractRows },
+        { data: planRows },
+      ] = await Promise.all([
         supabase
           .from("customer_contacts")
           .select("id, customer_id, full_name, first_name, last_name, role, email, phone, is_primary")
@@ -446,7 +537,59 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           .eq("customer_id", customerId)
           .eq("is_archived", false)
           .order("is_default", { ascending: false }),
+        supabase
+          .from("equipment")
+          .select("id, name, equipment_code, serial_number, category, status")
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId)
+          .eq("is_archived", false)
+          .order("name", { ascending: true })
+          .limit(500),
+        supabase
+          .from("customer_contracts")
+          .select("id, name, contract_type, start_date, end_date, value_cents")
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId),
+        supabase
+          .from("maintenance_plans")
+          .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id")
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId)
+          .eq("is_archived", false)
+          .order("next_due_date", { ascending: true, nullsFirst: false }),
       ])
+
+      let woRes = await supabase
+        .from("work_orders")
+        .select(WO_LIST_SELECT_WITH_NUM)
+        .eq("organization_id", orgId)
+        .eq("customer_id", customerId)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(100)
+
+      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(WO_LIST_SELECT)
+          .eq("organization_id", orgId)
+          .eq("customer_id", customerId)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      }
+
+      const primaryName = (contacts as DbContact[] | null)?.[0]?.full_name ?? custRow.company_name
+
+      setHeader({
+        id: custRow.id,
+        organizationId: orgId,
+        company: custRow.company_name,
+        displayName: primaryName,
+        status: custRow.status === "inactive" ? "Inactive" : "Active",
+        joinedDate: custRow.joined_at ?? new Date().toISOString().slice(0, 10),
+        notes: custRow.notes ?? "",
+      })
 
       setDrawerContacts(
         ((contacts as DbContact[] | null) ?? []).map((c) => ({
@@ -488,10 +631,51 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           isDefault: Boolean(l.is_default),
         })),
       )
+
+      setDrawerEquipment(((eqRows ?? []) as DrawerEquipmentRow[]) ?? [])
+
+      setDrawerWOs((woRes.data ?? []) as DrawerWoRow[])
+
+      const plans = (planRows ?? []) as DrawerPlanRow[]
+      setDrawerPlans(plans)
+
+      const eqIds = [...new Set(plans.map((p) => p.equipment_id).filter(Boolean))]
+      const names: Record<string, string> = {}
+      if (eqIds.length > 0) {
+        const { data: nameRows } = await supabase
+          .from("equipment")
+          .select("id, name")
+          .eq("organization_id", orgId)
+          .in("id", eqIds)
+        for (const r of (nameRows ?? []) as Array<{ id: string; name: string }>) {
+          names[r.id] = r.name
+        }
+      }
+      setPlanEquipmentNames(names)
+
+      setDrawerContracts(
+        ((contractRows ?? []) as Array<{
+          id: string
+          name: string | null
+          contract_type: string | null
+          start_date: string | null
+          end_date: string | null
+          value_cents: number | null
+        }>).map((c) => ({
+          id: c.id,
+          name: c.name ?? "Contract",
+          type: c.contract_type ?? "PM Plan",
+          startDate: c.start_date ?? "",
+          endDate: c.end_date ?? "",
+          value: Math.floor((c.value_cents ?? 0) / 100),
+        })),
+      )
+
+      setDrawerLoading(false)
     }
 
     void loadOrgAndRelated()
-  }, [customerId])
+  }, [customerId, drawerRefresh, activeOrgId, orgStatus])
 
   useEffect(() => {
     return () => {
@@ -517,43 +701,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500)
   }
 
-  function startEdit() {
-    if (!customer) return
-    setDraft({
-      name: customer.name,
-      company: customer.company,
-      status: customer.status,
-      notes: customer.notes,
-      contacts: customer.contacts.map((c) => ({ ...c })),
-      locations: customer.locations.map((l) => ({ ...l })),
-    })
-    setEditing(true)
-  }
-
-  function cancelEdit() {
-    setEditing(false)
-    setDraft({})
-  }
-
-  function saveEdit() {
-    if (!customer) return
-    updateCustomer(customer.id, draft)
-    setEditing(false)
-    setDraft({})
-    toast("Customer updated successfully")
-  }
-
-  function setField<K extends keyof Customer>(field: K, value: Customer[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }))
-  }
-
-  function setContact(idx: number, field: keyof Contact, value: string) {
-    const contacts = [...(draft.contacts ?? customer?.contacts ?? [])]
-    contacts[idx] = { ...contacts[idx], [field]: value }
-    setDraft((prev) => ({ ...prev, contacts }))
-  }
-
-  if (!customer) {
+  if (!customerId) {
     return (
       <>
         <DetailDrawer
@@ -575,12 +723,35 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     )
   }
 
-  const currentStatus = (draft.status ?? customer.status)
-  const statusCls = currentStatus === "Active"
-    ? "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30"
-    : "bg-muted text-muted-foreground border-border"
+  if (drawerLoading || !header) {
+    return (
+      <>
+        <DetailDrawer
+          open={open}
+          onClose={handleClose}
+          title="Customer"
+          subtitle={drawerLoading ? "Loading…" : "Not found"}
+          width="lg"
+          transitionMs={400}
+        >
+          <p className="text-sm text-muted-foreground">
+            {drawerLoading ? "Loading customer…" : "This customer could not be loaded."}
+          </p>
+        </DetailDrawer>
+        <DrawerToastStack
+          toasts={toasts}
+          onRemove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+        />
+      </>
+    )
+  }
 
-  const openWOs = custWOs.filter((w) => w.status !== "Completed" && w.status !== "Invoiced")
+  const statusCls =
+    header.status === "Active"
+      ? "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30"
+      : "bg-muted text-muted-foreground border-border"
+
+  const openWOs = drawerWOs.filter((w) => w.status !== "completed" && w.status !== "invoiced")
 
   const contacts = drawerContacts
 
@@ -589,59 +760,63 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       <DetailDrawer
         open={open}
         onClose={handleClose}
-        title={draft.company ?? customer.company}
-        subtitle={draft.name ?? customer.name}
+        title={header.company}
+        subtitle={header.displayName}
         width="lg"
         transitionMs={400}
         badge={
           <Badge variant="secondary" className={cn("text-xs border", statusCls)}>
-            {currentStatus}
+            {header.status}
           </Badge>
         }
         actions={
-          editing ? (
-            <>
-              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={saveEdit}>
-                <Check className="w-3.5 h-3.5" /> Save Changes
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>
-                <X className="w-3.5 h-3.5" /> Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
-                <Pencil className="w-3.5 h-3.5" /> Edit
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("New work order created")}>
-                <ClipboardList className="w-3.5 h-3.5" /> New Work Order
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("New quote drafted")}>
-                <FileText className="w-3.5 h-3.5" /> New Quote
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs cursor-pointer"
-                onClick={() => setCreatePlanModalOpen(true)}
+          <>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" asChild>
+              <Link
+                href={`/equipment?action=new-equipment&customerId=${encodeURIComponent(header.id)}`}
+                className="inline-flex items-center gap-1.5"
               >
-                <Plus className="w-3.5 h-3.5" /> New Maintenance Plan
-              </Button>
-              <Link href={`/customers/${customer.id}`}>
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer">
-                  <ExternalLink className="w-3.5 h-3.5" /> Full Profile
-                </Button>
+                <Plus className="w-3.5 h-3.5" /> Equipment
               </Link>
-            </>
-          )
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" asChild>
+              <Link
+                href={`/work-orders?action=new-work-order&customerId=${encodeURIComponent(header.id)}`}
+                className="inline-flex items-center gap-1.5"
+              >
+                <ClipboardList className="w-3.5 h-3.5" /> Work Order
+              </Link>
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" asChild>
+              <Link
+                href={`/quotes?action=new-quote&customerId=${encodeURIComponent(header.id)}`}
+                className="inline-flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" /> Quote
+              </Link>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs cursor-pointer"
+              onClick={() => setCreatePlanModalOpen(true)}
+            >
+              <Plus className="w-3.5 h-3.5" /> Plan
+            </Button>
+            <Link href={`/customers/${header.id}`}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer">
+                <ExternalLink className="w-3.5 h-3.5" /> Full Profile
+              </Button>
+            </Link>
+          </>
         }
       >
         {/* Key stats */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Equipment", value: customer.equipmentCount, sub: "units" },
+            { label: "Equipment", value: drawerEquipment.length, sub: "units" },
             { label: "Open WOs", value: openWOs.length, sub: "active", warn: openWOs.length > 0 },
-            { label: "Contracts", value: customer.contracts.length, sub: "active" },
+            { label: "Contracts", value: drawerContracts.length, sub: "active" },
           ].map(({ label, value, warn }) => (
             <div key={label} className="bg-muted/40 rounded-lg p-3 text-center border border-border">
               <p className={cn("text-xl font-bold", warn ? "text-[color:var(--status-warning)]" : "text-foreground")}>{value}</p>
@@ -652,19 +827,21 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
         {/* Details */}
         <DrawerSection title="Details">
-          <EditRow label="Company" view={customer.company} editing={editing}>
-            <EditInput value={draft.company ?? ""} onChange={(v) => setField("company", v)} />
-          </EditRow>
-          <EditRow label="Contact Name" view={customer.name} editing={editing}>
-            <EditInput value={draft.name ?? ""} onChange={(v) => setField("name", v)} />
-          </EditRow>
-          <EditRow label="Status" view={
-            <Badge variant="secondary" className={cn("text-[10px] border", statusCls)}>{customer.status}</Badge>
-          } editing={editing}>
-            <EditSelect value={draft.status ?? customer.status} onChange={(v) => setField("status", v as Customer["status"])} options={["Active", "Inactive"]} />
-          </EditRow>
-          <DrawerRow label="Customer Since" value={new Date(customer.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "long" })} />
-          <DrawerRow label="Locations" value={customer.locations.map((l) => l.city).join(", ")} />
+          <DrawerRow label="Company" value={header.company} />
+          <DrawerRow label="Primary contact" value={header.displayName} />
+          <DrawerRow
+            label="Status"
+            value={
+              <Badge variant="secondary" className={cn("text-[10px] border", statusCls)}>
+                {header.status}
+              </Badge>
+            }
+          />
+          <DrawerRow
+            label="Customer Since"
+            value={new Date(header.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "long" })}
+          />
+          <DrawerRow label="Locations" value={drawerLocations.map((l) => l.city).join(", ") || "—"} />
         </DrawerSection>
 
         {/* Active maintenance plans */}
@@ -682,7 +859,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
                     <p className="text-[10px] text-muted-foreground truncate">
-                      {plan.equipmentName} · {plan.interval} · Next {fmtPlanNextDue(plan.nextDueDate)}
+                      {planEquipmentNames[plan.equipment_id] ?? "Equipment"} · {drawerPlanIntervalLabel(plan)} · Next{" "}
+                      {fmtPlanNextDue(plan.next_due_date ?? "")}
                     </p>
                   </div>
                   <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-0.5" />
@@ -720,84 +898,69 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             {contacts.map((c, idx) => (
               <div key={c.id ?? `${c.email}-${idx}`} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center justify-between">
-                  {editing ? (
-                    <div className="flex flex-col gap-1.5 w-full">
-                      <div className="grid grid-cols-2 gap-2">
-                        <EditInput value={c.name} onChange={(v) => setContact(idx, "name", v)} placeholder="Name" />
-                        <EditInput value={c.role} onChange={(v) => setContact(idx, "role", v)} placeholder="Role" />
-                      </div>
-                      <EditInput value={c.email} onChange={(v) => setContact(idx, "email", v)} placeholder="Email" />
-                      <EditInput value={c.phone} onChange={(v) => setContact(idx, "phone", v)} placeholder="Phone" />
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-foreground">{c.name}</span>
-                      {c.isPrimary && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                          Primary
-                        </span>
-                      )}
-                      <span className="text-[10px] text-muted-foreground">{c.role}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-foreground">{c.name}</span>
+                    {c.isPrimary && (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                        Primary
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">{c.role}</span>
+                  </div>
                 </div>
-                {!editing && (
-                  <>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                      <Mail className="w-3 h-3" />{c.email}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="w-3 h-3" />{c.phone}
-                    </div>
-                    <div className="mt-2">
-                      <ContactActions
-                        email={{ customerName: customer.company, customerEmail: c.email }}
-                        phone={c.phone}
-                      />
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingContactId(c.id)
-                          setContactForm({
-                            full_name: c.name,
-                            first_name: c.firstName ?? "",
-                            last_name: c.lastName ?? "",
-                            role: c.role,
-                            email: c.email,
-                            phone: c.phone,
-                            is_primary: Boolean(c.isPrimary),
-                          })
-                          setContactModalOpen(true)
-                        }}
-                        className="text-[11px] text-primary hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!organizationId || !customerId) return
-                          const supabase = createBrowserSupabaseClient()
-                          const { error } = await supabase
-                            .from("customer_contacts")
-                            .update({ is_archived: true, archived_at: new Date().toISOString() })
-                            .eq("id", c.id)
-                            .eq("organization_id", organizationId)
-                            .eq("customer_id", customerId)
-                          if (!error) {
-                            setDrawerContacts((prev) => prev.filter((x) => x.id !== c.id))
-                            toast("Contact archived")
-                          }
-                        }}
-                        className="text-[11px] text-destructive hover:underline"
-                      >
-                        Archive
-                      </button>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                  <Mail className="w-3 h-3" />{c.email}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Phone className="w-3 h-3" />{c.phone}
+                </div>
+                <div className="mt-2">
+                  <ContactActions
+                    email={{ customerName: header.company, customerEmail: c.email }}
+                    phone={c.phone}
+                  />
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingContactId(c.id)
+                      setContactForm({
+                        full_name: c.name,
+                        first_name: c.firstName ?? "",
+                        last_name: c.lastName ?? "",
+                        role: c.role,
+                        email: c.email,
+                        phone: c.phone,
+                        is_primary: Boolean(c.isPrimary),
+                      })
+                      setContactModalOpen(true)
+                    }}
+                    className="text-[11px] text-primary hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!activeOrgId || !customerId) return
+                      const supabase = createBrowserSupabaseClient()
+                      const { error } = await supabase
+                        .from("customer_contacts")
+                        .update({ is_archived: true, archived_at: new Date().toISOString() })
+                        .eq("id", c.id)
+                        .eq("organization_id", activeOrgId)
+                        .eq("customer_id", customerId)
+                      if (!error) {
+                        setDrawerContacts((prev) => prev.filter((x) => x.id !== c.id))
+                        toast("Contact archived")
+                      }
+                    }}
+                    className="text-[11px] text-destructive hover:underline"
+                  >
+                    Archive
+                  </button>
+                </div>
               </div>
             ))}
             {contacts.length === 0 && (
@@ -869,19 +1032,19 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                         <button
                           onClick={() => {
                             setOpenLocationMenu(null)
-                            if (!organizationId || !customerId) return
+                            if (!activeOrgId || !customerId) return
                             const supabase = createBrowserSupabaseClient()
                             void (async () => {
                               await supabase
                                 .from("customer_locations")
                                 .update({ is_default: false })
-                                .eq("organization_id", organizationId)
+                                .eq("organization_id", activeOrgId)
                                 .eq("customer_id", customerId)
                               const { error } = await supabase
                                 .from("customer_locations")
                                 .update({ is_default: true })
                                 .eq("id", loc.id)
-                                .eq("organization_id", organizationId)
+                                .eq("organization_id", activeOrgId)
                                 .eq("customer_id", customerId)
                               if (!error) {
                                 setDrawerLocations((prev) =>
@@ -913,7 +1076,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <div className="px-3 pb-3">
                   <ContactActions
                     address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
-                    email={contacts[0] ? { customerName: customer.company, customerEmail: contacts[0].email } : undefined}
+                    email={contacts[0] ? { customerName: header.company, customerEmail: contacts[0].email } : undefined}
                     phone={loc.phone ?? contacts[0]?.phone}
                   />
                 </div>
@@ -929,39 +1092,32 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         {/* Contracts */}
         <DrawerSection title="Contracts">
           <div className="space-y-2">
-            {customer.contracts.map((con) => {
-              const planMatch = custPlans.find((p) =>
-                p.name.toLowerCase().includes(con.name.toLowerCase()) ||
-                con.name.toLowerCase().includes(p.name.toLowerCase())
-              )
-              const href = planMatch ? `/maintenance-plans?open=${planMatch.id}` : `/maintenance-plans`
-              return (
-                <Link
-                  key={con.id}
-                  href={href}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
-                >
-                  <div>
-                    <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{con.name}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{con.type} · {con.startDate} – {con.endDate}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-foreground">${con.value.toLocaleString()}</span>
-                    <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
-                  </div>
-                </Link>
-              )
-            })}
-            {customer.contracts.length === 0 && (
+            {drawerContracts.map((con) => (
+              <div
+                key={con.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border"
+              >
+                <div>
+                  <p className="text-xs font-semibold text-foreground">{con.name}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {con.type} · {con.startDate} – {con.endDate}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground">${con.value.toLocaleString()}</span>
+                </div>
+              </div>
+            ))}
+            {drawerContracts.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No contracts on file.</p>
             )}
           </div>
         </DrawerSection>
 
         {/* Equipment */}
-        <DrawerSection title={`Equipment (${custEquipment.length})`}>
+        <DrawerSection title={`Equipment (${drawerEquipment.length})`}>
           <div className="space-y-1.5">
-            {custEquipment.slice(0, 5).map((eq) => (
+            {drawerEquipment.slice(0, 5).map((eq) => (
               <Link
                 key={eq.id}
                 href={`/equipment?open=${eq.id}`}
@@ -971,9 +1127,9 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                   <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                     {getEquipmentDisplayPrimary({
                       id: eq.id,
-                      name: eq.model,
-                      equipment_code: eq.equipmentCode,
-                      serial_number: eq.serialNumber,
+                      name: eq.name,
+                      equipment_code: eq.equipment_code,
+                      serial_number: eq.serial_number,
                       category: eq.category,
                     })}
                   </p>
@@ -981,27 +1137,34 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                     {getEquipmentSecondaryLine(
                       {
                         id: eq.id,
-                        name: eq.model,
-                        equipment_code: eq.equipmentCode,
-                        serial_number: eq.serialNumber,
+                        name: eq.name,
+                        equipment_code: eq.equipment_code,
+                        serial_number: eq.serial_number,
                         category: eq.category,
                       },
-                      customer?.company,
+                      header.company,
                     )}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-[10px]">{eq.status}</Badge>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {drawerEquipmentStatusLabel(eq.status)}
+                  </Badge>
                   <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
                 </div>
               </Link>
             ))}
-            {custEquipment.length > 5 && (
-              <Link href="/equipment" className="block text-xs text-primary hover:text-primary/80 transition-colors text-center pt-1">
-                +{custEquipment.length - 5} more
+            {drawerEquipment.length > 5 && (
+              <Link
+                href={`/customers/${header.id}`}
+                className="block text-xs text-primary hover:text-primary/80 transition-colors text-center pt-1"
+              >
+                +{drawerEquipment.length - 5} more
               </Link>
             )}
-            {custEquipment.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No equipment registered.</p>}
+            {drawerEquipment.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-3">No equipment registered.</p>
+            )}
           </div>
         </DrawerSection>
 
@@ -1015,11 +1178,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
               >
                 <div>
-                  <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay(wo)}</p>
-                  <p className="text-[10px] text-muted-foreground truncate max-w-[220px]">{wo.description}</p>
+                  <p className="text-xs font-semibold font-mono text-primary">
+                    {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate max-w-[220px]">{wo.title}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-[10px] shrink-0">{wo.status}</Badge>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                    {drawerWoStatusLabel(wo.status)}
+                  </Badge>
                   <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
                 </div>
               </Link>
@@ -1028,109 +1195,43 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           </div>
         </DrawerSection>
 
-        {/* Quotes */}
-        <DrawerSection title={`Quotes (${custQuotes.length})`}>
-          <div className="space-y-1.5">
-            {custQuotes.slice(0, 3).map((q) => (
-              <Link
-                key={q.id}
-                href={`/quotes?open=${q.id}`}
-                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
-              >
-                <div>
-                  <p className="text-xs font-semibold font-mono text-primary">{q.id}</p>
-                  <p className="text-[10px] text-muted-foreground">{q.status} · {q.createdDate}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-foreground">${q.amount.toLocaleString()}</span>
-                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
-                </div>
-              </Link>
-            ))}
-            {custQuotes.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No quotes on file.</p>}
-          </div>
-        </DrawerSection>
-
-        {/* Invoices */}
-        <DrawerSection title={`Invoices (${custInvoices.length})`}>
-          <div className="space-y-1.5">
-            {custInvoices.slice(0, 3).map((inv) => (
-              <Link
-                key={inv.id}
-                href={`/invoices?open=${inv.id}`}
-                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
-              >
-                <div>
-                  <p className="text-xs font-semibold font-mono text-primary">{inv.id}</p>
-                  <p className="text-[10px] text-muted-foreground">{inv.status} · Due {inv.dueDate}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-foreground">${inv.amount.toLocaleString()}</span>
-                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
-                </div>
-              </Link>
-            ))}
-            {custInvoices.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No invoices on file.</p>}
-          </div>
-        </DrawerSection>
-
-        {/* Maintenance Plans */}
-        {custPlans.length > 0 && (
-          <DrawerSection title={`Maintenance Plans (${custPlans.length})`}>
-            <div className="space-y-1.5">
-              {custPlans.slice(0, 3).map((plan) => (
-                <Link
-                  key={plan.id}
-                  href={`/maintenance-plans?open=${plan.id}`}
-                  className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
-                >
-                  <div>
-                    <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{plan.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      <span className="text-primary font-mono">{plan.id}</span> · {plan.interval} · {plan.status}
-                    </p>
-                  </div>
-                  <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
-                </Link>
-              ))}
-              {custPlans.length > 3 && (
-                <Link href="/maintenance-plans" className="block text-xs text-primary hover:text-primary/80 transition-colors text-center pt-1">
-                  +{custPlans.length - 3} more
-                </Link>
-              )}
-            </div>
-          </DrawerSection>
-        )}
-
-        {/* Service history */}
-        <DrawerSection title="Service History">
-          {custWOs.length > 0 ? (
+        {/* Service history (recent work orders) */}
+        <DrawerSection title="Recent work orders">
+          {drawerWOs.length > 0 ? (
             <div className="space-y-1">
-              {custWOs.slice(0, 6).map((wo) => (
+              {drawerWOs.slice(0, 6).map((wo) => (
                 <Link
                   key={wo.id}
                   href={`/work-orders?open=${wo.id}`}
                   className="flex items-center gap-3 py-2 px-2.5 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group"
                 >
-                  <div className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
-                    wo.status === "Completed" ? "bg-[color:var(--status-success)]"
-                    : wo.priority === "Critical" ? "bg-[color:var(--status-danger)]"
-                    : "bg-muted-foreground/40"
-                  )} />
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      wo.status === "completed" || wo.status === "invoiced"
+                        ? "bg-[color:var(--status-success)]"
+                        : "bg-muted-foreground/40",
+                    )}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono text-primary shrink-0">{getWorkOrderDisplay(wo)}</span>
-                      <span className="text-[10px] text-muted-foreground truncate">{wo.scheduledDate || wo.createdAt.slice(0, 10)}</span>
+                      <span className="text-[10px] font-mono text-primary shrink-0">
+                        {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground truncate">
+                        {wo.created_at.slice(0, 10)}
+                      </span>
                     </div>
-                    <p className="text-xs text-foreground group-hover:text-primary transition-colors truncate">{wo.type} — {wo.equipmentName}</p>
+                    <p className="text-xs text-foreground group-hover:text-primary transition-colors truncate">
+                      {wo.type.replace(/_/g, " ")} — {wo.title}
+                    </p>
                   </div>
                   <ExternalLink size={11} className="text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground text-center py-3">No service history.</p>
+            <p className="text-xs text-muted-foreground text-center py-3">No work orders yet.</p>
           )}
         </DrawerSection>
 
@@ -1269,17 +1370,19 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
         {/* Notes */}
         <DrawerSection title="Notes">
-          {editing ? (
-            <EditTextarea
-              value={draft.notes ?? ""}
-              onChange={(v) => setField("notes", v)}
-              placeholder="Add notes about this customer..."
-            />
-          ) : customer.notes ? (
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">{customer.notes}</p>
+          {header.notes ? (
+            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
+              {header.notes}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
           )}
+          <Link
+            href={`/customers/${header.id}`}
+            className="mt-3 inline-flex text-[11px] font-medium text-primary hover:underline"
+          >
+            Edit notes on full profile
+          </Link>
         </DrawerSection>
       </DetailDrawer>
 
@@ -1300,11 +1403,11 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               className="px-5 py-4 space-y-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                if (!organizationId || !customerId || !contactForm.full_name.trim()) return
+                if (!activeOrgId || !customerId || !contactForm.full_name.trim()) return
                 setContactBusy(true)
                 const supabase = createBrowserSupabaseClient()
                 const payload = {
-                  organization_id: organizationId,
+                  organization_id: activeOrgId,
                   customer_id: customerId,
                   full_name: contactForm.full_name.trim(),
                   first_name: contactForm.first_name.trim() || null,
@@ -1319,7 +1422,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                     await supabase
                       .from("customer_contacts")
                       .update({ is_primary: false })
-                      .eq("organization_id", organizationId)
+                      .eq("organization_id", activeOrgId)
                       .eq("customer_id", customerId)
                   }
 
@@ -1328,7 +1431,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                         .from("customer_contacts")
                         .update(payload)
                         .eq("id", editingContactId)
-                        .eq("organization_id", organizationId)
+                        .eq("organization_id", activeOrgId)
                         .eq("customer_id", customerId)
                         .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
                         .single()
@@ -1340,7 +1443,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
                   const { data, error } = await query
                   if (!error && data) {
-                    const nextContact: Contact = {
+                    const nextContact: DrawerContact = {
                       id: data.id,
                       name: data.full_name,
                       firstName: data.first_name ?? "",
@@ -1418,20 +1521,20 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           title="Add Location"
           onCancel={() => setLocationModal(null)}
           onSave={(d) => {
-            if (!organizationId || !customerId) return
+            if (!activeOrgId || !customerId) return
             const supabase = createBrowserSupabaseClient()
             void (async () => {
               if (d.isDefault) {
                 await supabase
                   .from("customer_locations")
                   .update({ is_default: false })
-                  .eq("organization_id", organizationId)
+                  .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
               }
               const { data, error } = await supabase
                 .from("customer_locations")
                 .insert({
-                  organization_id: organizationId,
+                  organization_id: activeOrgId,
                   customer_id: customerId,
                   name: d.name,
                   address_line1: d.address,
@@ -1492,14 +1595,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             }}
             onCancel={() => { setLocationModal(null); setEditingLocationId(null) }}
             onSave={(d) => {
-              if (!organizationId || !customerId) return
+              if (!activeOrgId || !customerId) return
               const supabase = createBrowserSupabaseClient()
               void (async () => {
                 if (d.isDefault) {
                   await supabase
                     .from("customer_locations")
                     .update({ is_default: false })
-                    .eq("organization_id", organizationId)
+                    .eq("organization_id", activeOrgId)
                     .eq("customer_id", customerId)
                 }
                 const { error } = await supabase
@@ -1517,7 +1620,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                     is_default: d.isDefault,
                   })
                   .eq("id", editingLocationId)
-                  .eq("organization_id", organizationId)
+                  .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
                 if (!error) {
                   setDrawerLocations((prev) =>
@@ -1553,22 +1656,20 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       {deleteTarget && (() => {
         const loc = drawerLocations.find((l) => l.id === deleteTarget)
         if (!loc) return null
-        const hasRelated =
-          equipment.some((e) => e.customerId === customer.id) ||
-          workOrders.some((w) => w.customerId === customer.id)
+        const hasRelated = drawerEquipment.length > 0 || drawerWOs.length > 0
         return (
           <DeleteConfirm
             hasRelatedRecords={hasRelated}
             onCancel={() => setDeleteTarget(null)}
             onArchive={() => {
-              if (!organizationId || !customerId) return
+              if (!activeOrgId || !customerId) return
               const supabase = createBrowserSupabaseClient()
               void (async () => {
                 const { error } = await supabase
                   .from("customer_locations")
                   .update({ is_archived: true })
                   .eq("id", deleteTarget)
-                  .eq("organization_id", organizationId)
+                  .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
                 if (!error) {
                   setDrawerLocations((prev) => prev.filter((x) => x.id !== deleteTarget))
@@ -1578,14 +1679,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               })()
             }}
             onDelete={() => {
-              if (!organizationId || !customerId) return
+              if (!activeOrgId || !customerId) return
               const supabase = createBrowserSupabaseClient()
               void (async () => {
                 const { error } = await supabase
                   .from("customer_locations")
                   .update({ is_archived: true })
                   .eq("id", deleteTarget)
-                  .eq("organization_id", organizationId)
+                  .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
                 if (!error) {
                   setDrawerLocations((prev) => prev.filter((x) => x.id !== deleteTarget))
@@ -1601,10 +1702,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       <CreateMaintenancePlanDialog
         open={createPlanModalOpen}
         onClose={() => setCreatePlanModalOpen(false)}
-        prefillCustomerId={customer.id}
+        prefillCustomerId={header.id}
         lockCustomer
-        lockedCustomerName={customer.company}
-        onCreated={() => void refreshPlans({ silent: true })}
+        lockedCustomerName={header.company}
+        onCreated={() => setDrawerRefresh((n) => n + 1)}
       />
     </>
   )

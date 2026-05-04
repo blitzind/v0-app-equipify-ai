@@ -478,7 +478,7 @@ export default function BillingPage() {
                       ? "bg-foreground text-background hover:opacity-90"
                       : isDowngrade
                       ? "bg-secondary text-foreground border border-border hover:bg-secondary/80"
-                      : "bg-primary text-primary-foreground hover:opacity-90 shadow-sm"
+                      : "bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active shadow-sm"
                   }`}
                 >
                   {isCurrent ? (
@@ -598,7 +598,7 @@ export default function BillingPage() {
                   </p>
                   <button
                     onClick={() => simulateUpgrade(checkoutPlan)}
-                    className="w-full h-9 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                    className="w-full h-9 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors"
                   >
                     Simulate upgrade (demo)
                   </button>

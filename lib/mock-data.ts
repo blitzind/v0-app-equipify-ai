@@ -476,6 +476,8 @@ export interface RepairLog {
   signatureDataUrl: string  // base64 canvas data or ""
   signedBy: string
   signedAt: string
+  /** Optional checklist persisted in `repair_log` JSON (not a separate table). */
+  tasks?: { id: string; label: string; done: boolean }[]
 }
 
 export interface WorkOrder {
@@ -517,6 +519,7 @@ const emptyRepairLog = (): RepairLog => ({
   signatureDataUrl: "",
   signedBy: "",
   signedAt: "",
+  tasks: [],
 })
 
 export const workOrders: WorkOrder[] = [

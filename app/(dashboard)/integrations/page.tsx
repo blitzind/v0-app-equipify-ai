@@ -484,8 +484,14 @@ export default function IntegrationsPage() {
 
       {/* ── Page header card ── */}
       <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">
-        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center shrink-0">
-          <Plug className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        <div
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: "color-mix(in srgb, #2563eb 14%, var(--card))",
+            borderColor: "color-mix(in srgb, #2563eb 24%, var(--border))",
+          }}
+        >
+          <Plug className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: "#2563eb" }} />
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">

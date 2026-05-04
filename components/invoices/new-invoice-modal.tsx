@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { X, Plus, Trash2, Send, FilePen } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import { useCustomers } from "@/lib/customer-store"
 import { useEquipment } from "@/lib/equipment-store"
@@ -10,6 +10,16 @@ import { useWorkOrders } from "@/lib/work-order-store"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
+
+function quoteOptionLabel(q: { id: string; description: string }) {
+  const id = q.id.trim()
+  if (looksLikeUuid(id)) {
+    const d = q.description.trim()
+    if (d) return d.length > 72 ? `${d.slice(0, 72)}…` : d
+    return "Quote"
+  }
+  return `${id} — ${q.description}`
+}
 
 // ─── Primitive field components ───────────────────────────────────────────────
 
@@ -346,7 +356,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
               <FieldSelect value={workOrderId} onChange={e => setWorkOrderId(e.target.value)}>
                 <option value="">None</option>
                 {filteredWorkOrders.map(wo => (
-                  <option key={wo.id} value={wo.id}>{getWorkOrderDisplay(wo)} — {wo.title}</option>
+                  <option key={wo.id} value={wo.id}>{getWorkOrderDisplay(wo)} — {wo.description}</option>
                 ))}
               </FieldSelect>
             </div>
@@ -355,7 +365,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
               <FieldSelect value={quoteId} onChange={e => setQuoteId(e.target.value)}>
                 <option value="">None</option>
                 {filteredQuotes.map(q => (
-                  <option key={q.id} value={q.id}>{q.id} — {q.description}</option>
+                  <option key={q.id} value={q.id}>{quoteOptionLabel(q)}</option>
                 ))}
               </FieldSelect>
               {quoteId && (
@@ -563,7 +573,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
           <button
             type="button"
             onClick={() => handleSubmit("Sent")}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
             Send Invoice

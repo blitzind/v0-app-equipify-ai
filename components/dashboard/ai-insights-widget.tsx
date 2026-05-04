@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   AlertTriangle,
   Repeat2,
-  UserMinus,
+  Shield,
   Wrench,
   ChevronRight,
   X,
@@ -40,7 +40,7 @@ const CATEGORY_META: Record<
   },
   "expiring_warranty": {
     label: "Expiring Warranties",
-    icon: UserMinus,
+    icon: Shield,
     color: "text-destructive",
     bg: "bg-destructive/10",
     border: "border-l-destructive",
@@ -240,7 +240,7 @@ export function OperationalInsightsWidget({
 
       <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border bg-muted/30">
         <p className="text-[10px] text-muted-foreground">
-          Numbers come from equipment, work orders, and warranty dates in Supabase.
+          Live metrics from equipment, work orders, and warranty coverage.
         </p>
         <button
           type="button"

@@ -9,9 +9,16 @@
   --card-foreground: oklch(0.15 0.01 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0.01 240);
-  /* Brand primary blue: #0f7ae5 */
+  /* App primary: brand blue (links, focus, tabs, toggles, badges) */
   --primary: oklch(0.56 0.21 231);
+  --primary-hover: color-mix(in srgb, var(--primary) 88%, #000000);
+  --primary-active: color-mix(in srgb, var(--primary) 72%, #000000);
   --primary-foreground: oklch(0.99 0 0);
+  /* Filled primary CTAs only (Button default, portal primary buttons) */
+  --cta: #f59f1c;
+  --cta-hover: color-mix(in srgb, var(--cta) 88%, #000000);
+  --cta-active: color-mix(in srgb, var(--cta) 72%, #000000);
+  --cta-foreground: oklch(0.18 0.045 65);
   --secondary: oklch(0.94 0.005 240);
   --secondary-foreground: oklch(0.25 0.01 240);
   --muted: oklch(0.94 0.005 240);
@@ -23,7 +30,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.88 0.008 240);
   --input: oklch(0.88 0.008 240);
-  --ring: oklch(0.56 0.21 231);
+  --ring: color-mix(in srgb, var(--primary) 45%, transparent);
   /* Chart palette: blue, green, orange, teal, red */
   --chart-1: oklch(0.56 0.21 231);
   --chart-2: oklch(0.53 0.15 145);
@@ -34,12 +41,12 @@
   /* Dark navy sidebar: #08111f */
   --sidebar: oklch(0.115 0.022 250);
   --sidebar-foreground: oklch(0.87 0.01 240);
-  --sidebar-primary: oklch(0.56 0.21 231);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.19 0.018 248);
   --sidebar-accent-foreground: oklch(0.91 0.008 240);
   --sidebar-border: oklch(0.20 0.016 248);
-  --sidebar-ring: oklch(0.56 0.21 231);
+  --sidebar-ring: var(--primary);
   /* Status colors matched to brand palette */
   --status-success: oklch(0.53 0.15 145);   /* #16a34a */
   --status-warning: oklch(0.72 0.17 70);    /* #f59e0b */
@@ -58,7 +65,13 @@
   --popover: oklch(0.18 0.012 245);
   --popover-foreground: oklch(0.92 0.008 240);
   --primary: oklch(0.60 0.21 231);
+  --primary-hover: color-mix(in srgb, var(--primary) 88%, #000000);
+  --primary-active: color-mix(in srgb, var(--primary) 72%, #000000);
   --primary-foreground: oklch(0.99 0 0);
+  --cta: #f59f1c;
+  --cta-hover: color-mix(in srgb, var(--cta) 88%, #000000);
+  --cta-active: color-mix(in srgb, var(--cta) 72%, #000000);
+  --cta-foreground: oklch(0.16 0.04 65);
   --secondary: oklch(0.22 0.012 245);
   --secondary-foreground: oklch(0.88 0.008 240);
   --muted: oklch(0.22 0.012 245);
@@ -69,7 +82,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.25 0.012 245);
   --input: oklch(0.25 0.012 245);
-  --ring: oklch(0.60 0.21 231);
+  --ring: color-mix(in srgb, var(--primary) 50%, transparent);
   --chart-1: oklch(0.60 0.21 231);
   --chart-2: oklch(0.55 0.15 145);
   --chart-3: oklch(0.72 0.17 70);
@@ -77,12 +90,12 @@
   --chart-5: oklch(0.577 0.245 27.33);
   --sidebar: oklch(0.09 0.018 250);
   --sidebar-foreground: oklch(0.87 0.01 240);
-  --sidebar-primary: oklch(0.60 0.21 231);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.16 0.015 248);
   --sidebar-accent-foreground: oklch(0.88 0.008 240);
   --sidebar-border: oklch(0.17 0.014 248);
-  --sidebar-ring: oklch(0.60 0.21 231);
+  --sidebar-ring: var(--primary);
 }
 
 @theme inline {
@@ -96,6 +109,12 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-cta-hover: var(--cta-hover);
+  --color-cta-active: var(--cta-active);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -140,10 +159,14 @@
   --portal-nav-text:     #6b7280;
   --portal-nav-icon:     #9ca3af;
   --portal-hover:        #f3f4f6;
+  /* Links & nav active — blue; primary portal buttons use --portal-cta */
   --portal-accent:       #2563eb;
-  --portal-accent-dark:  #1d4ed8;
-  --portal-accent-muted: #eff6ff;
-  --portal-accent-text:  #1e40af;
+  --portal-accent-dark:  color-mix(in srgb, #2563eb 78%, #000000);
+  --portal-accent-muted: color-mix(in srgb, #2563eb 12%, #ffffff);
+  --portal-accent-text:  #1e3a8a;
+  --portal-cta:          #f59f1c;
+  --portal-cta-dark:     color-mix(in srgb, #f59f1c 78%, #000000);
+  --portal-cta-foreground: #292524;
   --portal-success:      #16a34a;
   --portal-success-muted:#f0fdf4;
   --portal-warning:      #d97706;
@@ -412,7 +435,7 @@
   }
   .portal-input:focus {
     border-color: var(--portal-accent);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-accent) 28%, transparent);
   }
   .portal-input::placeholder {
     color: var(--portal-nav-icon);
@@ -431,7 +454,7 @@
   }
   .portal-textarea:focus {
     border-color: var(--portal-accent);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-accent) 28%, transparent);
   }
   .portal-select {
     width: 100%;
@@ -448,7 +471,7 @@
   }
   .portal-select:focus {
     border-color: var(--portal-accent);
-    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-accent) 28%, transparent);
   }
   .portal-btn-primary {
     display: inline-flex;
@@ -459,13 +482,19 @@
     font-size: 0.875rem;
     font-weight: 500;
     border-radius: 0.375rem;
-    background: var(--portal-accent);
-    color: #fff;
+    background: var(--portal-cta);
+    color: var(--portal-cta-foreground);
     border: none;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, transform 0.12s ease;
   }
-  .portal-btn-primary:hover { background: var(--portal-accent-dark); }
+  .portal-btn-primary:hover {
+    background: var(--portal-cta-dark);
+  }
+  .portal-btn-primary:active {
+    background: color-mix(in srgb, var(--portal-cta) 68%, #000000);
+    transform: scale(0.98);
+  }
   .portal-btn-secondary {
     display: inline-flex;
     align-items: center;

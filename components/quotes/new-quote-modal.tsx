@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
@@ -113,15 +114,24 @@ interface NewQuoteModalProps {
   open: boolean
   onClose: () => void
   onSuccess?: (id: string, status: QuoteStatus) => void
+  prefilledCustomerId?: string | null
+  prefilledEquipmentId?: string | null
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) {
+export function NewQuoteModal({
+  open,
+  onClose,
+  onSuccess,
+  prefilledCustomerId = null,
+  prefilledEquipmentId = null,
+}: NewQuoteModalProps) {
   const { addQuote } = useQuotes()
   const prevOpenRef = useRef(false)
+  const { organizationId: activeOrgId, status: orgContextStatus } = useActiveOrganization()
+  const organizationId = orgContextStatus === "ready" ? activeOrgId : null
 
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
@@ -176,7 +186,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      setCustomerId("")
+      setCustomerId(prefilledCustomerId ?? "")
       setEquipmentId("")
       setWorkOrderId("")
       setTitle("")
@@ -196,7 +206,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
     if (!open) {
       setAddEquipmentOpen(false)
     }
-  }, [open])
+  }, [open, prefilledCustomerId])
 
   useEffect(() => {
     if (!open) return
@@ -212,29 +222,22 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
 
       if (!user || cancelled) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomers([])
         }
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgContextStatus !== "ready" || !activeOrgId) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomers([])
-          setLoadError(profileError?.message ?? "No default organization.")
+          setLoadError(
+            orgContextStatus === "ready" && !activeOrgId ? "No organization selected." : null,
+          )
         }
         return
       }
 
-      const orgId = profile.default_organization_id
-      if (!cancelled) setOrganizationId(orgId)
+      const orgId = activeOrgId
 
       const { data: custRows, error: custError } = await supabase
         .from("customers")
@@ -255,7 +258,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, orgContextStatus, activeOrgId])
 
   useEffect(() => {
     if (!open || !organizationId || !customerId) {
@@ -311,7 +314,11 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
       if (cancelled) return
 
       if (!eqRes.error) {
-        setEquipmentList((eqRes.data as EquipmentOption[]) ?? [])
+        const list = (eqRes.data as EquipmentOption[]) ?? []
+        setEquipmentList(list)
+        if (prefilledEquipmentId && list.some((e) => e.id === prefilledEquipmentId)) {
+          setEquipmentId(prefilledEquipmentId)
+        }
       } else {
         setEquipmentList([])
       }
@@ -328,7 +335,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, customerId])
+  }, [open, organizationId, customerId, prefilledEquipmentId])
 
   useEffect(() => {
     if (!open) return
@@ -745,7 +752,7 @@ export function NewQuoteModal({ open, onClose, onSuccess }: NewQuoteModalProps) 
               <button
                 type="button"
                 onClick={() => handleSubmit("Sent")}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
                 Send Quote

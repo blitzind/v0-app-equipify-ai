@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn, looksLikeUuid } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
@@ -53,6 +54,16 @@ function fmtDate(d: string) {
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
+}
+
+function quoteDrawerTitle(q: AdminQuote): string {
+  const id = q.id.trim()
+  if (looksLikeUuid(id)) {
+    const d = q.description.trim()
+    if (d) return d.length > 56 ? `${d.slice(0, 56)}…` : d
+    return "Service quote"
+  }
+  return id
 }
 
 type LineItem = { description: string; qty: number; unit: number }
@@ -481,6 +492,7 @@ interface QuoteDrawerProps {
 }
 
 export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { quotes, updateQuote } = useQuotes()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
@@ -574,17 +586,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       setConvertingToWo(false)
       return
     }
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("default_organization_id")
-      .eq("id", user.id)
-      .single()
-    const orgId = profile?.default_organization_id
-    if (!orgId) {
-      toast("No default organization.")
+    if (orgStatus !== "ready" || !activeOrgId) {
+      toast(orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…")
       setConvertingToWo(false)
       return
     }
+    const orgId = activeOrgId
     const scheduled = quote.expiresDate || new Date().toISOString().slice(0, 10)
     const priority: WorkOrderPriority = "Normal"
     const woType: WorkOrderType = "Repair"
@@ -670,7 +677,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       <DetailDrawer
         open={!!quoteId}
         onClose={onClose}
-        title={quote.id}
+        title={quoteDrawerTitle(quote)}
         subtitle={
           quote.equipmentName
             ? `${quote.customerName} · ${quote.equipmentName}`

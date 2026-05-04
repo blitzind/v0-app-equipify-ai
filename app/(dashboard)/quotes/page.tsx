@@ -112,7 +112,13 @@ function QuotesPageInner() {
   const { quotes } = useQuotes()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
-  useQuickAdd("new-quote", () => setNewModalOpen(true))
+  const [newQuotePrefillCustomerId, setNewQuotePrefillCustomerId] = useState<string | null>(null)
+  const [newQuotePrefillEquipmentId, setNewQuotePrefillEquipmentId] = useState<string | null>(null)
+  useQuickAdd("new-quote", () => {
+    setNewQuotePrefillCustomerId(null)
+    setNewQuotePrefillEquipmentId(null)
+    setNewModalOpen(true)
+  })
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | QuoteStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("createdDate")
@@ -127,6 +133,18 @@ function QuotesPageInner() {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedQuoteId(openId)
+      router.replace("/quotes", { scroll: false })
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    const action = searchParams.get("action")
+    const cid = searchParams.get("customerId")
+    const eid = searchParams.get("equipmentId")
+    if (action === "new-quote") {
+      setNewQuotePrefillCustomerId(cid)
+      setNewQuotePrefillEquipmentId(eid)
+      setNewModalOpen(true)
       router.replace("/quotes", { scroll: false })
     }
   }, [searchParams, router])
@@ -209,7 +227,15 @@ function QuotesPageInner() {
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setNewModalOpen(true)}>
+          <Button
+            size="sm"
+            className="gap-2 cursor-pointer"
+            onClick={() => {
+              setNewQuotePrefillCustomerId(null)
+              setNewQuotePrefillEquipmentId(null)
+              setNewModalOpen(true)
+            }}
+          >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Quote</span>
             <span className="sm:hidden">New</span>
@@ -391,7 +417,13 @@ function QuotesPageInner() {
 
       <NewQuoteModal
         open={newModalOpen}
-        onClose={() => setNewModalOpen(false)}
+        prefilledCustomerId={newQuotePrefillCustomerId}
+        prefilledEquipmentId={newQuotePrefillEquipmentId}
+        onClose={() => {
+          setNewModalOpen(false)
+          setNewQuotePrefillCustomerId(null)
+          setNewQuotePrefillEquipmentId(null)
+        }}
         onSuccess={(id, status) => {
           toast({
             title: status === "Sent" ? "Quote sent to customer" : "Quote saved as draft",
@@ -400,7 +432,14 @@ function QuotesPageInner() {
         }}
       />
       <Toaster />
-      <QuickAddParamBridge action="new-quote" onTrigger={() => setNewModalOpen(true)} />
+      <QuickAddParamBridge
+        action="new-quote"
+        onTrigger={() => {
+          setNewQuotePrefillCustomerId(null)
+          setNewQuotePrefillEquipmentId(null)
+          setNewModalOpen(true)
+        }}
+      />
     </div>
   )
 }

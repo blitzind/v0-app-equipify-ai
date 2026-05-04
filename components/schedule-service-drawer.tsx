@@ -5,6 +5,7 @@ import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { DetailDrawer } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
@@ -142,7 +143,7 @@ function DrawerSelectContent({
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([])
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
   const [technicianOptions, setTechnicianOptions] = useState<TechnicianOption[]>([])
@@ -189,31 +190,24 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
 
       if (!user || cancelled) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomerOptions([])
           setTechnicianOptions([])
         }
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomerOptions([])
           setTechnicianOptions([])
-          setLoadError(profileError?.message ?? "No default organization.")
+          setLoadError(
+            orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…"
+          )
         }
         return
       }
 
-      const orgId = profile.default_organization_id
-      if (!cancelled) setOrganizationId(orgId)
+      const orgId = activeOrgId
 
       const { data: custRows, error: custError } = await supabase
         .from("customers")
@@ -256,7 +250,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
             (p) => ({
               id: p.id,
               label:
-                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8),
+                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
             })
           )
         techOptions.sort((a, b) => a.label.localeCompare(b.label))
@@ -268,11 +262,11 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, activeOrgId, orgStatus])
 
   // Equipment + customer_locations when customer selected
   useEffect(() => {
-    if (!open || !organizationId || !form.customerId) {
+    if (!open || !activeOrgId || !form.customerId) {
       if (!form.customerId) {
         setEquipmentList([])
         setCustomerLocations([])
@@ -287,7 +281,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
         .select("id, name, location_label, equipment_code, serial_number, category")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", activeOrgId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
         .eq("is_archived", false)
@@ -303,7 +297,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       const { data: locRows, error: locError } = await supabase
         .from("customer_locations")
         .select("id, name, city, state")
-        .eq("organization_id", organizationId)
+        .eq("organization_id", activeOrgId)
         .eq("customer_id", form.customerId)
         .eq("is_archived", false)
         .order("is_default", { ascending: false })
@@ -320,7 +314,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, form.customerId])
+  }, [open, activeOrgId, form.customerId])
 
   // Auto-fill location from equipment.location_label when possible
   useEffect(() => {
@@ -372,7 +366,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
   }
 
   async function handleSaveNewLoc() {
-    if (!organizationId || !form.customerId || !newLoc.name.trim() || !newLoc.address.trim()) return
+    if (!activeOrgId || !form.customerId || !newLoc.name.trim() || !newLoc.address.trim()) return
     if (!newLoc.city.trim() || !newLoc.state.trim() || !newLoc.zip.trim()) {
       setLocSaveError("City, state, and ZIP are required.")
       return
@@ -384,7 +378,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     const { data, error } = await supabase
       .from("customer_locations")
       .insert({
-        organization_id: organizationId,
+        organization_id: activeOrgId,
         customer_id: form.customerId,
         name: newLoc.name.trim(),
         address_line1: newLoc.address.trim(),
@@ -412,7 +406,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
   }
 
   const canSubmit =
-    !!organizationId &&
+    !!activeOrgId &&
     !!form.customerId &&
     !!form.equipmentId &&
     !!form.serviceType &&
@@ -423,7 +417,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     !loadError
 
   async function handleSubmit() {
-    if (!canSubmit || !organizationId) return
+    if (!canSubmit || !activeOrgId) return
 
     setSubmitError(null)
 
@@ -448,7 +442,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     const scheduledTime = normalizeTimeForDb(windowStartTime(form.timeWindow))
 
     const { error: insertError } = await supabase.from("work_orders").insert({
-      organization_id: organizationId,
+      organization_id: activeOrgId,
       customer_id: form.customerId,
       equipment_id: form.equipmentId,
       title,

@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { useWorkOrders } from "@/lib/work-order-store"
-import { useMaintenancePlans } from "@/lib/maintenance-store"
-import type { Equipment } from "@/lib/mock-data"
+import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
-import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
+import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,11 +21,10 @@ import {
 } from "@/components/detail-drawer"
 import {
   Wrench, ClipboardList, FileText, AlertTriangle, Pencil, X, Check,
-  ShieldCheck, ExternalLink, CalendarPlus, QrCode, Mail, Upload,
-  TrendingUp, AlertOctagon, RefreshCw, Calendar, DollarSign, Image as ImageIcon,
-  StickyNote, HardHat, Cpu,
+  ExternalLink, CalendarPlus,
+  AlertOctagon, Calendar,
+  StickyNote, Shield, Cpu,
 } from "lucide-react"
-import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { ContactActions } from "@/components/contact-actions"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
 
@@ -40,16 +42,12 @@ const STATUS_COLORS: Record<Equipment["status"], string> = {
 const STATUSES: Equipment["status"][] = ["Active", "Needs Service", "In Repair", "Out of Service"]
 
 const TABS = [
-  { id: "overview",      label: "Overview",      icon: Cpu },
-  { id: "service",       label: "Service History",icon: Wrench },
-  { id: "workorders",    label: "Open WOs",       icon: ClipboardList },
-  { id: "plans",         label: "Maintenance Plans", icon: Calendar },
-  { id: "certs",         label: "Certificates",   icon: ShieldCheck },
-  { id: "warranty",      label: "Warranty",       icon: HardHat },
-  { id: "files",         label: "Files",          icon: FileText },
-  { id: "photos",        label: "Photos",         icon: ImageIcon },
-  { id: "financial",     label: "Financial",      icon: DollarSign },
-  { id: "notes",         label: "Notes",          icon: StickyNote },
+  { id: "overview", label: "Overview", icon: Cpu },
+  { id: "service", label: "Service History", icon: Wrench },
+  { id: "plans", label: "Maintenance Plans", icon: Calendar },
+  { id: "quotes", label: "Quotes", icon: FileText },
+  { id: "warranty", label: "Warranty", icon: Shield },
+  { id: "notes", label: "Notes", icon: StickyNote },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
@@ -63,6 +61,30 @@ type PlanWoRow = {
   scheduled_on: string | null
   maintenance_plan_id: string | null
   created_at: string
+}
+
+type DrawerAssetWo = {
+  id: string
+  work_order_number?: number | null
+  title: string
+  status: string
+  type: string
+  scheduled_on: string | null
+  created_at: string
+  completed_at: string | null
+  total_labor_cents: number
+  total_parts_cents: number
+  maintenance_plan_id: string | null
+}
+
+type EqDrawerPlanRow = {
+  id: string
+  name: string
+  status: string
+  interval_value: number
+  interval_unit: string
+  next_due_date: string | null
+  equipment_id: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,6 +112,41 @@ function woDbStatusLabel(s: string) {
 function woDbTypeLabel(s: string) {
   if (!s) return "—"
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function eqPlanIntervalLabel(row: EqDrawerPlanRow): string {
+  const u = row.interval_unit as MaintenancePlanRow["interval_unit"]
+  const { interval, customIntervalDays } = intervalFromDb(row.interval_value, u)
+  return interval === "Custom" ? `${customIntervalDays} day cycle` : interval
+}
+
+function woTypeToServiceHistoryType(typeDb: string): ServiceHistoryEntry["type"] {
+  const t = (typeDb ?? "").toLowerCase()
+  if (t === "pm") return "PM"
+  if (t === "inspection") return "Inspection"
+  if (t === "install") return "Install"
+  return "Repair"
+}
+
+function woRowsToServiceHistory(rows: DrawerAssetWo[]): ServiceHistoryEntry[] {
+  return rows.map((wo) => ({
+    id: wo.id,
+    date: (wo.completed_at ?? wo.created_at).slice(0, 10),
+    type: woTypeToServiceHistoryType(wo.type),
+    technician: "",
+    workOrderId: wo.id,
+    description: wo.title,
+    cost: ((wo.total_labor_cents ?? 0) + (wo.total_parts_cents ?? 0)) / 100,
+    status:
+      wo.status === "completed" || wo.status === "invoiced" ? ("Completed" as const) : ("Cancelled" as const),
+  }))
+}
+
+function warrantyKpiLabel(days: number, hasDate: boolean): string {
+  if (!hasDate) return "—"
+  if (days < 0) return "Expired"
+  if (days <= 90) return "Expiring"
+  return "Active"
 }
 
 function daysToDue(dateStr: string) {
@@ -343,10 +400,10 @@ function mapUiStatusToDbStatus(status: Equipment["status"]): DbEquipmentRow["sta
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDrawerProps) {
-  const { workOrders } = useWorkOrders()
-  const { plans } = useMaintenancePlans()
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [eq, setEq] = useState<Equipment | null>(null)
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [drawerWOs, setDrawerWOs] = useState<DrawerAssetWo[]>([])
+  const [drawerPlans, setDrawerPlans] = useState<EqDrawerPlanRow[]>([])
   const [customers, setCustomers] = useState<DrawerCustomer[]>([])
   const [loading, setLoading] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -356,14 +413,84 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [planLinkedWOs, setPlanLinkedWOs] = useState<PlanWoRow[]>([])
   const [planWoLoading, setPlanWoLoading] = useState(false)
 
-  const eqPlans = useMemo(
-    () => (eq ? plans.filter((p) => p.equipmentId === eq.id) : []),
-    [plans, eq?.id],
+  const eqPlanIdsKey = useMemo(() => drawerPlans.map((p) => p.id).sort().join(","), [drawerPlans])
+
+  const openWOsList = useMemo(
+    () => drawerWOs.filter((w) => w.status !== "completed" && w.status !== "invoiced"),
+    [drawerWOs],
   )
-  const eqPlanIdsKey = useMemo(() => eqPlans.map((p) => p.id).sort().join(","), [eqPlans])
+  const completedWOCount = useMemo(
+    () => drawerWOs.filter((w) => w.status === "completed" || w.status === "invoiced").length,
+    [drawerWOs],
+  )
+  const activePlanCount = useMemo(
+    () => drawerPlans.filter((p) => planStatusDbToUi(p.status) === "Active").length,
+    [drawerPlans],
+  )
+  const planNameById = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const p of drawerPlans) m[p.id] = p.name
+    return m
+  }, [drawerPlans])
+  const activeMaintenancePlans = useMemo(
+    () => drawerPlans.filter((p) => planStatusDbToUi(p.status) === "Active"),
+    [drawerPlans],
+  )
+  const inactiveMaintenancePlans = useMemo(
+    () => drawerPlans.filter((p) => planStatusDbToUi(p.status) !== "Active"),
+    [drawerPlans],
+  )
+  const completedHistoryForAi = useMemo(
+    () =>
+      woRowsToServiceHistory(
+        drawerWOs.filter((w) => w.status === "completed" || w.status === "invoiced"),
+      ),
+    [drawerWOs],
+  )
+  const eqForAi = useMemo((): Equipment | null => {
+    if (!eq) return null
+    return { ...eq, serviceHistory: completedHistoryForAi }
+  }, [eq, completedHistoryForAi])
+  const totalServiceCost = useMemo(
+    () =>
+      drawerWOs.reduce((s, w) => s + ((w.total_labor_cents ?? 0) + (w.total_parts_cents ?? 0)) / 100, 0),
+    [drawerWOs],
+  )
+  const overviewRecentTimeline = useMemo(() => {
+    type Ev = { at: string; label: string; desc: string; accent: "success" | "warning" | "muted" }
+    const ev: Ev[] = []
+    for (const wo of drawerWOs) {
+      ev.push({
+        at: wo.created_at,
+        label: `Work order opened · ${formatWorkOrderDisplay(wo.work_order_number, wo.id)}`,
+        desc: `${wo.title} · ${woDbStatusLabel(wo.status)}`,
+        accent: "muted",
+      })
+      if (wo.completed_at) {
+        ev.push({
+          at: wo.completed_at,
+          label: `Work order completed · ${formatWorkOrderDisplay(wo.work_order_number, wo.id)}`,
+          desc: wo.title,
+          accent: "success",
+        })
+      }
+    }
+    ev.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    return ev.slice(0, 12).map((e) => ({
+      date: new Date(e.at).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      label: e.label,
+      description: e.desc,
+      accent: e.accent,
+    }))
+  }, [drawerWOs])
 
   useEffect(() => {
-    if (activeTab !== "plans" || !eq || !organizationId) return
+    if (activeTab !== "plans" || !eq || !activeOrgId) return
     if (!eqPlanIdsKey) {
       setPlanLinkedWOs([])
       setPlanWoLoading(false)
@@ -383,7 +510,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       let woRes = await supabase
         .from("work_orders")
         .select(eqPlanWoSelWithNum)
-        .eq("organization_id", organizationId)
+        .eq("organization_id", activeOrgId)
         .eq("equipment_id", eq.id)
         .in("maintenance_plan_id", planIds)
         .eq("is_archived", false)
@@ -394,7 +521,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         woRes = await supabase
           .from("work_orders")
           .select(eqPlanWoSel)
-          .eq("organization_id", organizationId)
+          .eq("organization_id", activeOrgId)
           .eq("equipment_id", eq.id)
           .in("maintenance_plan_id", planIds)
           .eq("is_archived", false)
@@ -417,13 +544,14 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     return () => {
       cancelled = true
     }
-  }, [activeTab, eq, organizationId, eqPlanIdsKey])
+  }, [activeTab, eq, activeOrgId, eqPlanIdsKey])
 
   const loadDrawerData = useCallback(async () => {
     if (!equipmentId) {
       setEq(null)
-      setOrganizationId(null)
       setCustomers([])
+      setDrawerWOs([])
+      setDrawerPlans([])
       return
     }
 
@@ -436,22 +564,18 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       } = await supabase.auth.getUser()
       if (!user) {
         setEq(null)
-        setOrganizationId(null)
         setCustomers([])
+        setDrawerWOs([])
+        setDrawerPlans([])
         return
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      const orgId = profile?.default_organization_id ?? null
-      setOrganizationId(orgId)
+      const orgId = orgStatus === "ready" ? activeOrgId : null
       if (!orgId) {
         setEq(null)
         setCustomers([])
+        setDrawerWOs([])
+        setDrawerPlans([])
         return
       }
 
@@ -476,6 +600,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
       if (error || !row) {
         setEq(null)
+        setDrawerWOs([])
+        setDrawerPlans([])
         return
       }
 
@@ -503,10 +629,46 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         manuals: [],
         serviceHistory: [],
       })
+
+      let woListRes = await supabase
+        .from("work_orders")
+        .select(WO_LIST_SELECT_WITH_NUM)
+        .eq("organization_id", orgId)
+        .eq("equipment_id", equipmentRow.id)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(150)
+
+      if (woListRes.error && missingWorkOrderNumberColumn(woListRes.error)) {
+        woListRes = await supabase
+          .from("work_orders")
+          .select(WO_LIST_SELECT)
+          .eq("organization_id", orgId)
+          .eq("equipment_id", equipmentRow.id)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false })
+          .limit(150)
+      }
+
+      if (woListRes.error) {
+        setDrawerWOs([])
+      } else {
+        setDrawerWOs((woListRes.data ?? []) as DrawerAssetWo[])
+      }
+
+      const { data: planData } = await supabase
+        .from("maintenance_plans")
+        .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id")
+        .eq("organization_id", orgId)
+        .eq("equipment_id", equipmentRow.id)
+        .eq("is_archived", false)
+        .order("next_due_date", { ascending: true, nullsFirst: false })
+
+      setDrawerPlans((planData ?? []) as EqDrawerPlanRow[])
     } finally {
       setLoading(false)
     }
-  }, [equipmentId])
+  }, [equipmentId, activeOrgId, orgStatus])
 
   useEffect(() => {
     setEditing(false)
@@ -518,8 +680,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   useEffect(() => {
     if (!equipmentId) {
       setEq(null)
-      setOrganizationId(null)
       setCustomers([])
+      setDrawerWOs([])
+      setDrawerPlans([])
     }
   }, [equipmentId])
 
@@ -544,7 +707,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   function cancelEdit() { setEditing(false); setDraft({}) }
 
   async function saveEdit() {
-    if (!eq || !organizationId) return
+    if (!eq || !activeOrgId) return
     const supabase = createBrowserSupabaseClient()
 
     const updatePayload = {
@@ -565,7 +728,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       .from("equipment")
       .update(updatePayload)
       .eq("id", eq.id)
-      .eq("organization_id", organizationId)
+      .eq("organization_id", activeOrgId)
 
     if (error) {
       toast(`Update failed: ${error.message}`)
@@ -580,7 +743,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   }
 
   async function archiveEquipment() {
-    if (!eq || !organizationId) return
+    if (!eq || !activeOrgId) return
     if (!window.confirm("Archive this equipment?")) return
     const supabase = createBrowserSupabaseClient()
 
@@ -588,7 +751,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       .from("equipment")
       .update({ is_archived: true, archived_at: new Date().toISOString() })
       .eq("id", eq.id)
-      .eq("organization_id", organizationId)
+      .eq("organization_id", activeOrgId)
 
     if (error) {
       toast(`Archive failed: ${error.message}`)
@@ -622,33 +785,34 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     )
   }
 
-  // Derived values
-  const days         = daysToDue(eq.nextDueDate)
-  const daysLabel    = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `Due in ${days}d`
-  const daysColor    = days < 0 ? "text-destructive" : days <= 7 ? "text-[color:var(--status-warning)]" : "text-muted-foreground"
+  // Derived values (equipment row)
+  const days = daysToDue(eq.nextDueDate)
+  const daysLabel = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `Due in ${days}d`
+  const daysColor = days < 0 ? "text-destructive" : days <= 7 ? "text-[color:var(--status-warning)]" : "text-muted-foreground"
   const warrantyDays = daysToDue(eq.warrantyExpiration)
-  const warrantyLabel= warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? `Expires in ${warrantyDays}d` : fmtDate(eq.warrantyExpiration)
-  const warrantyColor= warrantyDays < 0 ? "text-destructive" : warrantyDays <= 90 ? "text-[color:var(--status-warning)]" : "text-foreground"
-  const currentStatus= (draft.status ?? eq.status) as Equipment["status"]
-  const age          = ageYears(eq.installDate)
+  const warrantyHasDate = Boolean(eq.warrantyExpiration?.trim())
+  const warrantyLabel =
+    !warrantyHasDate ? "No date on file" : warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? `Expires in ${warrantyDays}d` : fmtDate(eq.warrantyExpiration)
+  const warrantyColor =
+    !warrantyHasDate
+      ? "text-muted-foreground"
+      : warrantyDays < 0
+        ? "text-destructive"
+        : warrantyDays <= 90
+          ? "text-[color:var(--status-warning)]"
+          : "text-foreground"
+  const currentStatus = (draft.status ?? eq.status) as Equipment["status"]
+  const age = ageYears(eq.installDate)
+  const warrantyKpiDisplay = warrantyKpiLabel(warrantyDays, warrantyHasDate)
+  const warrantyKpiSub = !warrantyHasDate
+    ? "No expiration on file"
+    : warrantyDays < 0
+      ? `Expired ${fmtDate(eq.warrantyExpiration)}`
+      : `Ends ${fmtDate(eq.warrantyExpiration)}`
 
-  // Related records
-  const openWOs = workOrders.filter(
-    (wo) => wo.equipmentId === eq.id && !["Completed", "Invoiced"].includes(wo.status)
-  )
-  const activeMaintenancePlans = eqPlans.filter((p) => p.status === "Active")
-  const inactiveMaintenancePlans = eqPlans.filter((p) => p.status !== "Active")
-  const totalRepairCost = eq.serviceHistory.filter(h => h.type === "Repair").reduce((s, h) => s + h.cost, 0)
-  const totalServiceCost= eq.serviceHistory.reduce((s, h) => s + h.cost, 0)
-
-  // Timeline items for service history tab
-  const timelineItems = eq.serviceHistory.map((h) => ({
-    date: h.date,
-    label: `${h.type} — ${getWorkOrderDisplay({ id: h.workOrderId })}`,
-    href: `/work-orders?open=${h.workOrderId}`,
-    description: h.description + (h.technician ? ` · ${h.technician}` : "") + ` · ${fmtCurrency(h.cost)}`,
-    accent: (h.status === "Completed" ? "success" : "muted") as "success" | "muted",
-  }))
+  const woNewHref = `/work-orders?action=new-work-order&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
+  const quoteNewHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
+  const planNewHref = `/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
 
   return (
     <>
@@ -678,6 +842,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
             {currentStatus}
           </Badge>
         }
+        noScroll
         actions={
           editing ? (
             <>
@@ -694,24 +859,24 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
-                <Link
-                  href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
-                  className="flex items-center gap-1.5"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> New Maintenance Plan
+                <Link href={woNewHref} className="flex items-center gap-1.5">
+                  <ClipboardList className="w-3.5 h-3.5 shrink-0" /> New Work Order
                 </Link>
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order created")}>
-                <ClipboardList className="w-3.5 h-3.5" /> Create WO
+              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                <Link href={quoteNewHref} className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 shrink-0" /> New Quote
+                </Link>
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Scheduling opened")}>
-                <CalendarPlus className="w-3.5 h-3.5" /> Schedule Service
+              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                <Link href={planNewHref} className="flex items-center gap-1.5">
+                  <MaintenancePlansBrandTile size="xs" /> New Maintenance Plan
+                </Link>
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("QR label generated")}>
-                <QrCode className="w-3.5 h-3.5" /> QR Label
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Email composed")}>
-                <Mail className="w-3.5 h-3.5" /> Email Customer
+              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                <Link href={`/equipment/${eq.id}`} className="flex items-center gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
+                </Link>
               </Button>
               <Button
                 size="sm"
@@ -725,70 +890,152 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           )
         }
       >
-        {/* Service urgency banner */}
-        {days <= 7 && !editing && (
-          <div className={cn(
-            "mx-5 mt-4 flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium",
-            days < 0
-              ? "bg-destructive/10 border-destructive/30 text-destructive"
-              : "bg-[color:var(--status-warning)]/10 border-[color:var(--status-warning)]/30 text-[color:var(--status-warning)]"
-          )}>
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Service {days < 0 ? "overdue" : `due in ${days} day${days !== 1 ? "s" : ""}`} — {fmtDate(eq.nextDueDate)}</span>
-          </div>
-        )}
-
-        {/* Tab bar */}
-        {!editing && (
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-5 pt-4">
-            <div className="flex gap-0 overflow-x-auto scrollbar-none">
-              {TABS.map((tab) => {
-                const Icon = tab.icon
-                const isActive = activeTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors shrink-0",
-                      isActive
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                    {/* Badge for open WOs and plans */}
-                    {tab.id === "workorders" && openWOs.length > 0 && (
-                      <span className="ml-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
-                        {openWOs.length}
-                      </span>
-                    )}
-                    {tab.id === "plans" && eqPlans.length > 0 && (
-                      <span className="ml-0.5 bg-muted text-muted-foreground text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
-                        {eqPlans.length}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+          {!editing && days <= 7 && (
+            <div className="shrink-0 px-5 pt-3">
+              <div
+                className={cn(
+                  "flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium",
+                  days < 0
+                    ? "bg-destructive/10 border-destructive/30 text-destructive"
+                    : "bg-[color:var(--status-warning)]/10 border-[color:var(--status-warning)]/30 text-[color:var(--status-warning)]",
+                )}
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>
+                  Service {days < 0 ? "overdue" : `due in ${days} day${days !== 1 ? "s" : ""}`} — {fmtDate(eq.nextDueDate)}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab content */}
-        <div className="px-5 py-5 space-y-5">
+          {!editing && (
+            <div className="shrink-0 bg-background border-b border-border z-[11]">
+              <div className="flex min-w-0 gap-0 overflow-x-auto scrollbar-none px-5">
+                {TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors shrink-0",
+                        isActive
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                      {tab.id === "service" && drawerWOs.length > 0 && (
+                        <span className="ml-0.5 bg-muted text-muted-foreground text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                          {drawerWOs.length}
+                        </span>
+                      )}
+                      {tab.id === "plans" && drawerPlans.length > 0 && (
+                        <span className="ml-0.5 bg-muted text-muted-foreground text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                          {drawerPlans.length}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5 space-y-5">
 
           {/* ── OVERVIEW ── */}
           {(activeTab === "overview" || editing) && (
             <>
               {/* AI Recommendations — shown only when not editing */}
-              {!editing && (
+              {!editing && eqForAi && (
                 <AIRecommendationPanel
                   title="AI Insights"
-                  recommendations={buildAIRecommendations(eq)}
+                  recommendations={buildAIRecommendations(eqForAi)}
                   initialLimit={3}
                 />
+              )}
+
+              {!editing && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  {(
+                    [
+                      {
+                        label: "Open Work Orders",
+                        value: String(openWOsList.length),
+                        sub: "not completed",
+                        warn: openWOsList.length > 0,
+                      },
+                      {
+                        label: "Completed Work Orders",
+                        value: String(completedWOCount),
+                        sub: "completed or invoiced",
+                        warn: false,
+                      },
+                      {
+                        label: "Active Maintenance Plans",
+                        value: String(activePlanCount),
+                        sub: "on this asset",
+                        warn: false,
+                      },
+                      {
+                        label: "Warranty Status",
+                        value: warrantyKpiDisplay,
+                        sub: warrantyKpiSub,
+                        warn: warrantyHasDate && warrantyDays >= 0 && warrantyDays <= 90,
+                      },
+                    ] as const
+                  ).map(({ label, value, sub, warn }) => (
+                    <div
+                      key={label}
+                      className="bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                      <p
+                        className={cn(
+                          "text-xl font-bold tracking-tight",
+                          warn ? "text-[color:var(--status-warning)]" : "text-foreground",
+                        )}
+                      >
+                        {value}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">{sub}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!editing && (
+                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Quick actions</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
+                      <Link href={woNewHref}>
+                        <ClipboardList className="w-3.5 h-3.5" /> New Work Order
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
+                      <Link href={quoteNewHref}>
+                        <FileText className="w-3.5 h-3.5" /> New Quote
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
+                      <Link href={planNewHref}>
+                        <CalendarPlus className="w-3.5 h-3.5" /> New Maintenance Plan
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!editing && overviewRecentTimeline.length > 0 && (
+                <DrawerSection title="Recent service activity">
+                  <DrawerTimeline items={overviewRecentTimeline} />
+                </DrawerSection>
               )}
 
               {/* Equipment Details */}
@@ -855,8 +1102,11 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               {/* Summary stat row */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "Total Events", value: eq.serviceHistory.length },
-                  { label: "Repairs", value: eq.serviceHistory.filter(h => h.type === "Repair").length },
+                  { label: "Total Events", value: drawerWOs.length },
+                  {
+                    label: "Repairs",
+                    value: drawerWOs.filter((w) => (w.type ?? "").toLowerCase() === "repair").length,
+                  },
                   { label: "Total Cost", value: fmtCurrency(totalServiceCost) },
                 ].map((s) => (
                   <div key={s.label} className="bg-muted/30 border border-border rounded-lg p-3 text-center">
@@ -866,72 +1116,71 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 ))}
               </div>
 
-              <DrawerSection title={`Service History (${eq.serviceHistory.length})`}>
-                {timelineItems.length > 0 ? (
-                  <DrawerTimeline items={timelineItems} />
+              <DrawerSection title={`Service history (${drawerWOs.length})`}>
+                {drawerWOs.length > 0 ? (
+                  <div className="space-y-2">
+                    {drawerWOs
+                      .slice()
+                      .sort((a, b) =>
+                        (b.completed_at ?? b.created_at).localeCompare(a.completed_at ?? a.created_at),
+                      )
+                      .map((wo) => (
+                        <Link
+                          key={wo.id}
+                          href={`/work-orders?open=${wo.id}`}
+                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                        >
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <p className="text-xs font-semibold font-mono text-primary truncate">
+                              {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
+                            </p>
+                            <p className="text-xs text-foreground font-medium truncate">{wo.title}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {woDbTypeLabel(wo.type)} · {fmtDate(wo.scheduled_on ?? wo.created_at.slice(0, 10))}
+                              {wo.completed_at ? ` · Done ${fmtDate(wo.completed_at.slice(0, 10))}` : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {woDbStatusLabel(wo.status)}
+                            </Badge>
+                            <ExternalLink
+                              size={11}
+                              className="text-muted-foreground/50 group-hover:text-primary transition-colors"
+                            />
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-6">No service history on record.</p>
+                  <p className="text-xs text-muted-foreground text-center py-6">No work orders on record for this equipment.</p>
                 )}
               </DrawerSection>
             </>
-          )}
-
-          {/* ── OPEN WORK ORDERS ── */}
-          {activeTab === "workorders" && !editing && (
-            <DrawerSection title={`Open Work Orders (${openWOs.length})`}>
-              {openWOs.length > 0 ? (
-                <div className="space-y-2">
-                  {openWOs.map((wo) => (
-                    <Link
-                      key={wo.id}
-                      href={`/work-orders?open=${wo.id}`}
-                      className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay(wo)}</p>
-                        <p className="text-xs text-foreground font-medium">{wo.type} — {wo.description.slice(0, 60)}{wo.description.length > 60 ? "…" : ""}</p>
-                        <p className="text-[10px] text-muted-foreground">{wo.technicianName} · {fmtDate(wo.scheduledDate)}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="secondary" className="text-[10px]">{wo.status}</Badge>
-                        <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors" />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 text-center">
-                  <p className="text-xs text-muted-foreground">No open work orders for this equipment.</p>
-                  <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" onClick={() => toast("Work order created")}>
-                    <ClipboardList className="w-3.5 h-3.5" /> Create Work Order
-                  </Button>
-                </div>
-              )}
-            </DrawerSection>
           )}
 
           {/* ── MAINTENANCE PLANS ── */}
           {activeTab === "plans" && !editing && (
             <>
               <DrawerSection
-                title={`Maintenance Plans (${eqPlans.length})`}
+                title={`Maintenance plans (${drawerPlans.length})`}
                 action={
                   <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" asChild>
-                    <Link
-                      href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
-                    >
+                    <Link href={planNewHref}>
                       <CalendarPlus className="w-3 h-3" /> New plan
                     </Link>
                   </Button>
                 }
               >
-                {eqPlans.length > 0 ? (
+                {drawerPlans.length > 0 ? (
                   <div className="space-y-4">
                     {activeMaintenancePlans.length > 0 && (
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active</p>
                         <div className="space-y-2">
-                          {activeMaintenancePlans.map((plan) => (
+                          {activeMaintenancePlans.map((plan) => {
+                            const uiStatus = planStatusDbToUi(plan.status)
+                            return (
                             <Link
                               key={plan.id}
                               href={`/maintenance-plans?open=${plan.id}`}
@@ -940,21 +1189,25 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                               <div className="min-w-0">
                                 <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
                                 <p className="text-[10px] text-muted-foreground">
-                                  {plan.interval} · Next: {fmtDate(plan.nextDueDate)}
+                                  {eqPlanIntervalLabel(plan)} · Next:{" "}
+                                  {plan.next_due_date ? fmtDate(plan.next_due_date.slice(0, 10)) : "—"}
                                 </p>
                                 <Badge
                                   variant="secondary"
                                   className={cn(
                                     "text-[10px] mt-1",
-                                    "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border border-[color:var(--status-success)]/20",
+                                    uiStatus === "Active"
+                                      ? "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border border-[color:var(--status-success)]/20"
+                                      : "text-muted-foreground border-border",
                                   )}
                                 >
-                                  {plan.status}
+                                  {uiStatus}
                                 </Badge>
                               </div>
                               <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-1" />
                             </Link>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -962,7 +1215,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Inactive</p>
                         <div className="space-y-2">
-                          {inactiveMaintenancePlans.map((plan) => (
+                          {inactiveMaintenancePlans.map((plan) => {
+                            const uiStatus = planStatusDbToUi(plan.status)
+                            return (
                             <Link
                               key={plan.id}
                               href={`/maintenance-plans?open=${plan.id}`}
@@ -971,15 +1226,17 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                               <div className="min-w-0">
                                 <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
                                 <p className="text-[10px] text-muted-foreground">
-                                  {plan.interval} · Next: {fmtDate(plan.nextDueDate)}
+                                  {eqPlanIntervalLabel(plan)} · Next:{" "}
+                                  {plan.next_due_date ? fmtDate(plan.next_due_date.slice(0, 10)) : "—"}
                                 </p>
                                 <Badge variant="secondary" className="text-[10px] mt-1 text-muted-foreground border-border">
-                                  {plan.status}
+                                  {uiStatus}
                                 </Badge>
                               </div>
                               <ExternalLink size={11} className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0 mt-1" />
                             </Link>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -988,9 +1245,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   <div className="py-8 text-center">
                     <p className="text-xs text-muted-foreground">No maintenance plans linked to this equipment.</p>
                     <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" asChild>
-                      <Link
-                        href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`}
-                      >
+                      <Link href={planNewHref}>
                         <CalendarPlus className="w-3.5 h-3.5" /> Create maintenance plan
                       </Link>
                     </Button>
@@ -1005,7 +1260,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   <div className="space-y-2">
                     {planLinkedWOs.map((wo) => {
                       const planName =
-                        eqPlans.find((p) => p.id === wo.maintenance_plan_id)?.name ?? "Maintenance plan"
+                        (wo.maintenance_plan_id ? planNameById[wo.maintenance_plan_id] : undefined) ??
+                        "Maintenance plan"
                       return (
                         <Link
                           key={wo.id}
@@ -1029,7 +1285,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-4">
-                    {eqPlans.length === 0
+                    {drawerPlans.length === 0
                       ? "Create a maintenance plan to generate linked work orders from this asset."
                       : "No work orders from these plans yet."}
                   </p>
@@ -1038,207 +1294,98 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
             </>
           )}
 
-          {/* ── CERTIFICATES ── */}
-          {activeTab === "certs" && !editing && (
-            <DrawerSection title="Calibration Certificates"
+          {/* ── QUOTES (quotes live in app workspace until a Supabase quotes API exists) ── */}
+          {activeTab === "quotes" && !editing && (
+            <DrawerSection
+              title="Quotes"
               action={
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" onClick={() => toast("Upload dialog opened")}>
-                  <Upload className="w-3 h-3" /> Upload
+                <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" asChild>
+                  <Link href={quoteNewHref}>
+                    <FileText className="w-3 h-3" /> New quote
+                  </Link>
                 </Button>
               }
             >
-              <CertificatePanel
-                equipmentId={eq.id}
-                equipmentName={eq.model}
-                customerId={eq.customerId}
-                customerName={eq.customerName}
-              />
+              <div className="rounded-lg border border-border bg-muted/20 p-4 text-center">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Quotes are created from the Quotes workspace. Open Quotes with this customer and equipment pre-selected,
+                  or start a new quote from quick actions on the overview tab.
+                </p>
+                <Button size="sm" variant="secondary" className="mt-4 gap-1.5 text-xs" asChild>
+                  <Link href={quoteNewHref}>
+                    <FileText className="w-3.5 h-3.5" /> New quote for this equipment
+                  </Link>
+                </Button>
+              </div>
             </DrawerSection>
           )}
 
           {/* ── WARRANTY ── */}
           {activeTab === "warranty" && !editing && (
             <>
-              {/* Warranty status card */}
-              <div className={cn(
-                "rounded-xl border p-4 flex items-center gap-4",
-                warrantyDays < 0
-                  ? "bg-destructive/8 border-destructive/25"
-                  : warrantyDays <= 90
-                  ? "bg-[color:var(--status-warning)]/8 border-[color:var(--status-warning)]/25"
-                  : "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/25"
-              )}>
-                <HardHat className={cn("w-8 h-8 shrink-0",
-                  warrantyDays < 0 ? "text-destructive" : warrantyDays <= 90 ? "text-[color:var(--status-warning)]" : "text-[color:var(--status-success)]"
-                )} />
+              <div
+                className={cn(
+                  "rounded-xl border p-4 flex items-center gap-4",
+                  !warrantyHasDate
+                    ? "bg-muted/30 border-border"
+                    : warrantyDays < 0
+                      ? "bg-destructive/8 border-destructive/25"
+                      : warrantyDays <= 90
+                        ? "bg-[color:var(--status-warning)]/8 border-[color:var(--status-warning)]/25"
+                        : "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/25",
+                )}
+              >
+                <Shield
+                  className={cn(
+                    "w-8 h-8 shrink-0",
+                    !warrantyHasDate
+                      ? "text-muted-foreground"
+                      : warrantyDays < 0
+                        ? "text-destructive"
+                        : warrantyDays <= 90
+                          ? "text-[color:var(--status-warning)]"
+                          : "text-[color:var(--status-success)]",
+                  )}
+                />
                 <div>
                   <p className={cn("text-sm font-semibold", warrantyColor)}>{warrantyLabel}</p>
                   <p className="text-xs text-muted-foreground">
-                    {warrantyDays < 0 ? "Warranty has expired. Equipment is out of coverage." : `Coverage ends ${fmtDate(eq.warrantyExpiration)}`}
+                    {!warrantyHasDate
+                      ? "Add a warranty end date on this equipment to track coverage in KPIs and renewals."
+                      : warrantyDays < 0
+                        ? "Warranty has expired. Equipment is out of coverage."
+                        : `Coverage ends ${fmtDate(eq.warrantyExpiration)}`}
                   </p>
                 </div>
               </div>
 
-              <DrawerSection title="Warranty Details">
-                <DrawerRow label="Expiration" value={<span className={warrantyColor}>{fmtDate(eq.warrantyExpiration)}</span>} />
-                <DrawerRow label="Status" value={warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? "Expiring Soon" : "Active"} />
-                <DrawerRow label="Install Date" value={fmtDate(eq.installDate)} />
-                <DrawerRow label="Unit Age" value={age > 0 ? `~${age} year${age !== 1 ? "s" : ""}` : "< 1 year"} />
+              <DrawerSection title="Warranty details">
+                <DrawerRow
+                  label="Expiration"
+                  value={<span className={warrantyColor}>{warrantyHasDate ? fmtDate(eq.warrantyExpiration) : "—"}</span>}
+                />
+                <DrawerRow
+                  label="Status"
+                  value={
+                    !warrantyHasDate ? "Unknown" : warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? "Expiring soon" : "Active"
+                  }
+                />
+                <DrawerRow label="Install date" value={fmtDate(eq.installDate)} />
+                <DrawerRow label="Unit age" value={age > 0 ? `~${age} year${age !== 1 ? "s" : ""}` : "< 1 year"} />
               </DrawerSection>
 
-              {warrantyDays > 0 && warrantyDays <= 90 && (
+              {warrantyHasDate && warrantyDays > 0 && warrantyDays <= 90 && (
                 <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/8 p-3">
                   <p className="text-xs font-medium text-[color:var(--status-warning)]">
                     Warranty expiring soon — Schedule a pre-warranty inspection to address any issues while still under coverage.
                   </p>
-                  <Button size="sm" variant="outline" className="mt-2 gap-1.5 text-xs cursor-pointer h-7" onClick={() => toast("Work order created")}>
-                    <ClipboardList className="w-3 h-3" /> Create WO
+                  <Button size="sm" variant="outline" className="mt-2 gap-1.5 text-xs cursor-pointer h-7" asChild>
+                    <Link href={woNewHref}>
+                      <ClipboardList className="w-3 h-3" /> New work order
+                    </Link>
                   </Button>
                 </div>
               )}
-            </>
-          )}
-
-          {/* ── FILES / MANUALS ── */}
-          {activeTab === "files" && !editing && (
-            <DrawerSection
-              title={`Files & Manuals (${eq.manuals.length})`}
-              action={
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" onClick={() => toast("Upload dialog opened")}>
-                  <Upload className="w-3 h-3" /> Upload
-                </Button>
-              }
-            >
-              {eq.manuals.length > 0 ? (
-                <div className="space-y-1.5">
-                  {eq.manuals.map((m, i) => (
-                    <div key={i} className="flex items-center gap-2.5 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors cursor-pointer group">
-                      <FileText className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-xs text-foreground flex-1">{m}</span>
-                      <ExternalLink size={11} className="text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 text-center">
-                  <p className="text-xs text-muted-foreground">No manuals or documents uploaded yet.</p>
-                  <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" onClick={() => toast("Upload dialog opened")}>
-                    <Upload className="w-3.5 h-3.5" /> Upload File
-                  </Button>
-                </div>
-              )}
-            </DrawerSection>
-          )}
-
-          {/* ── PHOTOS ── */}
-          {activeTab === "photos" && !editing && (
-            <DrawerSection
-              title={`Photos (${eq.photos.length})`}
-              action={
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px] cursor-pointer" onClick={() => toast("Upload dialog opened")}>
-                  <Upload className="w-3 h-3" /> Upload
-                </Button>
-              }
-            >
-              {eq.photos.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {eq.photos.map((p, i) => (
-                    <div key={i} className="aspect-video rounded-lg bg-muted border border-border flex items-center justify-center">
-                      <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
-                  <ImageIcon className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">No photos uploaded yet.</p>
-                  <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs cursor-pointer" onClick={() => toast("Upload dialog opened")}>
-                    <Upload className="w-3.5 h-3.5" /> Upload Photos
-                  </Button>
-                </div>
-              )}
-            </DrawerSection>
-          )}
-
-          {/* ── FINANCIAL ── */}
-          {activeTab === "financial" && !editing && (
-            <>
-              {/* Key financial metrics */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  {
-                    label: "Replacement Value",
-                    value: eq.replacementCost ? fmtCurrency(eq.replacementCost) : "Not set",
-                    icon: TrendingUp,
-                    color: "text-[color:var(--status-info)]",
-                  },
-                  {
-                    label: "Total Repair Cost",
-                    value: fmtCurrency(totalRepairCost),
-                    icon: AlertOctagon,
-                    color: totalRepairCost > 0 ? "text-[color:var(--status-warning)]" : "text-muted-foreground",
-                  },
-                  {
-                    label: "Total Service Cost",
-                    value: fmtCurrency(totalServiceCost),
-                    icon: DollarSign,
-                    color: "text-foreground",
-                  },
-                  {
-                    label: "Repair-to-Value Ratio",
-                    value: eq.replacementCost ? `${Math.round((totalRepairCost / eq.replacementCost) * 100)}%` : "—",
-                    icon: RefreshCw,
-                    color: eq.replacementCost && totalRepairCost / eq.replacementCost > 0.4 ? "text-destructive" : "text-foreground",
-                  },
-                ].map((m) => {
-                  const Icon = m.icon
-                  return (
-                    <div key={m.label} className="bg-muted/30 border border-border rounded-lg p-3 flex items-start gap-3">
-                      <Icon className={cn("w-4 h-4 shrink-0 mt-0.5", m.color)} />
-                      <div>
-                        <p className={cn("text-sm font-bold", m.color)}>{m.value}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{m.label}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Per-service cost breakdown */}
-              <DrawerSection title="Service Cost Breakdown">
-                {eq.serviceHistory.length > 0 ? (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/40">
-                        <tr>
-                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground text-[10px] uppercase tracking-wide">Date</th>
-                          <th className="text-left px-3 py-2 font-semibold text-muted-foreground text-[10px] uppercase tracking-wide">Type</th>
-                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground text-[10px] uppercase tracking-wide">Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {eq.serviceHistory.map((h) => (
-                          <tr key={h.id} className="bg-card">
-                            <td className="px-3 py-2 text-muted-foreground">{fmtDate(h.date)}</td>
-                            <td className="px-3 py-2">
-                              <Badge variant="secondary" className="text-[10px]">{h.type}</Badge>
-                            </td>
-                            <td className="px-3 py-2 text-right font-medium text-foreground">{fmtCurrency(h.cost)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-muted/40 border-t border-border">
-                        <tr>
-                          <td colSpan={2} className="px-3 py-2 text-right font-semibold text-foreground text-[11px] uppercase tracking-wide">Total</td>
-                          <td className="px-3 py-2 text-right font-bold text-foreground">{fmtCurrency(totalServiceCost)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground text-center py-6">No service cost data available.</p>
-                )}
-              </DrawerSection>
             </>
           )}
 
@@ -1270,6 +1417,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
             </DrawerSection>
           )}
 
+          </div>
         </div>
       </DetailDrawer>
 

@@ -80,8 +80,7 @@ export function CreateMaintenancePlanDialog({
   lockedCustomerName?: string | null;
   onCreated?: () => void;
 }) {
-  const { createPlan } = useMaintenancePlans();
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const { createPlan, organizationId } = useMaintenancePlans();
   const [customers, setCustomers] = useState<
     Array<{ id: string; company_name: string }>
   >([]);
@@ -184,7 +183,6 @@ export function CreateMaintenancePlanDialog({
 
       if (!user || cancelled) {
         if (!cancelled) {
-          setOrganizationId(null);
           setCustomers([]);
           setTechnicians([]);
         }
@@ -192,25 +190,17 @@ export function CreateMaintenancePlanDialog({
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError || !profile?.default_organization_id) {
+      if (!organizationId) {
         if (!cancelled) {
-          setOrganizationId(null);
           setCustomers([]);
           setTechnicians([]);
-          setCatalogError(profileError?.message ?? "No default organization.");
+          setCatalogError("No organization selected.");
         }
         setCatalogLoading(false);
         return;
       }
 
-      const orgId = profile.default_organization_id;
-      if (!cancelled) setOrganizationId(orgId);
+      const orgId = organizationId;
 
       const { data: custRows, error: custError } = await supabase
         .from("customers")
@@ -270,7 +260,7 @@ export function CreateMaintenancePlanDialog({
           label:
             (p.full_name && p.full_name.trim()) ||
             (p.email && p.email.trim()) ||
-            p.id.slice(0, 8),
+            "Team member",
         }));
         techOptions.sort((a, b) => a.label.localeCompare(b.label));
       }
@@ -282,7 +272,7 @@ export function CreateMaintenancePlanDialog({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, organizationId]);
 
   useEffect(() => {
     if (!open || !organizationId || !form.customerId) {

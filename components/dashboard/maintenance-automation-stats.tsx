@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Calendar, Clock, Repeat, ChevronRight } from "lucide-react"
+import { Calendar, Clock, ChevronRight } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
+import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 
 function startOfMonthIso(): string {
   const d = new Date()
@@ -14,6 +17,7 @@ function startOfMonthIso(): string {
 }
 
 export function MaintenanceAutomationStats() {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [dueToday, setDueToday] = useState<number | null>(null)
   const [overdue, setOverdue] = useState<number | null>(null)
   const [autoThisMonth, setAutoThisMonth] = useState<number | null>(null)
@@ -23,27 +27,19 @@ export function MaintenanceAutomationStats() {
     let cancelled = false
 
     void (async () => {
+      if (orgStatus !== "ready" || !activeOrgId) {
+        if (!cancelled) {
+          setDueToday(null)
+          setOverdue(null)
+          setAutoThisMonth(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      if (!cancelled) setLoading(true)
       const supabase = createBrowserSupabaseClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user || cancelled) {
-        setLoading(false)
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      const orgId = (profile as { default_organization_id?: string | null })?.default_organization_id
-      if (!orgId || cancelled) {
-        setLoading(false)
-        return
-      }
+      const orgId = activeOrgId
 
       const today = new Date().toISOString().slice(0, 10)
       const monthStart = startOfMonthIso()
@@ -79,10 +75,20 @@ export function MaintenanceAutomationStats() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeOrgId, orgStatus])
 
-  const items = [
+  type MetricRow = {
+    kind: "metric"
+    label: string
+    value: number | null
+    Icon: LucideIcon
+    iconClass: string
+    bgClass: string
+  }
+  type BrandRow = { kind: "brand"; label: string; value: number | null }
+  const items: (MetricRow | BrandRow)[] = [
     {
+      kind: "metric",
       label: "Due today",
       value: dueToday,
       Icon: Clock,
@@ -90,6 +96,7 @@ export function MaintenanceAutomationStats() {
       bgClass: "bg-amber-500/10",
     },
     {
+      kind: "metric",
       label: "Overdue",
       value: overdue,
       Icon: Calendar,
@@ -97,11 +104,9 @@ export function MaintenanceAutomationStats() {
       bgClass: "bg-destructive/10",
     },
     {
+      kind: "brand",
       label: "Auto-created this month",
       value: autoThisMonth,
-      Icon: Repeat,
-      iconClass: "text-primary",
-      bgClass: "bg-primary/10",
     },
   ]
 
@@ -117,15 +122,19 @@ export function MaintenanceAutomationStats() {
         </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-        {items.map(({ label, value, Icon, iconClass, bgClass }) => (
-          <div key={label} className="flex items-center gap-3 px-5 py-4">
-            <div className={cn("flex items-center justify-center w-10 h-10 rounded-lg shrink-0", bgClass)}>
-              <Icon className={cn("w-5 h-5", iconClass)} />
+        {items.map((row) => (
+          <div key={row.label} className="flex items-center gap-3 px-5 py-4">
+            {row.kind === "brand" ? (
+              <MaintenancePlansBrandTile size="stat" className="rounded-xl" />
+            ) : (
+            <div className={cn("flex items-center justify-center w-10 h-10 rounded-lg shrink-0", row.bgClass)}>
+              <row.Icon className={cn("w-5 h-5", row.iconClass)} />
             </div>
+            )}
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground font-medium">{label}</p>
+              <p className="text-xs text-muted-foreground font-medium">{row.label}</p>
               <p className="text-xl font-bold text-foreground tabular-nums">
-                {loading ? "—" : value ?? "—"}
+                {loading ? "—" : row.value ?? "—"}
               </p>
             </div>
           </div>

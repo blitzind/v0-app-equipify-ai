@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, ShieldCheck, X } from "lucide-react"
+import { CheckCircle2, X } from "lucide-react"
+import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -124,6 +126,7 @@ export function AddEquipmentModal({
   offerMaintenancePlanNext = true,
   onCreateMaintenancePlan,
 }: AddEquipmentModalProps) {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -132,39 +135,23 @@ export function AddEquipmentModal({
   const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!open || orgStatus !== "ready" || !activeOrgId) {
+      if (!open) setCustomers([])
+      return
+    }
     const supabase = createBrowserSupabaseClient()
     void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        setCustomers([])
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (!profile?.default_organization_id) {
-        setCustomers([])
-        return
-      }
-
       const { data } = await supabase
         .from("customers")
         .select("id, company_name")
-        .eq("organization_id", profile.default_organization_id)
+        .eq("organization_id", activeOrgId)
         .eq("status", "active")
         .eq("is_archived", false)
         .order("company_name", { ascending: true })
 
       setCustomers((data as CustomerOption[] | null) ?? [])
     })()
-  }, [open])
+  }, [open, orgStatus, activeOrgId])
 
   useEffect(() => {
     if (!open) return
@@ -219,15 +206,11 @@ export function AddEquipmentModal({
       return
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("default_organization_id")
-      .eq("id", user.id)
-      .single()
-
-    if (!profile?.default_organization_id) {
+    if (orgStatus !== "ready" || !activeOrgId) {
       setSaving(false)
-      setToastMsg("No default organization found.")
+      setToastMsg(
+        orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…"
+      )
       setTimeout(() => setToastMsg(null), 3500)
       return
     }
@@ -242,7 +225,7 @@ export function AddEquipmentModal({
     const { data: inserted, error } = await supabase
       .from("equipment")
       .insert({
-        organization_id: profile.default_organization_id,
+        organization_id: activeOrgId,
         customer_id: form.customerId,
         name: (form.model || form.name).trim(),
         manufacturer: form.manufacturer.trim() || null,
@@ -451,7 +434,7 @@ export function AddEquipmentModal({
                   Done
                 </Button>
                 <Button onClick={handleCreatePlanAfterSave} className="cursor-pointer gap-2 w-full sm:w-auto">
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <MaintenancePlansBrandTile size="xs" />
                   Create Maintenance Plan
                 </Button>
               </>

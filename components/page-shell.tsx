@@ -8,10 +8,11 @@ import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 import { useQuickAdd } from "@/lib/quick-add-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
-  ShieldCheck, HardHat, BarChart3, Globe, Settings, Building2,
+  HardHat, BarChart3, Globe, Settings, Building2,
   CreditCard, Shield, Sparkles, FileText, Receipt, Plug, ShoppingCart,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
 // ─── Route meta ───────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   "/maintenance-plans": {
     title: "Maintenance Plans",
     subtitle: "Recurring service schedules with automated notifications and work order creation.",
-    icon: ShieldCheck,
+    icon: MaintenancePlansLucideIcon,
     cta: { label: "+ New Plan" },
   },
   "/technicians": {
@@ -128,6 +129,36 @@ const ROUTE_META: Record<string, RouteMeta> = {
 // Routes that render their own full-bleed hero — PageHero is suppressed.
 const HERO_SUPPRESS = new Set(["/insights", "/integrations"])
 
+/** Per-area hero icon color (title card only); primary CTAs stay orange via `Button`. */
+const FEATURE_ICON_HEX: Record<string, string> = {
+  "/": "#6366F1",
+  "/customers": "#2563EB",
+  "/equipment": "#64748B",
+  "/work-orders": "#22C55E",
+  "/service-schedule": "#A855F7",
+  "/maintenance-plans": "#F59E0B",
+  "/technicians": "#4F46E5",
+  "/quotes": "#06B6D4",
+  "/invoices": "#06B6D4",
+  "/purchase-orders": "#06B6D4",
+  "/reports": "#6366F1",
+  "/portal": "#2563EB",
+  "/settings/workspace": "#64748B",
+  "/settings/team": "#64748B",
+  "/settings/billing": "#06B6D4",
+  "/settings/permissions": "#64748B",
+  "/settings/equipment-types": "#64748B",
+  "/integrations": "#2563EB",
+}
+
+function getFeatureIconColor(pathname: string): string {
+  if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
+  if (pathname.startsWith("/customers/")) return "#2563EB"
+  if (pathname.startsWith("/work-orders/")) return "#22C55E"
+  if (pathname.startsWith("/settings/")) return FEATURE_ICON_HEX[pathname] ?? "#64748B"
+  return "#64748B"
+}
+
 function resolveMeta(pathname: string): RouteMeta | null {
   if (HERO_SUPPRESS.has(pathname)) return null
   if (ROUTE_META[pathname]) return ROUTE_META[pathname]
@@ -139,13 +170,36 @@ function resolveMeta(pathname: string): RouteMeta | null {
 
 // ─── PageHero ─────────────────────────────────────────────────────────────────
 
-function PageHero({ title, subtitle, icon: Icon }: { title: string; subtitle: string; icon: LucideIcon }) {
+function PageHero({
+  title,
+  subtitle,
+  icon: Icon,
+  featureColor,
+  pathname,
+}: {
+  title: string
+  subtitle: string
+  icon: LucideIcon
+  featureColor: string
+  pathname: string
+}) {
+  const maintenancePlansHero = pathname === "/maintenance-plans"
   return (
     <div className="px-3 sm:px-6 pt-4 sm:pt-5 pb-1 shrink-0">
       <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">
-        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        {maintenancePlansHero ? (
+          <MaintenancePlansBrandTile size="md" />
+        ) : (
+        <div
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${featureColor} 14%, var(--card))`,
+            borderColor: `color-mix(in srgb, ${featureColor} 24%, var(--border))`,
+          }}
+        >
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: featureColor }} />
         </div>
+        )}
         <div className="min-w-0">
           <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
             {title}
@@ -170,7 +224,15 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppTopbar />
-      {meta && <PageHero title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />}
+      {meta && (
+        <PageHero
+          title={meta.title}
+          subtitle={meta.subtitle}
+          icon={meta.icon}
+          featureColor={getFeatureIconColor(pathname)}
+          pathname={pathname}
+        />
+      )}
       <main className="flex-1 overflow-y-auto">
         {/* pb-24 on mobile gives clearance above the fixed bottom nav (≈80px bar + safe area) */}
         <div className="max-w-[1440px] mx-auto p-3 sm:p-6 pb-24 lg:pb-6">

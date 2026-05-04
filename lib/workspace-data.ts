@@ -49,6 +49,24 @@ import {
   medExpiringWarranties,
   medInsights,
 } from "@/lib/medology-data"
+import {
+  pbsCustomers,
+  pbsEquipment,
+  pbsWorkOrders,
+  pbsMaintenancePlans,
+  pbsNotificationLog,
+  pbsTechnicians,
+  pbsQuotes,
+  pbsInvoices,
+  pbsStats,
+  pbsRevenueData,
+  pbsWorkOrdersByStatus,
+  pbsRecentWorkOrders,
+  pbsEquipmentDueSoon,
+  pbsRepeatRepairs,
+  pbsExpiringWarranties,
+  pbsInsights,
+} from "@/lib/precision-biomedical-data"
 
 export interface DashboardStats {
   equipmentDueThisMonth: number
@@ -176,9 +194,54 @@ const WORKSPACE_DATA: Record<string, WorkspaceDataBundle> = {
     expiringWarranties: medExpiringWarranties,
     aiInsights: medInsights,
   },
+  "ws-precision-biomedical": {
+    customers: pbsCustomers,
+    equipment: pbsEquipment,
+    workOrders: pbsWorkOrders,
+    maintenancePlans: pbsMaintenancePlans,
+    notificationLog: pbsNotificationLog,
+    technicians: pbsTechnicians,
+    quotes: pbsQuotes,
+    invoices: pbsInvoices,
+    stats: pbsStats,
+    revenueData: pbsRevenueData,
+    workOrdersByStatus: pbsWorkOrdersByStatus,
+    recentWorkOrders: pbsRecentWorkOrders,
+    equipmentDueSoon: pbsEquipmentDueSoon,
+    repeatRepairs: pbsRepeatRepairs,
+    expiringWarranties: pbsExpiringWarranties,
+    aiInsights: pbsInsights,
+  },
+  "ws-live-generic": {
+    customers: [],
+    equipment: [],
+    workOrders: [],
+    maintenancePlans: [],
+    notificationLog: [],
+    technicians: [],
+    quotes: [],
+    invoices: [],
+    stats: {
+      equipmentDueThisMonth: 0,
+      overdueService: 0,
+      openWorkOrders: 0,
+      monthlyRevenue: "$0",
+      revenueSubtitle: "Revenue from completed work",
+      revenueTrend: "",
+      expiringWarranties: 0,
+      warrantyTrend: "",
+      repeatRepairAlerts: 0,
+    },
+    revenueData: [],
+    workOrdersByStatus: [],
+    recentWorkOrders: [],
+    equipmentDueSoon: [],
+    repeatRepairs: [],
+    expiringWarranties: [],
+    aiInsights: [],
+  },
 }
 
-// Fallback to Acme data if workspace not found
 export function getWorkspaceData(workspaceId: string): WorkspaceDataBundle {
-  return WORKSPACE_DATA[workspaceId] ?? WORKSPACE_DATA["ws-acme"]
+  return WORKSPACE_DATA[workspaceId] ?? WORKSPACE_DATA["ws-live-generic"]
 }

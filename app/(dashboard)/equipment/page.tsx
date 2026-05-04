@@ -8,6 +8,7 @@ import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { AIScanModal } from "@/components/equipment/ai-scan-modal"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -206,6 +207,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 }
 
 function EquipmentPageInner() {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
@@ -230,8 +232,22 @@ function EquipmentPageInner() {
     }
   }, [searchParams, router])
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [addEquipmentPrefillCustomerId, setAddEquipmentPrefillCustomerId] = useState<string | null>(null)
   const [scanModalOpen, setScanModalOpen] = useState(false)
-  useQuickAdd("new-equipment", () => setAddModalOpen(true))
+  useQuickAdd("new-equipment", () => {
+    setAddEquipmentPrefillCustomerId(null)
+    setAddModalOpen(true)
+  })
+
+  useEffect(() => {
+    const action = searchParams.get("action")
+    const cid = searchParams.get("customerId")
+    if (action === "new-equipment") {
+      setAddEquipmentPrefillCustomerId(cid)
+      setAddModalOpen(true)
+      router.replace("/equipment", { scroll: false })
+    }
+  }, [searchParams, router])
 
   useEffect(() => {
     let active = true
@@ -247,18 +263,12 @@ function EquipmentPageInner() {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (active) setEquipment([])
         return
       }
 
-      const orgId = profile.default_organization_id
+      const orgId = activeOrgId
 
       const { data: equipmentRows, error: equipmentError } = await supabase
         .from("equipment")
@@ -317,7 +327,7 @@ function EquipmentPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken])
+  }, [refreshToken, orgStatus, activeOrgId])
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -441,7 +451,10 @@ function EquipmentPageInner() {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem
                 className="gap-2.5 cursor-pointer py-2.5"
-                onClick={() => setAddModalOpen(true)}
+                onClick={() => {
+                  setAddEquipmentPrefillCustomerId(null)
+                  setAddModalOpen(true)
+                }}
               >
                 <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div>
@@ -642,7 +655,11 @@ function EquipmentPageInner() {
 
       <AddEquipmentModal
         open={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        prefilledCustomerId={addEquipmentPrefillCustomerId}
+        onClose={() => {
+          setAddModalOpen(false)
+          setAddEquipmentPrefillCustomerId(null)
+        }}
         onSuccess={() => setRefreshToken((v) => v + 1)}
         onCreateMaintenancePlan={({ customerId, equipmentId }) => {
           const q = new URLSearchParams({
@@ -659,7 +676,13 @@ function EquipmentPageInner() {
         onClose={() => setScanModalOpen(false)}
       />
 
-      <QuickAddParamBridge action="new-equipment" onTrigger={() => setAddModalOpen(true)} />
+      <QuickAddParamBridge
+        action="new-equipment"
+        onTrigger={() => {
+          setAddEquipmentPrefillCustomerId(null)
+          setAddModalOpen(true)
+        }}
+      />
     </div>
   )
 }

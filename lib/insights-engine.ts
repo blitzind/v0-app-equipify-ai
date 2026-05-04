@@ -38,7 +38,7 @@ export const CATEGORY_META: Record<InsightCategory, { label: string; icon: strin
   overdue_client:      { label: "Overdue Clients",       icon: "AlertCircle",   accentHex: "#ef4444" },
   repeat_failure:      { label: "Repeat Failures",       icon: "RefreshCcw",    accentHex: "#f97316" },
   upsell:              { label: "Upsell Opportunities",  icon: "TrendingUp",    accentHex: "#10b981" },
-  expiring_warranty:   { label: "Expiring Warranties",   icon: "ShieldAlert",   accentHex: "#eab308" },
+  expiring_warranty:   { label: "Expiring Warranties",   icon: "Shield",        accentHex: "#eab308" },
   revenue_opportunity: { label: "Revenue Opportunities", icon: "DollarSign",    accentHex: "#3b82f6" },
 }
 

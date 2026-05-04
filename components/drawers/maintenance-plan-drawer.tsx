@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -85,12 +85,6 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
   const [woBusy, setWoBusy] = useState(false)
 
   const plan = planId ? plans.find((p) => p.id === planId) ?? null : null
-
-  useEffect(() => {
-    if (planId && plan) {
-      console.info("[Equipify] MaintenancePlanDrawer (service-schedule)", { planId: plan.id })
-    }
-  }, [planId, plan])
 
   function toast(message: string, type: ToastItem["type"] = "success") {
     const id = ++toastCounter

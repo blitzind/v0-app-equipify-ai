@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType, RepairLog } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -254,6 +255,8 @@ function JobCard({
                 scheduledTime:  wo.scheduledTime,
                 address:        wo.location,
                 workOrderId:    wo.id,
+                workOrderNumber: wo.workOrderNumber ?? null,
+                workOrderTitle: wo.description,
                 ccEmails:       ["service@equipify.ai"],
               }}
             />
@@ -423,7 +426,8 @@ export default function TechnicianDailySchedulePage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const { organizationId: resolvedOrgId, status: orgStatus } = useActiveOrganization()
+  const organizationId = orgStatus === "ready" ? resolvedOrgId : null
   const [roster, setRoster] = useState<RosterTech[]>([])
   const [rosterLoading, setRosterLoading] = useState(true)
   const [rosterError, setRosterError] = useState<string | null>(null)
@@ -455,30 +459,24 @@ export default function TechnicianDailySchedulePage() {
 
       if (!user || cancelled) {
         if (!cancelled) {
-          setOrganizationId(null)
           setRoster([])
           setRosterLoading(false)
         }
         return
       }
 
-      const { data: userProfile, error: pErr } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (pErr || !userProfile?.default_organization_id) {
+      if (orgStatus !== "ready" || !resolvedOrgId) {
         if (!cancelled) {
-          setRosterError(pErr?.message ?? "No default organization.")
+          setRosterError(
+            orgStatus === "ready" && !resolvedOrgId ? "No organization selected." : null,
+          )
           setRoster([])
           setRosterLoading(false)
         }
         return
       }
 
-      const orgId = userProfile.default_organization_id
-      if (!cancelled) setOrganizationId(orgId)
+      const orgId = resolvedOrgId
 
       const { data: members, error: mErr } = await supabase
         .from("organization_members")
@@ -530,7 +528,7 @@ export default function TechnicianDailySchedulePage() {
           const name =
             (p.full_name && p.full_name.trim()) ||
             (p.email && p.email.trim()) ||
-            p.id.slice(0, 8)
+            "Technician"
           return {
             id: p.id,
             name,
@@ -552,7 +550,7 @@ export default function TechnicianDailySchedulePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [orgStatus, resolvedOrgId])
 
   useEffect(() => {
     if (roster.length === 0) return

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import Link from "next/link"
 import {
-  AlertCircle, RefreshCcw, TrendingUp, ShieldAlert, DollarSign,
+  AlertCircle, RefreshCcw, TrendingUp, Shield, DollarSign,
   ChevronRight, Sparkles, Download, X, CheckCircle2,
   AlertTriangle, Clock, ArrowUpRight, BarChart3, Users,
   Zap, FileText,
@@ -38,7 +38,7 @@ const CATEGORY_ICONS: Record<InsightCategory, React.ElementType> = {
   overdue_client: AlertCircle,
   repeat_failure: RefreshCcw,
   upsell: TrendingUp,
-  expiring_warranty: ShieldAlert,
+  expiring_warranty: Shield,
   revenue_opportunity: DollarSign,
 }
 

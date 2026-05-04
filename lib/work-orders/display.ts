@@ -1,4 +1,6 @@
-/** Branded display: `WO-` + 7 digits (e.g. WO-1045821). Falls back to `fallbackId` (e.g. UUID) when unset. */
+import { looksLikeUuid } from "@/lib/utils"
+
+/** Branded display: `WO-` + 7 digits (e.g. WO-1045821). Never surfaces raw UUIDs. */
 export function formatWorkOrderDisplay(
   workOrderNumber: number | null | undefined,
   fallbackId?: string,
@@ -7,8 +9,8 @@ export function formatWorkOrderDisplay(
     return `WO-${String(workOrderNumber).padStart(7, "0")}`
   }
   const id = fallbackId?.trim()
-  if (id) return id
-  return "—"
+  if (id && !looksLikeUuid(id)) return id
+  return "WO pending"
 }
 
 /** Numeric part from user search: `WO-1045821`, `wo1045821`, `1045821`. */
@@ -34,6 +36,7 @@ export function effectiveWorkOrderNumber(wo: {
 export function getWorkOrderDisplay(wo: { id: string; workOrderNumber?: number | null }): string {
   const n = effectiveWorkOrderNumber(wo)
   if (n != null) return formatWorkOrderDisplay(n)
+  if (looksLikeUuid(wo.id)) return formatWorkOrderDisplay(undefined, wo.id)
   return wo.id
 }
 

@@ -73,7 +73,7 @@ function TriggerBtn({ label, icon, open, variant = "ghost", className }: Trigger
       className={cn(
         "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer select-none whitespace-nowrap",
         variant === "primary"
-          ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary"
+          ? "bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active border border-cta"
           : "bg-background border border-border text-foreground hover:bg-muted",
         open && variant !== "primary" && "bg-muted",
         className,

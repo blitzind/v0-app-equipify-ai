@@ -5,7 +5,7 @@ import {
   AlertCircle,
   ClipboardList,
   DollarSign,
-  ShieldAlert,
+  Shield,
   Repeat2,
   AlertTriangle,
 } from "lucide-react"
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           title="Expiring Warranties"
           value={stats.expiringWarrantiesCount}
           subtitle="Within 30 days"
-          icon={ShieldAlert}
+          icon={Shield}
           iconColor="text-[oklch(0.50_0.12_70)]"
           iconBg="bg-[oklch(0.75_0.16_70)]/10"
           href="/equipment"

@@ -7,7 +7,7 @@ import {
 } from "recharts"
 import {
   Download, FileText, Clock, Mail, Copy, TrendingUp,
-  AlertTriangle, ShieldAlert, RefreshCcw, DollarSign,
+  AlertTriangle, Shield, RefreshCcw, DollarSign,
   ChevronDown, Calendar, User, MapPin, Filter, X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -540,7 +540,7 @@ export default function ReportsPage() {
           <div className="space-y-2">
             {expiringWarranties.map((w) => (
               <div key={w.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-warning border">
-                <ShieldAlert className="w-4 h-4 ds-icon-warning mt-0.5 shrink-0" />
+                <Shield className="w-4 h-4 ds-icon-warning mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">{w.equipment}</p>
                   <p className="text-[11px] text-muted-foreground">{w.customer}</p>
@@ -583,7 +583,7 @@ export default function ReportsPage() {
                 </div>
                 <p className="text-[10px] text-muted-foreground">Last run: {r.lastRun}</p>
                 <div className="flex items-center gap-2 pt-1 border-t border-border">
-                  <button className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-semibold text-primary-foreground bg-primary hover:opacity-90 transition-opacity rounded-md py-1.5">
+                  <button className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-semibold text-cta-foreground bg-cta hover:bg-cta-hover active:bg-cta-active transition-colors rounded-md py-1.5">
                     <Download className="w-3 h-3" /> Run Report
                   </button>
                   <button

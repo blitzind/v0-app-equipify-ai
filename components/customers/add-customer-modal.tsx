@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 
 interface AddCustomerModalProps {
   open: boolean
@@ -50,6 +51,7 @@ const INITIAL = {
 }
 
 export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalProps) {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [form, setForm] = useState(INITIAL)
   const [errors, setErrors] = useState<Partial<typeof INITIAL>>({})
   const [saving, setSaving] = useState(false)
@@ -89,18 +91,12 @@ export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalP
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
-        setSubmitError(profileError?.message ?? "No default organization found.")
+      if (orgStatus !== "ready" || !activeOrgId) {
+        setSubmitError(orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…")
         return
       }
 
-      const orgId = profile.default_organization_id
+      const orgId = activeOrgId
 
       const { data: created, error: insertError } = await supabase
         .from("customers")

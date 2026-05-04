@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import {
   Wrench, ChevronRight, Search, CalendarClock,
-  ShieldCheck, MapPin, Clock,
+  Shield, MapPin, Clock,
 } from "lucide-react"
 import { equipment, workOrders } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
@@ -93,7 +93,7 @@ function EquipmentCard({ eq }: { eq: typeof myEquipment[number] }) {
             </span>
           </div>
           <div className="flex items-center gap-2" style={{ color: "var(--portal-nav-text)" }}>
-            <ShieldCheck size={12} className="shrink-0" />
+            <Shield size={12} className="shrink-0" />
             <span>Warranty: </span>
             <span className="font-medium" style={{ color: warrantyDays < 0 ? "var(--portal-danger)" : warrantyDays <= 30 ? "var(--portal-warning)" : "var(--portal-secondary)" }}>
               {warrantyDays < 0 ? "Expired" : `Expires ${fmtDate(eq.warrantyExpiration)}`}

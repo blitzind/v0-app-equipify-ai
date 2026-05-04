@@ -510,7 +510,7 @@ function ServiceCard({
                   technicianName: plan.technicianName,
                   scheduledDate:  plan.nextDueDate,
                   address:        plan.location,
-                  workOrderId:    plan.id,
+                  workOrderTitle:   plan.name,
                   ccEmails:       ["service@equipify.ai"],
                 }}
               />
@@ -1048,7 +1048,7 @@ function ScheduledWorkOrdersSection({
           Scheduled Work Orders
         </CardTitle>
         <p className="text-xs text-muted-foreground font-normal pt-0.5">
-          From Supabase: active work orders with a scheduled date in your default organization.
+          Active work orders with a scheduled date for your organization.
         </p>
       </CardHeader>
       <CardContent className="pt-0 flex flex-col gap-3">
@@ -1229,13 +1229,7 @@ function ServiceSchedulePageInner() {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (!organizationId) {
         if (active) {
           setScheduledWoRows([])
           setScheduledWoLoading(false)
@@ -1243,7 +1237,7 @@ function ServiceSchedulePageInner() {
         return
       }
 
-      const orgId = profile.default_organization_id
+      const orgId = organizationId
 
       const schedWoSelWithNum =
         "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
@@ -1387,7 +1381,7 @@ function ServiceSchedulePageInner() {
     return () => {
       active = false
     }
-  }, [scheduledWoRefresh])
+  }, [scheduledWoRefresh, organizationId])
 
   // View state
   const [viewTab, setViewTab]             = useState<ViewTab>("list")

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, ShieldAlert, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
+import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -43,7 +43,7 @@ const INITIAL_PREFS: NotifPreference[] = [
     id: "warranty-expiring",
     label: "Warranty expiring",
     description: "When equipment warranties are approaching expiration.",
-    icon: ShieldAlert,
+    icon: Shield,
     iconColor: "text-[oklch(0.50_0.12_70)]",
     channels: { inApp: true, email: true, sms: false },
   },

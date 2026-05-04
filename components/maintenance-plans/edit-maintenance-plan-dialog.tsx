@@ -216,19 +216,13 @@ export function EditMaintenancePlanDialog({
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
-        if (!cancelled) setCatalogError(profileError?.message ?? "No default organization.")
+      if (!organizationId) {
+        if (!cancelled) setCatalogError("No organization selected.")
         setCatalogLoading(false)
         return
       }
 
-      const orgId = profile.default_organization_id
+      const orgId = organizationId
 
       const { data: custRows, error: custError } = await supabase
         .from("customers")
@@ -273,7 +267,7 @@ export function EditMaintenancePlanDialog({
             (p) => ({
               id: p.id,
               label:
-                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8),
+                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
             })
           )
         techOptions.sort((a, b) => a.label.localeCompare(b.label))
@@ -286,7 +280,7 @@ export function EditMaintenancePlanDialog({
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, organizationId])
 
   useEffect(() => {
     if (!open || !organizationId || !form.customerId) {

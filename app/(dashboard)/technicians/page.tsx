@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -167,7 +168,7 @@ function buildTechnicianFromProfile(
   const name =
     (profile.full_name && profile.full_name.trim()) ||
     (profile.email && profile.email.trim()) ||
-    profile.id.slice(0, 8)
+    "Technician"
   const hireDate =
     profile.created_at && /^\d{4}-\d{2}-\d{2}/.test(profile.created_at)
       ? profile.created_at.slice(0, 10)
@@ -821,6 +822,7 @@ function TechCard({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function TechniciansPageInner() {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [techs, setTechs] = useState<Technician[]>([])
   const [woRows, setWoRows] = useState<WoRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -858,23 +860,21 @@ function TechniciansPageInner() {
         return
       }
 
-      const { data: userProfile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !userProfile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (active) {
           setTechs([])
           setWoRows([])
-          setLoadError(profileError?.message ?? "No default organization.")
+          setLoadError(
+            orgStatus === "ready" && !activeOrgId
+              ? "No organization selected."
+              : null,
+          )
           setLoading(false)
         }
         return
       }
 
-      const orgId = userProfile.default_organization_id
+      const orgId = activeOrgId
 
       const { data: members, error: memError } = await supabase
         .from("organization_members")
@@ -959,7 +959,7 @@ function TechniciansPageInner() {
     return () => {
       active = false
     }
-  }, [rosterRefresh])
+  }, [rosterRefresh, orgStatus, activeOrgId])
 
   useEffect(() => {
     const openId = searchParams.get("open")

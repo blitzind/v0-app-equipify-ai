@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useCustomers } from "@/lib/customer-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -177,6 +178,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 }
 
 function CustomersPageInner() {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [customers, setCustomers] = useState<Customer[]>([])
   const { customers: drawerCustomers, addCustomer } = useCustomers()
   const [refreshToken, setRefreshToken] = useState(0)
@@ -205,21 +207,17 @@ function CustomersPageInner() {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (active) setCustomers([])
         return
       }
 
+      const orgId = activeOrgId
+
       const { data, error } = await supabase
         .from("customers")
         .select("id, company_name, status, joined_at")
-        .eq("organization_id", profile.default_organization_id)
+        .eq("organization_id", orgId)
         .eq("is_archived", false)
         .order("created_at", { ascending: false })
 
@@ -239,14 +237,14 @@ function CustomersPageInner() {
           supabase
             .from("customer_contacts")
             .select("customer_id, full_name, email, phone, is_primary")
-            .eq("organization_id", profile.default_organization_id)
+            .eq("organization_id", orgId)
             .eq("is_archived", false)
             .in("customer_id", customerIds)
             .order("is_primary", { ascending: false }),
           supabase
             .from("customer_locations")
             .select("customer_id, id, address_line1, city, state, postal_code, is_default")
-            .eq("organization_id", profile.default_organization_id)
+            .eq("organization_id", orgId)
             .eq("is_archived", false)
             .in("customer_id", customerIds)
             .order("is_default", { ascending: false }),
@@ -309,7 +307,7 @@ function CustomersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken])
+  }, [refreshToken, orgStatus, activeOrgId])
 
   useEffect(() => {
     const openId = searchParams.get("open")

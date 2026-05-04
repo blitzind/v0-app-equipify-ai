@@ -3,7 +3,7 @@
 import { use } from "react"
 import Link from "next/link"
 import {
-  ChevronLeft, MapPin, CalendarClock, ShieldCheck,
+  ChevronLeft, MapPin, CalendarClock, Shield,
   Hash, Wrench, CheckCircle2, Clock, AlertTriangle,
   FileDown, ArrowUpRight,
 } from "lucide-react"
@@ -123,7 +123,7 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
               { icon: Hash, label: "Serial No.", value: eq.serialNumber },
               { icon: MapPin, label: "Location", value: eq.location },
               { icon: CalendarClock, label: "Installed", value: fmtDate(eq.installDate) },
-              { icon: ShieldCheck, label: "Warranty", value: warrantyDays < 0 ? "Expired" : `Exp. ${fmtDate(eq.warrantyExpiration)}`,
+              { icon: Shield, label: "Warranty", value: warrantyDays < 0 ? "Expired" : `Exp. ${fmtDate(eq.warrantyExpiration)}`,
                 warn: warrantyDays < 0 || warrantyDays <= 30 },
             ].map(({ icon: Icon, label, value, warn }) => (
               <div key={label}>

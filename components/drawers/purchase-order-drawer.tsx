@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { cn } from "@/lib/utils"
+import { cn, looksLikeUuid } from "@/lib/utils"
 import { usePurchaseOrders, type PurchaseOrder, type POStatus, type POLineItem } from "@/lib/purchase-order-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,6 +41,12 @@ function fmtDate(d: string) {
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
+}
+
+function purchaseOrderDrawerTitle(o: PurchaseOrder): string {
+  const id = o.id.trim()
+  if (looksLikeUuid(id)) return `Purchase order · ${o.vendor}`
+  return id
 }
 
 // ─── Draft state shape ────────────────────────────────────────────────────────
@@ -186,7 +192,7 @@ export function PurchaseOrderDrawer({ orderId, onClose }: Props) {
       <DetailDrawer
         open={!!orderId}
         onClose={onClose}
-        title={order.id}
+        title={purchaseOrderDrawerTitle(order)}
         subtitle={`${order.vendor} — ${fmtDate(order.orderedDate)}`}
         width="lg"
         badge={

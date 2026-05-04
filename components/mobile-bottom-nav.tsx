@@ -11,6 +11,7 @@ import {
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
   Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart,
 } from "lucide-react"
+import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -127,15 +128,19 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
 
-  const items = [
-    { icon: Wrench,        label: "Equipment",  href: "/equipment" },
-    { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
-    { icon: FileText,      label: "Quotes",           href: "/quotes" },
-    { icon: Receipt,       label: "Invoices",         href: "/invoices" },
-    { icon: ShoppingCart,  label: "Purchase Orders",  href: "/purchase-orders" },
-    { icon: BarChart3,     label: "Reports",          href: "/reports" },
-    { icon: Sparkles,      label: "AI Insights", href: "/insights" },
-    { icon: Settings,      label: "Settings",    href: "/settings/workspace" },
+  const items: (
+    | { kind: "lucide"; icon: React.ElementType; label: string; href: string }
+    | { kind: "maintenance-plans"; label: string; href: string }
+  )[] = [
+    { kind: "lucide", icon: Wrench,        label: "Equipment",  href: "/equipment" },
+    { kind: "lucide", icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
+    { kind: "maintenance-plans", label: "Maintenance Plans", href: "/maintenance-plans" },
+    { kind: "lucide", icon: FileText,      label: "Quotes",           href: "/quotes" },
+    { kind: "lucide", icon: Receipt,       label: "Invoices",         href: "/invoices" },
+    { kind: "lucide", icon: ShoppingCart,  label: "Purchase Orders",  href: "/purchase-orders" },
+    { kind: "lucide", icon: BarChart3,     label: "Reports",          href: "/reports" },
+    { kind: "lucide", icon: Sparkles,      label: "AI Insights", href: "/insights" },
+    { kind: "lucide", icon: Settings,      label: "Settings",    href: "/settings/workspace" },
   ]
 
   return (
@@ -152,18 +157,28 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </button>
         </div>
         <div className="flex flex-col divide-y divide-border">
-          {items.map(({ icon: Icon, label, href }) => {
-            const active = isActive(pathname, href)
+          {items.map((item) => {
+            const active = isActive(pathname, item.href)
             return (
               <Link
-                key={href}
-                href={href}
+                key={item.href}
+                href={item.href}
                 onClick={onClose}
                 className="flex items-center gap-3 py-3.5 transition-colors"
                 style={active ? { color: ACCENT } : undefined}
               >
-                <Icon className="w-4 h-4 shrink-0" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
-                <span className={cn("text-sm", active && "font-semibold")}>{label}</span>
+                {item.kind === "maintenance-plans" ? (
+                  <MaintenancePlansBrandTile
+                    size="xs"
+                    className={cn(active && "ring-2 ring-[#f59f1c]/35 ring-offset-1 ring-offset-background")}
+                  />
+                ) : (
+                  <item.icon
+                    className="w-4 h-4 shrink-0"
+                    style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
+                  />
+                )}
+                <span className={cn("text-sm", active && "font-semibold")}>{item.label}</span>
               </Link>
             )
           })}

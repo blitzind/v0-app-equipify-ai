@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -159,12 +160,12 @@ export function TechnicianDrawer({
   onSchedule,
   onUpdated,
 }: TechnicianDrawerProps) {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [tab, setTab] = useState<DrawerTab>("overview")
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [orgId, setOrgId] = useState<string | null>(null)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [viewerIsAdmin, setViewerIsAdmin] = useState(false)
   const [fullName, setFullName] = useState("")
@@ -219,17 +220,10 @@ export function TechnicianDrawer({
 
     setViewerUserId(user.id)
 
-    const { data: viewerProfile } = await supabase
-      .from("profiles")
-      .select("default_organization_id")
-      .eq("id", user.id)
-      .single()
-
-    const oid = viewerProfile?.default_organization_id ?? null
-    setOrgId(oid)
+    const oid = orgStatus === "ready" ? activeOrgId : null
 
     if (!oid) {
-      setLoadError("No default organization.")
+      setLoadError(orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…")
       setLoading(false)
       return
     }
@@ -278,7 +272,7 @@ export function TechnicianDrawer({
     setMemberRole(tom.role)
     setMemberStatus(tom.status)
     setLoading(false)
-  }, [techId])
+  }, [techId, activeOrgId, orgStatus])
 
   useEffect(() => {
     if (!techId) return
@@ -302,7 +296,7 @@ export function TechnicianDrawer({
   }, [onClose, openScheduleWoId, editOpen])
 
   useEffect(() => {
-    if (tab !== "schedule" || !techId || !orgId) return
+    if (tab !== "schedule" || !techId || !activeOrgId) return
 
     let cancelled = false
 
@@ -318,7 +312,7 @@ export function TechnicianDrawer({
       let woRes = await supabase
         .from("work_orders")
         .select(techSchedSelectWithNum)
-        .eq("organization_id", orgId)
+        .eq("organization_id", activeOrgId)
         .eq("assigned_user_id", techId)
         .eq("is_archived", false)
         .not("scheduled_on", "is", null)
@@ -327,7 +321,7 @@ export function TechnicianDrawer({
         woRes = await supabase
           .from("work_orders")
           .select(techSchedSelect)
-          .eq("organization_id", orgId)
+          .eq("organization_id", activeOrgId)
           .eq("assigned_user_id", techId)
           .eq("is_archived", false)
           .not("scheduled_on", "is", null)
@@ -373,7 +367,7 @@ export function TechnicianDrawer({
         const { data: custRows } = await supabase
           .from("customers")
           .select("id, company_name")
-          .eq("organization_id", orgId)
+          .eq("organization_id", activeOrgId)
           .in("id", customerIds)
         ;((custRows as Array<{ id: string; company_name: string }> | null) ?? []).forEach((c) => {
           customerMap.set(c.id, c.company_name)
@@ -394,7 +388,7 @@ export function TechnicianDrawer({
         const { data: eqRows } = await supabase
           .from("equipment")
           .select("id, name, location_label, equipment_code, serial_number, category")
-          .eq("organization_id", orgId)
+          .eq("organization_id", activeOrgId)
           .in("id", equipmentIds)
         ;(
           (eqRows as Array<{
@@ -452,7 +446,7 @@ export function TechnicianDrawer({
     return () => {
       cancelled = true
     }
-  }, [tab, techId, orgId, scheduleRefresh])
+  }, [tab, techId, activeOrgId, scheduleRefresh])
 
   function openEdit() {
     setDraftName(fullName)
@@ -462,7 +456,7 @@ export function TechnicianDrawer({
   }
 
   async function saveEdit() {
-    if (!techId || !orgId) return
+    if (!techId || !activeOrgId) return
     const nameTrim = draftName.trim()
     if (!nameTrim) {
       toast("Name is required.", "info")
@@ -494,7 +488,7 @@ export function TechnicianDrawer({
             status: draftStatus,
             updated_at: new Date().toISOString(),
           })
-          .eq("organization_id", orgId)
+          .eq("organization_id", activeOrgId)
           .eq("user_id", techId)
 
         if (omErr) {

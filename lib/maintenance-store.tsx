@@ -16,6 +16,7 @@ import type {
   NotificationTriggerDays,
 } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { loadMaintenancePlansForOrg } from "@/lib/maintenance-plans/load-plans"
 import {
   computeNextDueDate,
@@ -47,6 +48,7 @@ interface MaintenanceContextValue {
 const MaintenanceContext = createContext<MaintenanceContextValue | null>(null)
 
 export function MaintenanceProvider({ children }: { children: ReactNode }) {
+  const activeOrg = useActiveOrganization()
   const [plans, setPlans] = useState<MaintenancePlan[]>([])
   const [notificationLog, setNotificationLog] = useState<NotificationLogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,28 +71,31 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("default_organization_id")
-      .eq("id", user.id)
-      .single()
+    if (activeOrg.status !== "ready") {
+      if (!silent) setLoading(true)
+      return
+    }
 
-    if (profileError || !profile?.default_organization_id) {
+    if (!activeOrg.organizationId) {
       setOrganizationId(null)
       setPlans([])
-      setError(profileError?.message ?? "No default organization.")
+      setError(
+        activeOrg.organizations.length === 0
+          ? "No organizations found for this account."
+          : "Select an organization.",
+      )
       if (!silent) setLoading(false)
       return
     }
 
-    const orgId = profile.default_organization_id
+    const orgId = activeOrg.organizationId
     setOrganizationId(orgId)
 
     const { plans: loaded, error: loadErr } = await loadMaintenancePlansForOrg(supabase, orgId)
     setPlans(loaded)
     setError(loadErr)
     if (!silent) setLoading(false)
-  }, [])
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length])
 
   useEffect(() => {
     void refreshPlans()

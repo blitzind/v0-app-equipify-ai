@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type {
   WorkOrder,
@@ -484,6 +485,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 // ─── Main page ─────────────────────────────────────────��──────────────────────
 
 function WorkOrdersPageInner() {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
 
@@ -501,18 +503,12 @@ function WorkOrdersPageInner() {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (active) setWorkOrders([])
         return
       }
 
-      const orgId = profile.default_organization_id
+      const orgId = activeOrgId
 
       let woRes = await supabase
         .from("work_orders")
@@ -679,7 +675,7 @@ function WorkOrdersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken])
+  }, [refreshToken, orgStatus, activeOrgId])
 
   const [view, setView] = useState<ViewMode>("kanban")
   const [search, setSearch] = useState("")
@@ -689,7 +685,13 @@ function WorkOrdersPageInner() {
   const [sortKey, setSortKey] = useState<SortKey>("scheduledDate")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [createOpen, setCreateOpen] = useState(false)
-  useQuickAdd("new-work-order", () => setCreateOpen(true))
+  const [createModalCustomerId, setCreateModalCustomerId] = useState<string | null>(null)
+  const [createModalEquipmentId, setCreateModalEquipmentId] = useState<string | null>(null)
+  useQuickAdd("new-work-order", () => {
+    setCreateModalCustomerId(null)
+    setCreateModalEquipmentId(null)
+    setCreateOpen(true)
+  })
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -699,6 +701,18 @@ function WorkOrdersPageInner() {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedWoId(openId)
+      router.replace("/work-orders", { scroll: false })
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    const action = searchParams.get("action")
+    const cid = searchParams.get("customerId")
+    const eid = searchParams.get("equipmentId")
+    if (action === "new-work-order") {
+      setCreateModalCustomerId(cid)
+      setCreateModalEquipmentId(eid)
+      setCreateOpen(true)
       router.replace("/work-orders", { scroll: false })
     }
   }, [searchParams, router])
@@ -783,76 +797,83 @@ function WorkOrdersPageInner() {
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Search */}
-        <div className="relative w-full sm:flex-1 sm:min-w-0 sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search work orders..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      {/* Toolbar: search & filters (left) · view mode + primary action (right) */}
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-2.5">
+          <div className="relative w-full min-w-[12rem] sm:max-w-sm sm:flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search work orders..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as WorkOrderPriority | "all")}>
+              <SelectTrigger className="w-32 sm:w-36">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="Critical">Critical</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Normal">Normal</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={techFilter} onValueChange={setTechFilter}>
+              <SelectTrigger className="w-36 sm:w-44">
+                <SelectValue placeholder="Technician" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Technicians</SelectItem>
+                {allTechs.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Priority filter */}
-          <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as WorkOrderPriority | "all")}>
-            <SelectTrigger className="w-32 sm:w-36">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="Critical">Critical</SelectItem>
-              <SelectItem value="High">High</SelectItem>
-              <SelectItem value="Normal">Normal</SelectItem>
-              <SelectItem value="Low">Low</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:justify-end">
+          <div className="flex items-center overflow-hidden rounded-md border border-border">
+            {([
+              { mode: "kanban", icon: LayoutGrid, label: "Kanban" },
+              { mode: "table", icon: List, label: "Table" },
+              { mode: "calendar", icon: Calendar, label: "Calendar" },
+            ] as const).map(({ mode, icon: Icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => setView(mode)}
+                title={label}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-xs transition-colors",
+                  view === mode
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
 
-          {/* Technician filter */}
-          <Select value={techFilter} onValueChange={setTechFilter}>
-            <SelectTrigger className="w-36 sm:w-44">
-              <SelectValue placeholder="Technician" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Technicians</SelectItem>
-              {allTechs.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            onClick={() => {
+              setCreateModalCustomerId(null)
+              setCreateModalEquipmentId(null)
+              setCreateOpen(true)
+            }}
+            className="gap-2 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            New Work Order
+          </Button>
         </div>
-
-        {/* View toggle */}
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          {([
-            { mode: "kanban", icon: LayoutGrid, label: "Kanban" },
-            { mode: "table", icon: List, label: "Table" },
-            { mode: "calendar", icon: Calendar, label: "Calendar" },
-          ] as const).map(({ mode, icon: Icon, label }) => (
-            <button
-              key={mode}
-              onClick={() => setView(mode)}
-              title={label}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-xs transition-colors",
-                view === mode
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-        </div>
-
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 shrink-0">
-          <Plus className="w-4 h-4" />
-          New Work Order
-        </Button>
       </div>
 
       {/* Results count (non-kanban) */}
@@ -880,7 +901,13 @@ function WorkOrdersPageInner() {
 
       <CreateWorkOrderModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        initialCustomerId={createModalCustomerId}
+        initialEquipmentId={createModalEquipmentId}
+        onClose={() => {
+          setCreateOpen(false)
+          setCreateModalCustomerId(null)
+          setCreateModalEquipmentId(null)
+        }}
         onSuccess={() => setRefreshToken((v) => v + 1)}
       />
 

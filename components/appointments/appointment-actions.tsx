@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { MapPin, Mail, Apple, ChevronDown, Copy, Check, ExternalLink } from "lucide-react"
-import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 // ─── Map URL builders ─────────────────────────────────────────────────────────
 
@@ -32,7 +32,12 @@ export interface EmailParams {
   scheduledDate: string
   scheduledTime?: string
   address: string
+  /** DB id — used only after number/title; may appear as last-resort display (e.g. WO- in id). */
   workOrderId?: string
+  /** When set, formatted as WO-####### in email copy. */
+  workOrderNumber?: number | null
+  /** Prefer over raw id when no numeric WO label (e.g. work order title / plan name). */
+  workOrderTitle?: string
   ccEmails?: string[]
 }
 
@@ -46,11 +51,25 @@ function fmtDateLong(dateStr: string): string {
   })
 }
 
+/** Human-facing work order / reference line for email — never prefers raw UUID over title or WO number. */
+function resolveAppointmentWoLabel(p: EmailParams): string {
+  const n = p.workOrderNumber
+  if (n != null && Number.isFinite(n)) {
+    return formatWorkOrderDisplay(n)
+  }
+  const title = p.workOrderTitle?.trim()
+  if (title) return title
+  const id = p.workOrderId?.trim()
+  if (!id) return ""
+  return getWorkOrderDisplay({ id, workOrderNumber: p.workOrderNumber ?? undefined })
+}
+
 function buildEmail(params: EmailParams): { subject: string; body: string; mailto: string } {
   const dateStr = fmtDateLong(params.scheduledDate)
   const timeStr = params.scheduledTime ? ` at ${params.scheduledTime}` : ""
+  const woLabel = resolveAppointmentWoLabel(params)
 
-  const subject = `Appointment Confirmation${params.workOrderId ? ` — ${params.workOrderId}` : ""} · ${params.customerName}`
+  const subject = `Appointment Confirmation${woLabel ? ` — ${woLabel}` : ""} · ${params.customerName}`
 
   const body = `Dear ${params.customerName},
 

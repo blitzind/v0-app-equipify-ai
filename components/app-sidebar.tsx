@@ -6,13 +6,18 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/lib/tenant-store"
 import { MOCK_WORKSPACES } from "@/lib/tenant-data"
+
+/** Sidebar demo list: excludes generic live-org template (not a named tenant). */
+const PICKER_DEMO_WORKSPACES = MOCK_WORKSPACES.filter((w) => w.id !== "ws-live-generic")
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
-  ShieldCheck, HardHat, BarChart3,
+  HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
   Building2, X, FileText, Receipt, ShoppingCart,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
+import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
 type NavItem = {
   label: string
@@ -36,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Equipment",         href: "/equipment",         icon: Wrench },
       { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },
       { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
-      { label: "Maintenance Plans", href: "/maintenance-plans", icon: ShieldCheck },
+      { label: "Maintenance Plans", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
       { label: "Technicians",       href: "/technicians",       icon: HardHat },
     ],
   },
@@ -81,8 +86,11 @@ function SidebarBody({
 }) {
   const pathname = usePathname()
   const { workspace, dispatch, can } = useTenant()
+  const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
+    useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
   const planMeta = PLAN_META[workspace.planId] ?? PLAN_META["growth"]
+  const orgPickerLoading = orgStatus === "loading" || switching
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -172,15 +180,53 @@ function SidebarBody({
 
         {wsMenuOpen && !isCollapsed && (
           <div className="absolute top-full left-3 right-3 z-50 mt-1 bg-sidebar border border-sidebar-border rounded-xl shadow-xl overflow-hidden">
-            <p className="px-3.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">Switch workspace</p>
-            {MOCK_WORKSPACES.map((ws) => (
-              <button key={ws.id} onClick={() => { dispatch({ type: "SWITCH_WORKSPACE", payload: ws.id }); setWsMenuOpen(false) }}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0" style={{ background: ws.primaryColor }}>{ws.name[0]}</div>
-                <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{ws.name}</span>
-                {ws.id === workspace.id && <Check size={13} className="text-primary shrink-0" />}
-              </button>
-            ))}
+            <p className="px-3.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              {organizations.length > 0 ? "Your organizations" : "Sample organizations"}
+            </p>
+            {organizations.length > 0
+              ? organizations.map((org) => (
+                  <button
+                    key={org.id}
+                    type="button"
+                    disabled={orgPickerLoading}
+                    onClick={() => {
+                      void (async () => {
+                        await switchOrganization(org.id)
+                        setWsMenuOpen(false)
+                      })()
+                    }}
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 uppercase"
+                      style={{ background: workspace.primaryColor }}
+                    >
+                      {org.name[0]}
+                    </div>
+                    <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{org.name}</span>
+                    {org.id === organizationId ? <Check size={13} className="text-primary shrink-0" /> : null}
+                  </button>
+                ))
+              : PICKER_DEMO_WORKSPACES.map((ws) => (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={() => {
+                      dispatch({ type: "SWITCH_WORKSPACE", payload: ws.id })
+                      setWsMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                      style={{ background: ws.primaryColor }}
+                    >
+                      {ws.name[0]}
+                    </div>
+                    <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{ws.name}</span>
+                    {ws.id === workspace.id ? <Check size={13} className="text-primary shrink-0" /> : null}
+                  </button>
+                ))}
             <div className="border-t border-sidebar-border px-3.5 py-2.5">
               <Link href="/onboarding" onClick={() => setWsMenuOpen(false)} className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
                 <Building2 size={13} /> Create new workspace

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { AiInsight } from "@/lib/mock-data"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -130,7 +131,7 @@ export function buildOperationalInsights(input: {
       title: `${input.overdueService} asset${input.overdueService === 1 ? "" : "s"} past service due date`,
       description:
         "Equipment with a next service date before today still needs scheduling or completion. Review the equipment list and open or complete work orders.",
-      meta: "Based on equipment next due date",
+      meta: "Next service date vs. today",
       value: String(input.overdueService),
       actionLabel: "View equipment",
       actionHref: "/equipment",
@@ -160,7 +161,7 @@ export function buildOperationalInsights(input: {
       title: `${input.openWorkOrders} open work order${input.openWorkOrders === 1 ? "" : "s"}`,
       description:
         "Work orders in Open, Scheduled, or In Progress status. Clear the queue to improve response time and billing.",
-      meta: "Non-completed statuses",
+      meta: "Open, scheduled, and in progress",
       value: String(input.openWorkOrders),
       actionLabel: "Open queue",
       actionHref: "/work-orders",
@@ -175,7 +176,7 @@ export function buildOperationalInsights(input: {
       title: `${input.expiringWarrantiesCount} warrant${input.expiringWarrantiesCount === 1 ? "y" : "ies"} expiring within 30 days`,
       description:
         "Equipment with a recorded warranty end date in the next 30 days. Confirm coverage and renewal with customers.",
-      meta: "warranty_expires_at in CRM",
+      meta: "Recorded warranty end date",
       value: String(input.expiringWarrantiesCount),
       actionLabel: "View equipment",
       actionHref: "/equipment",
@@ -218,7 +219,7 @@ export function buildOperationalInsights(input: {
       title: `Completed work revenue this month: $${dollars.toLocaleString()}`,
       description:
         "Sum of labor and parts on work orders marked completed or invoiced with activity this month (from your ledger fields).",
-      meta: "Completed + invoiced WOs",
+      meta: "Completed and invoiced work",
       value: `$${dollars.toLocaleString()}`,
       actionLabel: "View reports",
       actionHref: "/reports",
@@ -229,9 +230,9 @@ export function buildOperationalInsights(input: {
 }
 
 export function useSupabaseDashboard() {
+  const activeOrg = useActiveOrganization()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     equipmentDueThisMonth: 0,
     overdueService: 0,
@@ -257,7 +258,6 @@ export function useSupabaseDashboard() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      setOrganizationId(null)
       setStats({
         equipmentDueThisMonth: 0,
         overdueService: 0,
@@ -278,14 +278,11 @@ export function useSupabaseDashboard() {
       return
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("default_organization_id")
-      .eq("id", user.id)
-      .single()
+    if (activeOrg.status !== "ready") {
+      return
+    }
 
-    if (profileError || !profile?.default_organization_id) {
-      setOrganizationId(null)
+    if (!activeOrg.organizationId) {
       setRecentWorkOrders([])
       setEquipmentDueSoon([])
       setExpiringWarranties([])
@@ -301,17 +298,26 @@ export function useSupabaseDashboard() {
         expiringWarrantiesCount: 0,
         repeatRepairAlertsCount: 0,
       })
-      setError(profileError?.message ?? "No default organization.")
+      setError(
+        activeOrg.organizations.length === 0
+          ? "No organizations found for this account."
+          : "Select an organization.",
+      )
       setLoading(false)
       return
     }
 
-    const orgId = profile.default_organization_id
-    setOrganizationId(orgId)
+    const orgId = activeOrg.organizationId
 
     const { monthStart, monthEnd, today } = boundsThisMonth()
     const warrantyBefore = addDays(today, 30)
     const ninetyDaysAgo = addDays(today, -90)
+
+    const chartWindowStart = new Date()
+    chartWindowStart.setMonth(chartWindowStart.getMonth() - 11)
+    chartWindowStart.setDate(1)
+    chartWindowStart.setHours(0, 0, 0, 0)
+    const chartWindowStartIso = chartWindowStart.toISOString()
 
     const recentWoSelectWithNum =
       "id, work_order_number, title, status, priority, scheduled_on, created_at, customer_id, equipment_id, assigned_user_id"
@@ -416,7 +422,7 @@ export function useSupabaseDashboard() {
           .eq("organization_id", orgId)
           .eq("is_archived", false)
           .in("status", ["completed", "invoiced"])
-          .gte("updated_at", new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).toISOString()),
+          .gte("updated_at", chartWindowStartIso),
       ])
 
       if (recentWoRes.error && missingWorkOrderNumberColumn(recentWoRes.error)) {
@@ -464,7 +470,7 @@ export function useSupabaseDashboard() {
         updated_at: string
       }>
       const monthTotals = new Map<string, number>()
-      for (let i = 5; i >= 0; i--) {
+      for (let i = 11; i >= 0; i--) {
         const d = new Date()
         d.setMonth(d.getMonth() - i)
         monthTotals.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, 0)
@@ -693,7 +699,7 @@ export function useSupabaseDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length])
 
   useEffect(() => {
     void load()
@@ -702,7 +708,7 @@ export function useSupabaseDashboard() {
   return {
     loading,
     error,
-    organizationId,
+    organizationId: activeOrg.organizationId,
     stats,
     recentWorkOrders,
     equipmentDueSoon,

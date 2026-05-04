@@ -219,6 +219,51 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     ownerId: "u-08",
     createdAt: "2024-06-01T08:00:00Z",
   },
+  {
+    id: "ws-precision-biomedical",
+    name: "Precision Biomedical Services",
+    slug: "precision-biomedical-demo",
+    planId: "growth",
+    billingCycle: "annual",
+    stripeCustomerId: "cus_pbs_demo",
+    stripeSubscriptionId: "sub_pbs_demo",
+    subscriptionStatus: "active",
+    trialEndsAt: "",
+    currentPeriodEnd: "2026-12-31",
+    logoUrl: "",
+    primaryColor: "#0d9488",
+    companyEmail: "dispatch@precisionbiomedical.demo",
+    companyPhone: "(559) 555-0140",
+    companyAddress: "4280 Biomedical Way, Fresno, CA 93726",
+    timezone: "America/Los_Angeles",
+    dateFormat: "MM/DD/YYYY",
+    seatCount: 8,
+    ownerId: "u-12",
+    createdAt: "2023-06-01T08:00:00Z",
+  },
+  /** Template for real Supabase orgs without a matching demo bundle (quotes/invoices stay empty). */
+  {
+    id: "ws-live-generic",
+    name: "Organization",
+    slug: "organization",
+    planId: "growth",
+    billingCycle: "annual",
+    stripeCustomerId: "",
+    stripeSubscriptionId: "",
+    subscriptionStatus: "active",
+    trialEndsAt: "",
+    currentPeriodEnd: "2026-12-31",
+    logoUrl: "",
+    primaryColor: "#64748b",
+    companyEmail: "",
+    companyPhone: "",
+    companyAddress: "",
+    timezone: "America/Los_Angeles",
+    dateFormat: "MM/DD/YYYY",
+    seatCount: 1,
+    ownerId: "u-01",
+    createdAt: "2026-01-01T08:00:00Z",
+  },
 ]
 
 export const MOCK_USERS: TenantUser[] = [
@@ -268,6 +313,18 @@ export const MOCK_USERS: TenantUser[] = [
   {
     id: "u-11", name: "Brandon Ellis", email: "b.ellis@medology.com",
     role: "Technician", avatar: "", joinedAt: "2024-07-15", lastActive: "2026-04-28", status: "Active",
+  },
+  {
+    id: "u-12", name: "Riley Park", email: "r.park@precisionbiomedical.demo",
+    role: "Owner", avatar: "", joinedAt: "2023-06-01", lastActive: "2026-05-01", status: "Active",
+  },
+  {
+    id: "u-13", name: "Alex Rivera", email: "demo.tech.rivera@precision-biomedical.seed",
+    role: "Technician", avatar: "", joinedAt: "2023-08-12", lastActive: "2026-05-01", status: "Active",
+  },
+  {
+    id: "u-14", name: "Linh Nguyen", email: "demo.tech.nguyen@precision-biomedical.seed",
+    role: "Technician", avatar: "", joinedAt: "2023-09-01", lastActive: "2026-04-30", status: "Active",
   },
 ]
 

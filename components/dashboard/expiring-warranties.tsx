@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ShieldAlert, AlertTriangle } from "lucide-react"
+import { Shield, AlertTriangle } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { cn } from "@/lib/utils"
 import type { WarrantyRow } from "@/lib/dashboard/use-supabase-dashboard"
@@ -23,7 +23,7 @@ export function ExpiringWarranties({
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-[oklch(0.72_0.17_70)]" />
+            <Shield className="w-4 h-4 text-[oklch(0.72_0.17_70)]" />
             <h2 className="text-sm font-semibold text-foreground">Expiring Warranties</h2>
           </div>
           <Link
@@ -49,7 +49,7 @@ export function ExpiringWarranties({
           </ul>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center px-4">
-            <ShieldAlert className="w-8 h-8 text-muted-foreground/30" />
+            <Shield className="w-8 h-8 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">No warranties expiring in the next 30 days</p>
             <p className="text-xs text-muted-foreground/80 max-w-[280px] leading-relaxed">
               Add <span className="font-medium text-muted-foreground">warranty end dates</span> on equipment records to track coverage and see expirations here.

@@ -24,6 +24,11 @@ type TenantAction =
   | { type: "SUSPEND_USER"; payload: string }
   | { type: "UPGRADE_PLAN"; payload: { planId: PlanId; billingCycle: "monthly" | "annual" } }
   | { type: "SWITCH_WORKSPACE"; payload: string }
+  /** Align tenant branding + mock bundle with active Supabase org without changing signed-in user. */
+  | {
+      type: "SYNC_WORKSPACE_FROM_ACTIVE_ORG"
+      payload: { templateWorkspaceId: string; displayName: string; slug: string }
+    }
 
 function reducer(state: TenantState, action: TenantAction): TenantState {
   switch (action.type) {
@@ -66,6 +71,18 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
       if (!ws) return state
       const wsUsers = MOCK_USERS.filter((u) => u.id === ws.ownerId || state.users.find((su) => su.id === u.id))
       return { workspace: ws, currentUser: MOCK_USERS.find((u) => u.id === ws.ownerId)!, users: wsUsers }
+    }
+    case "SYNC_WORKSPACE_FROM_ACTIVE_ORG": {
+      const tmpl = MOCK_WORKSPACES.find((w) => w.id === action.payload.templateWorkspaceId)
+      if (!tmpl) return state
+      return {
+        ...state,
+        workspace: {
+          ...tmpl,
+          name: action.payload.displayName,
+          slug: action.payload.slug,
+        },
+      }
     }
     default:
       return state

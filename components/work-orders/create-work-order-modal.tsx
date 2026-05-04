@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 
@@ -29,6 +30,10 @@ interface Props {
   open: boolean
   onClose: () => void
   onSuccess?: () => void
+  /** When the modal opens, pre-select this customer (e.g. deep link from customer profile). */
+  initialCustomerId?: string | null
+  /** After equipment loads for the customer, select this asset when present in the list. */
+  initialEquipmentId?: string | null
 }
 
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
@@ -44,8 +49,15 @@ type EquipmentOption = {
 }
 type TechnicianOption = { id: string; label: string }
 
-export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+export function CreateWorkOrderModal({
+  open,
+  onClose,
+  onSuccess,
+  initialCustomerId = null,
+  initialEquipmentId = null,
+}: Props) {
+  const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const organizationId = orgStatus === "ready" ? activeOrgId : null
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
   const [equipmentLoading, setEquipmentLoading] = useState(false)
@@ -79,31 +91,24 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
 
       if (!user || cancelled) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomers([])
           setTechnicians([])
         }
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("default_organization_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profileError || !profile?.default_organization_id) {
+      if (orgStatus !== "ready" || !activeOrgId) {
         if (!cancelled) {
-          setOrganizationId(null)
           setCustomers([])
           setTechnicians([])
-          setLoadError(profileError?.message ?? "No default organization.")
+          setLoadError(
+            orgStatus === "ready" && !activeOrgId ? "No organization selected." : null,
+          )
         }
         return
       }
 
-      const orgId = profile.default_organization_id
-      if (!cancelled) setOrganizationId(orgId)
+      const orgId = activeOrgId
 
       const { data: custRows, error: custError } = await supabase
         .from("customers")
@@ -146,7 +151,7 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
             (p) => ({
               id: p.id,
               label:
-                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || p.id.slice(0, 8),
+                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
             })
           )
         techOptions.sort((a, b) => a.label.localeCompare(b.label))
@@ -158,7 +163,16 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, orgStatus, activeOrgId])
+
+  const prevOpenRef = useRef(false)
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setCustomerId(initialCustomerId ?? "")
+    }
+    prevOpenRef.current = open
+    if (!open) prevOpenRef.current = false
+  }, [open, initialCustomerId])
 
   useEffect(() => {
     if (!open) {
@@ -208,14 +222,18 @@ export function CreateWorkOrderModal({ open, onClose, onSuccess }: Props) {
     let cancelled = false
     setEquipmentLoading(true)
     void (async () => {
-      await refreshEquipmentForCustomer({ organizationId, customerId })
+      await refreshEquipmentForCustomer({
+        organizationId,
+        customerId,
+        selectEquipmentId: initialEquipmentId ?? undefined,
+      })
       if (!cancelled) setEquipmentLoading(false)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, customerId, refreshEquipmentForCustomer])
+  }, [open, organizationId, customerId, initialEquipmentId, refreshEquipmentForCustomer])
 
   const selectedCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
 
