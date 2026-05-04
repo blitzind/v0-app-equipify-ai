@@ -180,7 +180,8 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
         onClose={onClose}
         title={activePlan.name}
         subtitle={`${activePlan.customerName} · ${activePlan.equipmentName}`}
-        width="lg"
+        width="xl"
+        transitionMs={400}
         badge={
           <Badge variant="secondary" className={cn("text-xs border", statusBadgeClass)}>
             {activePlan.status}
@@ -188,14 +189,14 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
         }
         actions={
           <div className="flex flex-wrap items-center justify-end gap-1.5 w-full">
-            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={handleEdit}>
+            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs cursor-pointer" onClick={handleEdit}>
               <Pencil className="w-3.5 h-3.5" /> Edit
             </Button>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5 h-8 text-xs"
+              className="gap-1.5 h-8 text-xs cursor-pointer"
               onClick={() => void handlePauseResume()}
             >
               {activePlan.status === "Active" ? (
@@ -212,7 +213,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5 h-8 text-xs"
+              className="gap-1.5 h-8 text-xs cursor-pointer"
               onClick={() => void handleCreateWo()}
               disabled={woBusy || !organizationId || !activePlan.equipmentId?.trim()}
             >
@@ -225,7 +226,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" size="sm" variant="outline" className="h-8 w-8 p-0" aria-label="More actions">
+                <Button type="button" size="sm" variant="outline" className="h-8 w-8 cursor-pointer p-0" aria-label="More actions">
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -326,7 +327,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
               {activePlan.services.map((svc) => (
                 <div
                   key={svc.id}
-                  className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border gap-3"
+                  className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground">{svc.name}</p>
@@ -370,7 +371,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
         {/* Notes */}
         {activePlan.notes && (
           <DrawerSection title="Notes">
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
+            <p className="rounded-xl border border-border bg-card p-3 text-xs leading-relaxed text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               {activePlan.notes}
             </p>
           </DrawerSection>

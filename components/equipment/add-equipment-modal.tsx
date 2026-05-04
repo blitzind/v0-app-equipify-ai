@@ -4,8 +4,7 @@ import { useEffect, useState } from "react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, X } from "lucide-react"
-import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
+import { CalendarPlus, CheckCircle2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -434,7 +433,7 @@ export function AddEquipmentModal({
                   Done
                 </Button>
                 <Button onClick={handleCreatePlanAfterSave} className="cursor-pointer gap-2 w-full sm:w-auto">
-                  <MaintenancePlansBrandTile size="xs" />
+                  <CalendarPlus className="h-4 w-4 shrink-0" />
                   Create Maintenance Plan
                 </Button>
               </>

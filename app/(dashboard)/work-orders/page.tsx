@@ -19,6 +19,7 @@ import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallba
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,7 +49,6 @@ import {
   ChevronRight,
   ArrowUpDown,
   Wrench,
-  User,
   Clock,
   ChevronRight as Arrow,
   AlertTriangle,
@@ -201,6 +201,13 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
+function initialsFromTechName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 // ─── Kanban card ──────────────────────────────────────────────────────────────
 
 function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
@@ -221,9 +228,15 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
             <Wrench className="w-3 h-3 shrink-0" />
             <span className="truncate">{wo.customerName}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <User className="w-3 h-3 shrink-0" />
-            <span>{wo.technicianName}</span>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <TechnicianAvatar
+              userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+              name={wo.technicianName}
+              initials={initialsFromTechName(wo.technicianName)}
+              avatarUrl={wo.technicianAvatarUrl}
+              size="xs"
+            />
+            <span className="truncate">{wo.technicianName}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="w-3 h-3 shrink-0" />
@@ -338,7 +351,18 @@ function TableView({
                 </div>
               </TableCell>
               <TableCell><StatusBadge status={wo.status} /></TableCell>
-              <TableCell className="text-sm text-muted-foreground">{wo.technicianName}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                  <TechnicianAvatar
+                    userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+                    name={wo.technicianName}
+                    initials={initialsFromTechName(wo.technicianName)}
+                    avatarUrl={wo.technicianAvatarUrl}
+                    size="sm"
+                  />
+                  <span className="truncate">{wo.technicianName}</span>
+                </div>
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">{formatDate(wo.scheduledDate)}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => onOpen(wo.id)}>
@@ -460,11 +484,23 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
                   <div className="flex flex-col gap-0.5 overflow-hidden">
                     {dayOrders.slice(0, 3).map((wo) => (
                       <button key={wo.id} onClick={() => onOpen(wo.id)} className="text-left w-full">
-                        <div className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity",
-                          STATUS_STYLE[wo.status]
-                        )}>
-                          {getWorkOrderDisplay(wo)} · {wo.technicianName.split(" ")[0]}
+                        <div
+                          className={cn(
+                            "text-[10px] px-1 py-0.5 rounded border cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 min-w-0",
+                            STATUS_STYLE[wo.status]
+                          )}
+                        >
+                          <TechnicianAvatar
+                            userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+                            name={wo.technicianName}
+                            initials={initialsFromTechName(wo.technicianName)}
+                            avatarUrl={wo.technicianAvatarUrl}
+                            size="xs"
+                            className="shrink-0"
+                          />
+                          <span className="truncate">
+                            {getWorkOrderDisplay(wo)} · {wo.technicianName.split(" ")[0]}
+                          </span>
                         </div>
                       </button>
                     ))}
@@ -590,19 +626,27 @@ function WorkOrdersPageInner() {
         })
       }
 
-      const profileMap = new Map<string, string>()
+      const profileMap = new Map<string, { label: string; avatarUrl: string | null }>()
       if (assigneeIds.length > 0) {
         const { data: profRows } = await supabase
           .from("profiles")
-          .select("id, full_name, email")
+          .select("id, full_name, email, avatar_url")
           .in("id", assigneeIds)
 
         ;(
-          (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []
+          (profRows as Array<{
+            id: string
+            full_name: string | null
+            email: string | null
+            avatar_url: string | null
+          }> | null) ?? []
         ).forEach((p) => {
           const label =
             (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Technician"
-          profileMap.set(p.id, label)
+          profileMap.set(p.id, {
+            label,
+            avatarUrl: p.avatar_url?.trim() || null,
+          })
         })
       }
 
@@ -623,9 +667,8 @@ function WorkOrdersPageInner() {
       const mapped: WorkOrder[] = list.map((row) => {
         const eq = equipmentMap.get(row.equipment_id)
         const techId = row.assigned_user_id ?? "unassigned"
-        const techName = row.assigned_user_id
-          ? (profileMap.get(row.assigned_user_id) ?? "Unknown")
-          : "Unassigned"
+        const tp = row.assigned_user_id ? profileMap.get(row.assigned_user_id) : undefined
+        const techName = row.assigned_user_id ? (tp?.label ?? "Unknown") : "Unassigned"
 
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
@@ -650,6 +693,7 @@ function WorkOrdersPageInner() {
           priority: mapDbPriority(row.priority),
           technicianId: techId,
           technicianName: techName,
+          technicianAvatarUrl: tp?.avatarUrl ?? null,
           scheduledDate: row.scheduled_on ?? "",
           scheduledTime: formatScheduledTime(row.scheduled_time),
           completedDate: row.completed_at ? row.completed_at.slice(0, 10) : "",
@@ -727,7 +771,11 @@ function WorkOrdersPageInner() {
   const allTechs = useMemo(() => {
     const seen = new Set<string>()
     return workOrders
-      .map((wo) => ({ id: wo.technicianId, name: wo.technicianName }))
+      .map((wo) => ({
+        id: wo.technicianId,
+        name: wo.technicianName,
+        avatarUrl: wo.technicianAvatarUrl,
+      }))
       .filter(({ id }) => (seen.has(id) ? false : seen.add(id)))
   }, [workOrders])
 
@@ -831,7 +879,18 @@ function WorkOrdersPageInner() {
               <SelectContent>
                 <SelectItem value="all">All Technicians</SelectItem>
                 {allTechs.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  <SelectItem key={t.id} value={t.id} className="cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <TechnicianAvatar
+                        userId={t.id === "unassigned" ? "—" : t.id}
+                        name={t.name}
+                        initials={initialsFromTechName(t.name)}
+                        avatarUrl={t.avatarUrl}
+                        size="xs"
+                      />
+                      <span className="truncate">{t.name}</span>
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

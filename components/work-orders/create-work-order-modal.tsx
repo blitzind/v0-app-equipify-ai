@@ -25,6 +25,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 
 interface Props {
   open: boolean
@@ -47,7 +48,14 @@ type EquipmentOption = {
   serial_number: string | null
   category: string | null
 }
-type TechnicianOption = { id: string; label: string }
+type TechnicianOption = { id: string; label: string; avatarUrl?: string | null }
+
+function initialsFromLabel(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export function CreateWorkOrderModal({
   open,
@@ -143,17 +151,21 @@ export function CreateWorkOrderModal({
       if (userIds.length > 0) {
         const { data: profRows } = await supabase
           .from("profiles")
-          .select("id, full_name, email")
+          .select("id, full_name, email, avatar_url")
           .in("id", userIds)
 
         techOptions =
-          ((profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []).map(
-            (p) => ({
-              id: p.id,
-              label:
-                (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-            })
-          )
+          ((profRows as Array<{
+            id: string
+            full_name: string | null
+            email: string | null
+            avatar_url: string | null
+          }> | null) ?? []).map((p) => ({
+            id: p.id,
+            label:
+              (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
+            avatarUrl: p.avatar_url?.trim() || null,
+          }))
         techOptions.sort((a, b) => a.label.localeCompare(b.label))
       }
 
@@ -465,8 +477,17 @@ export function CreateWorkOrderModal({
               </SelectTrigger>
               <SelectContent>
                 {technicians.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.label}
+                  <SelectItem key={t.id} value={t.id} className="cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <TechnicianAvatar
+                        userId={t.id}
+                        name={t.label}
+                        initials={initialsFromLabel(t.label)}
+                        avatarUrl={t.avatarUrl}
+                        size="xs"
+                      />
+                      <span className="truncate">{t.label}</span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

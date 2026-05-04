@@ -25,6 +25,8 @@ import {
   ClipboardList,
   Plus,
   Package,
+  CalendarPlus,
+  Repeat,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -256,11 +258,7 @@ function ActivityTimeline({ items }: { items: ActivityEntry[] }) {
             {item.icon === "wo_created" && <ClipboardList className="w-3.5 h-3.5 text-primary" />}
             {item.icon === "wo_completed" && <CheckCircle2 className="w-3.5 h-3.5 text-[color:var(--status-success)]" />}
             {item.icon === "equipment" && <Package className="w-3.5 h-3.5 text-[color:var(--status-info)]" />}
-            {item.icon === "plan" && (
-              <span className="flex items-center justify-center scale-95">
-                <MaintenancePlansBrandTile size="xs" />
-              </span>
-            )}
+            {item.icon === "plan" && <Repeat className="w-3.5 h-3.5 text-muted-foreground" />}
           </div>
           <Link href={item.href} className="block group">
             <div className="bg-card/80 border border-border rounded-xl p-4 hover:border-primary/35 hover:bg-muted/20 transition-all">
@@ -1216,7 +1214,7 @@ export default function CustomerDetailPage() {
                   href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
                   className="inline-flex items-center gap-1.5"
                 >
-                  <MaintenancePlansBrandTile size="xs" /> New Maintenance Plan
+                  <CalendarPlus className="w-3.5 h-3.5" /> New Maintenance Plan
                 </Link>
               </Button>
             </div>
@@ -1641,7 +1639,7 @@ export default function CustomerDetailPage() {
                 href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
                 className="inline-flex items-center gap-1.5"
               >
-                <MaintenancePlansBrandTile size="xs" /> Create maintenance plan
+                <CalendarPlus className="w-3.5 h-3.5" /> Create maintenance plan
               </Link>
             </Button>
           </div>
@@ -1674,7 +1672,9 @@ export default function CustomerDetailPage() {
                           href={`/maintenance-plans?open=${plan.id}`}
                           className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group"
                         >
-                          <MaintenancePlansBrandTile size="sm" />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
+                            <Repeat className="h-5 w-5 text-muted-foreground" />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors truncate">
@@ -1709,7 +1709,9 @@ export default function CustomerDetailPage() {
                           href={`/maintenance-plans?open=${plan.id}`}
                           className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group opacity-95"
                         >
-                          <MaintenancePlansBrandTile size="sm" className="opacity-90" />
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
+                            <Repeat className="h-5 w-5 text-muted-foreground" />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium text-sm text-foreground truncate">{plan.name}</p>

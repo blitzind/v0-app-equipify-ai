@@ -18,7 +18,6 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
-import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import {
   ChevronLeft,
   ClipboardList,
@@ -426,7 +425,7 @@ export default function EquipmentDetailPage() {
               </Button>
               <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
                 <Link href={planNew}>
-                  <MaintenancePlansBrandTile size="xs" /> New maintenance plan
+                  <CalendarPlus className="w-3.5 h-3.5" /> New maintenance plan
                 </Link>
               </Button>
             </div>

@@ -143,7 +143,7 @@ export async function loadWorkOrderDetailForOrg(
     w.assigned_user_id
       ? supabase
           .from("profiles")
-          .select("full_name, email")
+          .select("full_name, email, avatar_url")
           .eq("id", w.assigned_user_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -175,7 +175,11 @@ export async function loadWorkOrderDetailForOrg(
       })
     : "Equipment"
   const location = eqRow?.location_label ?? ""
-  const ap = assigneeProf as { full_name: string | null; email: string | null } | null
+  const ap = assigneeProf as {
+    full_name: string | null
+    email: string | null
+    avatar_url: string | null
+  } | null
   const techName = w.assigned_user_id
     ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
     : "Unassigned"
@@ -201,6 +205,7 @@ export async function loadWorkOrderDetailForOrg(
     priority: mapDbPriority(w.priority),
     technicianId: techId,
     technicianName: techName,
+    technicianAvatarUrl: w.assigned_user_id ? ap?.avatar_url?.trim() || null : null,
     scheduledDate: w.scheduled_on ?? "",
     scheduledTime: formatScheduledTime(w.scheduled_time),
     completedDate: w.completed_at ? w.completed_at.slice(0, 10) : "",

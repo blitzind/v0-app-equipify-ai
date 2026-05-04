@@ -37,7 +37,7 @@ import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
+import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/table"
 import { DrawerTimeline } from "@/components/detail-drawer"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 
 // ─── Styles (match existing WO page) ─────────────────────────────────────────
 
@@ -84,6 +85,13 @@ function formatDateTime(d: string) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+function initialsFromTechnicianName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 export type WorkOrderActivityItem = {
@@ -759,7 +767,7 @@ export function WorkOrderDetailExperience({
       {workOrder.maintenancePlanId && !isDrawer && (
         <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
           <div className="flex items-center gap-2 mb-1">
-            <MaintenancePlansBrandTile size="xs" />
+            <MaintenancePlansLucideIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Maintenance plan source
             </p>
@@ -879,7 +887,7 @@ export function WorkOrderDetailExperience({
           {isDrawer && workOrder.maintenancePlanId && (
             <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
-                <MaintenancePlansBrandTile size="xs" />
+                <MaintenancePlansLucideIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Maintenance plan source
                 </p>
@@ -962,37 +970,110 @@ export function WorkOrderDetailExperience({
           )}
 
           <div className={cn("grid", isDrawer ? "grid-cols-2 lg:grid-cols-4 gap-2" : "grid-cols-2 lg:grid-cols-4 gap-3")}>
-            {[
-              { icon: MapPin, label: "Site / location", value: workOrder.location || "—", sub: "" },
-              { icon: User, label: "Technician", value: workOrder.technicianName, sub: "" },
-              {
-                icon: Calendar,
-                label: "Scheduled",
-                value: formatDate(workOrder.scheduledDate),
-                sub: workOrder.scheduledTime ? `at ${workOrder.scheduledTime}` : "",
-              },
-              { icon: Clock, label: "Created", value: formatDate(workOrder.createdAt.slice(0, 10)), sub: "" },
-            ].map(({ icon: Icon, label, value, sub }) =>
-              isDrawer ? (
-                <div key={label} className={kpiCellClass}>
-                  <p className={kpiLabelClass}>{label}</p>
-                  <p className={kpiValueClass}>{value}</p>
-                  {sub ? <p className="text-[10px] text-muted-foreground leading-snug">{sub}</p> : null}
+            {isDrawer ? (
+              <>
+                <div className={kpiCellClass}>
+                  <p className={kpiLabelClass}>Site / location</p>
+                  <p className={kpiValueClass}>{workOrder.location || "—"}</p>
                 </div>
-              ) : (
-                <div key={label} className={kpiCellClass}>
+                <div className={kpiCellClass}>
+                  <p className={kpiLabelClass}>Technician</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TechnicianAvatar
+                      userId={workOrder.technicianId === "unassigned" ? "—" : workOrder.technicianId}
+                      name={workOrder.technicianName}
+                      initials={initialsFromTechnicianName(workOrder.technicianName)}
+                      avatarUrl={workOrder.technicianAvatarUrl}
+                      size="sm"
+                    />
+                    {workOrder.technicianId !== "unassigned" ? (
+                      <Link
+                        href={`/technicians?open=${workOrder.technicianId}`}
+                        className={cn(kpiValueClass, "hover:underline text-primary truncate")}
+                      >
+                        {workOrder.technicianName}
+                      </Link>
+                    ) : (
+                      <p className={kpiValueClass}>{workOrder.technicianName}</p>
+                    )}
+                  </div>
+                </div>
+                <div className={kpiCellClass}>
+                  <p className={kpiLabelClass}>Scheduled</p>
+                  <p className={kpiValueClass}>{formatDate(workOrder.scheduledDate)}</p>
+                  {workOrder.scheduledTime ? (
+                    <p className="text-[10px] text-muted-foreground leading-snug">at {workOrder.scheduledTime}</p>
+                  ) : null}
+                </div>
+                <div className={kpiCellClass}>
+                  <p className={kpiLabelClass}>Created</p>
+                  <p className={kpiValueClass}>{formatDate(workOrder.createdAt.slice(0, 10))}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={kpiCellClass}>
                   <div className="flex items-start gap-2.5">
                     <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-primary" />
+                      <MapPin className="w-4 h-4 text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <p className={kpiLabelClass}>{label}</p>
-                      <p className={kpiValueClass}>{value}</p>
-                      {sub && <p className="text-xs text-muted-foreground truncate">{sub}</p>}
+                      <p className={kpiLabelClass}>Site / location</p>
+                      <p className={kpiValueClass}>{workOrder.location || "—"}</p>
                     </div>
                   </div>
                 </div>
-              ),
+                <div className={kpiCellClass}>
+                  <div className="flex items-start gap-2.5">
+                    <TechnicianAvatar
+                      userId={workOrder.technicianId === "unassigned" ? "—" : workOrder.technicianId}
+                      name={workOrder.technicianName}
+                      initials={initialsFromTechnicianName(workOrder.technicianName)}
+                      avatarUrl={workOrder.technicianAvatarUrl}
+                      size="sm"
+                      className="mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <p className={kpiLabelClass}>Technician</p>
+                      {workOrder.technicianId !== "unassigned" ? (
+                        <Link
+                          href={`/technicians?open=${workOrder.technicianId}`}
+                          className={cn(kpiValueClass, "hover:underline text-primary block truncate")}
+                        >
+                          {workOrder.technicianName}
+                        </Link>
+                      ) : (
+                        <p className={kpiValueClass}>{workOrder.technicianName}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className={kpiCellClass}>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={kpiLabelClass}>Scheduled</p>
+                      <p className={kpiValueClass}>{formatDate(workOrder.scheduledDate)}</p>
+                      {workOrder.scheduledTime ? (
+                        <p className="text-xs text-muted-foreground truncate">at {workOrder.scheduledTime}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className={kpiCellClass}>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={kpiLabelClass}>Created</p>
+                      <p className={kpiValueClass}>{formatDate(workOrder.createdAt.slice(0, 10))}</p>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 

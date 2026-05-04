@@ -441,7 +441,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
       onClose={onClose}
       width="xl"
       ariaLabel={plan.name}
-      panelClassName="bg-card shadow-2xl"
+      panelClassName="border-l border-border bg-background shadow-2xl"
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header */}
@@ -471,12 +471,12 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5 h-8 text-xs"
+              className="gap-1.5 h-8 text-xs cursor-pointer"
               onClick={() => setEditDialogOpen(true)}
             >
               <Pencil className="w-3.5 h-3.5" /> Edit
             </Button>
-            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void handlePauseResumeSheet()}>
+            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs cursor-pointer" onClick={() => void handlePauseResumeSheet()}>
               {plan.status === "Active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               {plan.status === "Active" ? "Pause" : "Resume"}
             </Button>
@@ -484,7 +484,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               type="button"
               size="sm"
               variant="outline"
-              className="gap-1.5 h-8 text-xs"
+              className="gap-1.5 h-8 text-xs cursor-pointer"
               disabled={headerWoBusy || !organizationId || !planHasEquipment}
               onClick={() => void handleHeaderCreateWo()}
             >
@@ -497,7 +497,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8 w-8 p-0"
+                  className="h-8 w-8 p-0 cursor-pointer"
                   aria-label="More actions"
                   onPointerDown={() =>
                     console.info("[Equipify] PlanDetailSheet pointer → More menu trigger", { planId: plan.id })
@@ -566,9 +566,13 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           </div>
         )}
 
-        {/* Tabs */}
-        <Tabs value={detailSheetTab} onValueChange={setDetailSheetTab} className="flex flex-col flex-1 overflow-hidden">
-          <TabsList className="rounded-none border-b border-border bg-transparent px-6 justify-start gap-1 h-auto py-0 shrink-0">
+        {/* Tabs — match Work Order drawer: bottom-border active indicator, no pill/outline */}
+        <Tabs
+          value={detailSheetTab}
+          onValueChange={setDetailSheetTab}
+          className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden"
+        >
+          <TabsList className="h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none border-0 border-b border-border bg-background p-0 shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
               { value: "services",      label: "Services" },
               { value: "work_orders",   label: "Work Orders" },
@@ -579,23 +583,33 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               <TabsTrigger
                 key={value}
                 value={value}
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm"
+                className={cn(
+                  "grow-0 basis-auto rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 shadow-none outline-none",
+                  "text-xs font-medium whitespace-nowrap shrink-0 transition-colors",
+                  "text-muted-foreground hover:text-foreground hover:border-border",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none",
+                )}
               >
                 {label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5">
             {/* Services */}
-            <TabsContent value="services" className="p-6 mt-0 flex flex-col gap-4">
+            <TabsContent value="services" className="mt-0 flex flex-col gap-4">
               {plan.services.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No services defined for this plan.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {plan.services.map((svc, i) => (
-                    <div key={svc.id} className="flex items-start gap-3 p-4 rounded-lg border border-border bg-background hover:bg-muted/40 transition-colors">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">{i + 1}</div>
+                    <div
+                      key={svc.id}
+                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/30"
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold shrink-0 mt-0.5">
+                        {i + 1}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">{svc.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{svc.description}</p>
@@ -629,7 +643,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Work orders generated from this plan */}
-            <TabsContent value="work_orders" className="p-6 mt-0 flex flex-col gap-4">
+            <TabsContent value="work_orders" className="mt-0 flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Generated work orders</p>
@@ -665,7 +679,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   No work orders have been created from this plan yet. Use <strong>Create WO</strong> or enable auto-create to generate one.
                 </p>
               ) : (
-                <div className="rounded-lg border border-border overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -703,7 +717,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                             {formatShortDate(row.created_at)}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+                            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs cursor-pointer" asChild>
                               <Link href={`/work-orders?open=${row.id}`}>
                                 <ClipboardList className="w-3.5 h-3.5" />
                                 Open Work Order
@@ -719,13 +733,13 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Notification Rules */}
-            <TabsContent value="notifications" className="p-6 mt-0 flex flex-col gap-6">
+            <TabsContent value="notifications" className="mt-0 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">Notification Rules</p>
                   <p className="text-xs text-muted-foreground">Rules fire at 30, 14, 7, and 1 day before the due date.</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={handleFireAll} className="gap-1.5">
+                <Button size="sm" variant="outline" onClick={handleFireAll} className="h-8 gap-1.5 text-xs cursor-pointer">
                   <Bell className="w-3.5 h-3.5" />
                   {fired ? "Fired!" : "Simulate All"}
                 </Button>
@@ -743,7 +757,15 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                       {rules.map((rule) => {
                         const cfg = CHANNEL_CONFIG[rule.channel]
                         return (
-                          <div key={rule.id} className={cn("flex items-center gap-3 p-3 rounded-lg border transition-colors", rule.enabled ? "border-border bg-background" : "border-dashed border-border/60 bg-muted/30 opacity-60")}>
+                          <div
+                            key={rule.id}
+                            className={cn(
+                              "flex items-center gap-3 rounded-xl border p-3 transition-colors",
+                              rule.enabled
+                                ? "border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                                : "border-dashed border-border/60 bg-muted/25 opacity-60",
+                            )}
+                          >
                             <cfg.Icon className={cn("w-4 h-4 shrink-0", cfg.color)} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-foreground">{rule.channel}</p>
@@ -760,14 +782,17 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Notification Log */}
-            <TabsContent value="log" className="p-6 mt-0 flex flex-col gap-3">
+            <TabsContent value="log" className="mt-0 flex flex-col gap-3">
               {planLogs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notifications sent yet for this plan.</p>
               ) : (
                 planLogs.map((log) => {
                   const cfg = CHANNEL_CONFIG[log.channel]
                   return (
-                    <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                    <div
+                      key={log.id}
+                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                    >
                       <cfg.Icon className={cn("w-4 h-4 shrink-0 mt-0.5", cfg.color)} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -789,7 +814,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             </TabsContent>
 
             {/* Settings */}
-            <TabsContent value="settings" className="p-6 mt-0 flex flex-col gap-6">
+            <TabsContent value="settings" className="mt-0 flex flex-col gap-6">
               <div>
                 <p className="text-sm font-semibold mb-3">Plan Status</p>
                 <div className="flex gap-2 flex-wrap">
@@ -842,7 +867,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 <Button
                   onClick={() => void handleAutoCreateWo()}
                   variant="outline"
-                  className="gap-2"
+                  className="h-8 gap-1.5 text-xs cursor-pointer"
                   disabled={!planHasEquipment}
                 >
                   <Wrench className="w-4 h-4" />

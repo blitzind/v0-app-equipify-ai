@@ -494,6 +494,8 @@ export interface WorkOrder {
   priority: WorkOrderPriority
   technicianId: string
   technicianName: string
+  /** Public profile photo URL from `profiles.avatar_url` when assigned user has one. */
+  technicianAvatarUrl?: string | null
   scheduledDate: string   // ISO date string
   scheduledTime: string   // "HH:MM"
   completedDate: string
@@ -2267,6 +2269,10 @@ export interface Technician {
   id: string
   name: string
   avatar: string
+  /** Supabase Storage public URL for profile photo when set (`profiles.avatar_url`). */
+  avatarUrl?: string | null
+  /** From `organization_members.status` when roster is loaded from Supabase. */
+  membershipStatus?: "active" | "invited" | "suspended"
   role: string
   region: string
   email: string
@@ -2291,6 +2297,7 @@ export const technicians: Technician[] = [
     id: "T-01",
     name: "Marcus Webb",
     avatar: "MW",
+    avatarUrl: "/demo-techs/technician-01.png",
     role: "Senior Field Technician",
     region: "Midwest",
     email: "m.webb@equipify.ai",
@@ -2327,6 +2334,7 @@ export const technicians: Technician[] = [
     id: "T-02",
     name: "Sandra Liu",
     avatar: "SL",
+    avatarUrl: "/demo-techs/technician-02.png",
     role: "Lead Calibration Specialist",
     region: "Northeast",
     email: "s.liu@equipify.ai",
@@ -2361,6 +2369,7 @@ export const technicians: Technician[] = [
     id: "T-03",
     name: "Tyler Oakes",
     avatar: "TO",
+    avatarUrl: "/demo-techs/technician-03.png",
     role: "Industrial Repair Technician",
     region: "Southwest",
     email: "t.oakes@equipify.ai",
@@ -2396,6 +2405,7 @@ export const technicians: Technician[] = [
     id: "T-04",
     name: "Priya Mehta",
     avatar: "PM",
+    avatarUrl: "/demo-techs/technician-04.png",
     role: "Field Technician II",
     region: "Southeast",
     email: "p.mehta@equipify.ai",
@@ -2430,6 +2440,7 @@ export const technicians: Technician[] = [
     id: "T-05",
     name: "James Torres",
     avatar: "JT",
+    avatarUrl: "/demo-techs/technician-05.png",
     role: "Field Technician I",
     region: "West",
     email: "j.torres@equipify.ai",
@@ -2458,6 +2469,7 @@ export const technicians: Technician[] = [
     id: "T-06",
     name: "Denise Harmon",
     avatar: "DH",
+    avatarUrl: "/demo-techs/technician-06.png",
     role: "Senior Field Technician",
     region: "Midwest",
     email: "d.harmon@equipify.ai",
@@ -2485,6 +2497,62 @@ export const technicians: Technician[] = [
       { woId: "WO-2020", customer: "Metro Warehousing", jobType: "Electrical Panel PM", completedDate: "2026-04-14", duration: "4.0 hrs", rating: 5 },
       { woId: "WO-2006", customer: "Apex Fabricators", jobType: "HVAC Repair", completedDate: "2026-04-01", duration: "3.5 hrs", rating: 5 },
       { woId: "WO-1985", customer: "Riverstone Logistics", jobType: "AC Install", completedDate: "2026-03-10", duration: "5.5 hrs", rating: 4 },
+    ],
+  },
+  {
+    id: "T-07",
+    name: "Omar Haddad",
+    avatar: "OH",
+    avatarUrl: "/demo-techs/technician-07.png",
+    role: "Clinical Engineering Technician",
+    region: "Northeast",
+    email: "o.haddad@equipify.ai",
+    phone: "(718) 555-0144",
+    hireDate: "2019-04-22",
+    status: "Available",
+    skills: ["Medical Equipment", "Calibration", "Electrical"],
+    jobsThisWeek: 2,
+    completionPct: 95,
+    rating: 4.8,
+    utilizationPct: 78,
+    totalCompleted: 241,
+    avgJobDurationHrs: 3.5,
+    bio: "Omar supports imaging and patient-monitoring systems for hospitals and clinics, with a focus on preventive maintenance and regulatory documentation.",
+    certifications: [
+      { name: "CBET", issuer: "AAMI", issuedDate: "2019-11-01", expiryDate: "2027-11-01" },
+      { name: "OSHA 10 Healthcare", issuer: "OSHA", issuedDate: "2019-05-10", expiryDate: "2026-05-10" },
+    ],
+    schedule: [],
+    history: [
+      { woId: "WO-1990", customer: "Clearfield Foods", jobType: "Sterilizer annual PM", completedDate: "2026-03-28", duration: "3.0 hrs", rating: 5 },
+    ],
+  },
+  {
+    id: "T-08",
+    name: "Nina Kowalski",
+    avatar: "NK",
+    avatarUrl: "/demo-techs/technician-08.png",
+    role: "Biomedical Equipment Specialist",
+    region: "Midwest",
+    email: "n.kowalski@equipify.ai",
+    phone: "(414) 555-0289",
+    hireDate: "2021-08-16",
+    status: "Available",
+    skills: ["Medical Equipment", "PLC / Controls", "Calibration"],
+    jobsThisWeek: 3,
+    completionPct: 94,
+    rating: 4.7,
+    utilizationPct: 82,
+    totalCompleted: 156,
+    avgJobDurationHrs: 3.9,
+    bio: "Nina installs and verifies infusion pumps, ventilators, and diagnostic devices, and trains clinical staff on safe operation.",
+    certifications: [
+      { name: "AAMI BMET", issuer: "AAMI", issuedDate: "2021-10-01", expiryDate: "2027-10-01" },
+      { name: "ISO 13485 awareness", issuer: "Internal", issuedDate: "2022-01-15", expiryDate: "2026-01-15" },
+    ],
+    schedule: [],
+    history: [
+      { woId: "WO-2002", customer: "Metro Warehousing", jobType: "Lab analyzer QC visit", completedDate: "2026-04-02", duration: "2.5 hrs", rating: 5 },
     ],
   },
 ]

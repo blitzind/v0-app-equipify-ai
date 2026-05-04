@@ -187,6 +187,31 @@ const TECH_SEED = [
   { email: "demo.tech.kim@precision-biomedical.seed", name: "Jordan Kim" },
 ]
 
+/** Public app paths (Next.js `public/`) — must match `lib/mock-data` demo headshots. */
+function precisionDemoTechAvatarPath(index) {
+  return `/demo-techs/technician-${String(index + 1).padStart(2, "0")}.png`
+}
+
+/**
+ * Set profiles.avatar_url for each seeded demo technician (idempotent).
+ * Call on every script run so avatars stay in sync even when tenant data seed is skipped.
+ */
+async function syncPrecisionDemoTechnicianAvatars(sql) {
+  for (let i = 0; i < TECH_SEED.length; i++) {
+    const t = TECH_SEED[i]
+    const url = precisionDemoTechAvatarPath(i)
+    const found = await sql`
+      select u.id from auth.users u where u.email = ${t.email} limit 1
+    `
+    if (!found.length) continue
+    await sql`
+      update public.profiles
+      set avatar_url = ${url}, updated_at = now()
+      where id = ${found[0].id}::uuid
+    `
+  }
+}
+
 function assertSafeDbUrl(url) {
   try {
     const u = new URL(url)
@@ -384,6 +409,8 @@ async function main() {
       process.exit(1)
     }
 
+    await syncPrecisionDemoTechnicianAvatars(sql)
+
     let [{ id: orgId } = { id: null }] = await sql`
       select id from public.organizations where slug = ${orgSlug}::citext limit 1
     `
@@ -451,6 +478,7 @@ async function main() {
 
     console.log("Applying Precision Biomedical marketing seed…")
     const techUserIds = await ensureTechUsers(sql, supabase)
+    await syncPrecisionDemoTechnicianAvatars(sql)
 
     await sql.begin(async (tx) => {
       await clearPrecisionTenantData(tx, orgId)

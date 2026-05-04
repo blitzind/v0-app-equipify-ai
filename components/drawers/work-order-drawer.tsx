@@ -21,6 +21,7 @@ import {
   type ToastItem,
 } from "@/components/detail-drawer"
 import { Pencil, X, Check, AlertOctagon, ExternalLink } from "lucide-react"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 
 let toastCounter = 0
 
@@ -175,11 +176,18 @@ interface WorkOrderDrawerProps {
   onUpdated?: () => void
 }
 
-type TechnicianOption = { id: string; label: string }
+type TechnicianOption = { id: string; label: string; avatarUrl?: string | null }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const DRAWER_LABOR_RATE = 95
+
+function initialsFromTechnicianLabel(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDrawerProps) {
   const { toast: pushToast } = useToast()
@@ -235,16 +243,20 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
     if (userIds.length > 0) {
       const { data: profs } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, full_name, email, avatar_url")
         .in("id", userIds)
       techOpts =
-        ((profs as Array<{ id: string; full_name: string | null; email: string | null }> | null) ?? []).map(
-          (p) => ({
-            id: p.id,
-            label:
-              (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-          })
-        )
+        ((profs as Array<{
+          id: string
+          full_name: string | null
+          email: string | null
+          avatar_url: string | null
+        }> | null) ?? []).map((p) => ({
+          id: p.id,
+          label:
+            (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
+          avatarUrl: p.avatar_url?.trim() || null,
+        }))
       techOpts.sort((a, b) => a.label.localeCompare(b.label))
     }
     setTechnicianOptions(techOpts)
@@ -283,6 +295,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       priority: (draft.priority ?? wo.priority) as WorkOrderPriority,
       technicianId: (draft.technicianId ?? wo.technicianId) as string,
       technicianName: (draft.technicianName ?? wo.technicianName) as string,
+      technicianAvatarUrl:
+        (draft.technicianAvatarUrl !== undefined ? draft.technicianAvatarUrl : wo.technicianAvatarUrl) ??
+        null,
       scheduledDate: (draft.scheduledDate ?? wo.scheduledDate) as string,
       scheduledTime: (draft.scheduledTime ?? wo.scheduledTime) as string,
     }
@@ -301,6 +316,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       type: wo.type,
       technicianId: wo.technicianId,
       technicianName: wo.technicianName,
+      technicianAvatarUrl: wo.technicianAvatarUrl ?? null,
       priority: wo.priority,
       status: wo.status,
       scheduledDate: wo.scheduledDate ?? "",
@@ -521,22 +537,49 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
                 <EditRow
                   label="Technician"
                   view={
-                    wo.technicianId !== "unassigned" ? (
-                      <Link
-                        href={`/technicians?open=${wo.technicianId}`}
-                        className="text-primary hover:underline cursor-pointer font-medium"
-                      >
-                        {wo.technicianName}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">{wo.technicianName}</span>
-                    )
+                    <span className="inline-flex items-center gap-2 min-w-0">
+                      <TechnicianAvatar
+                        userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+                        name={wo.technicianName}
+                        initials={initialsFromTechnicianLabel(wo.technicianName)}
+                        avatarUrl={wo.technicianAvatarUrl}
+                        size="sm"
+                      />
+                      {wo.technicianId !== "unassigned" ? (
+                        <Link
+                          href={`/technicians?open=${wo.technicianId}`}
+                          className="text-primary hover:underline cursor-pointer font-medium truncate"
+                        >
+                          {wo.technicianName}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">{wo.technicianName}</span>
+                      )}
+                    </span>
                   }
                   editing
                 >
                   <select
                     value={draft.technicianId ?? wo.technicianId ?? "unassigned"}
-                    onChange={(e) => setField("technicianId", e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      if (id === "unassigned") {
+                        setDraft((prev) => ({
+                          ...prev,
+                          technicianId: id,
+                          technicianName: "Unassigned",
+                          technicianAvatarUrl: null,
+                        }))
+                        return
+                      }
+                      const opt = technicianOptions.find((x) => x.id === id)
+                      setDraft((prev) => ({
+                        ...prev,
+                        technicianId: id,
+                        technicianName: opt?.label ?? "Unknown",
+                        technicianAvatarUrl: opt?.avatarUrl ?? null,
+                      }))
+                    }}
                     className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
                   >
                     <option value="unassigned">Unassigned</option>

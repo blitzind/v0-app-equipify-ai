@@ -16,6 +16,7 @@ import {
   Phone, Mail, CalendarDays, ArrowRight, Loader2,
 } from "lucide-react"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -367,7 +368,7 @@ function TechSelector({
 }: {
   selectedId: string
   onChange: (id: string) => void
-  technicians: { id: string; name: string; avatar: string }[]
+  technicians: { id: string; name: string; avatar: string; avatarUrl?: string | null }[]
 }) {
   return (
     <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
@@ -383,12 +384,13 @@ function TechSelector({
               : "bg-card border-border text-foreground hover:bg-muted"
           )}
         >
-          <div className={cn(
-            "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-            selectedId === t.id ? "bg-primary-foreground/20" : "bg-primary/10 text-primary"
-          )}>
-            {t.avatar}
-          </div>
+          <TechnicianAvatar
+            userId={t.id}
+            name={t.name}
+            initials={t.avatar}
+            avatarUrl={t.avatarUrl}
+            size="xs"
+          />
           <span className="truncate max-w-[80px]">{t.name.split(" ")[0]}</span>
         </button>
       ))}
@@ -400,6 +402,7 @@ type RosterTech = {
   id: string
   name: string
   avatar: string
+  avatarUrl?: string | null
   role: string
   email: string
   phone: string
@@ -482,7 +485,7 @@ export default function TechnicianDailySchedulePage() {
         .from("organization_members")
         .select("user_id, role")
         .eq("organization_id", orgId)
-        .eq("status", "active")
+        .in("status", ["active", "invited"])
         .in("role", [...ROSTER_MEMBER_ROLES])
 
       if (mErr || cancelled) {
@@ -508,7 +511,7 @@ export default function TechnicianDailySchedulePage() {
 
       const { data: profRows, error: prErr } = await supabase
         .from("profiles")
-        .select("id, email, full_name")
+        .select("id, email, full_name, avatar_url")
         .in("id", userIds)
 
       if (prErr || cancelled) {
@@ -521,7 +524,12 @@ export default function TechnicianDailySchedulePage() {
       }
 
       const list: RosterTech[] = (
-        (profRows ?? []) as Array<{ id: string; email: string | null; full_name: string | null }>
+        (profRows ?? []) as Array<{
+          id: string
+          email: string | null
+          full_name: string | null
+          avatar_url?: string | null
+        }>
       )
         .filter((p) => roleByUser.has(p.id))
         .map((p) => {
@@ -533,6 +541,7 @@ export default function TechnicianDailySchedulePage() {
             id: p.id,
             name,
             avatar: initialsFromName(name),
+            avatarUrl: p.avatar_url?.trim() || null,
             role: formatMemberRole(roleByUser.get(p.id) ?? "tech"),
             email: p.email ?? "",
             phone: "—",
@@ -664,6 +673,8 @@ export default function TechnicianDailySchedulePage() {
 
       if (cancelled) return
 
+      const rosterTech = roster.find((r) => r.id === selectedTechId)
+
       const mapped: WorkOrder[] = list.map((row) => {
         const eq = equipmentMap.get(row.equipment_id)
         const scheduledTime = formatScheduledTime(row.scheduled_time)
@@ -691,6 +702,7 @@ export default function TechnicianDailySchedulePage() {
           priority: mapDbPriority(row.priority),
           technicianId: row.assigned_user_id ?? selectedTechId,
           technicianName: technicianNameForWo,
+          technicianAvatarUrl: rosterTech?.avatarUrl ?? null,
           scheduledDate: row.scheduled_on ?? selectedDate,
           scheduledTime,
           completedDate: "",
@@ -714,7 +726,7 @@ export default function TechnicianDailySchedulePage() {
     return () => {
       cancelled = true
     }
-  }, [organizationId, selectedTechId, selectedDate, technicianNameForWo, jobsRefresh])
+  }, [organizationId, selectedTechId, selectedDate, technicianNameForWo, jobsRefresh, roster])
 
   const dayJobs = workOrders
 
@@ -725,6 +737,7 @@ export default function TechnicianDailySchedulePage() {
     id: t.id,
     name: t.name,
     avatar: t.avatar,
+    avatarUrl: t.avatarUrl,
   }))
 
   const handleStatusChange = useCallback(
@@ -822,9 +835,14 @@ export default function TechnicianDailySchedulePage() {
 
       {selectedTech && !rosterLoading && (
         <div className="rounded-2xl border border-border bg-card p-4 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-base shrink-0">
-            {selectedTech.avatar}
-          </div>
+          <TechnicianAvatar
+            userId={selectedTech.id}
+            name={selectedTech.name}
+            initials={selectedTech.avatar}
+            avatarUrl={selectedTech.avatarUrl}
+            size="md"
+            className="!w-12 !h-12 text-base"
+          />
           <div className="flex-1 min-w-0">
             <p className="text-base font-bold text-foreground">{selectedTech.name}</p>
             <p className="text-xs text-muted-foreground">{selectedTech.role}</p>

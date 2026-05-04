@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -37,7 +37,14 @@ import {
   Loader2,
   Pencil,
   StickyNote,
+  Upload,
+  Trash2,
 } from "lucide-react"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
+import {
+  uploadProfileAvatar,
+  removeAvatarObjectIfInBucket,
+} from "@/lib/profile/avatar-storage"
 
 let toastCounter = 0
 
@@ -179,6 +186,11 @@ export function TechnicianDrawer({
   const [draftStatus, setDraftStatus] = useState<string>("active")
   const [editSaving, setEditSaving] = useState(false)
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const avatarFileRef = useRef<HTMLInputElement>(null)
+
   const [openScheduleWoId, setOpenScheduleWoId] = useState<string | null>(null)
   const [scheduleRefresh, setScheduleRefresh] = useState(0)
   const [scheduleLoading, setScheduleLoading] = useState(false)
@@ -241,7 +253,7 @@ export function TechnicianDrawer({
 
     const { data: targetProfile, error: pErr } = await supabase
       .from("profiles")
-      .select("full_name, email")
+      .select("full_name, email, avatar_url")
       .eq("id", techId)
       .single()
 
@@ -264,11 +276,12 @@ export function TechnicianDrawer({
       return
     }
 
-    const tp = targetProfile as { full_name: string | null; email: string | null }
+    const tp = targetProfile as { full_name: string | null; email: string | null; avatar_url: string | null }
     const tom = targetOm as { role: string; status: string }
 
     setFullName(tp.full_name?.trim() || tp.email?.split("@")[0] || "Member")
     setEmail(tp.email ?? "")
+    setAvatarUrl(tp.avatar_url?.trim() || null)
     setMemberRole(tom.role)
     setMemberStatus(tom.status)
     setLoading(false)
@@ -452,7 +465,78 @@ export function TechnicianDrawer({
     setDraftName(fullName)
     setDraftRole(memberRole)
     setDraftStatus(memberStatus)
+    setAvatarError(null)
     setEditOpen(true)
+  }
+
+  const canEditAvatar = Boolean(
+    techId && (viewerIsAdmin || (viewerUserId !== null && techId === viewerUserId)),
+  )
+
+  async function applyAvatarFile(file: File) {
+    if (!techId || !canEditAvatar) return
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please choose an image file (JPEG, PNG, WebP, or GIF).")
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Image must be 5 MB or smaller.")
+      return
+    }
+
+    setAvatarUploading(true)
+    setAvatarError(null)
+    const supabase = createBrowserSupabaseClient()
+
+    const uploaded = await uploadProfileAvatar(supabase, { targetUserId: techId, file })
+    if ("error" in uploaded) {
+      setAvatarError(uploaded.error)
+      setAvatarUploading(false)
+      return
+    }
+
+    await removeAvatarObjectIfInBucket(supabase, avatarUrl)
+
+    const { error: upProf } = await supabase
+      .from("profiles")
+      .update({ avatar_url: uploaded.publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", techId)
+
+    if (upProf) {
+      setAvatarError(upProf.message)
+      setAvatarUploading(false)
+      return
+    }
+
+    setAvatarUrl(uploaded.publicUrl)
+    setAvatarUploading(false)
+    toast("Profile photo updated.")
+    onUpdated?.()
+  }
+
+  async function removeAvatarPhoto() {
+    if (!techId || !canEditAvatar) return
+    setAvatarUploading(true)
+    setAvatarError(null)
+    const supabase = createBrowserSupabaseClient()
+
+    await removeAvatarObjectIfInBucket(supabase, avatarUrl)
+
+    const { error: upProf } = await supabase
+      .from("profiles")
+      .update({ avatar_url: null, updated_at: new Date().toISOString() })
+      .eq("id", techId)
+
+    if (upProf) {
+      setAvatarError(upProf.message)
+      setAvatarUploading(false)
+      return
+    }
+
+    setAvatarUrl(null)
+    setAvatarUploading(false)
+    toast("Profile photo removed.")
+    onUpdated?.()
   }
 
   async function saveEdit() {
@@ -465,7 +549,7 @@ export function TechnicianDrawer({
 
     setEditSaving(true)
     const supabase = createBrowserSupabaseClient()
-    const isSelf = viewerUserId === techId
+    const editingSelf = viewerUserId === techId
     const canMemberFields = viewerIsAdmin
 
     try {
@@ -500,7 +584,7 @@ export function TechnicianDrawer({
         setFullName(nameTrim)
         setMemberRole(draftRole)
         setMemberStatus(draftStatus)
-      } else if (isSelf) {
+      } else if (editingSelf) {
         const { error: pErr } = await supabase
           .from("profiles")
           .update({ full_name: nameTrim, updated_at: new Date().toISOString() })
@@ -541,14 +625,24 @@ export function TechnicianDrawer({
       <DrawerViewport open={!!techId} onClose={onClose} width="lg" ariaLabel={displayName}>
         <div className="flex items-start justify-between gap-2 p-6 border-b border-border shrink-0">
           <div className="flex items-center gap-4 min-w-0">
-            <div
-              className={cn(
-                "rounded-full flex items-center justify-center font-semibold text-white shrink-0 ring-2 ring-background select-none w-14 h-14 text-base",
-                techId ? avatarColor(techId) : AVATAR_COLORS[0]
-              )}
-            >
-              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : avatarLetter}
-            </div>
+            {loading ? (
+              <div
+                className={cn(
+                  "rounded-full flex items-center justify-center shrink-0 ring-2 ring-background select-none w-14 h-14 text-base",
+                  techId ? avatarColor(techId) : AVATAR_COLORS[0],
+                )}
+              >
+                <Loader2 className="w-6 h-6 animate-spin text-white" />
+              </div>
+            ) : (
+              <TechnicianAvatar
+                userId={techId}
+                name={displayName}
+                initials={avatarLetter}
+                avatarUrl={avatarUrl}
+                size="lg"
+              />
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
@@ -792,6 +886,68 @@ export function TechnicianDrawer({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <input
+              ref={avatarFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              aria-hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                e.target.value = ""
+                if (f) void applyAvatarFile(f)
+              }}
+            />
+            {canEditAvatar && (
+              <div className="space-y-2">
+                <Label>Profile photo</Label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <TechnicianAvatar
+                    userId={techId!}
+                    name={draftName.trim() || displayName}
+                    initials={initialsFromName(draftName.trim() || displayName)}
+                    avatarUrl={avatarUrl}
+                    size="lg"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 cursor-pointer"
+                      disabled={avatarUploading || editSaving}
+                      onClick={() => avatarFileRef.current?.click()}
+                    >
+                      {avatarUploading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      {avatarUrl ? "Change photo" : "Upload photo"}
+                    </Button>
+                    {avatarUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-destructive hover:text-destructive cursor-pointer"
+                        disabled={avatarUploading || editSaving}
+                        onClick={() => void removeAvatarPhoto()}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remove
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">JPEG, PNG, WebP, or GIF · max 5 MB</p>
+                {avatarError ? (
+                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-2 py-1.5">
+                    {avatarError}
+                  </p>
+                ) : null}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="tech-full-name">Full name</Label>
               <Input

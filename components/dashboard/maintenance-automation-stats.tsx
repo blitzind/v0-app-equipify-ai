@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
-import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
+import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
 function startOfMonthIso(): string {
   const d = new Date()
@@ -85,8 +85,7 @@ export function MaintenanceAutomationStats() {
     iconClass: string
     bgClass: string
   }
-  type BrandRow = { kind: "brand"; label: string; value: number | null }
-  const items: (MetricRow | BrandRow)[] = [
+  const items: MetricRow[] = [
     {
       kind: "metric",
       label: "Due today",
@@ -104,9 +103,12 @@ export function MaintenanceAutomationStats() {
       bgClass: "bg-destructive/10",
     },
     {
-      kind: "brand",
+      kind: "metric",
       label: "Auto-created this month",
       value: autoThisMonth,
+      Icon: MaintenancePlansLucideIcon,
+      iconClass: "text-muted-foreground",
+      bgClass: "bg-muted/60",
     },
   ]
 
@@ -124,13 +126,9 @@ export function MaintenanceAutomationStats() {
       <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
         {items.map((row) => (
           <div key={row.label} className="flex items-center gap-3 px-5 py-4">
-            {row.kind === "brand" ? (
-              <MaintenancePlansBrandTile size="stat" className="rounded-xl" />
-            ) : (
             <div className={cn("flex items-center justify-center w-10 h-10 rounded-lg shrink-0", row.bgClass)}>
               <row.Icon className={cn("w-5 h-5", row.iconClass)} />
             </div>
-            )}
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground font-medium">{row.label}</p>
               <p className="text-xl font-bold text-foreground tabular-nums">

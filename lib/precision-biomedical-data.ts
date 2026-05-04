@@ -269,6 +269,11 @@ export const pbsEquipment: Equipment[] = Array.from({ length: 60 }, (_, i) => {
   }
 })
 
+/** Matches `public/demo-techs` headshots and seed script `TECH_SEED` order (1–8). */
+function pbsDemoTechnicianAvatarUrl(indexZeroBased: number): string {
+  return `/demo-techs/technician-${String(indexZeroBased + 1).padStart(2, "0")}.png`
+}
+
 const TECH_META: {
   id: string
   name: string
@@ -294,6 +299,7 @@ export const pbsTechnicians: Technician[] = TECH_META.map((t, i) => ({
     .map((p) => p[0])
     .join("")
     .slice(0, 2),
+  avatarUrl: pbsDemoTechnicianAvatarUrl(i),
   role: "Biomedical Equipment Technician",
   region: t.region,
   email: t.email,
@@ -364,7 +370,8 @@ const WO_PRIORITIES: WorkOrder["priority"][] = ["Low", "Normal", "Normal", "High
 export const pbsWorkOrders: WorkOrder[] = Array.from({ length: 110 }, (_, i) => {
   const eqIdx = (i * 5 + 7) % pbsEquipment.length
   const eq = pbsEquipment[eqIdx]
-  const tech = TECH_META[i % TECH_META.length]
+  const techIdx = i % TECH_META.length
+  const tech = TECH_META[techIdx]
   const st = WO_STATUSES[i % WO_STATUSES.length]
   const completed =
     st === "Completed" || st === "Invoiced" ? "2026-04-15" : ""
@@ -381,6 +388,7 @@ export const pbsWorkOrders: WorkOrder[] = Array.from({ length: 110 }, (_, i) => 
     priority: WO_PRIORITIES[(i * 2) % WO_PRIORITIES.length],
     technicianId: i % 6 === 0 ? "" : tech.id,
     technicianName: i % 6 === 0 ? "Unassigned" : tech.name,
+    technicianAvatarUrl: i % 6 === 0 ? null : pbsDemoTechnicianAvatarUrl(techIdx),
     scheduledDate: `2026-${String((i % 10) + 1).padStart(2, "0")}-${String((i % 25) + 1).padStart(2, "0")}`,
     scheduledTime: "09:30",
     completedDate: completed,

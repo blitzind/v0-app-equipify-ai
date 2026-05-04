@@ -8,6 +8,7 @@ import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
+import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -161,9 +162,16 @@ function aggregateWoStats(
 }
 
 function buildTechnicianFromProfile(
-  profile: { id: string; email: string | null; full_name: string | null; created_at: string },
+  profile: {
+    id: string
+    email: string | null
+    full_name: string | null
+    created_at: string
+    avatar_url?: string | null
+  },
   memberRole: string,
-  stats: ReturnType<typeof aggregateWoStats>
+  stats: ReturnType<typeof aggregateWoStats>,
+  membershipRowStatus?: string | null,
 ): Technician {
   const name =
     (profile.full_name && profile.full_name.trim()) ||
@@ -174,10 +182,16 @@ function buildTechnicianFromProfile(
       ? profile.created_at.slice(0, 10)
       : "—"
 
+  const ms = membershipRowStatus?.toLowerCase()
+  const membershipStatus =
+    ms === "invited" || ms === "active" || ms === "suspended" ? ms : undefined
+
   return {
     id: profile.id,
     name,
     avatar: initialsFromName(name),
+    avatarUrl: profile.avatar_url?.trim() || null,
+    membershipStatus,
     role: formatMemberRole(memberRole),
     region: "—",
     email: profile.email ?? "",
@@ -212,22 +226,6 @@ const STATUS_DOT: Record<TechStatus, string> = {
   "On Job":    "bg-[color:var(--status-warning)]",
   "Off":       "bg-muted-foreground",
   "Vacation":  "bg-[var(--ds-accent-subtle)]",
-}
-
-const AVATAR_COLORS = [
-  "bg-[oklch(0.48_0.18_245)]",  // blue
-  "bg-[oklch(0.44_0.16_160)]",  // teal/green
-  "bg-[oklch(0.52_0.20_290)]",  // violet
-  "bg-[oklch(0.47_0.20_25)]",   // red-orange
-  "bg-[oklch(0.50_0.18_55)]",   // amber
-  "bg-primary",
-]
-
-function avatarColor(id: string) {
-  // Extract trailing numeric part robustly for both "T-01" and "MT-01"
-  const match = id.match(/(\d+)$/)
-  const idx = match ? parseInt(match[1], 10) - 1 : 0
-  return AVATAR_COLORS[Math.abs(idx) % AVATAR_COLORS.length]
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -288,18 +286,16 @@ function UtilBar({ pct, className }: { pct: number; className?: string }) {
 }
 
 function TechAvatar({ tech, size = "md" }: { tech: Technician; size?: "sm" | "md" | "lg" }) {
-  const sz = size === "lg" ? "w-14 h-14 text-base" : size === "sm" ? "w-8 h-8 text-[11px]" : "w-10 h-10 text-[13px]"
+  const mapped =
+    size === "lg" ? "lg" : size === "sm" ? "sm" : ("md" as const)
   return (
-    <div
-      className={cn(
-        "rounded-full flex items-center justify-center font-semibold text-white shrink-0 ring-2 ring-background select-none",
-        avatarColor(tech.id),
-        sz
-      )}
-      aria-label={tech.name}
-    >
-      {tech.avatar}
-    </div>
+    <TechnicianAvatar
+      userId={tech.id}
+      name={tech.name}
+      initials={tech.avatar}
+      avatarUrl={tech.avatarUrl}
+      size={mapped}
+    />
   )
 }
 
@@ -342,9 +338,19 @@ function ConfirmDeleteModal({
 // ─── Add Technician Modal ─────────────────────────────────────────────────────
 
 function AddTechModal({
-  onClose, onAdd,
-}: { onClose: () => void; onAdd: (t: Technician) => void }) {
+  onClose,
+  onInvite,
+}: {
+  onClose: () => void
+  onInvite: (input: { fullName: string; email: string }) => Promise<{
+    ok: boolean
+    error?: string
+    message?: string
+    alreadyMember?: boolean
+  }>
+}) {
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [selectedSkills, setSelectedSkills] = useState<TechSkill[]>([])
   const [form, setForm] = useState({
     name: "", email: "", phone: "", role: "", region: "",
@@ -361,27 +367,20 @@ function AddTechModal({
     setSelectedSkills((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name || !form.email || !form.role || !form.region) return
+    const fullName = form.name.trim()
+    const email = form.email.trim()
+    if (!fullName || !email) return
     setLoading(true)
-    setTimeout(() => {
-      const initials = form.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-      const newId = `T-0${Math.floor(Math.random() * 900 + 100)}`
-      const newTech: Technician = {
-        id: newId, name: form.name, avatar: initials,
-        role: form.role, region: form.region,
-        email: form.email, phone: form.phone,
-        hireDate: form.startDate || "2026-05-01",
-        status: form.status,
-        skills: selectedSkills,
-        jobsThisWeek: 0, completionPct: 0, rating: 0, utilizationPct: 0,
-        totalCompleted: 0, avgJobDurationHrs: 0,
-        certifications: [], schedule: [], history: [],
-        bio: `${form.name} joined the team in ${form.startDate ? form.startDate.slice(0, 4) : "2026"} as ${form.role} covering the ${form.region} region.`,
-      }
-      onAdd(newTech)
-    }, 800)
+    setFormError(null)
+    const result = await onInvite({ fullName, email })
+    setLoading(false)
+    if (result.ok) {
+      onClose()
+      return
+    }
+    setFormError(result.error ?? "Could not send invitation.")
   }
 
   return (
@@ -391,7 +390,9 @@ function AddTechModal({
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-background z-10">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Add Technician</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Fill in the details to create a new team member.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Sends an email invitation. They are added as a technician when they accept (owner/admin only).
+            </p>
           </div>
           <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="w-4 h-4" />
@@ -416,18 +417,18 @@ function AddTechModal({
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Role <span className="text-destructive">*</span></Label>
+              <Label>Role</Label>
               <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Job title (optional)" /></SelectTrigger>
                 <SelectContent>
                   {ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Region <span className="text-destructive">*</span></Label>
+              <Label>Region</Label>
               <Select value={form.region} onValueChange={(v) => setForm((f) => ({ ...f, region: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select region" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Region (optional)" /></SelectTrigger>
                 <SelectContent>
                   {ALL_REGIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                 </SelectContent>
@@ -469,12 +470,16 @@ function AddTechModal({
             </div>
           </div>
 
+          {formError ? (
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{formError}</p>
+          ) : null}
+
           <div className="flex gap-2 pt-2 border-t border-border">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
             <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating…</> : "Create Technician"}
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending…</> : "Send invitation"}
             </Button>
           </div>
         </form>
@@ -707,7 +712,17 @@ function TechCard({
               <p className="text-xs text-muted-foreground mt-0.5">{tech.role}</p>
             </div>
           </div>
-          <StatusBadge status={tech.status} />
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <StatusBadge status={tech.status} />
+            {tech.membershipStatus === "invited" ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-[color:var(--status-warning)]/40 text-[color:var(--status-warning)]"
+              >
+                Invite pending
+              </Badge>
+            ) : null}
+          </div>
         </div>
 
         {/* Meta row */}
@@ -836,6 +851,7 @@ function TechniciansPageInner() {
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null)
 
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null)
+  const [addTechOpen, setAddTechOpen] = useState(false)
   const [rosterRefresh, setRosterRefresh] = useState(0)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -878,9 +894,9 @@ function TechniciansPageInner() {
 
       const { data: members, error: memError } = await supabase
         .from("organization_members")
-        .select("user_id, role")
+        .select("user_id, role, status")
         .eq("organization_id", orgId)
-        .eq("status", "active")
+        .in("status", ["active", "invited"])
         .in("role", [...ROSTER_MEMBER_ROLES])
 
       if (memError) {
@@ -893,9 +909,10 @@ function TechniciansPageInner() {
         return
       }
 
-      const memberList = (members ?? []) as Array<{ user_id: string; role: string }>
+      const memberList = (members ?? []) as Array<{ user_id: string; role: string; status: string }>
       const userIds = [...new Set(memberList.map((m) => m.user_id))]
       const roleByUser = new Map(memberList.map((m) => [m.user_id, m.role]))
+      const membershipStatusByUser = new Map(memberList.map((m) => [m.user_id, m.status]))
 
       if (userIds.length === 0) {
         if (active) {
@@ -908,7 +925,7 @@ function TechniciansPageInner() {
 
       const { data: profRows, error: profError } = await supabase
         .from("profiles")
-        .select("id, email, full_name, created_at")
+        .select("id, email, full_name, created_at, avatar_url")
         .in("id", userIds)
 
       if (profError) {
@@ -938,13 +955,15 @@ function TechniciansPageInner() {
           email: string | null
           full_name: string | null
           created_at: string
+          avatar_url?: string | null
         }>
       )
         .filter((p) => roleByUser.has(p.id))
         .map((p) => {
           const role = roleByUser.get(p.id) ?? "tech"
           const stats = aggregateWoStats(woList, p.id, weekStart, weekEnd, todayStr)
-          return buildTechnicianFromProfile(p, role, stats)
+          const omStatus = membershipStatusByUser.get(p.id) ?? null
+          return buildTechnicianFromProfile(p, role, stats, omStatus)
         })
         .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -983,6 +1002,56 @@ function TechniciansPageInner() {
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
   }, [])
+
+  const inviteTechnician = useCallback(
+    async (input: { fullName: string; email: string }) => {
+      if (!activeOrgId) {
+        return { ok: false as const, error: "No organization selected." }
+      }
+      try {
+        const res = await fetch(`/api/organizations/${activeOrgId}/invite-member`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ fullName: input.fullName, email: input.email }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          message?: string
+          error?: string
+          ok?: boolean
+          alreadyMember?: boolean
+        }
+        if (!res.ok) {
+          const msg =
+            typeof data.message === "string"
+              ? data.message
+              : typeof data.error === "string"
+                ? data.error
+                : "Invitation failed."
+          addToast(msg, "info")
+          return { ok: false as const, error: msg }
+        }
+        const successMsg =
+          typeof data.message === "string"
+            ? data.message
+            : data.alreadyMember
+              ? "Already on the team."
+              : "Invitation sent."
+        addToast(successMsg, "success")
+        setRosterRefresh((n) => n + 1)
+        return {
+          ok: true as const,
+          message: successMsg,
+          alreadyMember: Boolean(data.alreadyMember),
+        }
+      } catch {
+        const msg = "Network error. Try again."
+        addToast(msg, "info")
+        return { ok: false as const, error: msg }
+      }
+    },
+    [activeOrgId, addToast],
+  )
 
   const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -1148,9 +1217,14 @@ function TechniciansPageInner() {
             <ViewToggle view={view} onViewChange={setView} />
             <Button
               type="button"
-              className="gap-2 h-9"
-              disabled
-              title="Invite team members from Settings — roster edits coming soon."
+              className="gap-2 h-9 cursor-pointer"
+              disabled={orgStatus !== "ready" || !activeOrgId}
+              title={
+                orgStatus !== "ready" || !activeOrgId
+                  ? "Select an organization first."
+                  : "Invite a technician by email (requires owner or admin)."
+              }
+              onClick={() => setAddTechOpen(true)}
             >
               <Plus className="w-4 h-4" /> Add Technician
             </Button>
@@ -1237,7 +1311,19 @@ function TechniciansPageInner() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell><StatusBadge status={tech.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge status={tech.status} />
+                        {tech.membershipStatus === "invited" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] border-[color:var(--status-warning)]/40 text-[color:var(--status-warning)]"
+                          >
+                            Invite pending
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1 text-sm text-muted-foreground">
                         <MapPin className="w-3 h-3" />{tech.region}
@@ -1314,6 +1400,10 @@ function TechniciansPageInner() {
           onClose={() => setMessageTech(null)}
           onSend={(msg) => { setMessageTech(null); addToast(msg) }}
         />
+      )}
+
+      {addTechOpen && (
+        <AddTechModal onClose={() => setAddTechOpen(false)} onInvite={inviteTechnician} />
       )}
 
       <ToastStack toasts={toasts} onRemove={removeToast} />

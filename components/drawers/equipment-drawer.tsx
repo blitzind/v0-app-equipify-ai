@@ -11,7 +11,6 @@ import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallba
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
-import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -870,7 +869,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               </Button>
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
                 <Link href={planNewHref} className="flex items-center gap-1.5">
-                  <MaintenancePlansBrandTile size="xs" /> New Maintenance Plan
+                  <CalendarPlus className="w-3.5 h-3.5 shrink-0" /> New Maintenance Plan
                 </Link>
               </Button>
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
