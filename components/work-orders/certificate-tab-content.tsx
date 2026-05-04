@@ -3,10 +3,16 @@
 import { useMemo } from "react"
 import Link from "next/link"
 import { CheckCircle2, FileDown, Save } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { CalibrationTemplate } from "@/lib/calibration-certificates"
+import {
+  buildCertificatePdfHtml,
+  downloadCertificateHtmlFile,
+  printCertificatePdfHtml,
+} from "@/lib/certificates/certificate-pdf-html"
 
 type CertificateTabContentProps = {
   templates: CalibrationTemplate[]
@@ -21,7 +27,25 @@ type CertificateTabContentProps = {
   companyName: string
   equipmentName: string
   customerName: string
+  workOrderDescription?: string
+  equipmentDetails?: string
+  serviceLocation?: string
+  equipmentCode?: string | null
+  equipmentSerialNumber?: string | null
+  calibrationRecordId?: string | null
+  serviceDateLabel?: string | null
+  technicianNotes?: string
+  technicianSignedDateLabel?: string | null
+  customerSignedDateLabel?: string | null
+  technicianName?: string
+  customerSignatureUrl?: string | null
+  customerSignedBy?: string | null
+  /** Legacy repair_log technician signature image. */
+  technicianSignatureDataUrl?: string | null
+  completedAtLabel?: string | null
   manageTemplatesHref?: string
+  /** When true, shows a subtle note that some fields were prefilled from the work order. */
+  showPrefillHelper?: boolean
 }
 
 function fmtDateTime(iso: string) {
@@ -33,59 +57,6 @@ function fmtDateTime(iso: string) {
     hour: "numeric",
     minute: "2-digit",
   })
-}
-
-export function printCertificateDocument(args: {
-  companyName: string
-  workOrderLabel: string
-  equipmentName: string
-  customerName: string
-  templateName: string
-  renderedRows: Array<{ label: string; value: string }>
-}) {
-  const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Certificate</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 28px; color: #0f172a; }
-      h1 { margin: 0 0 6px; font-size: 20px; }
-      .meta { margin: 0 0 16px; font-size: 12px; color: #475569; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 18px; }
-      .grid p { margin: 0; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; vertical-align: top; }
-      th { background: #f8fafc; text-align: left; }
-    </style>
-  </head>
-  <body>
-    <h1>${args.companyName} - Calibration Certificate</h1>
-    <p class="meta">${args.templateName}</p>
-    <div class="grid">
-      <p><strong>Work Order:</strong> ${args.workOrderLabel}</p>
-      <p><strong>Printed:</strong> ${new Date().toLocaleString()}</p>
-      <p><strong>Customer:</strong> ${args.customerName}</p>
-      <p><strong>Equipment:</strong> ${args.equipmentName}</p>
-    </div>
-    <table>
-      <thead>
-        <tr><th>Field</th><th>Value</th></tr>
-      </thead>
-      <tbody>
-        ${args.renderedRows.map((r) => `<tr><td>${r.label}</td><td>${r.value}</td></tr>`).join("")}
-      </tbody>
-    </table>
-  </body>
-</html>`
-
-  const win = window.open("", "_blank", "noopener,noreferrer,width=980,height=720")
-  if (!win) return
-  win.document.open()
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  win.print()
 }
 
 export function CertificateTabContent({
@@ -101,27 +72,29 @@ export function CertificateTabContent({
   companyName,
   equipmentName,
   customerName,
+  workOrderDescription,
+  equipmentDetails,
+  serviceLocation,
+  equipmentCode,
+  equipmentSerialNumber,
+  calibrationRecordId,
+  serviceDateLabel,
+  technicianNotes,
+  technicianSignedDateLabel,
+  customerSignedDateLabel,
+  technicianName,
+  customerSignatureUrl,
+  customerSignedBy,
+  technicianSignatureDataUrl,
+  completedAtLabel,
   manageTemplatesHref,
+  showPrefillHelper = false,
 }: CertificateTabContentProps) {
+  const { toast } = useToast()
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) ?? null,
     [templates, selectedTemplateId],
   )
-
-  const printableRows = useMemo(() => {
-    if (!selectedTemplate) return []
-    return selectedTemplate.fields
-      .filter((f) => f.type !== "section_heading")
-      .map((f) => {
-        const raw = values[f.id]
-        let out = "—"
-        if (f.type === "checkbox") out = raw ? "Yes" : "No"
-        else if (f.type === "pass_fail") out = raw === "fail" ? "Fail" : "Pass"
-        else if (typeof raw === "number") out = String(raw)
-        else if (typeof raw === "string" && raw.trim()) out = raw.trim()
-        return { label: f.label, value: out }
-      })
-  }, [selectedTemplate, values])
 
   return (
     <div className="space-y-4">
@@ -133,7 +106,7 @@ export function CertificateTabContent({
             </Button>
           </div>
         ) : null}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-2 items-end">
           <div className="space-y-1">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Certificate template</p>
             <select
@@ -160,18 +133,92 @@ export function CertificateTabContent({
             disabled={!selectedTemplate}
             onClick={() => {
               if (!selectedTemplate) return
-              printCertificateDocument({
-                companyName,
-                workOrderLabel,
-                customerName,
-                equipmentName,
-                templateName: selectedTemplate.name,
-                renderedRows: printableRows,
-              })
+              void (async () => {
+                try {
+                  const html = buildCertificatePdfHtml({
+                    companyName,
+                    templateName: selectedTemplate.name,
+                    template: selectedTemplate,
+                    values,
+                    workOrderLabel,
+                    customerName,
+                    serviceLocation,
+                    equipmentName,
+                    equipmentCode: equipmentCode ?? null,
+                    equipmentSerialNumber: equipmentSerialNumber ?? null,
+                    calibrationRecordId: calibrationRecordId ?? null,
+                    completedAtLabel: completedAtLabel ?? undefined,
+                    serviceDateLabel: serviceDateLabel ?? completedAtLabel ?? undefined,
+                    technicianName: technicianName?.trim() || "Technician",
+                    technicianSignatureDataUrl: technicianSignatureDataUrl ?? null,
+                    customerSignatureUrl: customerSignatureUrl ?? null,
+                    customerSignedBy: customerSignedBy ?? null,
+                    technicianSignedDateLabel: technicianSignedDateLabel ?? undefined,
+                    customerSignedDateLabel: customerSignedDateLabel ?? undefined,
+                    technicianNotes: technicianNotes?.trim() || undefined,
+                  })
+                  const result = await printCertificatePdfHtml(html)
+                  if (!result.success && result.message) {
+                    toast({
+                      variant: "destructive",
+                      title: "Print preview unavailable",
+                      description: result.message,
+                    })
+                  }
+                } catch (e) {
+                  toast({
+                    variant: "destructive",
+                    title: "Could not generate certificate",
+                    description: e instanceof Error ? e.message : String(e),
+                  })
+                }
+              })()
             }}
           >
             <FileDown className="w-3.5 h-3.5" />
-            Generate Certificate PDF
+            Print / PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs gap-1.5"
+            disabled={!selectedTemplate}
+            onClick={() => {
+              if (!selectedTemplate) return
+              try {
+                const html = buildCertificatePdfHtml({
+                  companyName,
+                  templateName: selectedTemplate.name,
+                  template: selectedTemplate,
+                  values,
+                  workOrderLabel,
+                  customerName,
+                  serviceLocation,
+                  equipmentName,
+                  equipmentCode: equipmentCode ?? null,
+                  equipmentSerialNumber: equipmentSerialNumber ?? null,
+                  calibrationRecordId: calibrationRecordId ?? null,
+                  completedAtLabel: completedAtLabel ?? undefined,
+                  serviceDateLabel: serviceDateLabel ?? completedAtLabel ?? undefined,
+                  technicianName: technicianName?.trim() || "Technician",
+                  technicianSignatureDataUrl: technicianSignatureDataUrl ?? null,
+                  customerSignatureUrl: customerSignatureUrl ?? null,
+                  customerSignedBy: customerSignedBy ?? null,
+                  technicianSignedDateLabel: technicianSignedDateLabel ?? undefined,
+                  customerSignedDateLabel: customerSignedDateLabel ?? undefined,
+                  technicianNotes: technicianNotes?.trim() || undefined,
+                })
+                downloadCertificateHtmlFile(html, `Calibration-${workOrderLabel}`)
+              } catch (e) {
+                toast({
+                  variant: "destructive",
+                  title: "Could not download certificate",
+                  description: e instanceof Error ? e.message : String(e),
+                })
+              }
+            }}
+          >
+            HTML
           </Button>
         </div>
         {lastSavedAt ? (
@@ -188,6 +235,11 @@ export function CertificateTabContent({
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+          {showPrefillHelper ? (
+            <p className="text-[11px] text-muted-foreground border-l-2 border-primary/20 pl-2.5 py-0.5 leading-relaxed">
+              Some fields were prefilled from the work order. You can edit them.
+            </p>
+          ) : null}
           {selectedTemplate.fields.length === 0 ? (
             <p className="text-sm text-muted-foreground">This template has no fields yet.</p>
           ) : (
@@ -207,6 +259,9 @@ export function CertificateTabContent({
                   <p className="text-[11px] font-medium text-foreground">
                     {field.label}
                     {field.required ? " *" : ""}
+                    {field.type === "number" && field.unit?.trim() ? (
+                      <span className="text-muted-foreground font-normal"> ({field.unit.trim()})</span>
+                    ) : null}
                   </p>
                   {field.type === "text" && (
                     <Input

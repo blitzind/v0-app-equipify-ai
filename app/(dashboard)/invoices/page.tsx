@@ -119,6 +119,8 @@ function InvoicesPageInner() {
   const { invoices, loading, error, refreshInvoices } = useInvoices()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
+  const [invoicePrefillWo, setInvoicePrefillWo] = useState<string | undefined>(undefined)
+  const [invoicePrefillCal, setInvoicePrefillCal] = useState<string | undefined>(undefined)
   useQuickAdd("new-invoice", () => setNewModalOpen(true))
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all")
@@ -136,6 +138,17 @@ function InvoicesPageInner() {
       setSelectedInvoiceId(openId)
       router.replace("/invoices", { scroll: false })
     }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    const action = searchParams.get("action")
+    if (action !== "new-invoice") return
+    const wo = searchParams.get("workOrderId") ?? undefined
+    const cal = searchParams.get("calibrationRecordId") ?? undefined
+    setInvoicePrefillWo(wo)
+    setInvoicePrefillCal(cal)
+    setNewModalOpen(true)
+    router.replace("/invoices", { scroll: false })
   }, [searchParams, router])
 
   const filtered = useMemo(() => {
@@ -425,7 +438,13 @@ function InvoicesPageInner() {
 
       <NewInvoiceModal
         open={newModalOpen}
-        onClose={() => setNewModalOpen(false)}
+        onClose={() => {
+          setNewModalOpen(false)
+          setInvoicePrefillWo(undefined)
+          setInvoicePrefillCal(undefined)
+        }}
+        initialWorkOrderId={invoicePrefillWo}
+        initialCalibrationRecordId={invoicePrefillCal}
         onSuccess={(_id, status) => {
           toast({
             title: status === "Sent" ? "Invoice sent to customer" : "Invoice saved as draft",

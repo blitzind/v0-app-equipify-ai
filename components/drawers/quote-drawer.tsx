@@ -729,6 +729,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       equipmentId: quote.equipmentId || null,
       workOrderId: quote.workOrderId || null,
       quoteId: quote.id,
+      calibrationRecordId: null,
       title: quote.description.trim() || "Invoice from quote",
       amountCents: Math.round(quote.amount * 100),
       status: "Draft",

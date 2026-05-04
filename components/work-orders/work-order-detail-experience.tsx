@@ -73,6 +73,8 @@ const STATUS_STYLE: Record<WorkOrderStatus, string> = {
   "In Progress":
     "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
   Completed: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
+  "Completed Pending Signature":
+    "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30",
   Invoiced: "bg-muted text-muted-foreground border-border",
 }
 
@@ -150,9 +152,12 @@ export function buildWorkOrderActivityItems(wo: WorkOrder): WorkOrderActivityIte
   if (wo.completedDate) {
     items.push({
       date: formatDate(wo.completedDate),
-      label: "Completed",
+      label:
+        wo.status === "Completed Pending Signature"
+          ? "Completed (pending customer signature)"
+          : "Completed",
       description: wo.repairLog.technicianNotes?.slice(0, 120) || "Service completed",
-      accent: "success",
+      accent: wo.status === "Completed Pending Signature" ? "warning" : "success",
     })
   }
   if (wo.invoiceNumber) {
@@ -530,13 +535,15 @@ function Section({
   title,
   icon: Icon,
   children,
+  id,
 }: {
   title: string
   icon: LucideIcon
   children: React.ReactNode
+  id?: string
 }) {
   return (
-    <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+    <Card id={id} className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Icon className="w-4 h-4 text-primary" />
@@ -850,6 +857,14 @@ export interface WorkOrderDetailExperienceProps {
    * (e.g. work order drawer Notes tab without global edit mode).
    */
   notesFieldsEditable?: boolean
+  /** Certificate / customer signature status chips (drawer + page). */
+  workflowHints?: {
+    certificateAssigned: boolean
+    certificateComplete: boolean
+    signatureCaptured: boolean
+  }
+  /** Shown after work is completed (e.g. PDF, signature, invoice shortcuts). */
+  postCompletionActions?: ReactNode
 }
 
 export function WorkOrderDetailExperience({
@@ -915,6 +930,8 @@ export function WorkOrderDetailExperience({
   certificateTabContent,
   certificateTabToolbar,
   notesFieldsEditable = false,
+  workflowHints,
+  postCompletionActions,
 }: WorkOrderDetailExperienceProps) {
   const [fallbackTab, setFallbackTab] = useState("overview")
   const tabsControlled = tabsValue !== undefined && onTabsValueChange !== undefined
@@ -927,7 +944,10 @@ export function WorkOrderDetailExperience({
   const isDrawer = layout === "drawer"
   const laborCost = laborHours * laborRatePerHour
   const partsCost = parts.reduce((s, p) => s + p.quantity * p.unitCost, 0)
-  const canMarkComplete = workOrder.status !== "Completed" && workOrder.status !== "Invoiced"
+  const canMarkComplete =
+    workOrder.status !== "Completed" &&
+    workOrder.status !== "Invoiced" &&
+    workOrder.status !== "Completed Pending Signature"
   const canEditProblem = problemEditable ?? fieldsEditable
   const notesInlineEditable = Boolean(notesFieldsEditable)
   const diagnosisNotesEditable = notesInlineEditable || fieldsEditable
@@ -1102,7 +1122,7 @@ export function WorkOrderDetailExperience({
           {canMarkComplete && (
             <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={() => void onMarkComplete()}>
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Mark complete
+              Complete work order
             </Button>
           )}
           <Button size="sm" variant={qaVariant} className={qaBtnClass} asChild>
@@ -1117,7 +1137,7 @@ export function WorkOrderDetailExperience({
             className={cn(qaBtnClass, !isDrawer && "opacity-70")}
             type="button"
             onClick={onInvoicePlaceholder}
-            title="Invoice creation from work orders is not wired yet"
+            title="Create an invoice for this work"
           >
             <Receipt className="w-3.5 h-3.5" />
             Create invoice
@@ -1146,6 +1166,38 @@ export function WorkOrderDetailExperience({
         </div>
       )}
 
+      {!isDrawer && workflowHints ? (
+        <div className="flex flex-wrap gap-2">
+          {workflowHints.certificateAssigned ? (
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px]",
+                workflowHints.certificateComplete
+                  ? "border-[color:var(--status-success)]/40 text-[color:var(--status-success)]"
+                  : "border-amber-500/40 text-amber-800 dark:text-amber-200",
+              )}
+            >
+              Certificate {workflowHints.certificateComplete ? "complete" : "incomplete"}
+            </Badge>
+          ) : null}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px]",
+              workflowHints.signatureCaptured
+                ? "border-[color:var(--status-success)]/40 text-[color:var(--status-success)]"
+                : "border-destructive/35 text-destructive",
+            )}
+          >
+            Signature {workflowHints.signatureCaptured ? "captured" : "missing"}
+          </Badge>
+        </div>
+      ) : null}
+      {!isDrawer && postCompletionActions ? (
+        <div className="rounded-xl border border-border bg-muted/15 px-4 py-3 space-y-2">{postCompletionActions}</div>
+      ) : null}
+
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
@@ -1168,6 +1220,12 @@ export function WorkOrderDetailExperience({
             <Clock className="w-3.5 h-3.5" />
             Labor
           </TabsTrigger>
+          {certificateTabContent ? (
+            <TabsTrigger value="certificate" className={tabTriggerClass()}>
+              <FileBadge2 className="w-3.5 h-3.5" />
+              Certificate
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="attachments" className={tabTriggerClass()}>
             <Paperclip className="w-3.5 h-3.5" />
             Attachments
@@ -1180,12 +1238,6 @@ export function WorkOrderDetailExperience({
             <History className="w-3.5 h-3.5" />
             Activity
           </TabsTrigger>
-          {certificateTabContent ? (
-            <TabsTrigger value="certificate" className={tabTriggerClass()}>
-              <FileBadge2 className="w-3.5 h-3.5" />
-              Certificate
-            </TabsTrigger>
-          ) : null}
         </TabsList>
 
         <div className={tabScrollWrapClass}>
@@ -1246,7 +1298,7 @@ export function WorkOrderDetailExperience({
                 {canMarkComplete && (
                   <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={() => void onMarkComplete()}>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Mark complete
+                    Complete work order
                   </Button>
                 )}
                 <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
@@ -1261,7 +1313,7 @@ export function WorkOrderDetailExperience({
                   className="h-8 gap-1.5 text-xs shadow-sm opacity-80"
                   type="button"
                   onClick={onInvoicePlaceholder}
-                  title="Invoice creation from work orders is not wired yet"
+                  title="Create an invoice for this work"
                 >
                   <Receipt className="w-3.5 h-3.5" />
                   Create invoice
@@ -1287,6 +1339,38 @@ export function WorkOrderDetailExperience({
               </div>
             </div>
           )}
+
+          {isDrawer && workflowHints ? (
+            <div className="flex flex-wrap gap-2">
+              {workflowHints.certificateAssigned ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px]",
+                    workflowHints.certificateComplete
+                      ? "border-[color:var(--status-success)]/40 text-[color:var(--status-success)]"
+                      : "border-amber-500/40 text-amber-800 dark:text-amber-200",
+                  )}
+                >
+                  Certificate {workflowHints.certificateComplete ? "complete" : "incomplete"}
+                </Badge>
+              ) : null}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px]",
+                  workflowHints.signatureCaptured
+                    ? "border-[color:var(--status-success)]/40 text-[color:var(--status-success)]"
+                    : "border-destructive/35 text-destructive",
+                )}
+              >
+                Signature {workflowHints.signatureCaptured ? "captured" : "missing"}
+              </Badge>
+            </div>
+          ) : null}
+          {isDrawer && postCompletionActions ? (
+            <div className="rounded-xl border border-border bg-muted/15 px-4 py-3 space-y-2">{postCompletionActions}</div>
+          ) : null}
 
           <div className={cn("grid", isDrawer ? "grid-cols-2 lg:grid-cols-4 gap-2" : "grid-cols-2 lg:grid-cols-4 gap-3")}>
             {isDrawer ? (
@@ -1514,7 +1598,7 @@ export function WorkOrderDetailExperience({
             </div>
           </Section>
 
-          <Section title="Customer signature" icon={PenLine}>
+          <Section title="Customer signature" icon={PenLine} id="customer-signature-section">
             <CustomerSignatureSection
               legacySigData={sigData}
               customerSignaturePreviewUrl={customerSignaturePreviewUrl}
@@ -1691,6 +1775,13 @@ export function WorkOrderDetailExperience({
           </Card>
         </TabsContent>
 
+        {certificateTabContent ? (
+          <TabsContent value="certificate" className="space-y-4 mt-0">
+            {certificateTabToolbar ? <div className="mb-1">{certificateTabToolbar}</div> : null}
+            {certificateTabContent}
+          </TabsContent>
+        ) : null}
+
         <TabsContent value="attachments" className="mt-0">
           <Section title="Attachments" icon={Paperclip}>
             <PhotoSection
@@ -1761,12 +1852,6 @@ export function WorkOrderDetailExperience({
             <DrawerTimeline items={activityItems} />
           </Section>
         </TabsContent>
-        {certificateTabContent ? (
-          <TabsContent value="certificate" className="space-y-4 mt-0">
-            {certificateTabToolbar ? <div className="mb-1">{certificateTabToolbar}</div> : null}
-            {certificateTabContent}
-          </TabsContent>
-        ) : null}
         </div>
       </Tabs>
     </div>

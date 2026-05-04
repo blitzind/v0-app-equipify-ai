@@ -53,6 +53,7 @@ interface QuoteInvoiceContextValue {
     equipmentId: string | null
     workOrderId: string | null
     quoteId: string | null
+    calibrationRecordId: string | null
     title: string
     amountCents: number
     status: InvoiceStatus

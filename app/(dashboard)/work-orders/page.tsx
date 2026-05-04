@@ -56,13 +56,22 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ALL_STATUSES: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "Completed", "Invoiced"]
+const ALL_STATUSES: WorkOrderStatus[] = [
+  "Open",
+  "Scheduled",
+  "In Progress",
+  "Completed",
+  "Completed Pending Signature",
+  "Invoiced",
+]
 
 const STATUS_STYLE: Record<WorkOrderStatus, string> = {
   "Open":        "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",
   "Scheduled":   "bg-[color:var(--status-info)]/15 text-[color:var(--status-info)] border-[color:var(--status-info)]/25",
   "In Progress": "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
   "Completed":   "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
+  "Completed Pending Signature":
+    "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30",
   "Invoiced":    "bg-muted text-muted-foreground border-border",
 }
 
@@ -73,13 +82,21 @@ const PRIORITY_STYLE: Record<WorkOrderPriority, string> = {
   "Critical": "text-destructive font-semibold",
 }
 
-const KANBAN_COLUMNS: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "Completed", "Invoiced"]
+const KANBAN_COLUMNS: WorkOrderStatus[] = [
+  "Open",
+  "Scheduled",
+  "In Progress",
+  "Completed",
+  "Completed Pending Signature",
+  "Invoiced",
+]
 
 const KANBAN_HEADER: Record<WorkOrderStatus, string> = {
   "Open":        "bg-[color:var(--status-info)]/8 border-[color:var(--status-info)]/20",
   "Scheduled":   "bg-[color:var(--status-info)]/12 border-[color:var(--status-info)]/18",
   "In Progress": "bg-[color:var(--status-warning)]/8 border-[color:var(--status-warning)]/20",
   "Completed":   "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/20",
+  "Completed Pending Signature": "bg-amber-500/8 border-amber-500/20",
   "Invoiced":    "bg-muted/50 border-border",
 }
 
@@ -132,6 +149,8 @@ function mapDbStatus(status: string): WorkOrderStatus {
       return "In Progress"
     case "completed":
       return "Completed"
+    case "completed_pending_signature":
+      return "Completed Pending Signature"
     case "invoiced":
       return "Invoiced"
     default:
@@ -739,14 +758,17 @@ function WorkOrdersPageInner() {
     setCreateOpen(true)
   })
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
+  const [drawerInitialTab, setDrawerInitialTab] = useState<string | undefined>(undefined)
   const searchParams = useSearchParams()
   const router = useRouter()
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
     const openId = searchParams.get("open")
+    const tab = searchParams.get("tab") ?? undefined
     if (openId) {
       setSelectedWoId(openId)
+      setDrawerInitialTab(tab)
       router.replace("/work-orders", { scroll: false })
     }
   }, [searchParams, router])
@@ -831,7 +853,7 @@ function WorkOrdersPageInner() {
   return (
     <div className="flex flex-col gap-6">
       {/* Stat strip */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3">
         {ALL_STATUSES.map((s) => (
           <button
             key={s}
@@ -974,7 +996,11 @@ function WorkOrdersPageInner() {
 
       <WorkOrderDrawer
         workOrderId={selectedWoId}
-        onClose={() => setSelectedWoId(null)}
+        initialTab={drawerInitialTab}
+        onClose={() => {
+          setSelectedWoId(null)
+          setDrawerInitialTab(undefined)
+        }}
         onUpdated={() => setRefreshToken((v) => v + 1)}
       />
 

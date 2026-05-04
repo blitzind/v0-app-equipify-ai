@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -24,11 +24,22 @@ import {
 import {
   assignTemplateToWorkOrder,
   createCalibrationRecord,
-  defaultValueForField,
+  isCalibrationRecordComplete,
   listCalibrationTemplates,
   loadLatestCalibrationRecord,
   type CalibrationTemplate,
 } from "@/lib/calibration-certificates"
+import {
+  buildCertificatePrefillContext,
+  certificateFieldMapsEqual,
+  seedCertificateValuesForWorkOrder,
+} from "@/lib/calibration-templates/prefill-from-work-order"
+import {
+  buildCertificatePdfHtml,
+  downloadCertificateHtmlFile,
+  printCertificatePdfHtml,
+} from "@/lib/certificates/certificate-pdf-html"
+import { certificateGateForCompletion, customerSignatureCaptured } from "@/lib/work-orders/work-order-completion"
 import { CertificateTabContent } from "@/components/work-orders/certificate-tab-content"
 import { cloneParts, partsEqual } from "@/lib/work-orders/parts-snapshot"
 import { cloneTasks, tasksEqual, type TaskDraft } from "@/lib/work-orders/tasks-snapshot"
@@ -52,7 +63,7 @@ import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
-import { Pencil, X, Check, AlertOctagon, ExternalLink } from "lucide-react"
+import { Pencil, X, Check, AlertOctagon, ExternalLink, FileDown, PenLine, Receipt } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 
 let toastCounter = 0
@@ -64,6 +75,8 @@ const STATUS_STYLE: Record<WorkOrderStatus, string> = {
   "Scheduled":   "bg-[color:var(--status-info)]/15 text-[color:var(--status-info)] border-[color:var(--status-info)]/25",
   "In Progress": "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
   "Completed":   "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
+  "Completed Pending Signature":
+    "bg-amber-500/10 text-amber-800 dark:text-amber-200 border-amber-500/30",
   "Invoiced":    "bg-muted text-muted-foreground border-border",
 }
 
@@ -74,7 +87,14 @@ const PRIORITY_COLOR: Record<WorkOrderPriority, string> = {
   Critical: "text-destructive font-semibold",
 }
 
-const ALL_STATUSES: WorkOrderStatus[] = ["Open", "Scheduled", "In Progress", "Completed", "Invoiced"]
+const ALL_STATUSES: WorkOrderStatus[] = [
+  "Open",
+  "Scheduled",
+  "In Progress",
+  "Completed",
+  "Completed Pending Signature",
+  "Invoiced",
+]
 const ALL_PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
 const ALL_TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
 
@@ -84,6 +104,7 @@ function uiStatusToDb(s: WorkOrderStatus): string {
     Scheduled: "scheduled",
     "In Progress": "in_progress",
     Completed: "completed",
+    "Completed Pending Signature": "completed_pending_signature",
     Invoiced: "invoiced",
   }
   return m[s]
@@ -206,6 +227,8 @@ interface WorkOrderDrawerProps {
   workOrderId: string | null
   onClose: () => void
   onUpdated?: () => void
+  /** Opens this tab when the drawer loads (e.g. `certificate` from invoice deep link). */
+  initialTab?: string
 }
 
 type TechnicianOption = { id: string; label: string; avatarUrl?: string | null }
@@ -221,7 +244,7 @@ function initialsFromTechnicianLabel(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDrawerProps) {
+export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }: WorkOrderDrawerProps) {
   const { toast: pushToast } = useToast()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const [wo, setWo] = useState<WorkOrder | null>(null)
@@ -271,22 +294,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
   const [certificateValues, setCertificateValues] = useState<Record<string, unknown>>({})
   const [certificateSavedAt, setCertificateSavedAt] = useState<string | null>(null)
   const [certificateSaveBusy, setCertificateSaveBusy] = useState(false)
+  const [calibrationRecordId, setCalibrationRecordId] = useState<string | null>(null)
+  const [certificateBaseline, setCertificateBaseline] = useState<Record<string, unknown>>({})
+  const [certificatePrefillNotice, setCertificatePrefillNotice] = useState(false)
+  const certificateTouchedRef = useRef<Set<string>>(new Set())
 
-  const seedCertificateValues = useCallback((
-    template: CalibrationTemplate | null,
-    existing: Record<string, unknown> | null,
-  ): Record<string, unknown> => {
-    if (!template) return {}
-    const out: Record<string, unknown> = {}
-    for (const field of template.fields) {
-      if (field.type === "section_heading") continue
-      out[field.id] = defaultValueForField(field.type)
-    }
-    if (existing) {
-      for (const [k, v] of Object.entries(existing)) out[k] = v
-    }
-    return out
-  }, [])
+  const seedCertificateFromWorkOrder = useCallback(
+    (
+      template: CalibrationTemplate | null,
+      existing: Record<string, unknown> | null,
+      woForSeed: WorkOrder | null,
+      touched?: ReadonlySet<string>,
+    ) => {
+      if (!woForSeed) return seedCertificateValuesForWorkOrder(template, existing, null, { touchedFieldIds: touched })
+      return seedCertificateValuesForWorkOrder(template, existing, buildCertificatePrefillContext(woForSeed), {
+        touchedFieldIds: touched,
+      })
+    },
+    [],
+  )
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -368,16 +394,26 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
         ""
       setCertificateTemplateId(selectedId)
       const selectedTemplate = templates.find((t) => t.id === selectedId) ?? null
-      setCertificateValues(seedCertificateValues(selectedTemplate, latestRecord?.values ?? null))
+      certificateTouchedRef.current.clear()
+      const seeded = seedCertificateFromWorkOrder(
+        selectedTemplate,
+        latestRecord?.values ?? null,
+        res.data.workOrder,
+      )
+      setCertificateValues(seeded.values)
+      setCertificateBaseline(structuredClone(seeded.values))
+      setCertificatePrefillNotice(seeded.hadPrefill)
       setCertificateSavedAt(latestRecord?.createdAt ?? null)
+      setCalibrationRecordId(latestRecord?.id ?? null)
     } catch {
       setCertificateTemplates([])
       setCertificateTemplateId("")
       setCertificateValues({})
       setCertificateSavedAt(null)
+      setCalibrationRecordId(null)
     }
     setLoading(false)
-  }, [workOrderId, activeOrgId, orgStatus, seedCertificateValues])
+  }, [workOrderId, activeOrgId, orgStatus, seedCertificateFromWorkOrder])
 
   const partsDirty = useMemo(() => !partsEqual(tabParts, savedParts), [tabParts, savedParts])
 
@@ -416,9 +452,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
     setDraft({})
     setDraftLaborDollars("")
     setDraftPartsDollars("")
-    setDrawerTab("overview")
+    setDrawerTab(initialTab ?? "overview")
     void loadWorkOrder()
-  }, [workOrderId, loadWorkOrder])
+  }, [workOrderId, loadWorkOrder, initialTab])
 
   const displayWo = useMemo((): WorkOrder | null => {
     if (!wo) return null
@@ -821,6 +857,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
         { stripTasks: usesTasksTable, stripParts: usesPartsLineItems },
       )
       pushToast({ title: "Signature saved", description: "Customer signature was uploaded." })
+      const { data: stRow } = await supabase
+        .from("work_orders")
+        .select("status")
+        .eq("id", wo.id)
+        .eq("organization_id", activeOrgId)
+        .maybeSingle()
+      if ((stRow as { status?: string } | null)?.status === "completed_pending_signature") {
+        await supabase
+          .from("work_orders")
+          .update({ status: "completed", updated_at: new Date().toISOString() })
+          .eq("id", wo.id)
+          .eq("organization_id", activeOrgId)
+      }
       await loadWorkOrder()
       onUpdated?.()
     } catch (e) {
@@ -874,7 +923,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
     setBillingDecisionOpen(false)
     await loadWorkOrder()
     onUpdated?.()
-    window.location.href = "/invoices?action=new-invoice"
+    window.location.href = buildNewInvoiceHref()
+  }
+
+  function buildNewInvoiceHref() {
+    if (!wo) return "/invoices?action=new-invoice"
+    const params = new URLSearchParams()
+    params.set("action", "new-invoice")
+    params.set("workOrderId", wo.id)
+    if (calibrationRecordId) params.set("calibrationRecordId", calibrationRecordId)
+    return `/invoices?${params.toString()}`
   }
 
   function handleCreateInvoiceAction() {
@@ -884,16 +942,36 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       setBillingDecisionOpen(true)
       return
     }
-    window.location.href = "/invoices?action=new-invoice"
+    window.location.href = buildNewInvoiceHref()
   }
 
-  async function markComplete() {
+  async function completeWorkOrder() {
     if (!wo || !activeOrgId) return
+    const assignedTemplate = wo.calibrationTemplateId
+      ? certificateTemplates.find((t) => t.id === wo.calibrationTemplateId) ?? null
+      : null
+    const gate = certificateGateForCompletion({
+      calibrationTemplateId: wo.calibrationTemplateId,
+      assignedTemplate,
+      certificateSavedAt,
+      certificateValues,
+    })
+    if (!gate.ok) {
+      pushToast({
+        variant: "destructive",
+        title: "Certificate required",
+        description: gate.message ?? "Complete the certificate before finishing this work order.",
+      })
+      return
+    }
+
     const supabase = createBrowserSupabaseClient()
+    const hasSig = customerSignatureCaptured(wo)
+    const dbStatus = hasSig ? "completed" : "completed_pending_signature"
     const { error } = await supabase
       .from("work_orders")
       .update({
-        status: "completed",
+        status: dbStatus,
         completed_at: new Date().toISOString(),
       })
       .eq("id", wo.id)
@@ -903,9 +981,115 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       toast(`Update failed: ${error.message}`)
       return
     }
-    toast("Work order marked complete")
+    toast(hasSig ? "Work order completed" : "Work order completed — capture customer signature when ready.")
     await loadWorkOrder()
     onUpdated?.()
+  }
+
+  async function handleGenerateCertificatePdf() {
+    if (!wo) return
+    const tmpl = certificateTemplates.find((t) => t.id === certificateTemplateId) ?? null
+    if (!tmpl) {
+      pushToast({ variant: "destructive", title: "No template", description: "Select a certificate template first." })
+      return
+    }
+    try {
+      const sig = wo.repairLog.signatureDataUrl
+      const techSig =
+        sig && (sig.startsWith("data:") || sig.startsWith("http")) ? sig : null
+      const html = buildCertificatePdfHtml({
+        companyName: "Equipify Service Co.",
+        templateName: tmpl.name,
+        template: tmpl,
+        values: certificateValues,
+        workOrderLabel: getWorkOrderDisplay(wo),
+        customerName: wo.customerName,
+        serviceLocation: wo.location || undefined,
+        equipmentName: wo.equipmentName,
+        equipmentCode: wo.equipmentCode ?? null,
+        equipmentSerialNumber: wo.equipmentSerialNumber ?? null,
+        calibrationRecordId: calibrationRecordId,
+        completedAtLabel: wo.completedDate ? fmtDate(wo.completedDate) : undefined,
+        serviceDateLabel: wo.completedDate
+          ? fmtDate(wo.completedDate)
+          : wo.scheduledDate
+            ? fmtDate(wo.scheduledDate)
+            : undefined,
+        technicianName: wo.technicianName,
+        technicianSignatureDataUrl: techSig,
+        customerSignatureUrl: wo.customerSignaturePreviewUrl ?? null,
+        customerSignedBy: wo.repairLog.signedBy?.trim() || null,
+        technicianSignedDateLabel: wo.repairLog.signedAt?.trim()
+          ? fmtDate(wo.repairLog.signedAt.slice(0, 10))
+          : wo.completedDate
+            ? fmtDate(wo.completedDate)
+            : undefined,
+        customerSignedDateLabel: wo.customerSignatureCapturedAt
+          ? fmtDate(wo.customerSignatureCapturedAt.slice(0, 10))
+          : undefined,
+        technicianNotes: wo.repairLog.technicianNotes?.trim() || undefined,
+      })
+      const result = await printCertificatePdfHtml(html)
+      if (!result.success && result.message) {
+        pushToast({
+          variant: "destructive",
+          title: "Print preview unavailable",
+          description: result.message,
+        })
+      }
+    } catch (e) {
+      pushToast({
+        variant: "destructive",
+        title: "Could not generate certificate",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  function handleDownloadCertificateHtml() {
+    if (!wo) return
+    const tmpl = certificateTemplates.find((t) => t.id === certificateTemplateId) ?? null
+    if (!tmpl) {
+      pushToast({ variant: "destructive", title: "No template", description: "Select a certificate template first." })
+      return
+    }
+    const sig = wo.repairLog.signatureDataUrl
+    const techSig =
+      sig && (sig.startsWith("data:") || sig.startsWith("http")) ? sig : null
+    const html = buildCertificatePdfHtml({
+      companyName: "Equipify Service Co.",
+      templateName: tmpl.name,
+      template: tmpl,
+      values: certificateValues,
+      workOrderLabel: getWorkOrderDisplay(wo),
+      customerName: wo.customerName,
+      serviceLocation: wo.location || undefined,
+      equipmentName: wo.equipmentName,
+      equipmentCode: wo.equipmentCode ?? null,
+      equipmentSerialNumber: wo.equipmentSerialNumber ?? null,
+      calibrationRecordId: calibrationRecordId,
+      completedAtLabel: wo.completedDate ? fmtDate(wo.completedDate) : undefined,
+      serviceDateLabel: wo.completedDate
+        ? fmtDate(wo.completedDate)
+        : wo.scheduledDate
+          ? fmtDate(wo.scheduledDate)
+          : undefined,
+      technicianName: wo.technicianName,
+      technicianSignatureDataUrl: techSig,
+      customerSignatureUrl: wo.customerSignaturePreviewUrl ?? null,
+      customerSignedBy: wo.repairLog.signedBy?.trim() || null,
+      technicianSignedDateLabel: wo.repairLog.signedAt?.trim()
+        ? fmtDate(wo.repairLog.signedAt.slice(0, 10))
+        : wo.completedDate
+          ? fmtDate(wo.completedDate)
+          : undefined,
+      customerSignedDateLabel: wo.customerSignatureCapturedAt
+        ? fmtDate(wo.customerSignatureCapturedAt.slice(0, 10))
+        : undefined,
+      technicianNotes: wo.repairLog.technicianNotes?.trim() || undefined,
+    })
+    downloadCertificateHtmlFile(html, `Calibration-${getWorkOrderDisplay(wo)}`)
+    pushToast({ title: "Download started", description: "Open the HTML file and use Print → Save as PDF." })
   }
 
   function legacyRepairPhotoIndex(gallery: WorkOrderPhotoGalleryItem[], fullIndex: number): number | null {
@@ -1091,12 +1275,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
 
   async function handleCertificateTemplateChange(templateId: string) {
     if (!wo || !activeOrgId) return
+    if (!certificateFieldMapsEqual(certificateValues, certificateBaseline)) {
+      if (
+        !window.confirm(
+          "You have unsaved changes to certificate fields. Switch template and discard them?",
+        )
+      ) {
+        return
+      }
+    }
     const supabase = createBrowserSupabaseClient()
     try {
       await assignTemplateToWorkOrder(supabase, activeOrgId, wo.id, templateId || null)
       setCertificateTemplateId(templateId)
       const selected = certificateTemplates.find((t) => t.id === templateId) ?? null
-      setCertificateValues(seedCertificateValues(selected, null))
+      certificateTouchedRef.current.clear()
+      const seeded = seedCertificateFromWorkOrder(selected, null, wo)
+      setCertificateValues(seeded.values)
+      setCertificateBaseline(structuredClone(seeded.values))
+      setCertificatePrefillNotice(seeded.hadPrefill)
       setCertificateSavedAt(null)
       if (templateId) toast("Certificate template assigned")
     } catch (e) {
@@ -1109,14 +1306,17 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
     const supabase = createBrowserSupabaseClient()
     setCertificateSaveBusy(true)
     try {
+      const snapshot = structuredClone(certificateValues)
       const record = await createCalibrationRecord(
         supabase,
         activeOrgId,
         wo.id,
         certificateTemplateId,
-        certificateValues,
+        snapshot,
       )
       setCertificateSavedAt(record.createdAt)
+      setCalibrationRecordId(record.id)
+      setCertificateBaseline(snapshot)
       toast("Certificate record saved")
     } catch (e) {
       toast(`Certificate save failed: ${e instanceof Error ? e.message : String(e)}`)
@@ -1147,6 +1347,74 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
   const currentStatus = (draft.status ?? wo.status) as WorkOrderStatus
 
   const quoteHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(wo.customerId)}&equipmentId=${encodeURIComponent(wo.equipmentId)}`
+
+  const assignedForWorkflow = wo.calibrationTemplateId
+    ? certificateTemplates.find((t) => t.id === wo.calibrationTemplateId) ?? null
+    : null
+
+  const certComplete =
+    !wo.calibrationTemplateId ||
+    (Boolean(certificateSavedAt) &&
+      assignedForWorkflow != null &&
+      isCalibrationRecordComplete(assignedForWorkflow, certificateValues))
+
+  const workflowHints = {
+    certificateAssigned: Boolean(wo.calibrationTemplateId),
+    certificateComplete: certComplete,
+    signatureCaptured: customerSignatureCaptured(wo),
+  }
+
+  const showPostComplete =
+    wo.status === "Completed" || wo.status === "Completed Pending Signature"
+
+  const postCompletionActions = showPostComplete ? (
+    <div className="flex flex-wrap gap-2 items-center">
+      {wo.calibrationTemplateId ? (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-8 gap-1.5 text-xs"
+            onClick={handleGenerateCertificatePdf}
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            Print / Save as PDF
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            onClick={handleDownloadCertificateHtml}
+          >
+            Download HTML
+          </Button>
+        </>
+      ) : null}
+      {!customerSignatureCaptured(wo) ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 text-xs"
+          onClick={() => setDrawerTab("overview")}
+        >
+          <PenLine className="w-3.5 h-3.5" />
+          Collect Customer Signature
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        onClick={() => handleCreateInvoiceAction()}
+      >
+        <Receipt className="w-3.5 h-3.5" />
+        Create Invoice
+      </Button>
+    </div>
+  ) : null
 
   return (
     <>
@@ -1554,9 +1822,10 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
                 selectedTemplateId={certificateTemplateId}
                 onTemplateChange={(templateId) => void handleCertificateTemplateChange(templateId)}
                 values={certificateValues}
-                onValueChange={(fieldId, value) =>
+                onValueChange={(fieldId, value) => {
+                  certificateTouchedRef.current.add(fieldId)
                   setCertificateValues((prev) => ({ ...prev, [fieldId]: value }))
-                }
+                }}
                 onSave={() => void handleSaveCertificateRecord()}
                 saveBusy={certificateSaveBusy}
                 lastSavedAt={certificateSavedAt}
@@ -1564,7 +1833,44 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
                 workOrderLabel={getWorkOrderDisplay(wo)}
                 customerName={wo.customerName}
                 equipmentName={wo.equipmentName}
+                workOrderDescription={wo.description}
+                equipmentDetails={wo.location ? `Location: ${wo.location}` : undefined}
+                serviceLocation={wo.location || undefined}
+                equipmentCode={wo.equipmentCode ?? null}
+                equipmentSerialNumber={wo.equipmentSerialNumber ?? null}
+                calibrationRecordId={calibrationRecordId}
+                serviceDateLabel={
+                  wo.completedDate
+                    ? fmtDate(wo.completedDate)
+                    : wo.scheduledDate
+                      ? fmtDate(wo.scheduledDate)
+                      : null
+                }
+                technicianNotes={wo.repairLog.technicianNotes}
+                technicianSignedDateLabel={
+                  wo.repairLog.signedAt?.trim()
+                    ? fmtDate(wo.repairLog.signedAt.slice(0, 10))
+                    : wo.completedDate
+                      ? fmtDate(wo.completedDate)
+                      : null
+                }
+                customerSignedDateLabel={
+                  wo.customerSignatureCapturedAt
+                    ? fmtDate(wo.customerSignatureCapturedAt.slice(0, 10))
+                    : null
+                }
+                technicianName={wo.technicianName}
+                customerSignatureUrl={wo.customerSignaturePreviewUrl}
+                customerSignedBy={wo.repairLog.signedBy || null}
+                technicianSignatureDataUrl={
+                  wo.repairLog.signatureDataUrl?.startsWith("data") ||
+                  wo.repairLog.signatureDataUrl?.startsWith("http")
+                    ? wo.repairLog.signatureDataUrl
+                    : null
+                }
+                completedAtLabel={wo.completedDate ? fmtDate(wo.completedDate) : null}
                 manageTemplatesHref="/calibration-templates"
+                showPrefillHelper={certificatePrefillNotice}
               />
             }
             sigData={wo.repairLog.signatureDataUrl}
@@ -1575,12 +1881,13 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
             onCustomerSignatureSave={(blob, name) => handleCustomerSignatureSave(blob, name)}
             signatureCaptureEnabled
             fieldsEditable={editing}
-            problemEditable={false}
             partsPhotosEditable={true}
             tasksEditable
             onEditWorkOrder={startEdit}
             onAssignTechnician={() => setAssignDialogOpen(true)}
-            onMarkComplete={() => void markComplete()}
+            onMarkComplete={() => void completeWorkOrder()}
+            workflowHints={workflowHints}
+            postCompletionActions={postCompletionActions}
             quoteHref={quoteHref}
             onInvoicePlaceholder={() => handleCreateInvoiceAction()}
             onPrint={() =>

@@ -33,6 +33,8 @@ function mapDbStatus(status: string): WorkOrderStatus {
       return "In Progress"
     case "completed":
       return "Completed"
+    case "completed_pending_signature":
+      return "Completed Pending Signature"
     case "invoiced":
       return "Invoiced"
     default:
@@ -372,6 +374,8 @@ export async function loadWorkOrderDetailForOrg(
     warrantyVendorId: w.warranty_vendor_id ?? null,
     warrantyVendorName,
     equipmentWarrantyActive,
+    equipmentCode: eqRow?.equipment_code?.trim() || null,
+    equipmentSerialNumber: eqRow?.serial_number?.trim() || null,
   }
 
   return {

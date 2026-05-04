@@ -455,7 +455,13 @@ export const equipment: Equipment[] = [
 
 // ─── Work Orders ─────────────────────────────────────────────────────────────
 
-export type WorkOrderStatus = "Open" | "Scheduled" | "In Progress" | "Completed" | "Invoiced"
+export type WorkOrderStatus =
+  | "Open"
+  | "Scheduled"
+  | "In Progress"
+  | "Completed"
+  | "Completed Pending Signature"
+  | "Invoiced"
 export type WorkOrderPriority = "Low" | "Normal" | "High" | "Critical"
 export type WorkOrderType = "Repair" | "PM" | "Inspection" | "Install" | "Emergency"
 
@@ -514,6 +520,9 @@ export interface WorkOrder {
   maintenancePlanName?: string | null
   calibrationTemplateId?: string | null
   equipmentCategory?: string | null
+  /** From equipment row in Supabase detail load (for certificates, etc.). */
+  equipmentCode?: string | null
+  equipmentSerialNumber?: string | null
   /** True when created by nightly PM automation (`created_by_pm_automation`). */
   createdByPmAutomation?: boolean
   /** Signed URL for `signature_url` storage object (Supabase detail load only). */
@@ -1727,6 +1736,8 @@ export interface AdminInvoice {
   internalNotes?: string
   /** ISO timestamp from org_invoices.sent_at when the invoice was emailed/sent. */
   sentAt?: string
+  /** Linked calibration certificate record (org_invoices.calibration_record_id). */
+  calibrationRecordId?: string
 }
 
 export const adminInvoices: AdminInvoice[] = [

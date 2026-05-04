@@ -124,11 +124,19 @@ interface NewInvoiceModalProps {
   open: boolean
   onClose: () => void
   onSuccess?: (id: string, status: InvoiceStatus) => void
+  initialWorkOrderId?: string
+  initialCalibrationRecordId?: string
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalProps) {
+export function NewInvoiceModal({
+  open,
+  onClose,
+  onSuccess,
+  initialWorkOrderId,
+  initialCalibrationRecordId,
+}: NewInvoiceModalProps) {
   const { addInvoiceFromPayload } = useInvoices()
   const { quotes } = useQuotes()
   const prevOpenRef = useRef(false)
@@ -155,6 +163,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
   const [paymentTerms, setPaymentTerms] = useState("Net 30")
   const [notes, setNotes] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
+  const [calibrationRecordId, setCalibrationRecordId] = useState("")
   const [status, setStatus] = useState<InvoiceStatus>("Draft")
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -191,19 +200,23 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      setCustomerId("")
-      setWorkOrderId("")
-      setQuoteId("")
-      setEquipmentId("")
-      setTitle("")
-      setLineItems([newLineItem()])
-      setDiscount("")
-      setTax("")
-      setDueDate("")
-      setPaymentTerms("Net 30")
-      setNotes("")
-      setInternalNotes("")
-      setStatus("Draft")
+      const hasPrefill = Boolean(initialWorkOrderId || initialCalibrationRecordId)
+      if (!hasPrefill) {
+        setCustomerId("")
+        setWorkOrderId("")
+        setQuoteId("")
+        setEquipmentId("")
+        setTitle("")
+        setLineItems([newLineItem()])
+        setDiscount("")
+        setTax("")
+        setDueDate("")
+        setPaymentTerms("Net 30")
+        setNotes("")
+        setInternalNotes("")
+        setStatus("Draft")
+      }
+      setCalibrationRecordId(initialCalibrationRecordId ?? "")
       setErrors({})
       setLoadError(null)
       setSubmitting(false)
@@ -213,7 +226,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
     if (!open) {
       setAddEquipmentOpen(false)
     }
-  }, [open])
+  }, [open, initialWorkOrderId, initialCalibrationRecordId])
 
   useEffect(() => {
     if (!open) return
@@ -264,6 +277,29 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
       cancelled = true
     }
   }, [open, orgContextStatus, activeOrgId])
+
+  useEffect(() => {
+    if (!open || !organizationId || !initialWorkOrderId) return
+    let cancelled = false
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data: wo, error } = await supabase
+        .from("work_orders")
+        .select("id, customer_id, equipment_id, title")
+        .eq("organization_id", organizationId)
+        .eq("id", initialWorkOrderId)
+        .maybeSingle()
+      if (cancelled || error || !wo) return
+      const row = wo as { id: string; customer_id: string; equipment_id: string | null; title: string }
+      setCustomerId(row.customer_id)
+      if (row.equipment_id) setEquipmentId(row.equipment_id)
+      setWorkOrderId(row.id)
+      setTitle((prev) => (prev.trim() ? prev : `Invoice — ${row.title.trim() || "Work order"}`))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, initialWorkOrderId])
 
   useEffect(() => {
     if (!open || !organizationId || !customerId) {
@@ -417,6 +453,7 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
       equipmentId: equipmentId || null,
       workOrderId: workOrderId || null,
       quoteId: quoteId || null,
+      calibrationRecordId: calibrationRecordId.trim() || null,
       title: title.trim(),
       amountCents: Math.round(total * 100),
       status: submitStatus,
@@ -497,6 +534,13 @@ export function NewInvoiceModal({ open, onClose, onSuccess }: NewInvoiceModalPro
                   {loadError ?? errors._submit}
                 </p>
               )}
+
+              {calibrationRecordId.trim() ? (
+                <div className="rounded-lg border border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/10 px-3 py-2.5 text-sm text-foreground">
+                  <span className="font-medium text-[color:var(--status-success)]">Certificate completed</span>
+                  <span className="text-muted-foreground"> — this invoice is linked to the work order certificate.</span>
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

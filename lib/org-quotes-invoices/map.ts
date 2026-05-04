@@ -36,6 +36,7 @@ export type OrgInvoiceRow = {
   created_at: string
   created_by: string | null
   work_order_id: string | null
+  calibration_record_id: string | null
   line_items: unknown
   notes: string | null
   internal_notes: string | null
@@ -190,5 +191,6 @@ export function mapOrgInvoiceToAdmin(
     quoteId: row.quote_id ?? undefined,
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
     sentAt: row.sent_at ?? undefined,
+    calibrationRecordId: row.calibration_record_id ?? undefined,
   }
 }

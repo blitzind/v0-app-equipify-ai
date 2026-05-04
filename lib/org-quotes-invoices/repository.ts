@@ -281,6 +281,7 @@ export async function insertOrgInvoice(
     equipmentId: string | null
     workOrderId: string | null
     quoteId: string | null
+    calibrationRecordId: string | null
     title: string
     amountCents: number
     status: InvoiceStatus
@@ -302,6 +303,7 @@ export async function insertOrgInvoice(
       equipment_id: payload.equipmentId,
       work_order_id: payload.workOrderId,
       quote_id: payload.quoteId,
+      calibration_record_id: payload.calibrationRecordId,
       seed_key: seedKey,
       title: payload.title.trim(),
       amount_cents: payload.amountCents,

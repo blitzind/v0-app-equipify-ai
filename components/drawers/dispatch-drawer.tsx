@@ -33,7 +33,7 @@ import {
   MapPin, Clock, Wrench,
   CheckCircle2, Circle, PlayCircle, Package,
   Phone, Mail, CalendarDays, ArrowRight, Loader2,
-  Plus, Route, Timer, CalendarOff,
+  Plus, Route, Timer, CalendarOff, PenLine,
 } from "lucide-react"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
@@ -198,6 +198,11 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { icon: React.ReactNode; color: str
   "Scheduled":   { icon: <CalendarDays className="w-4 h-4" />,   color: "text-[color:var(--status-info)] bg-[color:var(--status-info)]/10 border-[color:var(--status-info)]/25",         label: "Scheduled" },
   "In Progress": { icon: <PlayCircle className="w-4 h-4" />,     color: "text-[color:var(--status-warning)] bg-[color:var(--status-warning)]/10 border-[color:var(--status-warning)]/30", label: "In Progress" },
   "Completed":   { icon: <CheckCircle2 className="w-4 h-4" />,   color: "text-[color:var(--status-success)] bg-[color:var(--status-success)]/10 border-[color:var(--status-success)]/30", label: "Completed" },
+  "Completed Pending Signature": {
+    icon: <PenLine className="w-4 h-4" />,
+    color: "text-amber-800 bg-amber-500/10 border-amber-500/30",
+    label: "Completed Pending Signature",
+  },
   "Invoiced":    { icon: <CheckCircle2 className="w-4 h-4" />,   color: "text-muted-foreground bg-muted border-border",                                                                     label: "Invoiced" },
 }
 

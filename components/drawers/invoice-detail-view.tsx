@@ -956,6 +956,22 @@ function InfoTab({
             </Link>
           } />
         )}
+        {invoice.calibrationRecordId && invoice.workOrderId ? (
+          <Row
+            label="Certificate"
+            value={
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-[color:var(--status-success)]">Certificate completed</span>
+                <Link
+                  href={`/work-orders?open=${invoice.workOrderId}&tab=certificate`}
+                  className="text-primary hover:underline cursor-pointer"
+                >
+                  Open certificate in work order
+                </Link>
+              </div>
+            }
+          />
+        ) : null}
         <Row label="Issued" value={fmtDate(invoice.issueDate)} />
         {editing ? (
           <EditRow label="Due Date">

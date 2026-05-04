@@ -98,12 +98,17 @@ type VendorRow = {
   shipping_address: string | null
 }
 
+// ─── Drawer shell (aligned with Invoice / Quote drawers) ─────────────────────
+
+const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
+const sectionCardClass = "rounded-xl border border-border bg-white shadow-sm"
+
 // ─── Edit form field density (aligned with PO create modal) ───────────────────
 
-const editField = "h-9 w-full min-w-0 text-sm"
-const editTextarea = "min-h-[100px] resize-none text-sm leading-relaxed"
-const lineItemField = "h-9 w-full min-w-0 text-sm tabular-nums"
-const lineItemDesc = "h-9 w-full min-w-0 text-sm"
+const editField = "h-9 w-full min-w-0 text-sm bg-white border-border text-foreground"
+const editTextarea = "min-h-[100px] resize-none text-sm leading-relaxed bg-white border-border text-foreground"
+const lineItemField = "h-9 w-full min-w-0 text-sm tabular-nums bg-white border-border text-foreground"
+const lineItemDesc = "h-9 w-full min-w-0 text-sm bg-white border-border text-foreground"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -392,10 +397,11 @@ export function PurchaseOrderDrawer({
           )
         }
       >
+        <div className={drawerBodyClass}>
         {editing && draft ? (
           <>
             <DrawerSection title="Vendor Information">
-              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-4">
+              <div className={cn(sectionCardClass, "p-4 space-y-4")}>
                 <div className="relative w-full">
                   <FieldLabel>Vendor Name</FieldLabel>
                   <Input
@@ -490,7 +496,7 @@ export function PurchaseOrderDrawer({
             </DrawerSection>
 
             <DrawerSection title="Order Details">
-              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-4">
+              <div className={cn(sectionCardClass, "p-4 space-y-4")}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <FieldLabel>Order Date</FieldLabel>
@@ -515,7 +521,7 @@ export function PurchaseOrderDrawer({
 
             {(order.workOrderId || order.customerName) && (
               <DrawerSection title="Related Records">
-                <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
+                <div className={cn(sectionCardClass, "p-4 space-y-3")}>
                   {order.workOrderId && (
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="text-muted-foreground w-28 shrink-0">Work Order</span>
@@ -547,7 +553,7 @@ export function PurchaseOrderDrawer({
             )}
 
             <DrawerSection title="Line Items">
-              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-4">
+              <div className={cn(sectionCardClass, "p-4 space-y-4")}>
                 <div className="overflow-x-auto -mx-1 px-1">
                   <div className="min-w-[560px] space-y-3">
                     <div className="grid grid-cols-[minmax(10rem,1fr)_90px_120px_120px_36px] gap-3 items-end pb-2 border-b border-border">
@@ -654,7 +660,7 @@ export function PurchaseOrderDrawer({
             </DrawerSection>
 
             <DrawerSection title="Notes">
-              <div className="rounded-lg border border-border bg-muted/15 p-4">
+              <div className={cn(sectionCardClass, "p-4")}>
                 <Textarea
                   className={editTextarea}
                   rows={4}
@@ -667,7 +673,7 @@ export function PurchaseOrderDrawer({
 
             <DrawerSection title="Attachments">
               {order.attachments.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-muted/15 px-4 py-8 flex flex-col items-center gap-2">
+                <div className={cn(sectionCardClass, "border-dashed px-4 py-8 flex flex-col items-center gap-2")}>
                   <Paperclip className="w-5 h-5 text-muted-foreground/40" />
                   <p className="text-xs text-muted-foreground text-center">No attachments</p>
                   <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Coming soon">
@@ -675,9 +681,9 @@ export function PurchaseOrderDrawer({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-white dark:bg-card">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-card">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-sm text-foreground flex-1 truncate">{a}</span>
                       <button
@@ -697,6 +703,7 @@ export function PurchaseOrderDrawer({
         ) : (
           <>
             <DrawerSection title="Vendor Information">
+              <div className={cn(sectionCardClass, "p-4 space-y-0")}>
               <DrawerRow
                 label="Vendor Name"
                 value={
@@ -741,19 +748,23 @@ export function PurchaseOrderDrawer({
                   </span>
                 }
               />
+              </div>
             </DrawerSection>
 
             <DrawerSection title="Order Details">
+              <div className={cn(sectionCardClass, "p-4 space-y-0")}>
               <DrawerRow label="Order Date" value={fmtDate(order.orderedDate)} />
               <DrawerRow label="Expected Delivery Date" value={fmtDate(order.eta)} />
               <DrawerRow
                 label="Total Amount"
                 value={<span className="text-base font-bold text-foreground">{fmtCurrency(lineTotalCents / 100)}</span>}
               />
+              </div>
             </DrawerSection>
 
             {(order.workOrderId || order.customerId) && (
               <DrawerSection title="Related Records">
+                <div className={cn(sectionCardClass, "p-4 space-y-0")}>
                 {order.workOrderId && (
                   <DrawerRow
                     label="Work Order"
@@ -784,13 +795,14 @@ export function PurchaseOrderDrawer({
                     }
                   />
                 )}
+                </div>
               </DrawerSection>
             )}
 
             <DrawerSection title="Line Items">
-              <div className="rounded-lg border border-border overflow-hidden">
+              <div className={cn(sectionCardClass, "overflow-hidden p-0")}>
                 <table className="w-full text-xs">
-                  <thead className="bg-muted/40">
+                  <thead className="bg-muted/30">
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
                         Description
@@ -808,15 +820,15 @@ export function PurchaseOrderDrawer({
                   </thead>
                   <tbody className="divide-y divide-border">
                     {order.lineItems.map((item, i) => (
-                      <tr key={i} className="bg-card">
+                      <tr key={i} className="bg-white">
                         <td className="px-3 py-2 text-foreground">{item.description}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unitCostCents / 100)}</td>
+                        <td className="px-3 py-2 text-right text-foreground tabular-nums">{item.quantity}</td>
+                        <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmtCurrency(item.unitCostCents / 100)}</td>
                         <td className="px-3 py-2 text-right font-medium text-foreground">{fmtCurrency(item.lineTotalCents / 100)}</td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-muted/40 border-t border-border">
+                  <tfoot className="bg-muted/30 border-t border-border">
                     <tr>
                       <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">
                         Subtotal
@@ -829,14 +841,20 @@ export function PurchaseOrderDrawer({
             </DrawerSection>
 
             <DrawerSection title="Notes">
-              <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {order.notes || <span className="italic">No notes.</span>}
-              </p>
+              <div className={cn(sectionCardClass, "p-4")}>
+                {order.notes ? (
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap p-3 rounded-lg border border-border bg-white">
+                    {order.notes}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
+                )}
+              </div>
             </DrawerSection>
 
             <DrawerSection title="Attachments">
               {order.attachments.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-6 rounded-lg border border-dashed border-border">
+                <div className={cn(sectionCardClass, "border-dashed flex flex-col items-center gap-2 py-8")}>
                   <Paperclip className="w-5 h-5 text-muted-foreground/40" />
                   <p className="text-xs text-muted-foreground">No attachments</p>
                   <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Coming soon">
@@ -844,9 +862,9 @@ export function PurchaseOrderDrawer({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-white">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-xs text-foreground flex-1 truncate">{a}</span>
                       <button
@@ -864,6 +882,7 @@ export function PurchaseOrderDrawer({
             </DrawerSection>
           </>
         )}
+        </div>
       </DetailDrawer>
 
       <AddVendorModal
