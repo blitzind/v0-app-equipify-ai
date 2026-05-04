@@ -655,7 +655,7 @@ export function WorkOrderDetailExperience({
   }
 
   const tabListClass = isDrawer
-    ? "h-auto min-h-0 w-full flex flex-wrap justify-start gap-0 rounded-none bg-background p-0 border-0 border-b border-border shrink-0 z-[11] px-5"
+    ? "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none bg-background p-0 border-0 border-b border-border shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     : "h-auto min-h-10 w-full flex flex-wrap justify-start gap-1 rounded-xl bg-muted/60 p-1 border border-border"
 
   const tabTriggerClass = (extra?: string) =>
@@ -663,6 +663,7 @@ export function WorkOrderDetailExperience({
       "text-xs font-medium gap-1.5 whitespace-nowrap shrink-0 transition-colors",
       isDrawer
         ? cn(
+            "grow-0 basis-auto",
             "rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 shadow-none",
             "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none",
             "text-muted-foreground hover:text-foreground hover:border-border",
@@ -848,7 +849,7 @@ export function WorkOrderDetailExperience({
           </TabsTrigger>
           <TabsTrigger value="parts" className={tabTriggerClass()}>
             <Package className="w-3.5 h-3.5" />
-            Parts / materials
+            Parts / Materials
           </TabsTrigger>
           <TabsTrigger value="labor" className={tabTriggerClass()}>
             <Clock className="w-3.5 h-3.5" />
@@ -1242,15 +1243,10 @@ export function WorkOrderDetailExperience({
           </Section>
         </TabsContent>
 
-        <TabsContent value="activity" className="mt-0">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DrawerTimeline items={activityItems} />
-            </CardContent>
-          </Card>
+        <TabsContent value="activity" className="space-y-4 mt-0">
+          <Section title="Timeline" icon={History}>
+            <DrawerTimeline items={activityItems} />
+          </Section>
         </TabsContent>
         </div>
       </Tabs>

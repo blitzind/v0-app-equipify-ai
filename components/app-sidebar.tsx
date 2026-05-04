@@ -124,8 +124,8 @@ function SidebarBody({
           >
             <BrandLogo
               priority
-              sizes="(min-width: 768px) 208px, 192px"
-              className="min-h-0 min-w-0 max-h-11 w-full select-none object-contain object-center sm:max-h-12"
+              sizes="(min-width: 768px) 198px, 182px"
+              className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
             />
           </span>
           {/* Collapsed desktop only: icon mark */}
