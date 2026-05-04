@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, Building2,
   CreditCard, Shield, Sparkles, FileText, Receipt, Plug, ShoppingCart,
-  CalendarRange,
+  CalendarRange, Store,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -88,6 +88,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     icon: ShoppingCart,
     cta: { label: "+ New PO" },
   },
+  "/vendors": {
+    title: "Vendors",
+    subtitle: "Manage supplier contacts and addresses for purchase orders.",
+    icon: Store,
+  },
   "/reports": {
     title: "Reports",
     subtitle: "Track revenue, service performance, asset activity, and technician productivity.",
@@ -148,6 +153,7 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/quotes": "#06B6D4",
   "/invoices": "#06B6D4",
   "/purchase-orders": "#06B6D4",
+  "/vendors": "#F59E0B",
   "/reports": "#6366F1",
   "/portal": "#2563EB",
   "/settings/workspace": "#64748B",

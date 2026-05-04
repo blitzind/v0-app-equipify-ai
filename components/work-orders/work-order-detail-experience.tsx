@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, type MouseEvent, type TouchEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from "react"
 import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -20,9 +20,12 @@ import {
   Save,
   X,
   ExternalLink,
+  Download,
+  File,
+  Upload,
   ClipboardList,
   Hammer,
-  ImageIcon,
+  Paperclip,
   StickyNote,
   History,
   Pencil,
@@ -30,6 +33,7 @@ import {
   Receipt,
   Printer,
   AlertOctagon,
+  FileBadge2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Part, RepairLog, WorkOrder, WorkOrderPriority, WorkOrderStatus } from "@/lib/mock-data"
@@ -40,6 +44,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -85,6 +97,23 @@ function formatDateTime(d: string) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes)) return "—"
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`
+  const mb = kb / 1024
+  return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`
+}
+
+function documentAttachmentIcon(fileType: string) {
+  const t = fileType.toLowerCase()
+  if (t === "application/pdf" || t.includes("pdf")) {
+    return <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
+  }
+  return <File className="w-4 h-4 shrink-0 text-muted-foreground" />
 }
 
 function initialsFromTechnicianName(name: string): string {
@@ -286,16 +315,48 @@ function PartsTable({
   )
 }
 
+export type WorkOrderDocumentAttachmentView = {
+  id: string
+  fileName: string
+  fileType: string
+  url: string
+  uploadedAt: string
+  fileSizeBytes?: number | null
+}
+
+const ATTACHMENT_INPUT_ACCEPT =
+  ".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
 function PhotoSection({
   photos,
+  photoAttachmentIds,
+  documents,
   editable,
+  uploading,
+  uploadProgress,
+  uploadStatusLabel,
   onChange,
+  onAttachmentUpload,
+  onRemoveAttachmentPhoto,
+  onRemoveLegacyPhoto,
+  onRemoveDocument,
 }: {
   photos: string[]
+  /** Parallel to `photos`: set when the URL comes from `work_order_attachments`. */
+  photoAttachmentIds?: (string | undefined)[]
+  documents?: WorkOrderDocumentAttachmentView[]
   editable: boolean
+  uploading?: boolean
+  /** 0–100 while uploading, or null/undefined for indeterminate text only. */
+  uploadProgress?: number | null
+  uploadStatusLabel?: string
   onChange: (photos: string[]) => void
+  onAttachmentUpload?: (files: FileList) => void | Promise<void>
+  onRemoveAttachmentPhoto?: (attachmentId: string) => void | Promise<void>
+  onRemoveLegacyPhoto?: (index: number) => void
+  onRemoveDocument?: (attachmentId: string) => void | Promise<void>
 }) {
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileLegacy(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     files.forEach((file) => {
       const reader = new FileReader()
@@ -306,38 +367,161 @@ function PhotoSection({
     })
     e.target.value = ""
   }
+
+  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = e.target.files
+    if (list?.length && onAttachmentUpload) void onAttachmentUpload(list)
+    e.target.value = ""
+  }
+
+  function removeAt(index: number) {
+    const aid = photoAttachmentIds?.[index]
+    if (aid && onRemoveAttachmentPhoto) void onRemoveAttachmentPhoto(aid)
+    else if (onRemoveLegacyPhoto) onRemoveLegacyPhoto(index)
+    else onChange(photos.filter((_, j) => j !== index))
+  }
+
+  const showUploader = Boolean(onAttachmentUpload)
+  const docList = documents ?? []
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-3">
-        {photos.map((src, i) => (
-          <div
-            key={i}
-            className="relative group w-28 h-28 rounded-lg overflow-hidden border border-border bg-muted"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
-            {editable && (
-              <button
-                type="button"
-                onClick={() => onChange(photos.filter((_, j) => j !== i))}
-                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-3 h-3" />
-              </button>
+    <div className="flex flex-col gap-6">
+      {editable ? (
+        <div className="space-y-2">
+          {uploading ? (
+            <div className="w-full max-w-md space-y-1.5">
+              {typeof uploadProgress === "number" && uploadProgress >= 0 ? (
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-[width] duration-150 ease-out"
+                    style={{ width: `${Math.min(100, uploadProgress)}%` }}
+                  />
+                </div>
+              ) : null}
+              <p className="text-xs text-muted-foreground truncate">
+                {uploadStatusLabel || "Uploading…"}
+              </p>
+            </div>
+          ) : null}
+          <label
+            className={cn(
+              "flex w-full max-w-xl cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-border bg-muted/30 px-4 py-8 text-center transition-all text-muted-foreground",
+              uploading ? "pointer-events-none opacity-60" : "hover:border-primary/50 hover:bg-primary/5 hover:text-primary",
             )}
-          </div>
-        ))}
-        {editable && (
-          <label className="flex flex-col items-center justify-center w-28 h-28 rounded-lg border-2 border-dashed border-border bg-muted/30 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer text-muted-foreground hover:text-primary">
-            <Camera className="w-5 h-5 mb-1" />
-            <span className="text-xs text-center leading-tight">Add photo</span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handleFile} />
+          >
+            {showUploader ? (
+              <Upload className="h-6 w-6 shrink-0" aria-hidden />
+            ) : (
+              <Camera className="h-6 w-6 shrink-0" aria-hidden />
+            )}
+            <span className="text-sm font-medium text-foreground">
+              {uploading ? "Uploading…" : showUploader ? "Upload photos or documents" : "Add photo"}
+            </span>
+            {showUploader ? (
+              <span className="text-xs text-muted-foreground max-w-sm leading-snug">
+                Supports images, PDFs, and common document files.
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground max-w-sm leading-snug">
+                Images are saved on this work order.
+              </span>
+            )}
+            <input
+              type="file"
+              accept={showUploader ? ATTACHMENT_INPUT_ACCEPT : "image/*"}
+              multiple
+              className="hidden"
+              disabled={Boolean(uploading)}
+              onChange={showUploader ? handleUpload : handleFileLegacy}
+            />
           </label>
+        </div>
+      ) : null}
+
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Photos</p>
+        <div className="flex flex-wrap gap-3">
+          {photos.map((src, i) => (
+            <div
+              key={`${src.slice(0, 48)}-${i}`}
+              className="relative group w-28 h-28 rounded-lg overflow-hidden border border-border bg-muted"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => removeAt(i)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {photos.length === 0 && !editable && (
+          <p className="text-sm text-muted-foreground mt-2">No images yet.</p>
+        )}
+        {photos.length === 0 && editable && (
+          <p className="text-sm text-muted-foreground mt-2">No photos yet. Use the upload area above.</p>
         )}
       </div>
-      {photos.length === 0 && !editable && (
-        <p className="text-sm text-muted-foreground">No photos or image attachments.</p>
-      )}
+
+      {docList.length > 0 || editable ? (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Documents</p>
+          {docList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No PDFs or documents yet. Use the upload area above.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {docList.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 bg-muted/20"
+                >
+                  <div className="min-w-0 flex items-center gap-2.5">
+                    {documentAttachmentIcon(d.fileType)}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{d.fileName}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatFileSize(d.fileSizeBytes)} · {formatDateTime(d.uploadedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button type="button" variant="ghost" size="icon-sm" className="h-8 w-8" asChild>
+                      <a
+                        href={d.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open or download"
+                        aria-label="Open or download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </a>
+                    </Button>
+                    {editable && onRemoveDocument ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => void onRemoveDocument(d.id)}
+                        aria-label="Delete attachment"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -364,48 +548,57 @@ function Section({
   )
 }
 
-// ─── Signature (canvas) — same behavior as page ───────────────────────────────
+// ─── Customer signature (preview + modal canvas) ─────────────────────────────
 
-function SignatureCanvas({
-  existing,
-  onSave,
-  signedBy,
-  signedAt,
-  readOnly,
+function signatureCanvasGetPos(e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) {
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  if ("touches" in e) {
+    return {
+      x: (e.touches[0].clientX - rect.left) * scaleX,
+      y: (e.touches[0].clientY - rect.top) * scaleY,
+    }
+  }
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  }
+}
+
+function SignatureCaptureDialog({
+  open,
+  onOpenChange,
+  onConfirm,
 }: {
-  existing: string
-  onSave: (dataUrl: string, name: string) => void
-  signedBy: string
-  signedAt: string
-  readOnly?: boolean
+  open: boolean
+  onOpenChange: (next: boolean) => void
+  onConfirm: (blob: Blob, name: string) => Promise<void>
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [drawing, setDrawing] = useState(false)
   const [hasStrokes, setHasStrokes] = useState(false)
-  const [signerName, setSignerName] = useState(signedBy || "")
-  const [mode, setMode] = useState<"view" | "capture">(existing ? "view" : "capture")
+  const [signerName, setSignerName] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  const getPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) => {
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    if ("touches" in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY,
-      }
-    }
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    }
-  }
+  const resetCanvas = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height)
+    setHasStrokes(false)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    setSignerName("")
+    resetCanvas()
+  }, [open, resetCanvas])
 
   function startDraw(e: MouseEvent | TouchEvent) {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext("2d")!
-    const pos = getPos(e, canvas)
+    const pos = signatureCanvasGetPos(e, canvas)
     ctx.beginPath()
     ctx.moveTo(pos.x, pos.y)
     setDrawing(true)
@@ -416,7 +609,7 @@ function SignatureCanvas({
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext("2d")!
-    const pos = getPos(e, canvas)
+    const pos = signatureCanvasGetPos(e, canvas)
     ctx.lineWidth = 2.5
     ctx.lineCap = "round"
     ctx.strokeStyle = "#1a1a2e"
@@ -429,118 +622,143 @@ function SignatureCanvas({
     setDrawing(false)
   }
 
-  function clear() {
+  async function handleSave() {
     const canvas = canvasRef.current
-    if (!canvas) return
-    canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height)
-    setHasStrokes(false)
-  }
-
-  function save() {
-    const canvas = canvasRef.current
-    if (!canvas || !hasStrokes) return
-    onSave(canvas.toDataURL(), signerName)
-    setMode("view")
-  }
-
-  if (readOnly) {
-    if (!existing) {
-      return <p className="text-sm text-muted-foreground">No signature captured.</p>
+    if (!canvas || !hasStrokes || !signerName.trim()) return
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not create PNG"))), "image/png")
+    })
+    setSubmitting(true)
+    try {
+      await onConfirm(blob, signerName.trim())
+      onOpenChange(false)
+    } finally {
+      setSubmitting(false)
     }
-    return (
-      <div className="flex flex-col gap-3">
-        <div className="border border-border rounded-lg p-4 bg-muted/20">
-          {existing === "SIGNED" ? (
-            <div className="flex items-center gap-2 h-20">
-              <CheckCircle2 className="w-5 h-5 text-[color:var(--status-success)]" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Signed by {signedBy}</p>
-                <p className="text-xs text-muted-foreground">{formatDateTime(signedAt)}</p>
-              </div>
-            </div>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={existing} alt="Customer signature" className="max-h-24 object-contain" />
-          )}
-        </div>
-        {signedBy && (
-          <p className="text-xs text-muted-foreground">
-            Signed by <strong>{signedBy}</strong> on {formatDateTime(signedAt)}
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  if (mode === "view" && existing) {
-    return (
-      <div className="flex flex-col gap-3">
-        <div className="border border-border rounded-lg p-4 bg-muted/20">
-          {existing === "SIGNED" ? (
-            <div className="flex items-center gap-2 h-20">
-              <CheckCircle2 className="w-5 h-5 text-[color:var(--status-success)]" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Signed by {signedBy}</p>
-                <p className="text-xs text-muted-foreground">{formatDateTime(signedAt)}</p>
-              </div>
-            </div>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={existing} alt="Customer signature" className="max-h-24 object-contain" />
-          )}
-        </div>
-        {signedBy && (
-          <p className="text-xs text-muted-foreground">
-            Signed by <strong>{signedBy}</strong> on {formatDateTime(signedAt)}
-          </p>
-        )}
-        <Button variant="outline" size="sm" className="w-fit" onClick={() => setMode("capture")}>
-          <PenLine className="w-3.5 h-3.5 mr-1.5" />
-          Re-capture signature
-        </Button>
-      </div>
-    )
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <Input
-        placeholder="Signer&apos;s full name"
-        value={signerName}
-        onChange={(e) => setSignerName(e.target.value)}
-        className="max-w-72"
-      />
-      <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-white touch-none select-none">
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={160}
-          className="w-full cursor-crosshair"
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
-        />
-      </div>
-      <p className="text-xs text-muted-foreground">Draw signature using mouse or touch</p>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={save} disabled={!hasStrokes || !signerName.trim()}>
-          <Save className="w-3.5 h-3.5 mr-1.5" />
-          Save Signature
-        </Button>
-        <Button size="sm" variant="outline" onClick={clear}>
-          <X className="w-3.5 h-3.5 mr-1.5" />
-          Clear
-        </Button>
-        {existing && (
-          <Button size="sm" variant="ghost" onClick={() => setMode("view")}>
-            Cancel
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl" showCloseButton={!submitting}>
+        <DialogHeader>
+          <DialogTitle>Customer signature</DialogTitle>
+          <DialogDescription>
+            Sign with mouse or touch, enter the signer&apos;s name, then save.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Input
+            placeholder="Signer&apos;s full name"
+            value={signerName}
+            onChange={(e) => setSignerName(e.target.value)}
+            className="max-w-full sm:max-w-md"
+            disabled={submitting}
+          />
+          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-white touch-none select-none">
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={160}
+              className="w-full cursor-crosshair max-h-40"
+              onMouseDown={startDraw}
+              onMouseMove={draw}
+              onMouseUp={endDraw}
+              onMouseLeave={endDraw}
+              onTouchStart={startDraw}
+              onTouchMove={draw}
+              onTouchEnd={endDraw}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">Draw signature using mouse or touch</p>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button type="button" variant="outline" onClick={() => resetCanvas()} disabled={submitting}>
+            Clear
           </Button>
-        )}
-      </div>
+          <Button type="button" onClick={() => void handleSave()} disabled={submitting || !hasStrokes || !signerName.trim()}>
+            <Save className="w-3.5 h-3.5 mr-1.5" />
+            {submitting ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CustomerSignatureSection({
+  legacySigData,
+  customerSignaturePreviewUrl,
+  customerSignatureCapturedAt,
+  signedBy,
+  signedAt,
+  captureEnabled,
+  onCustomerSignatureSave,
+}: {
+  legacySigData: string
+  customerSignaturePreviewUrl?: string | null
+  customerSignatureCapturedAt?: string | null
+  signedBy: string
+  signedAt: string
+  captureEnabled: boolean
+  onCustomerSignatureSave?: (blob: Blob, name: string) => Promise<void>
+}) {
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const previewFromStorage = customerSignaturePreviewUrl?.trim() || null
+  const legacySignedMarker = legacySigData === "SIGNED"
+  const legacyDataUrl =
+    !legacySignedMarker && legacySigData?.trim() ? legacySigData : null
+  const imageSrc = previewFromStorage || legacyDataUrl
+  const capturedLabel = customerSignatureCapturedAt || signedAt
+  const showCheckOnly = legacySignedMarker && !previewFromStorage
+
+  return (
+    <div className="flex flex-col gap-3">
+      {showCheckOnly ? (
+        <div className="border border-border rounded-lg p-4 bg-muted/20">
+          <div className="flex items-center gap-2 h-20">
+            <CheckCircle2 className="w-5 h-5 text-[color:var(--status-success)]" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Signed by {signedBy || "Customer"}</p>
+              {capturedLabel ? <p className="text-xs text-muted-foreground">{formatDateTime(capturedLabel)}</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : imageSrc ? (
+        <div className="border border-border rounded-lg p-4 bg-muted/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageSrc} alt="Customer signature" className="max-h-32 w-auto object-contain mx-auto" />
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No signature captured.</p>
+      )}
+
+      {!showCheckOnly && (signedBy || capturedLabel) ? (
+        <p className="text-xs text-muted-foreground">
+          {signedBy ? (
+            <>
+              Signed by <strong>{signedBy}</strong>
+              {capturedLabel ? <> · {formatDateTime(capturedLabel)}</> : null}
+            </>
+          ) : capturedLabel ? (
+            <>{formatDateTime(capturedLabel)}</>
+          ) : null}
+        </p>
+      ) : null}
+
+      {captureEnabled && onCustomerSignatureSave ? (
+        <>
+          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setModalOpen(true)}>
+            <PenLine className="w-3.5 h-3.5 mr-1.5" />
+            {imageSrc || showCheckOnly ? "Replace signature" : "Capture signature"}
+          </Button>
+          <SignatureCaptureDialog
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            onConfirm={onCustomerSignatureSave}
+          />
+        </>
+      ) : null}
     </div>
   )
 }
@@ -566,18 +784,37 @@ export interface WorkOrderDetailExperienceProps {
   laborRatePerHour: number
   photos: string[]
   onPhotosChange: (photos: string[]) => void
-  tasks: { id: string; label: string; done: boolean }[]
-  onTasksChange: (tasks: { id: string; label: string; done: boolean }[]) => void
+  /** When supplied, indices align with `photos` for Supabase-backed rows. */
+  photoAttachmentIds?: (string | undefined)[]
+  documentAttachments?: WorkOrderDocumentAttachmentView[]
+  onAttachmentUpload?: (files: FileList) => void | Promise<void>
+  onRemoveAttachmentPhoto?: (attachmentId: string) => void | Promise<void>
+  onRemoveLegacyPhoto?: (index: number) => void
+  onRemoveDocument?: (attachmentId: string) => void | Promise<void>
+  attachmentUploading?: boolean
+  /** 0–100 while a batch upload is in progress. */
+  attachmentUploadProgress?: number | null
+  attachmentUploadStatusLabel?: string
+  tasks: { id: string; label: string; done: boolean; description?: string }[]
+  onTasksChange: (tasks: { id: string; label: string; done: boolean; description?: string }[]) => void
+  /** Legacy repair_log canvas data URL or `"SIGNED"` marker (shown if no storage preview). */
   sigData: string
   signedBy: string
   signedAt: string
-  onSignatureSave: (dataUrl: string, name: string) => void
+  customerSignaturePreviewUrl?: string | null
+  customerSignatureCapturedAt?: string | null
+  onCustomerSignatureSave?: (blob: Blob, signerName: string) => Promise<void>
+  /** When true, show Capture/Replace and modal (independent of repair-log edit mode). */
+  signatureCaptureEnabled?: boolean
   /** Field editors */
   fieldsEditable: boolean
   /** When false, problem reported stays read-only even if `fieldsEditable` (e.g. drawer). */
   problemEditable?: boolean
+  /** When true, Problem reported is always a textarea (e.g. drawer inline save). */
+  problemReportedInlineEditable?: boolean
+  /** e.g. Unsaved / Save / Cancel above Problem reported (drawer). */
+  problemReportedToolbar?: ReactNode
   partsPhotosEditable: boolean
-  signatureEditable: boolean
   tasksEditable: boolean
   /** Quick actions */
   onEditWorkOrder: () => void
@@ -593,6 +830,26 @@ export interface WorkOrderDetailExperienceProps {
   leading?: React.ReactNode
   /** `drawer` aligns chrome with `EquipmentDrawer` (underline tabs, KPI cards, quick actions). */
   layout?: "page" | "drawer"
+  /** Controlled tabs (e.g. confirm before leaving Parts tab with unsaved edits). Requires both. */
+  tabsValue?: string
+  onTabsValueChange?: (value: string) => void
+  /** Inserted above the parts table (e.g. save / revert bar in the drawer). */
+  partsTabToolbar?: ReactNode
+  /** Inserted above the tasks checklist (e.g. save / revert bar). */
+  tasksTabToolbar?: ReactNode
+  /** Inserted above Labor hours (e.g. save / revert bar). */
+  laborTabToolbar?: ReactNode
+  /** Inserted above Notes sections (e.g. drawer inline notes save bar). */
+  notesTabToolbar?: ReactNode
+  /** Optional calibration/certificate tab content. */
+  certificateTabContent?: ReactNode
+  /** Optional toolbar shown above certificate content. */
+  certificateTabToolbar?: ReactNode
+  /**
+   * When true, Diagnosis / Technician / Internal notes use textareas regardless of `fieldsEditable`
+   * (e.g. work order drawer Notes tab without global edit mode).
+   */
+  notesFieldsEditable?: boolean
 }
 
 export function WorkOrderDetailExperience({
@@ -615,16 +872,29 @@ export function WorkOrderDetailExperience({
   laborRatePerHour,
   photos,
   onPhotosChange,
+  photoAttachmentIds,
+  documentAttachments,
+  onAttachmentUpload,
+  onRemoveAttachmentPhoto,
+  onRemoveLegacyPhoto,
+  onRemoveDocument,
+  attachmentUploading,
+  attachmentUploadProgress,
+  attachmentUploadStatusLabel,
   tasks,
   onTasksChange,
   sigData,
   signedBy,
   signedAt,
-  onSignatureSave,
+  customerSignaturePreviewUrl,
+  customerSignatureCapturedAt,
+  onCustomerSignatureSave,
+  signatureCaptureEnabled = false,
   fieldsEditable,
   problemEditable,
+  problemReportedInlineEditable = false,
+  problemReportedToolbar,
   partsPhotosEditable,
-  signatureEditable,
   tasksEditable,
   onEditWorkOrder,
   onAssignTechnician,
@@ -636,12 +906,34 @@ export function WorkOrderDetailExperience({
   fullPageHref,
   leading,
   layout = "page",
+  tabsValue,
+  onTabsValueChange,
+  partsTabToolbar,
+  tasksTabToolbar,
+  laborTabToolbar,
+  notesTabToolbar,
+  certificateTabContent,
+  certificateTabToolbar,
+  notesFieldsEditable = false,
 }: WorkOrderDetailExperienceProps) {
+  const [fallbackTab, setFallbackTab] = useState("overview")
+  const tabsControlled = tabsValue !== undefined && onTabsValueChange !== undefined
+  const activeTab = tabsControlled ? tabsValue : fallbackTab
+  const handleTabChange = (v: string) => {
+    if (tabsControlled) onTabsValueChange(v)
+    else setFallbackTab(v)
+  }
+
   const isDrawer = layout === "drawer"
   const laborCost = laborHours * laborRatePerHour
   const partsCost = parts.reduce((s, p) => s + p.quantity * p.unitCost, 0)
   const canMarkComplete = workOrder.status !== "Completed" && workOrder.status !== "Invoiced"
   const canEditProblem = problemEditable ?? fieldsEditable
+  const notesInlineEditable = Boolean(notesFieldsEditable)
+  const diagnosisNotesEditable = notesInlineEditable || fieldsEditable
+  const technicianNotesEditable = notesInlineEditable || fieldsEditable
+  const internalNotesTabEditable =
+    (notesInlineEditable || internalNotesEditable) && Boolean(onInternalNotesChange)
   const qaVariant = isDrawer ? "secondary" : "outline"
   const qaBtnClass = isDrawer ? "h-8 gap-1.5 text-xs shadow-sm" : "gap-1.5"
   const kpiCellClass = isDrawer
@@ -657,9 +949,14 @@ export function WorkOrderDetailExperience({
   }
 
   function addTask() {
-    const label = window.prompt("Task description")
-    if (!label?.trim()) return
-    onTasksChange([...tasks, { id: `task-${Date.now()}`, label: label.trim(), done: false }])
+    onTasksChange([
+      ...tasks,
+      { id: `task-${Date.now()}`, label: "", done: false },
+    ])
+  }
+
+  function updateTask(id: string, patch: Partial<{ label: string; description: string | undefined; done: boolean }>) {
+    onTasksChange(tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)))
   }
 
   const tabListClass = isDrawer
@@ -850,7 +1147,8 @@ export function WorkOrderDetailExperience({
       )}
 
       <Tabs
-        defaultValue="overview"
+        value={activeTab}
+        onValueChange={handleTabChange}
         className={cn(isDrawer ? "flex min-h-0 flex-1 flex-col gap-0 overflow-hidden" : "gap-4")}
       >
         <TabsList className={tabListClass}>
@@ -870,9 +1168,9 @@ export function WorkOrderDetailExperience({
             <Clock className="w-3.5 h-3.5" />
             Labor
           </TabsTrigger>
-          <TabsTrigger value="photos" className={tabTriggerClass()}>
-            <ImageIcon className="w-3.5 h-3.5" />
-            Photos
+          <TabsTrigger value="attachments" className={tabTriggerClass()}>
+            <Paperclip className="w-3.5 h-3.5" />
+            Attachments
           </TabsTrigger>
           <TabsTrigger value="notes" className={tabTriggerClass()}>
             <StickyNote className="w-3.5 h-3.5" />
@@ -882,6 +1180,12 @@ export function WorkOrderDetailExperience({
             <History className="w-3.5 h-3.5" />
             Activity
           </TabsTrigger>
+          {certificateTabContent ? (
+            <TabsTrigger value="certificate" className={tabTriggerClass()}>
+              <FileBadge2 className="w-3.5 h-3.5" />
+              Certificate
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
         <div className={tabScrollWrapClass}>
@@ -920,6 +1224,12 @@ export function WorkOrderDetailExperience({
               Critical priority — dispatch and document promptly.
             </div>
           )}
+          {workOrder.equipmentWarrantyActive ? (
+            <div className="flex items-center gap-2.5 rounded-lg border border-[color:var(--status-warning)]/35 bg-[color:var(--status-warning)]/10 p-3 text-sm font-medium text-[color:var(--status-warning)]">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              This asset may be under warranty. Review coverage before billing customer.
+            </div>
+          ) : null}
 
           {isDrawer && !fieldsEditable && (
             <div className="rounded-xl border border-border bg-muted/20 p-3">
@@ -1154,7 +1464,17 @@ export function WorkOrderDetailExperience({
           </div>
 
           <Section title="Problem reported" icon={AlertTriangle}>
-            {canEditProblem ? (
+            {problemReportedInlineEditable ? (
+              <>
+                {problemReportedToolbar ? <div className="mb-2">{problemReportedToolbar}</div> : null}
+                <Textarea
+                  value={problemReported}
+                  onChange={(e) => onProblemReportedChange(e.target.value)}
+                  rows={3}
+                  placeholder="Describe the problem reported by the customer…"
+                />
+              </>
+            ) : canEditProblem ? (
               <Textarea
                 value={problemReported}
                 onChange={(e) => onProblemReportedChange(e.target.value)}
@@ -1163,23 +1483,52 @@ export function WorkOrderDetailExperience({
               />
             ) : (
               <p className="text-sm text-foreground leading-relaxed">
-                {problemReported || <span className="text-muted-foreground">Not recorded.</span>}
+                {problemReported?.trim() ? (
+                  problemReported
+                ) : (
+                  <span className="text-muted-foreground">No problem description provided</span>
+                )}
               </p>
             )}
           </Section>
 
+          <Section title="Warranty billing status" icon={Receipt}>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="text-xs border">
+                  {workOrder.billableToCustomer === false ? "Bill vendor / warranty" : "Bill customer"}
+                </Badge>
+                {workOrder.warrantyReviewRequired ? (
+                  <Badge variant="secondary" className="text-xs border border-[color:var(--status-warning)]/35 bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)]">
+                    Warranty review required
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-xs border border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/10 text-[color:var(--status-success)]">
+                    Review complete
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Warranty vendor: <span className="text-foreground font-medium">{workOrder.warrantyVendorName || "Not linked"}</span>
+              </p>
+            </div>
+          </Section>
+
           <Section title="Customer signature" icon={PenLine}>
-            <SignatureCanvas
-              existing={sigData}
-              onSave={onSignatureSave}
+            <CustomerSignatureSection
+              legacySigData={sigData}
+              customerSignaturePreviewUrl={customerSignaturePreviewUrl}
+              customerSignatureCapturedAt={customerSignatureCapturedAt}
               signedBy={signedBy}
               signedAt={signedAt}
-              readOnly={!signatureEditable}
+              captureEnabled={signatureCaptureEnabled}
+              onCustomerSignatureSave={onCustomerSignatureSave}
             />
           </Section>
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-4 mt-0">
+          {tasksTabToolbar ? <div className="mb-3">{tasksTabToolbar}</div> : null}
           {planServices && planServices.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -1208,7 +1557,11 @@ export function WorkOrderDetailExperience({
             <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle className="text-sm">Work order tasks</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Checklist stored on the work order</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {tasks.length > 0
+                    ? `${tasks.filter((x) => x.done).length} / ${tasks.length} complete`
+                    : "Checklist for this job"}
+                </p>
               </div>
               {tasksEditable && (
                 <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addTask}>
@@ -1219,25 +1572,76 @@ export function WorkOrderDetailExperience({
             </CardHeader>
             <CardContent className="space-y-2">
               {tasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">No tasks yet. Add tasks when editing this work order.</p>
+                <p className="text-sm text-muted-foreground py-2">No tasks yet. Add tasks to track work on this job.</p>
               ) : (
                 tasks.map((t) => (
-                  <label
+                  <div
                     key={t.id}
-                    className={cn(
-                      "flex items-start gap-3 rounded-lg border border-border px-3 py-2.5 cursor-pointer hover:bg-muted/30",
-                      !tasksEditable && "cursor-default",
-                    )}
+                    className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5 hover:bg-muted/30"
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-1 rounded border-input"
-                      checked={t.done}
-                      disabled={!tasksEditable}
-                      onChange={() => tasksEditable && toggleTask(t.id)}
-                    />
-                    <span className={cn("text-sm", t.done && "line-through text-muted-foreground")}>{t.label}</span>
-                  </label>
+                    {tasksEditable ? (
+                      <>
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            className="mt-2 rounded border-input shrink-0"
+                            checked={t.done}
+                            onChange={() => toggleTask(t.id)}
+                            aria-label="Completed"
+                          />
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <Input
+                              value={t.label}
+                              onChange={(e) => updateTask(t.id, { label: e.target.value })}
+                              placeholder="Task title"
+                              className="h-9 text-sm"
+                            />
+                            <Textarea
+                              value={t.description ?? ""}
+                              onChange={(e) =>
+                                updateTask(t.id, {
+                                  description: e.target.value.trim() ? e.target.value : undefined,
+                                })
+                              }
+                              placeholder="Description (optional)"
+                              rows={2}
+                              className="text-xs resize-none min-h-[52px]"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => onTasksChange(tasks.filter((x) => x.id !== t.id))}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-1 rounded border-input shrink-0"
+                          checked={t.done}
+                          disabled
+                          readOnly
+                          aria-label="Completed"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className={cn("text-sm", t.done && "line-through text-muted-foreground")}>
+                            {t.label || "—"}
+                          </span>
+                          {t.description ? (
+                            <p className="text-xs text-muted-foreground mt-0.5 leading-snug whitespace-pre-wrap">
+                              {t.description}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))
               )}
             </CardContent>
@@ -1245,12 +1649,14 @@ export function WorkOrderDetailExperience({
         </TabsContent>
 
         <TabsContent value="parts" className="mt-0">
+          {partsTabToolbar ? <div className="mb-3">{partsTabToolbar}</div> : null}
           <Section title="Parts / materials" icon={Package}>
             <PartsTable parts={parts} editable={partsPhotosEditable} onChange={onPartsChange} />
           </Section>
         </TabsContent>
 
         <TabsContent value="labor" className="mt-0 space-y-4">
+          {laborTabToolbar ? <div className="mb-3">{laborTabToolbar}</div> : null}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Labor hours</CardTitle>
@@ -1261,8 +1667,11 @@ export function WorkOrderDetailExperience({
                   type="number"
                   min={0}
                   step={0.5}
-                  value={laborHours}
-                  onChange={(e) => onLaborHoursChange(Number(e.target.value))}
+                  value={Number.isFinite(laborHours) ? laborHours : 0}
+                  onChange={(e) => {
+                    const v = Number.parseFloat(e.target.value)
+                    onLaborHoursChange(Number.isFinite(v) ? v : 0)
+                  }}
                   className="max-w-[10rem] h-10 text-lg font-semibold"
                 />
               ) : (
@@ -1282,15 +1691,29 @@ export function WorkOrderDetailExperience({
           </Card>
         </TabsContent>
 
-        <TabsContent value="photos" className="mt-0">
-          <Section title="Photos / attachments" icon={Camera}>
-            <PhotoSection photos={photos} editable={partsPhotosEditable} onChange={onPhotosChange} />
+        <TabsContent value="attachments" className="mt-0">
+          <Section title="Attachments" icon={Paperclip}>
+            <PhotoSection
+              photos={photos}
+              photoAttachmentIds={photoAttachmentIds}
+              documents={documentAttachments}
+              editable={partsPhotosEditable}
+              uploading={attachmentUploading}
+              uploadProgress={attachmentUploadProgress}
+              uploadStatusLabel={attachmentUploadStatusLabel}
+              onChange={onPhotosChange}
+              onAttachmentUpload={onAttachmentUpload}
+              onRemoveAttachmentPhoto={onRemoveAttachmentPhoto}
+              onRemoveLegacyPhoto={onRemoveLegacyPhoto}
+              onRemoveDocument={onRemoveDocument}
+            />
           </Section>
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-4 mt-0">
+          {notesTabToolbar ? <div className="mb-1">{notesTabToolbar}</div> : null}
           <Section title="Diagnosis" icon={FileText}>
-            {fieldsEditable ? (
+            {diagnosisNotesEditable ? (
               <Textarea
                 value={diagnosis}
                 onChange={(e) => onDiagnosisChange(e.target.value)}
@@ -1304,7 +1727,7 @@ export function WorkOrderDetailExperience({
             )}
           </Section>
           <Section title="Technician notes" icon={PenLine}>
-            {fieldsEditable ? (
+            {technicianNotesEditable ? (
               <Textarea
                 value={technicianNotes}
                 onChange={(e) => onTechnicianNotesChange(e.target.value)}
@@ -1318,7 +1741,7 @@ export function WorkOrderDetailExperience({
             )}
           </Section>
           <Section title="Internal notes (work order)" icon={StickyNote}>
-            {internalNotesEditable && onInternalNotesChange ? (
+            {internalNotesTabEditable && onInternalNotesChange ? (
               <Textarea
                 value={internalNotes}
                 onChange={(e) => onInternalNotesChange(e.target.value)}
@@ -1338,6 +1761,12 @@ export function WorkOrderDetailExperience({
             <DrawerTimeline items={activityItems} />
           </Section>
         </TabsContent>
+        {certificateTabContent ? (
+          <TabsContent value="certificate" className="space-y-4 mt-0">
+            {certificateTabToolbar ? <div className="mb-1">{certificateTabToolbar}</div> : null}
+            {certificateTabContent}
+          </TabsContent>
+        ) : null}
         </div>
       </Tabs>
     </div>

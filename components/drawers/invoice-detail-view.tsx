@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, type ReactNode } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
@@ -9,6 +9,15 @@ import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
@@ -18,6 +27,8 @@ import {
   Loader2,
   Smartphone, FileText, Settings, Eye, EyeOff, Building2, SlidersHorizontal,
   ExternalLink,
+  Archive,
+  History,
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,15 +85,16 @@ const COMPANY = {
 // ─── AI mock generators ───────────────────────────────────────────────────────
 
 function generatePaymentReminder(invoice: AdminInvoice): string {
+  const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const overdue = daysOverdue(invoice.dueDate)
   const tone = overdue > 30 ? "firm" : overdue > 14 ? "direct" : "friendly"
   if (tone === "friendly") {
-    return `Subject: Friendly Payment Reminder — Invoice ${invoice.id}\n\nDear ${invoice.customerName},\n\nThis is a friendly reminder that Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)} is due on ${fmtDate(invoice.dueDate)}.\n\nIf you have already arranged payment, please disregard this message. Otherwise, you can pay securely via the link in your original invoice email.\n\nThank you for your continued business.\n\nBest regards,\nEquipify Service Team`
+    return `Subject: Friendly Payment Reminder — Invoice ${invoiceLabel}\n\nDear ${invoice.customerName},\n\nThis is a friendly reminder that Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)} is due on ${fmtDate(invoice.dueDate)}.\n\nIf you have already arranged payment, please disregard this message. Otherwise, you can pay securely via the link in your original invoice email.\n\nThank you for your continued business.\n\nBest regards,\nEquipify Service Team`
   }
   if (tone === "direct") {
-    return `Subject: Payment Overdue — Invoice ${invoice.id} (${overdue} days)\n\nDear ${invoice.customerName},\n\nInvoice ${invoice.id} for ${fmtCurrency(invoice.amount)}, due on ${fmtDate(invoice.dueDate)}, remains outstanding after ${overdue} days.\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\nEquipify Service Team`
+    return `Subject: Payment Overdue — Invoice ${invoiceLabel} (${overdue} days)\n\nDear ${invoice.customerName},\n\nInvoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)}, due on ${fmtDate(invoice.dueDate)}, remains outstanding after ${overdue} days.\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\nEquipify Service Team`
   }
-  return `Subject: Final Notice — Invoice ${invoice.id} Now ${overdue} Days Overdue\n\nDear ${invoice.customerName},\n\nInvoice ${invoice.id} for ${fmtCurrency(invoice.amount)} is ${overdue} days past due. This is a final notice requesting immediate payment.\n\nEquipify Service Team`
+  return `Subject: Final Notice — Invoice ${invoiceLabel} Now ${overdue} Days Overdue\n\nDear ${invoice.customerName},\n\nInvoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)} is ${overdue} days past due. This is a final notice requesting immediate payment.\n\nEquipify Service Team`
 }
 
 interface RiskResult {
@@ -312,6 +324,7 @@ function InvoicePreview({
   settings: DisplaySettings
   device: PreviewDevice
 }) {
+  const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const subtotal  = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
   const taxRate   = 0.0875
   const taxAmt    = settings.showTax ? subtotal * taxRate : 0
@@ -364,7 +377,7 @@ function InvoicePreview({
                 {settings.customTitle || "INVOICE"}
               </p>
               <p className={cn("text-xs font-semibold mt-0.5", isBold ? "text-white/80" : "text-gray-700")}>
-                #{invoice.id}
+                {invoiceLabel}
               </p>
               <div className="mt-2 flex flex-col items-end gap-0.5">
                 <span className="text-[10px] text-gray-500">Date: {fmtDate(invoice.issueDate)}</span>
@@ -532,7 +545,7 @@ function InvoicePreview({
             <div>
               <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">Pay Online</p>
               <p className="text-[10px] text-[color:var(--primary)] font-medium underline cursor-pointer">
-                pay.equipify.ai/inv/{invoice.id.toLowerCase()}
+                pay.equipify.ai/inv/{invoiceLabel.toLowerCase()}
               </p>
             </div>
             <div className="text-right">
@@ -605,7 +618,7 @@ function SettingsPanel({
             value={settings.customTitle}
             onChange={(e) => set("customTitle", e.target.value)}
             placeholder="INVOICE"
-            className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
         <div>
@@ -613,7 +626,7 @@ function SettingsPanel({
           <select
             value={settings.paymentTerms}
             onChange={(e) => set("paymentTerms", e.target.value)}
-            className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+            className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
           >
             {["Net 15", "Net 30", "Net 45", "Net 60", "Due on Receipt"].map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -632,7 +645,7 @@ function SettingsPanel({
                   "flex-1 py-1.5 rounded border text-xs font-medium transition-colors cursor-pointer",
                   settings.invoiceTheme === t.value
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border hover:border-primary/50",
+                    : "bg-white text-foreground border-border hover:border-primary/50",
                 )}
               >
                 {t.label}
@@ -700,10 +713,11 @@ function EmailModal({
   onError?: (message: string) => void
 }) {
   const { updateInvoice } = useInvoices()
+  const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const [sending, setSending] = useState(false)
   const [to,      setTo]      = useState(`billing@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
-  const [subject, setSubject] = useState(`Invoice ${invoice.id} — ${fmtCurrency(invoice.amount)} Due ${fmtDate(invoice.dueDate)}`)
-  const [body,    setBody]    = useState(`Hi ${invoice.customerName},\n\nPlease find attached Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)}.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. You can pay securely online at:\npay.equipify.ai/inv/${invoice.id.toLowerCase()}\n\nPlease don't hesitate to reach out if you have any questions.\n\nThank you,\n${COMPANY.name}`)
+  const [subject, setSubject] = useState(`Invoice ${invoiceLabel} — ${fmtCurrency(invoice.amount)} Due ${fmtDate(invoice.dueDate)}`)
+  const [body,    setBody]    = useState(`Hi ${invoice.customerName},\n\nPlease find attached Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)}.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. You can pay securely online at:\npay.equipify.ai/inv/${invoiceLabel.toLowerCase()}\n\nPlease don't hesitate to reach out if you have any questions.\n\nThank you,\n${COMPANY.name}`)
 
   async function handleSend() {
     setSending(true)
@@ -725,7 +739,7 @@ function EmailModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !sending && onClose()} />
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
+      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Mail className="w-4 h-4 text-primary" />{" "}
@@ -739,21 +753,21 @@ function EmailModal({
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">To</label>
             <input type="email" value={to} onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Subject</label>
             <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border">
             <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground">Invoice {invoice.id}.pdf will be attached</span>
+            <span className="text-xs text-muted-foreground">Invoice {invoiceLabel}.pdf will be attached</span>
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
@@ -788,13 +802,14 @@ function EmailModal({
 }
 
 function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => void }) {
+  const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const [phone, setPhone] = useState("(555) 010-0001")
-  const [msg,   setMsg]   = useState(`Hi, this is ${COMPANY.name}. Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)} is due ${fmtDate(invoice.dueDate)}. Pay online: pay.equipify.ai/inv/${invoice.id.toLowerCase()}`)
+  const [msg,   setMsg]   = useState(`Hi, this is ${COMPANY.name}. Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)} is due ${fmtDate(invoice.dueDate)}. Pay online: pay.equipify.ai/inv/${invoiceLabel.toLowerCase()}`)
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary" /> SMS Invoice to Customer
@@ -807,12 +822,12 @@ function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => 
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
             <p className="text-[10px] text-muted-foreground mt-1 text-right">{msg.length} / 160 chars</p>
           </div>
         </div>
@@ -837,7 +852,7 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" /> Record Payment
@@ -854,12 +869,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Amount Received</label>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Method</label>
             <select value={method} onChange={(e) => setMethod(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
               {["Check", "ACH / Bank Transfer", "Credit Card", "Cash", "Zelle", "Other"].map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
@@ -868,12 +883,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Reference / Check Number</label>
             <input type="text" value={refNum} onChange={(e) => setRefNum(e.target.value)} placeholder="Optional"
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Date</label>
             <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
@@ -945,7 +960,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Due Date">
             <input type="date" value={draft.dueDate ?? ""} onChange={(e) => setField("dueDate", e.target.value)}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </EditRow>
         ) : (
           <Row label="Due Date" value={
@@ -955,7 +970,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Status">
             <select value={draft.status ?? invoice.status} onChange={(e) => setField("status", e.target.value as InvoiceStatus)}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </EditRow>
@@ -999,10 +1014,10 @@ function InfoTab({
             value={draft.notes ?? ""}
             onChange={(e) => setField("notes", e.target.value)}
             placeholder="Add notes..."
-            className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+            className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
           />
         ) : invoice.notes ? (
-          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">{invoice.notes}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-white rounded-lg border border-border">{invoice.notes}</p>
         ) : (
           <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
         )}
@@ -1025,7 +1040,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
           { label: "Amount Paid", value: isPaid ? fmtCurrency(grandTotal) : "$0.00", color: isPaid ? "text-[color:var(--status-success)]" : "text-muted-foreground" },
           { label: "Balance", value: isPaid ? "$0.00" : fmtCurrency(grandTotal), color: isPaid ? "text-muted-foreground" : "text-[color:var(--status-warning)]" },
         ].map((s) => (
-          <div key={s.label} className="rounded-lg border border-border bg-card p-3 text-center">
+          <div key={s.label} className="rounded-xl border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-3 text-center">
             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{s.label}</p>
             <p className={cn("text-base font-bold tabular-nums mt-0.5", s.color)}>{s.value}</p>
           </div>
@@ -1059,7 +1074,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
             { date: fmtDate(invoice.dueDate),   event: "Payment due",    detail: "",                     type: invoice.status === "Overdue" ? "danger" : "neutral" },
             ...(invoice.paidDate ? [{ date: fmtDate(invoice.paidDate), event: "Payment received", detail: fmtCurrency(grandTotal), type: "success" }] : []),
           ].map((e, i) => (
-            <div key={i} className="flex items-center gap-3 p-2.5 rounded-md bg-muted/30 border border-border">
+            <div key={i} className="flex items-center gap-3 p-2.5 rounded-md bg-white border border-border">
               <div className={cn(
                 "w-2 h-2 rounded-full shrink-0",
                 e.type === "success" ? "bg-[color:var(--status-success)]"
@@ -1136,7 +1151,7 @@ function CommentsTab() {
                 )}
                 <span className="text-[10px] text-muted-foreground">{c.time}</span>
               </div>
-              <p className="text-xs text-foreground leading-relaxed bg-muted/30 border border-border rounded-lg px-3 py-2">{c.text}</p>
+              <p className="text-xs text-foreground leading-relaxed bg-white border border-border rounded-lg px-3 py-2">{c.text}</p>
             </div>
           </div>
         ))}
@@ -1148,7 +1163,7 @@ function CommentsTab() {
           onChange={(e) => setComment(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addComment()}
           placeholder="Add a comment..."
-          className="flex-1 rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+          className="flex-1 rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
         />
         <Button size="sm" variant="outline" onClick={addComment} className="text-xs cursor-pointer px-3">Post</Button>
       </div>
@@ -1170,7 +1185,7 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
     <div className="space-y-2">
       <Link
         href={`/work-orders?open=${invoice.workOrderId}`}
-        className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+        className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:bg-muted/20 hover:border-primary/30 transition-colors cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -1188,8 +1203,9 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
 }
 
 function ActivityTab({ invoice }: { invoice: AdminInvoice }) {
+  const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const events = [
-    { date: fmtDate(invoice.issueDate), time: "9:00 AM", actor: "Admin", action: "Created invoice", detail: invoice.id },
+    { date: fmtDate(invoice.issueDate), time: "9:00 AM", actor: "Admin", action: "Created invoice", detail: invoiceLabel },
     { date: fmtDate(invoice.issueDate), time: "9:14 AM", actor: "Admin", action: "Changed status to Sent", detail: "" },
     ...(invoice.status === "Paid" && invoice.paidDate ? [
       { date: fmtDate(invoice.paidDate), time: "11:32 AM", actor: "Admin", action: "Payment recorded", detail: fmtCurrency(invoice.amount) },
@@ -1223,7 +1239,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{title}</p>
-      <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
+      <div className="rounded-xl border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden divide-y divide-border">
         {children}
       </div>
     </div>
@@ -1275,15 +1291,15 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
             <tr key={i}>
               <td className="px-1 py-1.5">
                 <input type="text" value={item.description} onChange={(e) => updateItem(i, "description", e.target.value)} placeholder="Item description"
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)}
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.unit} onChange={(e) => updateItem(i, "unit", e.target.value)}
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-2 py-1.5 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
               <td className="px-1 py-1.5 text-center">
@@ -1350,7 +1366,7 @@ interface InvoiceDetailViewProps {
 let toastCounter = 0
 
 export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) {
-  const { updateInvoice } = useInvoices()
+  const { updateInvoice, archiveInvoice } = useInvoices()
 
   // Tabs + layout state
   const [activeTab,    setActiveTab]    = useState<Tab>("info")
@@ -1372,6 +1388,8 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const [emailVariant, setEmailVariant] = useState<"send" | "resend">("send")
   const [moreOpen, setMoreOpen] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   function toast(message: string, kind: "success" | "error" = "success") {
     const id = ++toastCounter
@@ -1425,6 +1443,19 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     toast("Invoice updated successfully")
   }
 
+  async function confirmArchiveInvoice() {
+    setArchiveBusy(true)
+    const { error } = await archiveInvoice(invoice.id)
+    setArchiveBusy(false)
+    setArchiveDialogOpen(false)
+    if (error) {
+      toast(`Could not archive: ${error}`, "error")
+      return
+    }
+    toast("Invoice archived")
+    onClose()
+  }
+
   function setField<K extends keyof AdminInvoice>(field: K, value: AdminInvoice[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
@@ -1438,13 +1469,13 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
   const canRecordPayment = ["Unpaid", "Overdue", "Sent"].includes(currentStatus)
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "info",         label: "Info" },
-    { id: "payments",     label: "Payments" },
-    { id: "files",        label: "Files" },
-    { id: "comments",     label: "Comments" },
-    { id: "work-orders",  label: "Work Orders" },
-    { id: "activity",     label: "Activity" },
+  const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
+    { id: "info",        label: "Info",         icon: <FileText className="w-3.5 h-3.5 shrink-0" /> },
+    { id: "payments",    label: "Payments",    icon: <CreditCard className="w-3.5 h-3.5 shrink-0" /> },
+    { id: "files",       label: "Files",       icon: <Paperclip className="w-3.5 h-3.5 shrink-0" /> },
+    { id: "comments",    label: "Comments",    icon: <MessageSquare className="w-3.5 h-3.5 shrink-0" /> },
+    { id: "work-orders", label: "Work Orders", icon: <ClipboardList className="w-3.5 h-3.5 shrink-0" /> },
+    { id: "activity",    label: "Activity",    icon: <History className="w-3.5 h-3.5 shrink-0" /> },
   ]
 
   const DEVICES: { id: PreviewDevice; icon: React.ReactNode; label: string }[] = [
@@ -1457,7 +1488,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   return (
     <>
       {/* ── Top action bar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/20 flex-wrap shrink-0">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-background flex-wrap shrink-0">
         {editing ? (
           <>
             <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
@@ -1499,30 +1530,75 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
                   <div className="absolute left-0 top-full mt-1 z-20 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
-                    {[
-                      { icon: <Mail className="w-3.5 h-3.5" />,          label: alreadyEmailed ? "Resend Invoice" : "Email Dynamic Invoice",   action: () => openEmailModal(alreadyEmailed ? "resend" : "send") },
-                      { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "SMS Dynamic Invoice",     action: () => setModal("sms") },
-                      { icon: <Link2 className="w-3.5 h-3.5" />,         label: "Copy Invoice URL",        action: () => { navigator.clipboard?.writeText(`https://pay.equipify.ai/inv/${invoice.id.toLowerCase()}`); toast("Invoice URL copied to clipboard") } },
-                      { icon: <Download className="w-3.5 h-3.5" />,      label: "Download PDF",            action: () => toast("Invoice PDF downloaded") },
-                      { icon: <Save className="w-3.5 h-3.5" />,          label: "Save PDF to Record",      action: () => toast("PDF saved to invoice record") },
-                      { icon: <CreditCard className="w-3.5 h-3.5" />,    label: "Record Payment",          action: () => setModal("payment") },
-                      { icon: <CheckCircle2 className="w-3.5 h-3.5" />,  label: "Mark Paid",               action: async () => {
-                        const { error } = await updateInvoice(invoice.id, { status: "Paid", paidAt: new Date().toISOString() })
-                        if (error) { toast(`Could not mark paid: ${error}`, "error"); return }
-                        toast("Invoice marked as paid")
-                        setActionsOpen(false)
-                      } },
-                      { icon: <Ban className="w-3.5 h-3.5" />,           label: "Void Invoice",            action: async () => {
-                        const { error } = await updateInvoice(invoice.id, { status: "Void" })
-                        if (error) { toast(`Could not void: ${error}`, "error"); return }
-                        toast("Invoice voided")
-                        setActionsOpen(false)
-                      } },
-                    ].map((item) => (
-                      <button key={item.label} type="button" onClick={() => { item.action(); setActionsOpen(false) }}
-                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs text-foreground hover:bg-muted/60 transition-colors cursor-pointer">
+                    {(
+                      [
+                        {
+                          icon: <Mail className="w-3.5 h-3.5" />,
+                          label: alreadyEmailed ? "Resend Invoice" : "Email Dynamic Invoice",
+                          run: () => openEmailModal(alreadyEmailed ? "resend" : "send"),
+                        },
+                        { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "SMS Dynamic Invoice", soon: true },
+                        { icon: <Link2 className="w-3.5 h-3.5" />, label: "Copy Invoice URL", soon: true },
+                        { icon: <Download className="w-3.5 h-3.5" />, label: "Download PDF", soon: true },
+                        { icon: <Save className="w-3.5 h-3.5" />, label: "Save PDF to Record", soon: true },
+                        { icon: <CreditCard className="w-3.5 h-3.5" />, label: "Record Payment", run: () => setModal("payment") },
+                        {
+                          icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+                          label: "Mark Paid",
+                          run: async () => {
+                            const { error } = await updateInvoice(invoice.id, {
+                              status: "Paid",
+                              paidAt: new Date().toISOString(),
+                            })
+                            if (error) {
+                              toast(`Could not mark paid: ${error}`, "error")
+                              return
+                            }
+                            toast("Invoice marked as paid")
+                            setActionsOpen(false)
+                          },
+                        },
+                        {
+                          icon: <Ban className="w-3.5 h-3.5" />,
+                          label: "Void Invoice",
+                          run: async () => {
+                            const { error } = await updateInvoice(invoice.id, { status: "Void" })
+                            if (error) {
+                              toast(`Could not void: ${error}`, "error")
+                              return
+                            }
+                            toast("Invoice voided")
+                            setActionsOpen(false)
+                          },
+                        },
+                      ] as Array<
+                        | { icon: ReactNode; label: string; soon: true }
+                        | { icon: ReactNode; label: string; run: () => void | Promise<void> }
+                      >
+                    ).map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        disabled={"soon" in item && item.soon}
+                        title={"soon" in item && item.soon ? "Coming soon" : undefined}
+                        onClick={() => {
+                          if ("soon" in item && item.soon) return
+                          void Promise.resolve("run" in item ? item.run() : undefined).finally(() =>
+                            setActionsOpen(false),
+                          )
+                        }}
+                        className={cn(
+                          "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
+                          "soon" in item && item.soon
+                            ? "text-muted-foreground cursor-not-allowed opacity-60"
+                            : "text-foreground hover:bg-muted/60 cursor-pointer",
+                        )}
+                      >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {"soon" in item && item.soon ? (
+                          <span className="text-[10px] text-muted-foreground shrink-0">Soon</span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -1551,18 +1627,69 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setMoreOpen(false)} />
                   <div className="absolute right-0 top-full mt-1 z-20 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
-                    {[
-                      { icon: <Copy className="w-3.5 h-3.5" />,             label: "Duplicate Invoice",           action: () => toast("Invoice duplicated") },
-                      { icon: <Repeat className="w-3.5 h-3.5" />,           label: "Convert to Recurring",        action: () => toast("Converted to recurring invoice") },
-                      { icon: <Paperclip className="w-3.5 h-3.5" />,        label: "Attach Certificates",         action: () => { setActiveTab("files"); setMoreOpen(false) } },
-                      { icon: <FileSignature className="w-3.5 h-3.5" />,    label: "Attach Contract",             action: () => toast("Contract attachment coming soon") },
-                      { icon: <StickyNote className="w-3.5 h-3.5" />,       label: "Add Internal Note",           action: () => { setActiveTab("comments"); setMoreOpen(false) } },
-                      { icon: <ClipboardList className="w-3.5 h-3.5" />,    label: "View Audit Log",              action: () => { setActiveTab("activity"); setMoreOpen(false) } },
-                    ].map((item) => (
-                      <button key={item.label} type="button" onClick={() => { item.action(); setMoreOpen(false) }}
-                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs text-foreground hover:bg-muted/60 transition-colors cursor-pointer">
+                    {(
+                      [
+                        { icon: <Copy className="w-3.5 h-3.5" />, label: "Duplicate Invoice", soon: true },
+                        { icon: <Repeat className="w-3.5 h-3.5" />, label: "Convert to Recurring", soon: true },
+                        {
+                          icon: <Paperclip className="w-3.5 h-3.5" />,
+                          label: "Attach Certificates",
+                          run: () => {
+                            setActiveTab("files")
+                            setMoreOpen(false)
+                          },
+                        },
+                        { icon: <FileSignature className="w-3.5 h-3.5" />, label: "Attach Contract", soon: true },
+                        {
+                          icon: <StickyNote className="w-3.5 h-3.5" />,
+                          label: "Add Internal Note",
+                          run: () => {
+                            setActiveTab("comments")
+                            setMoreOpen(false)
+                          },
+                        },
+                        {
+                          icon: <ClipboardList className="w-3.5 h-3.5" />,
+                          label: "View Audit Log",
+                          run: () => {
+                            setActiveTab("activity")
+                            setMoreOpen(false)
+                          },
+                        },
+                        {
+                          icon: <Archive className="w-3.5 h-3.5" />,
+                          label: "Archive Invoice",
+                          run: () => {
+                            setArchiveDialogOpen(true)
+                            setMoreOpen(false)
+                          },
+                        },
+                      ] as Array<
+                        | { icon: ReactNode; label: string; soon: true }
+                        | { icon: ReactNode; label: string; run: () => void }
+                      >
+                    ).map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        disabled={"soon" in item && item.soon}
+                        title={"soon" in item && item.soon ? "Coming soon" : undefined}
+                        onClick={() => {
+                          if ("soon" in item && item.soon) return
+                          if ("run" in item) item.run()
+                        }}
+                        className={cn(
+                          "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
+                          "soon" in item && item.soon
+                            ? "text-muted-foreground cursor-not-allowed opacity-60"
+                            : "text-foreground hover:bg-muted/60 cursor-pointer",
+                        )}
+                      >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {"soon" in item && item.soon ? (
+                          <span className="text-[10px] text-muted-foreground shrink-0">Soon</span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -1618,24 +1745,30 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       )}
 
       {/* ── Main content area ──────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-muted/20">
 
         {/* Left: tabs + content */}
         <div className={cn("flex flex-col min-w-0 transition-all duration-300", showSettings ? "flex-1" : "flex-1")}>
-          {/* Tabs */}
-          <div className="flex items-center gap-0 border-b border-border px-5 shrink-0 overflow-x-auto">
+          {/* Tabs — match Work Order drawer (inline underline tabs + icons) */}
+          <div
+            className={cn(
+              "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none bg-background p-0 border-0 border-b border-border shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            )}
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0",
+                  "flex items-center text-xs font-medium gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer",
+                  "grow-0 basis-auto rounded-none border-0 border-b-2 bg-transparent px-3 py-2.5 shadow-none",
                   activeTab === tab.id
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-muted-foreground hover:text-foreground border-b-2 border-transparent",
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
                 )}
               >
+                {tab.icon}
                 {tab.label}
               </button>
             ))}
@@ -1664,7 +1797,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
         {/* Right: Settings panel */}
         {showSettings && !editing && (
-          <div className="w-64 shrink-0 border-l border-border bg-muted/10 flex flex-col">
+          <div className="w-64 shrink-0 border-l border-border bg-background flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
                 <Settings className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1683,7 +1816,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
       {/* ── Preview overlay ────────────────────────────────────────────────── */}
       {showPreview && !editing && (
-        <div className="border-t border-border bg-muted/30 shrink-0 overflow-y-auto" style={{ maxHeight: "55vh" }}>
+        <div className="border-t border-border bg-muted/20 shrink-0 overflow-y-auto" style={{ maxHeight: "55vh" }}>
           <div className="px-5 py-5">
             <InvoicePreview invoice={invoice} settings={settings} device={previewDevice} />
           </div>
@@ -1749,6 +1882,23 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           }}
         />
       )}
+
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The invoice will be hidden from the default invoice list. Archived rows remain in your database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiveBusy}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={archiveBusy} onClick={() => void confirmArchiveInvoice()}>
+              {archiveBusy ? "Archiving…" : "Archive"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

@@ -11,28 +11,18 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, Cell,
+  ResponsiveContainer,
 } from "recharts"
 import {
-  computeKpis,
-  computeCategoryBreakdown,
-  computeCustomerRiskScores,
-  getAllInsightsSorted,
-  getInsightsByCategory,
-  revenueTrend,
   SEVERITY_COLORS,
   CATEGORY_META,
-  aiSummaryReport,
   type InsightCategory,
   type InsightSeverity,
   type AiInsight,
 } from "@/lib/insights-engine"
+import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const CATEGORIES: InsightCategory[] = [
-  "overdue_client", "repeat_failure", "upsell", "expiring_warranty", "revenue_opportunity",
-]
 
 const CATEGORY_ICONS: Record<InsightCategory, React.ElementType> = {
   overdue_client: AlertCircle,
@@ -180,8 +170,18 @@ function KpiCard({
 
 // ─── Summary Report Modal ────────────────────────────────────────────────────�����
 
-function SummaryReportModal({ onClose }: { onClose: () => void }) {
-  const report = aiSummaryReport
+type ExecutiveSummaryReport = {
+  period: string
+  totalInsights: number
+  criticalCount: number
+  highCount: number
+  totalEstimatedOpportunity: number
+  topRisks: string[]
+  topOpportunities: string[]
+  recommendedActions: { priority: number; action: string; impact: string }[]
+}
+
+function SummaryReportModal({ onClose, report }: { onClose: () => void; report: ExecutiveSummaryReport }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
@@ -193,12 +193,12 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
               <Sparkles size={15} className="text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-zinc-900">AI Executive Summary</h2>
+              <h2 className="text-sm font-bold text-zinc-900">Executive summary</h2>
               <p className="text-xs text-zinc-400">Generated {report.period} &bull; {report.totalInsights} insights analyzed</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="text-zinc-600 bg-zinc-100 hover:bg-zinc-200 border-zinc-200">
+            <Button variant="outline" size="sm" disabled title="Coming soon" className="text-zinc-500 cursor-not-allowed opacity-60">
               <Download size={12} /> Export PDF
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100">
@@ -274,26 +274,83 @@ function SummaryReportModal({ onClose }: { onClose: () => void }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const kpis = useMemo(computeKpis, [])
-  const breakdown = useMemo(computeCategoryBreakdown, [])
-  const riskScores = useMemo(computeCustomerRiskScores, [])
-  const allInsights = useMemo(getAllInsightsSorted, [])
+  const dash = useSupabaseDashboard()
+  const liveInsights = dash.operationalInsights
+
+  const breakdown = useMemo(() => {
+    return (Object.keys(CATEGORY_META) as InsightCategory[]).map((cat) => {
+      const items = liveInsights.filter((i) => i.category === cat)
+      return {
+        category: cat,
+        label: CATEGORY_META[cat].label,
+        count: items.length,
+        totalValue: items.reduce((s, i) => s + (i.estimatedValue ?? 0), 0),
+        critical: items.filter((i) => i.severity === "critical").length,
+        high: items.filter((i) => i.severity === "high").length,
+        accentHex: CATEGORY_META[cat].accentHex,
+      }
+    })
+  }, [liveInsights])
+
+  const kpis = useMemo(() => {
+    const s = dash.stats
+    const dollars = Math.round(s.monthlyRevenueCents / 100)
+    return {
+      totalInsights: liveInsights.length,
+      criticalCount: liveInsights.filter((i) => i.severity === "critical").length,
+      highCount: liveInsights.filter((i) => i.severity === "high").length,
+      totalOpportunity: dollars,
+      pendingQuoteValue: s.openWorkOrders,
+      repeatFailureEquipmentCount: s.repeatRepairAlertsCount,
+      expiringWarrantyCount: s.expiringWarrantiesCount,
+      avgConfidence: liveInsights.length === 0 ? 0 : 100,
+    }
+  }, [dash.stats, liveInsights])
+
+  const revenueChartRows = useMemo(
+    () =>
+      dash.revenueByMonth.map((p) => ({
+        month: p.month,
+        captured: p.revenue,
+        opportunity: 0,
+      })),
+    [dash.revenueByMonth],
+  )
+
+  const executiveSummary = useMemo((): ExecutiveSummaryReport => {
+    const critical = liveInsights.filter((i) => i.severity === "critical")
+    const high = liveInsights.filter((i) => i.severity === "high")
+    return {
+      period: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
+      totalInsights: liveInsights.length,
+      criticalCount: critical.length,
+      highCount: high.length,
+      totalEstimatedOpportunity: Math.round(dash.stats.monthlyRevenueCents / 100),
+      topRisks: [...critical, ...high].slice(0, 5).map((i) => i.title),
+      topOpportunities: liveInsights
+        .filter((i) => i.category === "revenue_opportunity")
+        .slice(0, 5)
+        .map((i) => i.title),
+      recommendedActions: liveInsights.slice(0, 6).map((i, idx) => ({
+        priority: idx + 1,
+        action: i.title,
+        impact: i.description.slice(0, 160),
+      })),
+    }
+  }, [liveInsights, dash.stats.monthlyRevenueCents])
 
   const [activeCategory, setActiveCategory] = useState<InsightCategory | "all">("all")
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [showReport, setShowReport] = useState(false)
 
   const visibleInsights = useMemo(() => {
-    const base = activeCategory === "all" ? allInsights : getInsightsByCategory(activeCategory)
+    const base =
+      activeCategory === "all" ? liveInsights : liveInsights.filter((i) => i.category === activeCategory)
     return base.filter((i) => !dismissed.has(i.id))
-  }, [activeCategory, dismissed, allInsights])
+  }, [activeCategory, dismissed, liveInsights])
 
   function dismiss(id: string) {
     setDismissed((prev) => new Set([...prev, id]))
-  }
-
-  const RISK_COLORS: Record<string, string> = {
-    Critical: "#ef4444", High: "#f97316", Medium: "#eab308", Low: "#22c55e",
   }
 
   return (
@@ -315,7 +372,10 @@ export default function InsightsPage() {
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">Intelligence Hub</h1>
               <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.45)" }}>
-                AI-generated predictions &bull; Updated April 30, 2026 at 08:00
+                Rule-based operational signals from your live data &bull; {new Date().toLocaleString("en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
               </p>
             </div>
             <button onClick={() => setShowReport(true)}
@@ -328,26 +388,26 @@ export default function InsightsPage() {
 
           {/* KPI strip */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-            <KpiCard label="Total Insights" value={String(kpis.totalInsights)}
-              sub={`${kpis.criticalCount} critical, ${kpis.highCount} high`}
+            <KpiCard label="Operational insights" value={String(kpis.totalInsights)}
+              sub={`${kpis.criticalCount} critical · ${kpis.highCount} high`}
               icon={Zap} accent="#3b82f6" pulse />
-            <KpiCard label="Revenue Opportunity" value={fmt$(kpis.totalOpportunity)}
-              sub="across all insight types"
+            <KpiCard label="Closed revenue (MTD)" value={fmt$(kpis.totalOpportunity)}
+              sub="Completed / invoiced work this month"
               icon={DollarSign} accent="#10b981" />
-            <KpiCard label="Repeat Failures" value={String(kpis.repeatFailureEquipmentCount)}
-              sub="units with recurring issues"
+            <KpiCard label="Repeat repair alerts" value={String(kpis.repeatFailureEquipmentCount)}
+              sub="90-day equipment signals"
               icon={RefreshCcw} accent="#f97316" />
-            <KpiCard label="Pending Quotes" value={fmt$(kpis.pendingQuoteValue)}
-              sub="awaiting approval"
+            <KpiCard label="Open work orders" value={String(kpis.pendingQuoteValue)}
+              sub="Open, scheduled, in progress"
               icon={BarChart3} accent="#eab308" />
-            <KpiCard label="Avg Confidence" value={`${kpis.avgConfidence}%`}
-              sub="AI prediction accuracy"
+            <KpiCard label="Warranties (30d)" value={String(kpis.expiringWarrantyCount)}
+              sub="Expiring coverage windows"
               icon={CheckCircle2} accent="#a78bfa" />
           </div>
 
           {/* Category nav tabs */}
           <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: "none" }}>
-            {(([["all", "All Insights", allInsights.length - dismissed.size]] as [string, string, number][]).concat(
+            {(([["all", "All Insights", liveInsights.length - dismissed.size]] as [string, string, number][]).concat(
               breakdown.map((b) => [b.category, b.label, b.count] as [string, string, number])
             )).map(([key, label, count]) => {
               const active = activeCategory === key
@@ -404,21 +464,17 @@ export default function InsightsPage() {
           <div className="lg:col-span-3 bg-white rounded-xl border border-zinc-200/80 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-bold text-zinc-900">Revenue vs. Opportunity Gap</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Captured revenue compared to identified AI opportunities (6 months)</p>
+                <h3 className="text-sm font-bold text-zinc-900">Revenue trend</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Completed / invoiced work revenue by month (live org)</p>
               </div>
               <ArrowUpRight size={16} className="text-zinc-300" />
             </div>
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={revenueTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+              <AreaChart data={revenueChartRows} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="grad-rev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="grad-opp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -429,17 +485,13 @@ export default function InsightsPage() {
                   contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }} />
                 <Area type="monotone" dataKey="captured" stroke="#3b82f6" strokeWidth={2}
                   fill="url(#grad-rev)" name="captured" />
-                <Area type="monotone" dataKey="opportunity" stroke="#10b981" strokeWidth={2}
-                  fill="url(#grad-opp)" name="opportunity" strokeDasharray="4 2" />
               </AreaChart>
             </ResponsiveContainer>
             <div className="flex items-center gap-5 mt-3">
-              {[["#3b82f6", "Captured Revenue"], ["#10b981", "AI Opportunity"]].map(([c, l]) => (
-                <div key={l} className="flex items-center gap-1.5">
-                  <span className="w-3 h-0.5 rounded-full" style={{ background: c }} />
-                  <span className="text-xs text-zinc-400">{l}</span>
-                </div>
-              ))}
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 rounded-full" style={{ background: "#3b82f6" }} />
+                <span className="text-xs text-zinc-400">Revenue (USD)</span>
+              </div>
             </div>
           </div>
 
@@ -447,45 +499,33 @@ export default function InsightsPage() {
           <div className="lg:col-span-2 bg-white rounded-xl border border-zinc-200/80 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-bold text-zinc-900">Customer Risk Scores</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">AI-weighted account health</p>
+                <h3 className="text-sm font-bold text-zinc-900">Repeat work (90 days)</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Live equipment with multiple work orders</p>
               </div>
               <Users size={15} className="text-zinc-300" />
             </div>
             <div className="space-y-2">
-              {riskScores.map((r) => (
-                <Link key={r.customerId} href={`/customers/${r.customerId}`}
-                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-zinc-50 transition-colors group">
-                  {/* Score bar */}
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
-                    style={{ background: RISK_COLORS[r.riskLabel] }}>
-                    {r.riskScore}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <p className="text-xs font-semibold text-zinc-800 truncate">{r.company}</p>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
-                        style={{ background: RISK_COLORS[r.riskLabel] + "20", color: RISK_COLORS[r.riskLabel] }}>
-                        {r.riskLabel}
-                      </span>
+              {dash.repeatRepairs.length === 0 ? (
+                <p className="text-xs text-zinc-500 py-2">No repeat-repair patterns detected in the last 90 days.</p>
+              ) : (
+                dash.repeatRepairs.slice(0, 8).map((r) => (
+                  <Link
+                    key={r.equipmentId}
+                    href={`/equipment?open=${encodeURIComponent(r.equipmentId)}`}
+                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-zinc-50 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0 bg-orange-500">
+                      {r.repairs}
                     </div>
-                    <div className="mt-1 h-1 rounded-full bg-zinc-100">
-                      <div className="h-full rounded-full transition-all"
-                        style={{ width: `${r.riskScore}%`, background: RISK_COLORS[r.riskLabel] }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-zinc-800 truncate">{r.equipmentName}</p>
+                      <p className="text-[10px] text-zinc-500 truncate">{r.customerName}</p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-2">{r.issue}</p>
                     </div>
-                    <div className="flex gap-3 mt-1">
-                      <span className="text-[10px] text-zinc-400">{r.insightCount} insights</span>
-                      {r.openWOs > 0 && <span className="text-[10px] text-zinc-400">{r.openWOs} open WOs</span>}
-                      {r.totalOpportunity > 0 && (
-                        <span className="text-[10px] ds-change-positive font-medium">
-                          {fmt$(r.totalOpportunity)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <ChevronRight size={13} className="text-zinc-300 group-hover:text-zinc-500 transition-colors shrink-0" />
-                </Link>
-              ))}
+                    <ChevronRight size={13} className="text-zinc-300 group-hover:text-zinc-500 transition-colors shrink-0" />
+                  </Link>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -522,7 +562,13 @@ export default function InsightsPage() {
                     </p>
                   )}
                   <div className="h-1 rounded-full bg-zinc-100">
-                    <div className="h-full rounded-full" style={{ width: `${(b.count / aiSummaryReport.totalInsights) * 100}%`, background: b.accentHex }} />
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(b.count / Math.max(1, liveInsights.length)) * 100}%`,
+                        background: b.accentHex,
+                      }}
+                    />
                   </div>
                 </button>
               )
@@ -533,7 +579,9 @@ export default function InsightsPage() {
       </div>
 
       {/* Summary report modal */}
-      {showReport && <SummaryReportModal onClose={() => setShowReport(false)} />}
+      {showReport && (
+        <SummaryReportModal onClose={() => setShowReport(false)} report={executiveSummary} />
+      )}
     </div>
   )
 }

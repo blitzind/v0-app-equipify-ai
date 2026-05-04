@@ -90,6 +90,7 @@ export interface Equipment {
   category: string
   serialNumber: string
   installDate: string
+  warrantyStartDate?: string
   warrantyExpiration: string
   lastServiceDate: string
   nextDueDate: string
@@ -464,6 +465,8 @@ export interface Part {
   partNumber: string
   quantity: number
   unitCost: number
+  vendorId?: string | null
+  purchaseOrderId?: string | null
 }
 
 export interface RepairLog {
@@ -476,8 +479,8 @@ export interface RepairLog {
   signatureDataUrl: string  // base64 canvas data or ""
   signedBy: string
   signedAt: string
-  /** Optional checklist persisted in `repair_log` JSON (not a separate table). */
-  tasks?: { id: string; label: string; done: boolean }[]
+  /** Optional checklist persisted in `repair_log` JSON or `work_order_tasks`. */
+  tasks?: { id: string; label: string; done: boolean; description?: string }[]
 }
 
 export interface WorkOrder {
@@ -509,8 +512,21 @@ export interface WorkOrder {
   /** Set when this work order was created from a maintenance plan (Supabase `maintenance_plan_id`). */
   maintenancePlanId?: string | null
   maintenancePlanName?: string | null
+  calibrationTemplateId?: string | null
+  equipmentCategory?: string | null
   /** True when created by nightly PM automation (`created_by_pm_automation`). */
   createdByPmAutomation?: boolean
+  /** Signed URL for `signature_url` storage object (Supabase detail load only). */
+  customerSignaturePreviewUrl?: string | null
+  /** ISO timestamp from `signature_captured_at`. */
+  customerSignatureCapturedAt?: string | null
+  /** Warranty-aware billing controls from `work_orders`. */
+  billableToCustomer?: boolean
+  warrantyReviewRequired?: boolean
+  warrantyVendorId?: string | null
+  warrantyVendorName?: string | null
+  /** Derived from linked equipment dates in detail loader. */
+  equipmentWarrantyActive?: boolean
 }
 
 const emptyRepairLog = (): RepairLog => ({

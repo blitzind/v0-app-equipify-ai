@@ -440,6 +440,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
     const notesCombined = notesParts.filter(Boolean).join("\n\n") || null
 
     const scheduledTime = normalizeTimeForDb(windowStartTime(form.timeWindow))
+    const problemReported = form.notes.trim() || title
 
     const { error: insertError } = await supabase.from("work_orders").insert({
       organization_id: activeOrgId,
@@ -453,6 +454,18 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       scheduled_time: scheduledTime,
       assigned_user_id: form.technicianId,
       notes: notesCombined,
+      problem_reported: problemReported,
+      repair_log: {
+        problemReported,
+        diagnosis: "",
+        partsUsed: [],
+        laborHours: 0,
+        technicianNotes: "",
+        photos: [],
+        signatureDataUrl: "",
+        signedBy: "",
+        signedAt: "",
+      },
     })
 
     setSubmitting(false)

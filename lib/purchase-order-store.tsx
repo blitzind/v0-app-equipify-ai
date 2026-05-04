@@ -3,10 +3,13 @@
 import {
   createContext,
   useContext,
-  useReducer,
+  useEffect,
+  useState,
   useCallback,
   type ReactNode,
 } from "react"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,14 +24,19 @@ export type POStatus =
 
 export interface POLineItem {
   description: string
-  qty: number
-  unitCost: number
+  quantity: number
+  unitCostCents: number
+  lineTotalCents: number
 }
 
 export interface PurchaseOrder {
   id: string
+  purchaseOrderNumber: string
+  vendorId?: string
   vendor: string
   vendorEmail?: string
+  vendorPhone?: string
+  vendorContactName?: string
   shipTo: string
   billTo: string
   status: POStatus
@@ -37,212 +45,328 @@ export interface PurchaseOrder {
   amount: number
   workOrderId?: string
   customerId?: string
+  equipmentId?: string
   customerName?: string
   notes: string
   lineItems: POLineItem[]
   attachments: string[]
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
-  {
-    id: "PO-1042",
-    vendor: "Grainger Industrial",
-    vendorEmail: "orders@grainger.com",
-    shipTo: "123 Service Center Dr, Chicago IL 60601",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Ordered",
-    orderedDate: "2025-04-18",
-    eta: "2025-04-28",
-    amount: 3840,
-    workOrderId: "WO-2039",
-    customerId: "CUS-003",
-    customerName: "Metro Warehousing",
-    notes: "Rush order — HVAC compressor needed for warehouse refrigeration system.",
-    lineItems: [
-      { description: "Carrier 38CKC036340 Compressor", qty: 1, unitCost: 2850 },
-      { description: "Refrigerant R-410A (25 lb)", qty: 2, unitCost: 220 },
-      { description: "Capacitor Kit (start/run)", qty: 1, unitCost: 85 },
-      { description: "Contactor 30A 24V Coil", qty: 2, unitCost: 42 },
-      { description: "Shipping & Handling", qty: 1, unitCost: 160 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1041",
-    vendor: "Motion Industries",
-    vendorEmail: "procurement@motion.com",
-    shipTo: "900 Industrial Pkwy, Detroit MI 48201",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Received",
-    orderedDate: "2025-04-10",
-    eta: "2025-04-17",
-    amount: 1920,
-    workOrderId: "WO-1995",
-    customerId: "CUS-002",
-    customerName: "Apex Fabricators",
-    notes: "CNC spindle bearing replacement parts.",
-    lineItems: [
-      { description: "FAG 6007-2RSR Deep Groove Bearing", qty: 4, unitCost: 185 },
-      { description: "SKF LGWA 2 Bearing Grease (400g)", qty: 2, unitCost: 48 },
-      { description: "Spindle Lock Nut M45 x 1.5", qty: 2, unitCost: 94 },
-      { description: "Freight", qty: 1, unitCost: 75 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1040",
-    vendor: "W.W. Grainger",
-    vendorEmail: "orders@grainger.com",
-    shipTo: "7800 Commerce Blvd, Sacramento CA 95828",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Partially Received",
-    orderedDate: "2025-04-14",
-    eta: "2025-04-25",
-    amount: 5620,
-    workOrderId: "WO-2036",
-    customerId: "CUS-004",
-    customerName: "Summit Construction",
-    notes: "Track link assembly and hydraulic fittings for excavator repair.",
-    lineItems: [
-      { description: "Cat 320 Track Link Assembly (per link)", qty: 8, unitCost: 445 },
-      { description: "Hydraulic O-Ring Kit", qty: 3, unitCost: 72 },
-      { description: "Parker 1/2\" JIC Hydraulic Fittings (10pk)", qty: 4, unitCost: 38 },
-      { description: "Machine Bolt Kit M16 x 80mm", qty: 2, unitCost: 55 },
-      { description: "Freight (heavy items)", qty: 1, unitCost: 290 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1039",
-    vendor: "Fastenal Company",
-    vendorEmail: "sales@fastenal.com",
-    shipTo: "2200 Industrial Way, Denver CO 80216",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Approved",
-    orderedDate: "2025-04-20",
-    eta: "2025-04-27",
-    amount: 880,
-    workOrderId: "WO-2025",
-    customerId: "CUS-005",
-    customerName: "Clearfield Foods",
-    notes: "Refrigeration door gaskets and seals for walk-in cooler repair.",
-    lineItems: [
-      { description: "Heatcraft Door Gasket 36\" x 78\"", qty: 4, unitCost: 95 },
-      { description: "Foam Backer Rod 3/8\" (50ft roll)", qty: 3, unitCost: 28 },
-      { description: "Silicone Sealant (Clear, 10oz)", qty: 6, unitCost: 18 },
-      { description: "Shipping", qty: 1, unitCost: 45 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1038",
-    vendor: "MSC Industrial Direct",
-    vendorEmail: "orders@mscdirect.com",
-    shipTo: "555 Logistics Way, Cincinnati OH 45201",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Sent",
-    orderedDate: "2025-04-22",
-    eta: "2025-05-02",
-    amount: 2340,
-    workOrderId: "WO-1980",
-    customerId: "CUS-001",
-    customerName: "Riverstone Logistics",
-    notes: "Forklift mast chain and hydraulic pump for scheduled PM.",
-    lineItems: [
-      { description: "Toyota Forklift Mast Chain Assembly", qty: 2, unitCost: 685 },
-      { description: "Hydraulic Pump 14 GPM 2-Stage", qty: 1, unitCost: 590 },
-      { description: "Chain Lube Spray (12oz)", qty: 4, unitCost: 22 },
-      { description: "O-Ring Assortment Kit", qty: 1, unitCost: 165 },
-      { description: "Ground Shipping", qty: 1, unitCost: 55 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1037",
-    vendor: "Uline",
-    vendorEmail: "orders@uline.com",
-    shipTo: "123 Service Center Dr, Chicago IL 60601",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Draft",
-    orderedDate: "",
-    eta: "",
-    amount: 640,
-    workOrderId: "",
-    customerId: "",
-    customerName: "",
-    notes: "Shop consumables restock — gloves, rags, PPE.",
-    lineItems: [
-      { description: "Nitrile Gloves L (100/box)", qty: 4, unitCost: 28 },
-      { description: "Shop Towels (200/roll)", qty: 6, unitCost: 32 },
-      { description: "Safety Glasses (12pk)", qty: 2, unitCost: 45 },
-      { description: "Ear Plugs (200 pairs)", qty: 2, unitCost: 18 },
-      { description: "First Aid Kit Refill", qty: 1, unitCost: 72 },
-    ],
-    attachments: [],
-  },
-  {
-    id: "PO-1036",
-    vendor: "Applied Industrial",
-    vendorEmail: "sales@applied.com",
-    shipTo: "900 Industrial Pkwy, Detroit MI 48201",
-    billTo: "Equipify Field Ops, 456 Main St, Chicago IL 60601",
-    status: "Closed",
-    orderedDate: "2025-03-28",
-    eta: "2025-04-05",
-    amount: 4150,
-    workOrderId: "WO-1940",
-    customerId: "CUS-002",
-    customerName: "Apex Fabricators",
-    notes: "Complete toolhead rebuild kit for CNC machine.",
-    lineItems: [
-      { description: "CNC Toolhead Rebuild Kit (Haas VF-2)", qty: 1, unitCost: 3200 },
-      { description: "Coolant Pump Seal Kit", qty: 2, unitCost: 145 },
-      { description: "Drive Belt Set", qty: 3, unitCost: 88 },
-      { description: "Freight", qty: 1, unitCost: 195 },
-    ],
-    attachments: [],
-  },
-]
-
-// ─── Reducer ──────────────────────────────────────────────────────────────────
-
-interface POState { orders: PurchaseOrder[] }
-
-type POAction =
-  | { type: "ADD_PO"; payload: PurchaseOrder }
-  | { type: "UPDATE_PO"; id: string; payload: Partial<PurchaseOrder> }
-
-function poReducer(state: POState, action: POAction): POState {
-  switch (action.type) {
-    case "ADD_PO":
-      return { orders: [action.payload, ...state.orders] }
-    case "UPDATE_PO":
-      return { orders: state.orders.map((o) => o.id === action.id ? { ...o, ...action.payload } : o) }
-    default:
-      return state
-  }
-}
-
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 interface POContextValue {
   orders: PurchaseOrder[]
-  addOrder: (po: PurchaseOrder) => void
-  updateOrder: (id: string, payload: Partial<PurchaseOrder>) => void
+  loading: boolean
+  error: string | null
+  refreshOrders: () => Promise<void>
+  addOrder: (payload: {
+    vendorId?: string
+    vendor: string
+    vendorEmail?: string
+    vendorPhone?: string
+    vendorContactName?: string
+    shipTo: string
+    billTo: string
+    status: POStatus
+    orderedDate: string
+    eta: string
+    notes: string
+    customerId?: string
+    equipmentId?: string
+    workOrderId?: string
+    lineItems: POLineItem[]
+  }) => Promise<{ id?: string; error?: string }>
+  updateOrder: (id: string, payload: Partial<PurchaseOrder>) => Promise<{ error?: string }>
+  archiveOrder: (id: string) => Promise<{ error?: string }>
 }
 
 const POContext = createContext<POContextValue | null>(null)
 
-export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(poReducer, { orders: MOCK_PURCHASE_ORDERS })
+type OrgPurchaseOrderRow = {
+  id: string
+  purchase_order_number: string
+  vendor: string
+  vendor_id: string | null
+  vendor_email: string | null
+  vendor_phone: string | null
+  vendor_contact_name: string | null
+  ship_to: string | null
+  bill_to: string | null
+  status: string
+  order_date: string | null
+  expected_date: string | null
+  total_cents: number
+  line_items: unknown
+  notes: string | null
+  customer_id: string | null
+  equipment_id: string | null
+  work_order_id: string | null
+}
 
-  const addOrder = useCallback((po: PurchaseOrder) => dispatch({ type: "ADD_PO", payload: po }), [])
-  const updateOrder = useCallback((id: string, payload: Partial<PurchaseOrder>) => dispatch({ type: "UPDATE_PO", id, payload }), [])
+function parseLineItems(raw: unknown): POLineItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null
+      const row = item as Record<string, unknown>
+      const quantity =
+        typeof row.quantity === "number"
+          ? row.quantity
+          : typeof row.qty === "number"
+            ? row.qty
+            : Number(row.quantity ?? row.qty ?? 0)
+      const unitCostCents =
+        typeof row.unitCostCents === "number"
+          ? row.unitCostCents
+          : typeof row.unit_cost_cents === "number"
+            ? Number(row.unit_cost_cents)
+            : typeof row.unitCost === "number"
+              ? Math.round(Number(row.unitCost) * 100)
+              : typeof row.unit_cost === "number"
+                ? Math.round(Number(row.unit_cost) * 100)
+                : Math.round(Number(row.unitCost ?? row.unit_cost ?? 0) * 100)
+      const lineTotalCents =
+        typeof row.lineTotalCents === "number"
+          ? row.lineTotalCents
+          : typeof row.line_total_cents === "number"
+            ? Number(row.line_total_cents)
+            : Math.round(quantity * unitCostCents)
+      return {
+        description: String(row.description ?? ""),
+        quantity,
+        unitCostCents,
+        lineTotalCents,
+      }
+    })
+    .filter((item): item is POLineItem => Boolean(item))
+}
+
+function toUiStatus(status: string): POStatus {
+  switch (status) {
+    case "draft":
+      return "Draft"
+    case "sent":
+      return "Sent"
+    case "approved":
+      return "Approved"
+    case "ordered":
+      return "Ordered"
+    case "partially_received":
+      return "Partially Received"
+    case "received":
+      return "Received"
+    case "closed":
+      return "Closed"
+    default:
+      return "Draft"
+  }
+}
+
+function toDbStatus(status: POStatus): string {
+  const map: Record<POStatus, string> = {
+    Draft: "draft",
+    Sent: "sent",
+    Approved: "approved",
+    Ordered: "ordered",
+    "Partially Received": "partially_received",
+    Received: "received",
+    Closed: "closed",
+  }
+  return map[status] ?? "draft"
+}
+
+function mapRowToPurchaseOrder(row: OrgPurchaseOrderRow): PurchaseOrder {
+  const lineItems = parseLineItems(row.line_items)
+  const amount = Math.round(row.total_cents) / 100
+  return {
+    id: row.id,
+    purchaseOrderNumber: row.purchase_order_number,
+    vendorId: row.vendor_id ?? undefined,
+    vendor: row.vendor,
+    vendorEmail: row.vendor_email ?? undefined,
+    vendorPhone: row.vendor_phone ?? undefined,
+    vendorContactName: row.vendor_contact_name ?? undefined,
+    shipTo: row.ship_to ?? "",
+    billTo: row.bill_to ?? "",
+    status: toUiStatus(row.status),
+    orderedDate: row.order_date ?? "",
+    eta: row.expected_date ?? "",
+    amount,
+    workOrderId: row.work_order_id ?? undefined,
+    customerId: row.customer_id ?? undefined,
+    equipmentId: row.equipment_id ?? undefined,
+    customerName: "",
+    notes: row.notes ?? "",
+    lineItems,
+    attachments: [],
+  }
+}
+
+export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
+  const activeOrg = useActiveOrganization()
+  const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refreshOrders = useCallback(async () => {
+    if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setOrders([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const supabase = createBrowserSupabaseClient()
+    const { data, error: fetchError } = await supabase
+      .from("org_purchase_orders")
+      .select("*")
+      .eq("organization_id", activeOrg.organizationId)
+      .eq("is_archived", false)
+      .order("created_at", { ascending: false })
+    if (fetchError) {
+      setError(fetchError.message)
+      setLoading(false)
+      return
+    }
+    const rows = (data ?? []) as OrgPurchaseOrderRow[]
+    const custIds = [...new Set(rows.map((r) => r.customer_id).filter(Boolean))] as string[]
+    const customerNames = new Map<string, string>()
+    if (custIds.length > 0) {
+      const { data: custRows } = await supabase
+        .from("customers")
+        .select("id, company_name")
+        .eq("organization_id", activeOrg.organizationId)
+        .in("id", custIds)
+      for (const c of (custRows ?? []) as Array<{ id: string; company_name: string }>) {
+        customerNames.set(c.id, c.company_name)
+      }
+    }
+    setOrders(
+      rows.map((row) => {
+        const order = mapRowToPurchaseOrder(row)
+        if (row.customer_id) {
+          order.customerName = customerNames.get(row.customer_id) ?? ""
+        }
+        return order
+      }),
+    )
+    setLoading(false)
+  }, [activeOrg.status, activeOrg.organizationId])
+
+  useEffect(() => {
+    void refreshOrders()
+  }, [refreshOrders])
+
+  const addOrder = useCallback(
+    async (payload: Parameters<POContextValue["addOrder"]>[0]) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const total = Math.round(
+        payload.lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0),
+      )
+      const supabase = createBrowserSupabaseClient()
+      const { data, error: insertError } = await supabase
+        .from("org_purchase_orders")
+        .insert({
+          organization_id: activeOrg.organizationId,
+          vendor_id: payload.vendorId || null,
+          vendor: payload.vendor.trim() || "Vendor",
+          vendor_email: payload.vendorEmail?.trim() ? payload.vendorEmail.trim() : null,
+          vendor_phone: payload.vendorPhone?.trim() ? payload.vendorPhone.trim() : null,
+          vendor_contact_name: payload.vendorContactName?.trim() ? payload.vendorContactName.trim() : null,
+          ship_to: payload.shipTo.trim() || null,
+          bill_to: payload.billTo.trim() || null,
+          status: toDbStatus(payload.status),
+          order_date: payload.orderedDate || null,
+          expected_date: payload.eta || null,
+          total_cents: total,
+          line_items: payload.lineItems.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitCostCents: item.unitCostCents,
+            lineTotalCents: item.lineTotalCents,
+          })),
+          notes: payload.notes.trim() || null,
+          customer_id: payload.customerId || null,
+          equipment_id: payload.equipmentId || null,
+          work_order_id: payload.workOrderId || null,
+        })
+        .select("id")
+        .maybeSingle()
+      if (insertError) return { error: insertError.message }
+      await refreshOrders()
+      return { id: (data as { id: string } | null)?.id }
+    },
+    [activeOrg.organizationId, refreshOrders],
+  )
+
+  const updateOrder = useCallback(
+    async (id: string, payload: Partial<PurchaseOrder>) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const update: Record<string, unknown> = {}
+      if (payload.vendor !== undefined) update.vendor = payload.vendor.trim() || "Vendor"
+      if (payload.vendorId !== undefined) update.vendor_id = payload.vendorId || null
+      if (payload.vendorEmail !== undefined)
+        update.vendor_email = payload.vendorEmail?.trim() ? payload.vendorEmail.trim() : null
+      if (payload.vendorPhone !== undefined)
+        update.vendor_phone = payload.vendorPhone?.trim() ? payload.vendorPhone.trim() : null
+      if (payload.vendorContactName !== undefined)
+        update.vendor_contact_name = payload.vendorContactName?.trim()
+          ? payload.vendorContactName.trim()
+          : null
+      if (payload.shipTo !== undefined) update.ship_to = payload.shipTo.trim() || null
+      if (payload.billTo !== undefined) update.bill_to = payload.billTo.trim() || null
+      if (payload.status !== undefined) update.status = toDbStatus(payload.status)
+      if (payload.orderedDate !== undefined) update.order_date = payload.orderedDate || null
+      if (payload.eta !== undefined) update.expected_date = payload.eta || null
+      if (payload.notes !== undefined) update.notes = payload.notes.trim() || null
+      if (payload.customerId !== undefined) update.customer_id = payload.customerId || null
+      if (payload.equipmentId !== undefined) update.equipment_id = payload.equipmentId || null
+      if (payload.workOrderId !== undefined) update.work_order_id = payload.workOrderId || null
+      if (payload.lineItems !== undefined) {
+        update.line_items = payload.lineItems.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitCostCents: item.unitCostCents,
+          lineTotalCents: item.lineTotalCents,
+        }))
+        update.total_cents = payload.lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0)
+      } else if (payload.amount !== undefined) {
+        update.total_cents = Math.round(payload.amount * 100)
+      }
+      if (Object.keys(update).length === 0) return {}
+      const supabase = createBrowserSupabaseClient()
+      const { error: updateError } = await supabase
+        .from("org_purchase_orders")
+        .update(update)
+        .eq("id", id)
+        .eq("organization_id", activeOrg.organizationId)
+      if (updateError) return { error: updateError.message }
+      await refreshOrders()
+      return {}
+    },
+    [activeOrg.organizationId, refreshOrders],
+  )
+
+  const archiveOrder = useCallback(
+    async (id: string) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const { error: archiveError } = await supabase
+        .from("org_purchase_orders")
+        .update({ is_archived: true, archived_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("organization_id", activeOrg.organizationId)
+      if (archiveError) return { error: archiveError.message }
+      await refreshOrders()
+      return {}
+    },
+    [activeOrg.organizationId, refreshOrders],
+  )
 
   return (
-    <POContext.Provider value={{ orders: state.orders, addOrder, updateOrder }}>
+    <POContext.Provider
+      value={{ orders, loading, error, refreshOrders, addOrder, updateOrder, archiveOrder }}
+    >
       {children}
     </POContext.Provider>
   )

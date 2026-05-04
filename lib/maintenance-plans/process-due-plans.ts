@@ -156,7 +156,8 @@ export async function processDuePlansForOrganization(
     const rawTitle = `${row.name} — ${equipmentName}`.trim()
     const title = (rawTitle.length > 0 ? rawTitle : `Maintenance — ${equipmentName}`).slice(0, 500)
     const pmNotes = "Created by PM automation."
-    const problemReported = `${pmNotes} Preventive maintenance due ${dueDate}.`
+    const planTitle = String(row.name ?? "").trim() || "Maintenance plan"
+    const problemReported = `${planTitle} — Preventive maintenance due ${dueDate}.`
 
     const insertPayload: Record<string, unknown> = {
       organization_id: row.organization_id,
@@ -171,6 +172,7 @@ export async function processDuePlansForOrganization(
       assigned_user_id: row.assigned_user_id,
       maintenance_plan_id: row.id,
       notes: pmNotes,
+      problem_reported: problemReported,
       created_by_pm_automation: true,
       repair_log: {
         problemReported,

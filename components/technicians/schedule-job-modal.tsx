@@ -463,6 +463,7 @@ export function ScheduleJobModal({
       `${selectedJobType.name} — ${selectedCustomerLabel || "Customer"}`.slice(0, 500)
 
     const notesCombined = notes.trim() || null
+    const problemReported = notes.trim() || title
 
     const { error: insertErr } = await supabase.from("work_orders").insert({
       organization_id: activeOrgId,
@@ -475,7 +476,19 @@ export function ScheduleJobModal({
       scheduled_on: date,
       scheduled_time: timeDb,
       notes: notesCombined,
+      problem_reported: problemReported,
       assigned_user_id: tech.id,
+      repair_log: {
+        problemReported,
+        diagnosis: "",
+        partsUsed: [],
+        laborHours: 0,
+        technicianNotes: "",
+        photos: [],
+        signatureDataUrl: "",
+        signedBy: "",
+        signedAt: "",
+      },
     })
 
     setLoading(false)

@@ -14,6 +14,15 @@ import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
   type ToastItem,
@@ -160,45 +169,8 @@ function ageYears(installDate: string) {
   return new Date().getFullYear() - new Date(installDate).getFullYear()
 }
 
-// ─── Shared edit inputs ───────────────────────────────────────────────────────
-
-function EditInput({ value, onChange, type = "text", placeholder }: {
-  value: string; onChange: (v: string) => void; type?: string; placeholder?: string
-}) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-    />
-  )
-}
-
-function EditSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
-    >
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
-    </select>
-  )
-}
-
-function EditTextarea({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <textarea
-      rows={4}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
-    />
-  )
-}
+const drawerInputClass =
+  "h-8 min-h-8 w-full px-2 text-xs md:text-xs bg-white border-border text-foreground"
 
 function EditableRow({ label, value, editing, children }: {
   label: string; value: React.ReactNode; editing: boolean; children?: React.ReactNode
@@ -354,6 +326,9 @@ type DbEquipmentRow = {
   serial_number: string | null
   status: "active" | "needs_service" | "out_of_service" | "in_repair"
   install_date: string | null
+  warranty_start_date: string | null
+  warranty_expiration_date: string | null
+  /** Legacy field kept for backward compatibility while migrating. */
   warranty_expires_at: string | null
   last_service_at: string | null
   next_due_at: string | null
@@ -408,6 +383,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Equipment>>({})
+  const [warrantyEditing, setWarrantyEditing] = useState(false)
+  const [warrantySaving, setWarrantySaving] = useState(false)
+  const [warrantyDraftStartDate, setWarrantyDraftStartDate] = useState("")
+  const [warrantyDraftExpirationDate, setWarrantyDraftExpirationDate] = useState("")
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [planLinkedWOs, setPlanLinkedWOs] = useState<PlanWoRow[]>([])
   const [planWoLoading, setPlanWoLoading] = useState(false)
@@ -590,7 +569,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
         )
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
@@ -618,7 +597,9 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         category: equipmentRow.category ?? "",
         serialNumber: equipmentRow.serial_number ?? "",
         installDate: equipmentRow.install_date ?? "",
-        warrantyExpiration: equipmentRow.warranty_expires_at ?? "",
+        warrantyStartDate: equipmentRow.warranty_start_date ?? "",
+        warrantyExpiration:
+          equipmentRow.warranty_expiration_date ?? equipmentRow.warranty_expires_at ?? "",
         lastServiceDate: equipmentRow.last_service_at ?? "",
         nextDueDate: equipmentRow.next_due_at ?? "",
         status: mapDbStatusToUiStatus(equipmentRow.status),
@@ -628,6 +609,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         manuals: [],
         serviceHistory: [],
       })
+      setWarrantyDraftStartDate(equipmentRow.warranty_start_date ?? "")
+      setWarrantyDraftExpirationDate(
+        equipmentRow.warranty_expiration_date ?? equipmentRow.warranty_expires_at ?? "",
+      )
 
       let woListRes = await supabase
         .from("work_orders")
@@ -696,7 +681,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     setDraft({
       model: eq.model, manufacturer: eq.manufacturer, category: eq.category,
       serialNumber: eq.serialNumber, location: eq.location,
-      installDate: eq.installDate, warrantyExpiration: eq.warrantyExpiration,
+      installDate: eq.installDate, warrantyStartDate: eq.warrantyStartDate ?? "", warrantyExpiration: eq.warrantyExpiration,
       lastServiceDate: eq.lastServiceDate, nextDueDate: eq.nextDueDate,
       status: eq.status, notes: eq.notes,
     })
@@ -716,6 +701,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       serial_number: (draft.serialNumber ?? eq.serialNumber).trim() || null,
       status: mapUiStatusToDbStatus((draft.status ?? eq.status) as Equipment["status"]),
       install_date: (draft.installDate ?? eq.installDate) || null,
+      warranty_start_date: (draft.warrantyStartDate ?? eq.warrantyStartDate ?? "") || null,
+      warranty_expiration_date: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
       warranty_expires_at: (draft.warrantyExpiration ?? eq.warrantyExpiration) || null,
       last_service_at: (draft.lastServiceDate ?? eq.lastServiceDate) || null,
       next_due_at: (draft.nextDueDate ?? eq.nextDueDate) || null,
@@ -766,6 +753,44 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
+  function startWarrantyEdit() {
+    if (!eq) return
+    setWarrantyDraftStartDate(eq.warrantyStartDate ?? "")
+    setWarrantyDraftExpirationDate(eq.warrantyExpiration ?? "")
+    setWarrantyEditing(true)
+  }
+
+  function cancelWarrantyEdit() {
+    if (!eq) return
+    setWarrantyDraftStartDate(eq.warrantyStartDate ?? "")
+    setWarrantyDraftExpirationDate(eq.warrantyExpiration ?? "")
+    setWarrantyEditing(false)
+  }
+
+  async function saveWarrantyEdit() {
+    if (!eq || !activeOrgId) return
+    const supabase = createBrowserSupabaseClient()
+    setWarrantySaving(true)
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        warranty_start_date: warrantyDraftStartDate || null,
+        warranty_expiration_date: warrantyDraftExpirationDate || null,
+        warranty_expires_at: warrantyDraftExpirationDate || null,
+      })
+      .eq("id", eq.id)
+      .eq("organization_id", activeOrgId)
+    setWarrantySaving(false)
+    if (error) {
+      toast(`Warranty update failed: ${error.message}`)
+      return
+    }
+    toast("Warranty updated")
+    setWarrantyEditing(false)
+    await loadDrawerData()
+    onUpdated?.()
+  }
+
   if (!equipmentId) return null
 
   if (!eq) {
@@ -791,23 +816,26 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const warrantyDays = daysToDue(eq.warrantyExpiration)
   const warrantyHasDate = Boolean(eq.warrantyExpiration?.trim())
   const warrantyLabel =
-    !warrantyHasDate ? "No date on file" : warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? `Expires in ${warrantyDays}d` : fmtDate(eq.warrantyExpiration)
+    !warrantyHasDate ? "No warranty information added" : warrantyDays < 0 ? "Expired" : warrantyDays <= 30 ? `Expires in ${warrantyDays}d` : fmtDate(eq.warrantyExpiration)
   const warrantyColor =
     !warrantyHasDate
       ? "text-muted-foreground"
       : warrantyDays < 0
         ? "text-destructive"
-        : warrantyDays <= 90
+        : warrantyDays <= 30
           ? "text-[color:var(--status-warning)]"
           : "text-foreground"
   const currentStatus = (draft.status ?? eq.status) as Equipment["status"]
   const age = ageYears(eq.installDate)
   const warrantyKpiDisplay = warrantyKpiLabel(warrantyDays, warrantyHasDate)
   const warrantyKpiSub = !warrantyHasDate
-    ? "No expiration on file"
+    ? "No warranty information added"
     : warrantyDays < 0
       ? `Expired ${fmtDate(eq.warrantyExpiration)}`
       : `Ends ${fmtDate(eq.warrantyExpiration)}`
+  const warrantyDirty =
+    warrantyDraftStartDate !== (eq.warrantyStartDate ?? "") ||
+    warrantyDraftExpirationDate !== (eq.warrantyExpiration ?? "")
 
   const woNewHref = `/work-orders?action=new-work-order&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
   const quoteNewHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
@@ -1040,36 +1068,77 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               {/* Equipment Details */}
               <DrawerSection title="Equipment Details">
                 <EditableRow label="Model" value={eq.model} editing={editing}>
-                  <EditInput value={draft.model ?? ""} onChange={(v) => setField("model", v)} />
+                  <Input
+                    value={draft.model ?? ""}
+                    onChange={(e) => setField("model", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Manufacturer" value={eq.manufacturer} editing={editing}>
-                  <EditInput value={draft.manufacturer ?? ""} onChange={(v) => setField("manufacturer", v)} />
+                  <Input
+                    value={draft.manufacturer ?? ""}
+                    onChange={(e) => setField("manufacturer", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Category" value={eq.category} editing={editing}>
-                  <EditInput value={draft.category ?? ""} onChange={(v) => setField("category", v)} />
+                  <Input
+                    value={draft.category ?? ""}
+                    onChange={(e) => setField("category", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Serial Number" value={eq.serialNumber || "—"} editing={editing}>
-                  <EditInput value={draft.serialNumber ?? ""} onChange={(v) => setField("serialNumber", v)} />
+                  <Input
+                    value={draft.serialNumber ?? ""}
+                    onChange={(e) => setField("serialNumber", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Customer" value={
                   <Link href={`/customers?open=${eq.customerId}`} className="text-primary hover:underline font-medium">
                     {eq.customerName}
                   </Link>
                 } editing={editing}>
-                  <div className="w-full rounded border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
-                    {customers.find((c) => c.id === eq.customerId)?.company_name ?? eq.customerName}
-                  </div>
+                  <Input
+                    readOnly
+                    value={customers.find((c) => c.id === eq.customerId)?.company_name ?? eq.customerName}
+                    className={cn(drawerInputClass, "bg-muted/40 text-muted-foreground")}
+                    tabIndex={-1}
+                  />
                 </EditableRow>
                 <EditableRow label="Location" value={eq.location || "—"} editing={editing}>
-                  <EditInput value={draft.location ?? ""} onChange={(v) => setField("location", v)} />
+                  <Input
+                    value={draft.location ?? ""}
+                    onChange={(e) => setField("location", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Assigned Tech" value={eq.assignedTechnician || "—"} editing={editing}>
-                  <EditInput value={draft.assignedTechnician ?? ""} onChange={(v) => setField("assignedTechnician", v)} />
+                  <Input
+                    value={draft.assignedTechnician ?? ""}
+                    onChange={(e) => setField("assignedTechnician", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Status" value={
                   <Badge variant="secondary" className={cn("text-[10px] border", STATUS_COLORS[eq.status])}>{eq.status}</Badge>
                 } editing={editing}>
-                  <EditSelect value={draft.status ?? eq.status} onChange={(v) => setField("status", v as Equipment["status"])} options={STATUSES} />
+                  <Select
+                    value={draft.status ?? eq.status}
+                    onValueChange={(v) => setField("status", v as Equipment["status"])}
+                  >
+                    <SelectTrigger size="sm" className={cn(drawerInputClass, "w-full")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </EditableRow>
                 {!editing && eq.location && (
                   <div className="pt-1">
@@ -1081,15 +1150,54 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               {/* Service Information */}
               <DrawerSection title="Service Information">
                 <EditableRow label="Installed" value={fmtDate(eq.installDate)} editing={editing}>
-                  <EditInput type="date" value={draft.installDate ?? ""} onChange={(v) => setField("installDate", v)} />
+                  <Input
+                    type="date"
+                    value={draft.installDate ?? ""}
+                    onChange={(e) => setField("installDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Last Service" value={fmtDate(eq.lastServiceDate)} editing={editing}>
-                  <EditInput type="date" value={draft.lastServiceDate ?? ""} onChange={(v) => setField("lastServiceDate", v)} />
+                  <Input
+                    type="date"
+                    value={draft.lastServiceDate ?? ""}
+                    onChange={(e) => setField("lastServiceDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
                 <EditableRow label="Next Due" value={
                   <span className={cn("font-semibold", daysColor)}>{fmtDate(eq.nextDueDate)} · {daysLabel}</span>
                 } editing={editing}>
-                  <EditInput type="date" value={draft.nextDueDate ?? ""} onChange={(v) => setField("nextDueDate", v)} />
+                  <Input
+                    type="date"
+                    value={draft.nextDueDate ?? ""}
+                    onChange={(e) => setField("nextDueDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+                <EditableRow
+                  label="Warranty start"
+                  value={eq.warrantyStartDate ? fmtDate(eq.warrantyStartDate) : "—"}
+                  editing={editing}
+                >
+                  <Input
+                    type="date"
+                    value={draft.warrantyStartDate ?? ""}
+                    onChange={(e) => setField("warrantyStartDate", e.target.value)}
+                    className={drawerInputClass}
+                  />
+                </EditableRow>
+                <EditableRow
+                  label="Warranty expiration"
+                  value={eq.warrantyExpiration ? fmtDate(eq.warrantyExpiration) : "—"}
+                  editing={editing}
+                >
+                  <Input
+                    type="date"
+                    value={draft.warrantyExpiration ?? ""}
+                    onChange={(e) => setField("warrantyExpiration", e.target.value)}
+                    className={drawerInputClass}
+                  />
                 </EditableRow>
               </DrawerSection>
             </>
@@ -1322,6 +1430,20 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           {/* ── WARRANTY ── */}
           {activeTab === "warranty" && !editing && (
             <>
+              <div className="flex justify-end">
+                {!warrantyEditing ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs cursor-pointer"
+                    onClick={startWarrantyEdit}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit warranty
+                  </Button>
+                ) : null}
+              </div>
+
               <div
                 className={cn(
                   "rounded-xl border p-4 flex items-center gap-4",
@@ -1329,7 +1451,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                     ? "bg-muted/30 border-border"
                     : warrantyDays < 0
                       ? "bg-destructive/8 border-destructive/25"
-                      : warrantyDays <= 90
+                      : warrantyDays <= 30
                         ? "bg-[color:var(--status-warning)]/8 border-[color:var(--status-warning)]/25"
                         : "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/25",
                 )}
@@ -1341,7 +1463,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                       ? "text-muted-foreground"
                       : warrantyDays < 0
                         ? "text-destructive"
-                        : warrantyDays <= 90
+                        : warrantyDays <= 30
                           ? "text-[color:var(--status-warning)]"
                           : "text-[color:var(--status-success)]",
                   )}
@@ -1350,7 +1472,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   <p className={cn("text-sm font-semibold", warrantyColor)}>{warrantyLabel}</p>
                   <p className="text-xs text-muted-foreground">
                     {!warrantyHasDate
-                      ? "Add a warranty end date on this equipment to track coverage in KPIs and renewals."
+                      ? "No warranty information added"
                       : warrantyDays < 0
                         ? "Warranty has expired. Equipment is out of coverage."
                         : `Coverage ends ${fmtDate(eq.warrantyExpiration)}`}
@@ -1359,6 +1481,55 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               </div>
 
               <DrawerSection title="Warranty details">
+                {warrantyEditing && warrantyDirty ? (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+                    <span className="text-xs font-medium text-amber-900 dark:text-amber-100">Unsaved changes</span>
+                    <div className="ml-auto flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={cancelWarrantyEdit}
+                        disabled={warrantySaving}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={saveWarrantyEdit}
+                        disabled={warrantySaving}
+                      >
+                        {warrantySaving ? "Saving…" : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {warrantyEditing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Warranty start date</p>
+                      <Input
+                        type="date"
+                        value={warrantyDraftStartDate}
+                        onChange={(e) => setWarrantyDraftStartDate(e.target.value)}
+                        className={drawerInputClass}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Warranty expiration date</p>
+                      <Input
+                        type="date"
+                        value={warrantyDraftExpirationDate}
+                        onChange={(e) => setWarrantyDraftExpirationDate(e.target.value)}
+                        className={drawerInputClass}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <DrawerRow label="Start date" value={eq.warrantyStartDate ? fmtDate(eq.warrantyStartDate) : "—"} />
                 <DrawerRow
                   label="Expiration"
                   value={<span className={warrantyColor}>{warrantyHasDate ? fmtDate(eq.warrantyExpiration) : "—"}</span>}
@@ -1366,14 +1537,14 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 <DrawerRow
                   label="Status"
                   value={
-                    !warrantyHasDate ? "Unknown" : warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? "Expiring soon" : "Active"
+                    !warrantyHasDate ? "No warranty information added" : warrantyDays < 0 ? "Expired" : warrantyDays <= 30 ? "Warning" : "Active"
                   }
                 />
                 <DrawerRow label="Install date" value={fmtDate(eq.installDate)} />
                 <DrawerRow label="Unit age" value={age > 0 ? `~${age} year${age !== 1 ? "s" : ""}` : "< 1 year"} />
               </DrawerSection>
 
-              {warrantyHasDate && warrantyDays > 0 && warrantyDays <= 90 && (
+              {warrantyHasDate && warrantyDays > 0 && warrantyDays <= 30 && (
                 <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/8 p-3">
                   <p className="text-xs font-medium text-[color:var(--status-warning)]">
                     Warranty expiring soon — Schedule a pre-warranty inspection to address any issues while still under coverage.
@@ -1408,10 +1579,11 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           {/* Notes when editing */}
           {editing && (
             <DrawerSection title="Notes">
-              <EditTextarea
+              <Textarea
                 value={draft.notes ?? ""}
-                onChange={(v) => setField("notes", v)}
+                onChange={(e) => setField("notes", e.target.value)}
                 placeholder="Add notes about this equipment..."
+                className="min-h-[88px] resize-none px-2 py-2 text-xs md:text-xs bg-white border-border text-foreground"
               />
             </DrawerSection>
           )}

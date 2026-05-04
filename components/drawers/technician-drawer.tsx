@@ -159,6 +159,7 @@ function MockPlaceholder({ title, body }: { title: string; body: string }) {
   return (
     <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center space-y-2">
       <p className="text-xs font-semibold text-foreground uppercase tracking-wide">{title}</p>
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Coming soon</p>
       <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
     </div>
   )

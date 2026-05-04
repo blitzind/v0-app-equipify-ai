@@ -172,22 +172,6 @@ export async function fetchInvoicesForOrganization(
   return { invoices }
 }
 
-function randomQuoteNumber(): string {
-  const part =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()
-      : String(Date.now())
-  return `QT-${part}`
-}
-
-function randomInvoiceNumber(): string {
-  const part =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()
-      : String(Date.now())
-  return `INV-${part}`
-}
-
 export async function insertOrgQuote(
   supabase: SupabaseClient,
   payload: {
@@ -206,7 +190,6 @@ export async function insertOrgQuote(
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
-  const quoteNumber = randomQuoteNumber()
 
   const { data, error } = await supabase
     .from("org_quotes")
@@ -214,7 +197,6 @@ export async function insertOrgQuote(
       organization_id: payload.organizationId,
       customer_id: payload.customerId,
       seed_key: seedKey,
-      quote_number: quoteNumber,
       title: payload.title.trim(),
       amount_cents: payload.amountCents,
       status: quoteStatusUiToDb(payload.status),
@@ -311,7 +293,6 @@ export async function insertOrgInvoice(
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
-  const invoiceNumber = randomInvoiceNumber()
 
   const { data, error } = await supabase
     .from("org_invoices")
@@ -322,7 +303,6 @@ export async function insertOrgInvoice(
       work_order_id: payload.workOrderId,
       quote_id: payload.quoteId,
       seed_key: seedKey,
-      invoice_number: invoiceNumber,
       title: payload.title.trim(),
       amount_cents: payload.amountCents,
       status: invoiceStatusUiToDb(payload.status),

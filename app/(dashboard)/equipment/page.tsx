@@ -413,7 +413,7 @@ function EquipmentPageInner() {
 
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36 bg-card">
+            <SelectTrigger className="w-36">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -425,7 +425,7 @@ function EquipmentPageInner() {
           </Select>
 
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-36 bg-card">
+            <SelectTrigger className="w-36">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -511,14 +511,16 @@ function EquipmentPageInner() {
           <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={selected.size === filtered.length && filtered.length > 0}
-                    onCheckedChange={toggleAll}
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                    aria-label="Select all"
-                  />
+              <TableRow className="bg-muted/40 hover:bg-muted/40 h-12">
+                <TableHead className="w-12 min-w-12 px-0">
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Checkbox
+                      checked={selected.size === filtered.length && filtered.length > 0}
+                      onCheckedChange={toggleAll}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      aria-label="Select all"
+                    />
+                  </div>
                 </TableHead>
                 <TableHead>
                   <button onClick={() => toggleSort("model")} className="ds-btn-sort">
@@ -558,16 +560,28 @@ function EquipmentPageInner() {
                 </TableRow>
               ) : (
                 filtered.map((eq) => (
-                  <TableRow key={eq.id} className={cn("group cursor-pointer hover:bg-muted/30 transition-colors", selected.has(eq.id) && "bg-primary/5")} onClick={() => setSelectedEquipmentId(eq.id)}>
-                    <TableCell onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}>
-                      <Checkbox
-                        checked={selected.has(eq.id)}
-                        onCheckedChange={() => toggleSelect(eq.id)}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
+                  <TableRow
+                    key={eq.id}
+                    className={cn(
+                      "group cursor-pointer hover:bg-muted/30 transition-colors h-14",
+                      selected.has(eq.id) && "bg-primary/5",
+                    )}
+                    onClick={() => setSelectedEquipmentId(eq.id)}
+                  >
+                    <TableCell
+                      className="w-12 min-w-12 px-0 align-middle"
+                      onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}
+                    >
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Checkbox
+                          checked={selected.has(eq.id)}
+                          onCheckedChange={() => toggleSelect(eq.id)}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
+                    <TableCell className="pl-4">
+                      <div className="flex flex-col justify-center gap-1">
                         <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
                           {getEquipmentDisplayPrimary({
                             id: eq.id,

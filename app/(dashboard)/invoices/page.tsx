@@ -37,7 +37,7 @@ function fmtCurrency(n: number) {
 }
 
 function invoiceDisplayId(inv: AdminInvoice) {
-  return inv.invoiceNumber?.trim() || inv.id
+  return inv.invoiceNumber?.trim() || "Invoice"
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ function InvoicesPageInner() {
         </div>
 
         <Select value={statusFilter} onValueChange={v => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-36 bg-card">
+          <SelectTrigger className="w-36">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>

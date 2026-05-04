@@ -1314,20 +1314,23 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           {/* Quick actions */}
           <div className="mb-3 grid grid-cols-2 gap-2">
             {[
-              { icon: Globe, label: "View as Customer", action: "Opened portal preview" },
-              { icon: Send, label: "Send Portal Invite", action: "Portal invite sent" },
-              { icon: Link2, label: "Copy Magic Link", action: "Magic login link copied" },
-              { icon: RotateCcw, label: "Reset Portal Access", action: "Portal access reset" },
-            ].map(({ icon: Icon, label, action }) => (
+              { icon: Globe, label: "View as Customer" },
+              { icon: Send, label: "Send Portal Invite" },
+              { icon: Link2, label: "Copy Magic Link" },
+              { icon: RotateCcw, label: "Reset Portal Access" },
+            ].map(({ icon: Icon, label }) => (
               <button
                 key={label}
                 type="button"
-                onClick={() => toast(action)}
-                disabled={!portalEnabled && label !== "Send Portal Invite"}
-                className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/35 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled
+                title="Coming soon"
+                className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors cursor-not-allowed opacity-60"
               >
                 <Icon size={13} className="shrink-0 text-muted-foreground" />
-                {label}
+                <span className="flex flex-col gap-0.5">
+                  <span>{label}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground/80">Coming soon</span>
+                </span>
               </button>
             ))}
           </div>
@@ -1335,16 +1338,20 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           {/* Activity */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button
-              onClick={() => toast("Viewing portal activity log")}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              type="button"
+              disabled
+              title="Coming soon"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground/50 cursor-not-allowed"
             >
               <Activity size={12} />
               View portal activity log
             </button>
             <span className="text-muted-foreground/40">·</span>
             <button
-              onClick={() => toast("Opening last login details")}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              type="button"
+              disabled
+              title="Coming soon"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground/50 cursor-not-allowed"
             >
               <Clock size={12} />
               Last login details
@@ -1359,16 +1366,18 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => toast("Opening branding editor")}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40"
+                disabled
+                title="Coming soon"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60"
               >
                 <Paintbrush size={12} className="text-muted-foreground" />
                 Edit Branding
               </button>
               <button
                 type="button"
-                onClick={() => toast("Managing portal contacts")}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40"
+                disabled
+                title="Coming soon"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60"
               >
                 <UserCog size={12} className="text-muted-foreground" />
                 Portal Contacts

@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
-  Building2, X, FileText, Receipt, ShoppingCart,
+  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -43,6 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dispatch Board",    href: "/dispatch",          icon: CalendarRange },
       { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
       { label: "Maintenance Plans", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
+      { label: "Certificates", href: "/calibration-templates", icon: FileBadge2 },
       { label: "Technicians",       href: "/technicians",       icon: HardHat },
     ],
   },
@@ -52,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Quotes",           href: "/quotes",           icon: FileText },
       { label: "Invoices",         href: "/invoices",         icon: Receipt },
       { label: "Purchase Orders",  href: "/purchase-orders",  icon: ShoppingCart },
+      { label: "Vendors",          href: "/vendors",          icon: Store },
     ],
   },
   {

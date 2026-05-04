@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { cn, looksLikeUuid } from "@/lib/utils"
-import { useQuotes } from "@/lib/quote-invoice-store"
+import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -20,9 +20,18 @@ import {
 import {
   CheckCircle2, Download, Send, Pencil, X, Check,
   FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
-  ThumbsDown, DollarSign, FileEdit, Loader2, Wrench,
+  ThumbsDown, DollarSign, FileEdit, Loader2, Wrench, Archive,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 let toastCounter = 0
 
@@ -58,13 +67,15 @@ function fmtCurrency(n: number) {
 }
 
 function quoteDrawerTitle(q: AdminQuote): string {
+  const quoteNumber = q.quoteNumber?.trim()
+  if (quoteNumber) return quoteNumber
   const id = q.id.trim()
   if (looksLikeUuid(id)) {
     const d = q.description.trim()
     if (d) return d.length > 56 ? `${d.slice(0, 56)}…` : d
-    return "Service quote"
+    return "Quote"
   }
-  return id
+  return "Quote"
 }
 
 type LineItem = { description: string; qty: number; unit: number }
@@ -351,7 +362,7 @@ function EditInput({ value, onChange, type = "text", placeholder, className }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none",
+        "w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none",
         "focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
         className,
       )}
@@ -364,7 +375,7 @@ function EditSelect({ value, onChange, options }: { value: string; onChange: (v:
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -378,7 +389,7 @@ function EditTextarea({ value, onChange, placeholder }: { value: string; onChang
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
     />
   )
 }
@@ -410,9 +421,9 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
 
   return (
     <div className="space-y-2">
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
         <table className="w-full text-xs">
-          <thead className="bg-muted/40">
+          <thead className="bg-muted/30">
             <tr>
               <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
               <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-14">Qty</th>
@@ -423,7 +434,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           </thead>
           <tbody className="divide-y divide-border">
             {items.map((item, i) => (
-              <tr key={i} className="bg-card">
+              <tr key={i} className="bg-white">
                 <td className="px-2 py-1.5"><EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" /></td>
                 <td className="px-2 py-1.5"><EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" /></td>
                 <td className="px-2 py-1.5"><EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" /></td>
@@ -436,7 +447,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-muted/40 border-t border-border">
+          <tfoot className="bg-muted/30 border-t border-border">
             <tr>
               <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
               <td className="px-2 py-2 text-right font-bold text-foreground">{fmtCurrency(total)}</td>
@@ -454,9 +465,9 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
 
 function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number }) {
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
       <table className="w-full text-xs">
-        <thead className="bg-muted/40">
+        <thead className="bg-muted/30">
           <tr>
             <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
             <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-10">Qty</th>
@@ -466,7 +477,7 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
         </thead>
         <tbody className="divide-y divide-border">
           {items.map((item, i) => (
-            <tr key={i} className="bg-card">
+            <tr key={i} className="bg-white">
               <td className="px-3 py-2 text-foreground">{item.description}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unit)}</td>
@@ -474,7 +485,7 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
             </tr>
           ))}
         </tbody>
-        <tfoot className="bg-muted/40 border-t border-border">
+        <tfoot className="bg-muted/30 border-t border-border">
           <tr>
             <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
             <td className="px-3 py-2 text-right font-bold text-foreground">{fmtCurrency(total)}</td>
@@ -494,12 +505,17 @@ interface QuoteDrawerProps {
 
 export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
-  const { quotes, updateQuote } = useQuotes()
+  const { quotes, updateQuote, archiveQuote } = useQuotes()
+  const { addInvoiceFromPayload } = useInvoices()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<AdminQuote>>({})
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
   const [convertingToWo, setConvertingToWo] = useState(false)
+  const [convertingToInvoice, setConvertingToInvoice] = useState(false)
+  const [sendingQuote, setSendingQuote] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
 
@@ -612,20 +628,34 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     const scheduled = quote.expiresDate || new Date().toISOString().slice(0, 10)
     const priority: WorkOrderPriority = "Normal"
     const woType: WorkOrderType = "Repair"
+    const quoteTitle = quote.description.trim().slice(0, 500) || "Work from quote"
+    const problemReported = quoteTitle
     const { data: inserted, error } = await supabase
       .from("work_orders")
       .insert({
         organization_id: orgId,
         customer_id: quote.customerId,
         equipment_id: quote.equipmentId,
-        title: quote.description.trim().slice(0, 500) || "Work from quote",
+        title: quoteTitle,
         status: "open",
         priority: uiPriorityToDb(priority),
         type: uiTypeToDb(woType),
         scheduled_on: scheduled,
         scheduled_time: normalizeTimeForDb("08:00"),
         notes: quote.notes?.trim() || null,
+        problem_reported: problemReported,
         assigned_user_id: user.id,
+        repair_log: {
+          problemReported,
+          diagnosis: "",
+          partsUsed: [],
+          laborHours: 0,
+          technicianNotes: "",
+          photos: [],
+          signatureDataUrl: "",
+          signedBy: "",
+          signedAt: "",
+        },
       })
       .select("id, work_order_number")
       .single()
@@ -646,6 +676,90 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       return
     }
     toast(`Work order ${formatWorkOrderDisplay(row.work_order_number, newId)} created from quote`)
+  }
+
+  async function handleSendQuoteToCustomer() {
+    if (!quote) return
+    if (sendingQuote) return
+    setSendingQuote(true)
+
+    // Simulate external email delivery success before persisting send metadata.
+    await new Promise((resolve) => setTimeout(resolve, 450))
+
+    const sentAt = new Date().toISOString()
+    const alreadySent = quote.status === "Sent" || Boolean(quote.sentDate)
+    const patch: Parameters<typeof updateOrgQuote>[3] = alreadySent
+      ? { sentAt }
+      : { status: "Sent", sentAt }
+
+    const { error } = await updateQuote(quote.id, patch)
+    setSendingQuote(false)
+    if (error) {
+      toast(`Could not send quote: ${error}`, "info")
+      return
+    }
+
+    toast(
+      alreadySent
+        ? "Quote marked resent (email integration not configured yet)."
+        : "Quote marked sent (email integration not configured yet).",
+    )
+  }
+
+  async function handleConvertToInvoice() {
+    if (!quote) return
+    setConvertingToInvoice(true)
+    const issuedAt = new Date().toISOString().split("T")[0]
+    const due = new Date()
+    due.setDate(due.getDate() + 30)
+    const dueDate = due.toISOString().split("T")[0]
+    const lineItemsJson = quote.lineItems
+      .filter((li) => li.description.trim())
+      .map((li) => ({
+        description: li.description.trim(),
+        qty: li.qty,
+        unit: li.unit,
+      }))
+    const fallbackLine =
+      lineItemsJson.length > 0
+        ? lineItemsJson
+        : [{ description: quote.description.trim() || "Invoice from quote", qty: 1, unit: quote.amount }]
+    const { id, error } = await addInvoiceFromPayload({
+      customerId: quote.customerId,
+      equipmentId: quote.equipmentId || null,
+      workOrderId: quote.workOrderId || null,
+      quoteId: quote.id,
+      title: quote.description.trim() || "Invoice from quote",
+      amountCents: Math.round(quote.amount * 100),
+      status: "Draft",
+      issuedAt,
+      dueDate,
+      paidAt: null,
+      lineItems: fallbackLine,
+      notes: quote.notes?.trim() ? quote.notes.trim() : null,
+      internalNotes: quote.internalNotes?.trim() ? quote.internalNotes.trim() : null,
+    })
+    setConvertingToInvoice(false)
+    if (error) {
+      toast(`Could not create invoice: ${error}`, "info")
+      return
+    }
+    toast("Invoice created from quote")
+    if (id) onClose()
+  }
+
+  async function confirmArchiveQuote() {
+    if (!quote) return
+    setArchiveBusy(true)
+    const { error } = await archiveQuote(quote.id)
+    setArchiveBusy(false)
+    setArchiveOpen(false)
+    if (error) {
+      toast(`Could not archive: ${error}`, "info")
+      return
+    }
+    toast("Quote archived")
+    onClose()
   }
 
   function handleApplyPricing(amount: number) {
@@ -681,6 +795,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     quote.status !== "Expired"
 
   const currentStatus = (draft.status ?? quote.status) as QuoteStatus
+  const alreadySent = quote.status === "Sent" || Boolean(quote.sentDate)
 
   const timelineItems = [
     { date: fmtDate(quote.createdDate), label: "Quote created", description: `Created by ${quote.createdBy}`, accent: "muted" as const },
@@ -723,8 +838,22 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {(quote.status === "Draft" || quote.status === "Sent") && (
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Quote sent to customer")}>
-                  <Send className="w-3.5 h-3.5" /> Send to Customer
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs cursor-pointer"
+                  disabled={sendingQuote}
+                  onClick={() => void handleSendQuoteToCustomer()}
+                >
+                  {sendingQuote ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" /> {alreadySent ? "Resend Quote" : "Email to Customer"}
+                    </>
+                  )}
                 </Button>
               )}
               {canCreateWorkOrder && (
@@ -744,114 +873,167 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 </Button>
               )}
               {quote.status === "Approved" && (
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Invoice created from quote")}>
-                  <FileText className="w-3.5 h-3.5" /> Convert to Invoice
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs cursor-pointer"
+                  disabled={convertingToInvoice}
+                  onClick={() => void handleConvertToInvoice()}
+                >
+                  {convertingToInvoice ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating…
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-3.5 h-3.5" /> Convert to Invoice
+                    </>
+                  )}
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => toast("Quote PDF downloaded")}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed opacity-60" disabled title="Coming soon">
                 <Download className="w-3.5 h-3.5" /> Download PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10"
+                onClick={() => setArchiveOpen(true)}
+              >
+                <Archive className="w-3.5 h-3.5" /> Archive
               </Button>
             </>
           )
         }
       >
-        {/* AI Tools */}
-        {!editing && (
-          <QuoteAIToolsPanel
-            quote={quote}
-            onApplyDraft={handleApplyDraft}
-            onApplyPricing={handleApplyPricing}
-          />
-        )}
-
-        <DrawerSection title="Quote Details">
-          <DrawerRow label="Customer" value={
-            <Link href={`/customers?open=${quote.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
-              {quote.customerName}
-            </Link>
-          } />
-          <div className="py-1">
-            <ContactActions
-              email={{ customerName: quote.customerName }}
+        <div className="-mx-5 -my-5 min-h-full bg-muted/40 px-5 py-5 space-y-5">
+          {/* AI Tools */}
+          {!editing && (
+            <QuoteAIToolsPanel
+              quote={quote}
+              onApplyDraft={handleApplyDraft}
+              onApplyPricing={handleApplyPricing}
             />
-          </div>
-          <DrawerRow
-            label="Equipment"
-            value={
-              quote.equipmentId ? (
-                <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
-                  {quote.equipmentName?.trim() || "Equipment"}
+          )}
+
+          <DrawerSection title="Quote Details">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-1">
+              <DrawerRow label="Customer" value={
+                <Link href={`/customers?open=${quote.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
+                  {quote.customerName}
                 </Link>
+              } />
+              <div className="py-1">
+                <ContactActions
+                  email={{ customerName: quote.customerName }}
+                />
+              </div>
+              <DrawerRow
+                label="Equipment"
+                value={
+                  quote.equipmentId ? (
+                    <Link href={`/equipment?open=${quote.equipmentId}`} className="text-primary hover:underline cursor-pointer font-medium">
+                      {quote.equipmentName?.trim() || "Equipment"}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">No equipment on this quote</span>
+                  )
+                }
+              />
+              <DrawerRow label="Created By" value={quote.createdBy} />
+              <DrawerRow label="Created" value={fmtDate(quote.createdDate)} />
+              <EditRow label="Expires" view={
+                <span className={quote.status === "Expired" ? "text-destructive font-semibold" : ""}>{fmtDate(quote.expiresDate)}</span>
+              } editing={editing}>
+                <EditInput type="date" value={draft.expiresDate ?? ""} onChange={(v) => setField("expiresDate", v)} />
+              </EditRow>
+              <EditRow label="Status" view={
+                <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[quote.status].className)}>{quote.status}</Badge>
+              } editing={editing}>
+                <EditSelect value={draft.status ?? quote.status} onChange={(v) => setField("status", v as QuoteStatus)} options={ALL_STATUSES} />
+              </EditRow>
+              {quote.workOrderId && (
+                <DrawerRow label="Work Order" value={
+                  <Link href={`/work-orders?open=${quote.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
+                    {getWorkOrderDisplay({ id: quote.workOrderId, workOrderNumber: quote.workOrderNumber })}
+                  </Link>
+                } />
+              )}
+            </div>
+          </DrawerSection>
+
+          <DrawerSection title="Description">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4">
+              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-white rounded-lg border border-border">
+                {quote.description}
+              </p>
+            </div>
+          </DrawerSection>
+
+          <DrawerSection title="Line Items">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4">
+              {editing ? (
+                <EditableLineItems items={draftItems} onChange={setDraftItems} />
               ) : (
-                <span className="text-muted-foreground text-sm">No equipment on this quote</span>
-              )
-            }
-          />
-          <DrawerRow label="Created By" value={quote.createdBy} />
-          <DrawerRow label="Created" value={fmtDate(quote.createdDate)} />
-          <EditRow label="Expires" view={
-            <span className={quote.status === "Expired" ? "text-destructive font-semibold" : ""}>{fmtDate(quote.expiresDate)}</span>
-          } editing={editing}>
-            <EditInput type="date" value={draft.expiresDate ?? ""} onChange={(v) => setField("expiresDate", v)} />
-          </EditRow>
-          <EditRow label="Status" view={
-            <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[quote.status].className)}>{quote.status}</Badge>
-          } editing={editing}>
-            <EditSelect value={draft.status ?? quote.status} onChange={(v) => setField("status", v as QuoteStatus)} options={ALL_STATUSES} />
-          </EditRow>
-          {quote.workOrderId && (
-            <DrawerRow label="Work Order" value={
-              <Link href={`/work-orders?open=${quote.workOrderId}`} className="text-primary font-mono hover:underline cursor-pointer">
-                {getWorkOrderDisplay({ id: quote.workOrderId, workOrderNumber: quote.workOrderNumber })}
-              </Link>
-            } />
-          )}
-        </DrawerSection>
+                <ReadOnlyLineItems items={quote.lineItems} total={quote.amount} />
+              )}
+            </div>
+          </DrawerSection>
 
-        <DrawerSection title="Description">
-          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
-            {quote.description}
-          </p>
-        </DrawerSection>
+          <DrawerSection title="Notes">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4">
+              {editing ? (
+                <EditTextarea value={draft.notes ?? ""} onChange={(v) => setField("notes", v)} placeholder="Add notes..." />
+              ) : quote.notes ? (
+                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-white rounded-lg border border-border">{quote.notes}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
+              )}
+            </div>
+          </DrawerSection>
 
-        <DrawerSection title="Line Items">
-          {editing ? (
-            <EditableLineItems items={draftItems} onChange={setDraftItems} />
-          ) : (
-            <ReadOnlyLineItems items={quote.lineItems} total={quote.amount} />
-          )}
-        </DrawerSection>
+          <DrawerSection title="Internal Notes">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4">
+              {editing ? (
+                <EditTextarea
+                  value={draft.internalNotes ?? ""}
+                  onChange={(v) => setField("internalNotes", v)}
+                  placeholder="Internal team notes…"
+                />
+              ) : quote.internalNotes ? (
+                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-white rounded-lg border border-border">
+                  {quote.internalNotes}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-3">No internal notes.</p>
+              )}
+            </div>
+          </DrawerSection>
 
-        <DrawerSection title="Notes">
-          {editing ? (
-            <EditTextarea value={draft.notes ?? ""} onChange={(v) => setField("notes", v)} placeholder="Add notes..." />
-          ) : quote.notes ? (
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">{quote.notes}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
-          )}
-        </DrawerSection>
-
-        <DrawerSection title="Internal Notes">
-          {editing ? (
-            <EditTextarea
-              value={draft.internalNotes ?? ""}
-              onChange={(v) => setField("internalNotes", v)}
-              placeholder="Internal team notes…"
-            />
-          ) : quote.internalNotes ? (
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
-              {quote.internalNotes}
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground text-center py-3">No internal notes.</p>
-          )}
-        </DrawerSection>
-
-        <DrawerSection title="Timeline">
-          <DrawerTimeline items={timelineItems} />
-        </DrawerSection>
+          <DrawerSection title="Timeline">
+            <div className="rounded-xl border border-border bg-white shadow-sm p-4">
+              <DrawerTimeline items={timelineItems} />
+            </div>
+          </DrawerSection>
+        </div>
       </DetailDrawer>
+
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this quote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Archived quotes are hidden from the default quotes list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiveBusy}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={archiveBusy} onClick={() => void confirmArchiveQuote()}>
+              {archiveBusy ? "Archiving…" : "Archive"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
     </>

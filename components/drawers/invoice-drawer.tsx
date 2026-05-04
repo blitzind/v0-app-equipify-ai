@@ -33,7 +33,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
     <DetailDrawer
       open={!!invoiceId}
       onClose={onClose}
-      title={invoice ? invoice.invoiceNumber?.trim() || invoice.id : "Invoice"}
+      title={invoice ? invoice.invoiceNumber?.trim() || "Invoice" : "Invoice"}
       subtitle={
         invoice
           ? `${invoice.customerName} · ${invoice.equipmentName}${

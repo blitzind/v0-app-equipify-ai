@@ -9,6 +9,13 @@ import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { WO_DETAIL_SELECT, WO_DETAIL_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import {
+  fetchWorkOrderTasks,
+  fetchWorkOrderLineItems,
+  fetchWorkOrderAttachments,
+  mapLineItemRowToPart,
+  signedUrlForAttachmentPath,
+} from "@/lib/work-orders/work-order-tab-data"
 
 function formatScheduledTime(isoOrTime: string | null): string {
   if (!isoOrTime) return ""
@@ -87,6 +94,27 @@ type WoRow = {
   repair_log: unknown
   maintenance_plan_id: string | null
   created_by_pm_automation?: boolean
+  signature_url?: string | null
+  signature_captured_at?: string | null
+  problem_reported?: string | null
+  billable_to_customer?: boolean | null
+  warranty_review_required?: boolean | null
+  warranty_vendor_id?: string | null
+  calibration_template_id?: string | null
+}
+
+export type WorkOrderPhotoGalleryItem = {
+  url: string
+  attachmentId?: string
+}
+
+export type WorkOrderDocumentItem = {
+  id: string
+  fileName: string
+  fileType: string
+  url: string
+  uploadedAt: string
+  fileSizeBytes: number | null
 }
 
 export type LoadedWorkOrderDetail = {
@@ -94,6 +122,21 @@ export type LoadedWorkOrderDetail = {
   workOrder: WorkOrder
   notes: string
   planServices: unknown[] | null
+  /** Ordered gallery entries (Supabase attachment photos + legacy repair_log URLs). */
+  photoGallery: WorkOrderPhotoGalleryItem[]
+  documentAttachments: WorkOrderDocumentItem[]
+  /** Parts / materials are loaded from `work_order_line_items`. */
+  usesPartsLineItems: boolean
+  /** Tasks are loaded from `work_order_tasks`. */
+  usesTasksTable: boolean
+}
+
+async function safeLoadTabs<T>(loader: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await loader()
+  } catch {
+    return fallback
+  }
 }
 
 export async function loadWorkOrderDetailForOrg(
@@ -137,7 +180,7 @@ export async function loadWorkOrderDetailForOrg(
       .maybeSingle(),
     supabase
       .from("equipment")
-      .select("name, location_label, equipment_code, serial_number, category")
+      .select("name, location_label, equipment_code, serial_number, category, warranty_start_date, warranty_expiration_date, warranty_expires_at")
       .eq("id", w.equipment_id)
       .eq("organization_id", organizationId)
       .maybeSingle(),
@@ -165,6 +208,9 @@ export async function loadWorkOrderDetailForOrg(
     equipment_code: string | null
     serial_number: string | null
     category: string | null
+    warranty_start_date?: string | null
+    warranty_expiration_date?: string | null
+    warranty_expires_at?: string | null
   } | null
   const equipmentName = eqRow
     ? getEquipmentDisplayPrimary({
@@ -176,6 +222,14 @@ export async function loadWorkOrderDetailForOrg(
       })
     : "Equipment"
   const location = eqRow?.location_label ?? ""
+  const warrantyStart = eqRow?.warranty_start_date ?? null
+  const warrantyExp = eqRow?.warranty_expiration_date ?? eqRow?.warranty_expires_at ?? null
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const equipmentWarrantyActive = Boolean(
+    warrantyExp &&
+      warrantyExp >= todayIso &&
+      (!warrantyStart || warrantyStart <= todayIso),
+  )
   const ap = assigneeProf as {
     full_name: string | null
     email: string | null
@@ -191,6 +245,95 @@ export async function loadWorkOrderDetailForOrg(
   let planServices: unknown[] | null = null
   if (w.maintenance_plan_id && planRow && Array.isArray(planRow.services)) {
     planServices = planRow.services
+  }
+
+  const [dbTasks, dbLineItems, dbAttachments] = await Promise.all([
+    safeLoadTabs(() => fetchWorkOrderTasks(supabase, organizationId, workOrderId), []),
+    safeLoadTabs(() => fetchWorkOrderLineItems(supabase, organizationId, workOrderId), []),
+    safeLoadTabs(() => fetchWorkOrderAttachments(supabase, organizationId, workOrderId), []),
+  ])
+
+  const parsedBase = parseRepairLog(w.repair_log)
+  const usesTasksTable = dbTasks.length > 0
+  const usesPartsLineItems = dbLineItems.length > 0
+
+  const mergedTasks = usesTasksTable
+    ? dbTasks.map((t) => ({
+        id: t.id,
+        label: t.title,
+        done: t.completed,
+        description: t.description?.trim() || undefined,
+      }))
+    : (parsedBase.tasks ?? [])
+
+  const mergedParts = usesPartsLineItems
+    ? dbLineItems.map(mapLineItemRowToPart)
+    : parsedBase.partsUsed
+
+  const photoRows = dbAttachments.filter((a) => a.category === "photo")
+  const docRows = dbAttachments.filter((a) => a.category === "document")
+
+  const photoGalleryFromDb: WorkOrderPhotoGalleryItem[] = []
+  for (const row of photoRows) {
+    const url = await signedUrlForAttachmentPath(supabase, row.storage_path)
+    if (url) {
+      photoGalleryFromDb.push({ url, attachmentId: row.id })
+    }
+  }
+
+  const legacyPhotos = (parsedBase.photos ?? []).filter(
+    (u) => typeof u === "string" && u.length > 0,
+  )
+  const legacyGallery: WorkOrderPhotoGalleryItem[] = legacyPhotos.map((url) => ({
+    url,
+    attachmentId: undefined,
+  }))
+
+  const photoGallery: WorkOrderPhotoGalleryItem[] = [...photoGalleryFromDb, ...legacyGallery]
+
+  const documentAttachments: WorkOrderDocumentItem[] = []
+  for (const row of docRows) {
+    const url = await signedUrlForAttachmentPath(supabase, row.storage_path)
+    if (url) {
+      documentAttachments.push({
+        id: row.id,
+        fileName: row.file_name,
+        fileType: row.file_type,
+        url,
+        uploadedAt: row.uploaded_at,
+        fileSizeBytes: row.file_size_bytes,
+      })
+    }
+  }
+
+  const columnProblem = typeof w.problem_reported === "string" ? w.problem_reported.trim() : ""
+  const mergedProblemReported =
+    columnProblem !== "" ? columnProblem : (parsedBase.problemReported ?? "")
+
+  const mergedRepairLog = {
+    ...parsedBase,
+    problemReported: mergedProblemReported,
+    tasks: mergedTasks,
+    partsUsed: mergedParts,
+    /** Legacy-only; Supabase photos use `photoGallery` + attachment rows. */
+    photos: legacyPhotos,
+  }
+
+  let customerSignaturePreviewUrl: string | null = null
+  const sigPath = w.signature_url ?? null
+  if (sigPath) {
+    customerSignaturePreviewUrl = await signedUrlForAttachmentPath(supabase, sigPath)
+  }
+
+  let warrantyVendorName: string | null = null
+  if (w.warranty_vendor_id) {
+    const { data: vendorRow } = await supabase
+      .from("org_vendors")
+      .select("name")
+      .eq("organization_id", organizationId)
+      .eq("id", w.warranty_vendor_id)
+      .maybeSingle()
+    warrantyVendorName = (vendorRow as { name?: string } | null)?.name?.trim() || null
   }
 
   const mapped: WorkOrder = {
@@ -213,13 +356,22 @@ export async function loadWorkOrderDetailForOrg(
     createdAt: w.created_at,
     createdBy: "",
     description: w.title,
-    repairLog: parseRepairLog(w.repair_log),
+    repairLog: mergedRepairLog,
     totalLaborCost: w.total_labor_cents / 100,
     totalPartsCost: w.total_parts_cents / 100,
     invoiceNumber: w.invoice_number ?? "",
     maintenancePlanId: w.maintenance_plan_id,
     maintenancePlanName: planName,
+    calibrationTemplateId: w.calibration_template_id ?? null,
+    equipmentCategory: eqRow?.category ?? null,
     createdByPmAutomation: Boolean(w.created_by_pm_automation),
+    customerSignaturePreviewUrl,
+    customerSignatureCapturedAt: w.signature_captured_at ?? null,
+    billableToCustomer: w.billable_to_customer ?? true,
+    warrantyReviewRequired: w.warranty_review_required ?? false,
+    warrantyVendorId: w.warranty_vendor_id ?? null,
+    warrantyVendorName,
+    equipmentWarrantyActive,
   }
 
   return {
@@ -229,6 +381,10 @@ export async function loadWorkOrderDetailForOrg(
       workOrder: mapped,
       notes: w.notes ?? "",
       planServices,
+      photoGallery,
+      documentAttachments,
+      usesPartsLineItems,
+      usesTasksTable,
     },
   }
 }

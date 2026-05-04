@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 
@@ -24,19 +24,6 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 
 function Field({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col">{children}</div>
-}
-
-function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground",
-        "placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className
-      )}
-      {...props}
-    />
-  )
 }
 
 const INITIAL = {

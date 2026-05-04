@@ -424,7 +424,7 @@ function CustomersPageInner() {
         </div>
 
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-32 sm:w-36 bg-card">
+          <SelectTrigger className="w-32 sm:w-36">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkspaceData } from "@/lib/tenant-store"
+import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 
 // ─── Report mock data ─────────────────────────────────────────────────────────
 
@@ -183,14 +184,101 @@ function Section({ title, sub, action, children }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const { customers, technicians, workOrders, revenueData, repeatRepairs, expiringWarranties } = useWorkspaceData()
+  const dash = useSupabaseDashboard()
+  const { customers, technicians, revenueData, repeatRepairs: wrRepeat, expiringWarranties: wrWarranty } =
+    useWorkspaceData()
+  const useLive = Boolean(dash.organizationId) && !dash.loading
+
+  const kpiStrip = useMemo(() => {
+    if (!useLive) return kpis
+    const s = dash.stats
+    return [
+      {
+        label: "Monthly revenue (closed WOs)",
+        value: fmtFull$(Math.round(s.monthlyRevenueCents / 100)),
+        change: "Live",
+        positive: true,
+        sub: "Labor + parts on completed / invoiced work this month",
+        icon: DollarSign,
+        tile: "ds-icon-tile-info",
+      },
+      {
+        label: "Open work orders",
+        value: String(s.openWorkOrders),
+        change: "Live",
+        positive: true,
+        sub: "Open, scheduled, and in progress",
+        icon: RefreshCcw,
+        tile: "ds-icon-tile-success",
+      },
+      {
+        label: "Overdue service",
+        value: String(s.overdueService),
+        change: "Live",
+        positive: s.overdueService === 0,
+        sub: "Active assets past next service date",
+        icon: Clock,
+        tile: "ds-icon-tile-warning",
+      },
+      {
+        label: "Warranties expiring (30d)",
+        value: String(s.expiringWarrantiesCount),
+        change: "Live",
+        positive: true,
+        sub: "Recorded warranty windows",
+        icon: TrendingUp,
+        tile: "ds-icon-tile-accent",
+      },
+    ]
+  }, [useLive, dash.stats])
+
+  const revenueChartData = useMemo(() => {
+    if (useLive && dash.revenueByMonth.length > 0) return dash.revenueByMonth
+    return revenueData
+  }, [useLive, dash.revenueByMonth, revenueData])
+
+  const woStatusChart = useMemo(() => {
+    const palette = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-chart-5)", "var(--color-chart-3)"]
+    if (useLive && dash.workOrdersByStatus.length > 0) {
+      return dash.workOrdersByStatus.map((x, i) => ({
+        type: x.status,
+        count: x.count,
+        fill: palette[i % palette.length]!,
+      }))
+    }
+    return woByType
+  }, [useLive, dash.workOrdersByStatus])
+
+  const repeatDisplay = useMemo(() => {
+    if (useLive) {
+      return dash.repeatRepairs.map((r) => ({
+        equipment: r.equipmentName,
+        customer: r.customerName,
+        repairs: r.repairs,
+        lastRepair: r.lastRepair,
+        issue: r.issue,
+      }))
+    }
+    return wrRepeat
+  }, [useLive, dash.repeatRepairs, wrRepeat])
+
+  const warrantyDisplay = useMemo(() => {
+    if (useLive) {
+      return dash.expiringWarranties.map((w) => ({
+        equipment: w.equipmentName,
+        customer: w.customerName,
+        expires: w.expires,
+        daysLeft: w.daysLeft,
+      }))
+    }
+    return wrWarranty
+  }, [useLive, dash.expiringWarranties, wrWarranty])
+
   const [dateRange, setDateRange] = useState("Last 6 months")
   const [customer, setCustomer] = useState("All Customers")
   const [technician, setTechnician] = useState("All Technicians")
   const [region, setRegion] = useState("All Regions")
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [scheduledReport, setScheduledReport] = useState<string | null>(null)
-
   const customerNames = useMemo(
     () => ["All Customers", ...customers.map((c) => c.company)],
     [customers]
@@ -278,18 +366,25 @@ export default function ReportsPage() {
           <div className="flex-1" />
 
           {/* Export buttons */}
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" disabled title="Coming soon">
             <Download className="w-3.5 h-3.5" /> CSV
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" disabled title="Coming soon">
             <FileText className="w-3.5 h-3.5" /> PDF
           </Button>
         </div>
       </div>
 
+      {useLive && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          KPIs, revenue trend, work-order status, repeat alerts, and warranty alerts use live organization data. Sections
+          labeled “Sample” are illustrative until full reporting ships.
+        </p>
+      )}
+
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-        {kpis.map((k) => {
+        {kpiStrip.map((k) => {
           const Icon = k.icon
           return (
             <div key={k.label} className="ds-kpi-card">
@@ -320,15 +415,15 @@ export default function ReportsPage() {
         <div className="lg:col-span-3 h-full">
           <Section
             title="Revenue by Month"
-            sub="Last 6 months — total recognized revenue"
+            sub={useLive ? "Last 12 months — completed / invoiced work (live)" : "Last 6 months — workspace demo bundle"}
             action={
               <span className="text-xs font-semibold ds-badge-success border px-2 py-0.5 rounded-full">
-                +7.2% MoM
+                {useLive ? "Live" : "Demo"}
               </span>
             }
           >
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={revenueData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <LineChart data={revenueChartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
@@ -348,9 +443,12 @@ export default function ReportsPage() {
 
         {/* Work Orders by Type — vertical bar chart */}
         <div className="lg:col-span-2 h-full">
-          <Section title="Work Orders by Type" sub="Current period — all statuses">
+          <Section
+            title={useLive ? "Open Work Orders by Status" : "Work Orders by Type"}
+            sub={useLive ? "Live — open, scheduled, and in progress" : "Sample — mix of job types (demo)"}
+          >
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={woByType} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={36}>
+              <BarChart data={woStatusChart} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={36}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis
                   dataKey="type"
@@ -363,7 +461,7 @@ export default function ReportsPage() {
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                 <Tooltip content={<BarTooltip />} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {woByType.map((entry) => (
+                  {woStatusChart.map((entry) => (
                     <Cell key={entry.type} fill={entry.fill} />
                   ))}
                   <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "var(--muted-foreground)", fontWeight: 600 }} />
@@ -378,7 +476,7 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
 
         {/* Technician Productivity — horizontal bars */}
-        <Section title="Technician Productivity" sub="Jobs completed this period, by technician">
+        <Section title="Technician Productivity" sub="Sample data — productivity scoring not wired to payroll yet">
           <div className="space-y-3">
             {techProductivity.map((t, i) => (
               <div key={t.name} className="flex items-center gap-3">
@@ -411,7 +509,7 @@ export default function ReportsPage() {
         </Section>
 
         {/* Equipment Due by Month — bar chart */}
-        <Section title="Equipment Due by Month" sub="Scheduled service and PM work orders due">
+        <Section title="Equipment Due by Month" sub="Sample trend — use dashboard equipment views for live due dates">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={equipmentDueByMonth} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={32}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -439,7 +537,7 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
 
         {/* Top Customers by Revenue */}
-        <Section title="Top Customers by Revenue" sub="Current period — sorted by revenue">
+        <Section title="Top Customers by Revenue" sub="Sample rankings — connect to accounting export in a future release">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -476,7 +574,7 @@ export default function ReportsPage() {
         </Section>
 
         {/* Contract Renewal Pipeline */}
-        <Section title="Contract Renewal Pipeline" sub="Upcoming renewals — sorted by renewal date">
+        <Section title="Contract Renewal Pipeline" sub="Sample pipeline — renewal CRM integration coming later">
           <div className="space-y-2">
             {contractRenewalPipeline.map((c) => (
               <div key={c.customer} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/60 hover:bg-secondary/40 transition-colors">
@@ -505,12 +603,12 @@ export default function ReportsPage() {
           sub="Equipment repaired 3+ times for the same issue"
           action={
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ds-badge-danger border">
-              {repeatRepairs.length} alerts
+              {repeatDisplay.length} alerts
             </span>
           }
         >
           <div className="space-y-2">
-            {repeatRepairs.map((r) => (
+            {repeatDisplay.map((r) => (
               <div key={r.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-danger border">
                 <RefreshCcw className="w-4 h-4 ds-icon-danger mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -533,12 +631,12 @@ export default function ReportsPage() {
           sub="Equipment with warranty expiring within 90 days"
           action={
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ds-badge-warning border">
-              {expiringWarranties.length} expiring
+              {warrantyDisplay.length} expiring
             </span>
           }
         >
           <div className="space-y-2">
-            {expiringWarranties.map((w) => (
+            {warrantyDisplay.map((w) => (
               <div key={w.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-warning border">
                 <Shield className="w-4 h-4 ds-icon-warning mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -569,7 +667,6 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {savedReports.map((r) => {
             const Icon = r.icon
-            const isScheduled = scheduledReport === r.id
             return (
               <div key={r.id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 transition-colors">
                 <div className="flex items-start gap-3">
@@ -583,21 +680,29 @@ export default function ReportsPage() {
                 </div>
                 <p className="text-[10px] text-muted-foreground">Last run: {r.lastRun}</p>
                 <div className="flex items-center gap-2 pt-1 border-t border-border">
-                  <button className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-semibold text-cta-foreground bg-cta hover:bg-cta-hover active:bg-cta-active transition-colors rounded-md py-1.5">
+                  <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted-foreground bg-secondary cursor-not-allowed opacity-60 rounded-md py-1.5"
+                  >
                     <Download className="w-3 h-3" /> Run Report
                   </button>
                   <button
-                    onClick={() => setScheduledReport(isScheduled ? null : r.id)}
-                    className={`inline-flex items-center justify-center gap-1 text-[11px] font-medium rounded-md py-1.5 px-2.5 border transition-colors ${
-                      isScheduled
-                        ? "ds-badge-success"
-                        : "border-border bg-secondary hover:bg-accent text-foreground"
-                    }`}
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="inline-flex items-center justify-center gap-1 text-[11px] font-medium rounded-md py-1.5 px-2.5 border border-border bg-secondary text-muted-foreground cursor-not-allowed opacity-60"
                   >
                     <Mail className="w-3 h-3" />
-                    {isScheduled ? "Scheduled" : "Schedule"}
+                    Schedule
                   </button>
-                  <button className="inline-flex items-center justify-center gap-1 text-[11px] font-medium rounded-md py-1.5 px-2.5 border border-border bg-secondary hover:bg-accent text-foreground transition-colors">
+                  <button
+                    type="button"
+                    disabled
+                    title="Coming soon"
+                    className="inline-flex items-center justify-center gap-1 text-[11px] font-medium rounded-md py-1.5 px-2.5 border border-border bg-secondary text-muted-foreground cursor-not-allowed opacity-60"
+                  >
                     <Copy className="w-3 h-3" />
                     Duplicate
                   </button>

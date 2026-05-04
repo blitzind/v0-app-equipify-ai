@@ -22,7 +22,8 @@ export async function createWorkOrderFromMaintenancePlan(params: {
   const rawTitle = `${plan.name} — ${plan.equipmentName}`.trim()
   const title = (rawTitle.length > 0 ? rawTitle : `Maintenance — ${plan.equipmentName}`).slice(0, 500)
 
-  const problemReported = `Scheduled ${plan.interval} service per maintenance plan ${plan.id}.`
+  const planName = plan.name.trim() || "Maintenance plan"
+  const problemReported = `Maintenance plan: ${planName}`
 
   const { error } = await supabase.from("work_orders").insert({
     organization_id: organizationId,
@@ -37,6 +38,7 @@ export async function createWorkOrderFromMaintenancePlan(params: {
     assigned_user_id: plan.technicianId || null,
     maintenance_plan_id: plan.id,
     notes: null,
+    problem_reported: problemReported,
     repair_log: {
       problemReported,
       diagnosis: "",

@@ -8,11 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ViewToggle } from "@/components/ui/view-toggle"
-import { usePurchaseOrders, PurchaseOrder, POStatus } from "@/lib/purchase-order-store"
+import { usePurchaseOrders, POStatus } from "@/lib/purchase-order-store"
 import { PurchaseOrderDrawer } from "@/components/drawers/purchase-order-drawer"
+import { AddVendorModal } from "@/components/vendors/add-vendor-modal"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
-  ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2,
+  ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2, Trash2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
@@ -38,9 +41,50 @@ function fmtDate(s: string) {
 }
 
 type SortKey = "id" | "vendor" | "amount" | "orderDate" | "expectedDate" | "status"
+type DraftLineItem = { description: string; quantity: number; unitCostCents: number; lineTotalCents: number }
+type NewPoDraft = {
+  vendorId?: string
+  vendor: string
+  vendorEmail: string
+  vendorPhone: string
+  vendorContactName: string
+  shipTo: string
+  billTo: string
+  orderedDate: string
+  eta: string
+  notes: string
+  lineItems: DraftLineItem[]
+}
+
+function emptyNewPoDraft(): NewPoDraft {
+  return {
+    vendorId: undefined,
+    vendor: "",
+    vendorEmail: "",
+    vendorPhone: "",
+    vendorContactName: "",
+    shipTo: "",
+    billTo: "",
+    orderedDate: new Date().toISOString().slice(0, 10),
+    eta: "",
+    notes: "",
+    lineItems: [{ description: "", quantity: 1, unitCostCents: 0, lineTotalCents: 0 }],
+  }
+}
+
+type VendorRow = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  contact_name: string | null
+  billing_address: string | null
+  shipping_address: string | null
+}
 
 function PurchaseOrdersPageInner() {
-  const { orders } = usePurchaseOrders()
+  const { orders, loading, error, addOrder } = usePurchaseOrders()
+  const { organizationId, status: orgStatus } = useActiveOrganization()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -51,7 +95,22 @@ function PurchaseOrdersPageInner() {
   const [vendorFilter, setVendorFilter] = useState("All Vendors")
   const [sortKey, setSortKey] = useState<SortKey>("orderDate")
   const [sortAsc, setSortAsc] = useState(false)
-  const [showNewModal, setShowNewModal] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [creatingNew, setCreatingNew] = useState(false)
+  const [newDraft, setNewDraft] = useState<NewPoDraft>(emptyNewPoDraft())
+  const [vendors, setVendors] = useState<VendorRow[]>([])
+  const [vendorsLoading, setVendorsLoading] = useState(false)
+  const [vendorQuery, setVendorQuery] = useState("")
+  const [vendorMenuOpen, setVendorMenuOpen] = useState(false)
+  const [addVendorOpen, setAddVendorOpen] = useState(false)
+
+  function computeLineTotalCents(quantity: number, unitCostCents: number): number {
+    return Math.round(quantity * unitCostCents)
+  }
+
+  function fmtCurrencyFromCents(cents: number): string {
+    return fmtCurrency((Number.isFinite(cents) ? cents : 0) / 100)
+  }
 
   // ?open= deep-link support
   useEffect(() => {
@@ -62,7 +121,28 @@ function PurchaseOrdersPageInner() {
     }
   }, [searchParams, router])
 
-  const vendors = useMemo(() => {
+  useEffect(() => {
+    if (!createOpen || orgStatus !== "ready" || !organizationId) return
+    let cancelled = false
+    setVendorsLoading(true)
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data } = await supabase
+        .from("org_vendors")
+        .select("id, name, email, phone, contact_name, billing_address, shipping_address")
+        .eq("organization_id", organizationId)
+        .eq("is_archived", false)
+        .order("name")
+      if (cancelled) return
+      setVendors((data ?? []) as VendorRow[])
+      setVendorsLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [createOpen, orgStatus, organizationId])
+
+  const uniqueVendors = useMemo(() => {
     const set = new Set(orders.map(o => o.vendor))
     return ["All Vendors", ...Array.from(set).sort()]
   }, [orders])
@@ -72,7 +152,7 @@ function PurchaseOrdersPageInner() {
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(o =>
-        o.id.toLowerCase().includes(q) ||
+        o.purchaseOrderNumber.toLowerCase().includes(q) ||
         o.vendor.toLowerCase().includes(q) ||
         o.workOrderId?.toLowerCase().includes(q) ||
         o.lineItems.some(li => li.description.toLowerCase().includes(q))
@@ -83,7 +163,7 @@ function PurchaseOrdersPageInner() {
 
     list.sort((a, b) => {
       let av: string | number = 0, bv: string | number = 0
-      if (sortKey === "id") { av = a.id; bv = b.id }
+      if (sortKey === "id") { av = a.purchaseOrderNumber; bv = b.purchaseOrderNumber }
       else if (sortKey === "vendor") { av = a.vendor; bv = b.vendor }
       else if (sortKey === "amount") { av = a.amount; bv = b.amount }
       else if (sortKey === "orderDate") { av = a.orderedDate; bv = b.orderedDate }
@@ -120,8 +200,64 @@ function PurchaseOrdersPageInner() {
     )
   }
 
+  function handleStartCreatePo() {
+    setNewDraft(emptyNewPoDraft())
+    setVendorQuery("")
+    setVendorMenuOpen(false)
+    setCreateOpen(true)
+  }
+
+  function selectVendor(vendor: VendorRow) {
+    setNewDraft((d) => ({
+      ...d,
+      vendorId: vendor.id,
+      vendor: vendor.name,
+      vendorEmail: vendor.email ?? "",
+      vendorPhone: vendor.phone ?? "",
+      vendorContactName: vendor.contact_name ?? "",
+      billTo: vendor.billing_address ?? d.billTo,
+      shipTo: vendor.shipping_address ?? d.shipTo,
+    }))
+    setVendorQuery(vendor.name)
+    setVendorMenuOpen(false)
+  }
+
+  async function handleCreatePo() {
+    setCreatingNew(true)
+    const { id, error: createError } = await addOrder({
+      vendorId: newDraft.vendorId,
+      vendor: newDraft.vendor.trim() || "New Vendor",
+      vendorEmail: newDraft.vendorEmail,
+      vendorPhone: newDraft.vendorPhone,
+      vendorContactName: newDraft.vendorContactName,
+      shipTo: newDraft.shipTo,
+      billTo: newDraft.billTo,
+      status: "Draft",
+      orderedDate: newDraft.orderedDate,
+      eta: newDraft.eta,
+      notes: newDraft.notes,
+      lineItems: newDraft.lineItems,
+    })
+    setCreatingNew(false)
+    if (createError) return
+    setCreateOpen(false)
+    if (id) setSelectedId(id)
+  }
+
   return (
     <div className="flex flex-col gap-5">
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          Loading purchase orders...
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -163,13 +299,13 @@ function PurchaseOrdersPageInner() {
         <Select value={vendorFilter} onValueChange={setVendorFilter}>
           <SelectTrigger className="h-9 w-44 text-sm shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {vendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+            {uniqueVendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setShowNewModal(true)}>
+          <Button size="sm" className="gap-2 cursor-pointer" onClick={handleStartCreatePo}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New PO</span>
             <span className="sm:hidden">New</span>
@@ -195,7 +331,7 @@ function PurchaseOrdersPageInner() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{po.id}</p>
+                    <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{po.purchaseOrderNumber || "PO"}</p>
                     <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{po.vendor}</p>
                   </div>
                   <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
@@ -266,7 +402,7 @@ function PurchaseOrdersPageInner() {
                       onClick={() => setSelectedId(po.id)}
                     >
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 whitespace-nowrap">
-                        {po.id}
+                        {po.purchaseOrderNumber || "PO"}
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground max-w-[160px] truncate">{po.vendor}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">
@@ -300,7 +436,253 @@ function PurchaseOrdersPageInner() {
       {/* Drawer */}
       <PurchaseOrderDrawer
         orderId={selectedId}
-        onClose={() => setSelectedId(null)}
+        onClose={() => {
+          setSelectedId(null)
+        }}
+      />
+
+      {createOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !creatingNew && setCreateOpen(false)} />
+          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground">Create Purchase Order</h3>
+              <button
+                type="button"
+                onClick={() => !creatingNew && setCreateOpen(false)}
+                className="text-muted-foreground hover:text-foreground text-sm"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vendor Information</p>
+                <div className="relative">
+                  <label className="text-xs font-medium text-foreground block mb-1">Vendor Name</label>
+                  <Input
+                    placeholder={vendorsLoading ? "Loading vendors..." : "Search vendor..."}
+                    value={vendorQuery}
+                    onFocus={() => setVendorMenuOpen(true)}
+                    onChange={(e) => {
+                      setVendorQuery(e.target.value)
+                      setVendorMenuOpen(true)
+                      setNewDraft((d) => ({ ...d, vendorId: undefined, vendor: e.target.value }))
+                    }}
+                  />
+                  {vendorMenuOpen && (
+                    <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-56 overflow-y-auto">
+                      {vendors
+                        .filter((v) => v.name.toLowerCase().includes(vendorQuery.toLowerCase()))
+                        .map((vendor) => (
+                          <button
+                            key={vendor.id}
+                            type="button"
+                            onClick={() => selectVendor(vendor)}
+                            className="w-full text-left px-3 py-2 hover:bg-muted/60 text-sm"
+                          >
+                            <div className="font-medium">{vendor.name}</div>
+                            {vendor.email && <div className="text-xs text-muted-foreground">{vendor.email}</div>}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVendorMenuOpen(false)
+                          setAddVendorOpen(true)
+                        }}
+                        className="w-full text-left px-3 py-2 border-t border-border text-sm text-primary hover:bg-muted/60"
+                      >
+                        + Add New Vendor
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">Select an existing vendor or add a new one</p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/15 p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Vendor Email</label>
+                    <Input type="email" value={newDraft.vendorEmail} onChange={(e) => setNewDraft((d) => ({ ...d, vendorEmail: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Vendor Phone</label>
+                    <Input value={newDraft.vendorPhone} onChange={(e) => setNewDraft((d) => ({ ...d, vendorPhone: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Contact Name</label>
+                    <Input value={newDraft.vendorContactName} onChange={(e) => setNewDraft((d) => ({ ...d, vendorContactName: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Billing Address</label>
+                    <Input value={newDraft.billTo} onChange={(e) => setNewDraft((d) => ({ ...d, billTo: e.target.value }))} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-foreground block mb-1">Shipping Address</label>
+                    <Input value={newDraft.shipTo} onChange={(e) => setNewDraft((d) => ({ ...d, shipTo: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Details</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Order Date</label>
+                    <Input type="date" value={newDraft.orderedDate} onChange={(e) => setNewDraft((d) => ({ ...d, orderedDate: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">Expected Delivery Date</label>
+                    <Input type="date" value={newDraft.eta} onChange={(e) => setNewDraft((d) => ({ ...d, eta: e.target.value }))} />
+                    <p className="text-[11px] text-muted-foreground mt-1">Estimated arrival date from vendor</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Line Items</p>
+                <div className="grid grid-cols-[1fr_90px_120px_120px_32px] gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5">
+                  <span>Description</span>
+                  <span className="text-right">Quantity</span>
+                  <span className="text-right">Unit Cost</span>
+                  <span className="text-right">Line Total</span>
+                  <span />
+                </div>
+                {newDraft.lineItems.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_90px_120px_120px_32px] gap-2 items-center">
+                    <Input
+                      placeholder="Description"
+                      value={item.description}
+                      onChange={(e) =>
+                        setNewDraft((d) => ({
+                          ...d,
+                          lineItems: d.lineItems.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)),
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="Quantity"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        setNewDraft((d) => ({
+                          ...d,
+                          lineItems: d.lineItems.map((x, i) =>
+                            i === idx
+                              ? {
+                                  ...x,
+                                  quantity: Number(e.target.value) || 0,
+                                  lineTotalCents: computeLineTotalCents(
+                                    Number(e.target.value) || 0,
+                                    x.unitCostCents,
+                                  ),
+                                }
+                              : x,
+                          ),
+                        }))
+                      }
+                      className="text-right"
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      value={(item.unitCostCents / 100).toFixed(2)}
+                      onChange={(e) =>
+                        setNewDraft((d) => ({
+                          ...d,
+                          lineItems: d.lineItems.map((x, i) =>
+                            i === idx
+                              ? {
+                                  ...x,
+                                  unitCostCents: Math.round((Number(e.target.value) || 0) * 100),
+                                  lineTotalCents: computeLineTotalCents(
+                                    x.quantity,
+                                    Math.round((Number(e.target.value) || 0) * 100),
+                                  ),
+                                }
+                              : x,
+                          ),
+                        }))
+                      }
+                      className="text-right"
+                    />
+                    <div className="text-sm text-right font-medium text-foreground">
+                      {fmtCurrencyFromCents(item.lineTotalCents)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewDraft((d) => ({
+                          ...d,
+                          lineItems: d.lineItems.filter((_, i) => i !== idx),
+                        }))
+                      }
+                      className="inline-flex items-center justify-center text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNewDraft((d) => ({
+                      ...d,
+                      lineItems: [
+                        ...d.lineItems,
+                        { description: "", quantity: 1, unitCostCents: 0, lineTotalCents: 0 },
+                      ],
+                    }))
+                  }
+                  className="text-xs text-primary hover:underline"
+                >
+                  + Add line item
+                </button>
+                <div className="flex justify-end border-t border-border pt-2 mt-1">
+                  <div className="text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Subtotal</p>
+                    <p className="text-sm font-bold text-foreground">
+                      {fmtCurrencyFromCents(
+                        newDraft.lineItems.reduce((sum, li) => sum + li.lineTotalCents, 0),
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/15 p-4 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</p>
+                <textarea
+                  rows={4}
+                  value={newDraft.notes}
+                  onChange={(e) => setNewDraft((d) => ({ ...d, notes: e.target.value }))}
+                  placeholder="Add notes..."
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+              <Button size="sm" variant="outline" onClick={() => setCreateOpen(false)} disabled={creatingNew}>Cancel</Button>
+              <Button size="sm" onClick={() => void handleCreatePo()} disabled={creatingNew}>
+                {creatingNew ? "Creating..." : "Create PO"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AddVendorModal
+        open={addVendorOpen}
+        onClose={() => setAddVendorOpen(false)}
+        initialName={vendorQuery}
+        onSaved={(vendor) => {
+          const row = vendor as VendorRow
+          setVendors((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)))
+          selectVendor(row)
+        }}
       />
     </div>
   )

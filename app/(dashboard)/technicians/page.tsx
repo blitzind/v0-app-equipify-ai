@@ -665,7 +665,7 @@ function MessageModal({
             <Label>Recipient</Label>
             <Input
               value={tab === "sms" ? tech.phone : tab === "email" ? tech.email : tech.name}
-              readOnly className="bg-secondary/50 text-muted-foreground" />
+              readOnly className="text-muted-foreground" />
           </div>
           <div className="space-y-1.5">
             <Label>Message</Label>

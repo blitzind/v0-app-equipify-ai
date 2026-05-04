@@ -250,7 +250,16 @@ export function CreateWorkOrderModal({
   const selectedCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
 
   async function handleSubmit() {
-    if (!customerId || !equipmentId || !technicianId || !scheduledDate || !description.trim()) return
+    if (
+      !customerId ||
+      !equipmentId ||
+      !technicianId ||
+      !scheduledDate ||
+      !description.trim() ||
+      !problemReported.trim()
+    ) {
+      return
+    }
     if (!organizationId) return
 
     setSubmitError(null)
@@ -258,7 +267,7 @@ export function CreateWorkOrderModal({
 
     const supabase = createBrowserSupabaseClient()
 
-    const notesCombined = problemReported.trim() || null
+    const problemText = problemReported.trim()
 
     const { error: insertError } = await supabase.from("work_orders").insert({
       organization_id: organizationId,
@@ -270,8 +279,20 @@ export function CreateWorkOrderModal({
       type: uiTypeToDb(type),
       scheduled_on: scheduledDate,
       scheduled_time: normalizeTimeForDb(scheduledTime),
-      notes: notesCombined,
+      notes: null,
+      problem_reported: problemText,
       assigned_user_id: technicianId,
+      repair_log: {
+        problemReported: problemText,
+        diagnosis: "",
+        partsUsed: [],
+        laborHours: 0,
+        technicianNotes: "",
+        photos: [],
+        signatureDataUrl: "",
+        signedBy: "",
+        signedAt: "",
+      },
     })
 
     setSubmitting(false)
@@ -327,6 +348,7 @@ export function CreateWorkOrderModal({
     technicianId &&
     scheduledDate &&
     description.trim() &&
+    problemReported.trim() &&
     !loadError
 
   const woDialogOpen = open && !addEquipmentOpen
@@ -531,13 +553,16 @@ export function CreateWorkOrderModal({
 
           {/* Problem Reported */}
           <div className="flex flex-col gap-1.5">
-            <Label>Problem Reported</Label>
+            <Label>
+              Problem reported <span className="text-destructive">*</span>
+            </Label>
             <Textarea
-              placeholder="What problem did the customer report?"
+              placeholder="What problem did the customer report? (Required for dispatch and history.)"
               value={problemReported}
               onChange={(e) => setProblemReported(e.target.value)}
               rows={2}
             />
+            <p className="text-[11px] text-muted-foreground">Helps technicians and billing understand why this work order exists.</p>
           </div>
 
           {submitError && (

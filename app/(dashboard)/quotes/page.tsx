@@ -37,7 +37,7 @@ function fmtCurrency(n: number) {
 }
 
 function quoteDisplayId(q: AdminQuote) {
-  return q.quoteNumber?.trim() || q.id
+  return q.quoteNumber?.trim() || "Quote"
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ function QuotesPageInner() {
         </div>
 
         <Select value={statusFilter} onValueChange={v => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-40 bg-card">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
