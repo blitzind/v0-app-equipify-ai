@@ -111,6 +111,7 @@ function parseServiceRow(raw: unknown): MaintenancePlanService | null {
 function parseDefaultsRow(raw: unknown): {
   workOrderType: WorkOrderType
   workOrderPriority: WorkOrderPriority
+  preferredServiceTime: string
 } | null {
   if (!raw || typeof raw !== "object") return null
   const o = raw as Record<string, unknown>
@@ -119,9 +120,14 @@ function parseDefaultsRow(raw: unknown): {
   const wp = o.workOrderPriority as WorkOrderPriority | undefined
   const types: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
   const prios: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
+  const pst =
+    typeof o.preferredServiceTime === "string" && /^\d{1,2}:\d{2}$/.test(o.preferredServiceTime.trim())
+      ? o.preferredServiceTime.trim()
+      : "08:00"
   return {
     workOrderType: wt && types.includes(wt) ? wt : "PM",
     workOrderPriority: wp && prios.includes(wp) ? wp : "Normal",
+    preferredServiceTime: pst,
   }
 }
 
@@ -129,9 +135,11 @@ export function parseServicesJsonb(servicesJson: unknown): {
   displayServices: MaintenancePlanService[]
   workOrderType: WorkOrderType
   workOrderPriority: WorkOrderPriority
+  preferredServiceTime: string
 } {
   let workOrderType: WorkOrderType = "PM"
   let workOrderPriority: WorkOrderPriority = "Normal"
+  let preferredServiceTime = "08:00"
   const displayServices: MaintenancePlanService[] = []
 
   const arr = Array.isArray(servicesJson) ? servicesJson : []
@@ -140,21 +148,27 @@ export function parseServicesJsonb(servicesJson: unknown): {
     if (defs) {
       workOrderType = defs.workOrderType
       workOrderPriority = defs.workOrderPriority
+      preferredServiceTime = defs.preferredServiceTime
       continue
     }
     const svc = parseServiceRow(item)
     if (svc) displayServices.push(svc)
   }
 
-  return { displayServices, workOrderType, workOrderPriority }
+  return { displayServices, workOrderType, workOrderPriority, preferredServiceTime }
 }
 
 /** JSONB payload for `maintenance_plans.services` (includes hidden WO defaults row). */
 export function serializeServicesForDb(
   displayServices: MaintenancePlanService[],
   workOrderType: WorkOrderType,
-  workOrderPriority: WorkOrderPriority
+  workOrderPriority: WorkOrderPriority,
+  preferredServiceTime?: string
 ): unknown {
+  const time =
+    typeof preferredServiceTime === "string" && /^\d{1,2}:\d{2}$/.test(preferredServiceTime.trim())
+      ? preferredServiceTime.trim()
+      : "08:00"
   return [
     {
       id: WO_DEFAULTS_SERVICE_ID,
@@ -164,6 +178,7 @@ export function serializeServicesForDb(
       estimatedCost: 0,
       workOrderType,
       workOrderPriority,
+      preferredServiceTime: time,
     },
     ...displayServices.map((s) => ({
       id: s.id,
@@ -208,7 +223,9 @@ export function rowToMaintenancePlan(
   }
 ): MaintenancePlan {
   const { interval, customIntervalDays } = intervalFromDb(row.interval_value, row.interval_unit)
-  const { displayServices, workOrderType, workOrderPriority } = parseServicesJsonb(row.services)
+  const { displayServices, workOrderType, workOrderPriority, preferredServiceTime } = parseServicesJsonb(
+    row.services,
+  )
   const notificationRules = parseNotificationRulesJsonb(row.notification_rules)
 
   const lastServiceDate = row.last_service_date ?? ""
@@ -237,6 +254,7 @@ export function rowToMaintenancePlan(
     autoCreateWorkOrder: row.auto_create_work_order,
     workOrderType,
     workOrderPriority,
+    preferredServiceTime,
     notes: row.notes ?? "",
     createdAt: row.created_at,
     totalServicesCompleted: 0,

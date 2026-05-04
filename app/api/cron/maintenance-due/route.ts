@@ -2,7 +2,11 @@ import { NextResponse } from "next/server"
 import { processDuePlansAllOrganizations } from "@/lib/maintenance-plans/process-due-plans"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 
-export async function POST(request: Request) {
+function unauthorized() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+}
+
+async function runMaintenanceDueCron(request: Request) {
   const secret = process.env.CRON_SECRET
   const auth = request.headers.get("authorization")
   const cronHeader = request.headers.get("x-cron-secret")
@@ -10,7 +14,7 @@ export async function POST(request: Request) {
   const token = bearer ?? cronHeader
 
   if (!secret || token !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return unauthorized()
   }
 
   const admin = createServiceRoleClient()
@@ -23,4 +27,13 @@ export async function POST(request: Request) {
 
   const result = await processDuePlansAllOrganizations(admin)
   return NextResponse.json(result)
+}
+
+/** Vercel Cron and some hosts invoke scheduled routes with GET. */
+export async function GET(request: Request) {
+  return runMaintenanceDueCron(request)
+}
+
+export async function POST(request: Request) {
+  return runMaintenanceDueCron(request)
 }

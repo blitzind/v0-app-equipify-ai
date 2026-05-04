@@ -9,16 +9,39 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
-function startOfMonthIso(): string {
-  const d = new Date()
-  d.setDate(1)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+/** Local calendar YYYY-MM-DD */
+function localDateParts(d: Date) {
+  const y = d.getFullYear()
+  const m = d.getMonth()
+  const day = d.getDate()
+  return { y, m, day }
+}
+
+function monthRangeLocalStrings() {
+  const { y, m } = localDateParts(new Date())
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const monthStart = `${y}-${pad(m + 1)}-01`
+  const lastDay = new Date(y, m + 1, 0).getDate()
+  const monthEnd = `${y}-${pad(m + 1)}-${pad(lastDay)}`
+  return { monthStart, monthEnd }
+}
+
+function todayLocalString() {
+  const { y, m, day } = localDateParts(new Date())
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${y}-${pad(m + 1)}-${pad(day)}`
+}
+
+function monthStartEndIsoUtc() {
+  const { y, m } = localDateParts(new Date())
+  const start = new Date(y, m, 1, 0, 0, 0, 0)
+  const end = new Date(y, m + 1, 0, 23, 59, 59, 999)
+  return { startIso: start.toISOString(), endIso: end.toISOString() }
 }
 
 export function MaintenanceAutomationStats() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
-  const [dueToday, setDueToday] = useState<number | null>(null)
+  const [dueThisMonth, setDueThisMonth] = useState<number | null>(null)
   const [overdue, setOverdue] = useState<number | null>(null)
   const [autoThisMonth, setAutoThisMonth] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -29,7 +52,7 @@ export function MaintenanceAutomationStats() {
     void (async () => {
       if (orgStatus !== "ready" || !activeOrgId) {
         if (!cancelled) {
-          setDueToday(null)
+          setDueThisMonth(null)
           setOverdue(null)
           setAutoThisMonth(null)
           setLoading(false)
@@ -41,8 +64,9 @@ export function MaintenanceAutomationStats() {
       const supabase = createBrowserSupabaseClient()
       const orgId = activeOrgId
 
-      const today = new Date().toISOString().slice(0, 10)
-      const monthStart = startOfMonthIso()
+      const today = todayLocalString()
+      const { monthStart, monthEnd } = monthRangeLocalStrings()
+      const { startIso, endIso } = monthStartEndIsoUtc()
 
       const basePlans = () =>
         supabase
@@ -52,21 +76,25 @@ export function MaintenanceAutomationStats() {
           .eq("is_archived", false)
           .eq("status", "active")
 
-      const [dueTodayRes, overdueRes, autoRes] = await Promise.all([
-        basePlans().eq("next_due_date", today),
+      const [dueMonthRes, overdueRes, autoRes] = await Promise.all([
+        basePlans()
+          .gte("next_due_date", monthStart)
+          .lte("next_due_date", monthEnd)
+          .not("next_due_date", "is", null),
         basePlans().lt("next_due_date", today).not("next_due_date", "is", null),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
           .eq("is_archived", false)
-          .not("maintenance_plan_id", "is", null)
-          .gte("created_at", monthStart),
+          .eq("created_by_pm_automation", true)
+          .gte("created_at", startIso)
+          .lte("created_at", endIso),
       ])
 
       if (cancelled) return
 
-      setDueToday(dueTodayRes.count ?? 0)
+      setDueThisMonth(dueMonthRes.count ?? 0)
       setOverdue(overdueRes.count ?? 0)
       setAutoThisMonth(autoRes.count ?? 0)
       setLoading(false)
@@ -88,15 +116,15 @@ export function MaintenanceAutomationStats() {
   const items: MetricRow[] = [
     {
       kind: "metric",
-      label: "Due today",
-      value: dueToday,
+      label: "PM due this month",
+      value: dueThisMonth,
       Icon: Clock,
       iconClass: "text-amber-600",
       bgClass: "bg-amber-500/10",
     },
     {
       kind: "metric",
-      label: "Overdue",
+      label: "PM overdue",
       value: overdue,
       Icon: Calendar,
       iconClass: "text-destructive",

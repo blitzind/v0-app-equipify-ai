@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { useInvoices } from "@/lib/quote-invoice-store"
+import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ import {
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
   ChevronDown, X, Check, Pencil, Plus, Trash2, AlertTriangle, DollarSign,
   Sparkles, RefreshCw, ThumbsUp, ThumbsDown, ShieldAlert, Monitor, Tablet,
+  Loader2,
   Smartphone, FileText, Settings, Eye, EyeOff, Building2, SlidersHorizontal,
   ExternalLink,
 } from "lucide-react"
@@ -684,20 +686,52 @@ function SettingsPanel({
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function EmailModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => void }) {
+function EmailModal({
+  invoice,
+  variant,
+  onClose,
+  onSent,
+  onError,
+}: {
+  invoice: AdminInvoice
+  variant: "send" | "resend"
+  onClose: () => void
+  onSent?: () => void
+  onError?: (message: string) => void
+}) {
+  const { updateInvoice } = useInvoices()
+  const [sending, setSending] = useState(false)
   const [to,      setTo]      = useState(`billing@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
   const [subject, setSubject] = useState(`Invoice ${invoice.id} — ${fmtCurrency(invoice.amount)} Due ${fmtDate(invoice.dueDate)}`)
   const [body,    setBody]    = useState(`Hi ${invoice.customerName},\n\nPlease find attached Invoice ${invoice.id} for ${fmtCurrency(invoice.amount)}.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. You can pay securely online at:\npay.equipify.ai/inv/${invoice.id.toLowerCase()}\n\nPlease don't hesitate to reach out if you have any questions.\n\nThank you,\n${COMPANY.name}`)
 
+  async function handleSend() {
+    setSending(true)
+    const sentAt = new Date().toISOString()
+    const patch =
+      variant === "resend"
+        ? { sentAt }
+        : { status: "Sent" as const, sentAt }
+    const { error } = await updateInvoice(invoice.id, patch)
+    setSending(false)
+    if (error) {
+      onError?.(error)
+      return
+    }
+    onSent?.()
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !sending && onClose()} />
       <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Mail className="w-4 h-4 text-primary" /> Email Invoice to Customer
+            <Mail className="w-4 h-4 text-primary" />{" "}
+            {variant === "resend" ? "Resend Invoice to Customer" : "Email Invoice to Customer"}
           </h3>
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted transition-colors cursor-pointer">
+          <button type="button" onClick={() => !sending && onClose()} disabled={sending} className="p-1 rounded hover:bg-muted transition-colors cursor-pointer disabled:opacity-50">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
@@ -723,9 +757,29 @@ function EmailModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () =
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-          <Button size="sm" variant="outline" onClick={onClose} className="text-xs cursor-pointer">Cancel</Button>
-          <Button size="sm" variant="default" onClick={onClose} className="text-xs gap-1.5 cursor-pointer">
-            <Mail className="w-3.5 h-3.5" /> Send Email
+          <Button size="sm" variant="outline" onClick={onClose} disabled={sending} className="text-xs cursor-pointer disabled:opacity-50">
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => void handleSend()}
+            disabled={sending}
+            className="text-xs gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            {sending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...
+              </>
+            ) : variant === "resend" ? (
+              <>
+                <Mail className="w-3.5 h-3.5" /> Resend Invoice
+              </>
+            ) : (
+              <>
+                <Mail className="w-3.5 h-3.5" /> Send Email
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -909,6 +963,9 @@ function InfoTab({
           <Row label="Status" value={
             <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[invoice.status].className)}>{invoice.status}</Badge>
           } />
+        )}
+        {!editing && invoice.sentAt && (
+          <Row label="Sent" value={`Sent on ${fmtDate(invoice.sentAt)}`} />
         )}
         {invoice.paidDate && (
           <Row label="Paid On" value={<span className="text-[color:var(--status-success)] font-semibold">{fmtDate(invoice.paidDate)}</span>} />
@@ -1308,17 +1365,25 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
 
   // Toasts
-  const [toasts, setToasts] = useState<{ id: number; message: string }[]>([])
+  const [toasts, setToasts] = useState<{ id: number; message: string; kind: "success" | "error" }[]>([])
 
   // Modals
   const [modal, setModal] = useState<"email" | "sms" | "payment" | null>(null)
+  const [emailVariant, setEmailVariant] = useState<"send" | "resend">("send")
   const [moreOpen, setMoreOpen] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
 
-  function toast(message: string) {
+  function toast(message: string, kind: "success" | "error" = "success") {
     const id = ++toastCounter
-    setToasts((prev) => [...prev, { id, message }])
+    setToasts((prev) => [...prev, { id, message, kind }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500)
+  }
+
+  const alreadyEmailed = invoice.status === "Sent" && Boolean(invoice.sentAt)
+
+  function openEmailModal(variant: "send" | "resend") {
+    setEmailVariant(variant)
+    setModal("email")
   }
 
   function startEdit() {
@@ -1332,13 +1397,31 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     setEditing(false); setDraft({}); setDraftItems([])
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
-    updateInvoice(invoice.id, {
-      ...draft, lineItems: draftItems, amount: newTotal,
-      ...(draft.status === "Paid" && !invoice.paidDate ? { paidDate: new Date().toISOString().slice(0, 10) } : {}),
-    })
-    setEditing(false); setDraft({}); setDraftItems([])
+    const nextStatus = (draft.status ?? invoice.status) as InvoiceStatus
+    const patch: Parameters<typeof updateOrgInvoice>[3] = {
+      status: nextStatus,
+      dueDate: draft.dueDate ?? invoice.dueDate,
+      notes: draft.notes ?? invoice.notes,
+      lineItems: draftItems.map((li) => ({
+        description: li.description,
+        qty: li.qty,
+        unit: li.unit,
+      })),
+      amountCents: Math.round(newTotal * 100),
+    }
+    if (nextStatus === "Paid" && !invoice.paidDate) {
+      patch.paidAt = new Date().toISOString()
+    }
+    const { error } = await updateInvoice(invoice.id, patch)
+    if (error) {
+      toast(`Could not save: ${error}`, "error")
+      return
+    }
+    setEditing(false)
+    setDraft({})
+    setDraftItems([])
     toast("Invoice updated successfully")
   }
 
@@ -1377,7 +1460,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/20 flex-wrap shrink-0">
         {editing ? (
           <>
-            <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={saveEdit}>
+            <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
               <Check className="w-3.5 h-3.5" /> Save Changes
             </Button>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>
@@ -1386,10 +1469,26 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           </>
         ) : (
           <>
-            {/* Primary: Email */}
-            <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("email")}>
-              <Mail className="w-3.5 h-3.5" /> Email to Customer
-            </Button>
+            {/* Primary: Email / already sent + resend */}
+            {alreadyEmailed ? (
+              <>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed" disabled>
+                  <Mail className="w-3.5 h-3.5" /> Already Sent
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="gap-1.5 text-xs cursor-pointer"
+                  onClick={() => openEmailModal("resend")}
+                >
+                  <Mail className="w-3.5 h-3.5" /> Resend Invoice
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => openEmailModal("send")}>
+                <Mail className="w-3.5 h-3.5" /> Email to Customer
+              </Button>
+            )}
 
             {/* Dropdown: send actions */}
             <div className="relative">
@@ -1401,14 +1500,24 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   <div className="fixed inset-0 z-10" onClick={() => setActionsOpen(false)} />
                   <div className="absolute left-0 top-full mt-1 z-20 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
                     {[
-                      { icon: <Mail className="w-3.5 h-3.5" />,          label: "Email Dynamic Invoice",   action: () => setModal("email") },
+                      { icon: <Mail className="w-3.5 h-3.5" />,          label: alreadyEmailed ? "Resend Invoice" : "Email Dynamic Invoice",   action: () => openEmailModal(alreadyEmailed ? "resend" : "send") },
                       { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "SMS Dynamic Invoice",     action: () => setModal("sms") },
                       { icon: <Link2 className="w-3.5 h-3.5" />,         label: "Copy Invoice URL",        action: () => { navigator.clipboard?.writeText(`https://pay.equipify.ai/inv/${invoice.id.toLowerCase()}`); toast("Invoice URL copied to clipboard") } },
                       { icon: <Download className="w-3.5 h-3.5" />,      label: "Download PDF",            action: () => toast("Invoice PDF downloaded") },
                       { icon: <Save className="w-3.5 h-3.5" />,          label: "Save PDF to Record",      action: () => toast("PDF saved to invoice record") },
                       { icon: <CreditCard className="w-3.5 h-3.5" />,    label: "Record Payment",          action: () => setModal("payment") },
-                      { icon: <CheckCircle2 className="w-3.5 h-3.5" />,  label: "Mark Paid",               action: () => { updateInvoice(invoice.id, { status: "Paid", paidDate: new Date().toISOString().slice(0, 10) }); toast("Invoice marked as paid"); setActionsOpen(false) } },
-                      { icon: <Ban className="w-3.5 h-3.5" />,           label: "Void Invoice",            action: () => { updateInvoice(invoice.id, { status: "Void" }); toast("Invoice voided"); setActionsOpen(false) } },
+                      { icon: <CheckCircle2 className="w-3.5 h-3.5" />,  label: "Mark Paid",               action: async () => {
+                        const { error } = await updateInvoice(invoice.id, { status: "Paid", paidAt: new Date().toISOString() })
+                        if (error) { toast(`Could not mark paid: ${error}`, "error"); return }
+                        toast("Invoice marked as paid")
+                        setActionsOpen(false)
+                      } },
+                      { icon: <Ban className="w-3.5 h-3.5" />,           label: "Void Invoice",            action: async () => {
+                        const { error } = await updateInvoice(invoice.id, { status: "Void" })
+                        if (error) { toast(`Could not void: ${error}`, "error"); return }
+                        toast("Invoice voided")
+                        setActionsOpen(false)
+                      } },
                     ].map((item) => (
                       <button key={item.label} type="button" onClick={() => { item.action(); setActionsOpen(false) }}
                         className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs text-foreground hover:bg-muted/60 transition-colors cursor-pointer">
@@ -1585,8 +1694,20 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       {toasts.length > 0 && (
         <div className="fixed bottom-6 right-6 z-[70] flex flex-col gap-2 pointer-events-none">
           {toasts.map((t) => (
-            <div key={t.id} className="flex items-center gap-2 px-4 py-3 rounded-lg bg-foreground text-background text-xs font-medium shadow-lg pointer-events-auto">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[color:var(--status-success)]" />
+            <div
+              key={t.id}
+              className={cn(
+                "flex items-center gap-2 px-4 py-3 rounded-lg text-xs font-medium shadow-lg pointer-events-auto",
+                t.kind === "error"
+                  ? "bg-destructive text-destructive-foreground border border-destructive/30"
+                  : "bg-foreground text-background",
+              )}
+            >
+              {t.kind === "error" ? (
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[color:var(--status-success)]" />
+              )}
               {t.message}
             </div>
           ))}
@@ -1594,9 +1715,40 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       )}
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
-      {modal === "email"   && <EmailModal   invoice={invoice} onClose={() => setModal(null)} />}
+      {modal === "email" && (
+        <EmailModal
+          invoice={invoice}
+          variant={emailVariant}
+          onClose={() => setModal(null)}
+          onSent={() =>
+            toast(
+              emailVariant === "resend" ? "Invoice resent — sent time updated." : "Invoice sent to customer.",
+            )
+          }
+          onError={(msg) => toast(`Could not send email: ${msg}`, "error")}
+        />
+      )}
       {modal === "sms"     && <SmsModal     invoice={invoice} onClose={() => setModal(null)} />}
-      {modal === "payment" && <PaymentModal invoice={invoice} onClose={() => setModal(null)} onRecord={() => { updateInvoice(invoice.id, { status: "Paid", paidDate: new Date().toISOString().slice(0, 10) }); toast("Payment recorded — invoice marked as paid") }} />}
+      {modal === "payment" && (
+        <PaymentModal
+          invoice={invoice}
+          onClose={() => setModal(null)}
+          onRecord={() => {
+            void (async () => {
+              const { error } = await updateInvoice(invoice.id, {
+                status: "Paid",
+                paidAt: new Date().toISOString(),
+              })
+              if (error) {
+                toast(`Could not record payment: ${error}`, "error")
+                return
+              }
+              toast("Payment recorded — invoice marked as paid")
+              setModal(null)
+            })()
+          }}
+        />
+      )}
     </>
   )
 }

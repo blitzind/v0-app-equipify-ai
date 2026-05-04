@@ -172,6 +172,7 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       alreadyMember: true,
+      userId: targetUserId,
       message: "This person is already on the team.",
     })
   }
@@ -193,6 +194,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
+    userId: targetUserId,
     message: "Invitation sent. They will appear in the roster (invite pending until they accept).",
   })
 }

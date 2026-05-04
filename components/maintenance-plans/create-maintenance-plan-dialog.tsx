@@ -119,6 +119,7 @@ export function CreateMaintenancePlanDialog({
     status: "Active" as PlanStatus,
     workOrderType: "PM" as WorkOrderType,
     workOrderPriority: "Normal" as WorkOrderPriority,
+    preferredServiceTime: "08:00",
     autoCreateWorkOrder: true,
     notes: "",
     emailEnabled: true,
@@ -159,6 +160,7 @@ export function CreateMaintenancePlanDialog({
       status: "Active",
       workOrderType: "PM",
       workOrderPriority: "Normal",
+      preferredServiceTime: "08:00",
       autoCreateWorkOrder: true,
       notes: "",
       emailEnabled: true,
@@ -436,6 +438,7 @@ export function CreateMaintenancePlanDialog({
       autoCreateWorkOrder: hasEquipment && form.autoCreateWorkOrder,
       workOrderType: form.workOrderType,
       workOrderPriority: form.workOrderPriority,
+      preferredServiceTime: form.preferredServiceTime,
       notes: form.notes,
       createdAt: new Date().toISOString(),
       totalServicesCompleted: 0,
@@ -817,6 +820,22 @@ export function CreateMaintenancePlanDialog({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          )}
+          {canAutoWo && form.autoCreateWorkOrder && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Preferred service window start
+              </label>
+              <input
+                type="time"
+                className="input-base max-w-[200px]"
+                value={form.preferredServiceTime}
+                onChange={(e) => set("preferredServiceTime", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Automation sets the work order scheduled time on the due date.
+              </p>
             </div>
           )}
 

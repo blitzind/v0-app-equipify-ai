@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback, Suspense } from "react"
-import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
+import { DispatchDrawer } from "@/components/drawers/dispatch-drawer"
+import { ScheduleJobModal } from "@/components/technicians/schedule-job-modal"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -60,7 +61,13 @@ import {
   Copy,
   Trash2,
   Eye,
+  Camera,
 } from "lucide-react"
+import { ALL_REGIONS, ALL_ROLES, ALL_SKILLS, ALL_STATUSES } from "@/lib/technicians/roster-form-constants"
+import {
+  queryOrganizationMembersForRoster,
+  queryProfilesForRoster,
+} from "@/lib/technicians/roster-queries"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,18 +75,18 @@ type ViewMode = "card" | "table"
 type KpiFilter = "active" | "today" | "performance" | "expiring" | null
 type MessageTab = "sms" | "email" | "note"
 
-const ALL_STATUSES: TechStatus[] = ["Available", "On Job", "Off", "Vacation"]
-const ALL_SKILLS: TechSkill[] = [
-  "HVAC", "Electrical", "Calibration", "Medical Equipment",
-  "Industrial Repair", "Installations", "Refrigeration", "Hydraulics", "Welding", "PLC / Controls",
-]
-const ALL_REGIONS = ["Midwest", "Northeast", "Southeast", "Southwest", "West"]
-const ALL_ROLES = [
-  "Senior Field Technician", "Lead Calibration Specialist", "Industrial Repair Technician",
-  "Field Technician II", "Field Technician I",
-]
-
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
+
+function parseTechStatus(s: string | null | undefined): TechStatus {
+  if (s === "Available" || s === "On Job" || s === "Off" || s === "Vacation") return s
+  return "Available"
+}
+
+function normalizeSkills(arr: string[] | null | undefined): TechSkill[] {
+  if (!arr?.length) return []
+  const allowed = new Set<string>(ALL_SKILLS)
+  return arr.filter((x): x is TechSkill => allowed.has(x))
+}
 
 function formatMemberRole(role: string): string {
   if (!role) return "Member"
@@ -168,23 +175,37 @@ function buildTechnicianFromProfile(
     full_name: string | null
     created_at: string
     avatar_url?: string | null
+    phone?: string | null
   },
   memberRole: string,
   stats: ReturnType<typeof aggregateWoStats>,
   membershipRowStatus?: string | null,
+  roster?: {
+    job_title?: string | null
+    region?: string | null
+    skills?: string[] | null
+    availability_status?: string | null
+    start_date?: string | null
+  } | null,
 ): Technician {
   const name =
     (profile.full_name && profile.full_name.trim()) ||
     (profile.email && profile.email.trim()) ||
     "Technician"
+  const startRaw = roster?.start_date != null ? String(roster.start_date) : ""
   const hireDate =
-    profile.created_at && /^\d{4}-\d{2}-\d{2}/.test(profile.created_at)
-      ? profile.created_at.slice(0, 10)
-      : "—"
+    startRaw && /^\d{4}-\d{2}-\d{2}/.test(startRaw)
+      ? startRaw.slice(0, 10)
+      : profile.created_at && /^\d{4}-\d{2}-\d{2}/.test(profile.created_at)
+        ? profile.created_at.slice(0, 10)
+        : "—"
 
   const ms = membershipRowStatus?.toLowerCase()
   const membershipStatus =
     ms === "invited" || ms === "active" || ms === "suspended" ? ms : undefined
+
+  const displayRole =
+    (roster?.job_title && roster.job_title.trim()) || formatMemberRole(memberRole)
 
   return {
     id: profile.id,
@@ -192,13 +213,13 @@ function buildTechnicianFromProfile(
     avatar: initialsFromName(name),
     avatarUrl: profile.avatar_url?.trim() || null,
     membershipStatus,
-    role: formatMemberRole(memberRole),
-    region: "—",
+    role: displayRole,
+    region: roster?.region?.trim() || "—",
     email: profile.email ?? "",
-    phone: "—",
+    phone: profile.phone?.trim() || "—",
     hireDate,
-    status: "Available",
-    skills: [] as TechSkill[],
+    status: parseTechStatus(roster?.availability_status),
+    skills: normalizeSkills(roster?.skills ?? []),
     jobsThisWeek: stats.jobsThisWeek,
     completionPct: stats.completionPct,
     rating: 0,
@@ -208,7 +229,7 @@ function buildTechnicianFromProfile(
     certifications: [],
     schedule: [],
     history: [],
-    bio: `${name} (${formatMemberRole(memberRole)}). Performance metrics below reflect assigned work orders when available.`,
+    bio: `${name} (${displayRole}). Performance metrics below reflect assigned work orders when available.`,
   }
 }
 
@@ -342,15 +363,19 @@ function AddTechModal({
   onInvite,
 }: {
   onClose: () => void
-  onInvite: (input: { fullName: string; email: string }) => Promise<{
+  onInvite: (input: { fullName: string; email: string; avatarFile: File | null }) => Promise<{
     ok: boolean
     error?: string
     message?: string
     alreadyMember?: boolean
   }>
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const previewUrlRef = useRef<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [selectedSkills, setSelectedSkills] = useState<TechSkill[]>([])
   const [form, setForm] = useState({
     name: "", email: "", phone: "", role: "", region: "",
@@ -363,6 +388,30 @@ function AddTechModal({
     return () => window.removeEventListener("keydown", handler)
   }, [onClose])
 
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current)
+        previewUrlRef.current = null
+      }
+    }
+  }, [])
+
+  function applyAvatarFile(file: File | null) {
+    setAvatarFile(file)
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
+    if (file) {
+      const url = URL.createObjectURL(file)
+      previewUrlRef.current = url
+      setAvatarPreview(url)
+    } else {
+      setAvatarPreview(null)
+    }
+  }
+
   function toggleSkill(s: TechSkill) {
     setSelectedSkills((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s])
   }
@@ -374,7 +423,7 @@ function AddTechModal({
     if (!fullName || !email) return
     setLoading(true)
     setFormError(null)
-    const result = await onInvite({ fullName, email })
+    const result = await onInvite({ fullName, email, avatarFile })
     setLoading(false)
     if (result.ok) {
       onClose()
@@ -400,6 +449,72 @@ function AddTechModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="flex flex-col items-center gap-3 pb-4 border-b border-border">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null
+                e.target.value = ""
+                if (!f) return
+                if (!f.type.startsWith("image/")) {
+                  setFormError("Please choose an image file (JPEG, PNG, WebP, or GIF).")
+                  return
+                }
+                if (f.size > 5 * 1024 * 1024) {
+                  setFormError("Image must be 5 MB or smaller.")
+                  return
+                }
+                setFormError(null)
+                applyAvatarFile(f)
+              }}
+            />
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt=""
+                className="h-14 w-14 rounded-full object-cover ring-2 ring-background shadow-sm shrink-0"
+              />
+            ) : (
+              <TechnicianAvatar
+                userId={form.email.trim() || "add-tech-preview"}
+                name={form.name.trim() || "New technician"}
+                initials={initialsFromName(form.name.trim() || "?")}
+                size="lg"
+              />
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera className="w-3.5 h-3.5 mr-1.5" />
+                {avatarFile ? "Change photo" : "Upload photo"}
+              </Button>
+              {avatarFile ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground cursor-pointer"
+                  onClick={() => applyAvatarFile(null)}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center max-w-sm">
+              Optional. Saved to team storage and shown on the roster after you send the invitation.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-1.5">
               <Label htmlFor="add-name">Full Name <span className="text-destructive">*</span></Label>
@@ -480,85 +595,6 @@ function AddTechModal({
             </Button>
             <Button type="submit" className="flex-1" disabled={loading}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending…</> : "Send invitation"}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ─── Schedule Modal ──────────────────────────────────────────������───────���───────
-
-function ScheduleModal({
-  tech, onClose, onSave,
-}: { tech: Technician; onClose: () => void; onSave: (msg: string) => void }) {
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    date: "2026-05-05", time: "9:00 AM", customer: "", jobType: "", notes: "",
-  })
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [onClose])
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.customer || !form.jobType) return
-    setLoading(true)
-    setTimeout(() => {
-      onSave(`Job assigned to ${tech.name}`)
-    }, 700)
-  }
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Schedule Job</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Assigning to <strong>{tech.name}</strong></p>
-          </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="sched-date">Date <span className="text-destructive">*</span></Label>
-              <Input id="sched-date" type="date" value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="sched-time">Time <span className="text-destructive">*</span></Label>
-              <Input id="sched-time" placeholder="e.g. 9:00 AM" value={form.time}
-                onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sched-customer">Customer <span className="text-destructive">*</span></Label>
-            <Input id="sched-customer" placeholder="e.g. Apex Fabricators" value={form.customer}
-              onChange={(e) => setForm((f) => ({ ...f, customer: e.target.value }))} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sched-job">Job Type <span className="text-destructive">*</span></Label>
-            <Input id="sched-job" placeholder="e.g. HVAC Preventive Maintenance" value={form.jobType}
-              onChange={(e) => setForm((f) => ({ ...f, jobType: e.target.value }))} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sched-notes">Notes</Label>
-            <Textarea id="sched-notes" placeholder="Any special instructions…" rows={3} value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-          </div>
-          <div className="flex gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Assigning…</> : "Assign Job"}
             </Button>
           </div>
         </form>
@@ -853,8 +889,23 @@ function TechniciansPageInner() {
   const [selectedTech, setSelectedTech] = useState<Technician | null>(null)
   const [addTechOpen, setAddTechOpen] = useState(false)
   const [rosterRefresh, setRosterRefresh] = useState(0)
+  const [dispatchDrawerOpen, setDispatchDrawerOpen] = useState(false)
+  const [dispatchInitialTechId, setDispatchInitialTechId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (searchParams.get("dispatch") !== "1") return
+    const tech = searchParams.get("tech")
+    setDispatchDrawerOpen(true)
+    setDispatchInitialTechId(tech && tech.trim() ? tech.trim() : null)
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete("dispatch")
+    next.delete("tech")
+    const q = next.toString()
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false })
+  }, [searchParams, pathname, router])
 
   useEffect(() => {
     let active = true
@@ -892,12 +943,15 @@ function TechniciansPageInner() {
 
       const orgId = activeOrgId
 
-      const { data: members, error: memError } = await supabase
-        .from("organization_members")
-        .select("user_id, role, status")
-        .eq("organization_id", orgId)
-        .in("status", ["active", "invited"])
-        .in("role", [...ROSTER_MEMBER_ROLES])
+      const {
+        data: members,
+        error: memError,
+        rosterColumnsAvailable: omRosterColumns,
+      } = await queryOrganizationMembersForRoster(supabase, {
+        organizationId: orgId,
+        statusIn: ["active", "invited"],
+        roleIn: ROSTER_MEMBER_ROLES,
+      })
 
       if (memError) {
         if (active) {
@@ -909,10 +963,44 @@ function TechniciansPageInner() {
         return
       }
 
-      const memberList = (members ?? []) as Array<{ user_id: string; role: string; status: string }>
+      type MemberRow = {
+        user_id: string
+        role: string
+        status: string
+        job_title?: string | null
+        region?: string | null
+        skills?: string[] | null
+        availability_status?: string | null
+        start_date?: string | null
+      }
+
+      const memberList = (members ?? []) as MemberRow[]
       const userIds = [...new Set(memberList.map((m) => m.user_id))]
       const roleByUser = new Map(memberList.map((m) => [m.user_id, m.role]))
       const membershipStatusByUser = new Map(memberList.map((m) => [m.user_id, m.status]))
+      const rosterByUser = omRosterColumns
+        ? new Map(
+            memberList.map((m) => [
+              m.user_id,
+              {
+                job_title: m.job_title,
+                region: m.region,
+                skills: m.skills,
+                availability_status: m.availability_status,
+                start_date: m.start_date,
+              },
+            ]),
+          )
+        : new Map<
+            string,
+            {
+              job_title?: string | null
+              region?: string | null
+              skills?: string[] | null
+              availability_status?: string | null
+              start_date?: string | null
+            }
+          >()
 
       if (userIds.length === 0) {
         if (active) {
@@ -923,10 +1011,7 @@ function TechniciansPageInner() {
         return
       }
 
-      const { data: profRows, error: profError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, created_at, avatar_url")
-        .in("id", userIds)
+      const { data: profRows, error: profError } = await queryProfilesForRoster(supabase, userIds)
 
       if (profError) {
         if (active) {
@@ -956,6 +1041,7 @@ function TechniciansPageInner() {
           full_name: string | null
           created_at: string
           avatar_url?: string | null
+          phone?: string | null
         }>
       )
         .filter((p) => roleByUser.has(p.id))
@@ -963,7 +1049,8 @@ function TechniciansPageInner() {
           const role = roleByUser.get(p.id) ?? "tech"
           const stats = aggregateWoStats(woList, p.id, weekStart, weekEnd, todayStr)
           const omStatus = membershipStatusByUser.get(p.id) ?? null
-          return buildTechnicianFromProfile(p, role, stats, omStatus)
+          const roster = rosterByUser.get(p.id) ?? null
+          return buildTechnicianFromProfile(p, role, stats, omStatus, roster)
         })
         .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -1004,7 +1091,7 @@ function TechniciansPageInner() {
   }, [])
 
   const inviteTechnician = useCallback(
-    async (input: { fullName: string; email: string }) => {
+    async (input: { fullName: string; email: string; avatarFile: File | null }) => {
       if (!activeOrgId) {
         return { ok: false as const, error: "No organization selected." }
       }
@@ -1020,6 +1107,7 @@ function TechniciansPageInner() {
           error?: string
           ok?: boolean
           alreadyMember?: boolean
+          userId?: string
         }
         if (!res.ok) {
           const msg =
@@ -1031,6 +1119,28 @@ function TechniciansPageInner() {
           addToast(msg, "info")
           return { ok: false as const, error: msg }
         }
+
+        const userId = typeof data.userId === "string" && data.userId ? data.userId : null
+        if (input.avatarFile && userId) {
+          const fd = new FormData()
+          fd.append("file", input.avatarFile)
+          const up = await fetch(`/api/organizations/${activeOrgId}/members/${userId}/avatar`, {
+            method: "POST",
+            body: fd,
+            credentials: "include",
+          })
+          const upData = (await up.json().catch(() => ({}))) as { message?: string; error?: string }
+          if (!up.ok) {
+            const photoMsg =
+              typeof upData.message === "string"
+                ? upData.message
+                : typeof upData.error === "string"
+                  ? upData.error
+                  : "Could not save profile photo."
+            addToast(photoMsg, "info")
+          }
+        }
+
         const successMsg =
           typeof data.message === "string"
             ? data.message
@@ -1207,12 +1317,17 @@ function TechniciansPageInner() {
             </SelectContent>
           </Select>
 
-          <Link
-            href="/technicians/daily"
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors shrink-0"
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 px-3 gap-1.5 shrink-0 cursor-pointer"
+            onClick={() => {
+              setDispatchInitialTechId(null)
+              setDispatchDrawerOpen(true)
+            }}
           >
             <CalendarDays className="w-4 h-4" /> Daily Dispatch
-          </Link>
+          </Button>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <ViewToggle view={view} onViewChange={setView} />
             <Button
@@ -1386,8 +1501,17 @@ function TechniciansPageInner() {
         />
       )}
 
+      <DispatchDrawer
+        open={dispatchDrawerOpen}
+        onOpenChange={(open) => {
+          setDispatchDrawerOpen(open)
+          if (!open) setDispatchInitialTechId(null)
+        }}
+        initialTechnicianId={dispatchInitialTechId}
+      />
+
       {scheduleTech && (
-        <ScheduleModal
+        <ScheduleJobModal
           tech={scheduleTech}
           onClose={() => setScheduleTech(null)}
           onSave={(msg) => { setScheduleTech(null); addToast(msg) }}

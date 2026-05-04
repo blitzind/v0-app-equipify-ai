@@ -25,6 +25,7 @@ import {
   planStatusUiToDb,
   serializeServicesForDb,
 } from "@/lib/maintenance-plans/db-map"
+import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
 
 interface MaintenanceContextValue {
   plans: MaintenancePlan[]
@@ -124,7 +125,12 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         next_due_date: nextDue?.trim() ? nextDue : null,
         auto_create_work_order: plan.autoCreateWorkOrder,
         notes: plan.notes?.trim() ? plan.notes : null,
-        services: serializeServicesForDb(plan.services, plan.workOrderType, plan.workOrderPriority),
+        services: serializeServicesForDb(
+          plan.services,
+          plan.workOrderType,
+          plan.workOrderPriority,
+          plan.preferredServiceTime,
+        ),
         notification_rules: notificationRulesToJsonb(plan.notificationRules),
       })
 
@@ -176,7 +182,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
           services: serializeServicesForDb(
             merged.services,
             merged.workOrderType,
-            merged.workOrderPriority
+            merged.workOrderPriority,
+            merged.preferredServiceTime,
           ),
           notification_rules: notificationRulesToJsonb(merged.notificationRules),
         })
@@ -201,6 +208,25 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         .eq("organization_id", organizationId)
 
       if (upError) return { error: upError.message }
+
+      const evt =
+        status === "Paused"
+          ? ({ eventType: "plan_paused" as const, message: "Plan paused — automation will not create work orders." })
+          : status === "Active"
+            ? ({
+                eventType: "plan_resumed" as const,
+                message: "Plan resumed — automation eligible when due.",
+              })
+            : null
+      if (evt) {
+        void insertMaintenancePlanAutomationEvent(supabase, {
+          organizationId,
+          maintenancePlanId: id,
+          eventType: evt.eventType,
+          message: evt.message,
+        })
+      }
+
       await refreshPlans({ silent: true })
       return {}
     },

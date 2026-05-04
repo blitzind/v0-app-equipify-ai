@@ -7,6 +7,8 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { loadWorkOrderDetailForOrg } from "@/lib/work-orders/detail-load"
+import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
+import { AssignTechnicianDialog } from "@/components/work-orders/assign-technician-dialog"
 import { serializeRepairLog } from "@/lib/work-orders/parse-repair-log"
 import {
   WorkOrderDetailExperience,
@@ -195,7 +197,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
   const [wo, setWo] = useState<WorkOrder | null>(null)
   const [dbNotes, setDbNotes] = useState("")
   const [planServices, setPlanServices] = useState<unknown[] | null>(null)
-  const [technicianOptions, setTechnicianOptions] = useState<TechnicianOption[]>([])
+  const [technicianAssignOptions, setTechnicianAssignOptions] = useState<
+    Awaited<ReturnType<typeof loadTechnicianAssignOptions>>
+  >([])
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [assignSavingKey, setAssignSavingKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
@@ -231,35 +237,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       return
     }
 
-    const { data: members } = await supabase
-      .from("organization_members")
-      .select("user_id")
-      .eq("organization_id", orgId)
-      .eq("status", "active")
-      .in("role", ["owner", "admin", "manager", "tech"])
-
-    const userIds = [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))]
-    let techOpts: TechnicianOption[] = []
-    if (userIds.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, avatar_url")
-        .in("id", userIds)
-      techOpts =
-        ((profs as Array<{
-          id: string
-          full_name: string | null
-          email: string | null
-          avatar_url: string | null
-        }> | null) ?? []).map((p) => ({
-          id: p.id,
-          label:
-            (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-          avatarUrl: p.avatar_url?.trim() || null,
-        }))
-      techOpts.sort((a, b) => a.label.localeCompare(b.label))
-    }
-    setTechnicianOptions(techOpts)
+    const techOpts = await loadTechnicianAssignOptions(supabase, orgId)
+    setTechnicianAssignOptions(techOpts)
 
     const res = await loadWorkOrderDetailForOrg(supabase, orgId, workOrderId)
     if (!res.ok) {
@@ -302,6 +281,61 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
       scheduledTime: (draft.scheduledTime ?? wo.scheduledTime) as string,
     }
   }, [wo, editing, draft])
+
+  const technicianOptions: TechnicianOption[] = useMemo(
+    () =>
+      technicianAssignOptions.map((o) => ({
+        id: o.id,
+        label: o.label,
+        avatarUrl: o.avatarUrl,
+      })),
+    [technicianAssignOptions],
+  )
+
+  async function persistTechnicianAssignment(userId: string | null) {
+    if (!wo || !activeOrgId) return
+    if (userId && userId === wo.technicianId) {
+      setAssignDialogOpen(false)
+      return
+    }
+    if (!userId && wo.technicianId === "unassigned") {
+      setAssignDialogOpen(false)
+      return
+    }
+
+    const key = userId ?? "unassigned"
+    setAssignSavingKey(key)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { error } = await supabase
+        .from("work_orders")
+        .update({
+          assigned_user_id: userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", wo.id)
+        .eq("organization_id", activeOrgId)
+
+      if (error) {
+        pushToast({
+          variant: "destructive",
+          title: "Could not update assignment",
+          description: error.message,
+        })
+        return
+      }
+
+      pushToast({
+        title: userId ? "Technician assigned" : "Technician unassigned",
+        description: getWorkOrderDisplay(wo),
+      })
+      setAssignDialogOpen(false)
+      await loadWorkOrder()
+      onUpdated?.()
+    } finally {
+      setAssignSavingKey(null)
+    }
+  }
 
   function toast(message: string) {
     const id = ++toastCounter
@@ -700,13 +734,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
             signatureEditable={false}
             tasksEditable={false}
             onEditWorkOrder={startEdit}
-            onAssignTechnician={() => {
-              startEdit()
-              pushToast({
-                title: "Assign technician",
-                description: "Choose a technician under Job settings, then save changes.",
-              })
-            }}
+            onAssignTechnician={() => setAssignDialogOpen(true)}
             onMarkComplete={() => void markComplete()}
             quoteHref={quoteHref}
             onInvoicePlaceholder={() =>
@@ -721,6 +749,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated }: WorkOrderDr
           </div>
         </div>
       </DetailDrawer>
+
+      <AssignTechnicianDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        options={technicianAssignOptions}
+        currentTechnicianId={wo.technicianId}
+        savingKey={assignSavingKey}
+        onSelect={(userId) => void persistTechnicianAssignment(userId)}
+      />
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
     </>

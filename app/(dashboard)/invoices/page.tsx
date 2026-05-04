@@ -36,6 +36,10 @@ function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
 }
 
+function invoiceDisplayId(inv: AdminInvoice) {
+  return inv.invoiceNumber?.trim() || inv.id
+}
+
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<InvoiceStatus, { label: string; className: string; icon: React.ElementType }> = {
@@ -112,7 +116,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function InvoicesPageInner() {
-  const { invoices } = useInvoices()
+  const { invoices, loading, error, refreshInvoices } = useInvoices()
   const { toast } = useToast()
   const [newModalOpen, setNewModalOpen] = useState(false)
   useQuickAdd("new-invoice", () => setNewModalOpen(true))
@@ -142,6 +146,7 @@ function InvoicesPageInner() {
       list = list.filter(
         (inv) =>
           inv.id.toLowerCase().includes(q) ||
+          (inv.invoiceNumber?.toLowerCase().includes(q) ?? false) ||
           inv.customerName.toLowerCase().includes(q) ||
           inv.equipmentName.toLowerCase().includes(q) ||
           workOrderMatchesSearch(search, {
@@ -169,7 +174,7 @@ function InvoicesPageInner() {
     })
 
     return list
-  }, [search, statusFilter, sortKey, sortDir])
+  }, [invoices, search, statusFilter, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -180,7 +185,22 @@ function InvoicesPageInner() {
 
   return (
     <div className="flex flex-col gap-5">
-      <InvoiceStatCards invoices={invoices} />
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive flex flex-wrap items-center justify-between gap-2">
+          <span>{error}</span>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void refreshInvoices()}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {loading && invoices.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
+          Loading invoices…
+        </div>
+      ) : (
+        <InvoiceStatCards invoices={invoices} />
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -218,6 +238,7 @@ function InvoicesPageInner() {
       </div>
 
       <p className="text-sm text-muted-foreground -mt-1">
+        {loading && invoices.length > 0 && <span className="text-muted-foreground/80 mr-2">Refreshing…</span>}
         Showing <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
         <span className="font-medium text-foreground">{invoices.length}</span> invoices
       </p>
@@ -251,7 +272,7 @@ function InvoicesPageInner() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{inv.id}</p>
+                    <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{invoiceDisplayId(inv)}</p>
                     <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{inv.customerName}</p>
                   </div>
                   <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
@@ -353,7 +374,7 @@ function InvoicesPageInner() {
                   >
                     <TableCell>
                       <span className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 ds-tabular">
-                        {inv.id}
+                        {invoiceDisplayId(inv)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -405,10 +426,10 @@ function InvoicesPageInner() {
       <NewInvoiceModal
         open={newModalOpen}
         onClose={() => setNewModalOpen(false)}
-        onSuccess={(id, status) => {
+        onSuccess={(_id, status) => {
           toast({
             title: status === "Sent" ? "Invoice sent to customer" : "Invoice saved as draft",
-            description: `${id} has been ${status === "Sent" ? "sent" : "saved"}.`,
+            description: `Your invoice has been ${status === "Sent" ? "sent" : "saved"}.`,
           })
         }}
       />

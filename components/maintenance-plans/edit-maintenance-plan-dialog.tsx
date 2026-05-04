@@ -140,6 +140,7 @@ export function EditMaintenancePlanDialog({
     autoCreateWorkOrder: true,
     workOrderType: "PM" as WorkOrderType,
     workOrderPriority: "Normal" as WorkOrderPriority,
+    preferredServiceTime: "08:00",
     notes: "",
     emailEnabled: true,
     smsEnabled: false,
@@ -181,6 +182,7 @@ export function EditMaintenancePlanDialog({
       autoCreateWorkOrder: plan.autoCreateWorkOrder,
       workOrderType: plan.workOrderType,
       workOrderPriority: plan.workOrderPriority,
+      preferredServiceTime: plan.preferredServiceTime?.trim() || "08:00",
       notes: plan.notes ?? "",
       emailEnabled: channelEnabled(plan, "Email"),
       smsEnabled: channelEnabled(plan, "SMS"),
@@ -396,6 +398,7 @@ export function EditMaintenancePlanDialog({
       autoCreateWorkOrder: hasEquipment && form.autoCreateWorkOrder,
       workOrderType: form.workOrderType,
       workOrderPriority: form.workOrderPriority,
+      preferredServiceTime: form.preferredServiceTime,
       notes: form.notes,
       services: services.filter((s) => s.name.trim()),
       notificationRules: buildRules(
@@ -721,6 +724,20 @@ export function EditMaintenancePlanDialog({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          )}
+          {canAutoWo && form.autoCreateWorkOrder && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Preferred service window start</label>
+              <input
+                type="time"
+                className="input-base max-w-[200px]"
+                value={form.preferredServiceTime}
+                onChange={(e) => set("preferredServiceTime", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used when automation creates the next work order (scheduled time on the due date).
+              </p>
             </div>
           )}
 

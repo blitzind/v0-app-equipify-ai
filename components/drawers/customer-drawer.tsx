@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
 import {
-  DetailDrawer, DrawerSection, DrawerRow, DrawerToastStack,
+  DetailDrawer, DrawerRow, DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -15,7 +17,7 @@ import {
   ExternalLink, Pencil, X, Plus, Trash2, Archive,
   MoreHorizontal, Star,
   Globe, Send, Link2, RotateCcw, Clock, Activity,
-  Paintbrush, LayoutGrid, UserCog, ShieldOff, ShieldCheck,
+  Paintbrush, LayoutGrid, UserCog,
 } from "lucide-react"
 import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
@@ -85,6 +87,27 @@ function EditRow({ label, view, editing, children }: { label: string; view: Reac
     </div>
   ) : (
     <DrawerRow label={label} value={view} />
+  )
+}
+
+/** Card shell aligned with work-order drawer / `WorkOrderDetailExperience` sections */
+function CustomerDrawerCard({
+  title,
+  action,
+  children,
+}: {
+  title: ReactNode
+  action?: ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-2 pb-3 min-w-0">
+        <CardTitle className="text-sm font-semibold leading-tight min-w-0">{title}</CardTitle>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
   )
 }
 
@@ -709,7 +732,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           onClose={handleClose}
           title="Customer"
           subtitle="Details unavailable"
-          width="lg"
+          width="xl"
           transitionMs={400}
         >
           <p className="text-sm text-muted-foreground">Customer details are unavailable.</p>
@@ -731,7 +754,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           onClose={handleClose}
           title="Customer"
           subtitle={drawerLoading ? "Loading…" : "Not found"}
-          width="lg"
+          width="xl"
           transitionMs={400}
         >
           <p className="text-sm text-muted-foreground">
@@ -762,7 +785,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         onClose={handleClose}
         title={header.company}
         subtitle={header.displayName}
-        width="lg"
+        width="xl"
         transitionMs={400}
         badge={
           <Badge variant="secondary" className={cn("text-xs border", statusCls)}>
@@ -803,30 +826,44 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             >
               <Plus className="w-3.5 h-3.5" /> Plan
             </Button>
-            <Link href={`/customers/${header.id}`}>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer">
-                <ExternalLink className="w-3.5 h-3.5" /> Full Profile
-              </Button>
-            </Link>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" asChild>
+              <Link href={`/customers/${header.id}`} className="inline-flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full Profile
+              </Link>
+            </Button>
           </>
         }
       >
         {/* Key stats */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "Equipment", value: drawerEquipment.length, sub: "units" },
-            { label: "Open WOs", value: openWOs.length, sub: "active", warn: openWOs.length > 0 },
-            { label: "Contracts", value: drawerContracts.length, sub: "active" },
-          ].map(({ label, value, warn }) => (
-            <div key={label} className="bg-muted/40 rounded-lg p-3 text-center border border-border">
-              <p className={cn("text-xl font-bold", warn ? "text-[color:var(--status-warning)]" : "text-foreground")}>{value}</p>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">{label}</p>
+        <Card className="border-border py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <CardContent className="px-6 pb-0 pt-0">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: "Equipment", value: drawerEquipment.length, sub: "units" },
+                { label: "Open WOs", value: openWOs.length, sub: "active", warn: openWOs.length > 0 },
+                { label: "Contracts", value: drawerContracts.length, sub: "active" },
+              ].map(({ label, value, warn }) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-border bg-muted/30 p-3 text-center shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]"
+                >
+                  <p
+                    className={cn(
+                      "text-xl font-bold",
+                      warn ? "text-[color:var(--status-warning)]" : "text-foreground",
+                    )}
+                  >
+                    {value}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mt-0.5">{label}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Details */}
-        <DrawerSection title="Details">
+        <CustomerDrawerCard title="Details">
           <DrawerRow label="Company" value={header.company} />
           <DrawerRow label="Primary contact" value={header.displayName} />
           <DrawerRow
@@ -842,10 +879,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             value={new Date(header.joinedDate).toLocaleDateString("en-US", { year: "numeric", month: "long" })}
           />
           <DrawerRow label="Locations" value={drawerLocations.map((l) => l.city).join(", ") || "—"} />
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Active maintenance plans */}
-        <DrawerSection title={`Maintenance Plans (${activeCustPlans.length} active)`}>
+        <CustomerDrawerCard title={`Maintenance Plans (${activeCustPlans.length} active)`}>
           {activeCustPlans.length === 0 ? (
             <p className="text-xs text-muted-foreground">No active maintenance plans for this customer.</p>
           ) : (
@@ -854,7 +891,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <Link
                   key={plan.id}
                   href={`/maintenance-plans?open=${plan.id}`}
-                  className="flex items-start justify-between gap-2 p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                  className="flex items-start justify-between gap-2 p-3 rounded-xl border border-border bg-muted/25 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] hover:border-primary/30 hover:bg-muted/40 transition-colors group"
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
@@ -868,10 +905,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               ))}
             </div>
           )}
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Contacts */}
-        <DrawerSection
+        <CustomerDrawerCard
           title="Contacts"
           action={
             <button
@@ -896,7 +933,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         >
           <div className="space-y-2.5">
             {contacts.map((c, idx) => (
-              <div key={c.id ?? `${c.email}-${idx}`} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/30 border border-border">
+              <div
+                key={c.id ?? `${c.email}-${idx}`}
+                className="flex flex-col gap-0.5 rounded-xl border border-border bg-muted/20 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-foreground">{c.name}</span>
@@ -967,10 +1007,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <p className="text-xs text-muted-foreground text-center py-3">No contacts yet.</p>
             )}
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Locations */}
-        <DrawerSection
+        <CustomerDrawerCard
           title="Locations"
           action={
             <button
@@ -983,7 +1023,10 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         >
           <div className="space-y-2">
             {drawerLocations.map((loc) => (
-              <div key={loc.id} className="rounded-lg bg-muted/30 border border-border overflow-hidden">
+              <div
+                key={loc.id}
+                className="overflow-hidden rounded-xl border border-border bg-muted/20 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]"
+              >
                 {/* Location card header */}
                 <div className="flex items-start gap-2.5 p-3">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -1087,15 +1130,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <p className="text-xs text-muted-foreground text-center py-3">No locations. Add one to get started.</p>
             )}
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Contracts */}
-        <DrawerSection title="Contracts">
+        <CustomerDrawerCard title="Contracts">
           <div className="space-y-2">
             {drawerContracts.map((con) => (
               <div
                 key={con.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border"
+                className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]"
               >
                 <div>
                   <p className="text-xs font-semibold text-foreground">{con.name}</p>
@@ -1112,16 +1155,16 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <p className="text-xs text-muted-foreground text-center py-3">No contracts on file.</p>
             )}
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Equipment */}
-        <DrawerSection title={`Equipment (${drawerEquipment.length})`}>
+        <CustomerDrawerCard title={`Equipment (${drawerEquipment.length})`}>
           <div className="space-y-1.5">
             {drawerEquipment.slice(0, 5).map((eq) => (
               <Link
                 key={eq.id}
                 href={`/equipment?open=${eq.id}`}
-                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40"
               >
                 <div>
                   <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
@@ -1166,16 +1209,16 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <p className="text-xs text-muted-foreground text-center py-3">No equipment registered.</p>
             )}
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Open Work Orders */}
-        <DrawerSection title={`Open Work Orders (${openWOs.length})`}>
+        <CustomerDrawerCard title={`Open Work Orders (${openWOs.length})`}>
           <div className="space-y-1.5">
             {openWOs.slice(0, 4).map((wo) => (
               <Link
                 key={wo.id}
                 href={`/work-orders?open=${wo.id}`}
-                className="flex items-center justify-between p-2.5 rounded-md bg-muted/30 border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40"
               >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">
@@ -1193,17 +1236,17 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             ))}
             {openWOs.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No open work orders.</p>}
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Service history (recent work orders) */}
-        <DrawerSection title="Recent work orders">
+        <CustomerDrawerCard title="Recent work orders">
           {drawerWOs.length > 0 ? (
             <div className="space-y-1">
               {drawerWOs.slice(0, 6).map((wo) => (
                 <Link
                   key={wo.id}
                   href={`/work-orders?open=${wo.id}`}
-                  className="flex items-center gap-3 py-2 px-2.5 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group"
+                  className="group flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/30"
                 >
                   <div
                     className={cn(
@@ -1233,62 +1276,64 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No work orders yet.</p>
           )}
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Portal Access */}
-        <DrawerSection title="Portal Access">
+        <CustomerDrawerCard title="Portal Access">
           {/* Status bar */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border mb-3">
-            <div className="flex items-center gap-2.5">
-              <div className={cn(
-                "w-2 h-2 rounded-full shrink-0",
-                portalEnabled ? "bg-[color:var(--status-success)]" : "bg-muted-foreground/40"
-              )} />
-              <div>
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/25 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  portalEnabled ? "bg-[color:var(--status-success)]" : "bg-muted-foreground/40",
+                )}
+              />
+              <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground">
-                  {portalEnabled ? "Portal Active" : "Portal Disabled"}
+                  {portalEnabled ? "Portal active" : "Portal disabled"}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Last login: Apr 28, 2026 at 3:14 PM
-                </p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">Last login: Apr 28, 2026 at 3:14 PM</p>
               </div>
             </div>
-            <button
-              onClick={() => { setPortalEnabled((v) => !v); toast(portalEnabled ? "Portal access disabled" : "Portal access enabled") }}
-              className={cn(
-                "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors",
-                portalEnabled
-                  ? "border-[color:var(--status-danger)]/30 text-[color:var(--status-danger)] hover:bg-[color:var(--status-danger)]/8"
-                  : "border-[color:var(--status-success)]/30 text-[color:var(--status-success)] hover:bg-[color:var(--status-success)]/8"
-              )}
-            >
-              {portalEnabled ? <ShieldOff size={12} /> : <ShieldCheck size={12} />}
-              {portalEnabled ? "Disable" : "Enable"}
-            </button>
+            <div className="flex shrink-0 items-center gap-2 self-center">
+              <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                {portalEnabled ? "Enabled" : "Off"}
+              </span>
+              <Switch
+                checked={portalEnabled}
+                onCheckedChange={(checked) => {
+                  setPortalEnabled(checked)
+                  toast(checked ? "Portal access enabled" : "Portal access disabled")
+                }}
+                aria-label={portalEnabled ? "Disable portal access" : "Enable portal access"}
+              />
+            </div>
           </div>
 
           {/* Quick actions */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="mb-3 grid grid-cols-2 gap-2">
             {[
-              { icon: Globe,      label: "View as Customer",   action: "Opened portal preview" },
-              { icon: Send,       label: "Send Portal Invite", action: "Portal invite sent" },
-              { icon: Link2,      label: "Copy Magic Link",    action: "Magic login link copied" },
-              { icon: RotateCcw,  label: "Reset Portal Access",action: "Portal access reset" },
+              { icon: Globe, label: "View as Customer", action: "Opened portal preview" },
+              { icon: Send, label: "Send Portal Invite", action: "Portal invite sent" },
+              { icon: Link2, label: "Copy Magic Link", action: "Magic login link copied" },
+              { icon: RotateCcw, label: "Reset Portal Access", action: "Portal access reset" },
             ].map(({ icon: Icon, label, action }) => (
               <button
                 key={label}
+                type="button"
                 onClick={() => toast(action)}
                 disabled={!portalEnabled && label !== "Send Portal Invite"}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/35 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Icon size={13} className="text-muted-foreground shrink-0" />
+                <Icon size={13} className="shrink-0 text-muted-foreground" />
                 {label}
               </button>
             ))}
           </div>
 
           {/* Activity */}
-          <div className="flex items-center gap-2 mb-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <button
               onClick={() => toast("Viewing portal activity log")}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -1307,21 +1352,23 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           </div>
 
           {/* Admin controls */}
-          <div className="border-t border-border pt-3 space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">Admin Controls</p>
+          <div className="space-y-3 rounded-xl border border-border bg-muted/15 p-3 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admin controls</p>
 
             {/* Branding + contacts */}
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => toast("Opening branding editor")}
-                className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40"
               >
                 <Paintbrush size={12} className="text-muted-foreground" />
                 Edit Branding
               </button>
               <button
+                type="button"
                 onClick={() => toast("Managing portal contacts")}
-                className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/30 text-xs font-medium text-foreground hover:bg-muted/60 hover:border-primary/30 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/30 hover:bg-muted/40"
               >
                 <UserCog size={12} className="text-muted-foreground" />
                 Portal Contacts
@@ -1329,9 +1376,9 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             </div>
 
             {/* Module toggles */}
-            <div className="pt-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">Enabled Modules</p>
-              <div className="space-y-1.5">
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Enabled modules</p>
+              <div className="divide-y divide-border/60 rounded-lg border border-border/80 bg-card">
                 {(Object.entries(portalModules) as [keyof typeof portalModules, boolean][]).map(([key, enabled]) => {
                   const labels: Record<keyof typeof portalModules, string> = {
                     workOrders: "Work Orders",
@@ -1341,37 +1388,29 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                     documents: "Documents",
                   }
                   return (
-                    <div key={key} className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-2">
-                        <LayoutGrid size={11} className="text-muted-foreground" />
-                        <span className="text-xs text-foreground">{labels[key]}</span>
+                    <div key={key} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <LayoutGrid size={14} className="shrink-0 text-muted-foreground" />
+                        <span className="text-sm text-foreground">{labels[key]}</span>
                       </div>
-                      <button
-                        onClick={() => setPortalModules((m) => ({ ...m, [key]: !m[key] }))}
-                        className={cn(
-                          "relative w-8 h-4 rounded-full transition-colors shrink-0",
-                          enabled ? "bg-primary" : "bg-muted-foreground/25"
-                        )}
-                        role="switch"
-                        aria-checked={enabled}
-                      >
-                        <span className={cn(
-                          "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
-                          enabled ? "translate-x-4" : "translate-x-0.5"
-                        )} />
-                      </button>
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={(checked) => setPortalModules((m) => ({ ...m, [key]: checked }))}
+                        disabled={!portalEnabled}
+                        aria-label={`${labels[key]} module ${enabled ? "on" : "off"}`}
+                      />
                     </div>
                   )
                 })}
               </div>
             </div>
           </div>
-        </DrawerSection>
+        </CustomerDrawerCard>
 
         {/* Notes */}
-        <DrawerSection title="Notes">
+        <CustomerDrawerCard title="Notes">
           {header.notes ? (
-            <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-muted/30 rounded-lg border border-border">
+            <p className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)]">
               {header.notes}
             </p>
           ) : (
@@ -1383,7 +1422,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           >
             Edit notes on full profile
           </Link>
-        </DrawerSection>
+        </CustomerDrawerCard>
       </DetailDrawer>
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

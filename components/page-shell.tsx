@@ -10,6 +10,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, Building2,
   CreditCard, Shield, Sparkles, FileText, Receipt, Plug, ShoppingCart,
+  CalendarRange,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -46,6 +47,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Create, assign, and monitor all active and historical work orders.",
     icon: ClipboardList,
     cta: { label: "+ New Work Order" },
+  },
+  "/dispatch": {
+    title: "Dispatch Board",
+    subtitle: "Weekly crew schedule—drag work orders to assign times and technicians.",
+    icon: CalendarRange,
   },
   "/service-schedule": {
     title: "Service Schedule",
@@ -135,6 +141,7 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/customers": "#2563EB",
   "/equipment": "#64748B",
   "/work-orders": "#22C55E",
+  "/dispatch": "#0EA5E9",
   "/service-schedule": "#A855F7",
   "/maintenance-plans": "#F59E0B",
   "/technicians": "#4F46E5",

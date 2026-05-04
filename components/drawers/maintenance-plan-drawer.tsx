@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -41,9 +41,15 @@ import {
   Trash2,
   Loader2,
   MoreHorizontal,
+  ScrollText,
 } from "lucide-react"
 import { ReminderRulesPanel } from "@/components/reminders/reminder-rules-panel"
 import { ContactActions } from "@/components/contact-actions"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import {
+  loadPlanAutomationEvents,
+  type PlanAutomationEventRow,
+} from "@/lib/maintenance-plans/automation-events"
 
 let toastCounter = 0
 
@@ -61,6 +67,34 @@ function daysToDue(dateStr: string) {
   const due = new Date(dateStr + "T00:00:00Z").getTime()
   const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime()
   return Math.round((due - today) / (1000 * 60 * 60 * 24))
+}
+
+function fmtDateTime(iso: string) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function eventTypeLabel(t: PlanAutomationEventRow["event_type"]) {
+  switch (t) {
+    case "wo_created":
+      return "WO created"
+    case "skipped_duplicate":
+      return "Skipped (duplicate)"
+    case "run_error":
+      return "Error"
+    case "plan_paused":
+      return "Paused"
+    case "plan_resumed":
+      return "Resumed"
+    default:
+      return t
+  }
 }
 
 interface MaintenancePlanDrawerProps {
@@ -83,8 +117,30 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [actionBusy, setActionBusy] = useState(false)
   const [woBusy, setWoBusy] = useState(false)
+  const [autoEvents, setAutoEvents] = useState<PlanAutomationEventRow[]>([])
+  const [autoEventsLoading, setAutoEventsLoading] = useState(false)
 
   const plan = planId ? plans.find((p) => p.id === planId) ?? null : null
+  const watchedPlan = planId ? plans.find((p) => p.id === planId) : undefined
+
+  useEffect(() => {
+    if (!planId || !organizationId) {
+      setAutoEvents([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      setAutoEventsLoading(true)
+      const supabase = createBrowserSupabaseClient()
+      const { events, error } = await loadPlanAutomationEvents(supabase, organizationId, planId)
+      if (cancelled) return
+      setAutoEvents(error ? [] : events)
+      setAutoEventsLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [planId, organizationId, watchedPlan?.status])
 
   function toast(message: string, type: ToastItem["type"] = "success") {
     const id = ++toastCounter
@@ -353,6 +409,47 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
         </DrawerSection>
 
         {/* Notification Rules — editable */}
+        <DrawerSection title="Automation history">
+          <div className="flex items-center gap-2 mb-2">
+            <ScrollText className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              PM engine runs nightly. Pauses, work orders, and skips are recorded here.
+            </p>
+          </div>
+          {autoEventsLoading ? (
+            <p className="text-xs text-muted-foreground py-2">Loading history…</p>
+          ) : autoEvents.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3 rounded-xl border border-dashed border-border">
+              No automation events yet.
+            </p>
+          ) : (
+            <ul className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+              {autoEvents.map((ev) => (
+                <li
+                  key={ev.id}
+                  className="rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                    <span>{fmtDateTime(ev.created_at)}</span>
+                    <Badge variant="outline" className="text-[10px] font-medium">
+                      {eventTypeLabel(ev.event_type)}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-foreground mt-1.5 leading-snug">{ev.message}</p>
+                  {ev.work_order_id ? (
+                    <Link
+                      href={`/work-orders/${ev.work_order_id}`}
+                      className="inline-flex text-xs font-medium text-primary hover:underline mt-2"
+                    >
+                      Open work order
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DrawerSection>
+
         <DrawerSection title={`Reminder Rules (${enabledRules.length} active)`}>
           <ReminderRulesPanel
             planId={activePlan.id}

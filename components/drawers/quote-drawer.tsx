@@ -7,6 +7,7 @@ import { useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
@@ -508,9 +509,9 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     setDraftItems([])
   }, [quoteId])
 
-  function toast(message: string) {
+  function toast(message: string, tone: "success" | "info" = "success") {
     const id = ++toastCounter
-    setToasts((prev) => [...prev, { id, message, type: "success" }])
+    setToasts((prev) => [...prev, { id, message, type: tone }])
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500)
   }
 
@@ -532,16 +533,32 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     setDraftItems([])
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!quote) return
     const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
     const internal = (draft.internalNotes ?? "").trim()
-    updateQuote(quote.id, {
-      ...draft,
-      lineItems: draftItems,
-      amount: newTotal,
+    const lineItems = draftItems.map((li) => ({
+      description: li.description,
+      qty: li.qty,
+      unit: li.unit,
+    }))
+    const nextStatus = (draft.status ?? quote.status) as QuoteStatus
+    const patch: Parameters<typeof updateOrgQuote>[3] = {
+      status: nextStatus,
+      expiresAt: draft.expiresDate ?? quote.expiresDate,
+      notes: (draft.notes ?? quote.notes) || "",
       internalNotes: internal || undefined,
-    })
+      lineItems,
+      amountCents: Math.round(newTotal * 100),
+    }
+    if (nextStatus === "Sent" && !quote.sentDate) {
+      patch.sentAt = new Date().toISOString()
+    }
+    const { error } = await updateQuote(quote.id, patch)
+    if (error) {
+      toast(`Could not save: ${error}`, "info")
+      return
+    }
     setEditing(false)
     setDraft({})
     setDraftItems([])
@@ -623,10 +640,11 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       toast("Work order was not created.")
       return
     }
-    updateQuote(quote.id, {
-      workOrderId: newId,
-      ...(row.work_order_number != null ? { workOrderNumber: row.work_order_number } : {}),
-    })
+    const { error: linkErr } = await updateQuote(quote.id, { workOrderId: newId })
+    if (linkErr) {
+      toast(`Work order created but quote link failed: ${linkErr}`, "info")
+      return
+    }
     toast(`Work order ${formatWorkOrderDisplay(row.work_order_number, newId)} created from quote`)
   }
 
@@ -692,7 +710,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
         actions={
           editing ? (
             <>
-              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={saveEdit}>
+              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
                 <Check className="w-3.5 h-3.5" /> Save Changes
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>

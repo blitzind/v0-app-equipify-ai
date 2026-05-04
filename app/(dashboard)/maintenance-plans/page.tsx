@@ -604,7 +604,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 <div className="flex flex-col gap-2">
                   {plan.services.map((svc, i) => (
                     <div
-                      key={svc.id}
+                      key={`${svc.id ?? "service"}-${i}`}
                       className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/30"
                     >
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold shrink-0 mt-0.5">
@@ -691,8 +691,8 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {planWorkOrders.map((row) => (
-                        <TableRow key={row.id}>
+                      {planWorkOrders.map((row, i) => (
+                        <TableRow key={`${row.id ?? "wo"}-${i}`}>
                           <TableCell className="text-sm font-medium max-w-[220px]">
                             <span className="block truncate" title={row.title}>
                               {row.title}
@@ -754,11 +754,11 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{trigDays} Day{trigDays !== 1 ? "s" : ""} Before Due</span>
                     </div>
                     <div className="flex flex-col gap-2">
-                      {rules.map((rule) => {
+                      {rules.map((rule, ruleIdx) => {
                         const cfg = CHANNEL_CONFIG[rule.channel]
                         return (
                           <div
-                            key={rule.id}
+                            key={`${rule.id ?? "rule"}-${ruleIdx}`}
                             className={cn(
                               "flex items-center gap-3 rounded-xl border p-3 transition-colors",
                               rule.enabled
@@ -786,11 +786,11 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               {planLogs.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notifications sent yet for this plan.</p>
               ) : (
-                planLogs.map((log) => {
+                planLogs.map((log, i) => {
                   const cfg = CHANNEL_CONFIG[log.channel]
                   return (
                     <div
-                      key={log.id}
+                      key={`${log.id ?? "log"}-${i}`}
                       className="flex items-start gap-3 rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                     >
                       <cfg.Icon className={cn("w-4 h-4 shrink-0 mt-0.5", cfg.color)} />
@@ -1202,8 +1202,8 @@ function MaintenancePlansPageInner() {
           <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 border-b border-border">
               <tr>
-                {["Plan Name", "Customer", "Equipment", "Interval", "Technician", "Next Due", "Status", ""].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+                {["Plan Name", "Customer", "Equipment", "Interval", "Technician", "Next Due", "Status", ""].map((h, colIdx) => (
+                  <th key={`th-${colIdx}`} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
 import {
   computeNextDueDate,
   intervalFromDb,
@@ -112,13 +113,37 @@ export async function processDuePlansForOrganization(
     const dueDate = row.next_due_date
     if (!dueDate) continue
 
+    const { interval, customIntervalDays } = intervalFromDb(row.interval_value, row.interval_unit)
+    const nextDue = computeNextDueDate(dueDate, interval, customIntervalDays)
+
     const duplicate = await hasDuplicateWoForDueCycle(supabase, row.organization_id, row.id, dueDate)
     if (duplicate) {
       skippedDuplicate++
+      const { error: dupUpErr } = await supabase
+        .from("maintenance_plans")
+        .update({
+          next_due_date: nextDue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id)
+        .eq("organization_id", row.organization_id)
+
+      if (dupUpErr) {
+        errors.push(`Plan ${row.id}: duplicate WO exists but schedule advance failed: ${dupUpErr.message}`)
+      } else {
+        void insertMaintenancePlanAutomationEvent(supabase, {
+          organizationId: row.organization_id,
+          maintenancePlanId: row.id,
+          eventType: "skipped_duplicate",
+          message: `Skipped creating a duplicate work order for due date ${dueDate}; schedule advanced to ${nextDue}.`,
+          metadata: { dueDate, nextDueDate: nextDue },
+        })
+      }
       continue
     }
 
-    const { workOrderType, workOrderPriority } = parseServicesJsonb(row.services)
+    const { workOrderType, workOrderPriority, preferredServiceTime } = parseServicesJsonb(row.services)
+    const windowTime = normalizeTimeForDb(preferredServiceTime || "08:00") ?? null
 
     const { data: eqRow } = await supabase
       .from("equipment")
@@ -130,7 +155,8 @@ export async function processDuePlansForOrganization(
     const equipmentName = (eqRow as { name?: string } | null)?.name ?? "Equipment"
     const rawTitle = `${row.name} — ${equipmentName}`.trim()
     const title = (rawTitle.length > 0 ? rawTitle : `Maintenance — ${equipmentName}`).slice(0, 500)
-    const problemReported = `Auto-created preventive maintenance — plan ${row.id}, due ${dueDate}.`
+    const pmNotes = "Created by PM automation."
+    const problemReported = `${pmNotes} Preventive maintenance due ${dueDate}.`
 
     const insertPayload: Record<string, unknown> = {
       organization_id: row.organization_id,
@@ -141,10 +167,11 @@ export async function processDuePlansForOrganization(
       priority: uiPriorityToDb(workOrderPriority),
       type: uiTypeToDb(workOrderType),
       scheduled_on: dueDate,
-      scheduled_time: normalizeTimeForDb("08:00"),
+      scheduled_time: windowTime,
       assigned_user_id: row.assigned_user_id,
       maintenance_plan_id: row.id,
-      notes: null,
+      notes: pmNotes,
+      created_by_pm_automation: true,
       repair_log: {
         problemReported,
         diagnosis: "",
@@ -162,17 +189,33 @@ export async function processDuePlansForOrganization(
       insertPayload.created_by = systemActorId
     }
 
-    const { error: insErr } = await supabase.from("work_orders").insert(insertPayload as never)
+    const insRes = await supabase.from("work_orders").insert(insertPayload as never).select("id")
 
-    if (insErr) {
-      errors.push(`Plan ${row.id}: ${insErr.message}`)
+    const insertedRows = (insRes.data ?? []) as Array<{ id: string }>
+    if (insRes.error || insertedRows.length === 0) {
+      const msg = insRes.error?.message ?? "insert returned no row"
+      errors.push(`Plan ${row.id}: ${msg}`)
+      void insertMaintenancePlanAutomationEvent(supabase, {
+        organizationId: row.organization_id,
+        maintenancePlanId: row.id,
+        eventType: "run_error",
+        message: `Work order insert failed: ${msg}`,
+        metadata: { dueDate },
+      })
       continue
     }
 
     workOrdersCreated++
+    const woId = insertedRows[0]!.id
 
-    const { interval, customIntervalDays } = intervalFromDb(row.interval_value, row.interval_unit)
-    const nextDue = computeNextDueDate(dueDate, interval, customIntervalDays)
+    void insertMaintenancePlanAutomationEvent(supabase, {
+      organizationId: row.organization_id,
+      maintenancePlanId: row.id,
+      workOrderId: woId,
+      eventType: "wo_created",
+      message: `${pmNotes} Work order scheduled for ${dueDate}.`,
+      metadata: { dueDate, workOrderId: woId, nextDueDate: nextDue },
+    })
 
     const { error: upErr } = await supabase
       .from("maintenance_plans")

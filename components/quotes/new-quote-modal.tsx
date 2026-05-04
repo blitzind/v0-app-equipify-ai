@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { X, Plus, Trash2, Send, FilePen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
-import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
+import type { QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -104,10 +104,6 @@ type EquipmentOption = {
 }
 type WorkOrderOption = { id: string; work_order_number?: number | null; title: string }
 
-function newQuoteId(): string {
-  return `QT-${crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface NewQuoteModalProps {
@@ -127,7 +123,7 @@ export function NewQuoteModal({
   prefilledCustomerId = null,
   prefilledEquipmentId = null,
 }: NewQuoteModalProps) {
-  const { addQuote } = useQuotes()
+  const { addQuoteFromPayload } = useQuotes()
   const prevOpenRef = useRef(false)
   const { organizationId: activeOrgId, status: orgContextStatus } = useActiveOrganization()
   const organizationId = orgContextStatus === "ready" ? activeOrgId : null
@@ -153,6 +149,7 @@ export function NewQuoteModal({
   const [internalNotes, setInternalNotes] = useState("")
   const [status, setStatus] = useState<QuoteStatus>("Draft")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
 
   const refreshEquipmentForCustomer = useCallback(
     async (opts?: { organizationId: string; customerId: string; selectEquipmentId?: string }) => {
@@ -200,6 +197,7 @@ export function NewQuoteModal({
       setStatus("Draft")
       setErrors({})
       setLoadError(null)
+      setSubmitting(false)
       setAddEquipmentOpen(false)
     }
     prevOpenRef.current = open
@@ -374,41 +372,39 @@ export function NewQuoteModal({
     return Object.keys(errs).length === 0
   }
 
-  function handleSubmit(submitStatus: QuoteStatus) {
+  async function handleSubmit(submitStatus: QuoteStatus) {
     if (!validate()) return
-
-    const customer = customers.find((c) => c.id === customerId)
-    const eq = equipmentList.find((e) => e.id === equipmentId)
-    const now = new Date().toISOString().split("T")[0]
-    const id = newQuoteId()
-
-    const quote: AdminQuote = {
-      id,
-      customerId,
-      customerName: customer?.company_name ?? "",
-      equipmentId: equipmentId || "",
-      equipmentName: eq ? getEquipmentDisplayPrimary(eq) : "",
-      createdDate: now,
-      expiresDate,
-      sentDate: submitStatus === "Sent" ? now : "",
-      amount: total,
-      status: submitStatus,
-      description: title,
-      createdBy: "Admin",
-      workOrderId: workOrderId || "",
-      lineItems: lineItems
-        .filter((li) => li.description.trim())
-        .map((li) => ({
-          description: li.description,
-          qty: parseFloat(li.qty) || 1,
-          unit: parseFloat(li.unit) || 0,
-        })),
-      notes,
-      internalNotes: internalNotes.trim() || undefined,
+    if (!organizationId) {
+      setErrors((e) => ({ ...e, customerId: "Select an organization first." }))
+      return
     }
-
-    addQuote(quote)
-    onSuccess?.(id, submitStatus)
+    setSubmitting(true)
+    const lineItemsJson = lineItems
+      .filter((li) => li.description.trim())
+      .map((li) => ({
+        description: li.description.trim(),
+        qty: parseFloat(li.qty) || 1,
+        unit: parseFloat(li.unit) || 0,
+      }))
+    const { id, error: saveError } = await addQuoteFromPayload({
+      customerId,
+      equipmentId: equipmentId || null,
+      workOrderId: workOrderId || null,
+      title: title.trim(),
+      amountCents: Math.round(total * 100),
+      status: submitStatus,
+      expiresAt: expiresDate,
+      lineItems: lineItemsJson,
+      notes: notes.trim() ? notes.trim() : null,
+      internalNotes: internalNotes.trim() ? internalNotes.trim() : null,
+      sentAt: submitStatus === "Sent" ? new Date().toISOString() : null,
+    })
+    setSubmitting(false)
+    if (saveError) {
+      setErrors((e) => ({ ...e, _submit: saveError }))
+      return
+    }
+    if (id) onSuccess?.(id, submitStatus)
     onClose()
   }
 
@@ -470,9 +466,9 @@ export function NewQuoteModal({
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-              {loadError && (
+              {(loadError || errors._submit) && (
                 <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
-                  {loadError}
+                  {loadError ?? errors._submit}
                 </p>
               )}
 
@@ -737,22 +733,25 @@ export function NewQuoteModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors cursor-pointer"
+                disabled={submitting}
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => handleSubmit("Draft")}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer"
+                onClick={() => void handleSubmit("Draft")}
+                disabled={submitting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
               >
                 <FilePen className="w-3.5 h-3.5" />
                 Save Draft
               </button>
               <button
                 type="button"
-                onClick={() => handleSubmit("Sent")}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors cursor-pointer"
+                onClick={() => void handleSubmit("Sent")}
+                disabled={submitting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
                 Send Quote

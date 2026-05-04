@@ -106,7 +106,7 @@ export function buildWorkOrderActivityItems(wo: WorkOrder): WorkOrderActivityIte
     {
       date: formatDate(wo.createdAt.slice(0, 10)),
       label: "Work order created",
-      description: "Recorded in your workspace",
+      description: wo.createdByPmAutomation ? "Created by PM automation" : "Recorded in your workspace",
       accent: "muted",
     },
   ]
@@ -716,6 +716,11 @@ export function WorkOrderDetailExperience({
                     <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
                       {workOrder.type}
                     </Badge>
+                    {workOrder.createdByPmAutomation ? (
+                      <Badge variant="secondary" className="text-xs border border-border">
+                        Created by PM automation
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-sm text-muted-foreground leading-snug">{workOrder.description}</p>
                 </div>
@@ -780,7 +785,9 @@ export function WorkOrderDetailExperience({
               {workOrder.maintenancePlanName?.trim() || "View plan"}
               <ExternalLink className="w-3.5 h-3.5 opacity-70" />
             </Link>
-            <span className="text-xs text-muted-foreground">· Created from this recurring plan</span>
+            <span className="text-xs text-muted-foreground">
+              · {workOrder.createdByPmAutomation ? "Created by PM automation" : "Created from this recurring plan"}
+            </span>
           </div>
         </div>
       )}
@@ -900,7 +907,9 @@ export function WorkOrderDetailExperience({
                   {workOrder.maintenancePlanName?.trim() || "View plan"}
                   <ExternalLink className="w-3.5 h-3.5 opacity-70" />
                 </Link>
-                <span className="text-xs text-muted-foreground">· Created from this recurring plan</span>
+                <span className="text-xs text-muted-foreground">
+                  · {workOrder.createdByPmAutomation ? "Created by PM automation" : "Created from this recurring plan"}
+                </span>
               </div>
             </div>
           )}

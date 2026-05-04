@@ -86,6 +86,7 @@ type WoRow = {
   notes: string | null
   repair_log: unknown
   maintenance_plan_id: string | null
+  created_by_pm_automation?: boolean
 }
 
 export type LoadedWorkOrderDetail = {
@@ -218,6 +219,7 @@ export async function loadWorkOrderDetailForOrg(
     invoiceNumber: w.invoice_number ?? "",
     maintenancePlanId: w.maintenance_plan_id,
     maintenancePlanName: planName,
+    createdByPmAutomation: Boolean(w.created_by_pm_automation),
   }
 
   return {

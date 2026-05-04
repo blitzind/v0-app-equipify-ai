@@ -105,6 +105,7 @@ type DbWorkOrderRow = {
   total_parts_cents: number
   notes: string | null
   maintenance_plan_id: string | null
+  created_by_pm_automation?: boolean | null
 }
 
 function emptyRepairLog(): RepairLog {
@@ -708,6 +709,7 @@ function WorkOrdersPageInner() {
           maintenancePlanName: row.maintenance_plan_id
             ? (planNameById.get(row.maintenance_plan_id) ?? null)
             : null,
+          createdByPmAutomation: Boolean(row.created_by_pm_automation),
         }
       })
 

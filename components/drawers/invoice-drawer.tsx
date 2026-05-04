@@ -33,8 +33,16 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps) {
     <DetailDrawer
       open={!!invoiceId}
       onClose={onClose}
-      title={invoice?.id ?? "Invoice"}
-      subtitle={invoice ? `${invoice.customerName} · ${invoice.equipmentName}` : undefined}
+      title={invoice ? invoice.invoiceNumber?.trim() || invoice.id : "Invoice"}
+      subtitle={
+        invoice
+          ? `${invoice.customerName} · ${invoice.equipmentName}${
+              invoice.sentAt
+                ? ` · Sent on ${new Date(invoice.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                : ""
+            }`
+          : undefined
+      }
       width="2xl"
       noScroll
       badge={

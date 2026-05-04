@@ -2,6 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
+import type { TechSkill, TechStatus } from "@/lib/mock-data"
+import {
+  ALL_REGIONS,
+  ALL_ROLES,
+  ALL_SKILLS,
+  ALL_STATUSES,
+} from "@/lib/technicians/roster-form-constants"
+import {
+  queryDrawerOrganizationMember,
+  queryDrawerProfile,
+} from "@/lib/technicians/roster-queries"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -32,13 +43,14 @@ import {
   Mail,
   Calendar,
   ClipboardList,
+  Wrench,
   MessageSquare,
   X,
   Loader2,
   Pencil,
   StickyNote,
-  Upload,
   Trash2,
+  Camera,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import {
@@ -177,13 +189,25 @@ export function TechnicianDrawer({
   const [viewerIsAdmin, setViewerIsAdmin] = useState(false)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [memberRole, setMemberRole] = useState<string>("tech")
   const [memberStatus, setMemberStatus] = useState<string>("active")
+  const [jobTitle, setJobTitle] = useState("")
+  const [region, setRegion] = useState("")
+  const [skills, setSkills] = useState<TechSkill[]>([])
+  const [availabilityStatus, setAvailabilityStatus] = useState<TechStatus>("Available")
+  const [startDate, setStartDate] = useState("")
 
   const [editOpen, setEditOpen] = useState(false)
   const [draftName, setDraftName] = useState("")
-  const [draftRole, setDraftRole] = useState<string>("tech")
-  const [draftStatus, setDraftStatus] = useState<string>("active")
+  const [draftPhone, setDraftPhone] = useState("")
+  const [draftOrgRole, setDraftOrgRole] = useState<string>("tech")
+  const [draftMemberStatus, setDraftMemberStatus] = useState<string>("active")
+  const [draftJobTitle, setDraftJobTitle] = useState("")
+  const [draftRegion, setDraftRegion] = useState("")
+  const [draftSkills, setDraftSkills] = useState<TechSkill[]>([])
+  const [draftAvailability, setDraftAvailability] = useState<TechStatus>("Available")
+  const [draftStartDate, setDraftStartDate] = useState("")
   const [editSaving, setEditSaving] = useState(false)
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -193,6 +217,17 @@ export function TechnicianDrawer({
 
   const [openScheduleWoId, setOpenScheduleWoId] = useState<string | null>(null)
   const [scheduleRefresh, setScheduleRefresh] = useState(0)
+  const [assignmentListRefresh, setAssignmentListRefresh] = useState(0)
+  const [openAssignments, setOpenAssignments] = useState<
+    Array<{
+      id: string
+      title: string
+      status: string
+      scheduled_on: string | null
+      work_order_number?: number | null
+    }>
+  >([])
+  const [openAssignmentsLoading, setOpenAssignmentsLoading] = useState(false)
   const [scheduleLoading, setScheduleLoading] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [scheduleRows, setScheduleRows] = useState<
@@ -251,11 +286,7 @@ export function TechnicianDrawer({
     const vr = (viewerOm as { role: string } | null)?.role ?? ""
     setViewerIsAdmin(vr === "owner" || vr === "admin")
 
-    const { data: targetProfile, error: pErr } = await supabase
-      .from("profiles")
-      .select("full_name, email, avatar_url")
-      .eq("id", techId)
-      .single()
+    const { data: targetProfile, error: pErr } = await queryDrawerProfile(supabase, techId)
 
     if (pErr || !targetProfile) {
       setLoadError(pErr?.message ?? "Could not load profile.")
@@ -263,12 +294,7 @@ export function TechnicianDrawer({
       return
     }
 
-    const { data: targetOm, error: omErr } = await supabase
-      .from("organization_members")
-      .select("role, status")
-      .eq("organization_id", oid)
-      .eq("user_id", techId)
-      .maybeSingle()
+    const { data: targetOm, error: omErr } = await queryDrawerOrganizationMember(supabase, oid, techId)
 
     if (omErr || !targetOm) {
       setLoadError(omErr?.message ?? "This user is not a member of your organization.")
@@ -276,14 +302,41 @@ export function TechnicianDrawer({
       return
     }
 
-    const tp = targetProfile as { full_name: string | null; email: string | null; avatar_url: string | null }
-    const tom = targetOm as { role: string; status: string }
+    const tp = targetProfile as {
+      full_name: string | null
+      email: string | null
+      avatar_url: string | null
+      phone?: string | null
+    }
+    const tom = targetOm as {
+      role: string
+      status: string
+      job_title?: string | null
+      region?: string | null
+      skills?: string[] | null
+      availability_status?: string | null
+      start_date?: string | null
+    }
+
+    const skillAllow = new Set<string>(ALL_SKILLS)
+    const parsedSkills = (tom.skills ?? []).filter((s): s is TechSkill => skillAllow.has(s))
+    const av = tom.availability_status
+    const parsedAvail: TechStatus =
+      av === "Available" || av === "On Job" || av === "Off" || av === "Vacation" ? av : "Available"
+    const sd = tom.start_date != null ? String(tom.start_date) : ""
+    const startDateStr = /^\d{4}-\d{2}-\d{2}/.test(sd) ? sd.slice(0, 10) : ""
 
     setFullName(tp.full_name?.trim() || tp.email?.split("@")[0] || "Member")
     setEmail(tp.email ?? "")
+    setPhone(tp.phone?.trim() ?? "")
     setAvatarUrl(tp.avatar_url?.trim() || null)
     setMemberRole(tom.role)
     setMemberStatus(tom.status)
+    setJobTitle(tom.job_title?.trim() ?? "")
+    setRegion(tom.region?.trim() ?? "")
+    setSkills(parsedSkills)
+    setAvailabilityStatus(parsedAvail)
+    setStartDate(startDateStr)
     setLoading(false)
   }, [techId, activeOrgId, orgStatus])
 
@@ -296,6 +349,50 @@ export function TechnicianDrawer({
     setOpenScheduleWoId(null)
     setTab("overview")
   }, [techId])
+
+  useEffect(() => {
+    if (!techId || orgStatus !== "ready" || !activeOrgId) {
+      setOpenAssignments([])
+      return
+    }
+
+    let cancelled = false
+
+    async function loadOpenAssignments() {
+      setOpenAssignmentsLoading(true)
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("work_orders")
+        .select("id, title, status, scheduled_on, work_order_number")
+        .eq("organization_id", activeOrgId)
+        .eq("assigned_user_id", techId)
+        .eq("is_archived", false)
+        .in("status", ["open", "scheduled", "in_progress"])
+        .order("scheduled_on", { ascending: true, nullsFirst: false })
+
+      if (cancelled) return
+      if (error) {
+        setOpenAssignments([])
+        setOpenAssignmentsLoading(false)
+        return
+      }
+      setOpenAssignments(
+        (data ?? []) as Array<{
+          id: string
+          title: string
+          status: string
+          scheduled_on: string | null
+          work_order_number?: number | null
+        }>,
+      )
+      setOpenAssignmentsLoading(false)
+    }
+
+    void loadOpenAssignments()
+    return () => {
+      cancelled = true
+    }
+  }, [techId, activeOrgId, orgStatus, scheduleRefresh, assignmentListRefresh])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -462,11 +559,23 @@ export function TechnicianDrawer({
   }, [tab, techId, activeOrgId, scheduleRefresh])
 
   function openEdit() {
+    const jobTitleSet = new Set<string>(ALL_ROLES)
+    const regionSet = new Set<string>(ALL_REGIONS)
     setDraftName(fullName)
-    setDraftRole(memberRole)
-    setDraftStatus(memberStatus)
+    setDraftPhone(phone)
+    setDraftOrgRole(memberRole)
+    setDraftMemberStatus(memberStatus)
+    setDraftJobTitle(jobTitle.trim() && jobTitleSet.has(jobTitle) ? jobTitle : "")
+    setDraftRegion(region.trim() && regionSet.has(region) ? region : "")
+    setDraftSkills([...skills])
+    setDraftAvailability(availabilityStatus)
+    setDraftStartDate(startDate)
     setAvatarError(null)
     setEditOpen(true)
+  }
+
+  function toggleDraftSkill(s: TechSkill) {
+    setDraftSkills((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
   }
 
   const canEditAvatar = Boolean(
@@ -552,24 +661,41 @@ export function TechnicianDrawer({
     const editingSelf = viewerUserId === techId
     const canMemberFields = viewerIsAdmin
 
+    const rosterFields = {
+      job_title: draftJobTitle.trim() || null,
+      region: draftRegion.trim() || null,
+      skills: draftSkills,
+      availability_status: draftAvailability,
+      start_date: draftStartDate.trim() || null,
+    }
+
     try {
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: nameTrim,
+          phone: draftPhone.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", techId)
+
+      if (pErr) {
+        toast(pErr.message, "info")
+        setEditSaving(false)
+        return
+      }
+
       if (canMemberFields) {
-        const { error: pErr } = await supabase
-          .from("profiles")
-          .update({ full_name: nameTrim, updated_at: new Date().toISOString() })
-          .eq("id", techId)
-
-        if (pErr) {
-          toast(pErr.message, "info")
-          setEditSaving(false)
-          return
-        }
-
         const { error: omErr } = await supabase
           .from("organization_members")
           .update({
-            role: draftRole,
-            status: draftStatus,
+            role: draftOrgRole,
+            status: draftMemberStatus,
+            job_title: rosterFields.job_title,
+            region: rosterFields.region,
+            skills: rosterFields.skills,
+            availability_status: rosterFields.availability_status,
+            start_date: rosterFields.start_date,
             updated_at: new Date().toISOString(),
           })
           .eq("organization_id", activeOrgId)
@@ -580,22 +706,22 @@ export function TechnicianDrawer({
           setEditSaving(false)
           return
         }
-
-        setFullName(nameTrim)
-        setMemberRole(draftRole)
-        setMemberStatus(draftStatus)
       } else if (editingSelf) {
-        const { error: pErr } = await supabase
-          .from("profiles")
-          .update({ full_name: nameTrim, updated_at: new Date().toISOString() })
-          .eq("id", techId)
+        const { error: rpcErr } = await supabase.rpc("patch_member_roster_details", {
+          p_organization_id: activeOrgId,
+          p_user_id: techId,
+          p_job_title: rosterFields.job_title,
+          p_region: rosterFields.region,
+          p_skills: rosterFields.skills,
+          p_availability_status: rosterFields.availability_status,
+          p_start_date: rosterFields.start_date,
+        })
 
-        if (pErr) {
-          toast(pErr.message, "info")
+        if (rpcErr) {
+          toast(rpcErr.message, "info")
           setEditSaving(false)
           return
         }
-        setFullName(nameTrim)
       } else {
         setEditSaving(false)
         return
@@ -648,7 +774,9 @@ export function TechnicianDrawer({
                 <h2 className="text-lg font-bold text-foreground truncate">{displayName}</h2>
                 {!loading && !loadError && <MemberStatusBadge status={memberStatus} />}
               </div>
-              <p className="text-sm text-muted-foreground">{formatMemberRole(memberRole)}</p>
+              <p className="text-sm text-muted-foreground">
+                {jobTitle.trim() ? jobTitle : formatMemberRole(memberRole)}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -716,6 +844,28 @@ export function TechnicianDrawer({
                     )}
                   </p>
                 </div>
+                {phone.trim() ? (
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Phone</div>
+                    <p className="text-xs font-medium text-foreground">{phone}</p>
+                  </div>
+                ) : null}
+                {jobTitle.trim() ? (
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Role</div>
+                    <p className="text-xs font-medium text-foreground">{jobTitle}</p>
+                  </div>
+                ) : null}
+                {region.trim() ? (
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Region</div>
+                    <p className="text-xs font-medium text-foreground">{region}</p>
+                  </div>
+                ) : null}
+                <div className="bg-secondary/50 rounded-lg p-3">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Field status</div>
+                  <p className="text-xs font-medium text-foreground">{availabilityStatus}</p>
+                </div>
                 <div className="bg-secondary/50 rounded-lg p-3">
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Organization role</div>
                   <p className="text-xs font-medium text-foreground">{formatMemberRole(memberRole)}</p>
@@ -724,6 +874,58 @@ export function TechnicianDrawer({
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Membership status</div>
                   <p className="text-xs font-medium text-foreground capitalize">{memberStatus}</p>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-primary shrink-0" />
+                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Open work orders</p>
+                </div>
+                {openAssignmentsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading assignments…
+                  </div>
+                ) : openAssignments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No open or in-progress jobs assigned.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {openAssignments.map((row) => (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenScheduleWoId(row.id)}
+                          className="w-full text-left rounded-lg border border-border bg-secondary/20 hover:bg-secondary/40 px-3 py-2.5 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground line-clamp-2">{row.title}</span>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] shrink-0 border capitalize",
+                                WO_SCHEDULE_STATUS_BADGE[row.status] ?? WO_SCHEDULE_STATUS_BADGE.open,
+                              )}
+                            >
+                              {mapDbStatusToLabel(row.status)}
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1 font-mono text-primary">
+                            {formatWorkOrderDisplay(row.work_order_number, row.id)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {row.scheduled_on
+                              ? `Scheduled ${new Date(row.scheduled_on + "T12:00:00").toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}`
+                              : "Not scheduled"}
+                          </p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </>
           )}
@@ -872,123 +1074,248 @@ export function TechnicianDrawer({
       <WorkOrderDrawer
         workOrderId={openScheduleWoId}
         onClose={() => setOpenScheduleWoId(null)}
-        onUpdated={() => setScheduleRefresh((n) => n + 1)}
+        onUpdated={() => {
+          setScheduleRefresh((n) => n + 1)
+          setAssignmentListRefresh((n) => n + 1)
+        }}
       />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit technician</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               {viewerIsAdmin
-                ? "Update display name and organization membership for this user."
-                : "Update your display name. Ask an owner or admin to change role or status."}
+                ? "Update roster details, profile, and organization membership."
+                : "Update your profile and roster details. Organization role and membership status require an owner or admin."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+
+          <div className="space-y-4 py-1">
             <input
               ref={avatarFileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               className="sr-only"
               aria-hidden
+              tabIndex={-1}
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 e.target.value = ""
                 if (f) void applyAvatarFile(f)
               }}
             />
-            {canEditAvatar && (
-              <div className="space-y-2">
-                <Label>Profile photo</Label>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <TechnicianAvatar
-                    userId={techId!}
-                    name={draftName.trim() || displayName}
-                    initials={initialsFromName(draftName.trim() || displayName)}
-                    avatarUrl={avatarUrl}
-                    size="lg"
-                  />
-                  <div className="flex flex-wrap gap-2">
+
+            {canEditAvatar ? (
+              <div className="flex flex-col items-center gap-3 pb-4 border-b border-border">
+                <TechnicianAvatar
+                  userId={techId!}
+                  name={draftName.trim() || displayName}
+                  initials={initialsFromName(draftName.trim() || displayName)}
+                  avatarUrl={avatarUrl}
+                  size="lg"
+                />
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs cursor-pointer"
+                    disabled={avatarUploading || editSaving}
+                    onClick={() => avatarFileRef.current?.click()}
+                  >
+                    {avatarUploading ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    {avatarUrl ? "Change photo" : "Upload photo"}
+                  </Button>
+                  {avatarUrl ? (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="gap-1.5 cursor-pointer"
+                      className="text-xs text-muted-foreground cursor-pointer"
                       disabled={avatarUploading || editSaving}
-                      onClick={() => avatarFileRef.current?.click()}
+                      onClick={() => void removeAvatarPhoto()}
                     >
-                      {avatarUploading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="w-3.5 h-3.5" />
-                      )}
-                      {avatarUrl ? "Change photo" : "Upload photo"}
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      Remove
                     </Button>
-                    {avatarUrl ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 text-destructive hover:text-destructive cursor-pointer"
-                        disabled={avatarUploading || editSaving}
-                        onClick={() => void removeAvatarPhoto()}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Remove
-                      </Button>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
-                <p className="text-[11px] text-muted-foreground">JPEG, PNG, WebP, or GIF · max 5 MB</p>
+                <p className="text-[10px] text-muted-foreground text-center">JPEG, PNG, WebP, or GIF · max 5 MB</p>
                 {avatarError ? (
-                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-2 py-1.5">
+                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-2 py-1.5 w-full text-center">
                     {avatarError}
                   </p>
                 ) : null}
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="tech-full-name">Full name</Label>
-              <Input
-                id="tech-full-name"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                autoComplete="name"
-              />
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1.5">
+                <Label htmlFor="tech-full-name">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="tech-full-name"
+                  placeholder="e.g. Jordan Mills"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  autoComplete="name"
+                />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <Label htmlFor="tech-email">Email</Label>
+                <Input
+                  id="tech-email"
+                  type="email"
+                  value={email}
+                  readOnly
+                  disabled
+                  className="bg-muted/50 cursor-not-allowed"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Email is tied to the login account. Changing it requires account administration.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tech-phone">Phone</Label>
+                <Input
+                  id="tech-phone"
+                  placeholder="(555) 000-0000"
+                  value={draftPhone}
+                  onChange={(e) => setDraftPhone(e.target.value)}
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={draftJobTitle} onValueChange={setDraftJobTitle}>
+                  <SelectTrigger id="tech-job-title" className="cursor-pointer">
+                    <SelectValue placeholder="Job title (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="cursor-pointer">
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Region</Label>
+                <Select value={draftRegion} onValueChange={setDraftRegion}>
+                  <SelectTrigger className="cursor-pointer">
+                    <SelectValue placeholder="Region (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_REGIONS.map((r) => (
+                      <SelectItem key={r} value={r} className="cursor-pointer">
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select
+                  value={draftAvailability}
+                  onValueChange={(v) => setDraftAvailability(v as TechStatus)}
+                >
+                  <SelectTrigger className="cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s} className="cursor-pointer">
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tech-start">Start Date</Label>
+                <Input
+                  id="tech-start"
+                  type="date"
+                  value={draftStartDate}
+                  onChange={(e) => setDraftStartDate(e.target.value)}
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label>Organization role</Label>
-              <Select value={draftRole} onValueChange={setDraftRole} disabled={!viewerIsAdmin}>
-                <SelectTrigger className="cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ORG_ROLES.map((r) => (
-                    <SelectItem key={r} value={r} className="cursor-pointer">
-                      {formatMemberRole(r)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Skill Tags</Label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_SKILLS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleDraftSkill(s)}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer",
+                      draftSkills.includes(s)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Membership status</Label>
-              <Select value={draftStatus} onValueChange={setDraftStatus} disabled={!viewerIsAdmin}>
-                <SelectTrigger className="cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MEMBER_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s} className="cursor-pointer capitalize">
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+              <div className="space-y-1.5">
+                <Label>Organization role</Label>
+                <Select value={draftOrgRole} onValueChange={setDraftOrgRole} disabled={!viewerIsAdmin}>
+                  <SelectTrigger className="cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORG_ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="cursor-pointer">
+                        {formatMemberRole(r)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!viewerIsAdmin ? (
+                  <p className="text-[10px] text-muted-foreground">Only owners and admins can change this.</p>
+                ) : null}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Membership status</Label>
+                <Select
+                  value={draftMemberStatus}
+                  onValueChange={setDraftMemberStatus}
+                  disabled={!viewerIsAdmin}
+                >
+                  <SelectTrigger className="cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEMBER_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s} className="cursor-pointer capitalize">
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!viewerIsAdmin ? (
+                  <p className="text-[10px] text-muted-foreground">Only owners and admins can change this.</p>
+                ) : null}
+              </div>
             </div>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+
+          <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-4">
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
               Cancel
             </Button>

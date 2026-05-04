@@ -11,7 +11,7 @@ import { MOCK_WORKSPACES } from "@/lib/tenant-data"
 const PICKER_DEMO_WORKSPACES = MOCK_WORKSPACES.filter((w) => w.id !== "ws-live-generic")
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
-  LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
+  LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
   Building2, X, FileText, Receipt, ShoppingCart,
@@ -40,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Customers",         href: "/customers",         icon: Users },
       { label: "Equipment",         href: "/equipment",         icon: Wrench },
       { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },
+      { label: "Dispatch Board",    href: "/dispatch",          icon: CalendarRange },
       { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
       { label: "Maintenance Plans", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
       { label: "Technicians",       href: "/technicians",       icon: HardHat },

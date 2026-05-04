@@ -509,6 +509,8 @@ export interface WorkOrder {
   /** Set when this work order was created from a maintenance plan (Supabase `maintenance_plan_id`). */
   maintenancePlanId?: string | null
   maintenancePlanName?: string | null
+  /** True when created by nightly PM automation (`created_by_pm_automation`). */
+  createdByPmAutomation?: boolean
 }
 
 const emptyRepairLog = (): RepairLog => ({
@@ -851,6 +853,8 @@ export interface MaintenancePlan {
   autoCreateWorkOrder: boolean
   workOrderType: WorkOrderType
   workOrderPriority: WorkOrderPriority
+  /** Preferred start time (HH:MM) for auto-created WOs; maps to plan services JSONB defaults. */
+  preferredServiceTime?: string
   notes: string
   createdAt: string
   totalServicesCompleted: number
@@ -1508,6 +1512,8 @@ export type QuoteStatus = "Draft" | "Sent" | "Pending Approval" | "Approved" | "
 
 export interface AdminQuote {
   id: string
+  /** Display number from org_quotes.quote_number when loaded from DB (e.g. QT-PBS-8801). */
+  quoteNumber?: string
   customerId: string
   customerName: string
   equipmentId: string
@@ -1685,6 +1691,8 @@ export type InvoiceStatus = "Draft" | "Sent" | "Paid" | "Unpaid" | "Overdue" | "
 
 export interface AdminInvoice {
   id: string
+  /** Display number from org_invoices.invoice_number when loaded from DB. */
+  invoiceNumber?: string
   customerId: string
   customerName: string
   workOrderId: string
@@ -1698,6 +1706,11 @@ export interface AdminInvoice {
   createdBy: string
   lineItems: { description: string; qty: number; unit: number }[]
   notes: string
+  /** Linked quote UUID from org_invoices.quote_id. */
+  quoteId?: string
+  internalNotes?: string
+  /** ISO timestamp from org_invoices.sent_at when the invoice was emailed/sent. */
+  sentAt?: string
 }
 
 export const adminInvoices: AdminInvoice[] = [
