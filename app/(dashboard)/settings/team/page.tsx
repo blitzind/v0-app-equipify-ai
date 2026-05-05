@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTenant } from "@/lib/tenant-store"
 import type { UserRole, TenantUser } from "@/lib/tenant-data"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   UserPlus, MoreHorizontal, Check, X, Mail, Shield,
   ChevronDown, Settings2, UserX, RotateCcw, Eye,
@@ -58,12 +59,15 @@ function StatusBadge({ status }: { status: TenantUser["status"] }) {
 
 export default function TeamPage() {
   const { workspace, workspaceUsers: users, currentUser, dispatch, plan } = useTenant()
+  const { organizationId } = useActiveOrganization()
 
   // Invite panel
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<UserRole>("Technician")
   const [inviteSent, setInviteSent] = useState(false)
+  const [inviteSending, setInviteSending] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
 
   // Menus
   const [menuOpen, setMenuOpen]         = useState<string | null>(null)
@@ -76,22 +80,57 @@ export default function TeamPage() {
   const usedSeats = users.filter((u) => u.status === "Active").length
   const atLimit   = seatLimit !== -1 && usedSeats >= seatLimit
 
-  function sendInvite() {
-    if (!inviteEmail.trim()) return
-    const newUser: TenantUser = {
-      id: `u-inv-${Date.now()}`,
-      name: inviteEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-      email: inviteEmail,
-      role: inviteRole,
-      avatar: "",
-      joinedAt: new Date().toISOString().split("T")[0],
-      lastActive: "—",
-      status: "Invited",
+  async function sendInvite() {
+    if (!inviteEmail.trim() || !organizationId) return
+    setInviteError(null)
+    setInviteSending(true)
+
+    const mapRoleToMembershipRole = (role: UserRole): "admin" | "manager" | "tech" | "viewer" => {
+      if (role === "Admin") return "admin"
+      if (role === "Read Only") return "viewer"
+      if (role === "Technician") return "tech"
+      return "manager"
     }
-    dispatch({ type: "INVITE_USER", payload: newUser })
-    setInviteEmail("")
-    setInviteSent(true)
-    setTimeout(() => { setInviteSent(false); setInviteOpen(false) }, 2000)
+
+    try {
+      const res = await fetch("/api/invites/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          organizationId,
+          role: mapRoleToMembershipRole(inviteRole),
+        }),
+      })
+      const result = (await res.json()) as { message?: string; error?: string }
+      if (!res.ok) {
+        setInviteError(result.message ?? "Could not send invitation.")
+        return
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        // Invite link is intentionally non-secret for admin troubleshooting.
+        console.log("Invite created for", inviteEmail.trim())
+      }
+
+      const now = new Date().toISOString().split("T")[0]
+      const newUser: TenantUser = {
+        id: `u-inv-${Date.now()}`,
+        name: inviteEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        avatar: "",
+        joinedAt: now,
+        lastActive: "—",
+        status: "Invited",
+      }
+      dispatch({ type: "INVITE_USER", payload: newUser })
+      setInviteEmail("")
+      setInviteSent(true)
+      setTimeout(() => { setInviteSent(false); setInviteOpen(false) }, 2000)
+    } finally {
+      setInviteSending(false)
+    }
   }
 
   function changeRole(userId: string, role: UserRole) {
@@ -188,14 +227,18 @@ export default function TeamPage() {
               </select>
               <Button
                 onClick={sendInvite}
+                disabled={inviteSending || !organizationId}
                 className={inviteSent ? "bg-[var(--ds-success-subtle)] hover:bg-[var(--ds-success-subtle)] text-white" : ""}
               >
-                {inviteSent ? <><Check size={13} /> Sent!</> : "Send invite"}
+                {inviteSent ? <><Check size={13} /> Sent!</> : inviteSending ? "Sending..." : "Send invite"}
               </Button>
               <Button variant="outline" size="icon" onClick={() => setInviteOpen(false)}>
                 <X size={14} />
               </Button>
             </div>
+            {inviteError && (
+              <p className="mt-2 text-xs text-red-600">{inviteError}</p>
+            )}
           </div>
         )}
 

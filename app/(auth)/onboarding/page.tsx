@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
 import { PLANS } from "@/lib/plans"
 import type { PlanId } from "@/lib/plans"
-import { BrandLogoOnLight } from "@/components/brand-logo"
+import { BrandLogo } from "@/components/brand-logo"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
   hasScaleTrialParam,
   ONBOARDING_INTENT_STORAGE_KEY,
@@ -44,6 +45,15 @@ const CURRENT_SYSTEM_OPTIONS = [
   "Other FSM Software",
   "None / Starting Fresh",
 ] as const
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+type InviteContext = {
+  email: string
+  organizationId: string
+  role: string
+  expiresAt: string
+}
 
 function getIndustrySetupCopy(industry: string) {
   switch (industry) {
@@ -61,9 +71,15 @@ function getIndustrySetupCopy(industry: string) {
 function OnboardingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const supabase = createBrowserSupabaseClient()
   const firstNameParam = parseOnboardingText(searchParams.get("firstName"))
   const lastNameParam = parseOnboardingText(searchParams.get("lastName"))
   const emailParam = parseOnboardingText(searchParams.get("email"))
+  const organizationIdParam = parseOnboardingText(searchParams.get("organizationId"))
+  const inviteTokenParam =
+    parseOnboardingText(searchParams.get("inviteToken")) ??
+    parseOnboardingText(searchParams.get("invite")) ??
+    parseOnboardingText(searchParams.get("token"))
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
@@ -82,6 +98,11 @@ function OnboardingPageContent() {
     timezone: "America/New_York",
   })
   const [stepOneError, setStepOneError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteContext, setInviteContext] = useState<InviteContext | null>(null)
 
   useEffect(() => {
     if (!searchParams) return
@@ -129,15 +150,188 @@ function OnboardingPageContent() {
     }))
   }, [searchParams])
 
+  useEffect(() => {
+    if (!inviteTokenParam) {
+      setInviteContext(null)
+      setInviteError(null)
+      return
+    }
+
+    let cancelled = false
+    setInviteLoading(true)
+    setInviteError(null)
+
+    ;(async () => {
+      try {
+        const res = await fetch("/api/invites/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inviteToken: inviteTokenParam }),
+        })
+        const data = (await res.json()) as {
+          invite?: InviteContext
+          message?: string
+        }
+        if (cancelled) return
+        if (!res.ok || !data.invite) {
+          setInviteContext(null)
+          setInviteError(data.message ?? "Invalid invite link.")
+          return
+        }
+        setInviteContext(data.invite)
+        setForm((prev) => ({ ...prev, email: data.invite!.email || prev.email }))
+      } catch {
+        if (cancelled) return
+        setInviteContext(null)
+        setInviteError("Unable to validate this invite right now. Please try again.")
+      } finally {
+        if (!cancelled) setInviteLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [inviteTokenParam])
+
   function setField(k: keyof typeof form, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
   }
 
+  async function finalizeOnboarding() {
+    const effectiveFirstName = form.firstName || firstNameParam || ""
+    const effectiveLastName = form.lastName || lastNameParam || ""
+    const effectiveEmail = form.email || emailParam || ""
+    const fullName = `${effectiveFirstName} ${effectiveLastName}`.trim()
+    const email = (inviteContext?.email || effectiveEmail).toLowerCase()
+
+    if (!inviteContext && organizationIdParam && !UUID_RE.test(organizationIdParam)) {
+      setSubmitError("Invalid organization invite link. Please request a new invitation.")
+      return
+    }
+
+    setSubmitError(null)
+    setIsSubmitting(true)
+
+    let authUserId: string | null = null
+    try {
+      const signUpResult = await supabase.auth.signUp({
+        email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: fullName,
+            first_name: effectiveFirstName,
+            last_name: effectiveLastName,
+          },
+        },
+      })
+
+      if (signUpResult.error) {
+        const userExists = /already registered|already exists|user already/i.test(signUpResult.error.message)
+        if (!userExists) {
+          setSubmitError(signUpResult.error.message || "Could not create your account.")
+          return
+        }
+
+        const signInResult = await supabase.auth.signInWithPassword({
+          email,
+          password: form.password,
+        })
+        if (signInResult.error || !signInResult.data.user) {
+          setSubmitError(signInResult.error?.message || "Account exists. Sign in or reset your password.")
+          return
+        }
+        authUserId = signInResult.data.user.id
+      } else {
+        authUserId = signUpResult.data.user?.id ?? null
+      }
+
+      if (!authUserId) {
+        setSubmitError("Account created, but session is not ready yet. Check your email to verify your account.")
+        return
+      }
+
+      if (inviteTokenParam) {
+        const acceptRes = await fetch("/api/invites/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inviteToken: inviteTokenParam }),
+        })
+        if (!acceptRes.ok) {
+          const acceptData = (await acceptRes.json()) as { message?: string }
+          setSubmitError(acceptData.message ?? "Could not accept invite. Request a new invite.")
+          return
+        }
+      } else if (organizationIdParam) {
+        const { data: membership, error: membershipErr } = await supabase
+          .from("organization_members")
+          .select("status")
+          .eq("organization_id", organizationIdParam)
+          .eq("user_id", authUserId)
+          .maybeSingle()
+
+        if (membershipErr || !membership) {
+          setSubmitError("This invite is missing, invalid, or expired. Ask your admin to resend it.")
+          return
+        }
+
+        // Best effort only; some environments activate membership on invite-accept flow.
+        if (membership.status === "invited") {
+          await supabase
+            .from("organization_members")
+            .update({ status: "active" })
+            .eq("organization_id", organizationIdParam)
+            .eq("user_id", authUserId)
+        }
+
+        await supabase
+          .from("profiles")
+          .update({ default_organization_id: organizationIdParam, updated_at: new Date().toISOString() })
+          .eq("id", authUserId)
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
+      window.localStorage.setItem(
+        ONBOARDING_INTENT_STORAGE_KEY,
+        JSON.stringify({
+          selectedPlan,
+          trial: "scale",
+          firstName: form.firstName || firstNameParam || undefined,
+          lastName: form.lastName || lastNameParam || undefined,
+          email: form.email || emailParam || undefined,
+          phone: form.phone || undefined,
+          company: form.companyName || undefined,
+          industry: form.industry || undefined,
+          teamSize: form.teamSize || undefined,
+          currentSystem: form.currentSystem || undefined,
+          organizationId: organizationIdParam || undefined,
+          inviteTokenPresent: Boolean(inviteTokenParam),
+          inviteOrganizationId: inviteContext?.organizationId || undefined,
+          inviteRole: inviteContext?.role || undefined,
+        })
+      )
+    }
+    router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
+  }
+
   function next() {
     if (step === 0) {
+      if (inviteTokenParam && inviteLoading) {
+        setStepOneError("Validating invite...")
+        return
+      }
+      if (inviteTokenParam && !inviteContext) {
+        setStepOneError(inviteError ?? "Invalid invite link.")
+        return
+      }
       const effectiveFirstName = form.firstName || firstNameParam || ""
       const effectiveLastName = form.lastName || lastNameParam || ""
-      const effectiveEmail = form.email || emailParam || ""
+      const effectiveEmail = inviteContext?.email || form.email || emailParam || ""
       if (!effectiveFirstName || !effectiveLastName || !effectiveEmail || !form.password) {
         setStepOneError("First name, last name, email, and password are required to continue.")
         return
@@ -146,27 +340,7 @@ function OnboardingPageContent() {
     }
 
     if (step < STEPS.length - 1) setStep((s) => s + 1)
-    else {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
-        window.localStorage.setItem(
-          ONBOARDING_INTENT_STORAGE_KEY,
-          JSON.stringify({
-            selectedPlan,
-            trial: "scale",
-            firstName: form.firstName || undefined,
-            lastName: form.lastName || undefined,
-            email: form.email || undefined,
-            phone: form.phone || undefined,
-            company: form.companyName || undefined,
-            industry: form.industry || undefined,
-            teamSize: form.teamSize || undefined,
-            currentSystem: form.currentSystem || undefined,
-          })
-        )
-      }
-      router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
-    }
+    else void finalizeOnboarding()
   }
   function back() { setStep((s) => Math.max(0, s - 1)) }
 
@@ -176,12 +350,16 @@ function OnboardingPageContent() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#f5f6f8" }}>
       {/* Top bar */}
-      <header className="h-14 flex items-center justify-between px-6 border-b bg-white" style={{ borderColor: "#e5e7eb" }}>
-        <BrandLogoOnLight />
-        <p className="text-sm text-gray-500">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium" style={{ color: "#2563eb" }}>Sign in</Link>
-        </p>
+      <header className="border-b border-white/10 bg-[#01050C] shadow-sm">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <BrandLogo className="h-8 w-auto sm:h-9" priority />
+          <p className="text-sm text-gray-300">
+            Already have an account?{" "}
+            <Link href="/login" className="font-medium text-white hover:text-gray-200">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-start py-12 px-4">
@@ -219,7 +397,7 @@ function OnboardingPageContent() {
                   <p className="mt-1 text-sm font-semibold text-gray-900">
                     {form.firstName || firstNameParam} {form.lastName || lastNameParam}
                   </p>
-                  <p className="text-sm text-gray-700">{form.email || emailParam}</p>
+                  <p className="text-sm text-gray-700">{inviteContext?.email || form.email || emailParam}</p>
                 </div>
               ) : (
                 <>
@@ -234,11 +412,17 @@ function OnboardingPageContent() {
                   </div>
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Work email</label>
-                    <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)}
+                    <input
+                      type="email"
+                      value={inviteContext?.email || form.email}
+                      onChange={(e) => setField("email", e.target.value)}
+                      disabled={Boolean(inviteContext)}
                       className="portal-input" placeholder="you@company.com" />
                   </div>
                 </>
               )}
+              {inviteLoading && <p className="mt-2 text-xs text-gray-500">Validating invite...</p>}
+              {inviteError && <p className="mt-2 text-xs text-red-600">{inviteError}</p>}
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
                 <input type="password" value={form.password} onChange={(e) => setField("password", e.target.value)}
@@ -247,6 +431,9 @@ function OnboardingPageContent() {
               </div>
               {stepOneError && (
                 <p className="mt-3 text-xs text-red-600">{stepOneError}</p>
+              )}
+              {submitError && step === 0 && (
+                <p className="mt-2 text-xs text-red-600">{submitError}</p>
               )}
               <button onClick={next} className="portal-btn-primary w-full justify-center h-10 mt-6">
                 Continue <ArrowRight size={15} />
@@ -405,10 +592,13 @@ function OnboardingPageContent() {
                 <button onClick={back} className="portal-btn-secondary h-10 px-5">
                   <ArrowLeft size={15} /> Back
                 </button>
-                <button onClick={next} className="portal-btn-primary flex-1 justify-center h-10">
-                  Start free trial <ArrowRight size={15} />
+                <button onClick={next} disabled={isSubmitting} className="portal-btn-primary flex-1 justify-center h-10">
+                  {isSubmitting ? "Creating account..." : <>Start free trial <ArrowRight size={15} /></>}
                 </button>
               </div>
+              {submitError && (
+                <p className="text-center text-xs text-red-600 mt-3">{submitError}</p>
+              )}
               <p className="text-center text-xs text-gray-400 mt-4">
                 14-day free trial &bull; Cancel any time &bull; No credit card required
               </p>
