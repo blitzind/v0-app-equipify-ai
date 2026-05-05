@@ -39,6 +39,7 @@ import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { clearOtherDefaultCustomerLocations } from "@/lib/customer-locations/clear-default"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -981,6 +982,19 @@ export default function CustomerDetailPage() {
         }
       }
       const supabase = createBrowserSupabaseClient()
+
+      if (locationForm.is_default) {
+        const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
+          organizationId: customer.organizationId,
+          customerId: customer.id,
+          exceptLocationId: editingLocationId ?? undefined,
+        })
+        if (clearErr) {
+          setLocationError(clearErr.message)
+          return
+        }
+      }
+
       const payload = {
         organization_id: customer.organizationId,
         customer_id: customer.id,

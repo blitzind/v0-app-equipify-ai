@@ -44,6 +44,7 @@ export async function POST() {
       trialing_accounts: metrics.trialing_accounts,
       archived_accounts: metrics.archived_accounts,
       total_mrr: metrics.total_mrr_cents,
+      trial_pipeline_mrr: metrics.trial_pipeline_mrr_cents,
       active_seats: metrics.active_seats,
       equipment_records: metrics.equipment_records,
       work_orders: metrics.work_orders,

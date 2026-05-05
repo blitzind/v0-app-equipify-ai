@@ -13,20 +13,36 @@ import { Badge } from "@/components/ui/badge"
 export const EQUIPIFY_SCRIM =
   "bg-black/40 backdrop-blur-[2px]"
 
-/** Slide-over / sheet panel: light uses page bg token; dark uses elevated card (#121B2C). */
-export const DRAWER_PANEL_SURFACE = "bg-background dark:bg-card"
+/** Main drawer panel (right sheet / DetailDrawer / vaul). Light unchanged; dark #121B2C. */
+export const DRAWER_PANEL_SURFACE =
+  "bg-background border-border dark:bg-[#121B2C] dark:border-[#25324C]"
 
-/** Nested cards / table shells inside drawer body (theme --card; dark #121B2C). */
+/** Nested cards / sections inside drawer body. Dark secondary surface #0B111E. */
 export const DRAWER_NESTED_CARD =
-  "rounded-xl border border-border bg-card shadow-sm"
+  "rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C]"
 
-/** Compact inline inputs & selects in drawers (dark canvas #0B111E via --background). */
+/** Compact inline inputs & selects (native / DRAWER_FIELD_CLASS). */
 export const DRAWER_FIELD_CLASS =
-  "rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none transition-colors focus:ring-2 focus:ring-primary/30 focus:border-primary dark:bg-background"
+  "rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none transition-colors focus:ring-2 focus:ring-primary/30 focus:border-primary dark:bg-[#0B111E] dark:border-[#25324C]"
 
-/** Modal/dialog shells stacked inside a drawer (avoid raw bg-white in dark). */
+/** Modal/dialog shells stacked inside a drawer. */
 export const DRAWER_STACKED_MODAL =
-  "relative bg-card border border-border rounded-xl shadow-2xl w-full flex flex-col"
+  "relative bg-card border border-border rounded-xl shadow-2xl w-full flex flex-col dark:bg-[#0B111E] dark:border-[#25324C]"
+
+/** Anchored popovers / small modal stacks inside drawer chrome. */
+export const DRAWER_ANCHORED_SURFACE =
+  "bg-background border border-border dark:bg-[#0B111E] dark:border-[#25324C]"
+
+/**
+ * Shadcn Input / Textarea / SelectTrigger default to `dark:bg-background`.
+ * Force drawer-canvas field colors without changing global input defaults.
+ */
+export const DRAWER_DESCENDANT_FIELD_OVERRIDES =
+  "dark:[&_input]:!bg-[#0B111E] dark:[&_input]:!border-[#25324C] dark:[&_textarea]:!bg-[#0B111E] dark:[&_textarea]:!border-[#25324C] dark:[&_[data-slot=select-trigger]]:!bg-[#0B111E] dark:[&_[data-slot=select-trigger]]:!border-[#25324C]"
+
+/** Table / list hover rows inside drawer panels. */
+export const DRAWER_DESCENDANT_LIST_HOVER =
+  "dark:[&_tbody>tr:hover]:bg-[#111724] dark:[&_.ds-hover-list-row-menu:hover]:bg-[#111724]"
 
 /** Backdrop sits below the panel; above main app chrome. */
 export const DRAWER_BACKDROP_Z = "z-[100]"
@@ -116,6 +132,8 @@ export function DrawerViewport({
         className={cn(
           "fixed top-0 right-0 h-full max-h-dvh w-full border-l border-border shadow-2xl",
           DRAWER_PANEL_SURFACE,
+          DRAWER_DESCENDANT_FIELD_OVERRIDES,
+          DRAWER_DESCENDANT_LIST_HOVER,
           "flex flex-col min-h-0 transition-transform ease-in-out will-change-transform",
           DRAWER_PANEL_Z,
           widthClass,
@@ -166,7 +184,7 @@ export function DetailDrawer({
   return (
     <DrawerViewport open={open} onClose={onClose} width={width} transitionMs={transitionMs} ariaLabel={title}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border shrink-0">
+      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border dark:border-[#25324C] shrink-0">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-semibold text-foreground leading-tight truncate">{title}</h2>
@@ -184,7 +202,7 @@ export function DetailDrawer({
       </div>
 
       {actions && (
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-border shrink-0 flex-wrap">{actions}</div>
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] shrink-0 flex-wrap">{actions}</div>
       )}
 
       <div
@@ -226,7 +244,7 @@ export function DrawerSection({
 
 export function DrawerRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-start justify-between gap-4 py-1.5 border-b border-border/50 last:border-0", className)}>
+    <div className={cn("flex items-start justify-between gap-4 py-1.5 border-b border-border/50 dark:border-[#25324C]/50 last:border-0", className)}>
       <span className="text-xs text-muted-foreground shrink-0 pt-0.5">{label}</span>
       <span className="text-xs font-medium text-foreground text-right">{value}</span>
     </div>
@@ -245,7 +263,7 @@ export function DrawerTimeline({ items }: {
 
   return (
     <div className="relative pl-4">
-      <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border" />
+      <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border dark:bg-[#25324C]" />
       <div className="flex flex-col gap-4">
         {items.map((item, i) => (
           <div key={i} className="relative flex gap-3">
@@ -278,7 +296,7 @@ export function DrawerLineItems({ items, total }: {
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-lg border border-border dark:border-[#25324C] overflow-hidden">
       <table className="w-full text-xs">
         <thead className="ds-thead-bg">
           <tr>
@@ -288,9 +306,9 @@ export function DrawerLineItems({ items, total }: {
             <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide text-[10px] w-16">Total</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody className="divide-y divide-border dark:divide-[#25324C]">
           {items.map((item, i) => (
-            <tr key={i} className="bg-card">
+            <tr key={i} className="bg-card dark:bg-[#0B111E]">
               <td className="px-3 py-2 text-foreground">{item.description}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{fmt$(item.unit)}</td>
@@ -311,7 +329,7 @@ export function DrawerLineItems({ items, total }: {
 
 // ─── Toast component ──────────────────────────────────────────────────────────
 
-export interface ToastItem { id: number; message: string; type?: "success" | "info" }
+export interface ToastItem { id: number; message: string; type?: "success" | "info" | "error" }
 
 export function DrawerToastStack({ toasts, onRemove }: { toasts: ToastItem[]; onRemove: (id: number) => void }) {
   return (
@@ -322,12 +340,18 @@ export function DrawerToastStack({ toasts, onRemove }: { toasts: ToastItem[]; on
           className={cn(
             "flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium pointer-events-auto",
             "animate-in slide-in-from-right-4 fade-in duration-200",
-            t.type === "success" || t.type == null
-              ? "bg-[color:var(--status-success)] text-white"
-              : "bg-foreground text-background"
+            t.type === "error"
+              ? "bg-destructive text-destructive-foreground"
+              : t.type === "success" || t.type == null
+                ? "bg-[color:var(--status-success)] text-white"
+                : "bg-foreground text-background"
           )}
         >
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {t.type === "error" ? (
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          )}
           {t.message}
           <button onClick={() => onRemove(t.id)} aria-label="Dismiss" className="ml-1 opacity-70 hover:opacity-100">
             <X className="w-3.5 h-3.5" />

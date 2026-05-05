@@ -26,7 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  DetailDrawer, DrawerSection, DrawerRow, DrawerTimeline, DrawerToastStack,
+  DetailDrawer,
+  DrawerSection,
+  DrawerRow,
+  DrawerTimeline,
+  DrawerToastStack,
+  DRAWER_FIELD_CLASS,
+  DRAWER_NESTED_CARD,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -172,8 +178,10 @@ function ageYears(installDate: string) {
   return new Date().getFullYear() - new Date(installDate).getFullYear()
 }
 
-const drawerInputClass =
-  "h-8 min-h-8 w-full px-2 text-xs md:text-xs bg-background border-border text-foreground dark:bg-background"
+const drawerInputClass = cn(
+  DRAWER_FIELD_CLASS,
+  "h-8 min-h-8 w-full md:text-xs",
+)
 
 function EditableRow({ label, value, editing, children }: {
   label: string; value: React.ReactNode; editing: boolean; children?: React.ReactNode
@@ -1004,7 +1012,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           )}
 
           {!editing && (
-            <div className="shrink-0 bg-background border-b border-border z-[11]">
+            <div className="shrink-0 border-b border-border z-[11] bg-background dark:bg-[#121B2C] dark:border-[#25324C]">
               <div className="flex min-w-0 gap-0 overflow-x-auto scrollbar-none px-5">
                 {TABS.map((tab) => {
                   const Icon = tab.icon
@@ -1086,7 +1094,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                   ).map(({ label, value, sub, warn }) => (
                     <div
                       key={label}
-                      className="bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+                      className={cn(
+                        DRAWER_NESTED_CARD,
+                        "p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]",
+                      )}
                     >
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
                       <p
@@ -1104,7 +1115,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
               )}
 
               {!editing && (
-                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="rounded-xl border border-border bg-muted/20 p-3 dark:bg-[#0B111E] dark:border-[#25324C]">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Quick actions</p>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
@@ -1650,7 +1661,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 value={draft.notes ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
                 placeholder="Add notes about this equipment..."
-                className="min-h-[88px] resize-none px-2 py-2 text-xs md:text-xs bg-background border-border text-foreground dark:bg-background"
+                className={cn(
+                  DRAWER_FIELD_CLASS,
+                  "min-h-[88px] resize-none px-2 py-2 md:text-xs",
+                )}
               />
             </DrawerSection>
           )}

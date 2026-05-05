@@ -72,7 +72,12 @@ export async function GET() {
   const list = orgs ?? []
   const ids = list.map((o) => o.id)
   if (ids.length === 0) {
-    return NextResponse.json({ accounts: [] as PlatformAccount[], totalMrrCents: 0 })
+    return NextResponse.json({
+      accounts: [] as PlatformAccount[],
+      paidMrrCents: 0,
+      trialPipelineMrrCents: 0,
+      totalMrrCents: 0,
+    })
   }
 
   const { data: subs, error: subsErr } = await admin
@@ -173,10 +178,8 @@ export async function GET() {
       createdAt: o.created_at?.slice(0, 10) ?? "",
       lastActive: (o.updated_at ?? o.created_at)?.slice(0, 10) ?? "",
       trialEndsAt: trialEndsAtIso,
-      trial_ends_at: trialEndsAtIso,
       trialDaysLeft,
       subscriptionStatus,
-      billingStatus: subscriptionStatus,
       planId: sub?.plan_id ?? null,
       intendedPlanId: sub?.intended_plan_id ?? null,
       stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
@@ -186,15 +189,21 @@ export async function GET() {
     }
   })
 
-  let totalMrrCents = 0
+  let paidMrrCents = 0
+  let trialPipelineMrrCents = 0
   for (const o of list) {
     const orgArchived = o.status === "archived"
     const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
     const parts = computePlatformAdminMrr(sub, orgArchived)
-    if (parts.countsTowardPlatformTotal) {
-      totalMrrCents += parts.finalCents
-    }
+    paidMrrCents += parts.paidMrrCents
+    trialPipelineMrrCents += parts.trialPipelineMrrCents
   }
 
-  return NextResponse.json({ accounts, totalMrrCents })
+  return NextResponse.json({
+    accounts,
+    paidMrrCents,
+    trialPipelineMrrCents,
+    /** @deprecated same as paidMrrCents */
+    totalMrrCents: paidMrrCents,
+  })
 }

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   DetailDrawer,
+  DRAWER_ANCHORED_SURFACE,
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
@@ -913,7 +914,7 @@ export function PurchaseOrderDrawer({
       {confirmArchiveOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmArchiveOpen(false)} />
-          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[color:var(--status-warning)]" />
               <h3 className="text-sm font-semibold text-foreground">Archive Purchase Order?</h3>
@@ -932,7 +933,7 @@ export function PurchaseOrderDrawer({
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteOpen(false)} />
-          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-destructive" />
               <h3 className="text-sm font-semibold text-foreground">Delete Purchase Order?</h3>

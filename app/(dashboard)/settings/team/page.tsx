@@ -10,6 +10,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import {
+  NAV_PRIMARY_ROW_MOTION,
+  NAV_ROW_INACTIVE_HOVER_CARD,
+} from "@/lib/navigation-chrome"
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 
@@ -321,7 +325,13 @@ export default function TeamPage() {
                               </div>
                               {ROLES.filter(r => r !== "Owner").map(r => (
                                 <button key={r} onClick={() => changeRole(user.id, r)}
-                                  className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-secondary transition-colors cursor-default">
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-3 py-1.5 cursor-default",
+                                    NAV_PRIMARY_ROW_MOTION,
+                                    NAV_ROW_INACTIVE_HOVER_CARD,
+                                    "rounded-sm",
+                                  )}
+                                >
                                   <RoleBadge role={r} />
                                   {user.role === r && <Check size={12} className="text-primary" />}
                                 </button>

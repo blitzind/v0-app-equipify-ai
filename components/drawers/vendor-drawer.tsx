@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   DetailDrawer,
+  DRAWER_ANCHORED_SURFACE,
+  DRAWER_NESTED_CARD,
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
@@ -43,17 +45,17 @@ type Draft = {
 }
 
 /** Aligned with purchase-order drawer: gray canvas + white section cards */
-const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
-const sectionCardClass =
-  "rounded-xl border border-border bg-card shadow-sm dark:bg-card"
+const drawerBodyClass =
+  "-mx-5 -my-5 min-h-full bg-muted/20 dark:bg-[#0B111E]/40 px-5 py-5 space-y-5"
+const sectionCardClass = DRAWER_NESTED_CARD
 
-/** Drawer fields use compact sizing on top of shared Input/Textarea styles (editable = white surfaces) */
+/** Drawer fields — light unchanged; dark surfaces via drawer scope + explicit borders */
 const fieldControl =
-  "h-8 px-2.5 py-1 text-xs bg-background border-border text-foreground dark:bg-background"
+  "h-8 px-2.5 py-1 text-xs bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
 const fieldTextarea =
-  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-background"
+  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
 const fieldNotesTextarea =
-  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-background"
+  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -534,7 +536,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       {confirmArchiveOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !destructiveBusy && setConfirmArchiveOpen(false)} />
-          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[color:var(--status-warning)]" />
               <h3 className="text-sm font-semibold text-foreground">Archive vendor?</h3>
@@ -557,7 +559,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !destructiveBusy && setConfirmDeleteOpen(false)} />
-          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-destructive" />
               <h3 className="text-sm font-semibold text-foreground">Delete vendor?</h3>

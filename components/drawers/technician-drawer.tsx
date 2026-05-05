@@ -48,7 +48,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DrawerViewport, DrawerToastStack, type ToastItem } from "@/components/detail-drawer"
+import {
+  DrawerViewport,
+  DrawerToastStack,
+  DRAWER_FIELD_CLASS,
+  DRAWER_NESTED_CARD,
+  type ToastItem,
+} from "@/components/detail-drawer"
 import {
   Mail,
   Calendar,
@@ -1889,7 +1895,7 @@ export function TechnicianDrawer({
                     onChange={(e) => setNoteDraft(e.target.value)}
                     placeholder="Add an internal note about this technician…"
                     rows={3}
-                    className="text-sm resize-y min-h-[72px] bg-background dark:bg-background"
+                    className={cn(DRAWER_FIELD_CLASS, "text-sm resize-y min-h-[72px]")}
                   />
                   <div className="flex justify-end">
                     <Button
@@ -1925,7 +1931,7 @@ export function TechnicianDrawer({
                     const author = noteProfiles.get(n.created_by) ?? "Member"
                     const isEditing = noteEditingId === n.id
                     return (
-                      <li key={n.id} className="rounded-xl border border-border bg-card p-3 space-y-2">
+                      <li key={n.id} className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2")}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[10px] text-muted-foreground">
                             {author} ·{" "}
@@ -1997,7 +2003,7 @@ export function TechnicianDrawer({
                             value={noteEditBody}
                             onChange={(e) => setNoteEditBody(e.target.value)}
                             rows={4}
-                            className="text-sm resize-y bg-background dark:bg-background"
+                            className={cn(DRAWER_FIELD_CLASS, "text-sm resize-y")}
                           />
                         ) : (
                           <p className="text-sm text-foreground whitespace-pre-wrap">{n.note}</p>

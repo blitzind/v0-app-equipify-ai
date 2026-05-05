@@ -7,21 +7,34 @@ type SubLike = {
   plan_id: string | null | undefined
   billing_cycle: string | null | undefined
   status: string | null | undefined
+  trial_ends_at?: string | null
   discount_type: string | null | undefined
   discount_value: number | string | null | undefined
   discount_expires_at: string | null | undefined
 }
 
+function trialStillActive(trialEndsAt: string | null | undefined): boolean {
+  if (!trialEndsAt || String(trialEndsAt).trim() === "") return false
+  const t = new Date(trialEndsAt).getTime()
+  return Number.isFinite(t) && t > Date.now()
+}
+
 /**
  * MRR for platform admin: list price from `pricing.ts` + internal discounts (cents, expiry-aware).
- * Platform total counts only non-archived orgs with subscription status `active` or `trialing`.
+ * Annual plans use monthly-equivalent rates from `monthlyListPriceUsd`.
+ *
+ * - **Paid MRR total** — only Stripe-equivalent `active` subscriptions (excludes trialing, past_due, paused, canceled, archived orgs).
+ * - **Trial pipeline** — `trialing` with a future `trial_ends_at` (estimated value if those workspaces converted).
  */
 export function computePlatformAdminMrr(sub: SubLike | null, orgArchived: boolean): {
   baseCents: number
   finalCents: number
   hasActiveDiscount: boolean
   mrrBaseCents: number | null
-  countsTowardPlatformTotal: boolean
+  /** Included in platform “Paid MRR” aggregate */
+  paidMrrCents: number
+  /** Not paid; shown as trial pipeline */
+  trialPipelineMrrCents: number
   showMrrInTable: boolean
 } {
   if (orgArchived || !sub) {
@@ -30,7 +43,8 @@ export function computePlatformAdminMrr(sub: SubLike | null, orgArchived: boolea
       finalCents: 0,
       hasActiveDiscount: false,
       mrrBaseCents: null,
-      countsTowardPlatformTotal: false,
+      paidMrrCents: 0,
+      trialPipelineMrrCents: 0,
       showMrrInTable: false,
     }
   }
@@ -61,14 +75,20 @@ export function computePlatformAdminMrr(sub: SubLike | null, orgArchived: boolea
   const excludedFromTable = new Set(["canceled", "unpaid", "incomplete_expired"])
   const showMrrInTable = !excludedFromTable.has(st)
 
-  const countsTowardPlatformTotal = st === "active" || st === "trialing"
+  const finalCents = parsed.finalCents
+
+  const paidMrrCents = st === "active" ? finalCents : 0
+
+  const trialPipelineMrrCents =
+    st === "trialing" && trialStillActive(sub.trial_ends_at) ? finalCents : 0
 
   return {
     baseCents,
-    finalCents: parsed.finalCents,
+    finalCents,
     hasActiveDiscount,
     mrrBaseCents,
-    countsTowardPlatformTotal,
+    paidMrrCents,
+    trialPipelineMrrCents,
     showMrrInTable,
   }
 }

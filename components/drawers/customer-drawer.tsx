@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import {
-  DetailDrawer, DrawerRow, DrawerToastStack,
+  DetailDrawer,
+  DRAWER_ANCHORED_SURFACE,
+  DrawerRow,
+  DrawerToastStack,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -31,6 +34,8 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
+import { clearOtherDefaultCustomerLocations } from "@/lib/customer-locations/clear-default"
 
 let toastCounter = 0
 
@@ -173,7 +178,7 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
+      <div className={cn("w-full max-w-md rounded-xl shadow-xl overflow-hidden", DRAWER_ANCHORED_SURFACE)}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -307,7 +312,7 @@ interface DeleteConfirmProps {
 function DeleteConfirm({ hasRelatedRecords, onArchive, onDelete, onCancel }: DeleteConfirmProps) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-sm bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
+      <div className={cn("w-full max-w-sm rounded-xl shadow-xl overflow-hidden", DRAWER_ANCHORED_SURFACE)}>
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">
             {hasRelatedRecords ? "Archive Location?" : "Delete Location?"}
@@ -721,10 +726,13 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     }, 420)
   }
 
-  function toast(message: string) {
+  function toast(message: string, type: NonNullable<ToastItem["type"]> = "success") {
     const id = ++toastCounter
-    setToasts((prev) => [...prev, { id, message, type: "success" }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500)
+    setToasts((prev) => [...prev, { id, message, type }])
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      type === "error" ? 6000 : 3500,
+    )
   }
 
   if (!customerId) {
@@ -1083,7 +1091,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
                     {/* Dropdown menu */}
                     {openLocationMenu === loc.id && (
-                      <div className="absolute right-0 top-8 z-50 w-44 rounded-lg border border-border bg-background dark:bg-card shadow-lg py-1 text-xs">
+                      <div className={cn("absolute right-0 top-8 z-50 w-44 rounded-lg shadow-lg py-1 text-xs", DRAWER_ANCHORED_SURFACE)}>
                         <button
                           onClick={() => {
                             setOpenLocationMenu(null)
@@ -1450,7 +1458,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
       {contactModalOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
+          <div className={cn("w-full max-w-md rounded-xl shadow-xl overflow-hidden", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground">
                 {editingContactId ? "Edit Contact" : "Add Contact"}
@@ -1584,14 +1592,22 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             if (!activeOrgId || !customerId) return
             const supabase = createBrowserSupabaseClient()
             void (async () => {
-              if (d.isDefault) {
-                await supabase
-                  .from("customer_locations")
-                  .update({ is_default: false })
-                  .eq("organization_id", activeOrgId)
-                  .eq("customer_id", customerId)
+              const gate = await enforceCanCreateRecord(activeOrgId, "customer")
+              if (!gate.ok) {
+                toast(gate.message, "error")
+                return
               }
-              const { data, error } = await supabase
+              if (d.isDefault) {
+                const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
+                  organizationId: activeOrgId,
+                  customerId,
+                })
+                if (clearErr) {
+                  toast(clearErr.message, "error")
+                  return
+                }
+              }
+              const { data: inserted, error } = await supabase
                 .from("customer_locations")
                 .insert({
                   organization_id: activeOrgId,
@@ -1608,27 +1624,33 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                   is_default: d.isDefault,
                 })
                 .select("id")
-                .single()
-              if (!error && data) {
-                setDrawerLocations((prev) => [
-                  {
-                    id: data.id,
-                    name: d.name,
-                    address: d.address,
-                    addressLine2: d.addressLine2 || undefined,
-                    city: d.city,
-                    state: d.state,
-                    zip: d.zip,
-                    phone: d.phone || undefined,
-                    contactPerson: d.contactPerson || undefined,
-                    notes: d.notes || undefined,
-                    isDefault: d.isDefault,
-                  },
-                  ...prev.map((loc) => ({ ...loc, isDefault: d.isDefault ? false : loc.isDefault })),
-                ])
-                setLocationModal(null)
-                toast("Location added successfully")
+              const newId = inserted?.[0]?.id
+              if (error) {
+                toast(error.message, "error")
+                return
               }
+              if (!newId) {
+                toast("Could not save location. Check permissions or refresh and try again.", "error")
+                return
+              }
+              setDrawerLocations((prev) => [
+                {
+                  id: newId,
+                  name: d.name,
+                  address: d.address,
+                  addressLine2: d.addressLine2 || undefined,
+                  city: d.city,
+                  state: d.state,
+                  zip: d.zip,
+                  phone: d.phone || undefined,
+                  contactPerson: d.contactPerson || undefined,
+                  notes: d.notes || undefined,
+                  isDefault: d.isDefault,
+                },
+                ...prev.map((loc) => ({ ...loc, isDefault: d.isDefault ? false : loc.isDefault })),
+              ])
+              setLocationModal(null)
+              toast("Location added successfully")
             })()
           }}
         />
@@ -1659,11 +1681,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               const supabase = createBrowserSupabaseClient()
               void (async () => {
                 if (d.isDefault) {
-                  await supabase
-                    .from("customer_locations")
-                    .update({ is_default: false })
-                    .eq("organization_id", activeOrgId)
-                    .eq("customer_id", customerId)
+                  const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
+                    organizationId: activeOrgId,
+                    customerId,
+                    exceptLocationId: editingLocationId,
+                  })
+                  if (clearErr) {
+                    toast(clearErr.message, "error")
+                    return
+                  }
                 }
                 const { error } = await supabase
                   .from("customer_locations")
@@ -1682,30 +1708,32 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                   .eq("id", editingLocationId)
                   .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
-                if (!error) {
-                  setDrawerLocations((prev) =>
-                    prev.map((x) =>
-                      x.id === editingLocationId
-                        ? {
-                            ...x,
-                            name: d.name,
-                            address: d.address,
-                            addressLine2: d.addressLine2 || undefined,
-                            city: d.city,
-                            state: d.state,
-                            zip: d.zip,
-                            phone: d.phone || undefined,
-                            contactPerson: d.contactPerson || undefined,
-                            notes: d.notes || undefined,
-                            isDefault: d.isDefault,
-                          }
-                        : { ...x, isDefault: d.isDefault ? false : x.isDefault },
-                    ),
-                  )
-                  setLocationModal(null)
-                  setEditingLocationId(null)
-                  toast("Location updated successfully")
+                if (error) {
+                  toast(error.message, "error")
+                  return
                 }
+                setDrawerLocations((prev) =>
+                  prev.map((x) =>
+                    x.id === editingLocationId
+                      ? {
+                          ...x,
+                          name: d.name,
+                          address: d.address,
+                          addressLine2: d.addressLine2 || undefined,
+                          city: d.city,
+                          state: d.state,
+                          zip: d.zip,
+                          phone: d.phone || undefined,
+                          contactPerson: d.contactPerson || undefined,
+                          notes: d.notes || undefined,
+                          isDefault: d.isDefault,
+                        }
+                      : { ...x, isDefault: d.isDefault ? false : x.isDefault },
+                  ),
+                )
+                setLocationModal(null)
+                setEditingLocationId(null)
+                toast("Location updated successfully")
               })()
             }}
           />

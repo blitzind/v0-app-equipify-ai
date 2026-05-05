@@ -986,7 +986,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           )
         }
       >
-        <div className="-mx-5 -my-5 min-h-full bg-muted/40 dark:bg-card px-5 py-5 space-y-5">
+        <div className="-mx-5 -my-5 min-h-full bg-muted/40 px-5 py-5 space-y-5 dark:bg-[#0B111E]">
           {/* AI Tools */}
           {!editing && !quote.isArchived && (
             <QuoteAIToolsPanel
@@ -1044,7 +1044,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
           <DrawerSection title="Description">
             <div className={cn(DRAWER_NESTED_CARD, "p-4")}>
-              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background dark:bg-background rounded-lg border border-border">
+              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">
                 {quote.description}
               </p>
             </div>
@@ -1065,7 +1065,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               {editing ? (
                 <EditTextarea value={draft.notes ?? ""} onChange={(v) => setField("notes", v)} placeholder="Add notes..." />
               ) : quote.notes ? (
-                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background dark:bg-background rounded-lg border border-border">{quote.notes}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">{quote.notes}</p>
               ) : (
                 <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
               )}
@@ -1081,7 +1081,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   placeholder="Internal team notes…"
                 />
               ) : quote.internalNotes ? (
-                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background dark:bg-background rounded-lg border border-border">
+                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">
                   {quote.internalNotes}
                 </p>
               ) : (

@@ -457,7 +457,6 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
       onClose={onClose}
       width="xl"
       ariaLabel={plan.name}
-      panelClassName="border-l border-border bg-background dark:bg-card shadow-2xl"
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header */}

@@ -7,6 +7,11 @@ import {
   User, Building2, Users, CreditCard, Bell,
   Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive,
 } from "lucide-react"
+import {
+  NAV_ICON_INACTIVE_CARD,
+  NAV_PRIMARY_ROW_MOTION,
+  NAV_ROW_INACTIVE_HOVER_CARD,
+} from "@/lib/navigation-chrome"
 
 const NAV_ITEMS = [
   { label: "General",         href: "/settings/general",         icon: User },
@@ -51,13 +56,14 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-md text-sm font-medium transition-colors shrink-0 min-h-[44px]",
+                "group flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium shrink-0 min-h-[44px]",
+                NAV_PRIMARY_ROW_MOTION,
                 active
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  : NAV_ROW_INACTIVE_HOVER_CARD,
               )}
             >
-              <Icon size={14} className={active ? "text-primary" : "text-muted-foreground"} />
+              <Icon size={14} className={active ? "text-primary" : NAV_ICON_INACTIVE_CARD} />
               {label}
             </Link>
           )
@@ -74,13 +80,14 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 key={href}
                 href={href}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
+                  "group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm",
+                  NAV_PRIMARY_ROW_MOTION,
                   active
                     ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    : NAV_ROW_INACTIVE_HOVER_CARD,
                 )}
               >
-                <Icon size={15} className={active ? "text-primary" : "text-muted-foreground"} />
+                <Icon size={15} className={active ? "text-primary" : NAV_ICON_INACTIVE_CARD} />
                 {label}
               </Link>
             )

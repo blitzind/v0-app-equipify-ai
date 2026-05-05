@@ -62,6 +62,13 @@ export type PlatformMetricsComputed = {
   active_accounts: number
   trialing_accounts: number
   archived_accounts: number
+  /** Paid subscriptions only (`status === active`), after discounts; annual → monthly equivalent. */
+  paid_mrr_cents: number
+  /** Estimated MRR if active trials converted; not included in paid_mrr_cents. */
+  trial_pipeline_mrr_cents: number
+  /**
+   * Same as `paid_mrr_cents` — legacy key for charts/snapshots labeled `total_mrr` in DB.
+   */
   total_mrr_cents: number
   active_seats: number
   equipment_records: number
@@ -71,7 +78,7 @@ export type PlatformMetricsComputed = {
 
 /**
  * Live platform totals from organizations, subscriptions, members, equipment, and work orders.
- * Mirrors per-account MRR rules in `app/api/platform/accounts/route.ts`.
+ * Paid vs trial MRR matches `computePlatformAdminMrr` in `app/api/platform/accounts/route.ts`.
  */
 export async function computePlatformMetrics(admin: SupabaseClient): Promise<PlatformMetricsComputed> {
   const { data: orgs, error: orgErr } = await admin.from("organizations").select("id, status")
@@ -89,6 +96,8 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
       active_accounts: 0,
       trialing_accounts: 0,
       archived_accounts: 0,
+      paid_mrr_cents: 0,
+      trial_pipeline_mrr_cents: 0,
       total_mrr_cents: 0,
       active_seats: 0,
       equipment_records: 0,
@@ -113,7 +122,8 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
   let archived_accounts = 0
   let active_accounts = 0
   let trialing_accounts = 0
-  let total_mrr_cents = 0
+  let paid_mrr_cents = 0
+  let trial_pipeline_mrr_cents = 0
 
   const planCounts: Record<"solo" | "core" | "growth" | "scale", number> = {
     solo: 0,
@@ -147,9 +157,8 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
     if (!sub) continue
 
     const parts = computePlatformAdminMrr(sub, false)
-    if (parts.countsTowardPlatformTotal) {
-      total_mrr_cents += parts.finalCents
-    }
+    paid_mrr_cents += parts.paidMrrCents
+    trial_pipeline_mrr_cents += parts.trialPipelineMrrCents
   }
 
   let active_seats = 0
@@ -203,7 +212,9 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
     active_accounts,
     trialing_accounts,
     archived_accounts,
-    total_mrr_cents,
+    paid_mrr_cents,
+    trial_pipeline_mrr_cents,
+    total_mrr_cents: paid_mrr_cents,
     active_seats,
     equipment_records,
     work_orders,

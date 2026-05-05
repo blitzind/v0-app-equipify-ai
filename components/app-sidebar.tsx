@@ -15,6 +15,13 @@ import {
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
+import {
+  NAV_ICON_ACTIVE_SIDEBAR,
+  NAV_ICON_INACTIVE_SIDEBAR,
+  NAV_PRIMARY_ROW_MOTION,
+  NAV_ROW_ACTIVE_SIDEBAR,
+  NAV_ROW_INACTIVE_HOVER_SIDEBAR,
+} from "@/lib/navigation-chrome"
 
 type NavItem = {
   label: string
@@ -255,11 +262,10 @@ function SidebarBody({
                     href={href}
                     title={isCollapsed ? label : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg text-sm transition-all duration-150 group relative",
+                      "flex items-center gap-3 group relative",
+                      NAV_PRIMARY_ROW_MOTION,
                       isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
-                      active
-                        ? "bg-blue-500/[0.18] text-white font-medium"
-                        : "text-sidebar-foreground/75 hover:bg-blue-500/[0.10] hover:text-sidebar-foreground",
+                      active ? NAV_ROW_ACTIVE_SIDEBAR : NAV_ROW_INACTIVE_HOVER_SIDEBAR,
                     )}
                   >
                     {/* Left accent bar — active only, desktop only */}
@@ -272,7 +278,7 @@ function SidebarBody({
                     )}
                     <Icon className={cn(
                       "w-[17px] h-[17px] shrink-0 transition-all duration-150",
-                      active ? "text-blue-300" : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80"
+                      active ? NAV_ICON_ACTIVE_SIDEBAR : NAV_ICON_INACTIVE_SIDEBAR,
                     )} />
                     {!isCollapsed && (
                       <>

@@ -1,5 +1,5 @@
-// ─── Platform Admin static samples ───────────────────────────────────────────
-// Audit tab and KPI strip use in-file samples; live accounts come from GET /api/platform/accounts.
+// ─── Platform Admin shared types & sample audit log ────────────────────────────
+// Live KPIs: GET /api/platform/analytics. Accounts grid: GET /api/platform/accounts.
 
 export type PlatformAdminRole = "Super Admin" | "Support Admin" | "Sales Admin" | "Finance Admin"
 
@@ -43,14 +43,10 @@ export interface PlatformAccount {
   lastActive: string
   /** ISO 8601 trial end from `organization_subscriptions.trial_ends_at` */
   trialEndsAt?: string | null
-  /** Same as trialEndsAt (snake_case alias from API). */
-  trial_ends_at?: string | null
   /** Whole days until trial ends; negative if expired; null if no trial end date */
   trialDaysLeft?: number | null
   /** Raw `organization_subscriptions.status` */
   subscriptionStatus?: string | null
-  /** @deprecated same as subscriptionStatus */
-  billingStatus?: string | null
   /** Raw `organization_subscriptions.plan_id` */
   planId?: string | null
   /** Raw `organization_subscriptions.intended_plan_id` when set */
@@ -60,36 +56,6 @@ export interface PlatformAccount {
   country: string
   industry: string
 }
-
-// ─── Platform-level usage stats ───────────────────────────────────────────────
-
-export const PLATFORM_STATS = {
-  totalAccounts: 9,
-  activeAccounts: 7,
-  totalMrr: 298600,      // cents → $2,986.00
-  trialAccounts: 1,
-  churnedAccounts: 1,
-  totalSeats: 71,
-  totalEquipment: 1026,
-  totalWorkOrders: 3457,
-  mrrGrowth: 12.4,       // % MoM
-  accountGrowth: 18.2,   // % MoM
-}
-
-export const MRR_TREND = [
-  { month: "Nov", mrr: 212000 },
-  { month: "Dec", mrr: 228000 },
-  { month: "Jan", mrr: 244000 },
-  { month: "Feb", mrr: 259000 },
-  { month: "Mar", mrr: 271000 },
-  { month: "Apr", mrr: 298600 },
-]
-
-export const PLAN_DISTRIBUTION = [
-  { plan: "Solo",    accounts: 3, color: "#f59e0b" },
-  { plan: "Growth",     accounts: 4, color: "#3b82f6" },
-  { plan: "Enterprise", accounts: 2, color: "#8b5cf6" },
-]
 
 // ─── Feature flags ────────────────────────────────────────────────────────────
 

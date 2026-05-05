@@ -349,7 +349,7 @@ function InvoicePreview({
   return (
     <div className={cn("mx-auto transition-all duration-300", wrapClass)}>
       <div className={cn(
-        "bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg overflow-hidden shadow-sm font-sans text-gray-800 dark:text-card-foreground",
+        "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm font-sans text-gray-800 dark:bg-[#0B111E] dark:border-[#25324C] dark:text-foreground",
         device === "pdf" && "rounded-none shadow-none",
       )}>
         {/* Header band */}

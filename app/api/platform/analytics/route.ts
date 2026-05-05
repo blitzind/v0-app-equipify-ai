@@ -10,7 +10,9 @@ export type PlatformMetricsDailyRow = {
   active_accounts: number
   trialing_accounts: number
   archived_accounts: number
+  /** Paid MRR only (matches DB `total_mrr`). */
   total_mrr_cents: number
+  trial_pipeline_mrr_cents: number
   active_seats: number
   equipment_records: number
   work_orders: number
@@ -119,7 +121,7 @@ export async function GET() {
   const { data: rows, error: histErr } = await admin
     .from("platform_metrics_daily")
     .select(
-      "metric_date, total_accounts, active_accounts, trialing_accounts, archived_accounts, total_mrr, active_seats, equipment_records, work_orders",
+      "metric_date, total_accounts, active_accounts, trialing_accounts, archived_accounts, total_mrr, trial_pipeline_mrr, active_seats, equipment_records, work_orders",
     )
     .gte("metric_date", cutoffStr)
     .order("metric_date", { ascending: true })
@@ -128,17 +130,21 @@ export async function GET() {
     return NextResponse.json({ error: "query_failed", message: histErr.message }, { status: 500 })
   }
 
-  const history: PlatformMetricsDailyRow[] = (rows ?? []).map((r) => ({
-    metric_date: String(r.metric_date),
-    total_accounts: Number(r.total_accounts ?? 0),
-    active_accounts: Number(r.active_accounts ?? 0),
-    trialing_accounts: Number(r.trialing_accounts ?? 0),
-    archived_accounts: Number(r.archived_accounts ?? 0),
-    total_mrr_cents: Math.round(parseNumeric(r.total_mrr)),
-    active_seats: Number(r.active_seats ?? 0),
-    equipment_records: Number(r.equipment_records ?? 0),
-    work_orders: Number(r.work_orders ?? 0),
-  }))
+  const history: PlatformMetricsDailyRow[] = (rows ?? []).map((r) => {
+    const raw = r as Record<string, unknown>
+    return {
+      metric_date: String(r.metric_date),
+      total_accounts: Number(r.total_accounts ?? 0),
+      active_accounts: Number(r.active_accounts ?? 0),
+      trialing_accounts: Number(r.trialing_accounts ?? 0),
+      archived_accounts: Number(r.archived_accounts ?? 0),
+      total_mrr_cents: Math.round(parseNumeric(r.total_mrr)),
+      trial_pipeline_mrr_cents: Math.round(parseNumeric(raw.trial_pipeline_mrr)),
+      active_seats: Number(r.active_seats ?? 0),
+      equipment_records: Number(r.equipment_records ?? 0),
+      work_orders: Number(r.work_orders ?? 0),
+    }
+  })
 
   const chart_monthly = buildMonthlyMrrChart(history, current.total_mrr_cents)
 

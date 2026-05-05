@@ -11,7 +11,6 @@ import {
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import {
-  PLATFORM_STATS,
   FEATURE_FLAGS, ADMIN_AUDIT_LOG,
   type AccountDisplayStatus,
   type PlatformAccount, type FeatureFlag,
@@ -163,7 +162,7 @@ function statusColor(status: AccountDisplayStatus) {
 
 function TrialColumnCell({ account }: { account: PlatformAccount }) {
   const raw = account.subscriptionStatus?.trim().toLowerCase()
-  const trialEnds = account.trialEndsAt ?? account.trial_ends_at
+  const trialEnds = account.trialEndsAt
   if (raw !== "trialing" || !trialEnds) {
     return <span className="text-muted-foreground text-sm">—</span>
   }
@@ -393,7 +392,7 @@ function AccountsTab({
       const key = (x: PlatformAccount) => {
         const st = x.subscriptionStatus?.trim().toLowerCase()
         if (st !== "trialing") return Number.POSITIVE_INFINITY
-        const iso = x.trialEndsAt ?? x.trial_ends_at
+        const iso = x.trialEndsAt
         if (!iso) return Number.POSITIVE_INFINITY
         return new Date(iso).getTime()
       }
@@ -512,7 +511,7 @@ function AccountsTab({
     setPlanTarget(account)
     setPlanFormPlanId(initialPlanKey(account))
     setPlanFormBillingCycle(account.billingCycle === "annual" ? "annual" : "monthly")
-    setPlanFormStatus(normalizeAdminBillingStatus(account.subscriptionStatus ?? account.billingStatus))
+    setPlanFormStatus(normalizeAdminBillingStatus(account.subscriptionStatus))
     setPlanFormTrialLocal(isoToDatetimeLocal(account.trialEndsAt))
     const dt = account.discountType?.trim().toLowerCase()
     if (dt === "percent") {
@@ -1137,7 +1136,7 @@ function AccountsTab({
                 <p>
                   <span className="text-muted-foreground">Billing status:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {billingStatusLabel(planTarget.subscriptionStatus ?? planTarget.billingStatus)}
+                    {billingStatusLabel(planTarget.subscriptionStatus)}
                   </span>
                 </p>
               </div>
@@ -1318,7 +1317,7 @@ function AccountsTab({
                 <p>
                   <span className="text-muted-foreground">Billing status:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {billingStatusLabel(discountTarget.subscriptionStatus ?? discountTarget.billingStatus)}
+                    {billingStatusLabel(discountTarget.subscriptionStatus)}
                   </span>
                 </p>
                 <p>
@@ -1476,6 +1475,8 @@ type PlatformAnalyticsResponse = {
     active_accounts: number
     trialing_accounts: number
     archived_accounts: number
+    paid_mrr_cents: number
+    trial_pipeline_mrr_cents: number
     total_mrr_cents: number
     active_seats: number
     equipment_records: number
@@ -1551,8 +1552,10 @@ function AnalyticsTab() {
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold">Monthly Recurring Revenue</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Last 6 months (from daily snapshots when available)</p>
+            <h3 className="text-sm font-semibold">Paid MRR trend</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Last 6 months from stored daily snapshots (paid subscriptions only). Forward-filled when some months have no snapshot.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1 text-xs font-semibold">
@@ -1599,7 +1602,7 @@ function AnalyticsTab() {
                 </defs>
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={v => "$" + (v / 100).toLocaleString()} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={64} />
-                <Tooltip formatter={(v: number) => [fmt$(v), "MRR"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
+                <Tooltip formatter={(v: number) => [fmt$(v), "Paid MRR"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
                 <Area type="monotone" dataKey="mrr" stroke="var(--primary)" strokeWidth={2} fill="url(#mrrGrad)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -1630,7 +1633,7 @@ function AnalyticsTab() {
       </div>
 
       {/* Usage metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
         {[
           {
             label: "Total Accounts",
@@ -1646,11 +1649,18 @@ function AnalyticsTab() {
             color: "#1d4ed8",
           },
           {
-            label: "Total MRR",
-            value: current ? fmt$(current.total_mrr_cents) : "—",
-            sub: "Sum of effective list MRR after discounts",
+            label: "Paid MRR",
+            value: current ? fmt$(current.paid_mrr_cents) : "—",
+            sub: "Active subscriptions after discounts (annual → monthly)",
             icon: DollarSign,
             color: "#15803d",
+          },
+          {
+            label: "Trial pipeline",
+            value: current ? fmt$(current.trial_pipeline_mrr_cents) : "—",
+            sub: "If active trials converted at list − discount",
+            icon: Ticket,
+            color: "#b45309",
           },
           {
             label: "Active Seats",
@@ -1812,7 +1822,8 @@ export default function PlatformAdminPage() {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [accountsError, setAccountsError] = useState<string | null>(null)
-  const [totalMrrCents, setTotalMrrCents] = useState<number | null>(null)
+  const [overview, setOverview] = useState<PlatformAnalyticsResponse | null>(null)
+  const [overviewLoading, setOverviewLoading] = useState(true)
 
   const loadAccounts = useCallback(async () => {
     setAccountsLoading(true)
@@ -1821,29 +1832,43 @@ export default function PlatformAdminPage() {
       const res = await fetch("/api/platform/accounts", { cache: "no-store" })
       const data = (await res.json()) as {
         accounts?: PlatformAccount[]
-        totalMrrCents?: number
         message?: string
       }
       if (!res.ok) {
         setAccountsError(data.message ?? "Could not load accounts.")
         setAccounts([])
-        setTotalMrrCents(null)
         return
       }
       setAccounts(data.accounts ?? [])
-      setTotalMrrCents(typeof data.totalMrrCents === "number" ? data.totalMrrCents : 0)
     } catch {
       setAccountsError("Could not load accounts.")
       setAccounts([])
-      setTotalMrrCents(null)
     } finally {
       setAccountsLoading(false)
     }
   }, [])
 
+  const loadOverview = useCallback(async () => {
+    setOverviewLoading(true)
+    try {
+      const res = await fetch("/api/platform/analytics", { cache: "no-store" })
+      const data = (await res.json()) as PlatformAnalyticsResponse & { message?: string; error?: string }
+      if (!res.ok) {
+        setOverview(null)
+        return
+      }
+      setOverview(data)
+    } catch {
+      setOverview(null)
+    } finally {
+      setOverviewLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadAccounts()
-  }, [loadAccounts])
+    void loadOverview()
+  }, [loadAccounts, loadOverview])
 
   function handleImpersonate(account: PlatformAccount) {
     startImpersonation(account)
@@ -1884,18 +1909,61 @@ export default function PlatformAdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-8">
-        {/* KPI strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Building2}   label="Total Accounts"  value={PLATFORM_STATS.totalAccounts.toString()} sub={`${PLATFORM_STATS.activeAccounts} active`} color="#1d4ed8" />
+        {/* KPI strip — live aggregates from organizations + organization_subscriptions */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatCard
+            icon={Building2}
+            label="Total Accounts"
+            value={overviewLoading ? "…" : String(overview?.current.total_accounts ?? "—")}
+            sub={
+              overview?.current
+                ? `${overview.current.active_accounts} active · ${overview.current.trialing_accounts} trialing · ${overview.current.archived_accounts} archived`
+                : ""
+            }
+            color="#1d4ed8"
+          />
           <StatCard
             icon={DollarSign}
-            label="Total MRR"
-            value={accountsLoading ? "…" : fmt$(totalMrrCents ?? 0)}
-            sub={`+${PLATFORM_STATS.mrrGrowth}% MoM`}
+            label="Paid MRR"
+            value={overviewLoading ? "…" : fmt$(overview?.current.paid_mrr_cents ?? 0)}
+            sub={
+              overviewLoading || overview?.mrr_growth_pct == null
+                ? "Stripe status active, after discounts"
+                : `${overview.mrr_growth_pct >= 0 ? "+" : ""}${overview.mrr_growth_pct.toFixed(1)}% MoM (chart)`
+            }
             color="#15803d"
           />
-          <StatCard icon={Users}       label="Active Seats"    value={PLATFORM_STATS.totalSeats.toString()} sub="across all accounts" color="#b45309" />
-          <StatCard icon={TrendingUp}  label="Account Growth"  value={`+${PLATFORM_STATS.accountGrowth}%`} sub="MoM new signups" color="#7c3aed" />
+          <StatCard
+            icon={Ticket}
+            label="Trial pipeline"
+            value={overviewLoading ? "…" : fmt$(overview?.current.trial_pipeline_mrr_cents ?? 0)}
+            sub="Estimated if trials convert"
+            color="#b45309"
+          />
+          <StatCard
+            icon={Users}
+            label="Active Seats"
+            value={overviewLoading ? "…" : String(overview?.current.active_seats ?? "—")}
+            sub="Members in non-archived orgs"
+            color="#0f766e"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Account Growth"
+            value={
+              overviewLoading
+                ? "…"
+                : overview?.account_growth_pct == null
+                  ? "—"
+                  : `${overview.account_growth_pct >= 0 ? "+" : ""}${overview.account_growth_pct.toFixed(1)}%`
+            }
+            sub={
+              overview?.account_growth_pct == null
+                ? "Needs daily snapshots (~30d)"
+                : "vs accounts ~30d ago"
+            }
+            color="#7c3aed"
+          />
         </div>
 
         {/* Tabs */}
