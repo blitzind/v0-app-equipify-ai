@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
@@ -61,22 +61,10 @@ function getIndustrySetupCopy(industry: string) {
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const parsedIntent = useMemo(() => ({
-    selectedPlan: parseOnboardingPlan(searchParams.get("plan")),
-    trial: hasScaleTrialParam(searchParams.get("trial")) ? "scale" as const : null,
-    firstName: parseOnboardingText(searchParams.get("firstName")),
-    lastName: parseOnboardingText(searchParams.get("lastName")),
-    email: parseOnboardingText(searchParams.get("email")),
-    company: parseOnboardingText(searchParams.get("company")),
-    phone: parseOnboardingText(searchParams.get("phone")),
-    industry: parseOnboardingIndustry(searchParams.get("industry")),
-    teamSize: parseOnboardingTeamSize(searchParams.get("teamSize")),
-    currentSystem: parseOnboardingText(searchParams.get("currentSystem")),
-  }), [searchParams])
-  const trialFromQuery = parsedIntent.trial === "scale"
+  const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>(parsedIntent.selectedPlan ?? "growth")
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>("growth")
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -91,25 +79,50 @@ export default function OnboardingPage() {
   })
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("onboarding params", parsedIntent)
-    }
-  }, [parsedIntent])
+    if (!searchParams) return
 
-  useEffect(() => {
-    setSelectedPlan(parsedIntent.selectedPlan ?? "growth")
+    const selectedPlanFromQuery = parseOnboardingPlan(searchParams.get("plan"))
+    const firstName = parseOnboardingText(searchParams.get("firstName")) || ""
+    const lastName = parseOnboardingText(searchParams.get("lastName")) || ""
+    const email = parseOnboardingText(searchParams.get("email")) || ""
+    const company = parseOnboardingText(searchParams.get("company")) || ""
+    const phone = parseOnboardingText(searchParams.get("phone")) || ""
+    const industry = parseOnboardingIndustry(searchParams.get("industry")) || ""
+    const teamSize = parseOnboardingTeamSize(searchParams.get("teamSize")) || ""
+    const currentSystem = parseOnboardingText(searchParams.get("currentSystem")) || ""
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("APPLYING PREFILL", { firstName, lastName, email })
+      console.log("onboarding params", {
+        selectedPlan: selectedPlanFromQuery,
+        trial: hasScaleTrialParam(searchParams.get("trial")) ? "scale" : null,
+        firstName,
+        lastName,
+        email,
+        company,
+        phone,
+        industry,
+        teamSize,
+        currentSystem,
+      })
+    }
+
+    if (selectedPlanFromQuery) {
+      setSelectedPlan(selectedPlanFromQuery)
+    }
+
     setForm((prev) => ({
       ...prev,
-      firstName: parsedIntent.firstName ?? prev.firstName,
-      lastName: parsedIntent.lastName ?? prev.lastName,
-      email: parsedIntent.email ?? prev.email,
-      companyName: parsedIntent.company ?? prev.companyName,
-      phone: parsedIntent.phone ?? prev.phone,
-      industry: parsedIntent.industry ?? prev.industry,
-      teamSize: parsedIntent.teamSize ?? prev.teamSize,
-      currentSystem: parsedIntent.currentSystem ?? prev.currentSystem,
+      firstName: firstName || prev.firstName,
+      lastName: lastName || prev.lastName,
+      email: email || prev.email,
+      companyName: company || prev.companyName,
+      phone: phone || prev.phone,
+      industry: industry || prev.industry,
+      teamSize: teamSize || prev.teamSize,
+      currentSystem: currentSystem || prev.currentSystem,
     }))
-  }, [parsedIntent])
+  }, [searchParams])
 
   function setField(k: keyof typeof form, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
