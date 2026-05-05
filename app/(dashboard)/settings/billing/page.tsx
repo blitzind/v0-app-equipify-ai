@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
-import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js"
+import { EmbeddedCheckoutProvider, EmbeddedCheckout, Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import { useTenant } from "@/lib/tenant-store"
 import { PLANS, getPlan } from "@/lib/plans"
 import type { PlanId } from "@/lib/plans"
@@ -21,6 +22,7 @@ import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } f
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { createCheckoutSession, createPortalSession } from "@/app/actions/stripe"
+import { createSetupIntent } from "@/app/actions/stripe-setup"
 import {
   getStripeBillingSummary,
   type StripeBillingInvoiceRow,
@@ -33,6 +35,11 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import {
+  ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
+  parseOnboardingPlan,
+} from "@/lib/onboarding-intent"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
@@ -187,7 +194,58 @@ function UsageBar({ label, icon: Icon, used, limit, unit = "" }: UsageBarProps) 
   )
 }
 
+function AddCardTrialForm({
+  clientSecret,
+  onSuccess,
+}: {
+  clientSecret: string
+  onSuccess: () => void
+}) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  async function submit() {
+    if (!stripe || !elements) return
+    setBusy(true)
+    setError(null)
+    const cardElement = elements.getElement(CardElement)
+    if (!cardElement) {
+      setError("Card form is not ready yet. Try again in a moment.")
+      setBusy(false)
+      return
+    }
+    const result = await stripe.confirmCardSetup(clientSecret, {
+      payment_method: { card: cardElement },
+    })
+    setBusy(false)
+    if (result.error) {
+      setError(result.error.message ?? "Could not save your card.")
+      return
+    }
+    toast({ title: "Card saved", description: "Card saved. Choose a plan anytime." })
+    onSuccess()
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-md border border-border px-3 py-2 bg-background">
+        <CardElement options={{ hidePostalCode: true }} />
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" size="sm" onClick={() => void submit()} disabled={busy || !stripe || !elements}>
+          {busy ? "Saving…" : "Save card"}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function BillingPage() {
+  const searchParams = useSearchParams()
   const { workspace, dispatch, workspaceUsers } = useTenant()
   const { organizationId, status: orgStatus } = useActiveOrganization()
 
@@ -208,6 +266,40 @@ export default function BillingPage() {
   const [stripePaymentMethod, setStripePaymentMethod] = useState<StripeBillingPaymentMethod | null>(null)
   const [stripeInvoices, setStripeInvoices] = useState<StripeBillingInvoiceRow[]>([])
   const [stripeBillingNote, setStripeBillingNote] = useState<string | null>(null)
+  const [billingRefreshTick, setBillingRefreshTick] = useState(0)
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null)
+  const [setupBusy, setSetupBusy] = useState(false)
+  const [setupError, setSetupError] = useState<string | null>(null)
+  const [intendedPlanId, setIntendedPlanId] = useState<PlanId | null>(null)
+  const [highlightedPlanId, setHighlightedPlanId] = useState<PlanId | null>(null)
+
+  useEffect(() => {
+    const queryPlan = parseOnboardingPlan(searchParams.get("plan"))
+    if (queryPlan) {
+      setIntendedPlanId(queryPlan)
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, queryPlan)
+      }
+      return
+    }
+
+    if (typeof window === "undefined") return
+    const storedPlan = parseOnboardingPlan(
+      window.localStorage.getItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY)
+    )
+    setIntendedPlanId(storedPlan)
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!intendedPlanId) return
+    const planSection = document.getElementById("plan-comparison")
+    if (!planSection) return
+    planSection.scrollIntoView({ behavior: "smooth", block: "start" })
+    setHighlightedPlanId(intendedPlanId)
+    const t = window.setTimeout(() => setHighlightedPlanId(null), 2600)
+    return () => window.clearTimeout(t)
+  }, [intendedPlanId])
 
   useEffect(() => {
     if (orgStatus !== "ready" || !organizationId) {
@@ -251,7 +343,7 @@ export default function BillingPage() {
     return () => {
       cancelled = true
     }
-  }, [organizationId, orgStatus])
+  }, [organizationId, orgStatus, billingRefreshTick])
 
   useEffect(() => {
     if (orgStatus !== "ready" || !organizationId) return
@@ -282,7 +374,7 @@ export default function BillingPage() {
     return () => {
       cancelled = true
     }
-  }, [organizationId, orgStatus])
+  }, [organizationId, orgStatus, billingRefreshTick])
 
   const storedPlanId = subscription?.plan_id ?? workspace.planId
   const effectivePlanId = getEffectivePlanId(storedPlanId, subscription)
@@ -399,6 +491,27 @@ export default function BillingPage() {
 
   const currentMonthlyRate =
     billingCycle === "annual" ? currentPlanData.priceAnnual : currentPlanData.priceMonthly
+
+  async function openAddCardModal() {
+    setSetupError(null)
+    setSetupBusy(true)
+    const res = await createSetupIntent()
+    setSetupBusy(false)
+    if (!res.clientSecret) {
+      setSetupError(res.error ?? "Could not initialize card setup.")
+      setSetupOpen(true)
+      return
+    }
+    setSetupClientSecret(res.clientSecret)
+    setSetupOpen(true)
+  }
+
+  function handleSetupSuccess() {
+    setSetupOpen(false)
+    setSetupClientSecret(null)
+    setSetupError(null)
+    setBillingRefreshTick((n) => n + 1)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -532,6 +645,9 @@ export default function BillingPage() {
                   {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} remaining · Trial ends{" "}
                   <strong>{fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}</strong>.
                 </p>
+                <p className={cn("text-[11px] text-muted-foreground", trialDaysLeft <= 6 && "text-foreground/80 font-medium")}>
+                  No card required. Add a card now to avoid interruption later.
+                </p>
                 {trialTotalDays != null && trialDaysUsed != null && (
                   <div className="space-y-1">
                     <p className="text-[11px] text-muted-foreground">
@@ -552,15 +668,28 @@ export default function BillingPage() {
                     </div>
                   </div>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={jumpToPlanComparison}
-                >
-                  Choose your plan
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={jumpToPlanComparison}
+                  >
+                    Choose your plan
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn("h-7 text-xs", trialDaysLeft <= 6 && "text-foreground")}
+                    disabled={setupBusy}
+                    onClick={() => void openAddCardModal()}
+                  >
+                    {setupBusy ? "Loading…" : "Add card (optional)"}
+                  </Button>
+                </div>
+                {setupError && <p className="text-xs text-destructive">{setupError}</p>}
               </div>
             )}
 
@@ -816,6 +945,10 @@ export default function BillingPage() {
                     : isPopular
                     ? "border-primary/40 bg-card hover:border-primary/60"
                     : "border-border bg-card hover:border-primary/30"
+                } ${
+                  highlightedPlanId === p.id
+                    ? "ring-2 ring-[#2563eb] ring-offset-2 ring-offset-background"
+                    : ""
                 }`}
               >
                 {p.badge && (
@@ -835,7 +968,14 @@ export default function BillingPage() {
                 )}
 
                 <div className="mb-3 mt-1">
-                  <h4 className="font-semibold text-foreground text-base">{p.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground text-base">{p.name}</h4>
+                    {intendedPlanId === p.id && (
+                      <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border border-[#93c5fd] bg-[#eff6ff] text-[#1d4ed8]">
+                        Intended
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{p.description}</p>
                 </div>
 
@@ -1068,6 +1208,41 @@ export default function BillingPage() {
                     <Check size={14} /> Simulate upgrade to {PLANS.find((p) => p.id === checkoutPlan)?.name}
                   </Button>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {setupOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <CreditCard size={15} />
+                Add card for trial
+              </h3>
+              <Button variant="ghost" size="icon-sm" onClick={() => setSetupOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </Button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Save a card now so plan activation is faster before trial ends.
+              </p>
+              {setupError && <p className="text-xs text-destructive">{setupError}</p>}
+              {!setupClientSecret ? (
+                <div className="flex justify-end">
+                  <Button type="button" size="sm" onClick={() => void openAddCardModal()} disabled={setupBusy}>
+                    {setupBusy ? "Loading…" : "Retry"}
+                  </Button>
+                </div>
+              ) : hasStripe ? (
+                <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+                  <AddCardTrialForm onSuccess={handleSetupSuccess} clientSecret={setupClientSecret} />
+                </Elements>
+              ) : (
+                <p className="text-xs text-muted-foreground">Stripe is not configured for card setup.</p>
               )}
             </div>
           </div>

@@ -2,18 +2,27 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
 import { PLANS } from "@/lib/plans"
+import type { PlanId } from "@/lib/plans"
 import { BrandLogoOnLight } from "@/components/brand-logo"
+import {
+  hasScaleTrialParam,
+  ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
+  parseOnboardingPlan,
+} from "@/lib/onboarding-intent"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const planFromQuery = parseOnboardingPlan(searchParams.get("plan"))
+  const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
-  const [selectedPlan, setSelectedPlan] = useState("growth")
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>(planFromQuery ?? "growth")
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", password: "",
     companyName: "", industry: "", teamSize: "", timezone: "America/New_York",
@@ -25,7 +34,12 @@ export default function OnboardingPage() {
 
   function next() {
     if (step < STEPS.length - 1) setStep((s) => s + 1)
-    else router.push("/")
+    else {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
+      }
+      router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
+    }
   }
   function back() { setStep((s) => Math.max(0, s - 1)) }
 
@@ -163,6 +177,11 @@ export default function OnboardingPage() {
                   <h2 className="text-lg font-semibold text-gray-900">Choose a plan</h2>
                 </div>
                 <p className="text-sm text-gray-500">Start with a 14-day free trial. No credit card required.</p>
+                {trialFromQuery && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    You&apos;ll get Scale trial access during onboarding. Choose your intended paid plan below.
+                  </p>
+                )}
                 {/* Billing toggle */}
                 <div className="inline-flex items-center gap-1 mt-4 p-1 rounded-lg border bg-white" style={{ borderColor: "#e5e7eb" }}>
                   {(["monthly", "annual"] as const).map((cycle) => (
