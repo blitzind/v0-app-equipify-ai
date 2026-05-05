@@ -1,7 +1,7 @@
 import "server-only"
 
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { displayNameFromProfile } from "@/lib/user-display"
 import type { SessionIdentity } from "@/lib/session-identity"
 

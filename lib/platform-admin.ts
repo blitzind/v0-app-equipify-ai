@@ -1,30 +1,11 @@
 import "server-only"
 
 /**
- * Lists emails allowed to open `/admin`, call platform APIs, and bypass archived-org guards where implemented.
- *
- * Set `EQUIPIFY_PLATFORM_ADMIN_EMAILS` to one or more addresses separated by commas (spaces optional).
- * Matching is case-insensitive.
- *
- * @example Single admin
- * `EQUIPIFY_PLATFORM_ADMIN_EMAILS=mike@blitzind.com`
- *
- * @example Multiple admins
- * `EQUIPIFY_PLATFORM_ADMIN_EMAILS=mike@blitzind.com,support@equipify.ai`
- *
- * Empty = no platform admins (secure default).
+ * Node/server routes may import from here (enforces server-only boundary).
+ * Middleware must import `@/lib/platform-admin-policy` directly (Edge-safe).
  */
-export function getPlatformAdminEmails(): string[] {
-  const raw = process.env.EQUIPIFY_PLATFORM_ADMIN_EMAILS?.trim()
-  if (!raw) return []
-  return raw
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-}
-
-export function isPlatformAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false
-  const normalized = email.trim().toLowerCase()
-  return getPlatformAdminEmails().includes(normalized)
-}
+export {
+  getPlatformAdminEmails,
+  isPlatformAdminEmail,
+  logPlatformAdminDevDiagnostics,
+} from "./platform-admin-policy"

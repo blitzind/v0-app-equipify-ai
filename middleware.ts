@@ -4,7 +4,10 @@ import {
   signOutAndRedirect,
   updateSession,
 } from "@/lib/supabase/middleware"
-import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import {
+  isPlatformAdminEmail,
+  logPlatformAdminDevDiagnostics,
+} from "@/lib/platform-admin-policy"
 
 const PUBLIC_ROUTES = new Set(["/login", "/onboarding"])
 
@@ -48,6 +51,7 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(user)
 
   if (pathname.startsWith("/admin")) {
+    logPlatformAdminDevDiagnostics("middleware:/admin gate", user?.email ?? undefined)
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url))
     }

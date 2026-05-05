@@ -245,7 +245,7 @@ export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { sessionIdentity, sessionIdentityLoading, isPlatformAdmin } = useAdmin()
+  const { sessionIdentity, sessionIdentityLoading, platformAdminNavVisible } = useAdmin()
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
@@ -314,8 +314,9 @@ export function AppTopbar() {
   }, [supabase, activeOrgOpt?.organizationId])
 
   const launcherLinks = useMemo(
-    () => LAUNCHER_LINKS.filter((link) => link.href !== "/admin" || isPlatformAdmin),
-    [isPlatformAdmin],
+    () =>
+      LAUNCHER_LINKS.filter((link) => link.href !== "/admin" || platformAdminNavVisible),
+    [platformAdminNavVisible],
   )
 
   // Mark a notification as read and navigate

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import { isPlatformAdminEmail, logPlatformAdminDevDiagnostics } from "@/lib/platform-admin-policy"
 import { displayNameFromProfile } from "@/lib/user-display"
 import type { SessionIdentity } from "@/lib/session-identity"
 
@@ -16,6 +16,7 @@ export async function GET() {
 
   const email = user.email.trim()
   const platformAdmin = isPlatformAdminEmail(email)
+  logPlatformAdminDevDiagnostics("GET /api/session/account-summary", email)
 
   const { data: profile } = await supabase
     .from("profiles")

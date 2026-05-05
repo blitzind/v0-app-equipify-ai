@@ -18,7 +18,10 @@ interface AdminContextValue {
   impersonation: ImpersonationState
   startImpersonation: (account: PlatformAccount) => void
   endImpersonation: () => void
+  /** Confirmed after bootstrap: session user email is in EQUIPIFY_PLATFORM_ADMIN_EMAILS (org role ignored). */
   isPlatformAdmin: boolean
+  /** Show Platform Admin nav entry while loading or when confirmed platform admin (middleware still enforces /admin). */
+  platformAdminNavVisible: boolean
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null)
@@ -113,6 +116,7 @@ export function AdminProvider({
   }, [adminLabel, adminRoleLabel])
 
   const isPlatformAdmin = Boolean(sessionIdentity?.platformAdmin)
+  const platformAdminNavVisible = sessionIdentityLoading || isPlatformAdmin
 
   return (
     <AdminContext.Provider
@@ -123,6 +127,7 @@ export function AdminProvider({
         startImpersonation,
         endImpersonation,
         isPlatformAdmin,
+        platformAdminNavVisible,
       }}
     >
       {children}
