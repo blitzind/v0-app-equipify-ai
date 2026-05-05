@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Building2, Users, DollarSign, TrendingUp, TrendingDown, Search, MoreHorizontal,
+  Building2, Users, DollarSign, TrendingUp, TrendingDown, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
   ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw,
   ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket,
@@ -18,8 +18,8 @@ import {
 } from "@/lib/admin-data"
 import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
 import {
   Dialog,
@@ -228,6 +228,16 @@ function adminDiscountShortLabel(account: PlatformAccount): string | null {
   return null
 }
 
+/** Matches server rules for when list + discount MRR is shown in the accounts grid. */
+function accountShowsAdminMrr(account: PlatformAccount): boolean {
+  if (account.organizationArchived) return false
+  if (account.planId == null && account.subscriptionStatus == null) return false
+  const st = account.subscriptionStatus?.trim().toLowerCase()
+  if (!st) return false
+  if (st === "canceled" || st === "unpaid" || st === "incomplete_expired") return false
+  return true
+}
+
 function planColor(plan: string) {
   switch (plan) {
     case "Enterprise":
@@ -294,6 +304,7 @@ function AccountsTab({
   )
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null)
+  const [convertBusyId, setConvertBusyId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PlatformAccount | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [deleteBusy, setDeleteBusy] = useState(false)
@@ -426,6 +437,45 @@ function AccountsTab({
     } finally {
       setArchiveBusyId(null)
       setMenuOpen(null)
+    }
+  }
+
+  async function convertToPaid(account: PlatformAccount) {
+    if (
+      !window.confirm(
+        "Open Stripe Checkout to convert this trial to a paid subscription? Payment completes on Stripe; the account updates when checkout finishes.",
+      )
+    ) {
+      return
+    }
+    setConvertBusyId(account.id)
+    try {
+      const planId = normalizePlanIdForRead(String(account.planId ?? "solo"))
+      const billingCycle = account.billingCycle === "annual" ? "annual" : "monthly"
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: account.id,
+          planId,
+          billingCycle,
+          skipTrial: true,
+        }),
+      })
+      const data = (await res.json()) as { url?: string; message?: string }
+      if (!res.ok) {
+        window.alert(typeof data.message === "string" ? data.message : "Could not start Stripe checkout.")
+        return
+      }
+      if (data.url) {
+        console.log("Converted org to paid (Stripe checkout):", account.id)
+        window.open(data.url, "_blank", "noopener,noreferrer")
+        setMenuOpen(null)
+        return
+      }
+      window.alert("Stripe did not return a checkout URL.")
+    } finally {
+      setConvertBusyId(null)
     }
   }
 
@@ -670,23 +720,29 @@ function AccountsTab({
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-48 bg-card border border-border rounded-lg px-3 py-2">
-          <Search size={14} className="text-muted-foreground shrink-0" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search accounts, emails..."
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <div className="flex gap-4 items-end shrink-0">
-          <div className="flex flex-col gap-1 w-[220px]">
-            <span className="text-xs text-muted-foreground mb-1">Status</span>
+      <div className="flex items-end gap-4 flex-wrap justify-between">
+        <div className="flex gap-4 items-end">
+          <div className="flex flex-col gap-1 w-[320px]">
+            <label className="text-xs text-muted-foreground" htmlFor="platform-admin-accounts-search">
+              Search
+            </label>
+            <Input
+              id="platform-admin-accounts-search"
+              placeholder="Search accounts, emails..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="flex flex-col gap-1 w-[180px]">
+            <label className="text-xs text-muted-foreground" htmlFor="platform-admin-accounts-status">
+              Status
+            </label>
             <select
+              id="platform-admin-accounts-status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="input-base w-full text-sm"
+              className="input-base h-9 w-full text-sm"
             >
               <option value="All">All</option>
               <option value="Active">Active</option>
@@ -694,12 +750,15 @@ function AccountsTab({
               <option value="Archived">Archived</option>
             </select>
           </div>
-          <div className="flex flex-col gap-1 w-[220px]">
-            <span className="text-xs text-muted-foreground mb-1">Plan</span>
+          <div className="flex flex-col gap-1 w-[200px]">
+            <label className="text-xs text-muted-foreground" htmlFor="platform-admin-accounts-plan">
+              Plan
+            </label>
             <select
+              id="platform-admin-accounts-plan"
               value={planFilter}
               onChange={(e) => setPlanFilter(e.target.value)}
-              className="input-base w-full text-sm"
+              className="input-base h-9 w-full text-sm"
             >
               <option value="All">All Plans</option>
               <option value="Starter">Starter</option>
@@ -711,7 +770,9 @@ function AccountsTab({
             </select>
           </div>
         </div>
-        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} accounts</span>
+        <div className="text-sm text-muted-foreground whitespace-nowrap">
+          {accounts.length} accounts
+        </div>
       </div>
 
       {/* Table */}
@@ -797,27 +858,26 @@ function AccountsTab({
                       <TrialColumnCell account={account} />
                     </td>
                     <td className="px-4 py-3 text-sm ds-tabular">
-                      {account.planId == null && account.subscriptionStatus == null ? (
+                      {!accountShowsAdminMrr(account) ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
                         <div className="flex flex-col gap-0.5 items-start font-medium">
-                          {account.mrrBaseCents != null &&
-                            account.mrrBaseCents > account.mrr && (
-                              <span className="text-xs text-muted-foreground line-through font-normal">
+                          {account.mrrBaseCents != null && account.mrrBaseCents > account.mrr ? (
+                            <span className="text-xs tabular-nums">
+                              <span className="text-muted-foreground line-through font-normal">
                                 {fmt$(account.mrrBaseCents)}
                               </span>
-                            )}
-                          <span className="flex items-center gap-1.5">
-                            {fmt$(account.mrr)}
-                            {account.hasActiveDiscount && (
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] px-1 py-0 h-5 font-normal shrink-0 tabular-nums"
-                              >
-                                {adminDiscountShortLabel(account) ?? "Discount"}
-                              </Badge>
-                            )}
-                          </span>
+                              <span className="text-muted-foreground"> → </span>
+                              <span className="text-foreground font-semibold">{fmt$(account.mrr)}</span>
+                            </span>
+                          ) : (
+                            <span className="tabular-nums">{fmt$(account.mrr)}</span>
+                          )}
+                          {account.hasActiveDiscount && adminDiscountShortLabel(account) && (
+                            <span className="text-xs text-green-600 dark:text-green-500 font-medium tabular-nums">
+                              {adminDiscountShortLabel(account)}
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>
@@ -869,6 +929,30 @@ function AccountsTab({
                             >
                               <CreditCard size={13} className="text-muted-foreground" /> Change plan
                             </button>
+                            {account.subscriptionStatus?.trim().toLowerCase() === "trialing" &&
+                              !loginDisabled && (
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
+                                disabled={
+                                  convertBusyId === account.id ||
+                                  (account.planId == null && account.subscriptionStatus == null)
+                                }
+                                title={
+                                  account.planId == null && account.subscriptionStatus == null
+                                    ? "No subscription row for this organization."
+                                    : undefined
+                                }
+                                onClick={() => void convertToPaid(account)}
+                              >
+                                {convertBusyId === account.id ? (
+                                  <Loader2 size={13} className="animate-spin text-muted-foreground" />
+                                ) : (
+                                  <Zap size={13} className="text-muted-foreground" />
+                                )}
+                                Convert to Paid
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -1694,6 +1778,7 @@ export default function PlatformAdminPage() {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [accountsError, setAccountsError] = useState<string | null>(null)
+  const [totalMrrCents, setTotalMrrCents] = useState<number | null>(null)
 
   const loadAccounts = useCallback(async () => {
     setAccountsLoading(true)
@@ -1702,20 +1787,21 @@ export default function PlatformAdminPage() {
       const res = await fetch("/api/platform/accounts", { cache: "no-store" })
       const data = (await res.json()) as {
         accounts?: PlatformAccount[]
+        totalMrrCents?: number
         message?: string
       }
       if (!res.ok) {
         setAccountsError(data.message ?? "Could not load accounts.")
         setAccounts([])
+        setTotalMrrCents(null)
         return
       }
-      const list = data.accounts ?? []
-      setAccounts(list)
-      // TODO(platform-admin): remove after verifying planId / subscriptionStatus vs DB
-      if (list.length > 0) console.log("ADMIN ROW", list[0])
+      setAccounts(data.accounts ?? [])
+      setTotalMrrCents(typeof data.totalMrrCents === "number" ? data.totalMrrCents : 0)
     } catch {
       setAccountsError("Could not load accounts.")
       setAccounts([])
+      setTotalMrrCents(null)
     } finally {
       setAccountsLoading(false)
     }
@@ -1768,7 +1854,13 @@ export default function PlatformAdminPage() {
         {/* KPI strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={Building2}   label="Total Accounts"  value={PLATFORM_STATS.totalAccounts.toString()} sub={`${PLATFORM_STATS.activeAccounts} active`} color="#1d4ed8" />
-          <StatCard icon={DollarSign}  label="Total MRR"       value={fmt$(PLATFORM_STATS.totalMrr)} sub={`+${PLATFORM_STATS.mrrGrowth}% MoM`} color="#15803d" />
+          <StatCard
+            icon={DollarSign}
+            label="Total MRR"
+            value={accountsLoading ? "…" : fmt$(totalMrrCents ?? 0)}
+            sub={`+${PLATFORM_STATS.mrrGrowth}% MoM`}
+            color="#15803d"
+          />
           <StatCard icon={Users}       label="Active Seats"    value={PLATFORM_STATS.totalSeats.toString()} sub="across all accounts" color="#b45309" />
           <StatCard icon={TrendingUp}  label="Account Growth"  value={`+${PLATFORM_STATS.accountGrowth}%`} sub="MoM new signups" color="#7c3aed" />
         </div>

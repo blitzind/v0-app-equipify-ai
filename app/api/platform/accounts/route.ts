@@ -3,8 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
-import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
-import { listMrrBaseCentsForSubscriptionRow } from "@/lib/billing/org-subscription-mrr"
+import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
 import type { AccountDisplayStatus, PlatformAccount } from "@/lib/admin-data"
 
 function normalizeOrgKey(id: string): string {
@@ -93,7 +92,7 @@ export async function GET() {
   const list = orgs ?? []
   const ids = list.map((o) => o.id)
   if (ids.length === 0) {
-    return NextResponse.json({ accounts: [] as PlatformAccount[] })
+    return NextResponse.json({ accounts: [] as PlatformAccount[], totalMrrCents: 0 })
   }
 
   const { data: subs, error: subsErr } = await admin
@@ -154,20 +153,11 @@ export async function GET() {
     const trialEndsAtIso = sub?.trial_ends_at ?? null
     const trialDaysLeft = trialDaysLeftFromIso(trialEndsAtIso)
 
-    const baseMrrCents = sub ? listMrrBaseCentsForSubscriptionRow(sub) : 0
-    const discountParsed = sub
-      ? applyDiscountToMrrCents(
-          baseMrrCents,
-          sub.discount_type,
-          sub.discount_value as number | string | null,
-          sub.discount_expires_at,
-        )
-      : { finalCents: 0, active: false }
-    const dt = sub?.discount_type?.trim().toLowerCase()
-    const typedDisc = dt === "percent" || dt === "fixed"
-    const hasActiveDiscount = Boolean(discountParsed.active && typedDisc)
-    const mrrBaseCents =
-      hasActiveDiscount && baseMrrCents > discountParsed.finalCents ? baseMrrCents : null
+    const mrrParts = computePlatformAdminMrr(sub, orgArchived)
+    const showRowMrr = mrrParts.showMrrInTable
+    const mrrCents = showRowMrr ? mrrParts.finalCents : 0
+    const mrrBaseCents = showRowMrr ? mrrParts.mrrBaseCents : null
+    const hasActiveDiscount = showRowMrr && mrrParts.hasActiveDiscount
 
     const subscriptionStatus = sub?.status ?? null
 
@@ -186,7 +176,7 @@ export async function GET() {
       status: displayStatus,
       displayStatus,
       organizationArchived: orgArchived,
-      mrr: sub ? discountParsed.finalCents : 0,
+      mrr: mrrCents,
       mrrBaseCents,
       hasActiveDiscount,
       discountType: sub?.discount_type ?? null,
@@ -216,5 +206,15 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json({ accounts })
+  let totalMrrCents = 0
+  for (const o of list) {
+    const orgArchived = o.status === "archived"
+    const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
+    const parts = computePlatformAdminMrr(sub, orgArchived)
+    if (parts.countsTowardPlatformTotal) {
+      totalMrrCents += parts.finalCents
+    }
+  }
+
+  return NextResponse.json({ accounts, totalMrrCents })
 }

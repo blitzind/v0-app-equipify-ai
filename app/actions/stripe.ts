@@ -191,6 +191,7 @@ export async function createCheckoutSession(
     trial_period_days?: number
   } = {
     metadata: {
+      organizationId,
       organization_id: organizationId,
       plan_id: planId,
       billing_cycle: billingCycle,
@@ -211,6 +212,7 @@ export async function createCheckoutSession(
       line_items: [{ price: priceId, quantity: 1 }],
       return_url: `${origin}/settings/billing?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
+        organizationId,
         organization_id: organizationId,
         plan_id: planId,
         billing_cycle: billingCycle,

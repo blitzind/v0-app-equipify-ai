@@ -2,8 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
-import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
-import { listMrrBaseCentsForSubscriptionRow } from "@/lib/billing/org-subscription-mrr"
+import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
 
 type OrgRow = { id: string; status: string | null }
 type SubRow = {
@@ -147,14 +146,10 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
 
     if (!sub) continue
 
-    const baseMrrCents = listMrrBaseCentsForSubscriptionRow(sub)
-    const discountParsed = applyDiscountToMrrCents(
-      baseMrrCents,
-      sub.discount_type,
-      sub.discount_value as number | string | null,
-      sub.discount_expires_at,
-    )
-    total_mrr_cents += discountParsed.finalCents
+    const parts = computePlatformAdminMrr(sub, false)
+    if (parts.countsTowardPlatformTotal) {
+      total_mrr_cents += parts.finalCents
+    }
   }
 
   let active_seats = 0

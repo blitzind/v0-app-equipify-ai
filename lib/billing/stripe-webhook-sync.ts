@@ -207,10 +207,13 @@ function invoiceCustomerId(invoice: Stripe.Invoice): string | null {
 function resolveOrganizationIdFromCheckout(session: Stripe.Checkout.Session): string | null {
   const ref = normalizeStripeIdColumn(session.client_reference_id)
   if (isValidOrganizationUuid(ref)) return ref
-  const metaOrg = session.metadata && typeof session.metadata.organization_id === "string"
-    ? normalizeStripeIdColumn(session.metadata.organization_id)
-    : null
-  if (isValidOrganizationUuid(metaOrg)) return metaOrg
+  const m = session.metadata ?? {}
+  const metaSnake =
+    typeof m.organization_id === "string" ? normalizeStripeIdColumn(m.organization_id) : null
+  const metaCamel =
+    typeof m.organizationId === "string" ? normalizeStripeIdColumn(m.organizationId) : null
+  if (isValidOrganizationUuid(metaSnake)) return metaSnake
+  if (isValidOrganizationUuid(metaCamel)) return metaCamel
   return null
 }
 

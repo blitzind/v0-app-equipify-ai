@@ -1,10 +1,10 @@
 "use client"
 
 import { Suspense } from "react"
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
-import { EmbeddedCheckoutProvider, EmbeddedCheckout, Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
+import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import { useTenant } from "@/lib/tenant-store"
 import { PLANS, getPlan } from "@/lib/plans"
 import type { PlanId } from "@/lib/plans"
@@ -23,7 +23,7 @@ import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } f
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
-import { createCheckoutSession, createPortalSession } from "@/app/actions/stripe"
+import { createPortalSession } from "@/app/actions/stripe"
 import { createSetupIntent } from "@/app/actions/stripe-setup"
 import {
   getStripeBillingSummary,
@@ -252,8 +252,7 @@ function BillingPageContent() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
 
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(workspace.billingCycle)
-  const [checkoutPlan, setCheckoutPlan] = useState<PlanId | null>(null)
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [checkoutBusy, setCheckoutBusy] = useState(false)
   const [checkoutError, setCheckoutError] = useState("")
   const [showAllInvoices, setShowAllInvoices] = useState(false)
 
@@ -468,30 +467,30 @@ function BillingPageContent() {
     void openBillingPortal()
   }
 
-  const fetchClientSecret = useCallback(async () => {
-    if (!checkoutPlan) return ""
-    const { clientSecret, error } = await createCheckoutSession(checkoutPlan, billingCycle)
-    if (error || !clientSecret) {
-      setCheckoutError(error ?? "Failed to start checkout.")
-      return ""
-    }
-    return clientSecret
-  }, [checkoutPlan, billingCycle])
-
-  function openCheckout(planId: PlanId) {
-    setCheckoutPlan(planId)
+  async function startHostedCheckout(planId: PlanId) {
     setCheckoutError("")
-    setCheckoutOpen(true)
-  }
-
-  function closeCheckout() {
-    setCheckoutOpen(false)
-    setCheckoutPlan(null)
-  }
-
-  function simulateUpgrade(planId: PlanId) {
-    dispatch({ type: "UPGRADE_PLAN", payload: { planId, billingCycle } })
-    closeCheckout()
+    setCheckoutBusy(true)
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId, billingCycle }),
+      })
+      const data = (await res.json()) as { url?: string; message?: string }
+      if (!res.ok) {
+        setCheckoutError(data.message ?? "Could not start checkout.")
+        return
+      }
+      if (data.url) {
+        window.location.href = data.url
+        return
+      }
+      setCheckoutError("Stripe did not return a checkout URL.")
+    } catch {
+      setCheckoutError("Could not start checkout.")
+    } finally {
+      setCheckoutBusy(false)
+    }
   }
 
   const hasStripe = !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -811,10 +810,11 @@ function BillingPageContent() {
           </div>
           <button
             type="button"
-            onClick={() => openCheckout(nextCheckoutPlanId(effectivePlanId))}
-            className="text-xs font-medium text-primary hover:underline"
+            disabled={checkoutBusy}
+            onClick={() => void startHostedCheckout(nextCheckoutPlanId(effectivePlanId))}
+            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
           >
-            Upgrade plan
+            {checkoutBusy ? "Redirecting…" : "Upgrade plan"}
           </button>
         </div>
         <div className="px-4 md:px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-0 sm:divide-x divide-border">
@@ -908,6 +908,13 @@ function BillingPageContent() {
 
       {/* ── Plan selector ────────────────────────────────────────────────────── */}
       <div id="plan-comparison" tabIndex={-1} className="bg-card border border-border rounded-lg overflow-hidden focus:outline-none">
+        {checkoutError && (
+          <div className="px-6 pt-4">
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {checkoutError}
+            </div>
+          </div>
+        )}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Change plan</h3>
@@ -1082,15 +1089,15 @@ function BillingPageContent() {
 
                 <button
                   type="button"
-                  disabled={isPaidCurrent}
-                  onClick={() => openCheckout(p.id)}
+                  disabled={isPaidCurrent || checkoutBusy}
+                  onClick={() => void startHostedCheckout(p.id)}
                   className={`w-full h-9 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-all mt-auto ${
                     isPaidCurrent
                       ? "bg-primary/10 text-primary cursor-default"
                       : "bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active shadow-sm"
                   }`}
                 >
-                  {planCta}
+                  {checkoutBusy ? "Redirecting…" : planCta}
                 </button>
               </div>
             )
@@ -1206,63 +1213,6 @@ function BillingPageContent() {
           </div>
         )}
       </div>
-
-      {/* ── Stripe Checkout modal ────────────────────────────────────────────── */}
-      {checkoutOpen && checkoutPlan && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <CreditCard size={15} />
-                {PLANS.find((p) => p.id === checkoutPlan)?.name} — {billingCycle}
-              </h3>
-              <Button variant="ghost" size="icon-sm" onClick={closeCheckout} className="text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </Button>
-            </div>
-            <div className="p-5">
-              {checkoutError ? (
-                <div className="space-y-4">
-                  <p className="text-sm ds-alert-danger border rounded-lg p-4">
-                    {checkoutError}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    To test with real Stripe, add your{" "}
-                    <code className="bg-gray-100 px-1 rounded text-[11px]">STRIPE_SECRET_KEY</code> and{" "}
-                    <code className="bg-gray-100 px-1 rounded text-[11px]">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>.
-                  </p>
-                  <button
-                    onClick={() => simulateUpgrade(checkoutPlan)}
-                    className="w-full h-9 text-sm font-medium rounded-md bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active transition-colors"
-                  >
-                    Simulate upgrade (demo)
-                  </button>
-                </div>
-              ) : hasStripe ? (
-                <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
-                  <EmbeddedCheckout />
-                </EmbeddedCheckoutProvider>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-lg border ds-alert-warning p-4 text-sm">
-                    <p className="font-medium mb-1">Stripe not configured</p>
-                    <p className="text-xs leading-relaxed">
-                      Add your Stripe keys to enable live checkout. Use the demo button to simulate an upgrade.
-                    </p>
-                    <ul className="mt-2 space-y-0.5 text-xs font-mono">
-                      <li>STRIPE_SECRET_KEY</li>
-                      <li>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
-                    </ul>
-                  </div>
-                  <Button onClick={() => simulateUpgrade(checkoutPlan)} className="w-full">
-                    <Check size={14} /> Simulate upgrade to {PLANS.find((p) => p.id === checkoutPlan)?.name}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {setupOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">
