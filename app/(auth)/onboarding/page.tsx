@@ -246,7 +246,13 @@ function OnboardingPageContent() {
           password: form.password,
         })
         if (signInResult.error || !signInResult.data.user) {
-          setSubmitError(signInResult.error?.message || "Account exists. Sign in or reset your password.")
+          const rawMsg = signInResult.error?.message ?? ""
+          const looksLikeWrongPassword = /invalid login credentials|invalid credentials/i.test(rawMsg)
+          setSubmitError(
+            looksLikeWrongPassword
+              ? "This email already has an account. Please sign in, reset your password, or use a different email."
+              : rawMsg || "Account exists. Sign in or reset your password.",
+          )
           return
         }
         authUserId = signInResult.data.user.id
@@ -259,10 +265,26 @@ function OnboardingPageContent() {
         return
       }
 
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        setSubmitError(
+          inviteTokenParam
+            ? "We couldn't start your session. Verify your email if you just created an account, then try again."
+            : "Account created, but session is not ready yet. Check your email to verify your account.",
+        )
+        return
+      }
+
+      const authedJsonHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      } as const
+
       if (inviteTokenParam) {
         const acceptRes = await fetch("/api/invites/accept", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authedJsonHeaders,
           body: JSON.stringify({ inviteToken: inviteTokenParam }),
         })
         if (!acceptRes.ok) {
@@ -273,12 +295,14 @@ function OnboardingPageContent() {
       } else {
         const provisionRes = await fetch("/api/onboarding/provision", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authedJsonHeaders,
           body: JSON.stringify({
             organizationId: organizationIdParam || null,
             organizationName: form.companyName || undefined,
             seedDemo: seedDemoParam,
             industry: normalizeIndustryKey(form.industry || industryParam),
+            selectedPlan,
+            billingCycle: billing,
           }),
         })
         if (!provisionRes.ok) {

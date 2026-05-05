@@ -1,20 +1,26 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { BrandLogo } from "@/components/brand-logo"
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const archivedNotice =
+    searchParams.get("error") === "archived"
+      ? "This workspace has been archived. Contact support if you need access."
+      : null
 
   async function signInWithEmailPassword(nextEmail: string, nextPassword: string) {
     const { error } = await supabase.auth.signInWithPassword({
@@ -166,7 +172,11 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
+            {(error || archivedNotice) && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                {error || archivedNotice}
+              </p>
+            )}
             <button type="submit" disabled={loading}
               className="portal-btn-primary w-full justify-center h-10 text-base font-medium">
               {loading ? "Signing in…" : (
@@ -184,5 +194,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#f5f6f8] text-sm text-gray-500">Loading…</div>}>
+      <LoginPageInner />
+    </Suspense>
   )
 }

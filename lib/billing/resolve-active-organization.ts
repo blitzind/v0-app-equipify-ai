@@ -36,7 +36,7 @@ export async function resolveActiveOrganizationForUser(
 ): Promise<ResolvedActiveOrganization | { error: string }> {
   const { data: memberRows, error: memberError } = await supabase
     .from("organization_members")
-    .select("organization_id, organizations(id, name, slug)")
+    .select("organization_id, organizations(id, name, slug, status)")
     .eq("user_id", userId)
     .eq("status", "active")
 
@@ -47,8 +47,8 @@ export async function resolveActiveOrganizationForUser(
   const raw = (memberRows ?? []) as Array<{
     organization_id: string
     organizations:
-      | { id: string; name: string; slug: string }
-      | { id: string; name: string; slug: string }[]
+      | { id: string; name: string; slug: string; status?: string | null }
+      | { id: string; name: string; slug: string; status?: string | null }[]
       | null
   }>
 
@@ -56,6 +56,7 @@ export async function resolveActiveOrganizationForUser(
   for (const row of raw) {
     const o = row.organizations
     const org = Array.isArray(o) ? o[0] : o
+    if (org?.status === "archived") continue
     if (org?.id && org.name) {
       orgs.push({
         organizationId: org.id,

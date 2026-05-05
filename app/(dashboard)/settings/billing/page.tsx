@@ -396,6 +396,13 @@ function BillingPageContent() {
 
   const currentPlanData = getPlan(effectivePlanId)
   const trialLive = subscription ? isTrialActive(subscription) : false
+  const intendedPlanIdResolved =
+    subscription?.intended_plan_id != null && subscription.intended_plan_id !== ""
+      ? normalizePlanIdForRead(subscription.intended_plan_id)
+      : null
+  const intendedPlanData = intendedPlanIdResolved ? getPlan(intendedPlanIdResolved) : null
+  const pricingPlanForDisplay =
+    trialLive && intendedPlanData ? intendedPlanData : currentPlanData
   const trialDaysLeft = subscription ? getTrialDaysRemaining(subscription) : 0
   const trialTotalDays = isoDiffInDays(subscription?.trial_starts_at ?? null, subscription?.trial_ends_at ?? null)
   const trialDaysUsed =
@@ -491,7 +498,7 @@ function BillingPageContent() {
   const visibleInvoices = showAllInvoices ? stripeInvoices : stripeInvoices.slice(0, 5)
 
   const currentMonthlyRate =
-    billingCycle === "annual" ? currentPlanData.priceAnnual : currentPlanData.priceMonthly
+    billingCycle === "annual" ? pricingPlanForDisplay.priceAnnual : pricingPlanForDisplay.priceMonthly
 
   async function openAddCardModal() {
     setSetupError(null)
@@ -555,15 +562,23 @@ function BillingPageContent() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-foreground">{currentPlanData.name} Plan</p>
+                    <p className="font-semibold text-foreground">
+                      {trialLive ? "Scale trial" : `${currentPlanData.name} plan`}
+                    </p>
                     <PlanBadge
                       planId={effectivePlanId}
-                      label={trialLive ? "Scale (Trial)" : undefined}
+                      label={trialLive ? "Trial" : undefined}
                     />
                     <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border border-border bg-secondary text-muted-foreground">
                       {subscriptionStatusDisplay}
                     </span>
                   </div>
+                  {trialLive && intendedPlanData && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Intended paid plan:{" "}
+                      <span className="font-medium text-foreground">{intendedPlanData.name}</span>
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     <span className="capitalize">{billingCycleLabel}</span> billing
                     {trialLive && subscription?.trial_ends_at && (
@@ -571,7 +586,7 @@ function BillingPageContent() {
                         {" "}
                         · Trial ends {fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}
                         {trialDaysLeft > 0 ?
-                          ` (${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left)`
+                          ` · ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left`
                         : ""}
                       </>
                     )}
@@ -605,7 +620,9 @@ function BillingPageContent() {
                 </p>
               </div>
               <div className="min-h-[44px] flex flex-col justify-center sm:border-l sm:border-border sm:pl-6">
-                <p className="text-xs text-muted-foreground">Monthly cost</p>
+                <p className="text-xs text-muted-foreground">
+                  {trialLive && intendedPlanData ? "Est. monthly (after trial)" : "Monthly cost"}
+                </p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">
                   {`$${(currentMonthlyRate / 100).toFixed(0)}/mo`}
                 </p>

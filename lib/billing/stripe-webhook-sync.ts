@@ -97,7 +97,10 @@ export function buildPatchFromStripeSubscription(
     updated_at: new Date().toISOString(),
   }
 
-  if (planId) patch.plan_id = planId
+  if (planId) {
+    patch.plan_id = planId
+    if (hasSub) patch.intended_plan_id = null
+  }
   if (billingCycle) patch.billing_cycle = billingCycle
 
   return patch

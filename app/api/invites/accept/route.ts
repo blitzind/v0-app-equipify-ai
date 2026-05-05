@@ -1,5 +1,6 @@
+import type { User } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient, getBearerAccessToken } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 
 type Body = {
@@ -20,9 +21,22 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const bearer = getBearerAccessToken(request)
+  let user: User | null = null
+
+  if (bearer) {
+    const { data, error } = await supabase.auth.getUser(bearer)
+    if (error || !data.user) {
+      return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
+    }
+    user = data.user
+  } else {
+    const {
+      data: { user: cookieUser },
+    } = await supabase.auth.getUser()
+    user = cookieUser ?? null
+  }
+
   if (!user) {
     return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
   }

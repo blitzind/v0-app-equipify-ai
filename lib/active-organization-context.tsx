@@ -60,8 +60,8 @@ function normalizeOrgRows(
   rows: Array<{
     organization_id: string
     organizations:
-      | { id: string; name: string; slug: string }
-      | { id: string; name: string; slug: string }[]
+      | { id: string; name: string; slug: string; status?: string | null }
+      | { id: string; name: string; slug: string; status?: string | null }[]
       | null
   }> | null,
 ): ActiveOrgRow[] {
@@ -69,6 +69,7 @@ function normalizeOrgRows(
   for (const row of rows ?? []) {
     const o = row.organizations
     const org = Array.isArray(o) ? o[0] : o
+    if (org?.status === "archived") continue
     if (org?.id && org.name) {
       out.push({ id: org.id, name: org.name, slug: String(org.slug ?? "") })
     }
@@ -108,7 +109,7 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
     }
 
     const memberSelect =
-      "organization_id, organizations(id, name, slug)" as const
+      "organization_id, organizations(id, name, slug, status)" as const
 
     let { data: memberRows, error: memberError } = await supabase
       .from("organization_members")

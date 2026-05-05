@@ -45,3 +45,58 @@ export async function updateSession(
 
   return { response, user }
 }
+
+/** True when the user has at least one active membership but every org is archived. */
+export async function membershipOnlyArchivedOrgs(request: NextRequest, userId: string): Promise<boolean> {
+  let response = NextResponse.next({ request })
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+        response = NextResponse.next({ request })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        )
+      },
+    },
+  })
+
+  const { data: rows } = await supabase
+    .from("organization_members")
+    .select("organizations(status)")
+    .eq("user_id", userId)
+    .eq("status", "active")
+
+  const list = rows ?? []
+  if (list.length === 0) return false
+
+  for (const row of list) {
+    const o = row.organizations as { status?: string } | { status?: string }[] | null
+    const org = Array.isArray(o) ? o[0] : o
+    const st = org?.status ?? "active"
+    if (st !== "archived") return false
+  }
+  return true
+}
+
+export async function signOutAndRedirect(request: NextRequest, redirectPath: string): Promise<NextResponse> {
+  const url = new URL(redirectPath, request.url)
+  let response = NextResponse.redirect(url)
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        )
+      },
+    },
+  })
+  await supabase.auth.signOut()
+  return response
+}

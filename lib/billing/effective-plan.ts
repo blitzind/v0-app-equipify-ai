@@ -4,8 +4,10 @@ import type { OrganizationSubscription } from "@/lib/billing/subscriptions"
 import { isTrialActive } from "@/lib/billing/subscriptions"
 
 /**
- * Plan shown in product UI and limits during an active trial: Scale tier experience.
- * Stored `organization_subscriptions.plan_id` remains the billing plan (e.g. solo).
+ * Effective product tier for limits and UI during an active trial: Scale.
+ * New onboarding stores `plan_id` = scale while trialing; `intended_plan_id` holds the
+ * paid tier for checkout. Legacy rows may keep a lower `plan_id` during trial — this
+ * still maps to Scale access until the trial ends.
  */
 export function getEffectivePlanId(
   planId: string,

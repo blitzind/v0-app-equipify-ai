@@ -1,5 +1,13 @@
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import {
+  createServerSupabaseClient,
+  createSupabaseClientWithAccessToken,
+  getBearerAccessToken,
+} from "@/lib/supabase/server"
+import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 import { seedDemoForIndustry } from "@/lib/demo-seeding/seed-engine"
 
 type Body = {
@@ -7,6 +15,63 @@ type Body = {
   organizationName?: string | null
   seedDemo?: boolean
   industry?: string | null
+  /** Paid plan chosen in onboarding; trial access is always Scale until checkout. */
+  selectedPlan?: string | null
+  billingCycle?: string | null
+}
+
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
+
+/**
+ * New self-serve org: one subscription row with Scale trial + intended paid tier for later checkout.
+ * Idempotent if a row already exists without a Stripe subscription (e.g. race).
+ */
+async function bootstrapOnboardingTrialSubscription(
+  organizationId: string,
+  opts: { intendedPlanKey: string | null | undefined; billingCycle: string | null | undefined },
+) {
+  const admin = createServiceRoleSupabaseClient()
+  const intendedPlan = normalizePlanIdForRead(String(opts.intendedPlanKey ?? "growth"))
+  const billingCycle = opts.billingCycle === "annual" ? "annual" : "monthly"
+  const now = new Date().toISOString()
+  const trialEnd = new Date(Date.now() + FOURTEEN_DAYS_MS).toISOString()
+
+  const payload = {
+    plan_id: "scale",
+    intended_plan_id: intendedPlan,
+    billing_cycle: billingCycle,
+    status: "trialing",
+    trial_starts_at: now,
+    trial_ends_at: trialEnd,
+    updated_at: now,
+  }
+
+  const { error: insertErr } = await admin.from("organization_subscriptions").insert({
+    organization_id: organizationId,
+    ...payload,
+  })
+
+  if (!insertErr) return
+
+  if (insertErr.code !== "23505") {
+    throw new Error(insertErr.message)
+  }
+
+  const { data: existing, error: selErr } = await admin
+    .from("organization_subscriptions")
+    .select("stripe_subscription_id")
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (selErr) throw new Error(selErr.message)
+  if (normalizeStripeIdColumn(existing?.stripe_subscription_id ?? null)) return
+
+  const { error: updateErr } = await admin
+    .from("organization_subscriptions")
+    .update(payload)
+    .eq("organization_id", organizationId)
+
+  if (updateErr) throw new Error(updateErr.message)
 }
 
 function slugify(value: string) {
@@ -26,16 +91,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json", message: "Invalid request body." }, { status: 400 })
   }
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const bearer = getBearerAccessToken(request)
+  const cookieClient = await createServerSupabaseClient()
+
+  let supabase: SupabaseClient = cookieClient
+  let user: User | null = null
+
+  if (bearer) {
+    const { data, error } = await cookieClient.auth.getUser(bearer)
+    if (error || !data.user) {
+      return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
+    }
+    user = data.user
+    supabase = createSupabaseClientWithAccessToken(bearer)
+  } else {
+    const {
+      data: { user: cookieUser },
+    } = await cookieClient.auth.getUser()
+    user = cookieUser ?? null
+  }
+
   if (!user) {
     return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
   }
 
   const seedDemo = Boolean(body.seedDemo)
   let organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
+  let createdNewOrganization = false
 
   if (organizationId) {
     const { data: membership } = await supabase
@@ -88,6 +170,22 @@ export async function POST(request: Request) {
         )
       }
       organizationId = created.id
+      createdNewOrganization = true
+    }
+  }
+
+  if (createdNewOrganization) {
+    try {
+      await bootstrapOnboardingTrialSubscription(organizationId, {
+        intendedPlanKey: body.selectedPlan,
+        billingCycle: body.billingCycle,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not activate trial subscription."
+      return NextResponse.json(
+        { error: "trial_bootstrap_failed", message, organizationId },
+        { status: 500 },
+      )
     }
   }
 

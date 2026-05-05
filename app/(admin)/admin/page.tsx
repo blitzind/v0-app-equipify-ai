@@ -1,24 +1,31 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Building2, Users, DollarSign, TrendingUp, Search, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
-  ChevronRight, ArrowUpRight, Filter, Toggle, Info, Eye, Ban, RefreshCw,
-  ScrollText, Gauge, Flag, Activity,
+  ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw,
+  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2,
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import {
-  PLATFORM_ACCOUNTS, PLATFORM_STATS, MRR_TREND, PLAN_DISTRIBUTION,
+  PLATFORM_STATS, MRR_TREND, PLAN_DISTRIBUTION,
   FEATURE_FLAGS, ADMIN_AUDIT_LOG, CURRENT_PLATFORM_ADMIN,
   type PlatformAccount, type FeatureFlag,
 } from "@/lib/admin-data"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { BrandLogoOnLight } from "@/components/brand-logo"
+import { BrandLogo } from "@/components/brand-logo"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,6 +41,7 @@ function statusColor(status: PlatformAccount["status"]) {
     case "Past Due":  return { color: "#dc2626", bg: "#fef2f2" }
     case "Canceled":  return { color: "#6b7280", bg: "#f3f4f6" }
     case "Suspended": return { color: "#6b7280", bg: "#f3f4f6" }
+    case "Archived":  return { color: "#64748b", bg: "#f1f5f9" }
     default:          return { color: "#6b7280", bg: "#f3f4f6" }
   }
 }
@@ -42,6 +50,7 @@ function planColor(plan: PlatformAccount["plan"]) {
   switch (plan) {
     case "Enterprise": return { color: "#7c3aed", bg: "#f5f3ff" }
     case "Growth":     return { color: "#1d4ed8", bg: "#eff6ff" }
+    case "Core":       return { color: "#0f766e", bg: "#ccfbf1" }
     default:           return { color: "#b45309", bg: "#fffbeb" }
   }
 }
@@ -77,48 +86,131 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
   )
 }
 
-function AccountsTab({ accounts, onImpersonate }: {
+function AccountsTab({
+  accounts,
+  loading,
+  loadError,
+  onImpersonate,
+  onRefresh,
+}: {
   accounts: PlatformAccount[]
+  loading: boolean
+  loadError: string | null
   onImpersonate: (a: PlatformAccount) => void
+  onRefresh: () => void
 }) {
   const [search, setSearch] = useState("")
   const [planFilter, setPlanFilter] = useState<string>("All")
-  const [statusFilter, setStatusFilter] = useState<string>("All")
+  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Trialing" | "Archived">("All")
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<PlatformAccount | null>(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState("")
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     return accounts.filter((a) => {
       const q = search.toLowerCase()
       const matchQ = !q || a.name.toLowerCase().includes(q) || a.ownerEmail.toLowerCase().includes(q)
       const matchPlan = planFilter === "All" || a.plan === planFilter
-      const matchStatus = statusFilter === "All" || a.status === statusFilter
-      return matchQ && matchPlan && matchStatus
+
+      if (statusFilter === "Archived") {
+        if (!a.organizationArchived) return false
+      } else {
+        if (a.organizationArchived) return false
+        if (statusFilter === "Active" && a.status !== "Active") return false
+        if (statusFilter === "Trialing" && a.status !== "Trialing") return false
+      }
+
+      return matchQ && matchPlan
     })
   }, [accounts, search, planFilter, statusFilter])
 
+  async function archiveAccount(account: PlatformAccount) {
+    if (
+      !window.confirm(
+        `Archive “${account.name}”? Members will lose access; data is preserved.`,
+      )
+    ) {
+      return
+    }
+    setArchiveBusyId(account.id)
+    try {
+      const res = await fetch(`/api/platform/accounts/${account.id}/archive`, { method: "PATCH" })
+      const data = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        window.alert(data.message ?? "Could not archive account.")
+        return
+      }
+      onRefresh()
+    } finally {
+      setArchiveBusyId(null)
+      setMenuOpen(null)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleteConfirmName.trim() !== deleteTarget.name.trim()) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/platform/accounts/${deleteTarget.id}`, { method: "DELETE" })
+      const data = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        setDeleteError(data.message ?? "Delete failed.")
+        return
+      }
+      setDeleteTarget(null)
+      setDeleteConfirmName("")
+      onRefresh()
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {loadError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </div>
+      )}
+      {loading && (
+        <p className="text-xs text-muted-foreground flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin" /> Loading accounts…
+        </p>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-48 bg-card border border-border rounded-lg px-3 py-2">
           <Search size={14} className="text-muted-foreground shrink-0" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search accounts, emails..."
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <select value={planFilter} onChange={e => setPlanFilter(e.target.value)}
-          className="input-base w-36 text-sm">
-          {["All", "Starter", "Growth", "Enterprise"].map(p => (
+        <select
+          value={planFilter}
+          onChange={(e) => setPlanFilter(e.target.value)}
+          className="input-base w-36 text-sm"
+        >
+          {["All", "Starter", "Core", "Growth", "Enterprise"].map((p) => (
             <option key={p}>{p}</option>
           ))}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="input-base w-36 text-sm">
-          {["All", "Active", "Trialing", "Past Due", "Canceled", "Suspended"].map(s => (
-            <option key={s}>{s}</option>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="input-base w-40 text-sm"
+        >
+          {(["All", "Active", "Trialing", "Archived"] as const).map((s) => (
+            <option key={s} value={s}>
+              {s === "All" ? "All (live)" : s}
+            </option>
           ))}
         </select>
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} accounts</span>
@@ -130,8 +222,13 @@ function AccountsTab({ accounts, onImpersonate }: {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-secondary/40">
-                {["Account", "Plan", "Status", "MRR", "Seats", "Work Orders", "Last Active", ""].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                {["Account", "Plan", "Status", "MRR", "Seats", "Work Orders", "Last Active", ""].map((h) => (
+                  <th
+                    key={h}
+                    className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -139,12 +236,19 @@ function AccountsTab({ accounts, onImpersonate }: {
               {filtered.map((account) => {
                 const sc = statusColor(account.status)
                 const pc = planColor(account.plan)
+                const archived = Boolean(account.organizationArchived)
+                const loginDisabled = archived
                 return (
-                  <tr key={account.id} className="border-t border-border/50 hover:bg-secondary/30 transition-colors">
+                  <tr
+                    key={account.id}
+                    className="border-t border-border/50 hover:bg-secondary/30 transition-colors"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
-                          style={{ background: "var(--primary)" }}>
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{ background: "var(--primary)" }}
+                        >
                           {account.name[0]}
                         </div>
                         <div>
@@ -154,25 +258,41 @@ function AccountsTab({ accounts, onImpersonate }: {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: pc.color, background: pc.bg }}>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: pc.color, background: pc.bg }}
+                      >
                         {account.plan}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color: sc.color, background: sc.bg }}>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: sc.color, background: sc.bg }}
+                      >
                         {account.status}
                         {account.status === "Trialing" && account.trialEndsAt && (
                           <span className="ml-1 font-normal opacity-70">
-                            ends {new Date(account.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            ends{" "}
+                            {new Date(account.trialEndsAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
                           </span>
                         )}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium ds-tabular">
-                      {account.mrr > 0 ? fmt$(account.mrr) : <span className="text-muted-foreground">—</span>}
+                      {account.mrr > 0 ? (
+                        fmt$(account.mrr)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm ds-tabular text-muted-foreground">{account.seats}</td>
-                    <td className="px-4 py-3 text-sm ds-tabular text-muted-foreground">{account.workOrderCount.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm ds-tabular text-muted-foreground">
+                      {account.workOrderCount.toLocaleString()}
+                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{account.lastActive}</td>
                     <td className="px-4 py-3">
                       <div className="relative flex items-center justify-end gap-1">
@@ -180,7 +300,9 @@ function AccountsTab({ accounts, onImpersonate }: {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs gap-1"
-                          onClick={() => onImpersonate(account)}
+                          disabled={loginDisabled}
+                          title={loginDisabled ? "Cannot log in as an archived workspace" : undefined}
+                          onClick={() => !loginDisabled && onImpersonate(account)}
                         >
                           <LogIn size={11} /> Login as
                         </Button>
@@ -193,21 +315,60 @@ function AccountsTab({ accounts, onImpersonate }: {
                           <MoreHorizontal size={13} />
                         </Button>
                         {menuOpen === account.id && (
-                          <div className="absolute right-0 top-8 z-50 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
-                            onMouseLeave={() => setMenuOpen(null)}>
-                            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
-                              onClick={() => { onImpersonate(account); setMenuOpen(null) }}>
+                          <div
+                            className="absolute right-0 top-8 z-50 w-52 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
+                            onMouseLeave={() => setMenuOpen(null)}
+                          >
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
+                              disabled={loginDisabled}
+                              onClick={() => {
+                                if (!loginDisabled) onImpersonate(account)
+                                setMenuOpen(null)
+                              }}
+                            >
                               <LogIn size={13} className="text-muted-foreground" /> Impersonate
                             </button>
-                            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left">
-                              <Eye size={13} className="text-muted-foreground" /> View details
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 dark:text-amber-500 hover:bg-amber-500/10 transition-colors text-left disabled:opacity-50"
+                              onClick={() => {
+                                void archiveAccount(account)
+                              }}
+                              disabled={archived || archiveBusyId === account.id}
+                            >
+                              {archiveBusyId === account.id ? (
+                                <Loader2 size={13} className="animate-spin text-amber-700 dark:text-amber-500" />
+                              ) : (
+                                <Archive size={13} className="text-amber-700 dark:text-amber-500" />
+                              )}
+                              Archive account
                             </button>
-                            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left">
-                              <RefreshCw size={13} className="text-muted-foreground" /> Reset password
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/15 transition-colors text-left"
+                              onClick={() => {
+                                setDeleteTarget(account)
+                                setDeleteConfirmName("")
+                                setDeleteError(null)
+                                setMenuOpen(null)
+                              }}
+                            >
+                              <Trash2 size={13} className="text-destructive" strokeWidth={2.25} /> Delete account…
                             </button>
                             <div className="border-t border-border">
-                              <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--ds-warning-bg)] ds-text-warning transition-colors text-left">
-                                <Ban size={13} /> Suspend account
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
+                              >
+                                <Eye size={13} className="text-muted-foreground" /> View details
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
+                              >
+                                <RefreshCw size={13} className="text-muted-foreground" /> Reset password
                               </button>
                             </div>
                           </div>
@@ -221,6 +382,65 @@ function AccountsTab({ accounts, onImpersonate }: {
           </table>
         </div>
       </div>
+
+      <Dialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null)
+            setDeleteConfirmName("")
+            setDeleteError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Permanently delete organization</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This removes the organization and related data. You cannot undo this. Blocked if there is an
+            active Stripe subscription or unpaid invoices.
+          </p>
+          {deleteTarget && (
+            <p className="text-sm font-medium text-foreground">
+              Type <span className="font-bold">{deleteTarget.name}</span> to confirm.
+            </p>
+          )}
+          <input
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.target.value)}
+            className="input-base w-full text-sm"
+            placeholder="Organization name"
+            autoComplete="off"
+          />
+          {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteConfirmName("")
+                setDeleteError(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                deleteBusy ||
+                !deleteTarget ||
+                deleteConfirmName.trim() !== (deleteTarget?.name ?? "").trim()
+              }
+              onClick={() => void confirmDelete()}
+            >
+              {deleteBusy ? <Loader2 size={14} className="animate-spin" /> : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -405,10 +625,41 @@ function AuditTab() {
 
 export default function PlatformAdminPage() {
   const router = useRouter()
-  const { impersonation, startImpersonation, endImpersonation } = useAdmin()
+  const { startImpersonation } = useAdmin()
   const [activeTab, setActiveTab] = useState<Tab>("accounts")
+  const [accounts, setAccounts] = useState<PlatformAccount[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(true)
+  const [accountsError, setAccountsError] = useState<string | null>(null)
+
+  const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true)
+    setAccountsError(null)
+    try {
+      const res = await fetch("/api/platform/accounts")
+      const data = (await res.json()) as {
+        accounts?: PlatformAccount[]
+        message?: string
+      }
+      if (!res.ok) {
+        setAccountsError(data.message ?? "Could not load accounts.")
+        setAccounts([])
+        return
+      }
+      setAccounts(data.accounts ?? [])
+    } catch {
+      setAccountsError("Could not load accounts.")
+      setAccounts([])
+    } finally {
+      setAccountsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAccounts()
+  }, [loadAccounts])
 
   function handleImpersonate(account: PlatformAccount) {
+    if (account.organizationArchived) return
     startImpersonation(account)
     router.push("/")
   }
@@ -423,10 +674,10 @@ export default function PlatformAdminPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Top nav */}
-      <header className="flex items-center h-14 px-6 bg-card border-b border-border gap-4 shrink-0">
+      <header className="flex items-center h-14 px-6 bg-[#0F172A] border-b border-white/10 gap-4 shrink-0">
         <div className="flex items-center gap-2">
-          <BrandLogoOnLight logoClassName="h-7" />
-          <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-[#7c3aed]/10 text-[#7c3aed] border border-[#7c3aed]/20">
+          <BrandLogo className="h-7 w-auto max-h-7" priority />
+          <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-200 border border-violet-400/25">
             Platform Admin
           </span>
         </div>
@@ -437,11 +688,11 @@ export default function PlatformAdminPage() {
             {initials(CURRENT_PLATFORM_ADMIN.name)}
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-foreground leading-tight">{CURRENT_PLATFORM_ADMIN.name}</p>
-            <p className="text-[10px] text-muted-foreground">{CURRENT_PLATFORM_ADMIN.role}</p>
+            <p className="text-xs font-semibold text-white leading-tight">{CURRENT_PLATFORM_ADMIN.name}</p>
+            <p className="text-[10px] text-slate-400">{CURRENT_PLATFORM_ADMIN.role}</p>
           </div>
         </div>
-        <Link href="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors ml-4">
+        <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors ml-4">
           Back to app <ChevronRight size={12} />
         </Link>
       </header>
@@ -474,7 +725,15 @@ export default function PlatformAdminPage() {
             ))}
           </nav>
 
-          {activeTab === "accounts"  && <AccountsTab accounts={PLATFORM_ACCOUNTS} onImpersonate={handleImpersonate} />}
+          {activeTab === "accounts" && (
+            <AccountsTab
+              accounts={accounts}
+              loading={accountsLoading}
+              loadError={accountsError}
+              onImpersonate={handleImpersonate}
+              onRefresh={() => void loadAccounts()}
+            />
+          )}
           {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "flags"     && <FlagsTab />}
           {activeTab === "audit"     && <AuditTab />}

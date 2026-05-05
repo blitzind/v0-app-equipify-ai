@@ -13,8 +13,10 @@ export function normalizeStripeIdColumn(value: string | null | undefined): strin
 }
 
 function normalizeSubscriptionStripeIds(row: OrganizationSubscription): OrganizationSubscription {
+  const r = row as OrganizationSubscription & { intended_plan_id?: string | null }
   return {
     ...row,
+    intended_plan_id: r.intended_plan_id ?? null,
     stripe_customer_id: normalizeStripeIdColumn(row.stripe_customer_id),
     stripe_subscription_id: normalizeStripeIdColumn(row.stripe_subscription_id),
   }
@@ -33,6 +35,8 @@ export type OrganizationSubscription = {
   stripe_subscription_id: string | null
   stripe_price_id: string | null
   plan_id: string
+  /** Paid tier chosen at onboarding; trial row still uses `plan_id` = scale for entitlements. */
+  intended_plan_id: string | null
   billing_cycle: string
   status: string
   trial_starts_at: string | null

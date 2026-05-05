@@ -21,7 +21,7 @@ export const CURRENT_PLATFORM_ADMIN: PlatformAdmin = {
 
 // ─── Tenant accounts (platform-level view) ────────────────────────────────────
 
-export type AccountStatus = "Active" | "Trialing" | "Past Due" | "Canceled" | "Suspended"
+export type AccountStatus = "Active" | "Trialing" | "Past Due" | "Canceled" | "Suspended" | "Archived"
 
 export interface PlatformAccount {
   id: string
@@ -29,9 +29,11 @@ export interface PlatformAccount {
   slug: string
   ownerName: string
   ownerEmail: string
-  plan: "Starter" | "Growth" | "Enterprise"
+  plan: "Starter" | "Growth" | "Enterprise" | "Core"
   billingCycle: "monthly" | "annual"
   status: AccountStatus
+  /** Soft-delete: organization.status === 'archived' */
+  organizationArchived?: boolean
   mrr: number           // monthly recurring revenue in cents
   seats: number
   equipmentCount: number
