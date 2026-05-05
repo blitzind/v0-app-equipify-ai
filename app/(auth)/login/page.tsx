@@ -168,8 +168,7 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
             <button type="submit" disabled={loading}
-              className="portal-btn-primary w-full justify-center h-10 text-base font-medium"
-              style={{ background: loading ? "#93c5fd" : "#2563eb" }}>
+              className="portal-btn-primary w-full justify-center h-10 text-base font-medium">
               {loading ? "Signing in…" : (
                 <><span>Sign in</span><ArrowRight size={15} /></>
               )}
