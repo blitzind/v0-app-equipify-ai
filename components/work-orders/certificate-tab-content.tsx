@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { CheckCircle2, FileDown, Save } from "lucide-react"
+import { CheckCircle2, FileDown, Loader2, Mail, Save } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,6 +46,13 @@ type CertificateTabContentProps = {
   manageTemplatesHref?: string
   /** When true, shows a subtle note that some fields were prefilled from the work order. */
   showPrefillHelper?: boolean
+  /** When set with workOrderId, shows "Email certificate" after a record is saved. */
+  organizationId?: string | null
+  workOrderId?: string | null
+  /** When set, email API loads the certificate for this equipment row (multi-asset work orders). */
+  equipmentScopeId?: string | null
+  /** When true, used inside a parent card (Work Order Certificates tab) to avoid double chrome. */
+  embedded?: boolean
 }
 
 function fmtDateTime(iso: string) {
@@ -89,16 +96,71 @@ export function CertificateTabContent({
   completedAtLabel,
   manageTemplatesHref,
   showPrefillHelper = false,
+  organizationId,
+  workOrderId,
+  equipmentScopeId = undefined,
+  embedded = false,
 }: CertificateTabContentProps) {
   const { toast } = useToast()
+  const [certEmailTo, setCertEmailTo] = useState("")
+  const [certEmailSending, setCertEmailSending] = useState(false)
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) ?? null,
     [templates, selectedTemplateId],
   )
 
+  const canEmailCertificate =
+    Boolean(organizationId?.trim() && workOrderId?.trim() && calibrationRecordId)
+
+  async function sendCertificateToCustomer() {
+    if (!organizationId?.trim() || !workOrderId?.trim()) return
+    const to = certEmailTo.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      toast({ variant: "destructive", title: "Invalid email", description: "Enter a valid customer email address." })
+      return
+    }
+    setCertEmailSending(true)
+    try {
+      const res = await fetch("/api/email/certificate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: organizationId.trim(),
+          workOrderId: workOrderId.trim(),
+          to,
+          equipmentId: equipmentScopeId?.trim() || undefined,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not send email",
+          description: typeof data.message === "string" ? data.message : "Request failed.",
+        })
+        return
+      }
+      toast({ title: "Certificate email sent", description: `Message sent to ${to}.` })
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Could not send email",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setCertEmailSending(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card p-3 space-y-3">
+      <div
+        className={
+          embedded
+            ? "space-y-3"
+            : "rounded-xl border border-border bg-card p-3 space-y-3"
+        }
+      >
         {manageTemplatesHref ? (
           <div className="flex justify-end">
             <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
@@ -228,6 +290,37 @@ export function CertificateTabContent({
           </div>
         ) : null}
       </div>
+
+      {canEmailCertificate ? (
+        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Send to customer</p>
+          <p className="text-xs text-muted-foreground">
+            Email a certificate summary to your customer. PDF attachments will be added when automated packaging is enabled.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[200px] space-y-1">
+              <label className="text-[10px] font-medium text-muted-foreground">Customer email</label>
+              <Input
+                type="email"
+                placeholder="customer@example.com"
+                value={certEmailTo}
+                onChange={(e) => setCertEmailTo(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 gap-1.5"
+              disabled={certEmailSending}
+              onClick={() => void sendCertificateToCustomer()}
+            >
+              {certEmailSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+              Email certificate
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {!selectedTemplate ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/10 py-10 text-center">

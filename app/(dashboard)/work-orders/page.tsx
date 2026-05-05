@@ -765,7 +765,8 @@ function WorkOrdersPageInner() {
   // Auto-open drawer from ?open= query param
   useEffect(() => {
     const openId = searchParams.get("open")
-    const tab = searchParams.get("tab") ?? undefined
+    const rawTab = searchParams.get("tab") ?? undefined
+    const tab = rawTab === "certificate" ? "certificates" : rawTab
     if (openId) {
       setSelectedWoId(openId)
       setDrawerInitialTab(tab)

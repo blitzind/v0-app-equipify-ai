@@ -42,10 +42,17 @@ type Draft = {
   notes: string
 }
 
-/** Drawer fields use compact sizing on top of shared Input/Textarea styles */
-const fieldControl = "h-8 px-2.5 py-1 text-xs"
-const fieldTextarea = "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed"
-const fieldNotesTextarea = "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed"
+/** Aligned with purchase-order drawer: gray canvas + white section cards */
+const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
+const sectionCardClass = "rounded-xl border border-border bg-white shadow-sm dark:bg-card"
+
+/** Drawer fields use compact sizing on top of shared Input/Textarea styles (editable = white surfaces) */
+const fieldControl =
+  "h-8 px-2.5 py-1 text-xs bg-white border-border text-foreground dark:bg-card"
+const fieldTextarea =
+  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-card"
+const fieldNotesTextarea =
+  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-card"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -328,171 +335,199 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
           ) : null
         }
       >
-        {loading && (
-          <p className="text-xs text-muted-foreground py-4">Loading vendor…</p>
-        )}
-        {!loading && !vendor && vendorId && (
-          <p className="text-xs text-muted-foreground py-4">Vendor not found or you don’t have access.</p>
-        )}
-        {!loading && vendor && !editing && (
-          <>
-            <DrawerSection title="Vendor Information">
-              <DrawerRow label="Vendor Name" value={vendor.name} />
-            </DrawerSection>
-            <DrawerSection title="Contact Info">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Contact Name</p>
-                  <p className="text-xs font-medium text-foreground break-words">{vendor.contact_name?.trim() || "—"}</p>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Email Address</p>
-                  <p className="text-xs font-medium text-foreground break-words">
-                    {vendor.email?.trim() ? (
-                      <a href={`mailto:${vendor.email.trim()}`} className="text-primary hover:underline">
-                        {vendor.email.trim()}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
+        <div className={drawerBodyClass}>
+          {loading && <p className="text-xs text-muted-foreground">Loading vendor…</p>}
+          {!loading && !vendor && vendorId && (
+            <p className="text-xs text-muted-foreground">Vendor not found or you don’t have access.</p>
+          )}
+          {!loading && vendor && !editing && (
+            <>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Vendor Information">
+                  <DrawerRow label="Vendor Name" value={vendor.name} />
+                </DrawerSection>
+              </div>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Contact Info">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                        Contact Name
+                      </p>
+                      <p className="text-xs font-medium text-foreground break-words">
+                        {vendor.contact_name?.trim() || "—"}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                        Email Address
+                      </p>
+                      <p className="text-xs font-medium text-foreground break-words">
+                        {vendor.email?.trim() ? (
+                          <a href={`mailto:${vendor.email.trim()}`} className="text-primary hover:underline">
+                            {vendor.email.trim()}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </p>
+                    </div>
+                    <div className="min-w-0 sm:col-span-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                        Phone Number
+                      </p>
+                      <p className="text-xs font-medium text-foreground">{vendor.phone?.trim() || "—"}</p>
+                    </div>
+                  </div>
+                </DrawerSection>
+              </div>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Addresses">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Billing Address
+                      </p>
+                      <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                        {vendor.billing_address?.trim() || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Shipping Address
+                      </p>
+                      <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                        {vendor.shipping_address?.trim() || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </DrawerSection>
+              </div>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Notes">
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {vendor.notes?.trim() || <span className="italic">No notes.</span>}
                   </p>
-                </div>
-                <div className="min-w-0 sm:col-span-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Phone Number</p>
-                  <p className="text-xs font-medium text-foreground">{vendor.phone?.trim() || "—"}</p>
-                </div>
+                </DrawerSection>
               </div>
-            </DrawerSection>
-            <DrawerSection title="Addresses">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Billing Address</p>
-                  <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                    {vendor.billing_address?.trim() || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Shipping Address</p>
-                  <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                    {vendor.shipping_address?.trim() || "—"}
-                  </p>
-                </div>
-              </div>
-            </DrawerSection>
-            <DrawerSection title="Notes">
-              <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {vendor.notes?.trim() || <span className="italic">No notes.</span>}
-              </p>
-            </DrawerSection>
-          </>
-        )}
-        {!loading && vendor && editing && draft && (
-          <>
-            <DrawerSection title="Vendor Information">
-              <div>
-                <FieldLabel>Vendor Name</FieldLabel>
-                <Input
-                  className={fieldControl}
-                  value={draft.name}
-                  onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
-                  placeholder="e.g. MedSupply Co."
-                />
-              </div>
-            </DrawerSection>
-            <DrawerSection title="Contact Info">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="min-w-0">
-                  <FieldLabel>Contact Name</FieldLabel>
-                  <Input
-                    className={fieldControl}
-                    value={draft.contactName}
-                    onChange={(e) => setDraft((d) => (d ? { ...d, contactName: e.target.value } : d))}
-                    placeholder="e.g. John Smith"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <FieldLabel>Email Address</FieldLabel>
-                  <Input
-                    className={fieldControl}
-                    type="email"
-                    value={draft.email}
-                    onChange={(e) => setDraft((d) => (d ? { ...d, email: e.target.value } : d))}
-                    placeholder="e.g. john@vendor.com"
-                  />
-                </div>
-                <div className="min-w-0 sm:col-span-2">
-                  <FieldLabel>Phone Number</FieldLabel>
-                  <Input
-                    className={fieldControl}
-                    type="tel"
-                    value={draft.phone}
-                    onChange={(e) => setDraft((d) => (d ? { ...d, phone: e.target.value } : d))}
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-              </div>
-            </DrawerSection>
-            <DrawerSection title="Addresses">
-              <div className="space-y-3">
-                <div>
-                  <FieldLabel>Billing Address</FieldLabel>
-                  <Textarea
-                    className={fieldTextarea}
-                    value={draft.billingAddress}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setDraft((d) =>
-                        d
-                          ? {
-                              ...d,
-                              billingAddress: v,
-                              shippingAddress: shippingSameAsBilling ? v : d.shippingAddress,
-                            }
-                          : d,
-                      )
-                    }}
-                    placeholder="Street, City, State, ZIP"
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={shippingSameAsBilling}
-                    onChange={(e) => {
-                      const checked = e.target.checked
-                      setShippingSameAsBilling(checked)
-                      if (checked) {
-                        setDraft((d) => (d ? { ...d, shippingAddress: d.billingAddress } : d))
-                      }
-                    }}
-                    className="rounded border-border"
-                  />
-                  Shipping address same as billing
-                </label>
-                {!shippingSameAsBilling && (
+            </>
+          )}
+          {!loading && vendor && editing && draft && (
+            <>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Vendor Information">
                   <div>
-                    <FieldLabel>Shipping Address</FieldLabel>
-                    <Textarea
-                      className={fieldTextarea}
-                      value={draft.shippingAddress}
-                      onChange={(e) => setDraft((d) => (d ? { ...d, shippingAddress: e.target.value } : d))}
-                      placeholder="Street, City, State, ZIP"
+                    <FieldLabel>Vendor Name</FieldLabel>
+                    <Input
+                      className={fieldControl}
+                      value={draft.name}
+                      onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
+                      placeholder="e.g. MedSupply Co."
                     />
                   </div>
-                )}
+                </DrawerSection>
               </div>
-            </DrawerSection>
-            <DrawerSection title="Notes">
-              <Textarea
-                className={fieldNotesTextarea}
-                value={draft.notes}
-                onChange={(e) => setDraft((d) => (d ? { ...d, notes: e.target.value } : d))}
-                placeholder="Internal notes about this vendor..."
-                aria-label="Notes"
-              />
-            </DrawerSection>
-          </>
-        )}
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Contact Info">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <FieldLabel>Contact Name</FieldLabel>
+                      <Input
+                        className={fieldControl}
+                        value={draft.contactName}
+                        onChange={(e) => setDraft((d) => (d ? { ...d, contactName: e.target.value } : d))}
+                        placeholder="e.g. John Smith"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <FieldLabel>Email Address</FieldLabel>
+                      <Input
+                        className={fieldControl}
+                        type="email"
+                        value={draft.email}
+                        onChange={(e) => setDraft((d) => (d ? { ...d, email: e.target.value } : d))}
+                        placeholder="e.g. john@vendor.com"
+                      />
+                    </div>
+                    <div className="min-w-0 sm:col-span-2">
+                      <FieldLabel>Phone Number</FieldLabel>
+                      <Input
+                        className={fieldControl}
+                        type="tel"
+                        value={draft.phone}
+                        onChange={(e) => setDraft((d) => (d ? { ...d, phone: e.target.value } : d))}
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+                  </div>
+                </DrawerSection>
+              </div>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Addresses">
+                  <div className="space-y-3">
+                    <div>
+                      <FieldLabel>Billing Address</FieldLabel>
+                      <Textarea
+                        className={fieldTextarea}
+                        value={draft.billingAddress}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setDraft((d) =>
+                            d
+                              ? {
+                                  ...d,
+                                  billingAddress: v,
+                                  shippingAddress: shippingSameAsBilling ? v : d.shippingAddress,
+                                }
+                              : d,
+                          )
+                        }}
+                        placeholder="Street, City, State, ZIP"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={shippingSameAsBilling}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setShippingSameAsBilling(checked)
+                          if (checked) {
+                            setDraft((d) => (d ? { ...d, shippingAddress: d.billingAddress } : d))
+                          }
+                        }}
+                        className="rounded border-border"
+                      />
+                      Shipping address same as billing
+                    </label>
+                    {!shippingSameAsBilling && (
+                      <div>
+                        <FieldLabel>Shipping Address</FieldLabel>
+                        <Textarea
+                          className={fieldTextarea}
+                          value={draft.shippingAddress}
+                          onChange={(e) => setDraft((d) => (d ? { ...d, shippingAddress: e.target.value } : d))}
+                          placeholder="Street, City, State, ZIP"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </DrawerSection>
+              </div>
+              <div className={cn(sectionCardClass, "p-4 sm:p-5 space-y-3")}>
+                <DrawerSection title="Notes">
+                  <Textarea
+                    className={fieldNotesTextarea}
+                    value={draft.notes}
+                    onChange={(e) => setDraft((d) => (d ? { ...d, notes: e.target.value } : d))}
+                    placeholder="Internal notes about this vendor..."
+                    aria-label="Notes"
+                  />
+                </DrawerSection>
+              </div>
+            </>
+          )}
+        </div>
       </DetailDrawer>
 
       {confirmArchiveOpen && (

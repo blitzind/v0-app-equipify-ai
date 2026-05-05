@@ -281,7 +281,7 @@ export default function CertificatesPage() {
 
   const openWorkOrderCertificate = useCallback(
     (workOrderId: string) => {
-      router.push(`/work-orders?open=${encodeURIComponent(workOrderId)}&tab=certificate`)
+      router.push(`/work-orders?open=${encodeURIComponent(workOrderId)}&tab=certificates`)
     },
     [router],
   )

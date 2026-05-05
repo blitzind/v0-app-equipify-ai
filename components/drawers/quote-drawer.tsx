@@ -505,7 +505,7 @@ interface QuoteDrawerProps {
 
 export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
-  const { quotes, updateQuote, archiveQuote } = useQuotes()
+  const { quotes, updateQuote, archiveQuote, refreshQuotes } = useQuotes()
   const { addInvoiceFromPayload } = useInvoices()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
@@ -513,7 +513,10 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [draftItems, setDraftItems] = useState<LineItem[]>([])
   const [convertingToWo, setConvertingToWo] = useState(false)
   const [convertingToInvoice, setConvertingToInvoice] = useState(false)
-  const [sendingQuote, setSendingQuote] = useState(false)
+  const [quoteEmailOpen, setQuoteEmailOpen] = useState(false)
+  const [quoteEmailTo, setQuoteEmailTo] = useState("")
+  const [quoteEmailNote, setQuoteEmailNote] = useState("")
+  const [quoteEmailBusy, setQuoteEmailBusy] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
 
@@ -678,32 +681,53 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     toast(`Work order ${formatWorkOrderDisplay(row.work_order_number, newId)} created from quote`)
   }
 
-  async function handleSendQuoteToCustomer() {
+  function openQuoteEmailModal() {
     if (!quote) return
-    if (sendingQuote) return
-    setSendingQuote(true)
+    setQuoteEmailTo(`billing@${quote.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
+    setQuoteEmailNote("")
+    setQuoteEmailOpen(true)
+  }
 
-    // Simulate external email delivery success before persisting send metadata.
-    await new Promise((resolve) => setTimeout(resolve, 450))
-
-    const sentAt = new Date().toISOString()
-    const alreadySent = quote.status === "Sent" || Boolean(quote.sentDate)
-    const patch: Parameters<typeof updateOrgQuote>[3] = alreadySent
-      ? { sentAt }
-      : { status: "Sent", sentAt }
-
-    const { error } = await updateQuote(quote.id, patch)
-    setSendingQuote(false)
-    if (error) {
-      toast(`Could not send quote: ${error}`, "info")
+  async function sendQuoteEmail() {
+    if (!quote) return
+    if (orgStatus !== "ready" || !activeOrgId) {
+      toast(orgStatus === "ready" && !activeOrgId ? "No organization selected." : "Loading organization…", "info")
       return
     }
-
-    toast(
-      alreadySent
-        ? "Quote marked resent (email integration not configured yet)."
-        : "Quote marked sent (email integration not configured yet).",
-    )
+    const trimmed = quoteEmailTo.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast("Enter a valid recipient email address.", "info")
+      return
+    }
+    setQuoteEmailBusy(true)
+    try {
+      const alreadySent = quote.status === "Sent" || Boolean(quote.sentDate)
+      const res = await fetch("/api/email/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: activeOrgId,
+          quoteId: quote.id,
+          to: trimmed,
+          message: quoteEmailNote.trim() || undefined,
+          variant: alreadySent ? "resend" : "send",
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) {
+        toast(typeof data.message === "string" ? data.message : "Could not send email.", "info")
+        return
+      }
+      await refreshQuotes()
+      setQuoteEmailOpen(false)
+      toast(
+        alreadySent ? "Quote resent to the customer by email." : "Quote sent to the customer by email.",
+      )
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not send email.", "info")
+    } finally {
+      setQuoteEmailBusy(false)
+    }
   }
 
   async function handleConvertToInvoice() {
@@ -843,18 +867,10 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   size="sm"
                   variant="outline"
                   className="gap-1.5 text-xs cursor-pointer"
-                  disabled={sendingQuote}
-                  onClick={() => void handleSendQuoteToCustomer()}
+                  disabled={quoteEmailBusy}
+                  onClick={() => openQuoteEmailModal()}
                 >
-                  {sendingQuote ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" /> {alreadySent ? "Resend Quote" : "Email to Customer"}
-                    </>
-                  )}
+                  <Send className="w-3.5 h-3.5" /> {alreadySent ? "Resend Quote" : "Email to Customer"}
                 </Button>
               )}
               {canCreateWorkOrder && (
@@ -1018,6 +1034,71 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           </DrawerSection>
         </div>
       </DetailDrawer>
+
+      {quoteEmailOpen && quote ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !quoteEmailBusy && setQuoteEmailOpen(false)} />
+          <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Send className="w-4 h-4 text-primary" />{" "}
+                {alreadySent ? "Resend quote by email" : "Email quote to customer"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => !quoteEmailBusy && setQuoteEmailOpen(false)}
+                disabled={quoteEmailBusy}
+                className="p-1 rounded hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 overflow-y-auto max-h-[70vh]">
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+                  To
+                </label>
+                <input
+                  type="email"
+                  value={quoteEmailTo}
+                  onChange={(e) => setQuoteEmailTo(e.target.value)}
+                  className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+                  Optional note (appended to email)
+                </label>
+                <textarea
+                  rows={5}
+                  value={quoteEmailNote}
+                  onChange={(e) => setQuoteEmailNote(e.target.value)}
+                  className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                PDF attachments will be added when document generation is enabled.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+              <Button size="sm" variant="outline" onClick={() => setQuoteEmailOpen(false)} disabled={quoteEmailBusy} className="text-xs">
+                Cancel
+              </Button>
+              <Button size="sm" variant="default" onClick={() => void sendQuoteEmail()} disabled={quoteEmailBusy} className="text-xs gap-1.5">
+                {quoteEmailBusy ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" /> Send email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <AlertDialogContent>

@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import Link from "next/link"
 import {
   AlertCircle, RefreshCcw, TrendingUp, Shield, DollarSign,
   ChevronRight, Sparkles, Download, X, CheckCircle2,
   AlertTriangle, Clock, ArrowUpRight, BarChart3, Users,
-  Zap, FileText,
+  Zap, FileText, Loader2, Cpu,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +21,9 @@ import {
   type AiInsight,
 } from "@/lib/insights-engine"
 import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
+import type { AiGeneratedInsightItem } from "@/lib/insights/openai-generate-insights"
+import { AiInsightActions } from "@/components/insights/ai-insight-actions"
+import { Toaster } from "@/components/ui/toaster"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -38,6 +41,21 @@ function fmt$(n: number) {
 
 function fmtFull$(n: number) {
   return `$${n.toLocaleString()}`
+}
+
+const AI_CATEGORY_LABEL: Record<AiGeneratedInsightItem["category"], string> = {
+  revenue: "Revenue",
+  operations: "Operations",
+  maintenance: "Maintenance",
+  warranty: "Warranty",
+  customer: "Customer",
+  technician: "Technician",
+}
+
+const AI_SEVERITY_DOT: Record<AiGeneratedInsightItem["severity"], string> = {
+  high: "#ef4444",
+  medium: "#eab308",
+  low: "#22c55e",
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -61,6 +79,52 @@ function ConfidenceMeter({ value }: { value: number }) {
         <div className="h-full rounded-full transition-all" style={{ width: `${value}%`, background: color }} />
       </div>
       <span className="text-xs font-mono font-medium" style={{ color }}>{value}%</span>
+    </div>
+  )
+}
+
+function AiInsightCard({
+  item,
+  organizationId,
+  insightIndex,
+}: {
+  item: AiGeneratedInsightItem
+  organizationId: string | null
+  insightIndex: number
+}) {
+  const dot = AI_SEVERITY_DOT[item.severity]
+  return (
+    <div
+      className="bg-white rounded-xl border border-zinc-200/80 shadow-sm overflow-hidden"
+      style={{ borderLeft: `3px solid ${dot}` }}
+    >
+      <div className="p-4 space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-zinc-900 leading-tight text-balance">{item.title}</p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600"
+            >
+              {AI_CATEGORY_LABEL[item.category]}
+            </span>
+            <span
+              className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+              style={{ color: dot, background: `${dot}18` }}
+            >
+              {item.severity}
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-zinc-600 leading-relaxed">{item.insight}</p>
+        <div className="rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 mb-0.5">Recommended</p>
+          <p className="text-xs text-zinc-800 leading-relaxed">{item.recommendedAction}</p>
+        </div>
+        {item.relatedMetric ? (
+          <p className="text-[11px] text-zinc-400 font-mono">{item.relatedMetric}</p>
+        ) : null}
+        <AiInsightActions organizationId={organizationId} insightIndex={insightIndex} item={item} />
+      </div>
     </div>
   )
 }
@@ -277,6 +341,58 @@ export default function InsightsPage() {
   const dash = useSupabaseDashboard()
   const liveInsights = dash.operationalInsights
 
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiPayload, setAiPayload] = useState<{
+    summary: string
+    insights: AiGeneratedInsightItem[]
+    generatedAt: string
+  } | null>(null)
+
+  const generateAiInsights = useCallback(async () => {
+    if (!dash.organizationId) {
+      setAiError("Select an organization to generate AI insights.")
+      return
+    }
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await fetch("/api/insights/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: dash.organizationId }),
+      })
+      const data = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        error?: string
+        summary?: string
+        insights?: AiGeneratedInsightItem[]
+        generatedAt?: string
+      }
+      if (!res.ok) {
+        setAiPayload(null)
+        setAiError(
+          data.message ?? (data.error === "not_configured" ? "AI is not configured on the server." : data.error) ?? "Could not generate insights.",
+        )
+        return
+      }
+      if (data.ok && data.generatedAt) {
+        setAiError(null)
+        setAiPayload({
+          summary: data.summary ?? "",
+          insights: data.insights ?? [],
+          generatedAt: data.generatedAt,
+        })
+      }
+    } catch (e) {
+      setAiPayload(null)
+      setAiError(e instanceof Error ? e.message : "Request failed.")
+    } finally {
+      setAiLoading(false)
+    }
+  }, [dash.organizationId])
+
   const breakdown = useMemo(() => {
     return (Object.keys(CATEGORY_META) as InsightCategory[]).map((cat) => {
       const items = liveInsights.filter((i) => i.category === cat)
@@ -378,12 +494,24 @@ export default function InsightsPage() {
                 })}
               </p>
             </div>
-            <button onClick={() => setShowReport(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110 shrink-0"
-              style={{ background: "#2563eb", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}>
-              <FileText size={14} />
-              Executive Summary
-            </button>
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => void generateAiInsights()}
+                disabled={aiLoading || dash.loading || !dash.organizationId}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110 shrink-0 disabled:opacity-50 disabled:pointer-events-none"
+                style={{ background: "#7c3aed", boxShadow: "0 0 18px rgba(124,58,237,0.35)" }}
+              >
+                {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Cpu size={14} />}
+                Generate AI Insights
+              </button>
+              <button onClick={() => setShowReport(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110 shrink-0"
+                style={{ background: "#2563eb", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}>
+                <FileText size={14} />
+                Executive Summary
+              </button>
+            </div>
           </div>
 
           {/* KPI strip */}
@@ -439,6 +567,65 @@ export default function InsightsPage() {
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex-1 bg-zinc-50 p-6 space-y-6">
+
+        {/* AI-generated (on-demand) */}
+        <section className="space-y-4">
+          {aiError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {aiError}
+            </div>
+          ) : null}
+          {aiLoading ? (
+            <div className="flex items-center gap-2 text-sm text-zinc-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Generating insights from your live data…
+            </div>
+          ) : null}
+          {aiPayload ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-600" />
+                    AI-generated operational insights
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Generated on{" "}
+                    {new Date(aiPayload.generatedAt).toLocaleString("en-US", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                </div>
+              </div>
+              {aiPayload.summary ? (
+                <div className="rounded-xl border border-violet-200/80 bg-violet-50/60 px-4 py-3 text-sm text-zinc-800 leading-relaxed">
+                  {aiPayload.summary}
+                </div>
+              ) : null}
+              {aiPayload.insights.length > 0 ? (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {aiPayload.insights.map((item, idx) => (
+                    <AiInsightCard
+                      key={`${item.title}-${idx}`}
+                      item={item}
+                      organizationId={dash.organizationId}
+                      insightIndex={idx}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500">No structured insights returned — try again later.</p>
+              )}
+            </div>
+          ) : null}
+        </section>
+
+        <div className="border-t border-zinc-200 pt-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">
+            Rule-based operational signals
+          </h2>
+        </div>
 
         {/* Insight cards */}
         <section>
@@ -582,6 +769,7 @@ export default function InsightsPage() {
       {showReport && (
         <SummaryReportModal onClose={() => setShowReport(false)} report={executiveSummary} />
       )}
+      <Toaster />
     </div>
   )
 }

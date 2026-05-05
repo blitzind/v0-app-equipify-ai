@@ -15,6 +15,7 @@ import {
   PenLine,
   Trash2,
   Plus,
+  MoreHorizontal,
   CheckCircle2,
   AlertTriangle,
   Save,
@@ -34,9 +35,14 @@ import {
   Printer,
   AlertOctagon,
   FileBadge2,
+  Boxes,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Part, RepairLog, WorkOrder, WorkOrderPriority, WorkOrderStatus } from "@/lib/mock-data"
+import type {
+  WorkOrderCertificateStatus,
+  WorkOrderEquipmentAsset,
+} from "@/lib/work-orders/detail-load"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,6 +70,12 @@ import {
 import { DrawerTimeline } from "@/components/detail-drawer"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // ─── Styles (match existing WO page) ─────────────────────────────────────────
 
@@ -99,6 +111,22 @@ function formatDateTime(d: string) {
     hour: "numeric",
     minute: "2-digit",
   })
+}
+
+function certificateStatusLabel(s: WorkOrderCertificateStatus): string {
+  if (s === "completed") return "Certificate complete"
+  if (s === "in_progress") return "Certificate in progress"
+  return "Certificate not started"
+}
+
+function certificateStatusBadgeClass(s: WorkOrderCertificateStatus): string {
+  if (s === "completed") {
+    return "border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+  }
+  if (s === "in_progress") {
+    return "border-amber-500/40 text-amber-800 dark:text-amber-200"
+  }
+  return "border-border text-muted-foreground"
 }
 
 function formatFileSize(bytes: number | null | undefined): string {
@@ -865,6 +893,14 @@ export interface WorkOrderDetailExperienceProps {
   }
   /** Shown after work is completed (e.g. PDF, signature, invoice shortcuts). */
   postCompletionActions?: ReactNode
+  /** Multi-asset jobs: equipment rows from `work_order_equipment` (+ fallback primary). */
+  equipmentAssets?: WorkOrderEquipmentAsset[]
+  /** Opens Certificate tab and focuses the asset (parent controls tab state). */
+  onNavigateToCertificateForEquipment?: (equipmentId: string) => void
+  /** Remove asset from work order (`work_order_equipment` row); optional. */
+  onRemoveEquipmentAsset?: (joinRowId: string) => void
+  /** Open modal to attach more customer equipment (e.g. work order drawer). */
+  onOpenAddEquipment?: () => void
 }
 
 export function WorkOrderDetailExperience({
@@ -932,6 +968,10 @@ export function WorkOrderDetailExperience({
   notesFieldsEditable = false,
   workflowHints,
   postCompletionActions,
+  equipmentAssets = [],
+  onNavigateToCertificateForEquipment,
+  onRemoveEquipmentAsset,
+  onOpenAddEquipment,
 }: WorkOrderDetailExperienceProps) {
   const [fallbackTab, setFallbackTab] = useState("overview")
   const tabsControlled = tabsValue !== undefined && onTabsValueChange !== undefined
@@ -1122,7 +1162,7 @@ export function WorkOrderDetailExperience({
           {canMarkComplete && (
             <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={() => void onMarkComplete()}>
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Complete work order
+              Complete Work Order
             </Button>
           )}
           <Button size="sm" variant={qaVariant} className={qaBtnClass} asChild>
@@ -1178,7 +1218,7 @@ export function WorkOrderDetailExperience({
                   : "border-amber-500/40 text-amber-800 dark:text-amber-200",
               )}
             >
-              Certificate {workflowHints.certificateComplete ? "complete" : "incomplete"}
+              Certificates {workflowHints.certificateComplete ? "complete" : "incomplete"}
             </Badge>
           ) : null}
           <Badge
@@ -1221,9 +1261,9 @@ export function WorkOrderDetailExperience({
             Labor
           </TabsTrigger>
           {certificateTabContent ? (
-            <TabsTrigger value="certificate" className={tabTriggerClass()}>
+            <TabsTrigger value="certificates" className={tabTriggerClass()}>
               <FileBadge2 className="w-3.5 h-3.5" />
-              Certificate
+              Certificates
             </TabsTrigger>
           ) : null}
           <TabsTrigger value="attachments" className={tabTriggerClass()}>
@@ -1270,6 +1310,123 @@ export function WorkOrderDetailExperience({
             </div>
           )}
 
+          {(equipmentAssets.length > 0 || onOpenAddEquipment) && (
+            <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 border-b border-border/80 bg-muted/30 px-4 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Boxes className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Equipment on this work order
+                  </p>
+                </div>
+                {onOpenAddEquipment ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs shrink-0"
+                    onClick={onOpenAddEquipment}
+                  >
+                    + Add Equipment
+                  </Button>
+                ) : null}
+              </div>
+              <div className="divide-y divide-border/70 px-3 py-2 sm:px-4 sm:py-3 space-y-0">
+                {equipmentAssets.map((asset) => {
+                  const categoryLocation = [asset.category, asset.locationLabel].filter((x) => x?.trim()).join(" · ") || "—"
+                  return (
+                    <div
+                      key={`${asset.id}-${asset.joinRowId ?? "legacy"}`}
+                      className={cn(
+                        "py-3 first:pt-1 last:pb-1 rounded-lg px-2 -mx-1 transition-colors",
+                        asset.isPrimary && "bg-primary/[0.04] ring-1 ring-primary/15",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-foreground leading-snug">{asset.name}</p>
+                            {asset.isPrimary ? (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-primary/30 text-primary">
+                                Primary
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground/80">Code:</span>{" "}
+                            {(asset.equipmentCode ?? "").trim() || "—"}
+                            <span className="mx-1.5 text-border">·</span>
+                            <span className="text-muted-foreground/80">Serial:</span>{" "}
+                            {(asset.serialNumber ?? "").trim() || "—"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            <span className="text-muted-foreground/80">Category / location:</span> {categoryLocation}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="text-[10px] font-normal">
+                              {asset.typeLabel}
+                            </Badge>
+                            <Badge variant="outline" className={cn("text-[10px] font-normal", PRIORITY_STYLE[asset.priorityLabel])}>
+                              {asset.priorityLabel}
+                            </Badge>
+                            <Badge variant="outline" className={cn("text-[10px] font-normal", certificateStatusBadgeClass(asset.certificateStatus))}>
+                              {certificateStatusLabel(asset.certificateStatus)}
+                            </Badge>
+                          </div>
+                          {onRemoveEquipmentAsset && asset.joinRowId && equipmentAssets.length > 1 ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground"
+                                  aria-label="Equipment actions"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="z-[120]">
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => onRemoveEquipmentAsset(asset.joinRowId!)}
+                                >
+                                  Remove from work order
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+                          <Link href={`/equipment/${asset.id}`}>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            View equipment
+                          </Link>
+                        </Button>
+                        {certificateTabContent && onNavigateToCertificateForEquipment ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1"
+                            onClick={() => onNavigateToCertificateForEquipment(asset.id)}
+                          >
+                            <FileBadge2 className="w-3.5 h-3.5" />
+                            Certificates
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {workOrder.priority === "Critical" && (
             <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1298,7 +1455,7 @@ export function WorkOrderDetailExperience({
                 {canMarkComplete && (
                   <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={() => void onMarkComplete()}>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Complete work order
+                    Complete Work Order
                   </Button>
                 )}
                 <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
@@ -1352,7 +1509,7 @@ export function WorkOrderDetailExperience({
                       : "border-amber-500/40 text-amber-800 dark:text-amber-200",
                   )}
                 >
-                  Certificate {workflowHints.certificateComplete ? "complete" : "incomplete"}
+                  Certificates {workflowHints.certificateComplete ? "complete" : "incomplete"}
                 </Badge>
               ) : null}
               <Badge
@@ -1776,7 +1933,7 @@ export function WorkOrderDetailExperience({
         </TabsContent>
 
         {certificateTabContent ? (
-          <TabsContent value="certificate" className="space-y-4 mt-0">
+          <TabsContent value="certificates" className="space-y-4 mt-0">
             {certificateTabToolbar ? <div className="mb-1">{certificateTabToolbar}</div> : null}
             {certificateTabContent}
           </TabsContent>

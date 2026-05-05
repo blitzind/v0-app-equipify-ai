@@ -85,10 +85,21 @@ function woDbStatusToUi(s: string): string {
     scheduled: "Scheduled",
     in_progress: "In Progress",
     completed: "Completed",
+    completed_pending_signature: "Completed Pending Signature",
     invoiced: "Invoiced",
   }
   return m[s] ?? s
 }
+
+/** DB column values in pipeline order (matches Work Orders page `ALL_STATUSES`). */
+const WO_PIPELINE_DB_KEYS = [
+  "open",
+  "scheduled",
+  "in_progress",
+  "completed",
+  "completed_pending_signature",
+  "invoiced",
+] as const
 
 function woDbPriorityToUi(p: string): string {
   const m: Record<string, string> = {
@@ -329,7 +340,12 @@ export function useSupabaseDashboard() {
         dueMonthListRes,
         overdueCountRes,
         openWoCountRes,
-        woStatusRes,
+        woCountOpenRes,
+        woCountScheduledRes,
+        woCountInProgressRes,
+        woCountCompletedRes,
+        woCountPendingSigRes,
+        woCountInvoicedRes,
         revenueAggRes,
         warrantyCountRes,
         warrantyListRes,
@@ -373,10 +389,40 @@ export function useSupabaseDashboard() {
           .in("status", ["open", "scheduled", "in_progress"]),
         supabase
           .from("work_orders")
-          .select("status")
+          .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
           .eq("is_archived", false)
-          .in("status", ["open", "scheduled", "in_progress"]),
+          .eq("status", "open"),
+        supabase
+          .from("work_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .eq("status", "scheduled"),
+        supabase
+          .from("work_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .eq("status", "in_progress"),
+        supabase
+          .from("work_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .eq("status", "completed"),
+        supabase
+          .from("work_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .eq("status", "completed_pending_signature"),
+        supabase
+          .from("work_orders")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("is_archived", false)
+          .eq("status", "invoiced"),
         supabase
           .from("work_orders")
           .select("total_labor_cents, total_parts_cents, completed_at, updated_at, status")
@@ -440,14 +486,17 @@ export function useSupabaseDashboard() {
       const openWorkOrders = openWoCountRes.count ?? 0
       const expiringWarrantiesCount = warrantyCountRes.count ?? 0
 
-      const statusRows = (woStatusRes.data ?? []) as { status: string }[]
-      const statusAgg: Record<string, number> = {}
-      for (const r of statusRows) {
-        statusAgg[r.status] = (statusAgg[r.status] ?? 0) + 1
-      }
-      const pie: WorkOrderStatusSlice[] = ["open", "scheduled", "in_progress"].map((s) => ({
-        status: woDbStatusToUi(s),
-        count: statusAgg[s] ?? 0,
+      const woStatusCounts = [
+        woCountOpenRes.count ?? 0,
+        woCountScheduledRes.count ?? 0,
+        woCountInProgressRes.count ?? 0,
+        woCountCompletedRes.count ?? 0,
+        woCountPendingSigRes.count ?? 0,
+        woCountInvoicedRes.count ?? 0,
+      ]
+      const pie: WorkOrderStatusSlice[] = WO_PIPELINE_DB_KEYS.map((db, i) => ({
+        status: woDbStatusToUi(db),
+        count: woStatusCounts[i] ?? 0,
       }))
 
       let monthlyRevenueCents = 0

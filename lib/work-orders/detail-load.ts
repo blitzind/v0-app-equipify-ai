@@ -16,6 +16,11 @@ import {
   mapLineItemRowToPart,
   signedUrlForAttachmentPath,
 } from "@/lib/work-orders/work-order-tab-data"
+import {
+  isCalibrationRecordComplete,
+  listCalibrationTemplates,
+  type CalibrationTemplate,
+} from "@/lib/calibration-certificates"
 
 function formatScheduledTime(isoOrTime: string | null): string {
   if (!isoOrTime) return ""
@@ -119,6 +124,27 @@ export type WorkOrderDocumentItem = {
   fileSizeBytes: number | null
 }
 
+/** Certificate lifecycle for an asset on this work order (from latest calibration_record + template). */
+export type WorkOrderCertificateStatus = "not_started" | "in_progress" | "completed"
+
+/** Equipment rows attached to the work order (`work_order_equipment`, or legacy primary only). */
+export type WorkOrderEquipmentAsset = {
+  id: string
+  /** `work_order_equipment` row id when present; null for legacy single-asset fallback without a join row. */
+  joinRowId: string | null
+  name: string
+  equipmentCode: string | null
+  serialNumber: string | null
+  category: string | null
+  locationLabel: string | null
+  typeLabel: WorkOrderType
+  priorityLabel: WorkOrderPriority
+  certificateStatus: WorkOrderCertificateStatus
+  calibrationRecordId: string | null
+  /** Matches `work_orders.equipment_id` (primary / header asset). */
+  isPrimary: boolean
+}
+
 export type LoadedWorkOrderDetail = {
   organizationId: string
   workOrder: WorkOrder
@@ -131,6 +157,8 @@ export type LoadedWorkOrderDetail = {
   usesPartsLineItems: boolean
   /** Tasks are loaded from `work_order_tasks`. */
   usesTasksTable: boolean
+  /** Assets on this job (join table, or `[work_orders.equipment_id]` when no rows yet). */
+  equipmentAssets: WorkOrderEquipmentAsset[]
 }
 
 async function safeLoadTabs<T>(loader: () => Promise<T>, fallback: T): Promise<T> {
@@ -139,6 +167,136 @@ async function safeLoadTabs<T>(loader: () => Promise<T>, fallback: T): Promise<T
   } catch {
     return fallback
   }
+}
+
+type JoinRow = {
+  id: string
+  equipment_id: string
+  work_type: string | null
+  priority: string | null
+}
+
+function resolveCertificateStatus(
+  template: CalibrationTemplate | null | undefined,
+  values: Record<string, unknown>,
+  hasRecord: boolean,
+): WorkOrderCertificateStatus {
+  if (!hasRecord) return "not_started"
+  if (isCalibrationRecordComplete(template, values)) return "completed"
+  return "in_progress"
+}
+
+async function fetchWorkOrderEquipmentAssets(
+  supabase: SupabaseClient,
+  organizationId: string,
+  workOrderId: string,
+  fallback: { equipmentId: string; typeDb: string; priorityDb: string },
+): Promise<WorkOrderEquipmentAsset[]> {
+  const { data: joinRows, error: joinErr } = await supabase
+    .from("work_order_equipment")
+    .select("id, equipment_id, work_type, priority, created_at")
+    .eq("organization_id", organizationId)
+    .eq("work_order_id", workOrderId)
+    .order("created_at", { ascending: true })
+
+  const normalizedJoin = (!joinErr && joinRows && joinRows.length > 0 ? joinRows : null) as JoinRow[] | null
+
+  const slotRows: Array<{
+    joinRowId: string | null
+    equipmentId: string
+    typeDb: string
+    priorityDb: string
+  }> =
+    normalizedJoin?.map((r) => ({
+      joinRowId: r.id,
+      equipmentId: r.equipment_id,
+      typeDb: (r.work_type ?? fallback.typeDb).trim() || fallback.typeDb,
+      priorityDb: (r.priority ?? fallback.priorityDb).trim() || fallback.priorityDb,
+    })) ?? [
+      {
+        joinRowId: null,
+        equipmentId: fallback.equipmentId,
+        typeDb: fallback.typeDb,
+        priorityDb: fallback.priorityDb,
+      },
+    ]
+
+  const ids = [...new Set(slotRows.map((s) => s.equipmentId))]
+
+  const [{ data: eqRows }, { data: certRows }, templates] = await Promise.all([
+    supabase
+      .from("equipment")
+      .select("id, name, equipment_code, serial_number, category, location_label")
+      .eq("organization_id", organizationId)
+      .in("id", ids),
+    supabase
+      .from("calibration_records")
+      .select("id, equipment_id, template_id, values, created_at")
+      .eq("organization_id", organizationId)
+      .eq("work_order_id", workOrderId)
+      .order("created_at", { ascending: false }),
+    listCalibrationTemplates(supabase, organizationId).catch(() => [] as CalibrationTemplate[]),
+  ])
+
+  const templateById = new Map(templates.map((t) => [t.id, t]))
+
+  const latestRecordByEquipment = new Map<
+    string,
+    { id: string; templateId: string; values: Record<string, unknown> }
+  >()
+  for (const row of (certRows ?? []) as Array<{
+    id: string
+    equipment_id: string
+    template_id: string
+    values: unknown
+    created_at: string
+  }>) {
+    if (latestRecordByEquipment.has(row.equipment_id)) continue
+    const vals =
+      row.values && typeof row.values === "object" && !Array.isArray(row.values)
+        ? (row.values as Record<string, unknown>)
+        : {}
+    latestRecordByEquipment.set(row.equipment_id, {
+      id: row.id,
+      templateId: row.template_id,
+      values: vals,
+    })
+  }
+
+  const byId = new Map(
+    (eqRows ?? []).map(
+      (e: {
+        id: string
+        name: string
+        equipment_code: string | null
+        serial_number: string | null
+        category: string | null
+        location_label: string | null
+      }) => [e.id, e],
+    ),
+  )
+
+  return slotRows.map((slot) => {
+    const e = byId.get(slot.equipmentId)
+    const rec = latestRecordByEquipment.get(slot.equipmentId)
+    const tmpl = rec ? templateById.get(rec.templateId) ?? null : null
+    const certStatus = resolveCertificateStatus(tmpl, rec?.values ?? {}, Boolean(rec))
+
+    return {
+      id: slot.equipmentId,
+      joinRowId: slot.joinRowId,
+      name: e?.name?.trim() || "Equipment",
+      equipmentCode: e?.equipment_code ?? null,
+      serialNumber: e?.serial_number ?? null,
+      category: e?.category ?? null,
+      locationLabel: e?.location_label?.trim() || null,
+      typeLabel: mapDbType(slot.typeDb),
+      priorityLabel: mapDbPriority(slot.priorityDb),
+      certificateStatus: certStatus,
+      calibrationRecordId: rec?.id ?? null,
+      isPrimary: slot.equipmentId === fallback.equipmentId,
+    }
+  })
 }
 
 export async function loadWorkOrderDetailForOrg(
@@ -338,6 +496,12 @@ export async function loadWorkOrderDetailForOrg(
     warrantyVendorName = (vendorRow as { name?: string } | null)?.name?.trim() || null
   }
 
+  const equipmentAssets = await fetchWorkOrderEquipmentAssets(supabase, organizationId, workOrderId, {
+    equipmentId: w.equipment_id,
+    typeDb: w.type,
+    priorityDb: w.priority,
+  })
+
   const mapped: WorkOrder = {
     id: w.id,
     workOrderNumber: w.work_order_number ?? undefined,
@@ -389,6 +553,7 @@ export async function loadWorkOrderDetailForOrg(
       documentAttachments,
       usesPartsLineItems,
       usesTasksTable,
+      equipmentAssets,
     },
   }
 }

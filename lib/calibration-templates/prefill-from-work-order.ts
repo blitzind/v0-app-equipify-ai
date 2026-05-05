@@ -55,6 +55,22 @@ export function buildCertificatePrefillContext(wo: WorkOrder): CertificatePrefil
   }
 }
 
+/** Prefill context using a specific equipment asset (multi-asset work orders). */
+export function buildCertificatePrefillContextForEquipment(
+  wo: WorkOrder,
+  asset: { name: string; equipmentCode?: string | null; serialNumber?: string | null },
+): CertificatePrefillContext {
+  const base = buildCertificatePrefillContext(wo)
+  const name = asset.name?.trim() || base.equipmentDisplayName
+  return {
+    ...base,
+    equipmentDisplayName: name,
+    equipmentModelLine: name,
+    equipmentSerial: (asset.serialNumber ?? "").trim() || base.equipmentSerial,
+    equipmentCode: (asset.equipmentCode ?? "").trim() || base.equipmentCode,
+  }
+}
+
 function isCertificateValueEmpty(field: CalibrationTemplateField, value: unknown): boolean {
   switch (field.type) {
     case "section_heading":

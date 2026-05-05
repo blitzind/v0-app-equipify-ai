@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { useInvoices } from "@/lib/quote-invoice-store"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
@@ -702,38 +703,63 @@ function SettingsPanel({
 function EmailModal({
   invoice,
   variant,
+  organizationId,
+  refreshInvoices,
   onClose,
   onSent,
   onError,
 }: {
   invoice: AdminInvoice
   variant: "send" | "resend"
+  organizationId: string | null | undefined
+  refreshInvoices: () => Promise<void>
   onClose: () => void
   onSent?: () => void
   onError?: (message: string) => void
 }) {
-  const { updateInvoice } = useInvoices()
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const [sending, setSending] = useState(false)
   const [to,      setTo]      = useState(`billing@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.com`)
-  const [subject, setSubject] = useState(`Invoice ${invoiceLabel} — ${fmtCurrency(invoice.amount)} Due ${fmtDate(invoice.dueDate)}`)
+  const [subject, setSubject] = useState(`Invoice ${invoiceLabel} from Equipify`)
   const [body,    setBody]    = useState(`Hi ${invoice.customerName},\n\nPlease find attached Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)}.\n\nPayment is due by ${fmtDate(invoice.dueDate)}. You can pay securely online at:\npay.equipify.ai/inv/${invoiceLabel.toLowerCase()}\n\nPlease don't hesitate to reach out if you have any questions.\n\nThank you,\n${COMPANY.name}`)
 
   async function handleSend() {
-    setSending(true)
-    const sentAt = new Date().toISOString()
-    const patch =
-      variant === "resend"
-        ? { sentAt }
-        : { status: "Sent" as const, sentAt }
-    const { error } = await updateInvoice(invoice.id, patch)
-    setSending(false)
-    if (error) {
-      onError?.(error)
+    if (!organizationId?.trim()) {
+      onError?.("Select an organization to send email.")
       return
     }
-    onSent?.()
-    onClose()
+    const trimmedTo = to.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedTo)) {
+      onError?.("Enter a valid recipient email address.")
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch("/api/invoices/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: organizationId.trim(),
+          invoiceId: invoice.id,
+          to: trimmedTo,
+          subject: subject.trim(),
+          message: body.trim(),
+          variant,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) {
+        onError?.(typeof data.message === "string" ? data.message : "Could not send email.")
+        return
+      }
+      await refreshInvoices()
+      onSent?.()
+      onClose()
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : "Could not send email.")
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -963,7 +989,7 @@ function InfoTab({
               <div className="flex flex-col gap-1 text-xs">
                 <span className="font-medium text-[color:var(--status-success)]">Certificate completed</span>
                 <Link
-                  href={`/work-orders?open=${invoice.workOrderId}&tab=certificate`}
+                  href={`/work-orders?open=${invoice.workOrderId}&tab=certificates`}
                   className="text-primary hover:underline cursor-pointer"
                 >
                   Open certificate in work order
@@ -1382,7 +1408,8 @@ interface InvoiceDetailViewProps {
 let toastCounter = 0
 
 export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) {
-  const { updateInvoice, archiveInvoice } = useInvoices()
+  const { updateInvoice, archiveInvoice, refreshInvoices } = useInvoices()
+  const { organizationId } = useActiveOrganization()
 
   // Tabs + layout state
   const [activeTab,    setActiveTab]    = useState<Tab>("info")
@@ -1868,10 +1895,14 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
         <EmailModal
           invoice={invoice}
           variant={emailVariant}
+          organizationId={organizationId}
+          refreshInvoices={refreshInvoices}
           onClose={() => setModal(null)}
           onSent={() =>
             toast(
-              emailVariant === "resend" ? "Invoice resent — sent time updated." : "Invoice sent to customer.",
+              emailVariant === "resend" ?
+                "Invoice resent — customer notified by email."
+              : "Invoice sent to the customer by email.",
             )
           }
           onError={(msg) => toast(`Could not send email: ${msg}`, "error")}

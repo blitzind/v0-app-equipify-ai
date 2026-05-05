@@ -40,6 +40,7 @@ export type CalibrationRecord = {
   id: string
   organizationId: string
   workOrderId: string
+  equipmentId: string
   templateId: string
   values: Record<string, unknown>
   createdAt: string
@@ -60,6 +61,7 @@ type CalibrationRecordRow = {
   id: string
   organization_id: string
   work_order_id: string
+  equipment_id: string
   template_id: string
   values: unknown
   created_at: string
@@ -169,6 +171,7 @@ function mapRecordRow(row: CalibrationRecordRow): CalibrationRecord {
     id: row.id,
     organizationId: row.organization_id,
     workOrderId: row.work_order_id,
+    equipmentId: row.equipment_id,
     templateId: row.template_id,
     values: row.values && typeof row.values === "object" ? (row.values as Record<string, unknown>) : {},
     createdAt: row.created_at,
@@ -254,22 +257,43 @@ export async function assignTemplateToWorkOrder(
   if (error) throw new Error(error.message)
 }
 
-export async function loadLatestCalibrationRecord(
+/** Latest saved certificate for one equipment asset on a work order (history: most recent `created_at`). */
+export async function loadLatestCalibrationRecordForEquipment(
   supabase: SupabaseClient,
   organizationId: string,
   workOrderId: string,
+  equipmentId: string,
 ): Promise<CalibrationRecord | null> {
   const { data, error } = await supabase
     .from("calibration_records")
-    .select("id, organization_id, work_order_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
     .eq("organization_id", organizationId)
     .eq("work_order_id", workOrderId)
+    .eq("equipment_id", equipmentId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) return null
   return mapRecordRow(data as CalibrationRecordRow)
+}
+
+/** Latest certificate for the work order primary equipment (`work_orders.equipment_id`). */
+export async function loadLatestCalibrationRecord(
+  supabase: SupabaseClient,
+  organizationId: string,
+  workOrderId: string,
+): Promise<CalibrationRecord | null> {
+  const { data: wo, error: woErr } = await supabase
+    .from("work_orders")
+    .select("equipment_id")
+    .eq("organization_id", organizationId)
+    .eq("id", workOrderId)
+    .maybeSingle()
+  if (woErr) throw new Error(woErr.message)
+  const eqId = (wo as { equipment_id?: string } | null)?.equipment_id
+  if (!eqId) return null
+  return loadLatestCalibrationRecordForEquipment(supabase, organizationId, workOrderId, eqId)
 }
 
 function formatWorkOrderStatusLabel(raw: string): string {
@@ -383,7 +407,7 @@ export async function listCompletedCertificatesForOrg(
 
   const { data: records, error: recErr } = await supabase
     .from("calibration_records")
-    .select("id, organization_id, work_order_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit)
@@ -417,7 +441,7 @@ export async function listCompletedCertificatesForOrg(
     const wo = woMap.get(r.work_order_id)
     if (!wo) continue
     customerIds.add(wo.customer_id)
-    equipmentIds.add(wo.equipment_id)
+    equipmentIds.add(r.equipment_id ?? wo.equipment_id)
     if (wo.assigned_user_id) assigneeIds.add(wo.assigned_user_id)
   }
 
@@ -483,10 +507,11 @@ export async function listCompletedCertificatesForOrg(
     const wo = woMap.get(r.work_order_id)
     if (!wo) continue
 
-    const eqRow = eqMap.get(wo.equipment_id)
+    const eqKey = (r as CalibrationRecordRow).equipment_id ?? wo.equipment_id
+    const eqRow = eqMap.get(eqKey)
     const equipmentLabel = eqRow
       ? getEquipmentDisplayPrimary({
-          id: wo.equipment_id,
+          id: eqKey,
           name: eqRow.name,
           equipment_code: eqRow.equipment_code,
           serial_number: eqRow.serial_number,
@@ -584,6 +609,7 @@ export async function createCalibrationRecord(
   supabase: SupabaseClient,
   organizationId: string,
   workOrderId: string,
+  equipmentId: string,
   templateId: string,
   values: Record<string, unknown>,
 ): Promise<CalibrationRecord> {
@@ -595,11 +621,12 @@ export async function createCalibrationRecord(
     .insert({
       organization_id: organizationId,
       work_order_id: workOrderId,
+      equipment_id: equipmentId,
       template_id: templateId,
       values,
       created_by: user?.id ?? null,
     })
-    .select("id, organization_id, work_order_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
     .single()
   if (error) throw new Error(error.message)
   return mapRecordRow(data as CalibrationRecordRow)

@@ -151,6 +151,13 @@ function InvoicesPageInner() {
     router.replace("/invoices", { scroll: false })
   }, [searchParams, router])
 
+  useEffect(() => {
+    const s = searchParams.get("status")
+    if (s && (ALL_STATUSES as readonly string[]).includes(s)) {
+      setStatusFilter(s as InvoiceStatus)
+    }
+  }, [searchParams])
+
   const filtered = useMemo(() => {
     let list = [...invoices]
 
