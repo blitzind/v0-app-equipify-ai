@@ -9,23 +9,58 @@ import type { PlanId } from "@/lib/plans"
 import { BrandLogoOnLight } from "@/components/brand-logo"
 import {
   hasScaleTrialParam,
+  ONBOARDING_INTENT_STORAGE_KEY,
   ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
+  parseOnboardingIndustry,
   parseOnboardingPlan,
+  parseOnboardingTeamSize,
 } from "@/lib/onboarding-intent"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
+const INDUSTRY_OPTIONS = [
+  { value: "medical-equipment", label: "Medical Equipment" },
+  { value: "hvac-r", label: "HVAC-R" },
+  { value: "plumbing", label: "Plumbing" },
+  { value: "electrical", label: "Electrical" },
+  { value: "equipment-service", label: "Equipment Service & Repair" },
+  { value: "appliance-repair", label: "Appliance Repair" },
+  { value: "garage-door", label: "Garage Door" },
+  { value: "locksmith", label: "Locksmith" },
+  { value: "property-management", label: "Property Management" },
+  { value: "specialty-contractors", label: "Specialty Contractors" },
+  { value: "other", label: "Other" },
+] as const
+const TEAM_SIZE_OPTIONS = ["1-3", "4-10", "11-25", "26-50", "51-100", "100+"] as const
+
+function getIndustrySetupCopy(industry: string) {
+  switch (industry) {
+    case "medical-equipment":
+      return "We’ll set up equipment tracking, calibration reminders, and service history for medical equipment teams."
+    case "hvac-r":
+      return "We’ll prepare service schedules, equipment history, and recurring maintenance workflows for HVAC-R teams."
+    case "plumbing":
+      return "We’ll organize customers, equipment, work orders, and recurring service reminders for plumbing teams."
+    default:
+      return "We’ll tailor your workspace around your equipment, service jobs, and team workflow."
+  }
+}
 
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const planFromQuery = parseOnboardingPlan(searchParams.get("plan"))
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
+  const industryFromQuery = parseOnboardingIndustry(searchParams.get("industry"))
+  const teamSizeFromQuery = parseOnboardingTeamSize(searchParams.get("teamSize"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(planFromQuery ?? "growth")
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", password: "",
-    companyName: "", industry: "", teamSize: "", timezone: "America/New_York",
+    companyName: "",
+    industry: industryFromQuery ?? "",
+    teamSize: teamSizeFromQuery ?? "",
+    timezone: "America/New_York",
   })
 
   function setField(k: keyof typeof form, v: string) {
@@ -37,6 +72,15 @@ export default function OnboardingPage() {
     else {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(ONBOARDING_INTENDED_PLAN_STORAGE_KEY, selectedPlan)
+        window.localStorage.setItem(
+          ONBOARDING_INTENT_STORAGE_KEY,
+          JSON.stringify({
+            selectedPlan,
+            trial: "scale",
+            industry: form.industry || undefined,
+            teamSize: form.teamSize || undefined,
+          })
+        )
       }
       router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
     }
@@ -120,6 +164,9 @@ export default function OnboardingPage() {
                 <h2 className="text-lg font-semibold text-gray-900">Set up your workspace</h2>
               </div>
               <div className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  {getIndustrySetupCopy(form.industry)}
+                </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Company name</label>
                   <input value={form.companyName} onChange={(e) => setField("companyName", e.target.value)}
@@ -131,8 +178,8 @@ export default function OnboardingPage() {
                     <select value={form.industry} onChange={(e) => setField("industry", e.target.value)}
                       className="portal-select">
                       <option value="">Select industry</option>
-                      {["HVAC", "Elevators & Lifts", "Industrial Equipment", "Construction", "Material Handling", "Refrigeration", "Other"].map((o) => (
-                        <option key={o}>{o}</option>
+                      {INDUSTRY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
                   </div>
@@ -141,8 +188,8 @@ export default function OnboardingPage() {
                     <select value={form.teamSize} onChange={(e) => setField("teamSize", e.target.value)}
                       className="portal-select">
                       <option value="">Select size</option>
-                      {["1–5", "6–15", "16–50", "51–200", "200+"].map((o) => (
-                        <option key={o}>{o}</option>
+                      {TEAM_SIZE_OPTIONS.map((o) => (
+                        <option key={o} value={o}>{o}</option>
                       ))}
                     </select>
                   </div>
