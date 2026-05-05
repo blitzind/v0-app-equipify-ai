@@ -4,10 +4,9 @@ import { PLAN_IDS, PLANS, type PlanId } from "@/lib/plans"
 import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 
 /**
- * Optional env overrides for real Stripe Price IDs (Dashboard → Products → Price).
- * When unset, callers fall back to placeholders in `lib/plans.ts` (checkout validation may reject them).
- *
- * TODO: Set all eight vars in production — see `.env.local.example`.
+ * Optional env overrides for Stripe Price IDs (per-deploy staging/live catalogs).
+ * When unset, callers use `PLANS[].stripeMonthlyPriceId` / `stripeAnnualPriceId`, sourced from
+ * `PLAN_PRICE_IDS` in `lib/plans.ts`.
  */
 const ENV_KEYS: Record<PlanId, { monthly: string; annual: string }> = {
   solo: { monthly: "STRIPE_PRICE_SOLO_MONTHLY", annual: "STRIPE_PRICE_SOLO_ANNUAL" },

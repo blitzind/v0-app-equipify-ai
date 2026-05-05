@@ -4,7 +4,7 @@ import type { PlanId } from "@/lib/plans"
 import { PLANS } from "@/lib/plans"
 import { stripePriceIdForPlan } from "@/lib/billing/stripe-price-map"
 
-/** Repo placeholders in lib/plans.ts — not valid Stripe Dashboard price IDs. */
+/** Legacy dev-only fake IDs — reject so checkout cannot run with accidental placeholders. */
 const PLACEHOLDER_PRICE_PATTERN =
   /^price_(solo|core|growth|scale)_(monthly|annual)$/i
 
@@ -31,7 +31,7 @@ export function validateStripePriceId(priceId: string): { ok: true } | { ok: fal
     return {
       ok: false,
       error:
-        "Stripe Price ID looks like a placeholder (e.g. price_solo_monthly). Replace lib/plans.ts entries with real Price IDs from the Stripe Dashboard.",
+        "Stripe Price ID looks like a legacy placeholder (e.g. price_solo_monthly). Use a Price ID from Stripe Dashboard → Products.",
     }
   }
   if (id.length < 24) {

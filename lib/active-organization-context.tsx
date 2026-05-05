@@ -134,6 +134,8 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       return
     }
 
+    /** Sidebar org list: only rows in `organization_members` for this auth user with `status = active`.
+     *  Platform Admin “accounts” lists every org via service role — not comparable without membership. */
     const memberSelect =
       "organization_id, organizations(id, name, slug, status)" as const
 

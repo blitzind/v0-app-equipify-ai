@@ -3,6 +3,26 @@ import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 export const PLAN_IDS = ["solo", "core", "growth", "scale"] as const
 export type PlanId = (typeof PLAN_IDS)[number]
 
+/** Canonical Stripe Price IDs (Dashboard → Products). Env vars in `stripe-price-map` may override per deploy. */
+export const PLAN_PRICE_IDS = {
+  solo: {
+    monthly: "price_1TTprI2Y5teM2HcUkuvow9to",
+    yearly: "price_1TTpuw2Y5teM2HcUWNGnMLdr",
+  },
+  core: {
+    monthly: "price_1TTpsY2Y5teM2HcUoiLUgUsT",
+    yearly: "price_1TTpvO2Y5teM2HcU3PdJNocm",
+  },
+  growth: {
+    monthly: "price_1TTpsr2Y5teM2HcUsV8lNRLE",
+    yearly: "price_1TTpvr2Y5teM2HcUdWJHgHzR",
+  },
+  scale: {
+    monthly: "price_1TTptB2Y5teM2HcUSmzgCrDS",
+    yearly: "price_1TTpwI2Y5teM2HcUV36vm7Rc",
+  },
+} as const
+
 export interface Plan {
   id: PlanId
   name: string
@@ -38,8 +58,8 @@ export const PLANS: Plan[] = [
       "Email notifications",
       "Limited dashboard",
     ],
-    stripeMonthlyPriceId: "price_solo_monthly",
-    stripeAnnualPriceId: "price_solo_annual",
+    stripeMonthlyPriceId: PLAN_PRICE_IDS.solo.monthly,
+    stripeAnnualPriceId: PLAN_PRICE_IDS.solo.yearly,
     cta: "Get started",
   },
   {
@@ -60,8 +80,8 @@ export const PLANS: Plan[] = [
       "Email reminders",
       "Basic reporting",
     ],
-    stripeMonthlyPriceId: "price_core_monthly",
-    stripeAnnualPriceId: "price_core_annual",
+    stripeMonthlyPriceId: PLAN_PRICE_IDS.core.monthly,
+    stripeAnnualPriceId: PLAN_PRICE_IDS.core.yearly,
     cta: "Get started",
   },
   {
@@ -84,8 +104,8 @@ export const PLANS: Plan[] = [
       "Payment links",
       "Priority support",
     ],
-    stripeMonthlyPriceId: "price_growth_monthly",
-    stripeAnnualPriceId: "price_growth_annual",
+    stripeMonthlyPriceId: PLAN_PRICE_IDS.growth.monthly,
+    stripeAnnualPriceId: PLAN_PRICE_IDS.growth.yearly,
     cta: "Get started",
     aiLabel: "AI Included",
     aiFeatures: [
@@ -114,8 +134,8 @@ export const PLANS: Plan[] = [
       "Advanced analytics",
       "Priority onboarding",
     ],
-    stripeMonthlyPriceId: "price_scale_monthly",
-    stripeAnnualPriceId: "price_scale_annual",
+    stripeMonthlyPriceId: PLAN_PRICE_IDS.scale.monthly,
+    stripeAnnualPriceId: PLAN_PRICE_IDS.scale.yearly,
     cta: "Get started",
     aiLabel: "Advanced AI",
     aiFeatures: [
