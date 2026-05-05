@@ -12,26 +12,31 @@ import {
   hasScaleTrialParam,
   ONBOARDING_INTENT_STORAGE_KEY,
   ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
-  parseOnboardingIndustry,
   parseOnboardingPlan,
   parseOnboardingTeamSize,
   parseOnboardingText,
 } from "@/lib/onboarding-intent"
+import {
+  INDUSTRY_KEYS,
+  normalizeIndustryKey,
+  type DemoIndustryKey,
+} from "@/lib/demo-seeding/profiles"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
-const INDUSTRY_OPTIONS = [
-  { value: "medical-equipment", label: "Medical Equipment" },
-  { value: "hvac-r", label: "HVAC-R" },
-  { value: "plumbing", label: "Plumbing" },
+const INDUSTRY_OPTIONS: Array<{ value: DemoIndustryKey; label: string }> = [
+  { value: "medical_equipment", label: "Medical Equipment" },
+  { value: "hvac_r", label: "HVAC-R" },
   { value: "electrical", label: "Electrical" },
-  { value: "equipment-service", label: "Equipment Service & Repair" },
-  { value: "appliance-repair", label: "Appliance Repair" },
-  { value: "garage-door", label: "Garage Door" },
+  { value: "plumbing", label: "Plumbing" },
+  { value: "garage_door", label: "Garage Door" },
   { value: "locksmith", label: "Locksmith" },
-  { value: "property-management", label: "Property Management" },
-  { value: "specialty-contractors", label: "Specialty Contractors" },
-  { value: "other", label: "Other" },
-] as const
+  { value: "property_management", label: "Property Management" },
+  { value: "appliance_repair", label: "Appliance Repair" },
+  { value: "commercial_equipment", label: "Commercial Equipment" },
+  { value: "fire_security", label: "Fire & Security" },
+  { value: "septic", label: "Septic" },
+  { value: "av_installation", label: "AV Installation" },
+]
 const TEAM_SIZE_OPTIONS = ["1-3", "4-10", "11-25", "26-50", "51-100", "100+"] as const
 const CURRENT_SYSTEM_OPTIONS = [
   "Spreadsheets / Paper",
@@ -57,9 +62,9 @@ type InviteContext = {
 
 function getIndustrySetupCopy(industry: string) {
   switch (industry) {
-    case "medical-equipment":
+    case "medical_equipment":
       return "We’ll set up equipment tracking, calibration reminders, and service history for medical equipment teams."
-    case "hvac-r":
+    case "hvac_r":
       return "We’ll prepare service schedules, equipment history, and recurring maintenance workflows for HVAC-R teams."
     case "plumbing":
       return "We’ll organize customers, equipment, work orders, and recurring service reminders for plumbing teams."
@@ -81,7 +86,7 @@ function OnboardingPageContent() {
     parseOnboardingText(searchParams.get("invite")) ??
     parseOnboardingText(searchParams.get("token"))
   const seedDemoParam = searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
-  const seedIndustryParam = parseOnboardingText(searchParams.get("industry"))
+  const industryParam = normalizeIndustryKey(searchParams.get("industry"))
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
@@ -94,7 +99,7 @@ function OnboardingPageContent() {
     password: "",
     companyName: "",
     phone: "",
-    industry: "",
+    industry: "commercial_equipment",
     teamSize: "",
     currentSystem: "",
     timezone: "America/New_York",
@@ -115,7 +120,7 @@ function OnboardingPageContent() {
     const email = parseOnboardingText(searchParams.get("email")) || ""
     const company = parseOnboardingText(searchParams.get("company")) || ""
     const phone = parseOnboardingText(searchParams.get("phone")) || ""
-    const industry = parseOnboardingIndustry(searchParams.get("industry")) || ""
+    const industry = normalizeIndustryKey(searchParams.get("industry"))
     const teamSize = parseOnboardingTeamSize(searchParams.get("teamSize")) || ""
     const currentSystem = parseOnboardingText(searchParams.get("currentSystem")) || ""
 
@@ -146,7 +151,7 @@ function OnboardingPageContent() {
       email: email || prev.email,
       companyName: company || prev.companyName,
       phone: phone || prev.phone,
-      industry: industry || prev.industry,
+      industry,
       teamSize: teamSize || prev.teamSize,
       currentSystem: currentSystem || prev.currentSystem,
     }))
@@ -273,7 +278,7 @@ function OnboardingPageContent() {
             organizationId: organizationIdParam || null,
             organizationName: form.companyName || undefined,
             seedDemo: seedDemoParam,
-            industry: seedIndustryParam,
+            industry: normalizeIndustryKey(form.industry || industryParam),
           }),
         })
         if (!provisionRes.ok) {
@@ -457,17 +462,21 @@ function OnboardingPageContent() {
                   <input value={form.companyName} onChange={(e) => setField("companyName", e.target.value)}
                     className="portal-input" placeholder="Acme Field Services" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry</label>
-                    <select value={form.industry} onChange={(e) => setField("industry", e.target.value)}
-                      className="portal-select">
-                      <option value="">Select industry</option>
-                      {INDUSTRY_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className={`grid gap-4 ${inviteTokenParam ? "grid-cols-1" : "grid-cols-2"}`}>
+                  {!inviteTokenParam && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry</label>
+                      <select
+                        value={INDUSTRY_KEYS.includes(form.industry as DemoIndustryKey) ? form.industry : "commercial_equipment"}
+                        onChange={(e) => setField("industry", normalizeIndustryKey(e.target.value))}
+                        className="portal-select"
+                      >
+                        {INDUSTRY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Team size</label>
                     <select value={form.teamSize} onChange={(e) => setField("teamSize", e.target.value)}
