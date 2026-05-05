@@ -10,8 +10,14 @@ export type OnboardingTeamSize = (typeof ONBOARDING_TEAM_SIZE_VALUES)[number]
 export type OnboardingIntent = {
   selectedPlan: PlanId
   trial: "scale"
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  company?: string
   industry?: string
   teamSize?: OnboardingTeamSize
+  currentSystem?: string
 }
 
 function isPlanId(value: string): value is PlanId {
@@ -42,4 +48,10 @@ export function parseOnboardingTeamSize(value: string | null): OnboardingTeamSiz
   return (ONBOARDING_TEAM_SIZE_VALUES as readonly string[]).includes(normalized)
     ? (normalized as OnboardingTeamSize)
     : null
+}
+
+export function parseOnboardingText(value: string | null): string | null {
+  if (!value) return null
+  const normalized = value.trim()
+  return normalized.length > 0 ? normalized : null
 }

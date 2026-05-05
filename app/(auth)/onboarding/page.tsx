@@ -14,6 +14,7 @@ import {
   parseOnboardingIndustry,
   parseOnboardingPlan,
   parseOnboardingTeamSize,
+  parseOnboardingText,
 } from "@/lib/onboarding-intent"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
@@ -31,6 +32,18 @@ const INDUSTRY_OPTIONS = [
   { value: "other", label: "Other" },
 ] as const
 const TEAM_SIZE_OPTIONS = ["1-3", "4-10", "11-25", "26-50", "51-100", "100+"] as const
+const CURRENT_SYSTEM_OPTIONS = [
+  "Spreadsheets / Paper",
+  "ServiceTitan",
+  "Housecall Pro",
+  "Jobber",
+  "FieldEdge",
+  "ServiceMax",
+  "Salesforce Field Service",
+  "Custom / In-house",
+  "Other FSM Software",
+  "None / Starting Fresh",
+] as const
 
 function getIndustrySetupCopy(industry: string) {
   switch (industry) {
@@ -50,16 +63,27 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams()
   const planFromQuery = parseOnboardingPlan(searchParams.get("plan"))
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
+  const firstNameFromQuery = parseOnboardingText(searchParams.get("firstName"))
+  const lastNameFromQuery = parseOnboardingText(searchParams.get("lastName"))
+  const emailFromQuery = parseOnboardingText(searchParams.get("email"))
+  const companyFromQuery = parseOnboardingText(searchParams.get("company"))
+  const phoneFromQuery = parseOnboardingText(searchParams.get("phone"))
   const industryFromQuery = parseOnboardingIndustry(searchParams.get("industry"))
   const teamSizeFromQuery = parseOnboardingTeamSize(searchParams.get("teamSize"))
+  const currentSystemFromQuery = parseOnboardingText(searchParams.get("currentSystem"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(planFromQuery ?? "growth")
   const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", password: "",
-    companyName: "",
+    firstName: firstNameFromQuery ?? "",
+    lastName: lastNameFromQuery ?? "",
+    email: emailFromQuery ?? "",
+    password: "",
+    companyName: companyFromQuery ?? "",
+    phone: phoneFromQuery ?? "",
     industry: industryFromQuery ?? "",
     teamSize: teamSizeFromQuery ?? "",
+    currentSystem: currentSystemFromQuery ?? "",
     timezone: "America/New_York",
   })
 
@@ -77,8 +101,14 @@ export default function OnboardingPage() {
           JSON.stringify({
             selectedPlan,
             trial: "scale",
+            firstName: form.firstName || undefined,
+            lastName: form.lastName || undefined,
+            email: form.email || undefined,
+            phone: form.phone || undefined,
+            company: form.companyName || undefined,
             industry: form.industry || undefined,
             teamSize: form.teamSize || undefined,
+            currentSystem: form.currentSystem || undefined,
           })
         )
       }
@@ -195,11 +225,34 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
+                    className="portal-input"
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
                   <select value={form.timezone} onChange={(e) => setField("timezone", e.target.value)}
                     className="portal-select">
                     {["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Phoenix", "Europe/London"].map((tz) => (
                       <option key={tz} value={tz}>{tz.replace("_", " ")}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Current system</label>
+                  <select
+                    value={form.currentSystem}
+                    onChange={(e) => setField("currentSystem", e.target.value)}
+                    className="portal-select"
+                  >
+                    <option value="">Select current system</option>
+                    {CURRENT_SYSTEM_OPTIONS.map((system) => (
+                      <option key={system} value={system}>{system}</option>
                     ))}
                   </select>
                 </div>
