@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { requireCanCreateRecordForOrganization } from "@/lib/billing/server-guard"
 import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
 import {
   computeNextDueDate,
@@ -108,6 +109,8 @@ export async function processDuePlansForOrganization(
 
   const plans = (rows ?? []) as MaintenancePlanRow[]
 
+  let workOrderBillingGate: Awaited<ReturnType<typeof requireCanCreateRecordForOrganization>> | null = null
+
   for (const row of plans) {
     processed++
     const dueDate = row.next_due_date
@@ -189,6 +192,14 @@ export async function processDuePlansForOrganization(
 
     if (systemInsert && systemActorId) {
       insertPayload.created_by = systemActorId
+    }
+
+    if (workOrderBillingGate === null) {
+      workOrderBillingGate = await requireCanCreateRecordForOrganization(supabase, organizationId, "work_order")
+    }
+    if (!workOrderBillingGate.ok) {
+      errors.push(`Plan ${row.id}: ${workOrderBillingGate.message}`)
+      continue
     }
 
     const insRes = await supabase.from("work_orders").insert(insertPayload as never).select("id")

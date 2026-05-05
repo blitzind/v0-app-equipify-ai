@@ -26,6 +26,7 @@ import {
   Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
@@ -445,6 +446,10 @@ export default function CertificatesPage() {
       }
       if (!state.name.trim()) {
         throw new Error("NAME_REQUIRED")
+      }
+      if (!state.id) {
+        const gate = await enforceCanCreateRecord(organizationId, "calibration_template")
+        if (!gate.ok) throw new Error(gate.message)
       }
       const supabase = createBrowserSupabaseClient()
       return upsertCalibrationTemplate(supabase, organizationId, {

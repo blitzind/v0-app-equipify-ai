@@ -11,6 +11,7 @@ import {
 import type { AdminInvoice, AdminQuote } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import {
   archiveOrgInvoice,
   archiveOrgQuote,
@@ -133,6 +134,8 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
   const addQuoteFromPayload = useCallback(
     async (payload: Parameters<QuoteInvoiceContextValue["addQuoteFromPayload"]>[0]) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const gate = await enforceCanCreateRecord(activeOrg.organizationId, "quote")
+      if (!gate.ok) return { error: gate.message }
       const supabase = createBrowserSupabaseClient()
       const res = await insertOrgQuote(supabase, {
         organizationId: activeOrg.organizationId,
@@ -169,6 +172,8 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
   const addInvoiceFromPayload = useCallback(
     async (payload: Parameters<QuoteInvoiceContextValue["addInvoiceFromPayload"]>[0]) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const gate = await enforceCanCreateRecord(activeOrg.organizationId, "invoice")
+      if (!gate.ok) return { error: gate.message }
       const supabase = createBrowserSupabaseClient()
       const res = await insertOrgInvoice(supabase, {
         organizationId: activeOrg.organizationId,

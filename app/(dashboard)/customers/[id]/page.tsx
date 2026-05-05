@@ -28,6 +28,7 @@ import {
   CalendarPlus,
   Repeat,
 } from "lucide-react"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -937,6 +938,13 @@ export default function CustomerDetailPage() {
 
     setLocationSaving(true)
     try {
+      if (!editingLocationId) {
+        const gate = await enforceCanCreateRecord(customer.organizationId, "customer")
+        if (!gate.ok) {
+          setLocationError(gate.message)
+          return
+        }
+      }
       const supabase = createBrowserSupabaseClient()
       const payload = {
         organization_id: customer.organizationId,
@@ -1042,6 +1050,13 @@ export default function CustomerDetailPage() {
 
     setContactSaving(true)
     try {
+      if (!editingContactId) {
+        const gate = await enforceCanCreateRecord(customer.organizationId, "customer")
+        if (!gate.ok) {
+          setContactError(gate.message)
+          return
+        }
+      }
       const supabase = createBrowserSupabaseClient()
       const payload = {
         organization_id: customer.organizationId,

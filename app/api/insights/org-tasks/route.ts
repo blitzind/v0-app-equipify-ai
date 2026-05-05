@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireCanCreateRecord } from "@/lib/billing/server-guard"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 const UUID_RE =
@@ -92,6 +93,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "forbidden", message: "You do not have access to this organization." },
       { status: 403 },
+    )
+  }
+
+  const billingGate = await requireCanCreateRecord(supabase, user.id, organizationId, "org_task")
+  if (!billingGate.ok) {
+    return NextResponse.json(
+      { error: "billing_gate", message: billingGate.message },
+      { status: billingGate.httpStatus },
     )
   }
 

@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 
 interface AddCustomerModalProps {
   open: boolean
@@ -39,6 +42,7 @@ const INITIAL = {
 
 export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [form, setForm] = useState(INITIAL)
   const [errors, setErrors] = useState<Partial<typeof INITIAL>>({})
   const [saving, setSaving] = useState(false)
@@ -65,9 +69,23 @@ export function AddCustomerModal({ open, onClose, onCreated }: AddCustomerModalP
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
 
+    if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
+
+    if (!activeOrgId) {
+      setSubmitError("No organization selected.")
+      return
+    }
+
     setSaving(true)
 
     try {
+      const serverGate = await enforceCanCreateRecord(activeOrgId, "customer")
+      if (!serverGate.ok) {
+        setSubmitError(serverGate.message)
+        setSaving(false)
+        return
+      }
+
       const supabase = createBrowserSupabaseClient()
       const {
         data: { user },

@@ -54,7 +54,7 @@ export default function WorkspacePage() {
     reader.readAsDataURL(file)
   }
 
-  const isGrowthOrAbove = plan.id !== "starter"
+  const isGrowthOrAbove = plan.id === "growth" || plan.id === "scale"
 
   return (
     <div className="flex flex-col gap-6">

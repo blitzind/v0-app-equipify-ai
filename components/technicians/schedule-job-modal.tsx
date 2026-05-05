@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Technician } from "@/lib/mock-data"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { normalizeTimeForDb, uiPriorityToDb } from "@/lib/work-orders/db-map"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -141,6 +144,7 @@ export function ScheduleJobModal({
 }: ScheduleJobModalProps) {
   const router = useRouter()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
 
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -406,6 +410,16 @@ export function ScheduleJobModal({
     if (!timeDb) {
       setSubmitError("Choose a valid time.")
       return
+    }
+
+    if (!isAssignExisting && toastRecordEligibilityBlocked(standardCreateEligibility)) return
+
+    if (!isAssignExisting) {
+      const serverGate = await enforceCanCreateRecord(activeOrgId, "work_order")
+      if (!serverGate.ok) {
+        setSubmitError(serverGate.message)
+        return
+      }
     }
 
     setLoading(true)

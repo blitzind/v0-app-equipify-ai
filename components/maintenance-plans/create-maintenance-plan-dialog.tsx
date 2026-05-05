@@ -40,6 +40,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { enforceMaintenancePlanCreate } from "@/app/actions/org-create-enforcement";
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal";
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display";
 
@@ -376,6 +377,16 @@ export function CreateMaintenancePlanDialog({
           ? `Please ${missing[0]}.`
           : `Please complete: ${missing.join("; ")}.`,
       );
+      return;
+    }
+
+    const planGate = await enforceMaintenancePlanCreate(organizationId!);
+    if (!planGate.ok) {
+      toast({
+        variant: "destructive",
+        title: "Cannot create plan",
+        description: planGate.message,
+      });
       return;
     }
 

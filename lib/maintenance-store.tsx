@@ -15,6 +15,7 @@ import type {
   PlanStatus,
   NotificationTriggerDays,
 } from "@/lib/mock-data"
+import { enforceMaintenancePlanCreate } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { loadMaintenancePlansForOrg } from "@/lib/maintenance-plans/load-plans"
@@ -105,6 +106,8 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
   const createPlan = useCallback(
     async (plan: MaintenancePlan) => {
       if (!organizationId) return { error: "No organization selected." }
+      const gate = await enforceMaintenancePlanCreate(organizationId)
+      if (!gate.ok) return { error: gate.message }
       const supabase = createBrowserSupabaseClient()
       const { interval_value, interval_unit } = intervalToDb(plan.interval, plan.customIntervalDays)
       const nextDue =

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import {
   Plug, CheckCircle2, Clock, Zap, ArrowRight,
@@ -7,6 +8,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useBillingAccess } from "@/lib/billing-access-context"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -472,6 +474,7 @@ function RequestIntegrationModal({ onClose }: { onClose: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function IntegrationsPage() {
+  const { apiFeaturesAllowed } = useBillingAccess()
   const [notifyModal, setNotifyModal] = useState<{ id: string; name: string } | null>(null)
   const [requestModal, setRequestModal] = useState(false)
 
@@ -481,6 +484,14 @@ export default function IntegrationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {!apiFeaturesAllowed && (
+        <div className="rounded-lg border border-muted px-4 py-3 text-sm text-muted-foreground bg-secondary/30">
+          Full integration and API access is available on the Scale plan.{" "}
+          <Link href="/settings/billing" className="font-medium text-foreground underline-offset-2 hover:underline">
+            View billing
+          </Link>
+        </div>
+      )}
 
       {/* ── Page header card ── */}
       <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">

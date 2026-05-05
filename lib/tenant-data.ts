@@ -179,7 +179,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     id: "ws-zephyr",
     name: "Zephyr Equipment Co.",
     slug: "zephyr",
-    planId: "starter",
+    planId: "solo",
     billingCycle: "monthly",
     stripeCustomerId: "cus_zephyr",
     stripeSubscriptionId: "sub_zephyr",

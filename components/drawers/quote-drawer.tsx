@@ -5,8 +5,10 @@ import Link from "next/link"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
 import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
@@ -505,6 +507,7 @@ interface QuoteDrawerProps {
 
 export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const { quotes, updateQuote, archiveQuote, refreshQuotes } = useQuotes()
   const { addInvoiceFromPayload } = useInvoices()
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -610,6 +613,19 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     if (!quote || quote.workOrderId) return
     if (!quote.customerId || !quote.equipmentId) {
       toast("Link equipment on this quote before creating a work order.")
+      return
+    }
+    if (!standardCreateEligibility.ok) {
+      toast(standardCreateEligibility.message, "info")
+      return
+    }
+    if (!activeOrgId) {
+      toast("No organization selected.")
+      return
+    }
+    const convertGate = await enforceCanCreateRecord(activeOrgId, "work_order")
+    if (!convertGate.ok) {
+      toast(convertGate.message, "info")
       return
     }
     setConvertingToWo(true)

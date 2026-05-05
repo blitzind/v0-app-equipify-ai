@@ -19,9 +19,11 @@ import {
   seedCertificateValuesForWorkOrder,
 } from "@/lib/calibration-templates/prefill-from-work-order"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { CertificateTabContent } from "@/components/work-orders/certificate-tab-content"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
 
 type SlotState = {
   templateId: string
@@ -76,6 +78,7 @@ export function CertificateMultiTabContent({
   focusEquipmentId,
   onFocusEquipmentApplied,
 }: CertificateMultiTabContentProps) {
+  const { toast } = useToast()
   const orgId = organizationId?.trim() ?? ""
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])
   const [slotStates, setSlotStates] = useState<Record<string, SlotState>>({})
@@ -245,6 +248,11 @@ export function CertificateMultiTabContent({
     if (!orgId) return
     const st = slotStates[assetId]
     if (!st?.templateId) return
+    const gate = await enforceCanCreateRecord(orgId, "calibration_record")
+    if (!gate.ok) {
+      toast({ variant: "destructive", title: "Cannot save certificate", description: gate.message })
+      return
+    }
     const supabase = createBrowserSupabaseClient()
     setSavingAssetId(assetId)
     try {

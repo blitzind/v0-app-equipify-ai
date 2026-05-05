@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { checkOrgInviteEligibility } from "@/app/actions/org-billing-guard"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -87,6 +88,11 @@ export async function POST(
       { error: "forbidden", message: "Only owners and admins can invite technicians." },
       { status: 403 },
     )
+  }
+
+  const billingGate = await checkOrgInviteEligibility(organizationId)
+  if (!billingGate.ok) {
+    return NextResponse.json({ error: "billing_gate", message: billingGate.message }, { status: 403 })
   }
 
   const admin = createServiceRoleClient()

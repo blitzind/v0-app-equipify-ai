@@ -1,4 +1,5 @@
 import type { MaintenancePlan } from "@/lib/mock-data"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
@@ -15,6 +16,11 @@ export async function createWorkOrderFromMaintenancePlan(params: {
 
   if (!plan.equipmentId?.trim()) {
     return { error: "Attach equipment to this plan before creating a work order." }
+  }
+
+  const gate = await enforceCanCreateRecord(organizationId, "work_order")
+  if (!gate.ok) {
+    return { error: gate.message }
   }
 
   const supabase = createBrowserSupabaseClient()

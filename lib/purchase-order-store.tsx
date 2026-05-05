@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 
@@ -260,6 +261,8 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
   const addOrder = useCallback(
     async (payload: Parameters<POContextValue["addOrder"]>[0]) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const gate = await enforceCanCreateRecord(activeOrg.organizationId, "purchase_order")
+      if (!gate.ok) return { error: gate.message }
       const total = Math.round(
         payload.lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0),
       )

@@ -7,6 +7,8 @@ import { useQuotes } from "@/lib/quote-invoice-store"
 import type { QuoteStatus } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
@@ -126,6 +128,7 @@ export function NewQuoteModal({
   const { addQuoteFromPayload } = useQuotes()
   const prevOpenRef = useRef(false)
   const { organizationId: activeOrgId, status: orgContextStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const organizationId = orgContextStatus === "ready" ? activeOrgId : null
 
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -378,6 +381,7 @@ export function NewQuoteModal({
       setErrors((e) => ({ ...e, customerId: "Select an organization first." }))
       return
     }
+    if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
     setSubmitting(true)
     const lineItemsJson = lineItems
       .filter((li) => li.description.trim())

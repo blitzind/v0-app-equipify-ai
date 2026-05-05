@@ -1,8 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { Button } from "@/components/ui/button"
 import { CalendarPlus, CheckCircle2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -126,6 +129,7 @@ export function AddEquipmentModal({
   onCreateMaintenancePlan,
 }: AddEquipmentModalProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { equipmentCreateEligibility } = useBillingAccess()
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -189,6 +193,19 @@ export function AddEquipmentModal({
     const errs = validate(form)
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
+      return
+    }
+
+    if (toastRecordEligibilityBlocked(equipmentCreateEligibility)) return
+
+    if (!activeOrgId) {
+      toast({ variant: "destructive", title: "Cannot add equipment", description: "No organization selected." })
+      return
+    }
+
+    const serverGate = await enforceCanCreateRecord(activeOrgId, "equipment")
+    if (!serverGate.ok) {
+      toast({ variant: "destructive", title: "Cannot add equipment", description: serverGate.message })
       return
     }
 

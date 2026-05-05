@@ -4,8 +4,11 @@ import { useState, useEffect, type ComponentProps, type ElementType } from "reac
 import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { DetailDrawer } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
@@ -144,6 +147,7 @@ function DrawerSelectContent({
 
 export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([])
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
   const [technicianOptions, setTechnicianOptions] = useState<TechnicianOption[]>([])
@@ -423,6 +427,14 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
 
     if (!form.createWorkOrder) {
       setSubmitted(true)
+      return
+    }
+
+    if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
+
+    const serverGate = await enforceCanCreateRecord(activeOrgId, "work_order")
+    if (!serverGate.ok) {
+      setSubmitError(serverGate.message)
       return
     }
 

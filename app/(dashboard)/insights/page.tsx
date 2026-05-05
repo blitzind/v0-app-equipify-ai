@@ -24,6 +24,8 @@ import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 import type { AiGeneratedInsightItem } from "@/lib/insights/openai-generate-insights"
 import { AiInsightActions } from "@/components/insights/ai-insight-actions"
 import { Toaster } from "@/components/ui/toaster"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { aiFeatureUpgradeMessage } from "@/lib/billing/feature-access"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -339,6 +341,7 @@ function SummaryReportModal({ onClose, report }: { onClose: () => void; report: 
 
 export default function InsightsPage() {
   const dash = useSupabaseDashboard()
+  const { insightsAllowed } = useBillingAccess()
   const liveInsights = dash.operationalInsights
 
   const [aiLoading, setAiLoading] = useState(false)
@@ -471,6 +474,19 @@ export default function InsightsPage() {
 
   return (
     <div className="min-h-full flex flex-col">
+      {!insightsAllowed && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 shrink-0">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+            <p>
+              {aiFeatureUpgradeMessage()}{" "}
+              <Link href="/settings/billing" className="font-semibold underline-offset-2 hover:underline">
+                View billing
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
       {/* ── Executive hero header ─────────────────────────────────────────── */}
       <div className="shrink-0 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #162032 100%)" }}>
         <div className="px-6 pt-6 pb-0">
@@ -498,7 +514,8 @@ export default function InsightsPage() {
               <button
                 type="button"
                 onClick={() => void generateAiInsights()}
-                disabled={aiLoading || dash.loading || !dash.organizationId}
+                disabled={aiLoading || dash.loading || !dash.organizationId || !insightsAllowed}
+                title={!insightsAllowed ? aiFeatureUpgradeMessage() : undefined}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110 shrink-0 disabled:opacity-50 disabled:pointer-events-none"
                 style={{ background: "#7c3aed", boxShadow: "0 0 18px rgba(124,58,237,0.35)" }}
               >

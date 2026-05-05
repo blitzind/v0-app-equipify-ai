@@ -23,6 +23,9 @@ import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
@@ -76,6 +79,7 @@ export function CreateWorkOrderModal({
   initialEquipmentId = null,
 }: Props) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const organizationId = orgStatus === "ready" ? activeOrgId : null
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([])
@@ -308,6 +312,14 @@ export function CreateWorkOrderModal({
       if (!jobByEquipmentId[id]) {
         return
       }
+    }
+
+    if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
+
+    const serverGate = await enforceCanCreateRecord(organizationId!, "work_order")
+    if (!serverGate.ok) {
+      setSubmitError(serverGate.message)
+      return
     }
 
     setSubmitError(null)

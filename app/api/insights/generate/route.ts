@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { gatherOrgInsightsContext } from "@/lib/insights/gather-org-context"
 import {
@@ -48,6 +49,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "forbidden", message: "You do not have access to this organization." },
       { status: 403 },
+    )
+  }
+
+  const featureGate = await requireFeatureAccess(supabase, organizationId, "ai")
+  if (!featureGate.ok) {
+    return NextResponse.json(
+      { error: "feature_denied", message: featureGate.message },
+      { status: featureGate.httpStatus },
     )
   }
 

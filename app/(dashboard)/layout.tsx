@@ -8,6 +8,8 @@ import { WorkOrderProvider } from "@/lib/work-order-store"
 import { MaintenanceProvider } from "@/lib/maintenance-store"
 import { TenantProvider } from "@/lib/tenant-store"
 import { ActiveOrganizationProvider } from "@/lib/active-organization-context"
+import { BillingAccessProvider } from "@/lib/billing-access-context"
+import { BillingWarningBanner } from "@/components/billing-warning-banner"
 import { TenantWorkspaceSync } from "@/components/tenant-workspace-sync"
 import { OrganizationSwitchOverlay } from "@/components/organization-switch-overlay"
 import { EquipmentProvider } from "@/lib/equipment-store"
@@ -53,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AdminProvider>
       <ActiveOrganizationProvider>
+        <BillingAccessProvider>
         <TenantProvider>
           <TenantWorkspaceSync />
           <OrganizationSwitchOverlay />
@@ -66,6 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
                         <div className="flex flex-col h-dvh overflow-hidden bg-background">
                           <ImpersonationBanner />
+                          <BillingWarningBanner />
                           <div className="flex flex-1 min-h-0 overflow-hidden">
                             <AppSidebar />
                             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -82,6 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </MaintenanceProvider>
           </WorkOrderProvider>
         </TenantProvider>
+        </BillingAccessProvider>
       </ActiveOrganizationProvider>
     </AdminProvider>
   )

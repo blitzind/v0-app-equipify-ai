@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
+import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 
@@ -73,6 +74,11 @@ export function AddVendorModal({
     }
     if (!draft.name.trim()) {
       setError("Vendor name is required.")
+      return
+    }
+    const gate = await enforceCanCreateRecord(organizationId, "vendor")
+    if (!gate.ok) {
+      setError(gate.message)
       return
     }
     setSaving(true)

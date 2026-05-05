@@ -6,6 +6,8 @@ import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
@@ -141,6 +143,7 @@ export function NewInvoiceModal({
   const { quotes } = useQuotes()
   const prevOpenRef = useRef(false)
   const { organizationId: activeOrgId, status: orgContextStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const organizationId = orgContextStatus === "ready" ? activeOrgId : null
 
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -439,6 +442,7 @@ export function NewInvoiceModal({
       setErrors((e) => ({ ...e, customerId: "Select an organization first." }))
       return
     }
+    if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
     setSubmitting(true)
     const issuedAt = new Date().toISOString().split("T")[0]
     const lineItemsJson = lineItems
