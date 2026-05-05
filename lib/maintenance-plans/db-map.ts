@@ -258,6 +258,7 @@ export function rowToMaintenancePlan(
     notes: row.notes ?? "",
     createdAt: row.created_at,
     totalServicesCompleted: 0,
+    isArchived: row.is_archived,
   }
 }
 

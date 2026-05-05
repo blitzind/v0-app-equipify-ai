@@ -100,6 +100,8 @@ export interface Equipment {
   photos: string[]
   manuals: string[]
   serviceHistory: ServiceHistoryEntry[]
+  /** Soft-archive; hidden from default lists when true (Supabase `equipment.is_archived`). */
+  isArchived?: boolean
   /** Estimated replacement cost in USD */
   replacementCost?: number
   /** Technician ID primarily responsible for this equipment */
@@ -534,6 +536,8 @@ export interface WorkOrder {
   warrantyReviewRequired?: boolean
   warrantyVendorId?: string | null
   warrantyVendorName?: string | null
+  /** Soft-archive (Supabase `work_orders.is_archived`). */
+  isArchived?: boolean
   /** Derived from linked equipment dates in detail loader. */
   equipmentWarrantyActive?: boolean
 }
@@ -883,6 +887,8 @@ export interface MaintenancePlan {
   notes: string
   createdAt: string
   totalServicesCompleted: number
+  /** Soft-archived plan (hidden from default lists). */
+  isArchived?: boolean
 }
 
 // Notification log entry — each fired notification is recorded here
@@ -1557,6 +1563,8 @@ export interface AdminQuote {
   notes: string
   /** Team-only notes (not shown on customer-facing materials). */
   internalNotes?: string
+  /** Soft-archived quote (hidden from default lists). */
+  isArchived?: boolean
 }
 
 export const adminQuotes: AdminQuote[] = [
@@ -1738,6 +1746,8 @@ export interface AdminInvoice {
   sentAt?: string
   /** Linked calibration certificate record (org_invoices.calibration_record_id). */
   calibrationRecordId?: string
+  /** Soft-archived invoice (hidden from default lists). */
+  isArchived?: boolean
 }
 
 export const adminInvoices: AdminInvoice[] = [

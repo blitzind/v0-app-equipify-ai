@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -32,6 +33,7 @@ import {
   ExternalLink, CalendarPlus,
   AlertOctagon, Calendar,
   StickyNote, Shield, Cpu,
+  RotateCcw,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
@@ -334,6 +336,7 @@ type DbEquipmentRow = {
   next_due_at: string | null
   location_label: string | null
   notes: string | null
+  is_archived: boolean
 }
 
 type DrawerCustomer = {
@@ -375,6 +378,7 @@ function mapUiStatusToDbStatus(status: Equipment["status"]): DbEquipmentRow["sta
 
 export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const [eq, setEq] = useState<Equipment | null>(null)
   const [drawerWOs, setDrawerWOs] = useState<DrawerAssetWo[]>([])
   const [drawerPlans, setDrawerPlans] = useState<EqDrawerPlanRow[]>([])
@@ -569,11 +573,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes, is_archived"
         )
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
         .maybeSingle()
 
       if (error || !row) {
@@ -584,13 +587,23 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       }
 
       const equipmentRow = row as DbEquipmentRow
-      const customerName =
-        (customerRows as DrawerCustomer[] | null)?.find((c) => c.id === equipmentRow.customer_id)?.company_name ?? "Unknown Customer"
+      let customerName =
+        (customerRows as DrawerCustomer[] | null)?.find((c) => c.id === equipmentRow.customer_id)?.company_name ?? null
+      if (!customerName) {
+        const { data: custOne } = await supabase
+          .from("customers")
+          .select("company_name")
+          .eq("organization_id", orgId)
+          .eq("id", equipmentRow.customer_id)
+          .maybeSingle()
+        customerName = (custOne as { company_name?: string } | null)?.company_name ?? null
+      }
+      const resolvedCustomerName = customerName ?? "Unknown Customer"
 
       setEq({
         id: equipmentRow.id,
         customerId: equipmentRow.customer_id,
-        customerName,
+        customerName: resolvedCustomerName,
         equipmentCode: equipmentRow.equipment_code ?? undefined,
         model: equipmentRow.name,
         manufacturer: equipmentRow.manufacturer ?? "",
@@ -608,6 +621,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         photos: [],
         manuals: [],
         serviceHistory: [],
+        isArchived: equipmentRow.is_archived,
       })
       setWarrantyDraftStartDate(equipmentRow.warranty_start_date ?? "")
       setWarrantyDraftExpirationDate(
@@ -677,7 +691,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   }
 
   function startEdit() {
-    if (!eq) return
+    if (!eq || eq.isArchived) return
     setDraft({
       model: eq.model, manufacturer: eq.manufacturer, category: eq.category,
       serialNumber: eq.serialNumber, location: eq.location,
@@ -691,7 +705,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   function cancelEdit() { setEditing(false); setDraft({}) }
 
   async function saveEdit() {
-    if (!eq || !activeOrgId) return
+    if (!eq || !activeOrgId || eq.isArchived) return
     const supabase = createBrowserSupabaseClient()
 
     const updatePayload = {
@@ -732,10 +746,13 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     if (!eq || !activeOrgId) return
     if (!window.confirm("Archive this equipment?")) return
     const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     const { error } = await supabase
       .from("equipment")
-      .update({ is_archived: true, archived_at: new Date().toISOString() })
+      .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: user?.id ?? null })
       .eq("id", eq.id)
       .eq("organization_id", activeOrgId)
 
@@ -747,6 +764,32 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     toast("Equipment archived")
     onUpdated?.()
     onClose()
+  }
+
+  async function restoreEquipment() {
+    if (!eq || !activeOrgId) return
+    if (!window.confirm("Restore this equipment to active lists?")) return
+    const supabase = createBrowserSupabaseClient()
+
+    const { error } = await supabase
+      .from("equipment")
+      .update({
+        is_archived: false,
+        archived_at: null,
+        archived_by: null,
+        archive_reason: null,
+      })
+      .eq("id", eq.id)
+      .eq("organization_id", activeOrgId)
+
+    if (error) {
+      toast(`Restore failed: ${error.message}`)
+      return
+    }
+
+    toast("Equipment restored")
+    await loadDrawerData()
+    onUpdated?.()
   }
 
   function setField<K extends keyof Equipment>(field: K, value: Equipment[K]) {
@@ -865,9 +908,16 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         )}${eq.manufacturer ? ` · ${eq.manufacturer}` : ""}`}
         width="xl"
         badge={
-          <Badge variant="secondary" className={cn("text-xs border", STATUS_COLORS[currentStatus])}>
-            {currentStatus}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-1">
+            <Badge variant="secondary" className={cn("text-xs border", STATUS_COLORS[currentStatus])}>
+              {currentStatus}
+            </Badge>
+            {eq.isArchived ? (
+              <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                Archived
+              </Badge>
+            ) : null}
+          </div>
         }
         noScroll
         actions={
@@ -882,37 +932,54 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
             </>
           ) : (
             <>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
-                <Pencil className="w-3.5 h-3.5" /> Edit
-              </Button>
-              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
-                <Link href={woNewHref} className="flex items-center gap-1.5">
-                  <ClipboardList className="w-3.5 h-3.5 shrink-0" /> New Work Order
-                </Link>
-              </Button>
-              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
-                <Link href={quoteNewHref} className="flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 shrink-0" /> New Quote
-                </Link>
-              </Button>
-              <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
-                <Link href={planNewHref} className="flex items-center gap-1.5">
-                  <CalendarPlus className="w-3.5 h-3.5 shrink-0" /> New Maintenance Plan
-                </Link>
-              </Button>
+              {!eq.isArchived ? (
+                <>
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </Button>
+                  <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                    <Link href={woNewHref} className="flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5 shrink-0" /> New Work Order
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                    <Link href={quoteNewHref} className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 shrink-0" /> New Quote
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
+                    <Link href={planNewHref} className="flex items-center gap-1.5">
+                      <CalendarPlus className="w-3.5 h-3.5 shrink-0" /> New Maintenance Plan
+                    </Link>
+                  </Button>
+                </>
+              ) : null}
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
                 <Link href={`/equipment/${eq.id}`} className="flex items-center gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
                 </Link>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs cursor-pointer border-destructive/40 text-destructive hover:bg-destructive/10"
-                onClick={archiveEquipment}
-              >
-                <AlertOctagon className="w-3.5 h-3.5" /> Archive
-              </Button>
+              {canArchiveRestore ? (
+                eq.isArchived ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs cursor-pointer border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={() => void restoreEquipment()}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Restore
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs cursor-pointer border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => void archiveEquipment()}
+                  >
+                    <AlertOctagon className="w-3.5 h-3.5" /> Archive
+                  </Button>
+                )
+              ) : null}
             </>
           )
         }

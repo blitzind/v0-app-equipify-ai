@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { AdminWorkspaceShell } from "@/components/admin-workspace-shell"
 import { loadPlatformAdminIdentity } from "@/lib/load-platform-admin-identity"
 import { AdminLayoutClient } from "./admin-layout-client"
 
@@ -10,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminLayoutClient initialSessionIdentity={identity}>
-      <div className="min-h-screen bg-background text-foreground">{children}</div>
+      <AdminWorkspaceShell>{children}</AdminWorkspaceShell>
     </AdminLayoutClient>
   )
 }

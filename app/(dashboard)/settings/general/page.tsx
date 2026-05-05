@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, User, Moon, Sun, Monitor } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useWorkspaceAppearance } from "@/lib/workspace-appearance-context"
 
 function SettingCard({ title, description, children }: {
   title: string
@@ -22,7 +23,7 @@ function SettingCard({ title, description, children }: {
 
 export default function GeneralPage() {
   const [saved, setSaved] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system")
+  const { preference: theme, setPreference: setTheme } = useWorkspaceAppearance()
   const [form, setForm] = useState({
     firstName: "Alex",
     lastName: "Johnson",
@@ -93,6 +94,7 @@ export default function GeneralPage() {
               key={id}
               type="button"
               onClick={() => setTheme(id)}
+              aria-pressed={theme === id}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
                 theme === id
                   ? "border-primary bg-primary/8 text-primary"

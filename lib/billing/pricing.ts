@@ -1,6 +1,6 @@
 /**
  * Platform admin list pricing (USD / month). Single source for MRR reporting.
- * `PLAN_PRICES` matches annual per-month equivalents ($55 Starter = catalog annual slice).
+ * `PLAN_PRICES` matches annual per-month equivalents ($55 Solo tier = catalog annual slice).
  */
 
 export const PLAN_PRICES = {

@@ -19,6 +19,7 @@ import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
+import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
@@ -125,6 +126,7 @@ type DbWorkOrderRow = {
   notes: string | null
   maintenance_plan_id: string | null
   created_by_pm_automation?: boolean | null
+  is_archived?: boolean | null
 }
 
 function emptyRepairLog(): RepairLog {
@@ -237,7 +239,12 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
     <div onClick={onOpen} className="bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group">
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-mono text-muted-foreground">{getWorkOrderDisplay(wo)}</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            {wo.isArchived ? (
+              <Badge variant="outline" className="text-[9px] font-semibold px-1.5 py-0 h-5 bg-muted text-muted-foreground border-border">
+                Archived
+              </Badge>
+            ) : null}
             <PriorityDot priority={wo.priority} />
             <span className={cn("text-xs", PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
           </div>
@@ -372,7 +379,16 @@ function TableView({
                   <span className={cn("text-xs", PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
                 </div>
               </TableCell>
-              <TableCell><StatusBadge status={wo.status} /></TableCell>
+              <TableCell>
+                <div className="flex flex-wrap items-center gap-1">
+                  <StatusBadge status={wo.status} />
+                  {wo.isArchived ? (
+                    <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                      Archived
+                    </Badge>
+                  ) : null}
+                </div>
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
                   <TechnicianAvatar
@@ -547,6 +563,7 @@ function WorkOrdersPageInner() {
   const { standardCreateEligibility } = useBillingAccess()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
+  const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
 
   useEffect(() => {
     let active = true
@@ -569,20 +586,26 @@ function WorkOrdersPageInner() {
 
       const orgId = activeOrgId
 
-      let woRes = await supabase
+      let woQuery = supabase
         .from("work_orders")
         .select(WO_LIST_SELECT_WITH_NUM)
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
         .order("created_at", { ascending: false })
 
+      if (archiveScope === "active") woQuery = woQuery.eq("is_archived", false)
+      else if (archiveScope === "archived") woQuery = woQuery.eq("is_archived", true)
+
+      let woRes = await woQuery
+
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-        woRes = await supabase
+        let woRetry = supabase
           .from("work_orders")
           .select(WO_LIST_SELECT)
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
           .order("created_at", { ascending: false })
+        if (archiveScope === "active") woRetry = woRetry.eq("is_archived", false)
+        else if (archiveScope === "archived") woRetry = woRetry.eq("is_archived", true)
+        woRes = await woRetry
       }
 
       const { data: rows, error: woError } = woRes
@@ -732,6 +755,7 @@ function WorkOrdersPageInner() {
             ? (planNameById.get(row.maintenance_plan_id) ?? null)
             : null,
           createdByPmAutomation: Boolean(row.created_by_pm_automation),
+          isArchived: Boolean(row.is_archived),
         }
       })
 
@@ -743,7 +767,7 @@ function WorkOrdersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
 
   const [view, setView] = useState<ViewMode>("kanban")
   const [search, setSearch] = useState("")
@@ -779,6 +803,7 @@ function WorkOrdersPageInner() {
     if (openId) {
       setSelectedWoId(openId)
       setDrawerInitialTab(tab)
+      setArchiveScope("all")
       router.replace("/work-orders", { scroll: false })
     }
   }, [searchParams, router])
@@ -860,7 +885,10 @@ function WorkOrdersPageInner() {
 
   const counts = useMemo(() => {
     const m: Partial<Record<WorkOrderStatus, number>> = {}
-    workOrders.forEach((wo) => { m[wo.status] = (m[wo.status] ?? 0) + 1 })
+    workOrders.forEach((wo) => {
+      if (wo.isArchived) return
+      m[wo.status] = (m[wo.status] ?? 0) + 1
+    })
     return m
   }, [workOrders])
 
@@ -930,6 +958,17 @@ function WorkOrdersPageInner() {
                     </span>
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
+              <SelectTrigger className="w-[132px]">
+                <SelectValue placeholder="Records" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="all">All</SelectItem>
               </SelectContent>
             </Select>
           </div>

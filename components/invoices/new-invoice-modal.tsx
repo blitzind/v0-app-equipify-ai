@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { X, Plus, Trash2, Send, FilePen } from "lucide-react"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
@@ -141,6 +141,7 @@ export function NewInvoiceModal({
 }: NewInvoiceModalProps) {
   const { addInvoiceFromPayload } = useInvoices()
   const { quotes } = useQuotes()
+  const activeQuotes = useMemo(() => quotes.filter((q) => !q.isArchived), [quotes])
   const prevOpenRef = useRef(false)
   const { organizationId: activeOrgId, status: orgContextStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
@@ -380,7 +381,7 @@ export function NewInvoiceModal({
   // ── Auto-fill from quote ──
   useEffect(() => {
     if (!quoteId) return
-    const q = quotes.find((qt) => qt.id === quoteId)
+    const q = activeQuotes.find((qt) => qt.id === quoteId)
     if (!q) return
     if (q.customerId) setCustomerId(q.customerId)
     if (q.equipmentId) setEquipmentId(q.equipmentId)
@@ -397,7 +398,7 @@ export function NewInvoiceModal({
       )
     }
     if (q.notes) setNotes(q.notes)
-  }, [quoteId, quotes])
+  }, [quoteId, activeQuotes])
 
   useEffect(() => {
     if (!open) return
@@ -499,7 +500,7 @@ export function NewInvoiceModal({
   if (!open) return null
 
   const invoiceEquipmentCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
-  const filteredQuotes = customerId ? quotes.filter((q) => q.customerId === customerId) : quotes
+  const filteredQuotes = customerId ? activeQuotes.filter((q) => q.customerId === customerId) : activeQuotes
   const invoicePanelVisible = open && !addEquipmentOpen
 
   return (

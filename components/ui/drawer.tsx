@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 
+import { useWorkspacePortalContainer } from '@/hooks/use-workspace-portal-container'
 import { cn } from '@/lib/utils'
 
 function Drawer({
@@ -18,9 +19,17 @@ function DrawerTrigger({
 }
 
 function DrawerPortal({
+  container,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
-  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
+  const fallback = useWorkspacePortalContainer()
+  return (
+    <DrawerPrimitive.Portal
+      data-slot="drawer-portal"
+      container={container ?? fallback}
+      {...props}
+    />
+  )
 }
 
 function DrawerClose({

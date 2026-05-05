@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +31,7 @@ import {
   ExternalLink,
   Archive,
   History,
+  RotateCcw,
 } from "lucide-react"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1408,7 +1410,8 @@ interface InvoiceDetailViewProps {
 let toastCounter = 0
 
 export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) {
-  const { updateInvoice, archiveInvoice, refreshInvoices } = useInvoices()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { updateInvoice, archiveInvoice, restoreInvoice, refreshInvoices } = useInvoices()
   const { organizationId } = useActiveOrganization()
 
   // Tabs + layout state
@@ -1433,6 +1436,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const [actionsOpen, setActionsOpen] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
+  const [restoreBusy, setRestoreBusy] = useState(false)
 
   function toast(message: string, kind: "success" | "error" = "success") {
     const id = ++toastCounter
@@ -1448,6 +1452,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   }
 
   function startEdit() {
+    if (invoice.isArchived) return
     setDraft({ status: invoice.status, dueDate: invoice.dueDate, notes: invoice.notes })
     setDraftItems(invoice.lineItems.map((li) => ({ ...li })))
     setEditing(true)
@@ -1499,6 +1504,17 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     onClose()
   }
 
+  async function confirmRestoreInvoice() {
+    setRestoreBusy(true)
+    const { error } = await restoreInvoice(invoice.id)
+    setRestoreBusy(false)
+    if (error) {
+      toast(`Could not restore: ${error}`, "error")
+      return
+    }
+    toast("Invoice restored")
+  }
+
   function setField<K extends keyof AdminInvoice>(field: K, value: AdminInvoice[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
@@ -1541,6 +1557,25 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
               <X className="w-3.5 h-3.5" /> Cancel
             </Button>
           </>
+        ) : invoice.isArchived ? (
+          canArchiveRestore ? (
+            <Button
+              size="sm"
+              variant="default"
+              className="gap-1.5 text-xs cursor-pointer"
+              disabled={restoreBusy}
+              onClick={() => void confirmRestoreInvoice()}
+            >
+              {restoreBusy ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RotateCcw className="w-3.5 h-3.5" />
+              )}
+              Restore
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground px-1">Archived (restore requires owner, admin, or manager)</span>
+          )
         ) : (
           <>
             {/* Primary: Email / already sent + resend */}
@@ -1703,6 +1738,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                           icon: <Archive className="w-3.5 h-3.5" />,
                           label: "Archive Invoice",
                           run: () => {
+                            if (!canArchiveRestore) return
                             setArchiveDialogOpen(true)
                             setMoreOpen(false)
                           },
@@ -1715,8 +1751,17 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                       <button
                         key={item.label}
                         type="button"
-                        disabled={"soon" in item && item.soon}
-                        title={"soon" in item && item.soon ? "Coming soon" : undefined}
+                        disabled={
+                          ("soon" in item && item.soon) ||
+                          (item.label === "Archive Invoice" && !canArchiveRestore)
+                        }
+                        title={
+                          "soon" in item && item.soon
+                            ? "Coming soon"
+                            : item.label === "Archive Invoice" && !canArchiveRestore
+                              ? "Owner, admin, or manager role required"
+                              : undefined
+                        }
                         onClick={() => {
                           if ("soon" in item && item.soon) return
                           if ("run" in item) item.run()
@@ -1744,7 +1789,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       </div>
 
       {/* ── Preview + Settings toggle bar ──────────────────────────────────── */}
-      {!editing && (
+      {!editing && !invoice.isArchived && (
         <div className="flex items-center gap-2 px-5 py-2 border-b border-border bg-background shrink-0">
           <button
             type="button"

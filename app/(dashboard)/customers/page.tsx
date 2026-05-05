@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { CustomerDrawer } from "@/components/drawers/customer-drawer"
 import { ContactActions } from "@/components/contact-actions"
+import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
 type SortDir = "asc" | "desc"
@@ -71,6 +72,7 @@ type Customer = {
   equipmentCount: number
   openWorkOrders: number
   joinedDate: string
+  isArchived?: boolean
 }
 
 type DbCustomerRow = {
@@ -78,6 +80,7 @@ type DbCustomerRow = {
   company_name: string
   status: "active" | "inactive"
   joined_at: string | null
+  is_archived: boolean
 }
 
 type DbContactRow = {
@@ -130,7 +133,14 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
                 <p className="text-xs text-muted-foreground mt-0.5">{customer.name}</p>
               </div>
             </div>
-            <StatusBadge status={customer.status} />
+            <div className="flex flex-wrap items-center gap-1 justify-end">
+              <StatusBadge status={customer.status} />
+              {customer.isArchived ? (
+                <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                  Archived
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-4 text-xs text-muted-foreground">
@@ -193,6 +203,7 @@ function CustomersPageInner() {
   useQuickAdd("new-customer", () => openNewCustomerModal())
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "Inactive">("all")
+  const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
   const [sortKey, setSortKey] = useState<SortKey>("company")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
@@ -221,12 +232,16 @@ function CustomersPageInner() {
 
       const orgId = activeOrgId
 
-      const { data, error } = await supabase
+      let custQuery = supabase
         .from("customers")
-        .select("id, company_name, status, joined_at")
+        .select("id, company_name, status, joined_at, is_archived")
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
         .order("created_at", { ascending: false })
+
+      if (archiveScope === "active") custQuery = custQuery.eq("is_archived", false)
+      else if (archiveScope === "archived") custQuery = custQuery.eq("is_archived", true)
+
+      const { data, error } = await custQuery
 
       if (error || !data) {
         if (active) setCustomers([])
@@ -303,6 +318,7 @@ function CustomersPageInner() {
           equipmentCount: 0,
           openWorkOrders: 0,
           joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
+          isArchived: row.is_archived,
         }
       })
 
@@ -314,12 +330,13 @@ function CustomersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
 
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedCustomerId(openId)
+      setArchiveScope("all")
       router.replace("/customers", { scroll: false })
     }
   }, [searchParams, router])
@@ -441,6 +458,17 @@ function CustomersPageInner() {
           </SelectContent>
         </Select>
 
+        <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
+          <SelectTrigger className="w-[132px]">
+            <SelectValue placeholder="Records" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all">All</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
           <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewCustomerModal()}>
@@ -525,7 +553,16 @@ function CustomersPageInner() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell><StatusBadge status={c.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusBadge status={c.status} />
+                        {c.isArchived ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                            Archived
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{c.locations.length}</TableCell>
                     <TableCell className="text-sm text-foreground font-medium">{c.equipmentCount}</TableCell>
                     <TableCell>

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 
+import { useWorkspacePortalContainer } from '@/hooks/use-workspace-portal-container'
 import { cn } from '@/lib/utils'
 
 function TooltipProvider({
@@ -40,8 +41,9 @@ function TooltipContent({
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+  const portalContainer = useWorkspacePortalContainer()
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={portalContainer}>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}

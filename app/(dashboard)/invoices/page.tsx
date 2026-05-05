@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useInvoices } from "@/lib/quote-invoice-store"
+import { useInvoices, type RecordArchiveVisibility } from "@/lib/quote-invoice-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
@@ -118,7 +118,14 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function InvoicesPageInner() {
-  const { invoices, loading, error, refreshInvoices } = useInvoices()
+  const {
+    invoices,
+    loading,
+    error,
+    refreshInvoices,
+    invoicesListVisibility,
+    setInvoicesListVisibility,
+  } = useInvoices()
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const [newModalOpen, setNewModalOpen] = useState(false)
@@ -142,14 +149,15 @@ function InvoicesPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Auto-open drawer from ?open= query param
+  // Auto-open drawer from ?open= query param (include archived rows so the drawer resolves)
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedInvoiceId(openId)
+      setInvoicesListVisibility("all")
       router.replace("/invoices", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, setInvoicesListVisibility])
 
   useEffect(() => {
     const action = searchParams.get("action")
@@ -172,6 +180,8 @@ function InvoicesPageInner() {
       setStatusFilter(s as InvoiceStatus)
     }
   }, [searchParams])
+
+  const invoicesForStats = useMemo(() => invoices.filter((i) => !i.isArchived), [invoices])
 
   const filtered = useMemo(() => {
     let list = [...invoices]
@@ -229,13 +239,13 @@ function InvoicesPageInner() {
         </div>
       )}
 
+      <InvoiceStatCards invoices={invoicesForStats} />
+
       {loading && invoices.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
           Loading invoices…
         </div>
-      ) : (
-        <InvoiceStatCards invoices={invoices} />
-      )}
+      ) : null}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -259,6 +269,20 @@ function InvoicesPageInner() {
             {ALL_STATUSES.map(s => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={invoicesListVisibility}
+          onValueChange={(v) => setInvoicesListVisibility(v as RecordArchiveVisibility)}
+        >
+          <SelectTrigger className="w-[132px]">
+            <SelectValue placeholder="Records" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
 
@@ -310,10 +334,17 @@ function InvoicesPageInner() {
                     <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{invoiceDisplayId(inv)}</p>
                     <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{inv.customerName}</p>
                   </div>
-                  <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
-                    <StatusIcon className="w-3 h-3" />
-                    {inv.status}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1 justify-end">
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
+                      <StatusIcon className="w-3 h-3" />
+                      {inv.status}
+                    </Badge>
+                    {inv.isArchived ? (
+                      <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                        Archived
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -424,7 +455,16 @@ function InvoicesPageInner() {
                       )}
                     </TableCell>
                     <TableCell className="text-sm font-semibold text-foreground ds-tabular">{fmtCurrency(inv.amount)}</TableCell>
-                    <TableCell><StatusBadge status={inv.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusBadge status={inv.status} />
+                        {inv.isArchived ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                            Archived
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground ds-tabular">{fmtDate(inv.issueDate)}</TableCell>
                     <TableCell className={cn(
                       "text-xs ds-tabular",

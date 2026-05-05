@@ -4,7 +4,7 @@ const VALID = new Set<string>(["solo", "core", "growth", "scale"])
 
 /**
  * Map DB or client plan strings to a valid {@link PlanId} for display and `getPlan`.
- * Legacy `starter` → `solo` (default trial / pre-Stripe tier).
+ * Legacy DB `plan_id` `starter` → `solo` (same product tier; UI label "Solo").
  */
 export function normalizePlanIdForRead(raw: string): PlanId {
   const t = raw.trim().toLowerCase()

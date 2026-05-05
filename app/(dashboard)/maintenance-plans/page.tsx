@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useMaintenancePlans } from "@/lib/maintenance-store"
+import { useMaintenancePlans, type RecordArchiveVisibility } from "@/lib/maintenance-store"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -68,6 +68,7 @@ import {
   MoreHorizontal,
   Archive,
   ClipboardList,
+  RotateCcw,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -192,6 +193,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
     notificationLog,
     organizationId,
     archivePlan,
+    restorePlan,
     deletePlan,
     refreshPlans,
   } = useMaintenancePlans()
@@ -414,6 +416,18 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
     onClose()
   }
 
+  async function handleRestorePlan() {
+    setActionBusy(true)
+    const res = await restorePlan(plan.id)
+    setActionBusy(false)
+    if (res.error) {
+      setDetailError(res.error)
+      return
+    }
+    toast({ title: "Plan restored", description: plan.name })
+    void refreshPlans({ silent: true })
+  }
+
   async function handleConfirmDelete() {
     console.info("[Equipify] PlanDetailSheet confirm → Delete", { planId: plan.id })
     setActionBusy(true)
@@ -452,6 +466,11 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-mono text-muted-foreground">{plan.id}</span>
               <StatusBadge status={plan.status} />
+              {plan.isArchived ? (
+                <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                  Archived
+                </Badge>
+              ) : null}
               {plan.autoCreateWorkOrder && (
                 <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
                   <Zap className="w-3 h-3" /> Auto-WO
@@ -469,70 +488,95 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
             aria-label="Plan actions"
             className="relative z-10 flex flex-wrap items-center justify-end gap-1.5 shrink-0 pointer-events-auto"
           >
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="gap-1.5 h-8 text-xs cursor-pointer"
-              onClick={() => setEditDialogOpen(true)}
-            >
-              <Pencil className="w-3.5 h-3.5" /> Edit
-            </Button>
-            <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs cursor-pointer" onClick={() => void handlePauseResumeSheet()}>
-              {plan.status === "Active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              {plan.status === "Active" ? "Pause" : "Resume"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="gap-1.5 h-8 text-xs cursor-pointer"
-              disabled={headerWoBusy || !organizationId || !planHasEquipment}
-              onClick={() => void handleHeaderCreateWo()}
-            >
-              {headerWoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-              Create WO
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            {plan.isArchived ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="gap-1.5 h-8 text-xs cursor-pointer"
+                  disabled={actionBusy}
+                  onClick={() => void handleRestorePlan()}
+                >
+                  {actionBusy ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  )}
+                  Restore plan
+                </Button>
+                <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} aria-label="Close">
+                  <X className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8 w-8 p-0 cursor-pointer"
-                  aria-label="More actions"
-                  onPointerDown={() =>
-                    console.info("[Equipify] PlanDetailSheet pointer → More menu trigger", { planId: plan.id })
-                  }
+                  className="gap-1.5 h-8 text-xs cursor-pointer"
+                  onClick={() => setEditDialogOpen(true)}
                 >
-                  <MoreHorizontal className="w-4 h-4" />
+                  <Pencil className="w-3.5 h-3.5" /> Edit
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  className="gap-2 cursor-pointer"
-                  onSelect={() => {
-                    console.info("[Equipify] PlanDetailSheet select → Archive plan", { planId: plan.id })
-                    setArchiveOpen(true)
-                  }}
+                <Button type="button" size="sm" variant="outline" className="gap-1.5 h-8 text-xs cursor-pointer" onClick={() => void handlePauseResumeSheet()}>
+                  {plan.status === "Active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  {plan.status === "Active" ? "Pause" : "Resume"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-8 text-xs cursor-pointer"
+                  disabled={headerWoBusy || !organizationId || !planHasEquipment}
+                  onClick={() => void handleHeaderCreateWo()}
                 >
-                  <Archive className="w-4 h-4" /> Archive plan
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                  onSelect={() => {
-                    console.info("[Equipify] PlanDetailSheet select → Delete plan", { planId: plan.id })
-                    setDeleteOpen(true)
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" /> Delete plan
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} aria-label="Close">
-              <X className="w-4 h-4" />
-            </Button>
+                  {headerWoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                  Create WO
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0 cursor-pointer"
+                      aria-label="More actions"
+                      onPointerDown={() =>
+                        console.info("[Equipify] PlanDetailSheet pointer → More menu trigger", { planId: plan.id })
+                      }
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      className="gap-2 cursor-pointer"
+                      onSelect={() => {
+                        console.info("[Equipify] PlanDetailSheet select → Archive plan", { planId: plan.id })
+                        setArchiveOpen(true)
+                      }}
+                    >
+                      <Archive className="w-4 h-4" /> Archive plan
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                      onSelect={() => {
+                        console.info("[Equipify] PlanDetailSheet select → Delete plan", { planId: plan.id })
+                        setDeleteOpen(true)
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" /> Delete plan
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose} aria-label="Close">
+                  <X className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1027,7 +1071,13 @@ function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => voi
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function MaintenancePlansPageInner() {
-  const { plans, loading, error } = useMaintenancePlans()
+  const {
+    plans,
+    loading,
+    error,
+    plansListVisibility,
+    setPlansListVisibility,
+  } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
@@ -1074,16 +1124,17 @@ function MaintenancePlansPageInner() {
     }
   }, [searchParams, router, standardCreateEligibility, maintenancePlansFeatureAllowed])
 
-  // Auto-open drawer from ?open= query param
+  // Auto-open drawer from ?open= query param (include archived plans)
   useEffect(() => {
     const openId = searchParams.get("open")
     if (!openId || loading) return
+    setPlansListVisibility("all")
     const match = plans.find((p) => p.id === openId)
     if (match) {
       setSelectedPlan(match)
       router.replace("/maintenance-plans", { scroll: false })
     }
-  }, [searchParams, plans, router, loading])
+  }, [searchParams, plans, router, loading, setPlansListVisibility])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -1095,13 +1146,15 @@ function MaintenancePlansPageInner() {
     })
   }, [plans, search, statusFilter, intervalFilter])
 
+  const plansForStats = useMemo(() => plans.filter((p) => !p.isArchived), [plans])
+
   const stats = useMemo(() => {
-    const active   = plans.filter((p) => p.status === "Active").length
-    const due7     = plans.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 7).length
-    const due30    = plans.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 30).length
-    const autoWo   = plans.filter((p) => p.autoCreateWorkOrder).length
+    const active   = plansForStats.filter((p) => p.status === "Active").length
+    const due7     = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 7).length
+    const due30    = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 30).length
+    const autoWo   = plansForStats.filter((p) => p.autoCreateWorkOrder).length
     return { active, due7, due30, autoWo }
-  }, [plans])
+  }, [plansForStats])
 
   const initialLoading = loading && plans.length === 0
   const listEmpty = !loading && plans.length === 0
@@ -1178,6 +1231,19 @@ function MaintenancePlansPageInner() {
           <SelectContent>
             <SelectItem value="All">All Intervals</SelectItem>
             {(["Annual", "Semi-Annual", "Quarterly", "Monthly", "Custom"] as PlanInterval[]).map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select
+          value={plansListVisibility}
+          onValueChange={(v) => setPlansListVisibility(v as RecordArchiveVisibility)}
+        >
+          <SelectTrigger className="h-9 w-[132px] text-sm">
+            <SelectValue placeholder="Records" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 ml-auto shrink-0">

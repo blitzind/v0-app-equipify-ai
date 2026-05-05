@@ -19,17 +19,26 @@ import {
   fetchQuotesForOrganization,
   insertOrgInvoice,
   insertOrgQuote,
+  restoreOrgInvoice,
+  restoreOrgQuote,
   updateOrgInvoice,
   updateOrgQuote,
+  type RecordArchiveVisibility,
 } from "@/lib/org-quotes-invoices/repository"
 import type { QuoteStatus, InvoiceStatus } from "@/lib/mock-data"
 import type { LineItemJson } from "@/lib/org-quotes-invoices/map"
+
+export type { RecordArchiveVisibility }
 
 interface QuoteInvoiceContextValue {
   quotes: AdminQuote[]
   invoices: AdminInvoice[]
   loading: boolean
   error: string | null
+  quotesListVisibility: RecordArchiveVisibility
+  setQuotesListVisibility: (v: RecordArchiveVisibility) => void
+  invoicesListVisibility: RecordArchiveVisibility
+  setInvoicesListVisibility: (v: RecordArchiveVisibility) => void
   refreshQuotes: () => Promise<void>
   refreshInvoices: () => Promise<void>
   refreshAll: () => Promise<void>
@@ -48,7 +57,8 @@ interface QuoteInvoiceContextValue {
     sentAt: string | null
   }) => Promise<{ id?: string; error?: string }>
   updateQuote: (id: string, patch: Parameters<typeof updateOrgQuote>[3]) => Promise<{ error?: string }>
-  archiveQuote: (id: string) => Promise<{ error?: string }>
+  archiveQuote: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>
+  restoreQuote: (id: string) => Promise<{ error?: string }>
   addInvoiceFromPayload: (payload: {
     customerId: string
     equipmentId: string | null
@@ -66,7 +76,8 @@ interface QuoteInvoiceContextValue {
     internalNotes: string | null
   }) => Promise<{ id?: string; error?: string }>
   updateInvoice: (id: string, patch: Parameters<typeof updateOrgInvoice>[3]) => Promise<{ error?: string }>
-  archiveInvoice: (id: string) => Promise<{ error?: string }>
+  archiveInvoice: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>
+  restoreInvoice: (id: string) => Promise<{ error?: string }>
 }
 
 const QuoteInvoiceContext = createContext<QuoteInvoiceContextValue | null>(null)
@@ -77,30 +88,38 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
   const [invoices, setInvoices] = useState<AdminInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [quotesListVisibility, setQuotesListVisibility] = useState<RecordArchiveVisibility>("active")
+  const [invoicesListVisibility, setInvoicesListVisibility] = useState<RecordArchiveVisibility>("active")
 
-  const refreshQuotes = useCallback(async () => {
+  useEffect(() => {
+    setQuotesListVisibility("active")
+    setInvoicesListVisibility("active")
+  }, [activeOrg.organizationId])
+
+  const reloadLists = useCallback(async () => {
     if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
       setQuotes([])
-      return
-    }
-    const supabase = createBrowserSupabaseClient()
-    const { quotes: q, error: err } = await fetchQuotesForOrganization(supabase, activeOrg.organizationId)
-    setQuotes(q)
-    if (err) setError(err)
-  }, [activeOrg.status, activeOrg.organizationId])
-
-  const refreshInvoices = useCallback(async () => {
-    if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
       setInvoices([])
       return
     }
     const supabase = createBrowserSupabaseClient()
-    const { invoices: inv, error: err } = await fetchInvoicesForOrganization(supabase, activeOrg.organizationId)
-    setInvoices(inv)
-    if (err) setError(err)
-  }, [activeOrg.status, activeOrg.organizationId])
+    const orgId = activeOrg.organizationId
+    const [qRes, iRes] = await Promise.all([
+      fetchQuotesForOrganization(supabase, orgId, { visibility: quotesListVisibility }),
+      fetchInvoicesForOrganization(supabase, orgId, { visibility: invoicesListVisibility }),
+    ])
+    setQuotes(qRes.quotes)
+    setInvoices(iRes.invoices)
+    const errMsg = qRes.error ?? iRes.error ?? null
+    if (errMsg) setError(errMsg)
+  }, [
+    activeOrg.status,
+    activeOrg.organizationId,
+    quotesListVisibility,
+    invoicesListVisibility,
+  ])
 
-  const refreshAll = useCallback(async () => {
+  useEffect(() => {
     if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
       setQuotes([])
       setInvoices([])
@@ -112,24 +131,49 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
       )
       return
     }
+    let cancelled = false
     setLoading(true)
     setError(null)
-    const supabase = createBrowserSupabaseClient()
-    const orgId = activeOrg.organizationId
-    const [qRes, iRes] = await Promise.all([
-      fetchQuotesForOrganization(supabase, orgId),
-      fetchInvoicesForOrganization(supabase, orgId),
-    ])
-    setQuotes(qRes.quotes)
-    setInvoices(iRes.invoices)
-    const errMsg = qRes.error ?? iRes.error ?? null
-    setError(errMsg)
-    setLoading(false)
-  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length])
+    void (async () => {
+      await reloadLists()
+      if (!cancelled) setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, reloadLists])
 
-  useEffect(() => {
-    void refreshAll()
-  }, [refreshAll])
+  const refreshQuotes = useCallback(async () => {
+    if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setQuotes([])
+      return
+    }
+    const supabase = createBrowserSupabaseClient()
+    const { quotes: q, error: err } = await fetchQuotesForOrganization(supabase, activeOrg.organizationId, {
+      visibility: quotesListVisibility,
+    })
+    setQuotes(q)
+    if (err) setError(err)
+  }, [activeOrg.status, activeOrg.organizationId, quotesListVisibility])
+
+  const refreshInvoices = useCallback(async () => {
+    if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setInvoices([])
+      return
+    }
+    const supabase = createBrowserSupabaseClient()
+    const { invoices: inv, error: err } = await fetchInvoicesForOrganization(
+      supabase,
+      activeOrg.organizationId,
+      { visibility: invoicesListVisibility },
+    )
+    setInvoices(inv)
+    if (err) setError(err)
+  }, [activeOrg.status, activeOrg.organizationId, invoicesListVisibility])
+
+  const refreshAll = useCallback(async () => {
+    await reloadLists()
+  }, [reloadLists])
 
   const addQuoteFromPayload = useCallback(
     async (payload: Parameters<QuoteInvoiceContextValue["addQuoteFromPayload"]>[0]) => {
@@ -159,10 +203,21 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
   )
 
   const archiveQuoteCb = useCallback(
+    async (id: string, options?: { archiveReason?: string | null }) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const res = await archiveOrgQuote(supabase, activeOrg.organizationId, id, options)
+      if (!res.error) await refreshQuotes()
+      return res
+    },
+    [activeOrg.organizationId, refreshQuotes],
+  )
+
+  const restoreQuoteCb = useCallback(
     async (id: string) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
       const supabase = createBrowserSupabaseClient()
-      const res = await archiveOrgQuote(supabase, activeOrg.organizationId, id)
+      const res = await restoreOrgQuote(supabase, activeOrg.organizationId, id)
       if (!res.error) await refreshQuotes()
       return res
     },
@@ -197,10 +252,21 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
   )
 
   const archiveInvoiceCb = useCallback(
+    async (id: string, options?: { archiveReason?: string | null }) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const res = await archiveOrgInvoice(supabase, activeOrg.organizationId, id, options)
+      if (!res.error) await refreshInvoices()
+      return res
+    },
+    [activeOrg.organizationId, refreshInvoices],
+  )
+
+  const restoreInvoiceCb = useCallback(
     async (id: string) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
       const supabase = createBrowserSupabaseClient()
-      const res = await archiveOrgInvoice(supabase, activeOrg.organizationId, id)
+      const res = await restoreOrgInvoice(supabase, activeOrg.organizationId, id)
       if (!res.error) await refreshInvoices()
       return res
     },
@@ -212,15 +278,21 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
     invoices,
     loading,
     error,
+    quotesListVisibility,
+    setQuotesListVisibility,
+    invoicesListVisibility,
+    setInvoicesListVisibility,
     refreshQuotes,
     refreshInvoices,
     refreshAll,
     addQuoteFromPayload,
     updateQuote: updateQuoteCb,
     archiveQuote: archiveQuoteCb,
+    restoreQuote: restoreQuoteCb,
     addInvoiceFromPayload,
     updateInvoice: updateInvoiceCb,
     archiveInvoice: archiveInvoiceCb,
+    restoreInvoice: restoreInvoiceCb,
   }
 
   return <QuoteInvoiceContext.Provider value={value}>{children}</QuoteInvoiceContext.Provider>
@@ -233,10 +305,13 @@ export function useQuotes() {
     quotes: ctx.quotes,
     loading: ctx.loading,
     error: ctx.error,
+    quotesListVisibility: ctx.quotesListVisibility,
+    setQuotesListVisibility: ctx.setQuotesListVisibility,
     refreshQuotes: ctx.refreshQuotes,
     addQuoteFromPayload: ctx.addQuoteFromPayload,
     updateQuote: ctx.updateQuote,
     archiveQuote: ctx.archiveQuote,
+    restoreQuote: ctx.restoreQuote,
   }
 }
 
@@ -247,9 +322,12 @@ export function useInvoices() {
     invoices: ctx.invoices,
     loading: ctx.loading,
     error: ctx.error,
+    invoicesListVisibility: ctx.invoicesListVisibility,
+    setInvoicesListVisibility: ctx.setInvoicesListVisibility,
     refreshInvoices: ctx.refreshInvoices,
     addInvoiceFromPayload: ctx.addInvoiceFromPayload,
     updateInvoice: ctx.updateInvoice,
     archiveInvoice: ctx.archiveInvoice,
+    restoreInvoice: ctx.restoreInvoice,
   }
 }

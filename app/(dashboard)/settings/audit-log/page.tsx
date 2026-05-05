@@ -56,7 +56,7 @@ const AUDIT_EVENTS: AuditEvent[] = [
     actor: "Alex Johnson",
     actorRole: "Admin",
     action: "Upgraded plan",
-    target: "Starter → Growth (annual)",
+    target: "Solo → Growth (annual)",
     category: "billing",
     severity: "info",
     timestamp: "Apr 28, 2026 at 9:55 AM",

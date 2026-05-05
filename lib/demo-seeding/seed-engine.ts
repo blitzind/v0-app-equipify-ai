@@ -1,4 +1,7 @@
+import "server-only"
+
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { DEMO_INDUSTRY_PROFILES, normalizeIndustryKey, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
 
@@ -7,6 +10,11 @@ type SeedArgs = {
   organizationId: string
   ownerUserId: string
   industry: string | null | undefined
+  /**
+   * From Settings sample import: workspace must have zero non-sample rows and zero sample rows
+   * (reset clears samples). Onboarding leaves this false.
+   */
+  import?: boolean
 }
 
 type SeedResult = {
@@ -36,7 +44,31 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
     .select("id", { count: "exact", head: true })
     .eq("organization_id", args.organizationId)
   if (existingErr) throw new Error(existingErr.message)
-  if ((existingCustomers ?? 0) > 0) {
+
+  const { count: nonSampleCustomers, error: nonSampleErr } = await args.supabase
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", args.organizationId)
+    .eq("is_sample", false)
+  if (nonSampleErr) throw new Error(nonSampleErr.message)
+
+  const { count: sampleCustomers, error: sampleErr } = await args.supabase
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", args.organizationId)
+    .eq("is_sample", true)
+  if (sampleErr) throw new Error(sampleErr.message)
+
+  if (args.import) {
+    if ((nonSampleCustomers ?? 0) > 0) {
+      throw new Error(
+        "This workspace already has non-sample customer records. Sample import is only for empty workspaces.",
+      )
+    }
+    if ((sampleCustomers ?? 0) > 0) {
+      throw new Error("Sample rows are still present. Run “Reset sample data” before importing again.")
+    }
+  } else if ((existingCustomers ?? 0) > 0) {
     return { seeded: false, skipped: true, industry }
   }
 
@@ -53,6 +85,7 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
     status: "active",
     joined_at: new Date(Date.now() - (i + 1) * 86400000 * 17).toISOString().slice(0, 10),
     created_by: args.ownerUserId,
+    is_sample: true,
   }))
 
   const { data: customers, error: customerErr } = await args.supabase
@@ -111,6 +144,7 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
       location_label: pick(["Main Plant", "East Wing", "Service Bay", "Operations Floor"], i),
       notes: `${profile.demoCompanyName} seeded demo asset.`,
       created_by: args.ownerUserId,
+      is_sample: true,
     }
   })
 
@@ -160,6 +194,7 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
       },
       notes: `${profile.industry} demo work order.`,
       created_by: args.ownerUserId,
+      is_sample: true,
     }
   })
   const { error: woErr } = await args.supabase.from("work_orders").insert(workOrderRows)
@@ -191,6 +226,7 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
         { id: "seed-email-14", offsetDays: 14, channel: "email", target: "dispatch@equipify-demo.org" },
       ],
       created_by: args.ownerUserId,
+      is_sample: true,
     }
   })
   const { error: mpErr } = await args.supabase.from("maintenance_plans").insert(planRows)
@@ -202,6 +238,21 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
     industry,
     specialties: profile.technicianSpecialties,
   })
+
+  try {
+    const adminOrg = createServiceRoleSupabaseClient()
+    const { error: orgMetaErr } = await adminOrg
+      .from("organizations")
+      .update({ demo_seed_industry: industry, updated_at: new Date().toISOString() })
+      .eq("id", args.organizationId)
+    if (orgMetaErr) throw new Error(orgMetaErr.message)
+  } catch {
+    const { error: orgMetaErr } = await args.supabase
+      .from("organizations")
+      .update({ demo_seed_industry: industry, updated_at: new Date().toISOString() })
+      .eq("id", args.organizationId)
+    if (orgMetaErr) throw new Error(orgMetaErr.message)
+  }
 
   return {
     seeded: true,
@@ -250,13 +301,14 @@ async function seedTechnicianMembers(params: {
       {
         organization_id: params.organizationId,
         user_id: userId,
-        role: "technician",
+        role: "tech",
         status: "active",
         invited_by: params.ownerUserId,
         job_title: "Field Service Technician",
         region: pick(["Central", "North", "South", "East", "West"], i),
         skills: params.specialties,
         availability_status: "Available",
+        is_sample: true,
       },
       { onConflict: "organization_id,user_id" },
     )

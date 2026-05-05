@@ -108,6 +108,7 @@ type WoRow = {
   warranty_review_required?: boolean | null
   warranty_vendor_id?: string | null
   calibration_template_id?: string | null
+  is_archived?: boolean | null
 }
 
 export type WorkOrderPhotoGalleryItem = {
@@ -312,7 +313,6 @@ export async function loadWorkOrderDetailForOrg(
     .select(WO_DETAIL_SELECT_WITH_NUM)
     .eq("id", workOrderId)
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
     .maybeSingle()
 
   if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
@@ -321,7 +321,6 @@ export async function loadWorkOrderDetailForOrg(
       .select(WO_DETAIL_SELECT)
       .eq("id", workOrderId)
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
       .maybeSingle()
   }
 
@@ -540,6 +539,7 @@ export async function loadWorkOrderDetailForOrg(
     equipmentWarrantyActive,
     equipmentCode: eqRow?.equipment_code?.trim() || null,
     equipmentSerialNumber: eqRow?.serial_number?.trim() || null,
+    isArchived: Boolean(w.is_archived),
   }
 
   return {

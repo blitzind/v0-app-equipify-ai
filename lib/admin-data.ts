@@ -86,7 +86,7 @@ export const MRR_TREND = [
 ]
 
 export const PLAN_DISTRIBUTION = [
-  { plan: "Starter",    accounts: 3, color: "#f59e0b" },
+  { plan: "Solo",    accounts: 3, color: "#f59e0b" },
   { plan: "Growth",     accounts: 4, color: "#3b82f6" },
   { plan: "Enterprise", accounts: 2, color: "#8b5cf6" },
 ]

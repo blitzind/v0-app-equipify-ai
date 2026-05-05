@@ -38,6 +38,7 @@ import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equ
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -103,6 +104,7 @@ type CustomerDetail = {
   contacts: CustomerContact[]
   locations: CustomerLocation[]
   contracts: CustomerContract[]
+  isArchived: boolean
 }
 
 type CustomerPlanRow = {
@@ -338,6 +340,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -421,7 +424,7 @@ export default function CustomerDetailPage() {
 
       const { data: customerRow, error: customerError } = await supabase
         .from("customers")
-        .select("id, company_name, status, joined_at, notes")
+        .select("id, company_name, status, joined_at, notes, is_archived")
         .eq("id", id)
         .eq("organization_id", orgId)
         .single()
@@ -532,6 +535,7 @@ export default function CustomerDetailPage() {
           endDate: contract.end_date ?? new Date().toISOString().slice(0, 10),
           value: Math.floor((contract.value_cents ?? 0) / 100),
         })),
+        isArchived: Boolean((customerRow as { is_archived?: boolean }).is_archived),
       }
 
       if (active) {
@@ -860,11 +864,15 @@ export default function CustomerDetailPage() {
     setArchiving(true)
     try {
       const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       const { error } = await supabase
         .from("customers")
         .update({
           is_archived: true,
           archived_at: new Date().toISOString(),
+          archived_by: user?.id ?? null,
         })
         .eq("id", customer.id)
         .eq("organization_id", customer.organizationId)
@@ -875,6 +883,35 @@ export default function CustomerDetailPage() {
       }
 
       router.push("/customers")
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function handleRestoreCustomer() {
+    if (!customer) return
+
+    setActionError("")
+    setArchiving(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          is_archived: false,
+          archived_at: null,
+          archived_by: null,
+          archive_reason: null,
+        })
+        .eq("id", customer.id)
+        .eq("organization_id", customer.organizationId)
+
+      if (error) {
+        setActionError(error.message)
+        return
+      }
+
+      setCustomer((prev) => (prev ? { ...prev, isArchived: false } : prev))
     } finally {
       setArchiving(false)
     }
@@ -1179,6 +1216,11 @@ export default function CustomerDetailPage() {
                   >
                     {customer.status}
                   </Badge>
+                  {customer.isArchived ? (
+                    <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                      Archived
+                    </Badge>
+                  ) : null}
                   {metricsLoading && (
                     <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" /> Syncing metrics…
@@ -1188,52 +1230,70 @@ export default function CustomerDetailPage() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleArchiveCustomer} disabled={archiving}>
-                {archiving ? "Archiving..." : "Archive"}
-              </Button>
+              {!customer.isArchived ? (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  Edit
+                </Button>
+              ) : null}
+              {canArchiveRestore ? (
+                customer.isArchived ? (
+                  <Button variant="outline" size="sm" onClick={() => void handleRestoreCustomer()} disabled={archiving}>
+                    {archiving ? "Restoring..." : "Restore"}
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => void handleArchiveCustomer()} disabled={archiving}>
+                    {archiving ? "Archiving..." : "Archive"}
+                  </Button>
+                )
+              ) : null}
             </div>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
-                <Link
-                  href={`/equipment?action=new-equipment&customerId=${encodeURIComponent(customer.id)}`}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> New Equipment
-                </Link>
-              </Button>
-              <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
-                <Link
-                  href={`/work-orders?action=new-work-order&customerId=${encodeURIComponent(customer.id)}`}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <ClipboardList className="w-3.5 h-3.5" /> New Work Order
-                </Link>
-              </Button>
-              <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
-                <Link
-                  href={`/quotes?action=new-quote&customerId=${encodeURIComponent(customer.id)}`}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <FileText className="w-3.5 h-3.5" /> New Quote
-                </Link>
-              </Button>
-              <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
-                <Link
-                  href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <CalendarPlus className="w-3.5 h-3.5" /> New Maintenance Plan
-                </Link>
-              </Button>
+          {!customer.isArchived ? (
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
+                  <Link
+                    href={`/equipment?action=new-equipment&customerId=${encodeURIComponent(customer.id)}`}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Equipment
+                  </Link>
+                </Button>
+                <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
+                  <Link
+                    href={`/work-orders?action=new-work-order&customerId=${encodeURIComponent(customer.id)}`}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" /> New Work Order
+                  </Link>
+                </Button>
+                <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
+                  <Link
+                    href={`/quotes?action=new-quote&customerId=${encodeURIComponent(customer.id)}`}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> New Quote
+                  </Link>
+                </Button>
+                <Button size="sm" variant="secondary" className="gap-1.5 shadow-sm" asChild>
+                  <Link
+                    href={`/maintenance-plans?new=1&customerId=${encodeURIComponent(customer.id)}`}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <CalendarPlus className="w-3.5 h-3.5" /> New Maintenance Plan
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                This customer is archived. Restore the customer to create new equipment, work orders, quotes, or plans.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

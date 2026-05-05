@@ -27,6 +27,9 @@ import {
   serializeServicesForDb,
 } from "@/lib/maintenance-plans/db-map"
 import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
+import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
+
+export type { RecordArchiveVisibility }
 
 interface MaintenanceContextValue {
   plans: MaintenancePlan[]
@@ -39,8 +42,11 @@ interface MaintenanceContextValue {
   updatePlan: (id: string, payload: Partial<MaintenancePlan>) => Promise<{ error?: string }>
   setStatus: (id: string, status: PlanStatus) => Promise<{ error?: string }>
   updateRules: (id: string, rules: NotificationRule[]) => Promise<{ error?: string }>
+  plansListVisibility: RecordArchiveVisibility
+  setPlansListVisibility: (v: RecordArchiveVisibility) => void
   /** Soft-archive: hides plan from active lists (sets `is_archived`, `archived_at`). */
   archivePlan: (id: string) => Promise<{ error?: string }>
+  restorePlan: (id: string) => Promise<{ error?: string }>
   /** Soft-remove: archives and marks plan expired; disables auto work orders. */
   deletePlan: (id: string) => Promise<{ error?: string }>
   fireNotifications: (planId: string) => void
@@ -56,6 +62,11 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [plansListVisibility, setPlansListVisibility] = useState<RecordArchiveVisibility>("active")
+
+  useEffect(() => {
+    setPlansListVisibility("active")
+  }, [activeOrg.organizationId])
 
   const refreshPlans = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true
@@ -93,11 +104,13 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     const orgId = activeOrg.organizationId
     setOrganizationId(orgId)
 
-    const { plans: loaded, error: loadErr } = await loadMaintenancePlansForOrg(supabase, orgId)
+    const { plans: loaded, error: loadErr } = await loadMaintenancePlansForOrg(supabase, orgId, {
+      visibility: plansListVisibility,
+    })
     setPlans(loaded)
     setError(loadErr)
     if (!silent) setLoading(false)
-  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length])
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, plansListVisibility])
 
   useEffect(() => {
     void refreshPlans()
@@ -257,12 +270,38 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!organizationId) return { error: "No organization selected." }
       const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       const archivedAt = new Date().toISOString()
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
           is_archived: true,
           archived_at: archivedAt,
+          archived_by: user?.id ?? null,
+        })
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+
+      if (upError) return { error: upError.message }
+      await refreshPlans({ silent: true })
+      return {}
+    },
+    [organizationId, refreshPlans]
+  )
+
+  const restorePlan = useCallback(
+    async (id: string) => {
+      if (!organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const { error: upError } = await supabase
+        .from("maintenance_plans")
+        .update({
+          is_archived: false,
+          archived_at: null,
+          archived_by: null,
+          archive_reason: null,
         })
         .eq("id", id)
         .eq("organization_id", organizationId)
@@ -279,11 +318,15 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       if (!organizationId) return { error: "No organization selected." }
       const supabase = createBrowserSupabaseClient()
       const archivedAt = new Date().toISOString()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
           is_archived: true,
           archived_at: archivedAt,
+          archived_by: user?.id ?? null,
           status: "expired",
           auto_create_work_order: false,
         })
@@ -349,12 +392,15 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         organizationId,
+        plansListVisibility,
+        setPlansListVisibility,
         refreshPlans,
         createPlan,
         updatePlan,
         setStatus,
         updateRules,
         archivePlan,
+        restorePlan,
         deletePlan,
         fireNotifications,
         getById,

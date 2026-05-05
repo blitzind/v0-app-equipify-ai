@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useQuotes } from "@/lib/quote-invoice-store"
+import { useQuotes, type RecordArchiveVisibility } from "@/lib/quote-invoice-store"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
@@ -115,7 +115,14 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function QuotesPageInner() {
-  const { quotes, loading, error, refreshQuotes } = useQuotes()
+  const {
+    quotes,
+    loading,
+    error,
+    refreshQuotes,
+    quotesListVisibility,
+    setQuotesListVisibility,
+  } = useQuotes()
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const [newModalOpen, setNewModalOpen] = useState(false)
@@ -141,14 +148,15 @@ function QuotesPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Auto-open drawer from ?open= query param
+  // Auto-open drawer from ?open= query param (include archived rows so the drawer resolves the quote)
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedQuoteId(openId)
+      setQuotesListVisibility("all")
       router.replace("/quotes", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, setQuotesListVisibility])
 
   useEffect(() => {
     const action = searchParams.get("action")
@@ -165,6 +173,9 @@ function QuotesPageInner() {
       router.replace("/quotes", { scroll: false })
     }
   }, [searchParams, router, standardCreateEligibility])
+
+  /** Stat cards always exclude archived rows (even when browsing “All” or “Archived”). */
+  const quotesForStats = useMemo(() => quotes.filter((q) => !q.isArchived), [quotes])
 
   const filtered = useMemo(() => {
     let list = [...quotes]
@@ -225,13 +236,13 @@ function QuotesPageInner() {
         </div>
       )}
 
+      <QuoteStatCards quotes={quotesForStats} />
+
       {loading && quotes.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
           Loading quotes…
         </div>
-      ) : (
-        <QuoteStatCards quotes={quotes} />
-      )}
+      ) : null}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -255,6 +266,20 @@ function QuotesPageInner() {
             {ALL_STATUSES.map(s => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={quotesListVisibility}
+          onValueChange={(v) => setQuotesListVisibility(v as RecordArchiveVisibility)}
+        >
+          <SelectTrigger className="w-[132px]">
+            <SelectValue placeholder="Records" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
 
@@ -311,10 +336,17 @@ function QuotesPageInner() {
                     <p className="font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2">{quoteDisplayId(qt)}</p>
                     <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{qt.customerName}</p>
                   </div>
-                  <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
-                    <StatusIcon className="w-3 h-3" />
-                    {qt.status}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1 justify-end">
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
+                      <StatusIcon className="w-3 h-3" />
+                      {qt.status}
+                    </Badge>
+                    {qt.isArchived ? (
+                      <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                        Archived
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Building2 className="w-3.5 h-3.5 shrink-0" />
@@ -412,7 +444,16 @@ function QuotesPageInner() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{qt.equipmentName}</TableCell>
                     <TableCell className="text-sm font-semibold text-foreground ds-tabular">{fmtCurrency(qt.amount)}</TableCell>
-                    <TableCell><StatusBadge status={qt.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <StatusBadge status={qt.status} />
+                        {qt.isArchived ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                            Archived
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground ds-tabular">{fmtDate(qt.createdDate)}</TableCell>
                     <TableCell className={cn("text-xs ds-tabular", qt.status === "Expired" ? "text-destructive font-medium" : "text-muted-foreground")}>
                       {fmtDate(qt.expiresDate)}

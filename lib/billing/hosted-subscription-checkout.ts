@@ -177,7 +177,9 @@ export async function createHostedSubscriptionCheckout(params: {
     organizationId: orgId,
     organization_id: orgId,
     plan_id: params.planId,
+    planId: params.planId,
     billing_cycle: params.billingCycle,
+    billingCycle: params.billingCycle === "annual" ? "yearly" : "monthly",
     source: HOSTED_SOURCE,
   }
 
@@ -189,7 +191,9 @@ export async function createHostedSubscriptionCheckout(params: {
       organizationId: orgId,
       organization_id: orgId,
       plan_id: params.planId,
+      planId: params.planId,
       billing_cycle: params.billingCycle,
+      billingCycle: params.billingCycle === "annual" ? "yearly" : "monthly",
       source: HOSTED_SOURCE,
     },
   }

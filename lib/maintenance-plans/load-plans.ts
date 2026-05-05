@@ -1,18 +1,25 @@
 import type { MaintenancePlan } from "@/lib/mock-data"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { rowToMaintenancePlan, type MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 
 export async function loadMaintenancePlansForOrg(
   supabase: SupabaseClient,
-  organizationId: string
+  organizationId: string,
+  options?: { visibility?: RecordArchiveVisibility },
 ): Promise<{ plans: MaintenancePlan[]; error: string | null }> {
-  const { data: rows, error } = await supabase
+  const visibility = options?.visibility ?? "active"
+  let q = supabase
     .from("maintenance_plans")
     .select("*")
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
     .order("created_at", { ascending: false })
+
+  if (visibility === "active") q = q.eq("is_archived", false)
+  else if (visibility === "archived") q = q.eq("is_archived", true)
+
+  const { data: rows, error } = await q
 
   if (error) {
     return { plans: [], error: error.message }

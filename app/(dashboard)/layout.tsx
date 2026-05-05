@@ -17,6 +17,8 @@ import { CustomerProvider } from "@/lib/customer-store"
 import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
 import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
+import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
+import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
 
@@ -57,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <ActiveOrganizationProvider>
         <BillingAccessProvider>
         <TenantProvider>
+          <ArchivedDashboardGate />
           <TenantWorkspaceSync />
           <OrganizationSwitchOverlay />
           <WorkOrderProvider>
@@ -72,9 +75,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <BillingWarningBanner />
                           <div className="flex flex-1 min-h-0 overflow-hidden">
                             <AppSidebar />
-                            <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                            <DashboardWorkspaceShell>
                               <PageShell>{children}</PageShell>
-                            </div>
+                            </DashboardWorkspaceShell>
                           </div>
                         </div>
                       </SidebarContext.Provider>

@@ -23,9 +23,15 @@ function buildLogger(eventId: string, eventType: string): WebhookLogFn {
       eventId,
       eventType,
       message: payload.message,
+      ...(payload.organizationIdFound !== undefined && {
+        organizationIdFound: payload.organizationIdFound,
+      }),
       ...(payload.organizationId != null && { organizationId: payload.organizationId }),
       ...(payload.subscriptionId != null && { subscriptionId: payload.subscriptionId }),
       ...(payload.customerId != null && { customerId: payload.customerId }),
+      ...(payload.stripePriceId != null && { stripePriceId: payload.stripePriceId }),
+      ...(payload.mappedPlanId != null && { mappedPlanId: payload.mappedPlanId }),
+      ...(payload.mappedBillingCycle != null && { mappedBillingCycle: payload.mappedBillingCycle }),
     }
     console.info(JSON.stringify(line))
   }

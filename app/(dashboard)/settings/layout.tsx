@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   User, Building2, Users, CreditCard, Bell,
-  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe,
+  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database,
 } from "lucide-react"
 
 const NAV_ITEMS = [
   { label: "General",         href: "/settings/general",         icon: User },
   { label: "Workspace",       href: "/settings/workspace",       icon: Building2 },
+  { label: "Sample data",     href: "/settings/sample-data",    icon: Database },
   { label: "Team",            href: "/settings/team",            icon: Users },
   { label: "Permissions",     href: "/settings/permissions",     icon: Lock },
   { label: "Billing",         href: "/settings/billing",         icon: CreditCard },

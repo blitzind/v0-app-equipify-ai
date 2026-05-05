@@ -36,12 +36,15 @@ import {
   buildCompletedCertificatePdfHtml,
   listCalibrationTemplates,
   listCompletedCertificatesForOrg,
+  restoreCalibrationTemplate,
   upsertCalibrationTemplate,
   type CalibrationFieldType,
+  type CalibrationTemplateListVisibility,
   type CalibrationTemplate,
   type CalibrationTemplateField,
   type CompletedCertificateListItem,
 } from "@/lib/calibration-certificates"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import {
   downloadCertificateHtmlFile,
   printCertificatePdfHtml,
@@ -50,6 +53,13 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
@@ -191,6 +201,7 @@ export default function CertificatesPage() {
   const router = useRouter()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /** True after "+ New Template" / "+ Create Template" until save or cancel — distinct from "no selection" idle. */
@@ -211,6 +222,8 @@ export default function CertificatesPage() {
   const [completedLoading, setCompletedLoading] = useState(false)
   const [completedError, setCompletedError] = useState<string | null>(null)
   const [completedCertificatesSearchQuery, setCompletedCertificatesSearchQuery] = useState("")
+  const [templateListVisibility, setTemplateListVisibility] =
+    useState<CalibrationTemplateListVisibility>("active")
 
   const completedSearchTokens = useMemo(
     () => normalizeCertSearchTokens(completedCertificatesSearchQuery),
@@ -224,8 +237,8 @@ export default function CertificatesPage() {
   const fetchTemplates = useCallback(async () => {
     if (!organizationId) return []
     const supabase = createBrowserSupabaseClient()
-    return listCalibrationTemplates(supabase, organizationId)
-  }, [organizationId])
+    return listCalibrationTemplates(supabase, organizationId, templateListVisibility)
+  }, [organizationId, templateListVisibility])
 
   useEffect(() => {
     if (orgStatus !== "ready" || !organizationId) return
@@ -251,7 +264,7 @@ export default function CertificatesPage() {
     return () => {
       cancelled = true
     }
-  }, [orgStatus, organizationId, fetchTemplates])
+  }, [orgStatus, organizationId, fetchTemplates, templateListVisibility])
 
   const fetchCompletedCertificates = useCallback(async () => {
     if (!organizationId) return []
@@ -471,9 +484,17 @@ export default function CertificatesPage() {
     setSaving(true)
     setError(null)
     try {
+      if (selectedTemplate?.isArchived) {
+        toast({
+          variant: "destructive",
+          title: "Template is archived",
+          description: "Restore this template before saving changes.",
+        })
+        return
+      }
       const saved = await saveDraftState(draft)
       const supabase = createBrowserSupabaseClient()
-      const rows = await listCalibrationTemplates(supabase, organizationId!)
+      const rows = await listCalibrationTemplates(supabase, organizationId!, templateListVisibility)
       setTemplates(rows)
       setIsCreatingNew(false)
       setSelectedId(saved.id)
@@ -520,7 +541,7 @@ export default function CertificatesPage() {
         fields: importReview.fields,
       })
       const supabase = createBrowserSupabaseClient()
-      const rows = await listCalibrationTemplates(supabase, organizationId!)
+      const rows = await listCalibrationTemplates(supabase, organizationId!, templateListVisibility)
       setTemplates(rows)
       setIsCreatingNew(false)
       setSelectedId(saved.id)
@@ -565,11 +586,15 @@ export default function CertificatesPage() {
     if (!window.confirm(archiveMsg)) return
     const supabase = createBrowserSupabaseClient()
     try {
-      await archiveCalibrationTemplate(supabase, organizationId, selectedTemplate.id)
-      const next = templates.filter((t) => t.id !== selectedTemplate.id)
-      setTemplates(next)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      await archiveCalibrationTemplate(supabase, organizationId, selectedTemplate.id, user?.id ?? null)
+      const rows = await listCalibrationTemplates(supabase, organizationId, templateListVisibility)
+      setTemplates(rows)
+      const next = rows.filter((t) => t.id !== selectedTemplate.id)
       if (next.length > 0) {
-        const first = next[0]
+        const first = next[0]!
         const d = copyTemplateToDraft(first)
         setIsCreatingNew(false)
         setSelectedId(first.id)
@@ -581,6 +606,31 @@ export default function CertificatesPage() {
         setDraft(emptyDraft())
         setBaselineDraft(emptyDraft())
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleRestoreCurrent() {
+    if (!selectedTemplate || !organizationId) return
+    if (!window.confirm(`Restore template "${selectedTemplate.name}" to active lists?`)) return
+    const supabase = createBrowserSupabaseClient()
+    try {
+      await restoreCalibrationTemplate(supabase, organizationId, selectedTemplate.id)
+      const nextVisibility: CalibrationTemplateListVisibility =
+        templateListVisibility === "archived" ? "active" : templateListVisibility
+      if (nextVisibility !== templateListVisibility) {
+        setTemplateListVisibility(nextVisibility)
+      }
+      const rows = await listCalibrationTemplates(supabase, organizationId, nextVisibility)
+      setTemplates(rows)
+      const restored = rows.find((t) => t.id === selectedTemplate.id)
+      if (restored) {
+        const d = copyTemplateToDraft(restored)
+        setDraft(d)
+        setBaselineDraft(cloneDraft(d))
+      }
+      toast({ title: "Template restored", description: selectedTemplate.name })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -674,18 +724,33 @@ export default function CertificatesPage() {
         <TabsContent value="templates" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
             <Card className="p-0 overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/20">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Templates</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={beginNewTemplate}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New
-                </Button>
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/20 flex-wrap">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground shrink-0">Templates</p>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Select
+                    value={templateListVisibility}
+                    onValueChange={(v) => setTemplateListVisibility(v as CalibrationTemplateListVisibility)}
+                  >
+                    <SelectTrigger className="h-8 w-[124px] text-xs">
+                      <SelectValue placeholder="View" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs gap-1.5"
+                    onClick={beginNewTemplate}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    New
+                  </Button>
+                </div>
               </div>
               <div className="max-h-[70vh] overflow-y-auto">
                 {loading ? (
@@ -711,7 +776,14 @@ export default function CertificatesPage() {
                             : "border-l-[3px] border-l-transparent hover:bg-muted/40 pl-3",
                         )}
                       >
-                        <p className={cn("font-medium", isSelected ? "text-primary" : "text-foreground")}>{t.name}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className={cn("font-medium", isSelected ? "text-primary" : "text-foreground")}>{t.name}</p>
+                          {t.isArchived ? (
+                            <Badge variant="outline" className="text-[9px] font-semibold px-1 py-0 h-5 bg-muted text-muted-foreground border-border">
+                              Archived
+                            </Badge>
+                          ) : null}
+                        </div>
                         {metaParts.length > 0 ? (
                           <p className="text-[11px] text-muted-foreground mt-0.5">{metaParts.join(" · ")}</p>
                         ) : null}
@@ -972,20 +1044,32 @@ export default function CertificatesPage() {
                       size="sm"
                       className="h-9 text-xs min-w-[8rem]"
                       onClick={() => void handleSave()}
-                      disabled={saving}
+                      disabled={saving || Boolean(selectedTemplate?.isArchived)}
                     >
                       {saving ? "Saving…" : panelMode === "create" ? "Create Template" : "Save Changes"}
                     </Button>
-                    {panelMode === "edit" && selectedTemplate ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-9 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                        onClick={() => void handleArchiveCurrent()}
-                      >
-                        Archive Template
-                      </Button>
+                    {panelMode === "edit" && selectedTemplate && canArchiveRestore ? (
+                      selectedTemplate.isArchived ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                          onClick={() => void handleRestoreCurrent()}
+                        >
+                          Restore Template
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-9 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => void handleArchiveCurrent()}
+                        >
+                          Archive Template
+                        </Button>
+                      )
                     ) : null}
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import { createHostedSubscriptionCheckout } from "@/lib/billing/hosted-subscript
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import { isOrganizationArchived } from "@/lib/organizations/archive-status"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -48,6 +49,9 @@ export async function POST(request: Request) {
 
   const planId = normalizePlanIdForRead(String(body.planId)) as PlanId
 
+  const authEmail = user.email?.trim()
+  const userIsPlatformAdmin = authEmail ? isPlatformAdminEmail(authEmail) : false
+
   let organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
 
   if (!organizationId) {
@@ -57,9 +61,7 @@ export async function POST(request: Request) {
     }
     organizationId = resolved.organizationId
   } else {
-    const email = user.email?.trim()
-    const isAdmin = email ? isPlatformAdminEmail(email) : false
-    if (!isAdmin) {
+    if (!userIsPlatformAdmin) {
       const { data: member } = await supabase
         .from("organization_members")
         .select("id")
@@ -74,6 +76,16 @@ export async function POST(request: Request) {
         )
       }
     }
+  }
+
+  if (!userIsPlatformAdmin && (await isOrganizationArchived(supabase, organizationId))) {
+    return NextResponse.json(
+      {
+        error: "organization_archived",
+        message: "This workspace has been archived. Contact support or restore it from Platform Admin.",
+      },
+      { status: 403 },
+    )
   }
 
   const origin =

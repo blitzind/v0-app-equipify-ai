@@ -27,7 +27,7 @@ export function stripePriceIdForPlan(planId: PlanId, billingCycle: "monthly" | "
 
 /**
  * Infer Equipify plan + billing cycle from a Stripe Price ID by matching env-configured
- * or catalog IDs. Returns nulls when the price is unknown (webhook should rely on metadata).
+ * or catalog IDs (`PLAN_PRICE_IDS` / `PLANS`). Returns nulls when the price is unknown (webhook may use metadata).
  */
 export function resolvePlanAndBillingCycleFromStripePriceId(
   priceId: string | null | undefined,
@@ -45,4 +45,19 @@ export function resolvePlanAndBillingCycleFromStripePriceId(
   }
 
   return { planId: null, billingCycle: null }
+}
+
+/** Public helper: maps Stripe Price ID → solo/core/growth/scale + monthly/yearly (yearly = annual billing in DB). */
+export type PlanFromStripePriceId = {
+  planId: PlanId
+  billingCycle: "monthly" | "yearly"
+}
+
+export function getPlanFromStripePriceId(priceId: string | null | undefined): PlanFromStripePriceId | null {
+  const r = resolvePlanAndBillingCycleFromStripePriceId(priceId)
+  if (!r.planId || !r.billingCycle) return null
+  return {
+    planId: r.planId,
+    billingCycle: r.billingCycle === "annual" ? "yearly" : "monthly",
+  }
 }

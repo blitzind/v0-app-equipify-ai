@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   Building2, Users, DollarSign, TrendingUp, TrendingDown, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
-  ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw,
+  ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw, RotateCcw,
   ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket,
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import { applyDiscountToMrrCents, resolveListMrrCents } from "@/lib/billing/discount-pricing"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,24 +58,7 @@ function billingStatusLabel(raw: string | null | undefined): string {
 
 /** Plan pill from `organization_subscriptions.plan_id` only (no demo / tier fallback). */
 function adminPlanPillFromAccount(account: PlatformAccount): string {
-  const planId = account.planId
-  if (planId == null || String(planId).trim() === "") return "—"
-  const p = String(planId).trim().toLowerCase()
-  switch (p) {
-    case "starter":
-    case "solo":
-      return "Starter"
-    case "core":
-      return "Core"
-    case "growth":
-      return "Growth"
-    case "scale":
-      return "Scale"
-    case "enterprise":
-      return "Enterprise"
-    default:
-      return String(planId).trim()
-  }
+  return planTierLabelFromDbPlanId(account.planId)
 }
 
 /** Status pill from org archive + raw `subscriptionStatus` only. */
@@ -247,7 +231,7 @@ function planColor(plan: string) {
       return { color: "#1d4ed8", bg: "#eff6ff" }
     case "Core":
       return { color: "#0f766e", bg: "#ccfbf1" }
-    case "Starter":
+    case "Solo":
       return { color: "#b45309", bg: "#fffbeb" }
     case "—":
     case "No plan":
@@ -304,6 +288,7 @@ function AccountsTab({
   )
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null)
+  const [reactivateBusyId, setReactivateBusyId] = useState<string | null>(null)
   const [convertBusyId, setConvertBusyId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PlatformAccount | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
@@ -416,6 +401,31 @@ function AccountsTab({
     })
     return rows
   }, [filtered, trialSortUrgentFirst])
+
+  async function reactivateAccount(account: PlatformAccount) {
+    if (!account.organizationArchived) return
+    if (
+      !window.confirm(
+        "Reactivate this account? Users will regain access to this workspace.",
+      )
+    ) {
+      return
+    }
+    setReactivateBusyId(account.id)
+    try {
+      const res = await fetch(`/api/platform/accounts/${account.id}/reactivate`, {
+        method: "PATCH",
+      })
+      const data = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        window.alert(typeof data.message === "string" ? data.message : "Could not reactivate account.")
+        return
+      }
+      await onRefresh()
+    } finally {
+      setReactivateBusyId(null)
+    }
+  }
 
   async function archiveAccount(account: PlatformAccount) {
     if (
@@ -761,7 +771,7 @@ function AccountsTab({
               className="input-base h-9 w-full text-sm"
             >
               <option value="All">All Plans</option>
-              <option value="Starter">Starter</option>
+              <option value="Solo">Solo</option>
               <option value="Core">Core</option>
               <option value="Growth">Growth</option>
               <option value="Scale">Scale</option>
@@ -818,7 +828,6 @@ function AccountsTab({
                 const sc = statusColor(pillStatus)
                 const pc = planColor(pillPlan)
                 const archived = Boolean(account.organizationArchived)
-                const loginDisabled = archived
                 return (
                   <tr
                     key={account.id}
@@ -892,9 +901,13 @@ function AccountsTab({
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs gap-1"
-                          disabled={loginDisabled}
-                          title={loginDisabled ? "Cannot log in as an archived workspace" : undefined}
-                          onClick={() => !loginDisabled && onImpersonate(account)}
+                          disabled={archived}
+                          title={
+                            archived
+                              ? "Reactivate this account before using Login as."
+                              : undefined
+                          }
+                          onClick={() => onImpersonate(account)}
                         >
                           <LogIn size={11} /> Login as
                         </Button>
@@ -913,15 +926,36 @@ function AccountsTab({
                           >
                             <button
                               type="button"
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
-                              disabled={loginDisabled}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
+                              disabled={archived}
+                              title={
+                                archived ? "Reactivate this account before impersonation." : undefined
+                              }
                               onClick={() => {
-                                if (!loginDisabled) onImpersonate(account)
+                                onImpersonate(account)
                                 setMenuOpen(null)
                               }}
                             >
                               <LogIn size={13} className="text-muted-foreground" /> Impersonate
                             </button>
+                            {archived && (
+                              <button
+                                type="button"
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left text-emerald-700 dark:text-emerald-400 disabled:opacity-50"
+                                disabled={reactivateBusyId === account.id}
+                                onClick={() => {
+                                  void reactivateAccount(account)
+                                  setMenuOpen(null)
+                                }}
+                              >
+                                {reactivateBusyId === account.id ? (
+                                  <Loader2 size={13} className="animate-spin text-muted-foreground" />
+                                ) : (
+                                  <RotateCcw size={13} className="text-muted-foreground" />
+                                )}
+                                Reactivate account
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
@@ -930,7 +964,7 @@ function AccountsTab({
                               <CreditCard size={13} className="text-muted-foreground" /> Change plan
                             </button>
                             {account.subscriptionStatus?.trim().toLowerCase() === "trialing" &&
-                              !loginDisabled && (
+                              !archived && (
                               <button
                                 type="button"
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -1812,7 +1846,6 @@ export default function PlatformAdminPage() {
   }, [loadAccounts])
 
   function handleImpersonate(account: PlatformAccount) {
-    if (account.organizationArchived) return
     startImpersonation(account)
     router.push("/")
   }

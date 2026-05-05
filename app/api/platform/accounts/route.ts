@@ -4,31 +4,11 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
 import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
+import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
 import type { AccountDisplayStatus, PlatformAccount } from "@/lib/admin-data"
 
 function normalizeOrgKey(id: string): string {
   return String(id).trim().toLowerCase()
-}
-
-/** Display label from `organization_subscriptions.plan_id` (DB is source of truth). */
-function mapPlanIdToDisplay(planId: string | null | undefined): string {
-  if (planId == null || String(planId).trim() === "") return "—"
-  const p = String(planId).trim().toLowerCase()
-  switch (p) {
-    case "starter":
-    case "solo":
-      return "Starter"
-    case "core":
-      return "Core"
-    case "growth":
-      return "Growth"
-    case "scale":
-      return "Scale"
-    case "enterprise":
-      return "Enterprise"
-    default:
-      return String(planId).trim()
-  }
 }
 
 /** Display pill from org archive flag + raw `organization_subscriptions.status`. */
@@ -161,7 +141,7 @@ export async function GET() {
 
     const subscriptionStatus = sub?.status ?? null
 
-    const displayPlan = orgArchived && !sub ? "—" : mapPlanIdToDisplay(sub?.plan_id ?? null)
+    const displayPlan = orgArchived && !sub ? "—" : planTierLabelFromDbPlanId(sub?.plan_id ?? null)
     const displayStatus = mapSubscriptionStatusToDisplay(orgArchived, sub?.status ?? null)
 
     return {

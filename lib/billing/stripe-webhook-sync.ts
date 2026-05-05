@@ -5,8 +5,11 @@ import type Stripe from "stripe"
 import { stripe } from "@/lib/stripe"
 import type { PlanId } from "@/lib/plans"
 import { normalizePlanIdForPersistence } from "@/lib/billing/plan-id"
-import { resolvePlanAndBillingCycleFromStripePriceId } from "@/lib/billing/stripe-price-map"
-import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
+import {
+  getPlanFromStripePriceId,
+  resolvePlanAndBillingCycleFromStripePriceId,
+} from "@/lib/billing/stripe-price-map"
+import { getOrganizationSubscription, normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -122,6 +125,85 @@ export function buildPatchFromStripeSubscription(
   return patch
 }
 
+function normalizeOrgSubscriptionPatch(patch: OrgSubPatch): Record<string, string | boolean | null> {
+  const clean: Record<string, string | boolean | null> = {}
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue
+    if (k === "stripe_customer_id" || k === "stripe_subscription_id" || k === "stripe_price_id") {
+      const s = v === "" || v == null ? null : normalizeStripeIdColumn(String(v))
+      clean[k] = s
+      continue
+    }
+    clean[k] = v as string | boolean | null
+  }
+  return clean
+}
+
+/**
+ * Update existing row, or insert one row per organization_id if missing (checkout race / first sync).
+ * Does not create duplicate rows — unique on organization_id.
+ */
+export async function upsertOrganizationSubscriptionPatch(
+  admin: SupabaseClient,
+  organizationId: string,
+  patch: OrgSubPatch,
+): Promise<{ inserted: boolean }> {
+  const existing = await getOrganizationSubscription(admin, organizationId)
+  const clean = normalizeOrgSubscriptionPatch(patch)
+
+  if (existing) {
+    const { error } = await admin
+      .from("organization_subscriptions")
+      .update(clean)
+      .eq("organization_id", organizationId)
+    if (error) throw new Error(error.message)
+    return { inserted: false }
+  }
+
+  const insertRow: Record<string, unknown> = {
+    organization_id: organizationId,
+    stripe_customer_id: clean.stripe_customer_id ?? null,
+    stripe_subscription_id: clean.stripe_subscription_id ?? null,
+    stripe_price_id: clean.stripe_price_id ?? null,
+    plan_id:
+      typeof clean.plan_id === "string" && String(clean.plan_id).trim() !== ""
+        ? clean.plan_id
+        : "solo",
+    billing_cycle:
+      typeof clean.billing_cycle === "string" && (clean.billing_cycle === "monthly" || clean.billing_cycle === "annual")
+        ? clean.billing_cycle
+        : "monthly",
+    status:
+      typeof clean.status === "string" && String(clean.status).trim() !== ""
+        ? clean.status
+        : "active",
+    trial_starts_at: clean.trial_starts_at ?? null,
+    trial_ends_at: clean.trial_ends_at ?? null,
+    current_period_start: clean.current_period_start ?? null,
+    current_period_end: clean.current_period_end ?? null,
+    cancel_at_period_end: typeof clean.cancel_at_period_end === "boolean" ? clean.cancel_at_period_end : false,
+    canceled_at: clean.canceled_at ?? null,
+    intended_plan_id: clean.intended_plan_id !== undefined ? clean.intended_plan_id : null,
+    payment_failed_at: clean.payment_failed_at ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error } = await admin.from("organization_subscriptions").insert(insertRow)
+  if (error) throw new Error(error.message)
+  return { inserted: true }
+}
+
+function resolveOrganizationIdFromStripeSubscription(sub: Stripe.Subscription): string | null {
+  const md = sub.metadata ?? {}
+  const metaSnake =
+    typeof md.organization_id === "string" ? normalizeStripeIdColumn(md.organization_id.trim()) : null
+  const metaCamel =
+    typeof md.organizationId === "string" ? normalizeStripeIdColumn(md.organizationId.trim()) : null
+  if (isValidOrganizationUuid(metaSnake)) return metaSnake
+  if (isValidOrganizationUuid(metaCamel)) return metaCamel
+  return null
+}
+
 async function findOrgSubscriptionBySubscriptionOrCustomer(
   admin: SupabaseClient,
   subscriptionId: string | null,
@@ -155,17 +237,7 @@ export async function updateOrganizationSubscriptionByOrgId(
   organizationId: string,
   patch: OrgSubPatch,
 ): Promise<void> {
-  const clean: Record<string, string | boolean | null> = {}
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === undefined) continue
-    if (k === "stripe_customer_id" || k === "stripe_subscription_id" || k === "stripe_price_id") {
-      const s = v === "" || v == null ? null : normalizeStripeIdColumn(String(v))
-      clean[k] = s
-      continue
-    }
-    clean[k] = v as string | boolean | null
-  }
-
+  const clean = normalizeOrgSubscriptionPatch(patch)
   const { error } = await admin
     .from("organization_subscriptions")
     .update(clean)
@@ -217,24 +289,40 @@ function resolveOrganizationIdFromCheckout(session: Stripe.Checkout.Session): st
   return null
 }
 
+function billingCycleFromCheckoutMetadata(m: Stripe.Metadata): "monthly" | "annual" | null {
+  const snake = typeof m.billing_cycle === "string" ? m.billing_cycle.trim().toLowerCase() : ""
+  const camel = typeof m.billingCycle === "string" ? m.billingCycle.trim().toLowerCase() : ""
+  const raw = snake || camel
+  if (raw === "monthly") return "monthly"
+  if (raw === "annual" || raw === "yearly") return "annual"
+  return null
+}
+
 function sessionPlanBilling(session: Stripe.Checkout.Session): {
   planId: PlanId | null
   billingCycle: "monthly" | "annual" | null
 } {
   const m = session.metadata ?? {}
-  const rawPlan = typeof m.plan_id === "string" ? m.plan_id : null
-  const planId = normalizePlanIdForPersistence(rawPlan, true)
-  const billingCycle =
-    typeof m.billing_cycle === "string" && isValidBillingCycle(m.billing_cycle) ? m.billing_cycle
+  const rawPlan =
+    typeof m.plan_id === "string" ? m.plan_id
+    : typeof m.planId === "string" ? m.planId
     : null
+  const planId = normalizePlanIdForPersistence(rawPlan, true)
+  const billingCycle = billingCycleFromCheckoutMetadata(m)
   return { planId, billingCycle }
 }
 
 export type WebhookLogPayload = {
   message: string
+  /** Whether we resolved a workspace UUID for this event (when applicable). */
+  organizationIdFound?: boolean
   organizationId?: string | null
   subscriptionId?: string | null
   customerId?: string | null
+  stripePriceId?: string | null
+  /** Resolved from Stripe price id → catalog (`lib/plans` / env overrides). */
+  mappedPlanId?: string | null
+  mappedBillingCycle?: string | null
 }
 
 export type WebhookLogFn = (payload: WebhookLogPayload) => void
@@ -255,7 +343,8 @@ export async function handleCheckoutSessionCompleted(
   const organizationId = resolveOrganizationIdFromCheckout(session)
   if (!organizationId) {
     log({
-      message: "checkout.session.completed missing valid organization_id",
+      message: "checkout.session.completed missing valid organizationId (metadata.organizationId / client_reference_id)",
+      organizationIdFound: false,
       subscriptionId: typeof session.subscription === "string" ? session.subscription : undefined,
       customerId: sessionCustomerId,
     })
@@ -273,6 +362,7 @@ export async function handleCheckoutSessionCompleted(
   if (!normalizedSubId) {
     log({
       message: "checkout.session.completed missing subscription id",
+      organizationIdFound: true,
       organizationId,
       customerId: sessionCustomerId,
     })
@@ -280,6 +370,7 @@ export async function handleCheckoutSessionCompleted(
   }
 
   const fullSub = await retrieveSubscription(normalizedSubId)
+  const priceId = primaryPriceId(fullSub)
   const { planId, billingCycle } = sessionPlanBilling(session)
 
   const patch = buildPatchFromStripeSubscription(fullSub, {
@@ -287,12 +378,17 @@ export async function handleCheckoutSessionCompleted(
     billingCycle,
   })
 
-  await updateOrganizationSubscriptionByOrgId(admin, organizationId, patch)
+  const mapped = getPlanFromStripePriceId(priceId)
+  const upsert = await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
   log({
-    message: "checkout.session.completed synced",
+    message: `checkout.session.completed synced (${upsert.inserted ? "inserted" : "updated"})`,
+    organizationIdFound: true,
     organizationId,
     subscriptionId: normalizedSubId,
     customerId: sessionCustomerId ?? parseCustomerId(fullSub.customer),
+    stripePriceId: priceId,
+    mappedPlanId: mapped?.planId ?? null,
+    mappedBillingCycle: mapped?.billingCycle ?? null,
   })
 }
 
@@ -300,6 +396,7 @@ export async function handleSubscriptionEvent(
   admin: SupabaseClient,
   sub: Stripe.Subscription,
   log: WebhookLogFn,
+  eventType: string,
 ): Promise<void> {
   const fullSub =
     sub.items?.data?.length ?
@@ -307,26 +404,61 @@ export async function handleSubscriptionEvent(
     : await retrieveSubscription(sub.id)
 
   const patch = buildPatchFromStripeSubscription(fullSub)
+  if (eventType === "customer.subscription.deleted") {
+    patch.status = "canceled"
+  }
+
+  const priceId = primaryPriceId(fullSub)
+  const mapped = getPlanFromStripePriceId(priceId)
 
   const subId = normalizeStripeIdColumn(fullSub.id)
   const custId = parseCustomerId(fullSub.customer)
 
-  const found = await findOrgSubscriptionBySubscriptionOrCustomer(admin, subId, custId)
-  if (!found) {
+  let organizationId = resolveOrganizationIdFromStripeSubscription(fullSub)
+  let resolvedVia: "subscription_metadata" | "database_lookup" | null = organizationId ?
+    "subscription_metadata"
+  : null
+
+  if (!organizationId) {
+    const found = await findOrgSubscriptionBySubscriptionOrCustomer(admin, subId, custId)
+    organizationId = found?.organization_id ?? null
+    if (organizationId) resolvedVia = "database_lookup"
+  }
+
+  if (!organizationId) {
     log({
-      message: "subscription event: no organization_subscriptions row",
+      message: `${eventType}: organization not found (metadata.organizationId missing, no DB match for subscription/customer)`,
+      organizationIdFound: false,
       subscriptionId: subId,
       customerId: custId,
+      stripePriceId: priceId,
+      mappedPlanId: mapped?.planId ?? null,
+      mappedBillingCycle: mapped?.billingCycle ?? null,
     })
     return
   }
 
-  await updateOrganizationSubscriptionByOrgId(admin, found.organization_id, patch)
   log({
-    message: "subscription event synced",
-    organizationId: found.organization_id,
+    message: `${eventType}: resolved organizationId (${resolvedVia ?? "unknown"})`,
+    organizationIdFound: true,
+    organizationId,
     subscriptionId: subId,
     customerId: custId,
+    stripePriceId: priceId,
+    mappedPlanId: mapped?.planId ?? null,
+    mappedBillingCycle: mapped?.billingCycle ?? null,
+  })
+
+  await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
+  log({
+    message: `${eventType} synced`,
+    organizationIdFound: true,
+    organizationId,
+    subscriptionId: subId,
+    customerId: custId,
+    stripePriceId: priceId,
+    mappedPlanId: mapped?.planId ?? null,
+    mappedBillingCycle: mapped?.billingCycle ?? null,
   })
 }
 
@@ -343,6 +475,7 @@ export async function handleInvoicePaymentSucceeded(
   if (!found) {
     log({
       message: "invoice.payment_succeeded: org row not found",
+      organizationIdFound: false,
       subscriptionId,
       customerId,
     })
@@ -356,14 +489,22 @@ export async function handleInvoicePaymentSucceeded(
 
   const sid = subscriptionId
   const custNorm = customerId
+  let mapped: ReturnType<typeof getPlanFromStripePriceId> = null
+  let invoicePriceId: string | null = null
   if (sid) {
     try {
       const fullSub = await retrieveSubscription(sid)
+      invoicePriceId = primaryPriceId(fullSub)
       Object.assign(patch, buildPatchFromStripeSubscription(fullSub))
       patch.payment_failed_at = null
+      if (fullSub.status === "active") {
+        patch.status = "active"
+      }
+      mapped = getPlanFromStripePriceId(invoicePriceId)
     } catch {
       log({
         message: "invoice.payment_succeeded: subscription retrieve failed; cleared payment_failed_at only",
+        organizationIdFound: true,
         organizationId: found.organization_id,
         subscriptionId: sid,
         customerId: custNorm,
@@ -374,9 +515,13 @@ export async function handleInvoicePaymentSucceeded(
   await updateOrganizationSubscriptionByOrgId(admin, found.organization_id, patch)
   log({
     message: "invoice.payment_succeeded synced",
+    organizationIdFound: true,
     organizationId: found.organization_id,
     subscriptionId: sid,
     customerId: custNorm,
+    stripePriceId: invoicePriceId,
+    mappedPlanId: mapped?.planId ?? null,
+    mappedBillingCycle: mapped?.billingCycle ?? null,
   })
 }
 
@@ -393,6 +538,7 @@ export async function handleInvoicePaymentFailed(
   if (!found) {
     log({
       message: "invoice.payment_failed: org row not found",
+      organizationIdFound: false,
       subscriptionId,
       customerId,
     })
@@ -407,9 +553,12 @@ export async function handleInvoicePaymentFailed(
 
   const sid = subscriptionId
   const custNorm = customerId
+  let mapped: ReturnType<typeof getPlanFromStripePriceId> = null
+  let invoicePriceId: string | null = null
   if (sid) {
     try {
       const fullSub = await retrieveSubscription(sid)
+      invoicePriceId = primaryPriceId(fullSub)
       Object.assign(patch, buildPatchFromStripeSubscription(fullSub))
       if (fullSub.status === "past_due" || fullSub.status === "unpaid") {
         patch.status = mapStripeSubscriptionStatus(fullSub.status)
@@ -417,10 +566,12 @@ export async function handleInvoicePaymentFailed(
         patch.status = "past_due"
       }
       patch.payment_failed_at = failedAt
+      mapped = getPlanFromStripePriceId(invoicePriceId)
     } catch {
       patch.status = "past_due"
       log({
         message: "invoice.payment_failed: subscription retrieve failed, forcing past_due",
+        organizationIdFound: true,
         organizationId: found.organization_id,
         subscriptionId: sid,
         customerId: custNorm,
@@ -433,9 +584,13 @@ export async function handleInvoicePaymentFailed(
   await updateOrganizationSubscriptionByOrgId(admin, found.organization_id, patch)
   log({
     message: "invoice.payment_failed synced",
+    organizationIdFound: true,
     organizationId: found.organization_id,
     subscriptionId: sid,
     customerId: custNorm,
+    stripePriceId: invoicePriceId,
+    mappedPlanId: mapped?.planId ?? null,
+    mappedBillingCycle: mapped?.billingCycle ?? null,
   })
 }
 
@@ -457,7 +612,7 @@ export async function dispatchStripeWebhookEvent(
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted":
-      await handleSubscriptionEvent(admin, event.data.object as Stripe.Subscription, log)
+      await handleSubscriptionEvent(admin, event.data.object as Stripe.Subscription, log, event.type)
       return
     case "invoice.payment_succeeded":
       await handleInvoicePaymentSucceeded(admin, event.data.object as Stripe.Invoice, log)

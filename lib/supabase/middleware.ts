@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
+import { userHasOnlyArchivedOrganizationMemberships } from "@/lib/supabase/archived-membership-query"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -64,24 +65,10 @@ export async function membershipOnlyArchivedOrgs(request: NextRequest, userId: s
     },
   })
 
-  const { data: rows } = await supabase
-    .from("organization_members")
-    .select("organizations(status)")
-    .eq("user_id", userId)
-    .eq("status", "active")
-
-  const list = rows ?? []
-  if (list.length === 0) return false
-
-  for (const row of list) {
-    const o = row.organizations as { status?: string } | { status?: string }[] | null
-    const org = Array.isArray(o) ? o[0] : o
-    const st = org?.status ?? "active"
-    if (st !== "archived") return false
-  }
-  return true
+  return userHasOnlyArchivedOrganizationMemberships(supabase, userId)
 }
 
+/** Signs out then redirects — clears session so API routes cannot keep using a blocked workspace session. */
 export async function signOutAndRedirect(request: NextRequest, redirectPath: string): Promise<NextResponse> {
   const url = new URL(redirectPath, request.url)
   let response = NextResponse.redirect(url)

@@ -40,6 +40,7 @@ import {
 } from "@/components/work-orders/work-order-detail-experience"
 import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-order-equipment-modal"
 import { useToast } from "@/hooks/use-toast"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import type { Part, RepairLog, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -249,6 +250,7 @@ function initialsFromTechnicianLabel(name: string): string {
 export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }: WorkOrderDrawerProps) {
   const { toast: pushToast } = useToast()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { canArchiveRestore } = useOrgArchivePermissions()
   const [wo, setWo] = useState<WorkOrder | null>(null)
   const [dbNotes, setDbNotes] = useState("")
   const [photoGallery, setPhotoGallery] = useState<WorkOrderPhotoGalleryItem[]>([])
@@ -1154,11 +1156,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!confirmDiscardUnsavedIfNeeded()) return
     if (!window.confirm("Archive this work order?")) return
     const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     const { error } = await supabase
       .from("work_orders")
       .update({
         is_archived: true,
         archived_at: new Date().toISOString(),
+        archived_by: user?.id ?? null,
       })
       .eq("id", wo.id)
       .eq("organization_id", activeOrgId)
@@ -1170,6 +1176,31 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     toast("Work order archived")
     onUpdated?.()
     onClose()
+  }
+
+  async function restoreWorkOrder() {
+    if (!wo || !activeOrgId) return
+    if (!confirmDiscardUnsavedIfNeeded()) return
+    if (!window.confirm("Restore this work order to active lists?")) return
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase
+      .from("work_orders")
+      .update({
+        is_archived: false,
+        archived_at: null,
+        archived_by: null,
+        archive_reason: null,
+      })
+      .eq("id", wo.id)
+      .eq("organization_id", activeOrgId)
+
+    if (error) {
+      toast(`Restore failed: ${error.message}`)
+      return
+    }
+    toast("Work order restored")
+    await loadWorkOrder()
+    onUpdated?.()
   }
 
   function setField<K extends keyof WorkOrder>(field: K, value: WorkOrder[K]) {
@@ -1254,7 +1285,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     }
   }
 
-  const postCompletionActions = showPostComplete ? (
+  const postCompletionActions = showPostComplete && !wo.isArchived ? (
     <div className="space-y-3">
       {wo.calibrationTemplateId ?
         <p className="text-[11px] text-muted-foreground">
@@ -1320,9 +1351,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         transitionMs={400}
         noScroll
         badge={
-          <Badge variant="secondary" className={cn("text-xs border shrink-0", STATUS_STYLE[currentStatus])}>
-            {currentStatus}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-1 shrink-0">
+            <Badge variant="secondary" className={cn("text-xs border shrink-0", STATUS_STYLE[currentStatus])}>
+              {currentStatus}
+            </Badge>
+            {wo.isArchived ? (
+              <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border shrink-0">
+                Archived
+              </Badge>
+            ) : null}
+          </div>
         }
         actions={
           editing ? (
@@ -1336,9 +1374,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </>
           ) : (
             <>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
-                <Pencil className="w-3.5 h-3.5 shrink-0" /> Edit
-              </Button>
+              {!wo.isArchived ? (
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
+                  <Pencil className="w-3.5 h-3.5 shrink-0" /> Edit
+                </Button>
+              ) : null}
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
                 <Link href={`/work-orders/${wo.id}`} className="flex items-center gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
@@ -1523,13 +1563,13 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             layout="drawer"
             workOrder={displayWo ?? wo}
             internalNotes={notesInternal}
-            internalNotesEditable
+            internalNotesEditable={!wo.isArchived}
             onInternalNotesChange={setNotesInternal}
             planServices={planServices}
             activityItems={buildWorkOrderActivityItems(wo)}
             problemReported={problemReportedDraft}
             onProblemReportedChange={setProblemReportedDraft}
-            problemReportedInlineEditable
+            problemReportedInlineEditable={!wo.isArchived}
             problemReportedToolbar={
               problemDirty ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
@@ -1565,7 +1605,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             onDiagnosisChange={setNotesDiagnosis}
             technicianNotes={notesTechnician}
             onTechnicianNotesChange={setNotesTechnician}
-            notesFieldsEditable
+            notesFieldsEditable={!wo.isArchived}
             parts={tabParts}
             onPartsChange={setTabParts}
             tabsValue={drawerTab}
@@ -1712,7 +1752,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               setCertificateFocusEquipmentId(eqId)
             }}
             onOpenAddEquipment={
-              wo && activeOrgId && wo.customerId
+              wo && activeOrgId && wo.customerId && !wo.isArchived
                 ? () => setAddEquipmentOpen(true)
                 : undefined
             }
@@ -1734,9 +1774,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             customerSignatureCapturedAt={wo.customerSignatureCapturedAt}
             onCustomerSignatureSave={(blob, name) => handleCustomerSignatureSave(blob, name)}
             signatureCaptureEnabled
-            fieldsEditable={editing}
-            partsPhotosEditable={true}
-            tasksEditable
+            fieldsEditable={editing && !wo.isArchived}
+            partsPhotosEditable={!wo.isArchived}
+            tasksEditable={!wo.isArchived}
             onEditWorkOrder={startEdit}
             onAssignTechnician={() => setAssignDialogOpen(true)}
             onMarkComplete={() => setCloseOutOpen(true)}
@@ -1747,7 +1787,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             onPrint={() =>
               toast("Print preview is not available yet — coming in a future release.")
             }
-            onArchive={() => void archiveWorkOrder()}
+            onArchive={
+              canArchiveRestore
+                ? () => void (wo.isArchived ? restoreWorkOrder() : archiveWorkOrder())
+                : undefined
+            }
           />
           </div>
         </div>

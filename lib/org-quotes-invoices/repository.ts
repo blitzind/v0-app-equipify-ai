@@ -12,6 +12,9 @@ import {
   type LineItemJson,
 } from "@/lib/org-quotes-invoices/map"
 
+/** Default lists hide archived rows; use `archived` or `all` for recovery views. */
+export type RecordArchiveVisibility = "active" | "archived" | "all"
+
 async function profileLabelsById(
   supabase: SupabaseClient,
   userIds: string[],
@@ -31,13 +34,19 @@ async function profileLabelsById(
 export async function fetchQuotesForOrganization(
   supabase: SupabaseClient,
   organizationId: string,
+  options?: { visibility?: RecordArchiveVisibility },
 ): Promise<{ quotes: AdminQuote[]; error?: string }> {
-  const { data: rows, error } = await supabase
+  const visibility = options?.visibility ?? "active"
+  let q = supabase
     .from("org_quotes")
     .select("*")
     .eq("organization_id", organizationId)
-    .is("archived_at", null)
     .order("created_at", { ascending: false })
+
+  if (visibility === "active") q = q.eq("is_archived", false)
+  else if (visibility === "archived") q = q.eq("is_archived", true)
+
+  const { data: rows, error } = await q
 
   if (error) return { quotes: [], error: error.message }
   const list = (rows ?? []) as OrgQuoteRow[]
@@ -113,13 +122,19 @@ export async function fetchQuotesForOrganization(
 export async function fetchInvoicesForOrganization(
   supabase: SupabaseClient,
   organizationId: string,
+  options?: { visibility?: RecordArchiveVisibility },
 ): Promise<{ invoices: AdminInvoice[]; error?: string }> {
-  const { data: rows, error } = await supabase
+  const visibility = options?.visibility ?? "active"
+  let q = supabase
     .from("org_invoices")
     .select("*")
     .eq("organization_id", organizationId)
-    .is("archived_at", null)
     .order("issued_at", { ascending: false })
+
+  if (visibility === "active") q = q.eq("is_archived", false)
+  else if (visibility === "archived") q = q.eq("is_archived", true)
+
+  const { data: rows, error } = await q
 
   if (error) return { invoices: [], error: error.message }
   const list = (rows ?? []) as OrgInvoiceRow[]
@@ -262,10 +277,40 @@ export async function archiveOrgQuote(
   supabase: SupabaseClient,
   organizationId: string,
   quoteId: string,
+  options?: { archiveReason?: string | null },
+): Promise<{ error?: string }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const archivedAt = new Date().toISOString()
+  const { error } = await supabase
+    .from("org_quotes")
+    .update({
+      is_archived: true,
+      archived_at: archivedAt,
+      archived_by: user?.id ?? null,
+      archive_reason: options?.archiveReason?.trim() ? options.archiveReason.trim() : null,
+    })
+    .eq("id", quoteId)
+    .eq("organization_id", organizationId)
+
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function restoreOrgQuote(
+  supabase: SupabaseClient,
+  organizationId: string,
+  quoteId: string,
 ): Promise<{ error?: string }> {
   const { error } = await supabase
     .from("org_quotes")
-    .update({ archived_at: new Date().toISOString() })
+    .update({
+      is_archived: false,
+      archived_at: null,
+      archived_by: null,
+      archive_reason: null,
+    })
     .eq("id", quoteId)
     .eq("organization_id", organizationId)
 
@@ -364,10 +409,40 @@ export async function archiveOrgInvoice(
   supabase: SupabaseClient,
   organizationId: string,
   invoiceId: string,
+  options?: { archiveReason?: string | null },
+): Promise<{ error?: string }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const archivedAt = new Date().toISOString()
+  const { error } = await supabase
+    .from("org_invoices")
+    .update({
+      is_archived: true,
+      archived_at: archivedAt,
+      archived_by: user?.id ?? null,
+      archive_reason: options?.archiveReason?.trim() ? options.archiveReason.trim() : null,
+    })
+    .eq("id", invoiceId)
+    .eq("organization_id", organizationId)
+
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function restoreOrgInvoice(
+  supabase: SupabaseClient,
+  organizationId: string,
+  invoiceId: string,
 ): Promise<{ error?: string }> {
   const { error } = await supabase
     .from("org_invoices")
-    .update({ archived_at: new Date().toISOString() })
+    .update({
+      is_archived: false,
+      archived_at: null,
+      archived_by: null,
+      archive_reason: null,
+    })
     .eq("id", invoiceId)
     .eq("organization_id", organizationId)
 

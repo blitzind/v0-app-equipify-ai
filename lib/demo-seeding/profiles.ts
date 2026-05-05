@@ -259,3 +259,11 @@ export function normalizeIndustryKey(value: string | null | undefined): DemoIndu
   const normalized = value.trim().toLowerCase()
   return INDUSTRY_ALIASES[normalized] ?? "commercial_equipment"
 }
+
+/** Labels for sample-data import UI (profile bundle title / sector label). */
+export function demoIndustrySelectOptions(): { value: DemoIndustryKey; label: string }[] {
+  return INDUSTRY_KEYS.map((k) => ({
+    value: k,
+    label: DEMO_INDUSTRY_PROFILES[k].demoCompanyName,
+  }))
+}

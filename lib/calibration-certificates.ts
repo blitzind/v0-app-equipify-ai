@@ -36,6 +36,9 @@ export type CalibrationTemplate = {
   updatedAt: string
 }
 
+/** Which rows to return from `listCalibrationTemplates` (default: active only). */
+export type CalibrationTemplateListVisibility = "active" | "archived" | "all"
+
 export type CalibrationRecord = {
   id: string
   organizationId: string
@@ -181,13 +184,17 @@ function mapRecordRow(row: CalibrationRecordRow): CalibrationRecord {
 export async function listCalibrationTemplates(
   supabase: SupabaseClient,
   organizationId: string,
+  visibility: CalibrationTemplateListVisibility = "active",
 ): Promise<CalibrationTemplate[]> {
-  const { data, error } = await supabase
+  let q = supabase
     .from("calibration_templates")
     .select("id, organization_id, name, equipment_category_id, fields, is_archived, created_at, updated_at")
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
     .order("name", { ascending: true })
+  if (visibility === "active") q = q.eq("is_archived", false)
+  else if (visibility === "archived") q = q.eq("is_archived", true)
+
+  const { data, error } = await q
   if (error) throw new Error(error.message)
   return ((data ?? []) as CalibrationTemplateRow[]).map(mapTemplateRow)
 }
@@ -234,10 +241,33 @@ export async function archiveCalibrationTemplate(
   supabase: SupabaseClient,
   organizationId: string,
   templateId: string,
+  archivedBy?: string | null,
 ): Promise<void> {
   const { error } = await supabase
     .from("calibration_templates")
-    .update({ is_archived: true, archived_at: new Date().toISOString() })
+    .update({
+      is_archived: true,
+      archived_at: new Date().toISOString(),
+      archived_by: archivedBy ?? null,
+    })
+    .eq("id", templateId)
+    .eq("organization_id", organizationId)
+  if (error) throw new Error(error.message)
+}
+
+export async function restoreCalibrationTemplate(
+  supabase: SupabaseClient,
+  organizationId: string,
+  templateId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("calibration_templates")
+    .update({
+      is_archived: false,
+      archived_at: null,
+      archived_by: null,
+      archive_reason: null,
+    })
     .eq("id", templateId)
     .eq("organization_id", organizationId)
   if (error) throw new Error(error.message)

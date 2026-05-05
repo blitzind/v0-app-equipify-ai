@@ -19,6 +19,9 @@ export type OrgQuoteRow = {
   internal_notes: string | null
   sent_at: string | null
   archived_at: string | null
+  is_archived: boolean
+  archived_by?: string | null
+  archive_reason?: string | null
 }
 
 export type OrgInvoiceRow = {
@@ -44,6 +47,9 @@ export type OrgInvoiceRow = {
   quote_id: string | null
   archived_at: string | null
   sent_at: string | null
+  is_archived: boolean
+  archived_by?: string | null
+  archive_reason?: string | null
 }
 
 export type LineItemJson = { description: string; qty: number; unit: number }
@@ -157,6 +163,7 @@ export function mapOrgQuoteToAdmin(
     lineItems,
     notes: row.notes ?? "",
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
+    isArchived: Boolean(row.is_archived),
   }
 }
 
@@ -192,5 +199,6 @@ export function mapOrgInvoiceToAdmin(
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
     sentAt: row.sent_at ?? undefined,
     calibrationRecordId: row.calibration_record_id ?? undefined,
+    isArchived: Boolean(row.is_archived),
   }
 }

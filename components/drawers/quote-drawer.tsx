@@ -9,6 +9,7 @@ import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
+import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
@@ -22,7 +23,7 @@ import {
 import {
   CheckCircle2, Download, Send, Pencil, X, Check,
   FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
-  ThumbsDown, DollarSign, FileEdit, Loader2, Wrench, Archive,
+  ThumbsDown, DollarSign, FileEdit, Loader2, Wrench, Archive, RotateCcw,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 import {
@@ -508,7 +509,8 @@ interface QuoteDrawerProps {
 export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
-  const { quotes, updateQuote, archiveQuote, refreshQuotes } = useQuotes()
+  const { canArchiveRestore } = useOrgArchivePermissions()
+  const { quotes, updateQuote, archiveQuote, restoreQuote, refreshQuotes } = useQuotes()
   const { addInvoiceFromPayload } = useInvoices()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
@@ -522,6 +524,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [quoteEmailBusy, setQuoteEmailBusy] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
+  const [restoreBusy, setRestoreBusy] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
 
@@ -538,7 +541,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   }
 
   function startEdit() {
-    if (!quote) return
+    if (!quote || quote.isArchived) return
     setDraft({
       status: quote.status,
       expiresDate: quote.expiresDate,
@@ -803,6 +806,18 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     onClose()
   }
 
+  async function confirmRestoreQuote() {
+    if (!quote) return
+    setRestoreBusy(true)
+    const { error } = await restoreQuote(quote.id)
+    setRestoreBusy(false)
+    if (error) {
+      toast(`Could not restore: ${error}`, "info")
+      return
+    }
+    toast("Quote restored")
+  }
+
   function handleApplyPricing(amount: number) {
     // Update total by scaling all line items proportionally
     if (!quote) return
@@ -859,9 +874,16 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
         }
         width="lg"
         badge={
-          <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[currentStatus].className)}>
-            {currentStatus}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-1">
+            <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[currentStatus].className)}>
+              {currentStatus}
+            </Badge>
+            {quote.isArchived ? (
+              <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                Archived
+              </Badge>
+            ) : null}
+          </div>
         }
         actions={
           editing ? (
@@ -873,6 +895,23 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 <X className="w-3.5 h-3.5" /> Cancel
               </Button>
             </>
+          ) : quote.isArchived ? (
+            canArchiveRestore ? (
+              <Button
+                size="sm"
+                variant="default"
+                className="gap-1.5 text-xs cursor-pointer"
+                disabled={restoreBusy}
+                onClick={() => void confirmRestoreQuote()}
+              >
+                {restoreBusy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+                Restore
+              </Button>
+            ) : null
           ) : (
             <>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
@@ -930,7 +969,9 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5 text-xs cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10"
+                className="gap-1.5 text-xs cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 disabled:opacity-50"
+                disabled={!canArchiveRestore}
+                title={!canArchiveRestore ? "Owner, admin, or manager role required" : undefined}
                 onClick={() => setArchiveOpen(true)}
               >
                 <Archive className="w-3.5 h-3.5" /> Archive
@@ -941,7 +982,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       >
         <div className="-mx-5 -my-5 min-h-full bg-muted/40 px-5 py-5 space-y-5">
           {/* AI Tools */}
-          {!editing && (
+          {!editing && !quote.isArchived && (
             <QuoteAIToolsPanel
               quote={quote}
               onApplyDraft={handleApplyDraft}

@@ -34,6 +34,7 @@ import {
   Receipt,
   Printer,
   AlertOctagon,
+  RotateCcw,
   FileBadge2,
   Boxes,
 } from "lucide-react"
@@ -1067,6 +1068,11 @@ export function WorkOrderDetailExperience({
                     <Badge variant="secondary" className={cn("border text-xs", STATUS_STYLE[workOrder.status])}>
                       {workOrder.status}
                     </Badge>
+                    {workOrder.isArchived ? (
+                      <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                        Archived
+                      </Badge>
+                    ) : null}
                     <span className={cn("text-xs font-semibold uppercase tracking-wide", PRIORITY_STYLE[workOrder.priority])}>
                       {workOrder.priority} priority
                     </span>
@@ -1151,56 +1157,66 @@ export function WorkOrderDetailExperience({
 
       {!isDrawer && (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={onEditWorkOrder}>
-            <Pencil className="w-3.5 h-3.5" />
-            Edit work order
-          </Button>
-          <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={onAssignTechnician}>
-            <UserPlus className="w-3.5 h-3.5" />
-            Assign technician
-          </Button>
-          {canMarkComplete && (
-            <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={() => void onMarkComplete()}>
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Complete Work Order
-            </Button>
-          )}
-          <Button size="sm" variant={qaVariant} className={qaBtnClass} asChild>
-            <Link href={quoteHref}>
-              <FileText className="w-3.5 h-3.5" />
-              Create quote
-            </Link>
-          </Button>
-          <Button
-            size="sm"
-            variant={qaVariant}
-            className={cn(qaBtnClass, !isDrawer && "opacity-70")}
-            type="button"
-            onClick={onInvoicePlaceholder}
-            title="Create an invoice for this work"
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            Create invoice
-          </Button>
-          {onPrint && (
-            <Button size="sm" variant={qaVariant} className={qaBtnClass} type="button" onClick={onPrint}>
-              <Printer className="w-3.5 h-3.5" />
-              Print
-            </Button>
-          )}
+          {!workOrder.isArchived ? (
+            <>
+              <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={onEditWorkOrder}>
+                <Pencil className="w-3.5 h-3.5" />
+                Edit work order
+              </Button>
+              <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={onAssignTechnician}>
+                <UserPlus className="w-3.5 h-3.5" />
+                Assign technician
+              </Button>
+              {canMarkComplete && (
+                <Button size="sm" variant={qaVariant} className={qaBtnClass} onClick={() => void onMarkComplete()}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Complete Work Order
+                </Button>
+              )}
+              <Button size="sm" variant={qaVariant} className={qaBtnClass} asChild>
+                <Link href={quoteHref}>
+                  <FileText className="w-3.5 h-3.5" />
+                  Create quote
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant={qaVariant}
+                className={cn(qaBtnClass, !isDrawer && "opacity-70")}
+                type="button"
+                onClick={onInvoicePlaceholder}
+                title="Create an invoice for this work"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                Create invoice
+              </Button>
+              {onPrint && (
+                <Button size="sm" variant={qaVariant} className={qaBtnClass} type="button" onClick={onPrint}>
+                  <Printer className="w-3.5 h-3.5" />
+                  Print
+                </Button>
+              )}
+            </>
+          ) : null}
           {onArchive && (
             <Button
               size="sm"
               variant={qaVariant}
               className={cn(
                 qaBtnClass,
-                "border-destructive/40 text-destructive hover:bg-destructive/10",
+                workOrder.isArchived
+                  ? "border-primary/40 text-primary hover:bg-primary/10"
+                  : "border-destructive/40 text-destructive hover:bg-destructive/10",
               )}
               type="button"
               onClick={onArchive}
             >
-              <AlertOctagon className="w-3.5 h-3.5" />
-              Archive
+              {workOrder.isArchived ? (
+                <RotateCcw className="w-3.5 h-3.5" />
+              ) : (
+                <AlertOctagon className="w-3.5 h-3.5" />
+              )}
+              {workOrder.isArchived ? "Restore" : "Archive"}
             </Button>
           )}
         </div>
@@ -1283,6 +1299,11 @@ export function WorkOrderDetailExperience({
         <div className={tabScrollWrapClass}>
 
         <TabsContent value="overview" className="space-y-4 mt-0">
+          {isDrawer && workOrder.isArchived ? (
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+              This work order is archived. It is hidden from default lists until restored.
+            </div>
+          ) : null}
           {isDrawer && workOrder.description?.trim() && (
             <p className="text-sm text-muted-foreground leading-snug">{workOrder.description}</p>
           )}
@@ -1444,53 +1465,66 @@ export function WorkOrderDetailExperience({
             <div className="rounded-xl border border-border bg-muted/20 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Quick actions</p>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={onEditWorkOrder}>
-                  <Pencil className="w-3.5 h-3.5" />
-                  Edit work order
-                </Button>
-                <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={onAssignTechnician}>
-                  <UserPlus className="w-3.5 h-3.5" />
-                  Assign technician
-                </Button>
-                {canMarkComplete && (
-                  <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={() => void onMarkComplete()}>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Complete Work Order
-                  </Button>
-                )}
-                <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
-                  <Link href={quoteHref}>
-                    <FileText className="w-3.5 h-3.5" />
-                    Create quote
-                  </Link>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-8 gap-1.5 text-xs shadow-sm opacity-80"
-                  type="button"
-                  onClick={onInvoicePlaceholder}
-                  title="Create an invoice for this work"
-                >
-                  <Receipt className="w-3.5 h-3.5" />
-                  Create invoice
-                </Button>
-                {onPrint && (
-                  <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" type="button" onClick={onPrint}>
-                    <Printer className="w-3.5 h-3.5" />
-                    Print
-                  </Button>
-                )}
+                {!workOrder.isArchived ? (
+                  <>
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={onEditWorkOrder}>
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit work order
+                    </Button>
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={onAssignTechnician}>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Assign technician
+                    </Button>
+                    {canMarkComplete && (
+                      <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" onClick={() => void onMarkComplete()}>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Complete Work Order
+                      </Button>
+                    )}
+                    <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
+                      <Link href={quoteHref}>
+                        <FileText className="w-3.5 h-3.5" />
+                        Create quote
+                      </Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 gap-1.5 text-xs shadow-sm opacity-80"
+                      type="button"
+                      onClick={onInvoicePlaceholder}
+                      title="Create an invoice for this work"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      Create invoice
+                    </Button>
+                    {onPrint && (
+                      <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" type="button" onClick={onPrint}>
+                        <Printer className="w-3.5 h-3.5" />
+                        Print
+                      </Button>
+                    )}
+                  </>
+                ) : null}
                 {onArchive && (
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="h-8 gap-1.5 text-xs shadow-sm border-destructive/40 text-destructive hover:bg-destructive/10"
+                    className={cn(
+                      "h-8 gap-1.5 text-xs shadow-sm",
+                      workOrder.isArchived
+                        ? "border-primary/40 text-primary hover:bg-primary/10"
+                        : "border-destructive/40 text-destructive hover:bg-destructive/10",
+                    )}
                     type="button"
                     onClick={onArchive}
                   >
-                    <AlertOctagon className="w-3.5 h-3.5" />
-                    Archive
+                    {workOrder.isArchived ? (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    ) : (
+                      <AlertOctagon className="w-3.5 h-3.5" />
+                    )}
+                    {workOrder.isArchived ? "Restore" : "Archive"}
                   </Button>
                 )}
               </div>

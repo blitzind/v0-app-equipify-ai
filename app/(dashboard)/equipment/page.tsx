@@ -56,6 +56,7 @@ import {
 } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { equipmentMatchesSearch, getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 type SortKey = "model" | "customerName" | "nextDueDate" | "lastServiceDate" | "category"
 type SortDir = "asc" | "desc"
@@ -76,6 +77,7 @@ type Equipment = {
   nextDueDate: string
   status: EquipmentStatus
   location: string
+  isArchived?: boolean
 }
 
 type DbEquipmentRow = {
@@ -90,6 +92,7 @@ type DbEquipmentRow = {
   last_service_at: string | null
   next_due_at: string | null
   location_label: string | null
+  is_archived: boolean
 }
 
 const statusColors: Record<Equipment["status"], string> = {
@@ -167,9 +170,16 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
                 {eq.manufacturer ? ` · ${eq.manufacturer}` : ""}
               </p>
             </div>
-            <Badge variant="secondary" className={cn("text-xs shrink-0", statusColors[eq.status])}>
-              {eq.status}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-1 justify-end shrink-0">
+              <Badge variant="secondary" className={cn("text-xs shrink-0", statusColors[eq.status])}>
+                {eq.status}
+              </Badge>
+              {eq.isArchived ? (
+                <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                  Archived
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs text-muted-foreground">
@@ -225,12 +235,14 @@ function EquipmentPageInner() {
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
+  const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
       setSelectedEquipmentId(openId)
+      setArchiveScope("all")
       router.replace("/equipment", { scroll: false })
     }
   }, [searchParams, router])
@@ -288,12 +300,16 @@ function EquipmentPageInner() {
 
       const orgId = activeOrgId
 
-      const { data: equipmentRows, error: equipmentError } = await supabase
+      let eqQuery = supabase
         .from("equipment")
-        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label")
+        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label, is_archived")
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
         .order("created_at", { ascending: false })
+
+      if (archiveScope === "active") eqQuery = eqQuery.eq("is_archived", false)
+      else if (archiveScope === "archived") eqQuery = eqQuery.eq("is_archived", true)
+
+      const { data: equipmentRows, error: equipmentError } = await eqQuery
 
       if (equipmentError || !equipmentRows) {
         if (active) setEquipment([])
@@ -335,6 +351,7 @@ function EquipmentPageInner() {
         nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
         status: statusMap[row.status] ?? "Active",
         location: row.location_label ?? "—",
+        isArchived: row.is_archived,
       }))
 
       if (active) setEquipment(mapped)
@@ -345,7 +362,7 @@ function EquipmentPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -451,6 +468,17 @@ function EquipmentPageInner() {
               {allCategories.map((c) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
+            <SelectTrigger className="w-[132px]">
+              <SelectValue placeholder="Records" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="all">All</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -629,9 +657,16 @@ function EquipmentPageInner() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{eq.category}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={cn("text-xs", statusColors[eq.status])}>
-                        {eq.status}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="secondary" className={cn("text-xs", statusColors[eq.status])}>
+                          {eq.status}
+                        </Badge>
+                        {eq.isArchived ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                            Archived
+                          </Badge>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {fmtDate(eq.lastServiceDate)}
