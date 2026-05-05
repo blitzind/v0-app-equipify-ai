@@ -1,7 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback } from "react"
-import { CURRENT_PLATFORM_ADMIN, type PlatformAccount, type FeatureFlag } from "./admin-data"
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
+import type { PlatformAccount } from "./admin-data"
+import type { SessionIdentity } from "./session-identity"
 
 interface ImpersonationState {
   active: boolean
@@ -12,6 +13,8 @@ interface ImpersonationState {
 }
 
 interface AdminContextValue {
+  sessionIdentity: SessionIdentity | null
+  sessionIdentityLoading: boolean
   impersonation: ImpersonationState
   startImpersonation: (account: PlatformAccount) => void
   endImpersonation: () => void
@@ -20,36 +23,108 @@ interface AdminContextValue {
 
 const AdminContext = createContext<AdminContextValue | null>(null)
 
-export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const [impersonation, setImpersonation] = useState<ImpersonationState>({
+function impersonationIdle(adminName: string, adminRole: string): ImpersonationState {
+  return {
     active: false,
     accountId: null,
     accountName: null,
-    adminName: CURRENT_PLATFORM_ADMIN.name,
-    adminRole: CURRENT_PLATFORM_ADMIN.role,
-  })
+    adminName,
+    adminRole,
+  }
+}
+
+export function AdminProvider({
+  children,
+  initialSessionIdentity,
+}: {
+  children: React.ReactNode
+  /** Server-rendered session on `/admin`; omit on dashboard to bootstrap via API. */
+  initialSessionIdentity?: SessionIdentity | null
+}) {
+  const skipBootstrapFetch = initialSessionIdentity !== undefined
+
+  const [sessionIdentity, setSessionIdentity] = useState<SessionIdentity | null>(() =>
+    initialSessionIdentity !== undefined ? initialSessionIdentity ?? null : null,
+  )
+
+  const [sessionIdentityLoading, setSessionIdentityLoading] = useState(!skipBootstrapFetch)
+
+  useEffect(() => {
+    if (skipBootstrapFetch) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/session/account-summary")
+        const data = (await res.json()) as
+          | { authenticated: false }
+          | ({ authenticated: true } & SessionIdentity)
+
+        if (cancelled) return
+
+        if ("authenticated" in data && data.authenticated === true) {
+          const { authenticated: _a, ...identity } = data
+          setSessionIdentity(identity)
+        } else {
+          setSessionIdentity(null)
+        }
+      } catch {
+        if (!cancelled) setSessionIdentity(null)
+      } finally {
+        if (!cancelled) setSessionIdentityLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [skipBootstrapFetch])
+
+  const adminLabel = sessionIdentity?.displayName ?? "Platform admin"
+  const adminRoleLabel = sessionIdentity?.platformRoleLabel ?? "Platform Admin"
+
+  const [impersonation, setImpersonation] = useState<ImpersonationState>(() =>
+    impersonationIdle(adminLabel, adminRoleLabel),
+  )
+
+  useEffect(() => {
+    setImpersonation((prev) => {
+      if (prev.active) return prev
+      return impersonationIdle(adminLabel, adminRoleLabel)
+    })
+  }, [adminLabel, adminRoleLabel])
+
+  const sessionIdentityRef = useRef(sessionIdentity)
+  sessionIdentityRef.current = sessionIdentity
 
   const startImpersonation = useCallback((account: PlatformAccount) => {
+    const sid = sessionIdentityRef.current
     setImpersonation({
       active: true,
       accountId: account.id,
       accountName: account.name,
-      adminName: CURRENT_PLATFORM_ADMIN.name,
-      adminRole: CURRENT_PLATFORM_ADMIN.role,
+      adminName: sid?.displayName ?? "Platform admin",
+      adminRole: sid?.platformRoleLabel ?? "Platform Admin",
     })
   }, [])
 
   const endImpersonation = useCallback(() => {
-    setImpersonation((prev) => ({ ...prev, active: false, accountId: null, accountName: null }))
-  }, [])
+    setImpersonation(impersonationIdle(adminLabel, adminRoleLabel))
+  }, [adminLabel, adminRoleLabel])
+
+  const isPlatformAdmin = Boolean(sessionIdentity?.platformAdmin)
 
   return (
-    <AdminContext.Provider value={{
-      impersonation,
-      startImpersonation,
-      endImpersonation,
-      isPlatformAdmin: true,
-    }}>
+    <AdminContext.Provider
+      value={{
+        sessionIdentity,
+        sessionIdentityLoading,
+        impersonation,
+        startImpersonation,
+        endImpersonation,
+        isPlatformAdmin,
+      }}
+    >
       {children}
     </AdminContext.Provider>
   )

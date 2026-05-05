@@ -23,6 +23,9 @@ import {
 import { SidebarContext } from "@/components/app-sidebar"
 import { BrandLogo } from "@/components/brand-logo"
 import { useTenant } from "@/lib/tenant-store"
+import { useAdmin } from "@/lib/admin-store"
+import { useActiveOrganizationOptional } from "@/lib/active-organization-context"
+import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { LucideIcon } from "lucide-react"
 
@@ -217,6 +220,14 @@ const NOTIFICATIONS_BY_WORKSPACE: Record<string, Notification[]> = {
 
 // ─── Account hub sections ─────────────────────────────────────────────────────
 
+function formatOrganizationMemberRole(role: string): string {
+  return role
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 const LAUNCHER_LINKS = [
   { icon: User,        label: "My Profile",      href: "/settings/general" },
   { icon: BellRing,    label: "Notifications",   href: "/settings/notifications" },
@@ -234,6 +245,9 @@ export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const { sessionIdentity, sessionIdentityLoading, isPlatformAdmin } = useAdmin()
+  const activeOrgOpt = useActiveOrganizationOptional()
+  const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
   const workspaceNotifs = NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"]
   const [notifications, setNotifications] = useState<Notification[]>(workspaceNotifs)
@@ -250,6 +264,59 @@ export function AppTopbar() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { setMobileOpen } = useContext(SidebarContext)
   const unreadCount = notifications.filter((n) => n.unread).length
+
+  const hubRoleLabel =
+    orgRoleLabel ??
+    (sessionIdentity?.platformAdmin ? (sessionIdentity.platformRoleLabel ?? "Platform Admin") : null) ??
+    "Member"
+
+  const menuDisplayName =
+    sessionIdentity?.displayName?.trim() ||
+    sessionIdentity?.email?.trim() ||
+    (sessionIdentityLoading ? "…" : "Account")
+
+  const menuEmail = sessionIdentity?.email?.trim() ?? ""
+  const avatarInitials = initialsFromDisplayLabel(
+    sessionIdentity?.displayName?.trim()
+      ? sessionIdentity.displayName
+      : (sessionIdentity?.email ?? ""),
+  )
+
+  useEffect(() => {
+    const orgId = activeOrgOpt?.organizationId
+    if (!orgId) {
+      setOrgRoleLabel(null)
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      const { data: row } = await supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", orgId)
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (cancelled) return
+      const role = (row as { role: string } | null)?.role
+      setOrgRoleLabel(role ? formatOrganizationMemberRole(role) : null)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, activeOrgOpt?.organizationId])
+
+  const launcherLinks = useMemo(
+    () => LAUNCHER_LINKS.filter((link) => link.href !== "/admin" || isPlatformAdmin),
+    [isPlatformAdmin],
+  )
 
   // Mark a notification as read and navigate
   function handleNotifClick(n: Notification) {
@@ -441,11 +508,11 @@ export function AppTopbar() {
           aria-expanded={hubOpen}
         >
           <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-semibold shrink-0">
-            AJ
+            {avatarInitials}
           </div>
           <div className="hidden md:block text-left">
-            <p className="text-sm font-medium text-foreground leading-tight">Alex Johnson</p>
-            <p className="text-xs text-muted-foreground leading-tight">Admin</p>
+            <p className="text-sm font-medium text-foreground leading-tight">{menuDisplayName}</p>
+            <p className="text-xs text-muted-foreground leading-tight">{hubRoleLabel}</p>
           </div>
           <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground hidden md:block transition-transform duration-150", hubOpen && "rotate-180")} />
         </button>
@@ -478,20 +545,20 @@ export function AppTopbar() {
           {/* User header */}
           <div className="flex items-center gap-3 px-5 py-4 bg-secondary/40 border-b border-border">
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
-              AJ
+              {avatarInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground leading-tight">Alex Johnson</p>
-              <p className="text-xs text-muted-foreground truncate">alex.johnson@acmecorp.com</p>
+              <p className="text-sm font-semibold text-foreground leading-tight">{menuDisplayName}</p>
+              <p className="text-xs text-muted-foreground truncate">{menuEmail || "—"}</p>
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
-              Admin
+              {hubRoleLabel}
             </span>
           </div>
 
           {/* Launcher grid */}
           <div className="grid grid-cols-2 gap-1 p-3">
-            {LAUNCHER_LINKS.map(({ icon: Icon, label, href }) => (
+            {launcherLinks.map(({ icon: Icon, label, href }) => (
               <Link
                 key={label}
                 href={href}

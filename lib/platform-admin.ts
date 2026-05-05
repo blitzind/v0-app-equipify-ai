@@ -1,7 +1,17 @@
 import "server-only"
 
 /**
- * Comma-separated emails in `EQUIPIFY_PLATFORM_ADMIN_EMAILS` (case-insensitive).
+ * Lists emails allowed to open `/admin`, call platform APIs, and bypass archived-org guards where implemented.
+ *
+ * Set `EQUIPIFY_PLATFORM_ADMIN_EMAILS` to one or more addresses separated by commas (spaces optional).
+ * Matching is case-insensitive.
+ *
+ * @example Single admin
+ * `EQUIPIFY_PLATFORM_ADMIN_EMAILS=mike@blitzind.com`
+ *
+ * @example Multiple admins
+ * `EQUIPIFY_PLATFORM_ADMIN_EMAILS=mike@blitzind.com,support@equipify.ai`
+ *
  * Empty = no platform admins (secure default).
  */
 export function getPlatformAdminEmails(): string[] {

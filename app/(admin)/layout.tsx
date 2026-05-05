@@ -1,13 +1,16 @@
-"use client"
+import { redirect } from "next/navigation"
+import { loadPlatformAdminIdentity } from "@/lib/load-platform-admin-identity"
+import { AdminLayoutClient } from "./admin-layout-client"
 
-import { AdminProvider } from "@/lib/admin-store"
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const identity = await loadPlatformAdminIdentity()
+  if (!identity) {
+    redirect("/")
+  }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AdminProvider>
-      <div className="min-h-screen bg-background text-foreground">
-        {children}
-      </div>
-    </AdminProvider>
+    <AdminLayoutClient initialSessionIdentity={identity}>
+      <div className="min-h-screen bg-background text-foreground">{children}</div>
+    </AdminLayoutClient>
   )
 }

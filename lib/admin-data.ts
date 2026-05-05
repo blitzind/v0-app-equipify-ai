@@ -1,23 +1,7 @@
-// ─── Platform Admin mock data ─────────────────────────────────────────────────
-// Represents the super-admin layer above all tenant workspaces.
+// ─── Platform Admin demo data ─────────────────────────────────────────────────
+// Audit tab examples only — live identity comes from auth / profiles.
 
 export type PlatformAdminRole = "Super Admin" | "Support Admin" | "Sales Admin" | "Finance Admin"
-
-export interface PlatformAdmin {
-  id: string
-  name: string
-  email: string
-  role: PlatformAdminRole
-  avatar: string
-}
-
-export const CURRENT_PLATFORM_ADMIN: PlatformAdmin = {
-  id: "pa-01",
-  name: "Devon Park",
-  email: "devon@equipify.ai",
-  role: "Super Admin",
-  avatar: "",
-}
 
 // ─── Tenant accounts (platform-level view) ────────────────────────────────────
 
@@ -358,7 +342,7 @@ export interface AdminAuditEvent {
 export const ADMIN_AUDIT_LOG: AdminAuditEvent[] = [
   {
     id: "ae-001",
-    actor: "Devon Park",
+    actor: "Platform admin",
     actorRole: "Super Admin",
     action: "impersonated_account",
     target: "Acme Field Services",
@@ -378,7 +362,7 @@ export const ADMIN_AUDIT_LOG: AdminAuditEvent[] = [
   },
   {
     id: "ae-003",
-    actor: "Devon Park",
+    actor: "Platform admin",
     actorRole: "Super Admin",
     action: "updated_feature_flag",
     target: "ff-beta-scheduling",
@@ -398,7 +382,7 @@ export const ADMIN_AUDIT_LOG: AdminAuditEvent[] = [
   },
   {
     id: "ae-005",
-    actor: "Devon Park",
+    actor: "Platform admin",
     actorRole: "Super Admin",
     action: "suspended_account",
     target: "Clearwater Plumbing",
@@ -428,7 +412,7 @@ export const ADMIN_AUDIT_LOG: AdminAuditEvent[] = [
   },
   {
     id: "ae-008",
-    actor: "Devon Park",
+    actor: "Platform admin",
     actorRole: "Super Admin",
     action: "added_admin",
     target: "Morgan Lee",

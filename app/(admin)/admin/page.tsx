@@ -12,9 +12,10 @@ import {
 import { useAdmin } from "@/lib/admin-store"
 import {
   PLATFORM_STATS, MRR_TREND, PLAN_DISTRIBUTION,
-  FEATURE_FLAGS, ADMIN_AUDIT_LOG, CURRENT_PLATFORM_ADMIN,
+  FEATURE_FLAGS, ADMIN_AUDIT_LOG,
   type PlatformAccount, type FeatureFlag,
 } from "@/lib/admin-data"
+import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -59,10 +60,6 @@ function severityIcon(sev: string) {
   if (sev === "critical") return <ShieldAlert size={13} className="ds-icon-danger shrink-0" />
   if (sev === "warning")  return <AlertTriangle size={13} className="ds-icon-warning shrink-0" />
   return <Info size={13} className="ds-icon-info shrink-0" />
-}
-
-function initials(name: string) {
-  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
 }
 
 type Tab = "accounts" | "analytics" | "flags" | "audit"
@@ -625,7 +622,15 @@ function AuditTab() {
 
 export default function PlatformAdminPage() {
   const router = useRouter()
-  const { startImpersonation } = useAdmin()
+  const { sessionIdentity, startImpersonation } = useAdmin()
+  const displayName = sessionIdentity?.displayName?.trim() ?? ""
+  const email = sessionIdentity?.email?.trim() ?? ""
+  const headerLine1 = displayName || email || "…"
+  const headerLine2 =
+    displayName && email && displayName.toLowerCase() !== email.toLowerCase()
+      ? email
+      : (sessionIdentity?.platformRoleLabel ?? "Platform Admin")
+  const headerInitials = initialsFromDisplayLabel(displayName || email || "?")
   const [activeTab, setActiveTab] = useState<Tab>("accounts")
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
@@ -685,11 +690,11 @@ export default function PlatformAdminPage() {
         {/* Admin identity */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#7c3aed] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-            {initials(CURRENT_PLATFORM_ADMIN.name)}
+            {headerInitials}
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-white leading-tight">{CURRENT_PLATFORM_ADMIN.name}</p>
-            <p className="text-[10px] text-slate-400">{CURRENT_PLATFORM_ADMIN.role}</p>
+            <p className="text-xs font-semibold text-white leading-tight">{headerLine1}</p>
+            <p className="text-[10px] text-slate-400">{headerLine2}</p>
           </div>
         </div>
         <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors ml-4">
