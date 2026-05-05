@@ -73,13 +73,13 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12"
         style={{ background: "#0f172a" }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-full max-w-[198px]">
+          <Link href="https://equipify.ai" className="w-full max-w-[198px] cursor-pointer">
             <BrandLogo
               priority
               sizes="(min-width: 768px) 198px, 182px"
               className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
             />
-          </div>
+          </Link>
         </div>
         <div>
           <blockquote className="text-2xl font-medium leading-relaxed mb-6" style={{ color: "#e2e8f0" }}>
@@ -108,13 +108,13 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="mb-8 lg:hidden rounded-xl bg-[#0F172A] px-4 py-3">
-            <div className="mx-auto w-full max-w-[198px]">
+            <Link href="https://equipify.ai" className="mx-auto block w-full max-w-[198px] cursor-pointer">
               <BrandLogo
                 priority
                 sizes="(min-width: 768px) 198px, 182px"
                 className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
               />
-            </div>
+            </Link>
           </div>
 
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome back</h1>

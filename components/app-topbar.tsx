@@ -304,9 +304,13 @@ export function AppTopbar() {
       </button>
 
       {/* Mobile logo — centered absolutely so it doesn't shift layout */}
-      <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none">
+      <Link
+        href="/"
+        className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none cursor-pointer"
+        aria-label="Equipify — Home"
+      >
         <BrandLogo className="h-7 w-auto max-h-7" priority />
-      </div>
+      </Link>
 
       {/* Search — desktop only (sm+), hidden on mobile */}
       <div

@@ -80,6 +80,8 @@ function OnboardingPageContent() {
     parseOnboardingText(searchParams.get("inviteToken")) ??
     parseOnboardingText(searchParams.get("invite")) ??
     parseOnboardingText(searchParams.get("token"))
+  const seedDemoParam = searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
+  const seedIndustryParam = parseOnboardingText(searchParams.get("industry"))
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
@@ -263,32 +265,22 @@ function OnboardingPageContent() {
           setSubmitError(acceptData.message ?? "Could not accept invite. Request a new invite.")
           return
         }
-      } else if (organizationIdParam) {
-        const { data: membership, error: membershipErr } = await supabase
-          .from("organization_members")
-          .select("status")
-          .eq("organization_id", organizationIdParam)
-          .eq("user_id", authUserId)
-          .maybeSingle()
-
-        if (membershipErr || !membership) {
-          setSubmitError("This invite is missing, invalid, or expired. Ask your admin to resend it.")
+      } else {
+        const provisionRes = await fetch("/api/onboarding/provision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizationId: organizationIdParam || null,
+            organizationName: form.companyName || undefined,
+            seedDemo: seedDemoParam,
+            industry: seedIndustryParam,
+          }),
+        })
+        if (!provisionRes.ok) {
+          const provisionData = (await provisionRes.json()) as { message?: string }
+          setSubmitError(provisionData.message ?? "Could not finish workspace setup. Please try again.")
           return
         }
-
-        // Best effort only; some environments activate membership on invite-accept flow.
-        if (membership.status === "invited") {
-          await supabase
-            .from("organization_members")
-            .update({ status: "active" })
-            .eq("organization_id", organizationIdParam)
-            .eq("user_id", authUserId)
-        }
-
-        await supabase
-          .from("profiles")
-          .update({ default_organization_id: organizationIdParam, updated_at: new Date().toISOString() })
-          .eq("id", authUserId)
       }
     } finally {
       setIsSubmitting(false)
@@ -358,7 +350,9 @@ function OnboardingPageContent() {
       {/* Top bar */}
       <header className="border-b border-white/10 bg-[#0F172A] shadow-sm">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <BrandLogo className="h-8 w-auto sm:h-9" priority />
+          <Link href="https://equipify.ai" className="cursor-pointer">
+            <BrandLogo className="h-8 w-auto sm:h-9" priority />
+          </Link>
           <p className="text-sm text-gray-300">
             Already have an account?{" "}
             <Link href="/login" className="font-medium text-white hover:text-gray-200">
