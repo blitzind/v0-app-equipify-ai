@@ -388,7 +388,7 @@ function OnboardingPageContent() {
           ))}
         </div>
 
-        <div className="w-full" style={{ maxWidth: step === 2 ? 860 : 480 }}>
+        <div className="w-full" style={{ maxWidth: step === 2 ? 1280 : 480 }}>
           {/* Step 0 — Account */}
           {step === 0 && (
             <div className="bg-white rounded-xl border p-8" style={{ borderColor: "#e5e7eb" }}>
@@ -558,7 +558,7 @@ function OnboardingPageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
                 {PLANS.map((plan) => {
                   const selected = selectedPlan === plan.id
                   const monthly = price(plan)
