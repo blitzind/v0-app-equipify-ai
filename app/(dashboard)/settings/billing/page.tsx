@@ -892,7 +892,7 @@ function BillingPageContent() {
           </p>
         </div>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
           {PLANS.map((p) => {
             const matchesStoredPlan = p.id === effectivePlanId
             const isCurrent = billingIsActive && matchesStoredPlan
@@ -940,7 +940,7 @@ function BillingPageContent() {
             return (
               <div
                 key={p.id}
-                className={`relative flex flex-col rounded-xl border-2 p-5 transition-all ${
+                className={`relative flex h-full flex-col rounded-xl border-2 p-5 transition-all ${
                   isCurrent
                     ? "border-primary bg-primary/5"
                     : isPopular
