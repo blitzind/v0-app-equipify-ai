@@ -3,6 +3,9 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
+import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
+import { listMrrBaseCentsForSubscriptionRow } from "@/lib/billing/org-subscription-mrr"
 import type { AccountStatus, PlatformAccount } from "@/lib/admin-data"
 
 function mapPlanTier(planId: string | null | undefined): PlatformAccount["plan"] {
@@ -68,7 +71,9 @@ export async function GET() {
 
   const { data: subs } = await admin
     .from("organization_subscriptions")
-    .select("organization_id, plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id")
+    .select(
+      "organization_id, plan_id, intended_plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id, stripe_price_id, discount_type, discount_value, discount_reason, discount_expires_at",
+    )
     .in("organization_id", ids)
 
   const subByOrg = new Map((subs ?? []).map((s) => [s.organization_id, s]))
@@ -108,6 +113,24 @@ export async function GET() {
     const billingCycle =
       sub?.billing_cycle === "annual" || sub?.billing_cycle === "monthly" ? sub.billing_cycle : "monthly"
 
+    const trialEndsAtIso = sub?.trial_ends_at ?? null
+    const trialDaysLeft = trialDaysLeftFromIso(trialEndsAtIso)
+
+    const baseMrrCents = sub ? listMrrBaseCentsForSubscriptionRow(sub) : 0
+    const discountParsed = sub
+      ? applyDiscountToMrrCents(
+          baseMrrCents,
+          sub.discount_type,
+          sub.discount_value as number | string | null,
+          sub.discount_expires_at,
+        )
+      : { finalCents: 0, active: false }
+    const dt = sub?.discount_type?.trim().toLowerCase()
+    const typedDisc = dt === "percent" || dt === "fixed"
+    const hasActiveDiscount = Boolean(discountParsed.active && typedDisc)
+    const mrrBaseCents =
+      hasActiveDiscount && baseMrrCents > discountParsed.finalCents ? baseMrrCents : null
+
     return {
       id: o.id,
       name: o.name,
@@ -121,13 +144,26 @@ export async function GET() {
         orgArchived,
       ),
       organizationArchived: orgArchived,
-      mrr: 0,
+      mrr: sub ? discountParsed.finalCents : 0,
+      mrrBaseCents,
+      hasActiveDiscount,
+      discountType: sub?.discount_type ?? null,
+      discountValue:
+        sub?.discount_value != null && sub.discount_value !== ""
+          ? Number(sub.discount_value)
+          : null,
+      discountReason: sub?.discount_reason ?? null,
+      discountExpiresAt: sub?.discount_expires_at ?? null,
       seats: seatCount.get(o.id) ?? 0,
       equipmentCount: 0,
       workOrderCount: 0,
       createdAt: o.created_at?.slice(0, 10) ?? "",
       lastActive: (o.updated_at ?? o.created_at)?.slice(0, 10) ?? "",
-      trialEndsAt: sub?.trial_ends_at?.slice(0, 10) || undefined,
+      trialEndsAt: trialEndsAtIso,
+      trialDaysLeft,
+      billingStatus: sub?.status ?? null,
+      planId: sub?.plan_id ?? null,
+      intendedPlanId: sub?.intended_plan_id ?? null,
       country: "",
       industry: "",
     }

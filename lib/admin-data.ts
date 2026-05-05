@@ -18,13 +18,29 @@ export interface PlatformAccount {
   status: AccountStatus
   /** Soft-delete: organization.status === 'archived' */
   organizationArchived?: boolean
-  mrr: number           // monthly recurring revenue in cents
+  mrr: number           // effective MRR in cents (after internal discount when active)
+  /** List MRR in cents before discount; set when a discount reduces price */
+  mrrBaseCents?: number | null
+  hasActiveDiscount?: boolean
+  discountType?: string | null
+  discountValue?: number | null
+  discountReason?: string | null
+  discountExpiresAt?: string | null
   seats: number
   equipmentCount: number
   workOrderCount: number
   createdAt: string
   lastActive: string
-  trialEndsAt?: string
+  /** ISO 8601 trial end from `organization_subscriptions.trial_ends_at` */
+  trialEndsAt?: string | null
+  /** Whole days until trial ends; negative if expired; null if no trial end date */
+  trialDaysLeft?: number | null
+  /** Raw `organization_subscriptions.status` (e.g. trialing, active, canceled) */
+  billingStatus?: string | null
+  /** Raw `organization_subscriptions.plan_id` */
+  planId?: string | null
+  /** Raw `organization_subscriptions.intended_plan_id` when set */
+  intendedPlanId?: string | null
   country: string
   industry: string
 }

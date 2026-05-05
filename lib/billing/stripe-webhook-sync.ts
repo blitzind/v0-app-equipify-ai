@@ -5,6 +5,7 @@ import type Stripe from "stripe"
 import { stripe } from "@/lib/stripe"
 import type { PlanId } from "@/lib/plans"
 import { normalizePlanIdForPersistence } from "@/lib/billing/plan-id"
+import { resolvePlanAndBillingCycleFromStripePriceId } from "@/lib/billing/stripe-price-map"
 import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 
 const UUID_RE =
@@ -72,21 +73,24 @@ export function buildPatchFromStripeSubscription(
   const cycleFromMeta = typeof md.billing_cycle === "string" ? md.billing_cycle : null
 
   const hasSub = !!normalizeStripeIdColumn(sub.id)
+  const priceId = primaryPriceId(sub)
+  const fromPrice = resolvePlanAndBillingCycleFromStripePriceId(priceId)
+
   const fromOpts =
     opts?.planId != null ? normalizePlanIdForPersistence(String(opts.planId), hasSub) : null
   const fromMeta = normalizePlanIdForPersistence(rawPlanFromMeta, hasSub)
-  const planId = fromOpts ?? fromMeta
+  const planId = fromOpts ?? fromMeta ?? fromPrice.planId
 
   const billingCycle =
     opts?.billingCycle && isValidBillingCycle(opts.billingCycle) ? opts.billingCycle
     : isValidBillingCycle(cycleFromMeta) ? cycleFromMeta
-    : null
+    : fromPrice.billingCycle
 
   const s = sub as SubscriptionApi
   const patch: OrgSubPatch = {
     stripe_customer_id: parseCustomerId(sub.customer),
     stripe_subscription_id: normalizeStripeIdColumn(sub.id),
-    stripe_price_id: primaryPriceId(sub),
+    stripe_price_id: priceId,
     status: mapStripeSubscriptionStatus(sub.status),
     trial_starts_at: unixSecondsToIso(sub.trial_start),
     trial_ends_at: unixSecondsToIso(sub.trial_end),
@@ -99,9 +103,21 @@ export function buildPatchFromStripeSubscription(
 
   if (planId) {
     patch.plan_id = planId
-    if (hasSub) patch.intended_plan_id = null
   }
   if (billingCycle) patch.billing_cycle = billingCycle
+
+  // Clear onboarding “intended” tier once Stripe shows a paid-like subscription or we know the purchased plan.
+  if (hasSub) {
+    const paidLike =
+      sub.status === "active" ||
+      sub.status === "past_due" ||
+      sub.status === "unpaid" ||
+      sub.status === "paused" ||
+      sub.status === "canceled"
+    if (planId || paidLike) {
+      patch.intended_plan_id = null
+    }
+  }
 
   return patch
 }
@@ -420,6 +436,12 @@ export async function handleInvoicePaymentFailed(
   })
 }
 
+/**
+ * Supported Stripe webhook types:
+ * - checkout.session.completed (subscription mode)
+ * - customer.subscription.created | .updated | .deleted
+ * - invoice.payment_succeeded | invoice.payment_failed
+ */
 export async function dispatchStripeWebhookEvent(
   event: Stripe.Event,
   admin: SupabaseClient,

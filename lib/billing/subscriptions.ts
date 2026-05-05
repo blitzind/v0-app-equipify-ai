@@ -37,6 +37,11 @@ export type OrganizationSubscription = {
   plan_id: string
   /** Paid tier chosen at onboarding; trial row still uses `plan_id` = scale for entitlements. */
   intended_plan_id: string | null
+  /** Internal manual discount (platform admin); not synced to Stripe yet. */
+  discount_type?: string | null
+  discount_value?: number | string | null
+  discount_reason?: string | null
+  discount_expires_at?: string | null
   billing_cycle: string
   status: string
   trial_starts_at: string | null

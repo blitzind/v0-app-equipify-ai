@@ -2,6 +2,7 @@ import "server-only"
 
 import type { PlanId } from "@/lib/plans"
 import { PLANS } from "@/lib/plans"
+import { stripePriceIdForPlan } from "@/lib/billing/stripe-price-map"
 
 /** Repo placeholders in lib/plans.ts — not valid Stripe Dashboard price IDs. */
 const PLACEHOLDER_PRICE_PATTERN =
@@ -44,6 +45,5 @@ export function validateStripePriceId(priceId: string): { ok: true } | { ok: fal
 }
 
 export function priceIdForPlan(planId: PlanId, billingCycle: "monthly" | "annual"): string {
-  const plan = PLANS.find((p) => p.id === planId)!
-  return billingCycle === "annual" ? plan.stripeAnnualPriceId : plan.stripeMonthlyPriceId
+  return stripePriceIdForPlan(planId, billingCycle)
 }

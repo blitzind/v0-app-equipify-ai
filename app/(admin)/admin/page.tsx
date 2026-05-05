@@ -4,14 +4,14 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Building2, Users, DollarSign, TrendingUp, Search, MoreHorizontal,
+  Building2, Users, DollarSign, TrendingUp, TrendingDown, Search, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
   ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw,
-  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2,
+  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket,
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import {
-  PLATFORM_STATS, MRR_TREND, PLAN_DISTRIBUTION,
+  PLATFORM_STATS,
   FEATURE_FLAGS, ADMIN_AUDIT_LOG,
   type PlatformAccount, type FeatureFlag,
 } from "@/lib/admin-data"
@@ -28,8 +28,86 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import { applyDiscountToMrrCents, resolveListMrrCents } from "@/lib/billing/discount-pricing"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const ADMIN_PLAN_OPTIONS = [
+  { id: "solo", label: "Solo" },
+  { id: "core", label: "Core" },
+  { id: "growth", label: "Growth" },
+  { id: "scale", label: "Scale" },
+] as const
+
+const ADMIN_BILLING_STATUSES = [
+  { id: "trialing", label: "Trialing" },
+  { id: "active", label: "Active" },
+  { id: "past_due", label: "Past Due" },
+  { id: "canceled", label: "Canceled" },
+] as const
+
+function billingStatusLabel(raw: string | null | undefined): string {
+  if (!raw) return "—"
+  const s = raw.trim().toLowerCase()
+  const row = ADMIN_BILLING_STATUSES.find((x) => x.id === s)
+  return row?.label ?? raw.replace(/_/g, " ")
+}
+
+function initialPlanKey(account: PlatformAccount): string {
+  if (account.planId) return normalizePlanIdForRead(account.planId)
+  const m: Record<PlatformAccount["plan"], string> = {
+    Starter: "solo",
+    Core: "core",
+    Growth: "growth",
+    Enterprise: "scale",
+  }
+  return m[account.plan] ?? "solo"
+}
+
+function isoToDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function datetimeLocalToIso(local: string): string | null {
+  const t = local.trim()
+  if (!t) return null
+  const d = new Date(t)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
+}
+
+function normalizeAdminBillingStatus(raw: string | null | undefined): (typeof ADMIN_BILLING_STATUSES)[number]["id"] {
+  const s = raw?.trim().toLowerCase() ?? ""
+  if (s === "trialing" || s === "active" || s === "past_due" || s === "canceled") return s
+  return "trialing"
+}
+
+function isoToDateInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toISOString().slice(0, 10)
+}
+
+/** End of local calendar day for expiration. */
+function dateInputToExpiresIso(dateStr: string): string | null {
+  const t = dateStr.trim()
+  if (!t) return null
+  const d = new Date(`${t}T23:59:59`)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
+}
+
+const DISCOUNT_TYPE_OPTIONS = [
+  { id: "none", label: "None" },
+  { id: "percent", label: "Percent" },
+  { id: "fixed", label: "Fixed amount" },
+] as const
 
 function fmt$(cents: number) {
   return "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })
@@ -45,6 +123,37 @@ function statusColor(status: PlatformAccount["status"]) {
     case "Archived":  return { color: "#64748b", bg: "#f1f5f9" }
     default:          return { color: "#6b7280", bg: "#f3f4f6" }
   }
+}
+
+function trialHint(account: PlatformAccount) {
+  if (account.organizationArchived) return null
+  const days = account.trialDaysLeft
+  const billing = account.billingStatus?.toLowerCase() ?? ""
+  const trialingState = account.status === "Trialing" || billing === "trialing"
+
+  if (trialingState && days != null && days > 0) {
+    const cls =
+      days <= 2
+        ? "text-red-600 dark:text-red-400 font-medium"
+        : days <= 7
+          ? "text-orange-600 dark:text-orange-400 font-medium"
+          : "text-amber-800 dark:text-amber-600 font-medium"
+    return (
+      <span className={`block text-[11px] mt-0.5 ${cls}`}>
+        Trial ends in {days} {days === 1 ? "day" : "days"}
+      </span>
+    )
+  }
+
+  if (trialingState && days != null && days <= 0) {
+    return (
+      <span className="block text-[11px] mt-0.5 text-red-600 dark:text-red-400 font-medium">
+        Trial expired
+      </span>
+    )
+  }
+
+  return null
 }
 
 function planColor(plan: PlatformAccount["plan"]) {
@@ -106,6 +215,68 @@ function AccountsTab({
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const [planTarget, setPlanTarget] = useState<PlatformAccount | null>(null)
+  const [planFormPlanId, setPlanFormPlanId] = useState<string>("solo")
+  const [planFormBillingCycle, setPlanFormBillingCycle] = useState<"monthly" | "annual">("monthly")
+  const [planFormStatus, setPlanFormStatus] = useState<string>("trialing")
+  const [planFormTrialLocal, setPlanFormTrialLocal] = useState("")
+  const [planBusy, setPlanBusy] = useState(false)
+  const [planError, setPlanError] = useState<string | null>(null)
+  const [planSaveNotice, setPlanSaveNotice] = useState<string | null>(null)
+
+  const [discountTarget, setDiscountTarget] = useState<PlatformAccount | null>(null)
+  const [discountFormType, setDiscountFormType] = useState<"none" | "percent" | "fixed">("none")
+  const [discountPercentValue, setDiscountPercentValue] = useState("")
+  const [discountFixedDollars, setDiscountFixedDollars] = useState("")
+  const [discountReason, setDiscountReason] = useState("")
+  const [discountExpiresDate, setDiscountExpiresDate] = useState("")
+  const [discountBusy, setDiscountBusy] = useState(false)
+  const [discountError, setDiscountError] = useState<string | null>(null)
+
+  const discountPreview = useMemo(() => {
+    if (!discountTarget) return null
+    const expIso = dateInputToExpiresIso(discountExpiresDate)
+    const baseM = resolveListMrrCents(discountTarget.planId, "monthly")
+    const baseA = resolveListMrrCents(discountTarget.planId, "annual")
+
+    if (discountFormType === "none") {
+      return {
+        monthly: { base: baseM, final: baseM },
+        annual: { base: baseA, final: baseA },
+      }
+    }
+
+    let valueNum: number | null = null
+    if (discountFormType === "percent") {
+      const p = parseFloat(discountPercentValue)
+      valueNum = Number.isFinite(p) ? p : null
+    } else {
+      const dollars = parseFloat(discountFixedDollars)
+      valueNum = Number.isFinite(dollars) ? Math.round(dollars * 100) : null
+    }
+
+    if (valueNum == null || !Number.isFinite(valueNum)) {
+      return {
+        monthly: { base: baseM, final: baseM },
+        annual: { base: baseA, final: baseA },
+      }
+    }
+
+    const t = discountFormType === "none" ? null : discountFormType
+    const pm = applyDiscountToMrrCents(baseM, t, valueNum, expIso)
+    const pa = applyDiscountToMrrCents(baseA, t, valueNum, expIso)
+    return {
+      monthly: { base: baseM, final: pm.finalCents },
+      annual: { base: baseA, final: pa.finalCents },
+    }
+  }, [
+    discountTarget,
+    discountFormType,
+    discountPercentValue,
+    discountFixedDollars,
+    discountExpiresDate,
+  ])
+
   const filtered = useMemo(() => {
     return accounts.filter((a) => {
       const q = search.toLowerCase()
@@ -166,8 +337,151 @@ function AccountsTab({
     }
   }
 
+  function openPlanDialog(account: PlatformAccount) {
+    setPlanTarget(account)
+    setPlanFormPlanId(initialPlanKey(account))
+    setPlanFormBillingCycle(account.billingCycle === "annual" ? "annual" : "monthly")
+    setPlanFormStatus(normalizeAdminBillingStatus(account.billingStatus))
+    setPlanFormTrialLocal(isoToDatetimeLocal(account.trialEndsAt))
+    setPlanError(null)
+    setPlanSaveNotice(null)
+    setMenuOpen(null)
+  }
+
+  function openDiscountDialog(account: PlatformAccount) {
+    setDiscountTarget(account)
+    const dt = account.discountType?.trim().toLowerCase()
+    if (dt === "percent") {
+      setDiscountFormType("percent")
+      setDiscountPercentValue(
+        account.discountValue != null && Number.isFinite(Number(account.discountValue))
+          ? String(account.discountValue)
+          : "",
+      )
+      setDiscountFixedDollars("")
+    } else if (dt === "fixed") {
+      setDiscountFormType("fixed")
+      const cents = account.discountValue != null ? Number(account.discountValue) : 0
+      setDiscountFixedDollars(Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : "")
+      setDiscountPercentValue("")
+    } else {
+      setDiscountFormType("none")
+      setDiscountPercentValue("")
+      setDiscountFixedDollars("")
+    }
+    setDiscountReason(account.discountReason ?? "")
+    setDiscountExpiresDate(isoToDateInput(account.discountExpiresAt))
+    setDiscountError(null)
+    setPlanSaveNotice(null)
+    setMenuOpen(null)
+  }
+
+  async function saveDiscount() {
+    if (!discountTarget) return
+    setDiscountBusy(true)
+    setDiscountError(null)
+    try {
+      if (discountFormType === "percent") {
+        const p = parseFloat(discountPercentValue)
+        if (!Number.isFinite(p) || p < 1 || p > 100) {
+          setDiscountError("Percent discount must be between 1 and 100.")
+          return
+        }
+      } else if (discountFormType === "fixed") {
+        const dollars = parseFloat(discountFixedDollars)
+        if (!Number.isFinite(dollars) || dollars <= 0) {
+          setDiscountError("Fixed amount must be greater than 0.")
+          return
+        }
+        const cents = Math.round(dollars * 100)
+        const base = resolveListMrrCents(discountTarget.planId, discountTarget.billingCycle)
+        if (cents > base) {
+          setDiscountError("Fixed discount cannot exceed list price for the current billing cycle.")
+          return
+        }
+      }
+
+      const payload: Record<string, unknown> = {}
+      if (discountFormType === "none") {
+        payload.discount_type = null
+        payload.discount_value = null
+        payload.discount_reason = null
+        payload.discount_expires_at = null
+      } else {
+        payload.discount_type = discountFormType
+        payload.discount_value =
+          discountFormType === "percent"
+            ? parseFloat(discountPercentValue)
+            : Math.round(parseFloat(discountFixedDollars) * 100)
+        payload.discount_reason = discountReason.trim() || null
+        payload.discount_expires_at = dateInputToExpiresIso(discountExpiresDate)
+      }
+
+      const res = await fetch(`/api/platform/accounts/${discountTarget.id}/discount`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        setDiscountError(data.message ?? "Could not save discount.")
+        return
+      }
+      setPlanSaveNotice("Discount saved.")
+      setDiscountTarget(null)
+      onRefresh()
+    } finally {
+      setDiscountBusy(false)
+    }
+  }
+
+  async function savePlan() {
+    if (!planTarget) return
+    if (planFormStatus === "trialing" && !planFormTrialLocal.trim()) {
+      setPlanError("Trial end date is required when status is Trialing.")
+      return
+    }
+    setPlanBusy(true)
+    setPlanError(null)
+    try {
+      const payload: Record<string, unknown> = {
+        plan_id: planFormPlanId,
+        billing_cycle: planFormBillingCycle,
+        status: planFormStatus,
+      }
+      if (planFormStatus === "trialing") {
+        const iso = datetimeLocalToIso(planFormTrialLocal)
+        if (!iso) {
+          setPlanError("Invalid trial end date.")
+          return
+        }
+        payload.trial_ends_at = iso
+      }
+      const res = await fetch(`/api/platform/accounts/${planTarget.id}/plan`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        setPlanError(data.message ?? "Could not update subscription.")
+        return
+      }
+      setPlanSaveNotice("Subscription updated.")
+      setPlanTarget(null)
+      onRefresh()
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {planSaveNotice && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+          {planSaveNotice}
+        </div>
+      )}
       {loadError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {loadError}
@@ -263,27 +577,39 @@ function AccountsTab({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ color: sc.color, background: sc.bg }}
-                      >
-                        {account.status}
-                        {account.status === "Trialing" && account.trialEndsAt && (
-                          <span className="ml-1 font-normal opacity-70">
-                            ends{" "}
-                            {new Date(account.trialEndsAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                        )}
-                      </span>
+                      <div className="flex flex-col gap-0.5 items-start">
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          style={{ color: sc.color, background: sc.bg }}
+                        >
+                          {account.status}
+                        </span>
+                        {trialHint(account)}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium ds-tabular">
-                      {account.mrr > 0 ? (
-                        fmt$(account.mrr)
-                      ) : (
+                    <td className="px-4 py-3 text-sm ds-tabular">
+                      {account.planId == null && account.billingStatus == null ? (
                         <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-col gap-0.5 items-start font-medium">
+                          {account.mrrBaseCents != null &&
+                            account.mrrBaseCents > account.mrr && (
+                              <span className="text-xs text-muted-foreground line-through font-normal">
+                                {fmt$(account.mrrBaseCents)}
+                              </span>
+                            )}
+                          <span className="flex items-center gap-1.5">
+                            {fmt$(account.mrr)}
+                            {account.hasActiveDiscount && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1 py-0 h-5 font-normal shrink-0"
+                              >
+                                Discount
+                              </Badge>
+                            )}
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm ds-tabular text-muted-foreground">{account.seats}</td>
@@ -326,6 +652,26 @@ function AccountsTab({
                               }}
                             >
                               <LogIn size={13} className="text-muted-foreground" /> Impersonate
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left"
+                              onClick={() => openPlanDialog(account)}
+                            >
+                              <CreditCard size={13} className="text-muted-foreground" /> Change plan
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
+                              disabled={account.planId == null && account.billingStatus == null}
+                              title={
+                                account.planId == null && account.billingStatus == null
+                                  ? "No subscription row yet — use Change plan first."
+                                  : undefined
+                              }
+                              onClick={() => openDiscountDialog(account)}
+                            >
+                              <Ticket size={13} className="text-muted-foreground" /> Manage discount
                             </button>
                             <button
                               type="button"
@@ -438,72 +784,486 @@ function AccountsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={planTarget != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPlanTarget(null)
+            setPlanError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change plan & billing</DialogTitle>
+          </DialogHeader>
+          {planTarget && (
+            <>
+              <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs space-y-1">
+                <p>
+                  <span className="text-muted-foreground">Current plan (display):</span>{" "}
+                  <span className="font-medium text-foreground">{planTarget.plan}</span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Billing status:</span>{" "}
+                  <span className="font-medium text-foreground">
+                    {billingStatusLabel(planTarget.billingStatus)}
+                  </span>
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Plan</label>
+                  <select
+                    className="input-base w-full text-sm"
+                    value={planFormPlanId}
+                    onChange={(e) => setPlanFormPlanId(e.target.value)}
+                  >
+                    {ADMIN_PLAN_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Billing cycle</label>
+                  <select
+                    className="input-base w-full text-sm"
+                    value={planFormBillingCycle}
+                    onChange={(e) => setPlanFormBillingCycle(e.target.value as "monthly" | "annual")}
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="annual">Annual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Subscription status</label>
+                  <select
+                    className="input-base w-full text-sm"
+                    value={planFormStatus}
+                    onChange={(e) => setPlanFormStatus(e.target.value)}
+                  >
+                    {ADMIN_BILLING_STATUSES.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {planFormStatus === "trialing" && (
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Trial ends (local time)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="input-base w-full text-sm"
+                      value={planFormTrialLocal}
+                      onChange={(e) => setPlanFormTrialLocal(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {planError && <p className="text-xs text-destructive">{planError}</p>}
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPlanTarget(null)
+                    setPlanError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" disabled={planBusy} onClick={() => void savePlan()}>
+                  {planBusy ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={discountTarget != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDiscountTarget(null)
+            setDiscountError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage discount</DialogTitle>
+          </DialogHeader>
+          {discountTarget && discountPreview && (
+            <>
+              <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs space-y-1">
+                <p>
+                  <span className="text-muted-foreground">Plan:</span>{" "}
+                  <span className="font-medium text-foreground">{discountTarget.plan}</span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Billing status:</span>{" "}
+                  <span className="font-medium text-foreground">
+                    {billingStatusLabel(discountTarget.billingStatus)}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">List price (monthly):</span>{" "}
+                  <span className="font-medium tabular-nums">
+                    {fmt$(resolveListMrrCents(discountTarget.planId, "monthly"))}/mo
+                  </span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">List price (annual billing cycle):</span>{" "}
+                  <span className="font-medium tabular-nums">
+                    {fmt$(resolveListMrrCents(discountTarget.planId, "annual"))}/mo
+                  </span>
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-dashed border-border px-3 py-2 text-xs space-y-1">
+                <p className="font-medium text-foreground">Preview</p>
+                <p>
+                  <span className="text-muted-foreground">Effective monthly rate:</span>{" "}
+                  <span className="font-semibold tabular-nums">{fmt$(discountPreview.monthly.final)}</span>
+                  {discountPreview.monthly.final < discountPreview.monthly.base && (
+                    <span className="text-muted-foreground line-through ml-2 tabular-nums">
+                      {fmt$(discountPreview.monthly.base)}
+                    </span>
+                  )}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Effective annual-cycle rate (/mo):</span>{" "}
+                  <span className="font-semibold tabular-nums">{fmt$(discountPreview.annual.final)}</span>
+                  {discountPreview.annual.final < discountPreview.annual.base && (
+                    <span className="text-muted-foreground line-through ml-2 tabular-nums">
+                      {fmt$(discountPreview.annual.base)}
+                    </span>
+                  )}
+                </p>
+                <p className="text-[10px] text-muted-foreground pt-1">
+                  Percent applies to list price. Fixed amount is dollars off per billing period (stored as cents).
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Discount type</label>
+                  <select
+                    className="input-base w-full text-sm"
+                    value={discountFormType}
+                    onChange={(e) =>
+                      setDiscountFormType(e.target.value as "none" | "percent" | "fixed")
+                    }
+                  >
+                    {DISCOUNT_TYPE_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {discountFormType === "percent" && (
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Percent off (1–100)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={1}
+                      className="input-base w-full text-sm"
+                      value={discountPercentValue}
+                      onChange={(e) => setDiscountPercentValue(e.target.value)}
+                    />
+                  </div>
+                )}
+                {discountFormType === "fixed" && (
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Fixed amount off (USD per billing period)
+                    </label>
+                    <input
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      className="input-base w-full text-sm"
+                      value={discountFixedDollars}
+                      onChange={(e) => setDiscountFixedDollars(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Reason (optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="input-base w-full text-sm"
+                    value={discountReason}
+                    onChange={(e) => setDiscountReason(e.target.value)}
+                    placeholder="e.g. Partner referral"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Discount expires (optional)
+                  </label>
+                  <input
+                    type="date"
+                    className="input-base w-full text-sm"
+                    value={discountExpiresDate}
+                    onChange={(e) => setDiscountExpiresDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {discountError && <p className="text-xs text-destructive">{discountError}</p>}
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDiscountTarget(null)
+                    setDiscountError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" disabled={discountBusy} onClick={() => void saveDiscount()}>
+                  {discountBusy ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
+type PlatformAnalyticsResponse = {
+  current: {
+    total_accounts: number
+    active_accounts: number
+    trialing_accounts: number
+    archived_accounts: number
+    total_mrr_cents: number
+    active_seats: number
+    equipment_records: number
+    work_orders: number
+    plan_distribution: { plan: string; accounts: number; color: string }[]
+  }
+  chart_monthly: { month: string; mrr: number }[]
+  mrr_growth_pct: number | null
+  account_growth_pct: number | null
+}
+
 function AnalyticsTab() {
+  const [data, setData] = useState<PlatformAnalyticsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const load = useCallback(async (silent?: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    } else {
+      setError(null)
+    }
+    try {
+      const res = await fetch("/api/platform/analytics")
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(typeof j.message === "string" ? j.message : "Failed to load analytics")
+      }
+      const j = (await res.json()) as PlatformAnalyticsResponse
+      setData(j)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load analytics")
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function runSnapshot() {
+    setRefreshing(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/analytics/snapshot", { method: "POST" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        throw new Error(typeof j.message === "string" ? j.message : "Could not refresh metrics")
+      }
+      await load(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not refresh metrics")
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const current = data?.current
+  const chartData = data?.chart_monthly ?? []
+  const nonArchived =
+    current != null ? Math.max(0, current.total_accounts - current.archived_accounts) : 0
+
   return (
     <div className="flex flex-col gap-6">
+      {error ? (
+        <div className="rounded-xl border border-border bg-card px-4 py-3 text-xs text-destructive">{error}</div>
+      ) : null}
+
       {/* MRR trend chart */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold">Monthly Recurring Revenue</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Last 6 months</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Last 6 months (from daily snapshots when available)</p>
           </div>
-          <span className="flex items-center gap-1 text-xs font-semibold ds-text-success">
-            <TrendingUp size={13} /> +{PLATFORM_STATS.mrrGrowth}% MoM
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1 text-xs font-semibold">
+              {loading ? (
+                <span className="text-muted-foreground">…</span>
+              ) : data?.mrr_growth_pct == null ? (
+                <span className="text-muted-foreground">— MoM</span>
+              ) : data.mrr_growth_pct >= 0 ? (
+                <span className="ds-text-success flex items-center gap-1">
+                  <TrendingUp size={13} /> +{data.mrr_growth_pct.toFixed(1)}% MoM
+                </span>
+              ) : (
+                <span className="text-destructive flex items-center gap-1">
+                  <TrendingDown size={13} /> {data.mrr_growth_pct.toFixed(1)}% MoM
+                </span>
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              disabled={loading || refreshing}
+              onClick={() => void runSnapshot()}
+            >
+              {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Refresh metrics
+            </Button>
+          </div>
         </div>
         <div className="p-6">
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={MRR_TREND}>
-              <defs>
-                <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => "$" + (v / 100).toLocaleString()} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={64} />
-              <Tooltip formatter={(v: number) => [fmt$(v), "MRR"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
-              <Area type="monotone" dataKey="mrr" stroke="var(--primary)" strokeWidth={2} fill="url(#mrrGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <div className="flex h-[180px] items-center justify-center text-xs text-muted-foreground">
+              <Loader2 size={18} className="animate-spin mr-2" /> Loading analytics…
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={v => "$" + (v / 100).toLocaleString()} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={64} />
+                <Tooltip formatter={(v: number) => [fmt$(v), "MRR"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)" }} />
+                <Area type="monotone" dataKey="mrr" stroke="var(--primary)" strokeWidth={2} fill="url(#mrrGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       {/* Plan distribution */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {PLAN_DISTRIBUTION.map(({ plan, accounts, color }) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {(current?.plan_distribution ?? []).map(({ plan, accounts, color }) => (
           <div key={plan} className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ color, background: color + "18" }}>{plan}</span>
-              <span className="text-2xl font-bold ds-tabular">{accounts}</span>
+              <span className="text-2xl font-bold ds-tabular">{loading ? "—" : accounts}</span>
             </div>
-            <p className="text-xs text-muted-foreground">accounts</p>
+            <p className="text-xs text-muted-foreground">accounts (non-archived)</p>
             <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${(accounts / PLATFORM_STATS.totalAccounts) * 100}%`, background: color }} />
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${nonArchived > 0 ? (accounts / nonArchived) * 100 : 0}%`,
+                  background: color,
+                }}
+              />
             </div>
           </div>
         ))}
       </div>
 
       {/* Usage metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
-          { label: "Total Accounts",  value: PLATFORM_STATS.totalAccounts.toString(),          icon: Building2, color: "#1d4ed8" },
-          { label: "Active Seats",    value: PLATFORM_STATS.totalSeats.toString(),              icon: Users,     color: "#15803d" },
-          { label: "Equipment Records", value: PLATFORM_STATS.totalEquipment.toLocaleString(), icon: Gauge,     color: "#b45309" },
-          { label: "Work Orders",     value: PLATFORM_STATS.totalWorkOrders.toLocaleString(),   icon: Activity,  color: "#7c3aed" },
-        ].map(({ label, value, icon: Icon, color }) => (
+          {
+            label: "Total Accounts",
+            value: current ? current.total_accounts.toString() : "—",
+            sub: current
+              ? `${current.active_accounts} active · ${current.trialing_accounts} trialing · ${current.archived_accounts} archived${
+                  loading || data?.account_growth_pct == null
+                    ? ""
+                    : ` · ${data.account_growth_pct >= 0 ? "+" : ""}${data.account_growth_pct.toFixed(1)}% (30d)`
+                }`
+              : "",
+            icon: Building2,
+            color: "#1d4ed8",
+          },
+          {
+            label: "Total MRR",
+            value: current ? fmt$(current.total_mrr_cents) : "—",
+            sub: "Sum of effective list MRR after discounts",
+            icon: DollarSign,
+            color: "#15803d",
+          },
+          {
+            label: "Active Seats",
+            value: current ? current.active_seats.toLocaleString() : "—",
+            sub: "non-archived workspaces",
+            icon: Users,
+            color: "#15803d",
+          },
+          {
+            label: "Equipment Records",
+            value: current ? current.equipment_records.toLocaleString() : "—",
+            sub: "non-archived orgs",
+            icon: Gauge,
+            color: "#b45309",
+          },
+          {
+            label: "Work Orders",
+            value: current ? current.work_orders.toLocaleString() : "—",
+            sub: "not archived",
+            icon: Activity,
+            color: "#7c3aed",
+          },
+        ].map(({ label, value, sub, icon: Icon, color }) => (
           <div key={label} className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-2">
               <Icon size={14} style={{ color }} />
               <p className="text-xs text-muted-foreground font-medium">{label}</p>
             </div>
             <p className="text-xl font-bold ds-tabular">{value}</p>
+            {sub ? <p className="text-[11px] text-muted-foreground mt-1">{sub}</p> : null}
           </div>
         ))}
       </div>
