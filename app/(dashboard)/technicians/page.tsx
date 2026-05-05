@@ -336,7 +336,7 @@ function ConfirmDeleteModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-sm p-6">
+      <div className="relative z-10 bg-background dark:bg-card rounded-xl border border-border shadow-2xl w-full max-w-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
             <Trash2 className="w-5 h-5 text-destructive" />
@@ -437,7 +437,7 @@ function AddTechModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="relative z-10 bg-background dark:bg-card rounded-xl border border-border shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-background z-10">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Add Technician</h2>
@@ -639,7 +639,7 @@ function MessageModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-md">
+      <div className="relative z-10 bg-background dark:bg-card rounded-xl border border-border shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Send Message</h2>
@@ -1402,7 +1402,7 @@ function TechniciansPageInner() {
           <Card>
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="ds-table-header-row">
                   <TableHead>Technician</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Region</TableHead>
@@ -1424,7 +1424,7 @@ function TechniciansPageInner() {
                   </TableRow>
                 )}
                 {!loading && filtered.map((tech) => (
-                  <TableRow key={tech.id} className="cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedTech(tech)}>
+                  <TableRow key={tech.id} className="cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors" onClick={() => setSelectedTech(tech)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <TechAvatar tech={tech} size="sm" />

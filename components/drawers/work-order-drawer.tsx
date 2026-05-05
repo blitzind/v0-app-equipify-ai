@@ -177,7 +177,7 @@ function EditInput({
       step={step}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 dark:bg-card"
+      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 dark:bg-background"
     />
   )
 }
@@ -189,7 +189,7 @@ function EditSelect({ value, onChange, options }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-card"
+      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -205,7 +205,7 @@ function EditTextarea({ value, onChange, placeholder, rows = 3 }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none dark:bg-card"
+      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none dark:bg-background"
     />
   )
 }
@@ -1471,7 +1471,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                         technicianAvatarUrl: opt?.avatarUrl ?? null,
                       }))
                     }}
-                    className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-card"
+                    className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
                   >
                     <option value="unassigned">Unassigned</option>
                     {technicianOptions.map((t) => (

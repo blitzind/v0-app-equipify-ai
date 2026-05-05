@@ -1128,7 +1128,7 @@ function BillingPageContent() {
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-secondary/40">
+            <tr className="border-b border-border bg-secondary/40 dark:bg-card">
               {["Invoice", "Date", "Amount", "Status", ""].map((h) => (
                 <th key={h || "actions"} className="text-left px-6 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">{h}</th>
               ))}

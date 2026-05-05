@@ -267,7 +267,7 @@ export function AddWorkOrderEquipmentModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter by name, model, serial, code…"
-              className="mb-3 bg-white dark:bg-card"
+              className="mb-3 bg-white dark:bg-background"
             />
 
             <div
@@ -302,7 +302,7 @@ export function AddWorkOrderEquipmentModal({
                           "rounded-lg border px-3 py-3 sm:px-4 sm:py-3.5 transition-colors",
                           checked
                             ? "border-primary/35 bg-primary/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                            : "border-border/90 bg-card/40 hover:bg-muted/30",
+                            : "border-border/90 bg-card/40 hover:bg-muted/30 dark:hover:bg-accent",
                         )}
                       >
                         <div className="flex flex-col gap-3">
@@ -347,7 +347,7 @@ export function AddWorkOrderEquipmentModal({
                                   disabled={!checked}
                                   onValueChange={(v) => setJobForEquipment(e.id, { type: v as WorkOrderType })}
                                 >
-                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-card">
+                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -366,7 +366,7 @@ export function AddWorkOrderEquipmentModal({
                                   disabled={!checked}
                                   onValueChange={(v) => setJobForEquipment(e.id, { priority: v as WorkOrderPriority })}
                                 >
-                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-card">
+                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -387,7 +387,7 @@ export function AddWorkOrderEquipmentModal({
                                 onChange={(ev) => setJobForEquipment(e.id, { problemReported: ev.target.value })}
                                 placeholder="Problem reported for this asset…"
                                 rows={2}
-                                className="text-sm bg-white dark:bg-card resize-y min-h-[52px]"
+                                className="text-sm bg-white dark:bg-background resize-y min-h-[52px]"
                               />
                             </div>
                             <div className="flex flex-col gap-1.5">
@@ -398,7 +398,7 @@ export function AddWorkOrderEquipmentModal({
                                 onChange={(ev) => setJobForEquipment(e.id, { notes: ev.target.value })}
                                 placeholder="Technician or office notes for this asset…"
                                 rows={2}
-                                className="text-sm bg-white dark:bg-card resize-y min-h-[52px]"
+                                className="text-sm bg-white dark:bg-background resize-y min-h-[52px]"
                               />
                             </div>
                           </div>

@@ -240,7 +240,7 @@ function PartsTable({
       <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/30 hover:bg-muted/30">
+            <TableRow className="ds-table-header-row-subtle">
               <TableHead>Part Name</TableHead>
               <TableHead>Part #</TableHead>
               <TableHead className="w-20 text-right">Qty</TableHead>
@@ -1333,7 +1333,7 @@ export function WorkOrderDetailExperience({
 
           {(equipmentAssets.length > 0 || onOpenAddEquipment) && (
             <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 border-b border-border/80 bg-muted/30 px-4 py-2.5">
+              <div className="flex items-center justify-between gap-2 border-b border-border/80 bg-muted/30 dark:bg-card px-4 py-2.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <Boxes className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1852,7 +1852,7 @@ export function WorkOrderDetailExperience({
                 tasks.map((t) => (
                   <div
                     key={t.id}
-                    className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5 hover:bg-muted/30"
+                    className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5 hover:bg-muted/30 dark:hover:bg-accent"
                   >
                     {tasksEditable ? (
                       <>

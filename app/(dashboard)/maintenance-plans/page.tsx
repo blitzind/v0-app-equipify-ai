@@ -457,7 +457,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
       onClose={onClose}
       width="xl"
       ariaLabel={plan.name}
-      panelClassName="border-l border-border bg-background shadow-2xl"
+      panelClassName="border-l border-border bg-background dark:bg-card shadow-2xl"
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header */}
@@ -651,7 +651,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   {plan.services.map((svc, i) => (
                     <div
                       key={`${svc.id ?? "service"}-${i}`}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/30"
+                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/30 dark:hover:bg-accent"
                     >
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold shrink-0 mt-0.5">
                         {i + 1}
@@ -728,7 +728,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                 <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableRow className="ds-table-header-row-subtle">
                         <TableHead className="text-xs">Title</TableHead>
                         <TableHead className="text-xs">Status</TableHead>
                         <TableHead className="text-xs">Scheduled</TableHead>
@@ -1283,7 +1283,7 @@ function MaintenancePlansPageInner() {
       ) : (
         <div className="border border-border rounded-lg overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-muted/50 border-b border-border">
+            <thead className="ds-thead-bg-strong border-b border-border">
               <tr>
                 {["Plan Name", "Customer", "Equipment", "Interval", "Technician", "Next Due", "Status", ""].map((h, colIdx) => (
                   <th key={`th-${colIdx}`} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
@@ -1298,7 +1298,7 @@ function MaintenancePlansPageInner() {
                   <tr
                     key={plan.id}
                     className={cn(
-                      "bg-card hover:bg-muted/30 cursor-pointer transition-colors",
+                      "bg-card hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors",
                       accent === "overdue" && "bg-destructive/[0.06]",
                       accent === "dueToday" && "bg-amber-500/[0.06]",
                     )}

@@ -183,7 +183,7 @@ function VendorsPageInner() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
+              <tr className="border-b border-border ds-table-header-row">
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">
                   Contact
@@ -209,7 +209,7 @@ function VendorsPageInner() {
                 filtered.map((r) => (
                   <tr
                     key={r.id}
-                    className="hover:bg-muted/30 cursor-pointer transition-colors group"
+                    className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors group"
                     onClick={() => setSelectedId(r.id)}
                   >
                     <td className="px-4 py-3 font-medium text-foreground max-w-[200px] truncate">{r.name}</td>

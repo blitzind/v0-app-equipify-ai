@@ -74,7 +74,7 @@ function CommandInput({
         data-slot="command-input"
         className={cn(
           'flex h-10 w-full rounded-md border border-transparent bg-white py-3 text-sm text-foreground outline-none transition-[color,box-shadow,border-color]',
-          'dark:bg-card',
+          'dark:bg-background',
           'placeholder:text-muted-foreground',
           'focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20',
           'focus-visible:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20',

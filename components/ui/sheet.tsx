@@ -8,6 +8,7 @@ import { useWorkspacePortalContainer } from '@/hooks/use-workspace-portal-contai
 import { cn } from '@/lib/utils'
 import {
   DRAWER_BACKDROP_Z,
+  DRAWER_PANEL_SURFACE,
   DRAWER_PANEL_Z,
   EQUIPIFY_SCRIM,
 } from '@/components/detail-drawer'
@@ -74,7 +75,8 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+          DRAWER_PANEL_SURFACE,
+          'data-[state=open]:animate-in data-[state=closed]:animate-out fixed flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
           DRAWER_PANEL_Z,
           side === 'right' &&
             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm',

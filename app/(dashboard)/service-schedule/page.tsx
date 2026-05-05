@@ -212,7 +212,7 @@ function RescheduleModal({ plan, onClose }: ReschedulePlan) {
     >
       <div className={cn("absolute inset-0", EQUIPIFY_SCRIM)} onClick={onClose} aria-hidden />
 
-      <div className="relative z-10 bg-background rounded-xl border border-border shadow-2xl w-full max-w-md flex flex-col">
+      <div className="relative z-10 bg-background dark:bg-card rounded-xl border border-border shadow-2xl w-full max-w-md flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
@@ -935,7 +935,7 @@ function MapView({
             key={loc}
             className={cn(
               "rounded-lg border p-3 flex flex-col gap-2 transition-colors cursor-pointer",
-              selected === loc ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:bg-muted/30"
+              selected === loc ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:bg-muted/30 dark:hover:bg-accent"
             )}
             onClick={() => setSelected(selected === loc ? null : loc)}
           >

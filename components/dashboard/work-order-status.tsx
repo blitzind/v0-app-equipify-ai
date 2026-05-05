@@ -104,7 +104,7 @@ export function WorkOrderStatus({
                   <button
                     type="button"
                     onClick={() => goToStatusFilter(status)}
-                    className="flex w-full items-center gap-2.5 rounded-md py-1 pr-1 text-left text-xs hover:bg-muted/60 transition-colors cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-md py-1 pr-1 text-left text-xs hover:bg-muted/60 dark:hover:bg-accent transition-colors cursor-pointer"
                   >
                     <span
                       className="size-2.5 shrink-0 rounded-full border border-border/50"

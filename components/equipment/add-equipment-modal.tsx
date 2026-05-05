@@ -309,7 +309,7 @@ export function AddEquipmentModal({
         aria-label={postSave ? "Equipment saved" : "Add Equipment"}
         className="fixed inset-0 z-[230] flex items-start justify-center pt-12 px-4 pb-8"
       >
-        <div className="relative w-full max-w-2xl bg-background rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
+        <div className="relative w-full max-w-2xl bg-background dark:bg-card rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
             <div>

@@ -350,7 +350,7 @@ function TableView({
     <div className="rounded-lg border border-border overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
+          <TableRow className="ds-table-header-row-subtle">
             <TableHead className="w-28"><SortHeader label="ID" col="id" /></TableHead>
             <TableHead><SortHeader label="Customer" col="customerName" /></TableHead>
             <TableHead>Equipment</TableHead>
@@ -364,7 +364,7 @@ function TableView({
         </TableHeader>
         <TableBody>
           {workOrders.map((wo) => (
-            <TableRow key={wo.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => onOpen(wo.id)}>
+            <TableRow key={wo.id} className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors" onClick={() => onOpen(wo.id)}>
               <TableCell>
                 <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
               </TableCell>

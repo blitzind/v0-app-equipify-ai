@@ -48,11 +48,11 @@ const sectionCardClass = "rounded-xl border border-border bg-white shadow-sm dar
 
 /** Drawer fields use compact sizing on top of shared Input/Textarea styles (editable = white surfaces) */
 const fieldControl =
-  "h-8 px-2.5 py-1 text-xs bg-white border-border text-foreground dark:bg-card"
+  "h-8 px-2.5 py-1 text-xs bg-white border-border text-foreground dark:bg-background"
 const fieldTextarea =
-  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-card"
+  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-background"
 const fieldNotesTextarea =
-  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-card"
+  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-background"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -533,7 +533,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       {confirmArchiveOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !destructiveBusy && setConfirmArchiveOpen(false)} />
-          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[color:var(--status-warning)]" />
               <h3 className="text-sm font-semibold text-foreground">Archive vendor?</h3>
@@ -556,7 +556,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !destructiveBusy && setConfirmDeleteOpen(false)} />
-          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-destructive" />
               <h3 className="text-sm font-semibold text-foreground">Delete vendor?</h3>

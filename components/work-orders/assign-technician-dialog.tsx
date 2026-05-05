@@ -72,7 +72,7 @@ export function AssignTechnicianDialog({
                       "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors cursor-pointer",
                       selected
                         ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                        : "border-border bg-card hover:bg-muted/40",
+                        : "border-border bg-card hover:bg-muted/40 dark:hover:bg-accent",
                       busy && !loadingThis && "opacity-50 pointer-events-none",
                     )}
                   >

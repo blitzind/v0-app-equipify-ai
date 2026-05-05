@@ -173,7 +173,7 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+      <div className="w-full max-w-md bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
@@ -279,7 +279,7 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 transition-colors"
+            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 dark:hover:bg-accent transition-colors"
           >
             Cancel
           </button>
@@ -307,7 +307,7 @@ interface DeleteConfirmProps {
 function DeleteConfirm({ hasRelatedRecords, onArchive, onDelete, onCancel }: DeleteConfirmProps) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-sm bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+      <div className="w-full max-w-sm bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">
             {hasRelatedRecords ? "Archive Location?" : "Delete Location?"}
@@ -323,7 +323,7 @@ function DeleteConfirm({ hasRelatedRecords, onArchive, onDelete, onCancel }: Del
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 transition-colors"
+            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted/60 dark:hover:bg-accent transition-colors"
           >
             Cancel
           </button>
@@ -903,7 +903,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <Link
                   key={plan.id}
                   href={`/maintenance-plans?open=${plan.id}`}
-                  className="flex items-start justify-between gap-2 p-3 rounded-xl border border-border bg-muted/25 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] hover:border-primary/30 hover:bg-muted/40 transition-colors group"
+                  className="flex items-start justify-between gap-2 p-3 rounded-xl border border-border bg-muted/25 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] hover:border-primary/30 hover:bg-muted/40 dark:hover:bg-accent transition-colors group"
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
@@ -1069,13 +1069,13 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                         setEditingLocationId(loc.id)
                         setLocationModal("edit")
                       }}
-                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/60 transition-colors"
+                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted/60 dark:hover:bg-accent transition-colors"
                     >
                       <Pencil size={11} /> Edit
                     </button>
                     <button
                       onClick={() => setOpenLocationMenu(openLocationMenu === loc.id ? null : loc.id)}
-                      className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                      className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted/60 dark:hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                       aria-label="More options"
                     >
                       <MoreHorizontal size={13} />
@@ -1083,7 +1083,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
                     {/* Dropdown menu */}
                     {openLocationMenu === loc.id && (
-                      <div className="absolute right-0 top-8 z-50 w-44 rounded-lg border border-border bg-background shadow-lg py-1 text-xs">
+                      <div className="absolute right-0 top-8 z-50 w-44 rounded-lg border border-border bg-background dark:bg-card shadow-lg py-1 text-xs">
                         <button
                           onClick={() => {
                             setOpenLocationMenu(null)
@@ -1109,7 +1109,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                               }
                             })()
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 text-foreground transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 dark:hover:bg-accent text-foreground transition-colors"
                         >
                           <Star size={12} className="text-muted-foreground" /> Set as Default
                         </button>
@@ -1176,7 +1176,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <Link
                 key={eq.id}
                 href={`/equipment?open=${eq.id}`}
-                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40"
+                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40 dark:hover:bg-accent"
               >
                 <div>
                   <p className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
@@ -1230,7 +1230,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <Link
                 key={wo.id}
                 href={`/work-orders?open=${wo.id}`}
-                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40"
+                className="group flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/20 p-2.5 shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors hover:border-primary/30 hover:bg-muted/40 dark:hover:bg-accent"
               >
                 <div>
                   <p className="text-xs font-semibold font-mono text-primary">
@@ -1258,7 +1258,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <Link
                   key={wo.id}
                   href={`/work-orders?open=${wo.id}`}
-                  className="group flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/30"
+                  className="group flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/30 dark:hover:bg-accent"
                 >
                   <div
                     className={cn(
@@ -1450,7 +1450,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
 
       {contactModalOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-background rounded-xl border border-border shadow-xl overflow-hidden">
+          <div className="w-full max-w-md bg-background dark:bg-card rounded-xl border border-border shadow-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground">
                 {editingContactId ? "Edit Contact" : "Add Contact"}

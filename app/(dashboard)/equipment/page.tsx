@@ -556,7 +556,7 @@ function EquipmentPageInner() {
           <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40 h-12">
+              <TableRow className="ds-table-header-row h-12">
                 <TableHead className="w-12 min-w-12 px-0">
                   <div className="flex h-full w-full items-center justify-center">
                     <Checkbox
@@ -608,7 +608,7 @@ function EquipmentPageInner() {
                   <TableRow
                     key={eq.id}
                     className={cn(
-                      "group cursor-pointer hover:bg-muted/30 transition-colors h-14",
+                      "group cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors h-14",
                       selected.has(eq.id) && "bg-primary/5",
                     )}
                     onClick={() => setSelectedEquipmentId(eq.id)}

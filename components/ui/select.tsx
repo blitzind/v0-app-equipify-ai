@@ -39,7 +39,7 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         "flex w-fit items-center justify-between gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground whitespace-nowrap shadow-xs outline-none transition-[color,box-shadow,border-color]",
-        "dark:bg-card",
+        "dark:bg-background",
         "data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground",
         "hover:border-foreground/15 dark:hover:border-foreground/25",
         "focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",

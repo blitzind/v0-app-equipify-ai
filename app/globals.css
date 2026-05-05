@@ -57,7 +57,7 @@
   --ai-purple-fg: oklch(0.99 0 0);
 }
 
-/* Dark theme: main canvas `#0B111E`; elevated surfaces `#121B2C` (sidebar uses explicit `#0F172A` in `app-sidebar`). */
+/* Dark theme: canvas `#0B111E`; surfaces `#121B2C`; borders `#25324C`; list-hover `#111724` via `--accent`. Slide-over: `DRAWER_PANEL_SURFACE`. Sidebar: `#0F172A` in `app-sidebar`. */
 .dark {
   --background: #0b111e;
   --foreground: oklch(0.93 0.008 240);
@@ -76,14 +76,19 @@
   --secondary: oklch(0.24 0.018 252);
   --secondary-foreground: oklch(0.90 0.008 240);
   --muted: oklch(0.24 0.018 252);
-  --muted-foreground: oklch(0.62 0.022 250);
-  --accent: oklch(0.24 0.018 252);
-  --accent-foreground: oklch(0.90 0.008 240);
+  --muted-foreground: oklch(0.65 0.024 250);
+  /* Tables, menus, cmdk, selectable rows — unified hover surface */
+  --accent: #111724;
+  --accent-foreground: oklch(0.93 0.008 240);
   --destructive: oklch(0.577 0.245 27.33);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.34 0.024 252);
-  --input: oklch(0.34 0.024 252);
+  --border: #25324c;
+  --input: #25324c;
   --ring: color-mix(in srgb, var(--primary) 50%, transparent);
+  /* Operational Insights / info callouts on dark (replaces light `#E4F5FE`-family tints) */
+  --ds-info-bg: #1b2437;
+  --ds-info-border: #25324c;
+  --ds-info-text: oklch(0.88 0.045 240);
   --chart-1: oklch(0.60 0.21 231);
   --chart-2: oklch(0.55 0.15 145);
   --chart-3: oklch(0.72 0.17 70);
@@ -373,6 +378,35 @@
   .ds-row-hover:hover {
     background-color: color-mix(in oklch, var(--primary) 3%, var(--card));
   }
+  .dark .ds-row-hover:hover {
+    background-color: var(--accent);
+  }
+
+  /* ── Table / list header rows & thead/tfoot (dark: #121B2C = --card; replaces ~#151D2A muted wash) ── */
+  .ds-table-header-row {
+    @apply bg-muted/40 hover:bg-muted/40 dark:bg-card dark:hover:bg-card;
+  }
+  .ds-table-header-row-subtle {
+    @apply bg-muted/30 hover:bg-muted/30 dark:bg-card dark:hover:bg-card;
+  }
+  .ds-table-header-row-strong {
+    @apply bg-muted/50 hover:bg-muted/50 dark:bg-card dark:hover:bg-card;
+  }
+  .ds-thead-bg {
+    @apply bg-muted/40 dark:bg-card;
+  }
+  .ds-thead-bg-subtle {
+    @apply bg-muted/30 dark:bg-card;
+  }
+  .ds-thead-bg-strong {
+    @apply bg-muted/50 dark:bg-card;
+  }
+  .ds-tfoot-bg {
+    @apply bg-muted/40 dark:bg-card;
+  }
+  .ds-tfoot-bg-subtle {
+    @apply bg-muted/30 dark:bg-card;
+  }
 
   /* ── Interactive card lift ────────────────────────────────────────────────
      Apply to any card that should lift on hover (opt-in, not global).      */
@@ -409,7 +443,7 @@
     @apply w-full h-9 px-3 text-sm border border-border rounded-md bg-white text-foreground
       placeholder:text-muted-foreground transition-shadow
       outline-none focus:outline-none focus:ring-2 focus:ring-primary/20
-      dark:bg-card
+      dark:bg-background
       disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed
       read-only:bg-zinc-50 read-only:text-foreground dark:read-only:bg-muted/30;
   }

@@ -1655,7 +1655,7 @@ export function TechnicianDrawer({
                 <div className="rounded-xl border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableRow className="ds-table-header-row">
                         <TableHead className="text-xs">Name</TableHead>
                         <TableHead className="text-xs">Issuer</TableHead>
                         <TableHead className="text-xs">Expires</TableHead>
@@ -1755,7 +1755,7 @@ export function TechnicianDrawer({
                 <div className="rounded-xl border border-border overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableRow className="ds-table-header-row">
                         <TableHead className="text-xs whitespace-nowrap">WO #</TableHead>
                         <TableHead className="text-xs">Customer</TableHead>
                         <TableHead className="text-xs min-w-[140px]">Equipment</TableHead>
@@ -1768,7 +1768,7 @@ export function TechnicianDrawer({
                       {historyRows.map((r) => (
                         <TableRow
                           key={r.id}
-                          className="cursor-pointer hover:bg-muted/30"
+                          className="cursor-pointer hover:bg-muted/30 dark:hover:bg-accent"
                           onClick={() => setOpenScheduleWoId(r.id)}
                         >
                           <TableCell className="text-sm font-mono text-primary whitespace-nowrap">
@@ -1889,7 +1889,7 @@ export function TechnicianDrawer({
                     onChange={(e) => setNoteDraft(e.target.value)}
                     placeholder="Add an internal note about this technician…"
                     rows={3}
-                    className="text-sm resize-y min-h-[72px] bg-white dark:bg-card"
+                    className="text-sm resize-y min-h-[72px] bg-white dark:bg-background"
                   />
                   <div className="flex justify-end">
                     <Button
@@ -1997,7 +1997,7 @@ export function TechnicianDrawer({
                             value={noteEditBody}
                             onChange={(e) => setNoteEditBody(e.target.value)}
                             rows={4}
-                            className="text-sm resize-y bg-white dark:bg-card"
+                            className="text-sm resize-y bg-white dark:bg-background"
                           />
                         ) : (
                           <p className="text-sm text-foreground whitespace-pre-wrap">{n.note}</p>

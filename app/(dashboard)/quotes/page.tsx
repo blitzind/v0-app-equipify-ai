@@ -372,7 +372,7 @@ function QuotesPageInner() {
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableRow className="ds-table-header-row-subtle">
                 <TableHead>
                   <button onClick={() => toggleSort("id")} className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                     Quote # <SortIcon col="id" sortKey={sortKey} sortDir={sortDir} />

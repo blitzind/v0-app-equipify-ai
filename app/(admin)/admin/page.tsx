@@ -790,7 +790,7 @@ function AccountsTab({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/40">
+              <tr className="border-b border-border bg-secondary/40 dark:bg-card">
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
                   Account
                 </th>

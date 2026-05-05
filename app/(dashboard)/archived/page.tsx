@@ -169,7 +169,7 @@ export default function ArchivedCenterPage() {
         <Card className="border-border/80 overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent">
+              <TableRow className="ds-table-header-row hover:bg-transparent dark:hover:bg-card">
                 <TableHead className="w-[140px]">Type</TableHead>
                 <TableHead>Name / title</TableHead>
                 <TableHead className="w-[160px]">Archived date</TableHead>

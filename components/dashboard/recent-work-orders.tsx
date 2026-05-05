@@ -57,7 +57,7 @@ export function RecentWorkOrders({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/30">
+              <tr className="border-b border-border ds-table-header-row-subtle">
                 <th className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">WO #</th>
                 <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Customer</th>
                 <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 whitespace-nowrap">Equipment</th>

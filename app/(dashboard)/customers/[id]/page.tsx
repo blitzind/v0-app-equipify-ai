@@ -264,7 +264,7 @@ function ActivityTimeline({ items }: { items: ActivityEntry[] }) {
             {item.icon === "plan" && <Repeat className="w-3.5 h-3.5 text-muted-foreground" />}
           </div>
           <Link href={item.href} className="block group">
-            <div className="bg-card/80 border border-border rounded-xl p-4 hover:border-primary/35 hover:bg-muted/20 transition-all">
+            <div className="bg-card/80 border border-border rounded-xl p-4 hover:border-primary/35 hover:bg-muted/20 dark:hover:bg-accent transition-all">
               <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{item.title}</p>
               <p className="text-xs text-muted-foreground mt-1">{item.subtitle}</p>
               <p className="text-[10px] text-muted-foreground/80 mt-2 font-medium uppercase tracking-wide">
@@ -292,7 +292,7 @@ function EquipmentRow({ eq, customerName }: { eq: Equipment; customerName?: stri
 
   return (
     <Link href={`/equipment/${eq.id}`}>
-      <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group cursor-pointer">
+      <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group cursor-pointer">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
           <Wrench className="w-4 h-4" />
         </div>
@@ -1624,7 +1624,7 @@ export default function CustomerDetailPage() {
           ) : (
             <div className="rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b border-border">
+                <thead className="ds-thead-bg-strong border-b border-border">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Work order
@@ -1643,7 +1643,7 @@ export default function CustomerDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {customerWorkOrders.map((wo) => (
-                    <tr key={wo.id} className="bg-card hover:bg-muted/25 transition-colors">
+                    <tr key={wo.id} className="bg-card hover:bg-muted/25 dark:hover:bg-accent transition-colors">
                       <td className="px-4 py-3">
                         <p className="text-xs font-mono text-primary">
                           {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
@@ -1745,7 +1745,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={plan.id}
                           href={`/maintenance-plans?open=${plan.id}`}
-                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group"
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
                             <Repeat className="h-5 w-5 text-muted-foreground" />
@@ -1782,7 +1782,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={plan.id}
                           href={`/maintenance-plans?open=${plan.id}`}
-                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group opacity-95"
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group opacity-95"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
                             <Repeat className="h-5 w-5 text-muted-foreground" />
@@ -1823,7 +1823,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={wo.id}
                           href={`/work-orders?open=${wo.id}`}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 transition-colors group"
+                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 dark:hover:bg-accent transition-colors group"
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-mono text-primary truncate">{formatWorkOrderDisplay(wo.work_order_number, wo.id)}</p>

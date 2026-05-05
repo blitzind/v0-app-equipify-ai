@@ -368,7 +368,7 @@ function PurchaseOrdersPageInner() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border ds-table-header-row">
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
                     <span className="flex items-center gap-1">PO # <SortBtn col="id" /></span>
                   </th>
@@ -402,7 +402,7 @@ function PurchaseOrdersPageInner() {
                   return (
                     <tr
                       key={po.id}
-                      className="hover:bg-muted/30 cursor-pointer transition-colors group"
+                      className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors group"
                       onClick={() => setSelectedId(po.id)}
                     >
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 whitespace-nowrap">
@@ -448,7 +448,7 @@ function PurchaseOrdersPageInner() {
       {createOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !creatingNew && setCreateOpen(false)} />
-          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col">
+          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground">Create Purchase Order</h3>
               <button
@@ -475,7 +475,7 @@ function PurchaseOrdersPageInner() {
                     }}
                   />
                   {vendorMenuOpen && (
-                    <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-56 overflow-y-auto">
+                    <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-background dark:bg-card shadow-lg max-h-56 overflow-y-auto">
                       {vendors
                         .filter((v) => v.name.toLowerCase().includes(vendorQuery.toLowerCase()))
                         .map((vendor) => (
@@ -483,7 +483,7 @@ function PurchaseOrdersPageInner() {
                             key={vendor.id}
                             type="button"
                             onClick={() => selectVendor(vendor)}
-                            className="w-full text-left px-3 py-2 hover:bg-muted/60 text-sm"
+                            className="w-full text-left px-3 py-2 hover:bg-muted/60 dark:hover:bg-accent text-sm"
                           >
                             <div className="font-medium">{vendor.name}</div>
                             {vendor.email && <div className="text-xs text-muted-foreground">{vendor.email}</div>}
@@ -495,7 +495,7 @@ function PurchaseOrdersPageInner() {
                           setVendorMenuOpen(false)
                           setAddVendorOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2 border-t border-border text-sm text-primary hover:bg-muted/60"
+                        className="w-full text-left px-3 py-2 border-t border-border text-sm text-primary hover:bg-muted/60 dark:hover:bg-accent"
                       >
                         + Add New Vendor
                       </button>

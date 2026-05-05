@@ -246,7 +246,7 @@ export default function TeamPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/30">
+              <tr className="border-b border-border bg-secondary/30 dark:bg-card">
                 {["Member", "Role", "Status", "Last active", ""].map((h) => (
                   <th key={h} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">{h}</th>
                 ))}

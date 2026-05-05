@@ -144,6 +144,7 @@ export function OperationalInsightsWidget({
             "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium border transition-colors shrink-0",
             "bg-white/60 border-[color:var(--ds-info-border)] text-[color:var(--ds-info-text)]",
             "hover:bg-white",
+            "dark:bg-card/80 dark:hover:bg-accent dark:border-border dark:text-foreground",
           )}
         >
           Work queue
@@ -166,7 +167,7 @@ export function OperationalInsightsWidget({
             "inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors shrink-0",
             activeCategory === null
               ? "bg-[color:var(--ds-info-subtle)] text-white"
-              : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80",
+              : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 dark:hover:bg-accent",
           )}
         >
           All
@@ -185,7 +186,7 @@ export function OperationalInsightsWidget({
                 "inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors shrink-0",
                 activeCategory === cat
                   ? "bg-[color:var(--ds-info-subtle)] text-white"
-                  : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80",
+                  : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 dark:hover:bg-accent",
                 count === 0 && "opacity-40",
               )}
               disabled={count === 0}
@@ -270,17 +271,9 @@ function InsightRow({
   return (
     <li
       className={cn(
-        "flex items-start gap-3 px-5 py-4 border-l-2 transition-colors",
+        "flex items-start gap-3 px-5 py-4 border-l-2 transition-colors bg-card hover:bg-accent",
         meta.border,
       )}
-      style={{ backgroundColor: "var(--card)" }}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.backgroundColor =
-          "color-mix(in oklch, var(--primary) 2.5%, var(--card))")
-      }
-      onMouseLeave={(e) =>
-        (e.currentTarget.style.backgroundColor = "var(--card)")
-      }
     >
       <div
         className={cn(

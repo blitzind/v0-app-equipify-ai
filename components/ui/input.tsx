@@ -10,7 +10,7 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
       className={cn(
         // Surface & typography (enabled editable fields)
         'min-h-9 h-9 w-full min-w-0 rounded-md border border-border bg-white px-3 py-1 text-base text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color]',
-        'dark:bg-card',
+        'dark:bg-background',
         'file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground',
         'placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
         'hover:border-foreground/15 dark:hover:border-foreground/25',

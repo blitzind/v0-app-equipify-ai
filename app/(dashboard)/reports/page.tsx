@@ -541,7 +541,7 @@ export default function ReportsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b border-border ds-table-header-row-subtle">
                   <th className="text-left text-muted-foreground font-medium pb-2 pr-3">#</th>
                   <th className="text-left text-muted-foreground font-medium pb-2 pr-3">Customer</th>
                   <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Revenue</th>

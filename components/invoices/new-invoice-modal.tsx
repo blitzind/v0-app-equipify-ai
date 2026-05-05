@@ -517,7 +517,7 @@ export function NewInvoiceModal({
             onClick={() => !submitting && onClose()}
           />
 
-          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-border bg-background shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-border bg-background dark:bg-card shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Create New Invoice</h2>

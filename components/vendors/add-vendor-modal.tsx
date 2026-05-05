@@ -116,7 +116,7 @@ export function AddVendorModal({
         onClick={() => !saving && onClose()}
         aria-hidden
       />
-      <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90dvh]">
+      <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90dvh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <h3 className="text-sm font-semibold text-foreground">Add Vendor</h3>
           <button

@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge"
 export const EQUIPIFY_SCRIM =
   "bg-black/40 backdrop-blur-[2px]"
 
+/** Slide-over / sheet panel: light uses page bg token; dark uses elevated card (#121B2C). */
+export const DRAWER_PANEL_SURFACE = "bg-background dark:bg-card"
+
 /** Backdrop sits below the panel; above main app chrome. */
 export const DRAWER_BACKDROP_Z = "z-[100]"
 /** Sliding panel above backdrop. */
@@ -99,7 +102,8 @@ export function DrawerViewport({
         aria-modal="true"
         aria-label={ariaLabel}
         className={cn(
-          "fixed top-0 right-0 h-full max-h-dvh w-full bg-background border-l border-border shadow-2xl",
+          "fixed top-0 right-0 h-full max-h-dvh w-full border-l border-border shadow-2xl",
+          DRAWER_PANEL_SURFACE,
           "flex flex-col min-h-0 transition-transform ease-in-out will-change-transform",
           DRAWER_PANEL_Z,
           widthClass,
@@ -234,7 +238,7 @@ export function DrawerTimeline({ items }: {
         {items.map((item, i) => (
           <div key={i} className="relative flex gap-3">
             <div className={cn(
-              "absolute -left-4 top-1 w-2 h-2 rounded-full border-2 border-background shrink-0",
+              "absolute -left-4 top-1 w-2 h-2 rounded-full border-2 border-background dark:border-card shrink-0",
               accentMap[item.accent ?? "muted"]
             )} />
             <div>
@@ -264,7 +268,7 @@ export function DrawerLineItems({ items, total }: {
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       <table className="w-full text-xs">
-        <thead className="bg-muted/40">
+        <thead className="ds-thead-bg">
           <tr>
             <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Description</th>
             <th className="text-right px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide text-[10px] w-10">Qty</th>
@@ -282,7 +286,7 @@ export function DrawerLineItems({ items, total }: {
             </tr>
           ))}
         </tbody>
-        <tfoot className="bg-muted/40 border-t border-border">
+        <tfoot className="ds-tfoot-bg border-t border-border">
           <tr>
             <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
             <td className="px-3 py-2 text-right font-bold text-foreground">{fmt$(total)}</td>

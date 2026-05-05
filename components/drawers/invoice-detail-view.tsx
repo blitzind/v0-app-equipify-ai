@@ -1229,7 +1229,7 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
     <div className="space-y-2">
       <Link
         href={`/work-orders?open=${invoice.workOrderId}`}
-        className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:bg-muted/20 hover:border-primary/30 transition-colors cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:bg-muted/20 dark:hover:bg-accent hover:border-primary/30 transition-colors cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -1321,7 +1321,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
   return (
     <div className="space-y-2 p-3">
       <table className="w-full text-xs">
-        <thead className="bg-muted/40">
+        <thead className="ds-thead-bg">
           <tr>
             <th className="text-left px-2 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
             <th className="text-right px-2 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-14">Qty</th>
@@ -1354,7 +1354,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
             </tr>
           ))}
         </tbody>
-        <tfoot className="bg-muted/40 border-t border-border">
+        <tfoot className="ds-tfoot-bg border-t border-border">
           <tr>
             <td colSpan={3} className="px-2 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
             <td className="px-2 py-2 text-right font-bold text-foreground tabular-nums">{fmtCurrency(total)}</td>
@@ -1372,7 +1372,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
 function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number }) {
   return (
     <table className="w-full text-xs">
-      <thead className="bg-muted/40">
+      <thead className="ds-thead-bg">
         <tr>
           <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
           <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-10">Qty</th>
@@ -1390,7 +1390,7 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
           </tr>
         ))}
       </tbody>
-      <tfoot className="bg-muted/40 border-t border-border">
+      <tfoot className="ds-tfoot-bg border-t border-border">
         <tr>
           <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
           <td className="px-3 py-2 text-right font-bold text-foreground tabular-nums">{fmtCurrency(total)}</td>
@@ -1669,7 +1669,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                           "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
                           "soon" in item && item.soon
                             ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground hover:bg-muted/60 cursor-pointer",
+                            : "text-foreground hover:bg-muted/60 dark:hover:bg-accent cursor-pointer",
                         )}
                       >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>
@@ -1770,7 +1770,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                           "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
                           "soon" in item && item.soon
                             ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground hover:bg-muted/60 cursor-pointer",
+                            : "text-foreground hover:bg-muted/60 dark:hover:bg-accent cursor-pointer",
                         )}
                       >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>

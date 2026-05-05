@@ -284,13 +284,13 @@ export function DispatchBoard({
                 gridTemplateColumns: `72px repeat(${technicians.length}, minmax(140px, 1fr))`,
               }}
             >
-              <div className="sticky top-0 z-10 border-b border-border bg-muted/40 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="sticky top-0 z-10 border-b border-border ds-thead-bg px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Time
               </div>
               {technicians.map((t) => (
                 <div
                   key={t.id}
-                  className="sticky top-0 z-10 border-b border-l border-border bg-muted/40 px-2 py-2"
+                  className="sticky top-0 z-10 border-b border-l border-border ds-thead-bg px-2 py-2"
                 >
                   <div className="flex items-center gap-2">
                     <TechnicianAvatar

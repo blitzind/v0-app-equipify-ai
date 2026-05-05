@@ -464,7 +464,7 @@ export function AppTopbar() {
                     className={cn(
                       "w-full flex items-start gap-3 px-4 py-3 text-left cursor-pointer",
                       "transition-colors duration-100",
-                      "hover:bg-muted/60",
+                      "hover:bg-muted/60 dark:hover:bg-accent",
                       n.unread ? "bg-primary/[0.03]" : "bg-card"
                     )}
                     aria-label={`${n.title}: ${n.desc}`}

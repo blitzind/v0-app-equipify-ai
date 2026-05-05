@@ -428,7 +428,7 @@ export function PurchaseOrderDrawer({
                             key={v.id}
                             type="button"
                             onClick={() => selectVendor(v)}
-                            className="w-full text-left px-3 py-2.5 hover:bg-muted/60 text-sm"
+                            className="w-full text-left px-3 py-2.5 hover:bg-muted/60 dark:hover:bg-accent text-sm"
                           >
                             <div className="font-medium text-foreground">{v.name}</div>
                             {v.email && <div className="text-xs text-muted-foreground">{v.email}</div>}
@@ -441,7 +441,7 @@ export function PurchaseOrderDrawer({
                           setVendorMenuOpen(false)
                           setAddVendorOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2.5 border-t border-border text-sm text-primary hover:bg-muted/60"
+                        className="w-full text-left px-3 py-2.5 border-t border-border text-sm text-primary hover:bg-muted/60 dark:hover:bg-accent"
                       >
                         + Add New Vendor
                       </button>
@@ -806,7 +806,7 @@ export function PurchaseOrderDrawer({
             <DrawerSection title="Line Items">
               <div className={cn(sectionCardClass, "overflow-hidden p-0")}>
                 <table className="w-full text-xs">
-                  <thead className="bg-muted/30">
+                  <thead className="ds-thead-bg-subtle">
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
                         Description
@@ -832,7 +832,7 @@ export function PurchaseOrderDrawer({
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-muted/30 border-t border-border">
+                  <tfoot className="ds-tfoot-bg-subtle border-t border-border">
                     <tr>
                       <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">
                         Subtotal
@@ -904,7 +904,7 @@ export function PurchaseOrderDrawer({
       {confirmArchiveOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmArchiveOpen(false)} />
-          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[color:var(--status-warning)]" />
               <h3 className="text-sm font-semibold text-foreground">Archive Purchase Order?</h3>
@@ -923,7 +923,7 @@ export function PurchaseOrderDrawer({
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteOpen(false)} />
-          <div className="relative bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-destructive" />
               <h3 className="text-sm font-semibold text-foreground">Delete Purchase Order?</h3>

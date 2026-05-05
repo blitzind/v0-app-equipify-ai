@@ -221,7 +221,7 @@ export default function PermissionsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/50">
+              <tr className="border-b border-border bg-secondary/50 dark:bg-card">
                 <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground w-56 min-w-[14rem]">
                   Permission
                 </th>

@@ -491,7 +491,7 @@ function CustomersPageInner() {
           <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableRow className="ds-table-header-row">
                 <TableHead>
                   <button
                     onClick={() => toggleSort("company")}
@@ -539,7 +539,7 @@ function CustomersPageInner() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => openCustomerDrawer(c)}>
+                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors" onClick={() => openCustomerDrawer(c)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">

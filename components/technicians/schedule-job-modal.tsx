@@ -524,7 +524,7 @@ export function ScheduleJobModal({
     <>
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-        <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background shadow-2xl">
+        <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background dark:bg-card shadow-2xl">
           <div className="flex items-center justify-between border-b border-border p-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
