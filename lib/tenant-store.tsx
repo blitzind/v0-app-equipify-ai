@@ -27,8 +27,25 @@ type TenantAction =
   /** Align tenant branding + mock bundle with active Supabase org without changing signed-in user. */
   | {
       type: "SYNC_WORKSPACE_FROM_ACTIVE_ORG"
-      payload: { templateWorkspaceId: string; displayName: string; slug: string }
+      payload: {
+        templateWorkspaceId: string
+        displayName: string
+        slug: string
+        organizationSubscription: {
+          planId: PlanId
+          status: string
+          intendedPlanId: string | null
+        } | null
+      }
     }
+
+function mapDbSubscriptionStatus(st: string): TenantWorkspace["subscriptionStatus"] {
+  const s = String(st).toLowerCase()
+  if (s === "trialing") return "trialing"
+  if (s === "past_due") return "past_due"
+  if (s === "canceled" || s === "cancelled") return "canceled"
+  return "active"
+}
 
 function reducer(state: TenantState, action: TenantAction): TenantState {
   switch (action.type) {
@@ -75,12 +92,16 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
     case "SYNC_WORKSPACE_FROM_ACTIVE_ORG": {
       const tmpl = MOCK_WORKSPACES.find((w) => w.id === action.payload.templateWorkspaceId)
       if (!tmpl) return state
+      const sub = action.payload.organizationSubscription
       return {
         ...state,
         workspace: {
           ...tmpl,
           name: action.payload.displayName,
           slug: action.payload.slug,
+          organizationSubscription: sub,
+          planId: sub ? sub.planId : tmpl.planId,
+          subscriptionStatus: sub ? mapDbSubscriptionStatus(sub.status) : tmpl.subscriptionStatus,
         },
       }
     }

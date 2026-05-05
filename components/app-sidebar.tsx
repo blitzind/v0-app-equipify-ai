@@ -5,10 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/lib/tenant-store"
-import { MOCK_WORKSPACES } from "@/lib/tenant-data"
-
-/** Sidebar demo list: excludes generic live-org template (not a named tenant). */
-const PICKER_DEMO_WORKSPACES = MOCK_WORKSPACES.filter((w) => w.id !== "ws-live-generic")
+import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
@@ -65,12 +62,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-const PLAN_META: Record<string, { label: string; color: string }> = {
-  starter:    { label: "Starter",    color: "#f59e0b" },
-  growth:     { label: "Growth",     color: "#3b82f6" },
-  enterprise: { label: "Enterprise", color: "#8b5cf6" },
-}
-
 // Mobile drawer open state — consumed by AppTopbar hamburger button
 export const SidebarContext = React.createContext<{
   mobileOpen: boolean
@@ -88,12 +79,18 @@ function SidebarBody({
   isMobile?: boolean
 }) {
   const pathname = usePathname()
-  const { workspace, dispatch, can } = useTenant()
+  const { workspace, can } = useTenant()
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
     useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
-  const planMeta = PLAN_META[workspace.planId] ?? PLAN_META["growth"]
+  const planMeta = planBadgeFromWorkspace(workspace)
   const orgPickerLoading = orgStatus === "loading" || switching
+  const showOrgSwitcher = organizations.length > 1
+
+  function toggleWorkspaceMenu() {
+    if (!showOrgSwitcher) return
+    setWsMenuOpen((v) => !v)
+  }
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -151,9 +148,14 @@ function SidebarBody({
       {/* ── Workspace selector ────────────────────────────────── */}
       <div className="relative px-3 py-3 border-b border-sidebar-border shrink-0">
         <button
-          onClick={() => setWsMenuOpen((v) => !v)}
+          type="button"
+          onClick={toggleWorkspaceMenu}
+          aria-expanded={showOrgSwitcher ? wsMenuOpen : undefined}
+          aria-haspopup={showOrgSwitcher ? "menu" : undefined}
           className={cn(
-            "w-full flex items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/30 transition-all duration-150 hover:border-primary/40 hover:bg-sidebar-accent/50",
+            "w-full flex items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/30 transition-all duration-150",
+            showOrgSwitcher && "hover:border-primary/40 hover:bg-sidebar-accent/50",
+            !showOrgSwitcher && "cursor-default",
             isCollapsed
               ? "justify-center p-2 border-transparent bg-transparent hover:bg-sidebar-accent/50"
               : "px-3.5 py-3"
@@ -176,60 +178,51 @@ function SidebarBody({
                 <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">{workspace.name}</p>
                 <span className="text-[11px] font-semibold" style={{ color: planMeta.color }}>{planMeta.label}</span>
               </div>
-              <ChevronDown size={14} className={cn("text-sidebar-foreground/40 shrink-0 transition-transform duration-150", wsMenuOpen && "rotate-180")} />
+              {showOrgSwitcher ? (
+                <ChevronDown
+                  size={14}
+                  className={cn(
+                    "text-sidebar-foreground/40 shrink-0 transition-transform duration-150",
+                    wsMenuOpen && "rotate-180",
+                  )}
+                />
+              ) : null}
             </>
           )}
         </button>
 
-        {wsMenuOpen && !isCollapsed && (
+        {wsMenuOpen && showOrgSwitcher && !isCollapsed && (
           <div className="absolute top-full left-3 right-3 z-50 mt-1 bg-sidebar border border-sidebar-border rounded-xl shadow-xl overflow-hidden">
             <p className="px-3.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              {organizations.length > 0 ? "Your organizations" : "Sample organizations"}
+              Your organizations
             </p>
-            {organizations.length > 0
-              ? organizations.map((org) => (
-                  <button
-                    key={org.id}
-                    type="button"
-                    disabled={orgPickerLoading}
-                    onClick={() => {
-                      void (async () => {
-                        await switchOrganization(org.id)
-                        setWsMenuOpen(false)
-                      })()
-                    }}
-                    className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
-                  >
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 uppercase"
-                      style={{ background: workspace.primaryColor }}
-                    >
-                      {org.name[0]}
-                    </div>
-                    <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{org.name}</span>
-                    {org.id === organizationId ? <Check size={13} className="text-primary shrink-0" /> : null}
-                  </button>
-                ))
-              : PICKER_DEMO_WORKSPACES.map((ws) => (
-                  <button
-                    key={ws.id}
-                    type="button"
-                    onClick={() => {
-                      dispatch({ type: "SWITCH_WORKSPACE", payload: ws.id })
+            {organizations.length > 0 ? (
+              organizations.map((org) => (
+                <button
+                  key={org.id}
+                  type="button"
+                  disabled={orgPickerLoading}
+                  onClick={() => {
+                    void (async () => {
+                      await switchOrganization(org.id)
                       setWsMenuOpen(false)
-                    }}
-                    className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors"
+                    })()
+                  }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
+                >
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 uppercase"
+                    style={{ background: workspace.primaryColor }}
                   >
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                      style={{ background: ws.primaryColor }}
-                    >
-                      {ws.name[0]}
-                    </div>
-                    <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{ws.name}</span>
-                    {ws.id === workspace.id ? <Check size={13} className="text-primary shrink-0" /> : null}
-                  </button>
-                ))}
+                    {org.name[0]}
+                  </div>
+                  <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{org.name}</span>
+                  {org.id === organizationId ? <Check size={13} className="text-primary shrink-0" /> : null}
+                </button>
+              ))
+            ) : (
+              <p className="px-3.5 py-3 text-xs text-sidebar-foreground/55">No organizations available.</p>
+            )}
             <div className="border-t border-sidebar-border px-3.5 py-2.5">
               <Link href="/onboarding" onClick={() => setWsMenuOpen(false)} className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
                 <Building2 size={13} /> Create new workspace

@@ -148,6 +148,17 @@ export interface TenantWorkspace {
   seatCount: number        // used seats
   ownerId: string
   createdAt: string
+  /**
+   * When set by TenantWorkspaceSync from `organization_subscriptions` (via session API):
+   * object — row exists; `plan_id` is source of truth for sidebar/top bar labels.
+   * null — loaded and no subscription row.
+   * omitted — initial demo workspace before sync (legacy mock).
+   */
+  organizationSubscription?: {
+    planId: PlanId
+    status: string
+    intendedPlanId: string | null
+  } | null
 }
 
 // ─── Mock tenants ─────────────────────────────────────────────────────────────

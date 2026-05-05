@@ -1,6 +1,8 @@
 "use client"
 
 import { useLayoutEffect } from "react"
+import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import type { PlanId } from "@/lib/plans"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useTenant } from "@/lib/tenant-store"
 import { workspaceTemplateIdForOrgSlug } from "@/lib/workspace-org-map"
@@ -8,31 +10,75 @@ import { workspaceTemplateIdForOrgSlug } from "@/lib/workspace-org-map"
 /**
  * Keeps tenant workspace metadata + mock bundle key aligned with the active Supabase organization
  * (does not replace the signed-in user — unlike legacy SWITCH_WORKSPACE).
+ * Loads subscription from `/api/session/organization-subscription` so platform admins can impersonate
+ * orgs they are not members of (RLS-safe).
  */
 export function TenantWorkspaceSync() {
   const { status, organizationId, organizationSlug, organizationName } = useActiveOrganization()
   const { workspace, dispatch } = useTenant()
 
   useLayoutEffect(() => {
-    if (status !== "ready" || !organizationId || !organizationSlug) return
-    const templateId = workspaceTemplateIdForOrgSlug(organizationSlug)
-    const displayName = organizationName?.trim() || workspace.name
-    if (
-      workspace.id === templateId &&
-      workspace.name === displayName &&
-      workspace.slug === organizationSlug
-    ) {
-      return
+    if (status !== "ready" || !organizationId) return
+
+    let cancelled = false
+
+    const run = async () => {
+      let organizationSubscription: {
+        planId: PlanId
+        status: string
+        intendedPlanId: string | null
+      } | null = null
+
+      try {
+        const res = await fetch(
+          `/api/session/organization-subscription?organizationId=${encodeURIComponent(organizationId)}`,
+          { cache: "no-store" },
+        )
+        if (res.ok) {
+          const body = (await res.json()) as {
+            subscription?: {
+              plan_id?: string | null
+              status?: string | null
+              intended_plan_id?: string | null
+            } | null
+          }
+          const row = body.subscription
+          if (row) {
+            organizationSubscription = {
+              planId: normalizePlanIdForRead(row.plan_id ?? "solo"),
+              status: row.status ?? "active",
+              intendedPlanId: row.intended_plan_id ?? null,
+            }
+          } else {
+            organizationSubscription = null
+          }
+        }
+      } catch {
+        organizationSubscription = null
+      }
+
+      if (cancelled) return
+
+      const slug = organizationSlug ?? ""
+      const templateId = workspaceTemplateIdForOrgSlug(slug)
+      const displayName = organizationName?.trim() || workspace.name
+
+      dispatch({
+        type: "SYNC_WORKSPACE_FROM_ACTIVE_ORG",
+        payload: {
+          templateWorkspaceId: templateId,
+          displayName,
+          slug,
+          organizationSubscription,
+        },
+      })
     }
-    dispatch({
-      type: "SYNC_WORKSPACE_FROM_ACTIVE_ORG",
-      payload: {
-        templateWorkspaceId: templateId,
-        displayName,
-        slug: organizationSlug,
-      },
-    })
-  }, [status, organizationId, organizationSlug, organizationName, workspace.id, workspace.name, workspace.slug, dispatch])
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [status, organizationId, organizationSlug, organizationName, dispatch])
 
   return null
 }

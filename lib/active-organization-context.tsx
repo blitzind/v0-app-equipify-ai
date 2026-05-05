@@ -6,9 +6,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
+import { useAdmin } from "@/lib/admin-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "equipify_active_organization_id"
@@ -78,6 +80,12 @@ function normalizeOrgRows(
 }
 
 export function ActiveOrganizationProvider({ children }: { children: ReactNode }) {
+  const { impersonation, isPlatformAdmin } = useAdmin()
+  const impersonationRef = useRef(impersonation)
+  const isPlatformAdminRef = useRef(isPlatformAdmin)
+  impersonationRef.current = impersonation
+  isPlatformAdminRef.current = isPlatformAdmin
+
   const [status, setStatus] = useState<Status>("loading")
   const [switching, setSwitching] = useState(false)
   const [organizations, setOrganizations] = useState<ActiveOrgRow[]>([])
@@ -104,6 +112,24 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       setOrganizationId(null)
       setOrganizationSlug(null)
       setOrganizationName(null)
+      setStatus("ready")
+      return
+    }
+
+    const imp = impersonationRef.current
+    if (imp.active && imp.accountId && isPlatformAdminRef.current) {
+      const slug = imp.accountSlug?.trim() ?? ""
+      const name = imp.accountName?.trim() || "Organization"
+      const row: ActiveOrgRow = { id: imp.accountId, name, slug }
+      setOrganizations([row])
+      setOrganizationId(imp.accountId)
+      setOrganizationSlug(slug || null)
+      setOrganizationName(name)
+      try {
+        localStorage.setItem(STORAGE_KEY, imp.accountId)
+      } catch {
+        /* ignore */
+      }
       setStatus("ready")
       return
     }
@@ -211,10 +237,17 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, impersonation.active, impersonation.accountId, impersonation.accountSlug])
 
   const switchOrganization = useCallback(
     async (orgId: string) => {
+      const imp = impersonationRef.current
+      if (imp.active && isPlatformAdminRef.current && imp.accountId && orgId !== imp.accountId) {
+        return {
+          error: "Switching workspaces is disabled while viewing another account as a platform admin.",
+        }
+      }
+
       const org = organizations.find((o) => o.id === orgId)
       if (!org) return { error: "Organization not found or you are not a member." }
 

@@ -23,6 +23,7 @@ import {
 import { SidebarContext } from "@/components/app-sidebar"
 import { BrandLogo } from "@/components/brand-logo"
 import { useTenant } from "@/lib/tenant-store"
+import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useAdmin } from "@/lib/admin-store"
 import { useActiveOrganizationOptional } from "@/lib/active-organization-context"
 import { initialsFromDisplayLabel } from "@/lib/user-display"
@@ -249,6 +250,19 @@ export function AppTopbar() {
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
+  const planBadge = planBadgeFromWorkspace(workspace)
+  const subscriptionChrome =
+    workspace.organizationSubscription === undefined
+      ? "Active"
+      : workspace.organizationSubscription === null
+        ? "Unassigned"
+        : workspace.subscriptionStatus === "trialing"
+          ? "Trialing"
+          : workspace.subscriptionStatus === "past_due"
+            ? "Past due"
+            : workspace.subscriptionStatus === "canceled"
+              ? "Canceled"
+              : "Active"
   const workspaceNotifs = NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"]
   const [notifications, setNotifications] = useState<Notification[]>(workspaceNotifs)
 
@@ -578,7 +592,20 @@ export function AppTopbar() {
           {/* Footer: Session */}
           <div className="border-t border-border px-5 py-3 flex items-center justify-between bg-secondary/20">
             <p className="text-[10px] text-muted-foreground">
-              Equipify.ai &middot; Growth Plan &middot; <span className="font-medium" style={{ color: "var(--status-success)" }}>Active</span>
+              Equipify.ai &middot; {planBadge.label} &middot;{" "}
+              <span
+                className="font-medium"
+                style={{
+                  color:
+                    subscriptionChrome === "Active"
+                      ? "var(--status-success)"
+                      : subscriptionChrome === "Unassigned"
+                        ? "var(--muted-foreground)"
+                        : undefined,
+                }}
+              >
+                {subscriptionChrome}
+              </span>
             </p>
             <button
               type="button"

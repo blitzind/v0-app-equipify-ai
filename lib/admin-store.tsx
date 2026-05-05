@@ -8,6 +8,8 @@ interface ImpersonationState {
   active: boolean
   accountId: string | null
   accountName: string | null
+  /** From Platform Admin account row — drives tenant slug/mapping when impersonating. */
+  accountSlug: string | null
   adminName: string
   adminRole: string
 }
@@ -31,6 +33,7 @@ function impersonationIdle(adminName: string, adminRole: string): ImpersonationS
     active: false,
     accountId: null,
     accountName: null,
+    accountSlug: null,
     adminName,
     adminRole,
   }
@@ -106,6 +109,7 @@ export function AdminProvider({
       active: true,
       accountId: account.id,
       accountName: account.name,
+      accountSlug: account.slug?.trim() ? account.slug.trim() : null,
       adminName: sid?.displayName ?? "Platform admin",
       adminRole: sid?.platformRoleLabel ?? "Platform Admin",
     })
