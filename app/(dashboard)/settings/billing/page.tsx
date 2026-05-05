@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useState, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
@@ -244,7 +245,7 @@ function AddCardTrialForm({
   )
 }
 
-export default function BillingPage() {
+function BillingPageContent() {
   const searchParams = useSearchParams()
   const { workspace, dispatch, workspaceUsers } = useTenant()
   const { organizationId, status: orgStatus } = useActiveOrganization()
@@ -1249,5 +1250,13 @@ export default function BillingPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading billing...</div>}>
+      <BillingPageContent />
+    </Suspense>
   )
 }

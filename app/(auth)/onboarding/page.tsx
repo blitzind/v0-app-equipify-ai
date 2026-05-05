@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
@@ -58,9 +58,13 @@ function getIndustrySetupCopy(industry: string) {
   }
 }
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const firstNameParam = parseOnboardingText(searchParams.get("firstName"))
+  const lastNameParam = parseOnboardingText(searchParams.get("lastName"))
+  const emailParam = parseOnboardingText(searchParams.get("email"))
+  const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
@@ -77,6 +81,7 @@ export default function OnboardingPage() {
     currentSystem: "",
     timezone: "America/New_York",
   })
+  const [stepOneError, setStepOneError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!searchParams) return
@@ -129,6 +134,17 @@ export default function OnboardingPage() {
   }
 
   function next() {
+    if (step === 0) {
+      const effectiveFirstName = form.firstName || firstNameParam || ""
+      const effectiveLastName = form.lastName || lastNameParam || ""
+      const effectiveEmail = form.email || emailParam || ""
+      if (!effectiveFirstName || !effectiveLastName || !effectiveEmail || !form.password) {
+        setStepOneError("First name, last name, email, and password are required to continue.")
+        return
+      }
+      setStepOneError(null)
+    }
+
     if (step < STEPS.length - 1) setStep((s) => s + 1)
     else {
       if (typeof window !== "undefined") {
@@ -197,26 +213,41 @@ export default function OnboardingPage() {
                 <User size={18} className="text-blue-600" />
                 <h2 className="text-lg font-semibold text-gray-900">Create your account</h2>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {([["firstName", "First name"], ["lastName", "Last name"]] as const).map(([k, label]) => (
-                  <div key={k}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-                    <input value={form[k]} onChange={(e) => setField(k, e.target.value)}
-                      className="portal-input" placeholder={label} />
+              {hasMarketingIdentity ? (
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                  <p className="text-xs font-medium text-gray-600">Creating account for</p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                    {form.firstName || firstNameParam} {form.lastName || lastNameParam}
+                  </p>
+                  <p className="text-sm text-gray-700">{form.email || emailParam}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    {([["firstName", "First name"], ["lastName", "Last name"]] as const).map(([k, label]) => (
+                      <div key={k}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+                        <input value={form[k]} onChange={(e) => setField(k, e.target.value)}
+                          className="portal-input" placeholder={label} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Work email</label>
-                <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)}
-                  className="portal-input" placeholder="you@company.com" />
-              </div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Work email</label>
+                    <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)}
+                      className="portal-input" placeholder="you@company.com" />
+                  </div>
+                </>
+              )}
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
                 <input type="password" value={form.password} onChange={(e) => setField("password", e.target.value)}
                   className="portal-input" placeholder="Min. 8 characters" />
                 <p className="text-xs text-gray-400 mt-1">Use at least 8 characters with a mix of letters, numbers, and symbols.</p>
               </div>
+              {stepOneError && (
+                <p className="mt-3 text-xs text-red-600">{stepOneError}</p>
+              )}
               <button onClick={next} className="portal-btn-primary w-full justify-center h-10 mt-6">
                 Continue <ArrowRight size={15} />
               </button>
@@ -386,5 +417,17 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        Loading onboarding...
+      </div>
+    }>
+      <OnboardingPageContent />
+    </Suspense>
   )
 }
