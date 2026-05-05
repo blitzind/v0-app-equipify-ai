@@ -316,7 +316,13 @@ function OnboardingPageContent() {
         })
       )
     }
-    router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
+    if (inviteTokenParam) {
+      router.push("/")
+    } else if (parseOnboardingPlan(searchParams.get("plan"))) {
+      router.push(`/settings/billing?plan=${selectedPlan}&source=onboarding`)
+    } else {
+      router.push("/")
+    }
   }
 
   function next() {
