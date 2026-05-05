@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Check, ArrowRight, ArrowLeft, Building2, User, CreditCard } from "lucide-react"
@@ -61,31 +61,55 @@ function getIndustrySetupCopy(industry: string) {
 export default function OnboardingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const planFromQuery = parseOnboardingPlan(searchParams.get("plan"))
-  const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
-  const firstNameFromQuery = parseOnboardingText(searchParams.get("firstName"))
-  const lastNameFromQuery = parseOnboardingText(searchParams.get("lastName"))
-  const emailFromQuery = parseOnboardingText(searchParams.get("email"))
-  const companyFromQuery = parseOnboardingText(searchParams.get("company"))
-  const phoneFromQuery = parseOnboardingText(searchParams.get("phone"))
-  const industryFromQuery = parseOnboardingIndustry(searchParams.get("industry"))
-  const teamSizeFromQuery = parseOnboardingTeamSize(searchParams.get("teamSize"))
-  const currentSystemFromQuery = parseOnboardingText(searchParams.get("currentSystem"))
+  const parsedIntent = useMemo(() => ({
+    selectedPlan: parseOnboardingPlan(searchParams.get("plan")),
+    trial: hasScaleTrialParam(searchParams.get("trial")) ? "scale" as const : null,
+    firstName: parseOnboardingText(searchParams.get("firstName")),
+    lastName: parseOnboardingText(searchParams.get("lastName")),
+    email: parseOnboardingText(searchParams.get("email")),
+    company: parseOnboardingText(searchParams.get("company")),
+    phone: parseOnboardingText(searchParams.get("phone")),
+    industry: parseOnboardingIndustry(searchParams.get("industry")),
+    teamSize: parseOnboardingTeamSize(searchParams.get("teamSize")),
+    currentSystem: parseOnboardingText(searchParams.get("currentSystem")),
+  }), [searchParams])
+  const trialFromQuery = parsedIntent.trial === "scale"
   const [step, setStep] = useState(0)
   const [billing, setBilling] = useState<"monthly" | "annual">("annual")
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>(planFromQuery ?? "growth")
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>(parsedIntent.selectedPlan ?? "growth")
   const [form, setForm] = useState({
-    firstName: firstNameFromQuery ?? "",
-    lastName: lastNameFromQuery ?? "",
-    email: emailFromQuery ?? "",
+    firstName: "",
+    lastName: "",
+    email: "",
     password: "",
-    companyName: companyFromQuery ?? "",
-    phone: phoneFromQuery ?? "",
-    industry: industryFromQuery ?? "",
-    teamSize: teamSizeFromQuery ?? "",
-    currentSystem: currentSystemFromQuery ?? "",
+    companyName: "",
+    phone: "",
+    industry: "",
+    teamSize: "",
+    currentSystem: "",
     timezone: "America/New_York",
   })
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("onboarding params", parsedIntent)
+    }
+  }, [parsedIntent])
+
+  useEffect(() => {
+    setSelectedPlan(parsedIntent.selectedPlan ?? "growth")
+    setForm((prev) => ({
+      ...prev,
+      firstName: parsedIntent.firstName ?? prev.firstName,
+      lastName: parsedIntent.lastName ?? prev.lastName,
+      email: parsedIntent.email ?? prev.email,
+      companyName: parsedIntent.company ?? prev.companyName,
+      phone: parsedIntent.phone ?? prev.phone,
+      industry: parsedIntent.industry ?? prev.industry,
+      teamSize: parsedIntent.teamSize ?? prev.teamSize,
+      currentSystem: parsedIntent.currentSystem ?? prev.currentSystem,
+    }))
+  }, [parsedIntent])
 
   function setField(k: keyof typeof form, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
