@@ -5,14 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
-import { BrandLogo, BrandLogoOnLight } from "@/components/brand-logo"
-
-const DEMO_ACCOUNTS = [
-  { name: "Sarah Mitchell", role: "Admin", email: "sarah@acme.com", workspace: "Acme Field Services" },
-  { name: "Tyler Oakes",    role: "Manager", email: "tyler@acme.com", workspace: "Acme Field Services" },
-  { name: "Marcus Webb",    role: "Tech",    email: "marcus@acme.com", workspace: "Acme Field Services" },
-  { name: "Jordan Kim",     role: "Read Only", email: "jordan@acme.com", workspace: "Acme Field Services" },
-]
+import { BrandLogo } from "@/components/brand-logo"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -54,20 +47,24 @@ export default function LoginPage() {
     }
   }
 
-  async function loginAs(demoEmail: string) {
+  async function handleGoogleSignIn() {
     setError("")
-    setEmail(demoEmail)
-    setPassword("demo1234")
     setLoading(true)
     try {
-      await signInWithEmailPassword(demoEmail, "demo1234")
-      router.push("/")
+      const redirectTo =
+        typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      })
+      if (error) throw new Error(error.message)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to sign in."
+      const message = err instanceof Error ? err.message : "Unable to continue with Google."
       setError(message)
-    } finally {
       setLoading(false)
+      return
     }
+    setLoading(false)
   }
 
   return (
@@ -76,7 +73,13 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col justify-between p-12"
         style={{ background: "#0f172a" }}>
         <div className="flex items-center gap-2.5">
-          <BrandLogo className="h-8 w-auto max-h-8" priority />
+          <div className="w-full max-w-[198px]">
+            <BrandLogo
+              priority
+              sizes="(min-width: 768px) 198px, 182px"
+              className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
+            />
+          </div>
         </div>
         <div>
           <blockquote className="text-2xl font-medium leading-relaxed mb-6" style={{ color: "#e2e8f0" }}>
@@ -104,12 +107,30 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
-          <div className="mb-8 lg:hidden">
-            <BrandLogoOnLight logoClassName="h-7" />
+          <div className="mb-8 lg:hidden rounded-xl bg-[#0F172A] px-4 py-3">
+            <div className="mx-auto w-full max-w-[198px]">
+              <BrandLogo
+                priority
+                sizes="(min-width: 768px) 198px, 182px"
+                className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
+              />
+            </div>
           </div>
 
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">Welcome back</h1>
           <p className="text-sm text-gray-500 mb-8">Sign in to your workspace</p>
+
+          <button
+            type="button"
+            onClick={() => void handleGoogleSignIn()}
+            disabled={loading}
+            className="mb-4 w-full h-10 inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#4285F4] font-semibold text-xs border border-gray-200">
+              G
+            </span>
+            Continue with Google
+          </button>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -154,42 +175,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          <div className="relative my-7">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-[#f5f6f8] px-3 text-xs text-gray-400">Demo accounts</span>
-            </div>
-          </div>
-
-          {/* Demo quick-login */}
-          <div className="space-y-2">
-            {DEMO_ACCOUNTS.map((d) => (
-              <button key={d.email} onClick={() => loginAs(d.email)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left transition-colors hover:bg-white group"
-                style={{ borderColor: "#e5e7eb", background: "white" }}>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
-                    style={{ background: "#2563eb" }}>
-                    {d.name.split(" ").map(n => n[0]).join("")}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{d.name}</p>
-                    <p className="text-xs text-gray-400">{d.email}</p>
-                  </div>
-                </div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{
-                    background: d.role === "Admin" ? "#eff6ff" : d.role === "Manager" ? "#f0fdf4" : d.role === "Tech" ? "#fffbeb" : "#f9fafb",
-                    color: d.role === "Admin" ? "#1d4ed8" : d.role === "Manager" ? "#15803d" : d.role === "Tech" ? "#b45309" : "#6b7280",
-                  }}>
-                  {d.role}
-                </span>
-              </button>
-            ))}
-          </div>
 
           <p className="mt-8 text-center text-sm text-gray-500">
             Don&apos;t have an account?{" "}

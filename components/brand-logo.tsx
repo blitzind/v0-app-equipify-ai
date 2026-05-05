@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 
 /** Canonical logo asset (1024×280, ~3.7:1). Designed for dark backgrounds; use `BrandLogoOnLight` on light UI. */
 export const BRAND_LOGO = {
-  src: "/brand/equipify-logo.png",
+  src: "/brand/equipify-logo.png?v=2",
   width: 1024,
   height: 280,
 } as const
@@ -60,7 +60,7 @@ export function BrandLogoOnLight({ className, logoClassName }: { className?: str
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center rounded-lg bg-slate-950 px-2.5 py-1.5 ring-1 ring-black/10",
+        "inline-flex items-center justify-center rounded-lg bg-transparent px-2.5 py-1.5",
         className
       )}
     >

@@ -356,7 +356,7 @@ function OnboardingPageContent() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#f5f6f8" }}>
       {/* Top bar */}
-      <header className="border-b border-white/10 bg-[#01050C] shadow-sm">
+      <header className="border-b border-white/10 bg-[#0F172A] shadow-sm">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <BrandLogo className="h-8 w-auto sm:h-9" priority />
           <p className="text-sm text-gray-300">

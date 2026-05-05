@@ -340,7 +340,7 @@ export function AppSidebar() {
     <>
       {/* ── Desktop sidebar (hidden on mobile) ────────────────── */}
       <aside className={cn(
-        "hidden md:flex flex-col h-full border-r border-sidebar-border bg-sidebar transition-all duration-200 shrink-0",
+        "hidden md:flex flex-col h-full border-r border-sidebar-border bg-[#0F172A] transition-all duration-200 shrink-0",
         collapsed ? "w-14" : "w-[248px]"
       )}>
         <SidebarBody collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -356,7 +356,7 @@ export function AppSidebar() {
             aria-hidden="true"
           />
           {/* Drawer panel */}
-          <aside className="absolute inset-y-0 left-0 flex flex-col w-64 bg-sidebar border-r border-sidebar-border shadow-2xl">
+          <aside className="absolute inset-y-0 left-0 flex flex-col w-64 bg-[#0F172A] border-r border-sidebar-border shadow-2xl">
             {/* Close button */}
             <button
               onClick={() => setMobileOpen(false)}
