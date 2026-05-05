@@ -7,7 +7,6 @@ import type { WorkOrder } from "@/lib/mock-data"
 import type { WorkOrderEquipmentAsset } from "@/lib/work-orders/detail-load"
 import type { CompletionCertificateSlot } from "@/lib/work-orders/work-order-completion"
 import {
-  assignTemplateToWorkOrder,
   createCalibrationRecord,
   isCalibrationRecordComplete,
   listCalibrationTemplates,
@@ -109,6 +108,19 @@ export function CertificateMultiTabContent({
         const tmplList = await listCalibrationTemplates(supabase, orgId)
         if (cancelled) return
         setTemplates(tmplList)
+
+        const { count: woCalRecordCount, error: woCalCountErr } = await supabase
+          .from("calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .eq("work_order_id", workOrder.id)
+
+        const woHasAnyCalibrationRecord = woCalCountErr ? true : (woCalRecordCount ?? 0) > 0
+
+        const legacyWoTemplateId = workOrder.calibrationTemplateId?.trim() || null
+        const legacyTemplateIsKnown =
+          Boolean(legacyWoTemplateId) && tmplList.some((t) => t.id === legacyWoTemplateId)
+
         const next: Record<string, SlotState> = {}
         for (const asset of equipmentAssets) {
           const record = await loadLatestCalibrationRecordForEquipment(
@@ -117,21 +129,31 @@ export function CertificateMultiTabContent({
             workOrder.id,
             asset.id,
           )
-          const selectedId =
-            record?.templateId ??
-            workOrder.calibrationTemplateId ??
-            (asset.category
-              ? tmplList.find((t) => t.equipmentCategoryId === asset.category)?.id
-              : null) ??
-            tmplList[0]?.id ??
-            ""
-          const templateObj = tmplList.find((t) => t.id === selectedId) ?? null
+
+          let selectedId = ""
+          if (record?.templateId) {
+            selectedId = record.templateId
+          } else if (
+            !woHasAnyCalibrationRecord &&
+            legacyTemplateIsKnown &&
+            asset.id === workOrder.equipmentId
+          ) {
+            selectedId = legacyWoTemplateId!
+          }
+
+          const templateObj = selectedId ? (tmplList.find((t) => t.id === selectedId) ?? null) : null
           const ctx = buildCertificatePrefillContextForEquipment(workOrder, asset)
-          const seeded = seedCertificateValuesForWorkOrder(
-            templateObj,
-            record?.values ?? null,
-            ctx,
-          )
+          const seeded =
+            record?.templateId &&
+            selectedId &&
+            !templateObj &&
+            record.values &&
+            typeof record.values === "object"
+              ? {
+                  values: { ...(record.values as Record<string, unknown>) },
+                  hadPrefill: false,
+                }
+              : seedCertificateValuesForWorkOrder(templateObj, record?.values ?? null, ctx)
           touchedRef.current[asset.id] = new Set()
           next[asset.id] = {
             templateId: selectedId,
@@ -156,7 +178,14 @@ export function CertificateMultiTabContent({
     return () => {
       cancelled = true
     }
-  }, [orgId, workOrder.id, workOrder.calibrationTemplateId, equipmentKey, equipmentAssets])
+  }, [
+    orgId,
+    workOrder.id,
+    workOrder.equipmentId,
+    workOrder.calibrationTemplateId,
+    equipmentKey,
+    equipmentAssets,
+  ])
 
   const emitCompletion = useCallback(() => {
     if (!onCompletionSlotsChange) return
@@ -178,7 +207,7 @@ export function CertificateMultiTabContent({
     emitCompletion()
   }, [emitCompletion])
 
-  async function handleTemplateChange(assetId: string, templateId: string) {
+  function handleTemplateChange(assetId: string, templateId: string) {
     if (!orgId) return
     const st = slotStates[assetId]
     if (!st) return
@@ -191,31 +220,25 @@ export function CertificateMultiTabContent({
         return
       }
     }
-    const supabase = createBrowserSupabaseClient()
-    try {
-      await assignTemplateToWorkOrder(supabase, orgId, workOrder.id, templateId || null)
-      const selected = templates.find((t) => t.id === templateId) ?? null
-      touchedRef.current[assetId] = new Set()
-      const ctx = buildCertificatePrefillContextForEquipment(
-        workOrder,
-        equipmentAssets.find((a) => a.id === assetId)!,
-      )
-      const seeded = seedCertificateValuesForWorkOrder(selected, null, ctx)
-      setSlotStates((prev) => ({
-        ...prev,
-        [assetId]: {
-          ...prev[assetId],
-          templateId,
-          values: seeded.values,
-          baseline: structuredClone(seeded.values),
-          savedAt: null,
-          recordId: null,
-          prefillNotice: seeded.hadPrefill,
-        },
-      }))
-    } catch {
-      /* toast optional — parent may show */
-    }
+    const selected = templates.find((t) => t.id === templateId) ?? null
+    touchedRef.current[assetId] = new Set()
+    const ctx = buildCertificatePrefillContextForEquipment(
+      workOrder,
+      equipmentAssets.find((a) => a.id === assetId)!,
+    )
+    const seeded = seedCertificateValuesForWorkOrder(selected, null, ctx)
+    setSlotStates((prev) => ({
+      ...prev,
+      [assetId]: {
+        ...prev[assetId],
+        templateId,
+        values: seeded.values,
+        baseline: structuredClone(seeded.values),
+        savedAt: null,
+        recordId: null,
+        prefillNotice: seeded.hadPrefill,
+      },
+    }))
   }
 
   async function handleSave(assetId: string) {
@@ -318,7 +341,7 @@ export function CertificateMultiTabContent({
                     equipmentScopeId={asset.id}
                     templates={templates}
                     selectedTemplateId={st.templateId}
-                    onTemplateChange={(tid) => void handleTemplateChange(asset.id, tid)}
+                    onTemplateChange={(tid) => handleTemplateChange(asset.id, tid)}
                     values={st.values}
                     onValueChange={(fieldId, value) => {
                       touchedRef.current[asset.id]?.add(fieldId)
