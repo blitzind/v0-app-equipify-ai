@@ -147,7 +147,11 @@ export default function WorkspacePage() {
                 {ACCENT_PRESETS.map((c) => (
                   <button key={c} onClick={() => dispatch({ type: "SET_COLOR", payload: c })}
                     className="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center"
-                    style={{ background: c, borderColor: workspace.primaryColor === c ? "#0f172a" : "transparent" }}>
+                    style={{
+                      background: c,
+                      borderColor: workspace.primaryColor === c ? "var(--background)" : "transparent",
+                    }}
+                  >
                     {workspace.primaryColor === c && <Check size={12} className="text-white" />}
                   </button>
                 ))}

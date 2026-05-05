@@ -57,13 +57,13 @@
   --ai-purple-fg: oklch(0.99 0 0);
 }
 
-/* Workspace / admin main content only (scoped `.dark` ancestor — sidebar stays outside this scope). */
+/* Dark theme: main canvas `#0B111E`; elevated surfaces `#121B2C` (sidebar uses explicit `#0F172A` in `app-sidebar`). */
 .dark {
-  --background: #0f172a;
+  --background: #0b111e;
   --foreground: oklch(0.93 0.008 240);
-  --card: oklch(0.21 0.022 252);
+  --card: #121b2c;
   --card-foreground: oklch(0.93 0.008 240);
-  --popover: oklch(0.21 0.022 252);
+  --popover: #121b2c;
   --popover-foreground: oklch(0.93 0.008 240);
   --primary: oklch(0.60 0.21 231);
   --primary-hover: color-mix(in srgb, var(--primary) 88%, #000000);
@@ -81,8 +81,8 @@
   --accent-foreground: oklch(0.90 0.008 240);
   --destructive: oklch(0.577 0.245 27.33);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.30 0.022 252);
-  --input: oklch(0.30 0.022 252);
+  --border: oklch(0.34 0.024 252);
+  --input: oklch(0.34 0.024 252);
   --ring: color-mix(in srgb, var(--primary) 50%, transparent);
   --chart-1: oklch(0.60 0.21 231);
   --chart-2: oklch(0.55 0.15 145);
