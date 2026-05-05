@@ -52,6 +52,14 @@ function fmtIsoDateTime(iso: string | null | undefined) {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 }
 
+function isoDiffInDays(startIso: string | null, endIso: string | null): number | null {
+  if (!startIso || !endIso) return null
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null
+  return Math.max(1, Math.ceil((end - start) / (86400 * 1000)))
+}
+
 function formatBillingStatus(status: string) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -296,6 +304,21 @@ export default function BillingPage() {
   const currentPlanData = getPlan(effectivePlanId)
   const trialLive = subscription ? isTrialActive(subscription) : false
   const trialDaysLeft = subscription ? getTrialDaysRemaining(subscription) : 0
+  const trialTotalDays = isoDiffInDays(subscription?.trial_starts_at ?? null, subscription?.trial_ends_at ?? null)
+  const trialDaysUsed =
+    trialTotalDays != null ? Math.min(trialTotalDays, Math.max(0, trialTotalDays - trialDaysLeft)) : null
+  const trialProgressPct =
+    trialTotalDays && trialTotalDays > 0
+      ? Math.min(100, Math.max(0, ((trialDaysUsed ?? 0) / trialTotalDays) * 100))
+      : 0
+  const trialUrgency =
+    trialLive && trialDaysLeft <= 2
+      ? "urgent"
+      : trialLive && trialDaysLeft <= 6
+      ? "warning"
+      : trialLive
+      ? "info"
+      : null
 
   const usedSeats = usagePack?.usage.seatsUsed ?? workspaceUsers.filter((u) => u.status === "Active").length
   const usedEquipment = usagePack?.usage.equipmentUsed ?? 0
@@ -493,9 +516,57 @@ export default function BillingPage() {
               </p>
             )}
 
+            {trialLive && subscription?.trial_ends_at && !showPaymentAttentionBanner && (
+              <div
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 space-y-1.5",
+                  trialUrgency === "urgent" && "border-destructive/40 bg-destructive/5",
+                  trialUrgency === "warning" && "border-[color:var(--status-warning)] bg-[color:var(--status-warning)]/10",
+                  trialUrgency === "info" && "border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)]",
+                )}
+              >
+                <p className="text-xs font-semibold text-foreground">
+                  You're using Scale access during your trial.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} remaining · Trial ends{" "}
+                  <strong>{fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}</strong>.
+                </p>
+                {trialTotalDays != null && trialDaysUsed != null && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">
+                      {trialDaysUsed} of {trialTotalDays} trial days used
+                    </p>
+                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          trialUrgency === "urgent"
+                            ? "bg-destructive"
+                            : trialUrgency === "warning"
+                            ? "bg-[color:var(--status-warning)]"
+                            : "bg-[color:var(--ds-info-text)]",
+                        )}
+                        style={{ width: `${trialProgressPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={jumpToPlanComparison}
+                >
+                  Choose your plan
+                </Button>
+              </div>
+            )}
+
             {/* Action buttons — full width on mobile, inline on sm+ */}
             <div className="flex flex-col gap-2">
-              {!showPaymentAttentionBanner && (
+              {!showPaymentAttentionBanner && !trialLive && (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
@@ -512,7 +583,7 @@ export default function BillingPage() {
                 </p>
               ) : (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Choose a plan to activate billing. The customer portal will be available after checkout.
+                  Choose a plan to continue after trial. No card required until you choose a plan.
                 </p>
               )}
               {hasStripeCustomer && portalMessage && (
@@ -532,17 +603,21 @@ export default function BillingPage() {
             </div>
           )}
 
-          {trialLive && subscription?.trial_ends_at && (
-            <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-warning text-sm">
+          {trialLive && subscription?.trial_ends_at && trialDaysLeft <= 6 && (
+            <div
+              className={cn(
+                "mt-4 flex items-center gap-2 p-3 rounded-lg border text-sm",
+                trialDaysLeft <= 2
+                  ? "border-destructive/40 bg-destructive/5 text-destructive"
+                  : "ds-alert-warning",
+              )}
+            >
               <AlertTriangle size={14} />
               <span>
                 Your free trial ends on{" "}
                 <strong>{fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}</strong>.
-                {" "}Add a payment method to continue after trial.
+                {" "}Choose a plan to continue after trial.
               </span>
-              <Button type="button" variant="ghost" size="sm" className="ml-auto text-xs h-7" onClick={() => void openBillingPortal()}>
-                Add card
-              </Button>
             </div>
           )}
         </div>
@@ -691,6 +766,7 @@ export default function BillingPage() {
           {PLANS.map((p) => {
             const matchesStoredPlan = p.id === effectivePlanId
             const isCurrent = billingIsActive && matchesStoredPlan
+            const isPaidCurrent = isCurrent && !trialLive
             const tierCurrent = planTierIndex(effectivePlanId)
             const tierP = planTierIndex(p.id)
             const isUpgrade = !matchesStoredPlan && tierP > tierCurrent
@@ -701,7 +777,7 @@ export default function BillingPage() {
             const planCta = (() => {
               if (isCurrent) {
                 return trialLive ? (
-                  <><Check size={12} /> Current trial</>
+                  <><Check size={12} /> Keep Scale</>
                 ) : (
                   <><Check size={12} /> Current plan</>
                 )
@@ -816,10 +892,10 @@ export default function BillingPage() {
 
                 <button
                   type="button"
-                  disabled={isCurrent}
+                  disabled={isPaidCurrent}
                   onClick={() => openCheckout(p.id)}
                   className={`w-full h-9 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-all mt-auto ${
-                    isCurrent
+                    isPaidCurrent
                       ? "bg-primary/10 text-primary cursor-default"
                       : "bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active shadow-sm"
                   }`}

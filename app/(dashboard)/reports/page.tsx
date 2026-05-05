@@ -608,8 +608,8 @@ export default function ReportsPage() {
           }
         >
           <div className="space-y-2">
-            {repeatDisplay.map((r) => (
-              <div key={r.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-danger border">
+            {repeatDisplay.map((r, idx) => (
+              <div key={`${r.equipment}-${r.customer}-${r.issue}-${idx}`} className="flex items-start gap-3 p-3 rounded-lg ds-alert-danger border">
                 <RefreshCcw className="w-4 h-4 ds-icon-danger mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">{r.equipment}</p>
@@ -636,8 +636,8 @@ export default function ReportsPage() {
           }
         >
           <div className="space-y-2">
-            {warrantyDisplay.map((w) => (
-              <div key={w.equipment} className="flex items-start gap-3 p-3 rounded-lg ds-alert-warning border">
+            {warrantyDisplay.map((w, idx) => (
+              <div key={`${w.equipment}-${w.customer}-${w.expires}-${idx}`} className="flex items-start gap-3 p-3 rounded-lg ds-alert-warning border">
                 <Shield className="w-4 h-4 ds-icon-warning mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground">{w.equipment}</p>
