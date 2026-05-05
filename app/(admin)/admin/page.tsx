@@ -13,6 +13,7 @@ import { useAdmin } from "@/lib/admin-store"
 import {
   PLATFORM_STATS,
   FEATURE_FLAGS, ADMIN_AUDIT_LOG,
+  type AccountDisplayStatus,
   type PlatformAccount, type FeatureFlag,
 } from "@/lib/admin-data"
 import { initialsFromDisplayLabel } from "@/lib/user-display"
@@ -54,15 +55,63 @@ function billingStatusLabel(raw: string | null | undefined): string {
   return row?.label ?? raw.replace(/_/g, " ")
 }
 
-function initialPlanKey(account: PlatformAccount): string {
-  if (account.planId) return normalizePlanIdForRead(account.planId)
-  const m: Record<PlatformAccount["plan"], string> = {
-    Starter: "solo",
-    Core: "core",
-    Growth: "growth",
-    Enterprise: "scale",
+/** Plan pill from `organization_subscriptions.plan_id` only (no demo / tier fallback). */
+function adminPlanPillFromAccount(account: PlatformAccount): string {
+  const planId = account.planId
+  if (planId == null || String(planId).trim() === "") return "—"
+  const p = String(planId).trim().toLowerCase()
+  switch (p) {
+    case "starter":
+    case "solo":
+      return "Starter"
+    case "core":
+      return "Core"
+    case "growth":
+      return "Growth"
+    case "scale":
+      return "Scale"
+    case "enterprise":
+      return "Enterprise"
+    default:
+      return String(planId).trim()
   }
-  return m[account.plan] ?? "solo"
+}
+
+/** Status pill from org archive + raw `subscriptionStatus` only. */
+function adminStatusPillFromAccount(account: PlatformAccount): AccountDisplayStatus {
+  if (account.organizationArchived) return "Archived"
+  const raw = account.subscriptionStatus
+  if (raw == null || String(raw).trim() === "") return "—"
+  const st = String(raw).trim().toLowerCase()
+  switch (st) {
+    case "trialing":
+      return "Trialing"
+    case "active":
+      return "Active"
+    case "past_due":
+      return "Past Due"
+    case "canceled":
+    case "unpaid":
+      return "Canceled"
+    case "paused":
+      return "Suspended"
+    case "incomplete":
+      return "Trialing"
+    case "incomplete_expired":
+      return "Canceled"
+    default:
+      return "—"
+  }
+}
+
+function initialPlanKey(account: PlatformAccount): string {
+  const raw = account.planId
+  if (raw != null && String(raw).trim() !== "") {
+    const t = String(raw).trim().toLowerCase()
+    if (t === "enterprise") return "scale"
+    return normalizePlanIdForRead(raw)
+  }
+  return "solo"
 }
 
 function isoToDatetimeLocal(iso: string | null | undefined): string {
@@ -84,7 +133,8 @@ function datetimeLocalToIso(local: string): string | null {
 function normalizeAdminBillingStatus(raw: string | null | undefined): (typeof ADMIN_BILLING_STATUSES)[number]["id"] {
   const s = raw?.trim().toLowerCase() ?? ""
   if (s === "trialing" || s === "active" || s === "past_due" || s === "canceled") return s
-  return "trialing"
+  if (s === "unpaid") return "canceled"
+  return "active"
 }
 
 function isoToDateInput(iso: string | null | undefined): string {
@@ -113,7 +163,7 @@ function fmt$(cents: number) {
   return "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })
 }
 
-function statusColor(status: PlatformAccount["status"]) {
+function statusColor(status: AccountDisplayStatus) {
   switch (status) {
     case "Active":    return { color: "#15803d", bg: "#f0fdf4" }
     case "Trialing":  return { color: "#b45309", bg: "#fffbeb" }
@@ -121,47 +171,79 @@ function statusColor(status: PlatformAccount["status"]) {
     case "Canceled":  return { color: "#6b7280", bg: "#f3f4f6" }
     case "Suspended": return { color: "#6b7280", bg: "#f3f4f6" }
     case "Archived":  return { color: "#64748b", bg: "#f1f5f9" }
+    case "Unassigned": return { color: "#64748b", bg: "#f1f5f9" }
+    case "—":         return { color: "#64748b", bg: "#f1f5f9" }
     default:          return { color: "#6b7280", bg: "#f3f4f6" }
   }
 }
 
-function trialHint(account: PlatformAccount) {
-  if (account.organizationArchived) return null
-  const days = account.trialDaysLeft
-  const billing = account.billingStatus?.toLowerCase() ?? ""
-  const trialingState = account.status === "Trialing" || billing === "trialing"
+function TrialColumnCell({ account }: { account: PlatformAccount }) {
+  const raw = account.subscriptionStatus?.trim().toLowerCase()
+  const trialEnds = account.trialEndsAt ?? account.trial_ends_at
+  if (raw !== "trialing" || !trialEnds) {
+    return <span className="text-muted-foreground text-sm">—</span>
+  }
 
-  if (trialingState && days != null && days > 0) {
-    const cls =
-      days <= 2
-        ? "text-red-600 dark:text-red-400 font-medium"
-        : days <= 7
-          ? "text-orange-600 dark:text-orange-400 font-medium"
-          : "text-amber-800 dark:text-amber-600 font-medium"
+  const now = new Date()
+  const end = new Date(trialEnds)
+  const diffMs = end.getTime() - now.getTime()
+  const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+  const pill = "px-2 py-0.5 rounded bg-muted text-xs inline-block tabular-nums"
+
+  if (days <= 0) {
+    return <span className={`${pill} text-sm text-red-600 font-semibold`}>Expired</span>
+  }
+
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  const calDiff = Math.round((startEnd.getTime() - startToday.getTime()) / 86400000)
+
+  if (calDiff <= 0) {
+    return <span className={`${pill} text-sm text-red-500 font-semibold`}>Ends today</span>
+  }
+  if (calDiff === 1) {
+    return <span className={`${pill} text-sm text-red-500 font-semibold`}>Ends tomorrow</span>
+  }
+
+  if (days <= 3) {
     return (
-      <span className={`block text-[11px] mt-0.5 ${cls}`}>
-        Trial ends in {days} {days === 1 ? "day" : "days"}
-      </span>
+      <span className={`${pill} text-sm text-orange-500 font-medium`}>Ends in {days} days</span>
     )
   }
 
-  if (trialingState && days != null && days <= 0) {
-    return (
-      <span className="block text-[11px] mt-0.5 text-red-600 dark:text-red-400 font-medium">
-        Trial expired
-      </span>
-    )
-  }
+  return <span className={`${pill} text-sm text-muted-foreground`}>{days} days left</span>
+}
 
+/** Short badge text for active internal discounts (−20% / −$50). */
+function adminDiscountShortLabel(account: PlatformAccount): string | null {
+  if (!account.hasActiveDiscount || !account.discountType) return null
+  const t = account.discountType.trim().toLowerCase()
+  if (t === "percent" && account.discountValue != null && Number.isFinite(Number(account.discountValue))) {
+    return `−${Math.round(Number(account.discountValue))}%`
+  }
+  if (t === "fixed" && account.discountValue != null && Number.isFinite(Number(account.discountValue))) {
+    return `−${fmt$(Number(account.discountValue))}`
+  }
   return null
 }
 
-function planColor(plan: PlatformAccount["plan"]) {
+function planColor(plan: string) {
   switch (plan) {
-    case "Enterprise": return { color: "#7c3aed", bg: "#f5f3ff" }
-    case "Growth":     return { color: "#1d4ed8", bg: "#eff6ff" }
-    case "Core":       return { color: "#0f766e", bg: "#ccfbf1" }
-    default:           return { color: "#b45309", bg: "#fffbeb" }
+    case "Enterprise":
+    case "Scale":
+      return { color: "#7c3aed", bg: "#f5f3ff" }
+    case "Growth":
+      return { color: "#1d4ed8", bg: "#eff6ff" }
+    case "Core":
+      return { color: "#0f766e", bg: "#ccfbf1" }
+    case "Starter":
+      return { color: "#b45309", bg: "#fffbeb" }
+    case "—":
+    case "No plan":
+      return { color: "#64748b", bg: "#f1f5f9" }
+    default:
+      return { color: "#64748b", bg: "#f1f5f9" }
   }
 }
 
@@ -207,7 +289,9 @@ function AccountsTab({
 }) {
   const [search, setSearch] = useState("")
   const [planFilter, setPlanFilter] = useState<string>("All")
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Trialing" | "Archived">("All")
+  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Trialing" | "Archived">(
+    "All",
+  )
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PlatformAccount | null>(null)
@@ -220,6 +304,11 @@ function AccountsTab({
   const [planFormBillingCycle, setPlanFormBillingCycle] = useState<"monthly" | "annual">("monthly")
   const [planFormStatus, setPlanFormStatus] = useState<string>("trialing")
   const [planFormTrialLocal, setPlanFormTrialLocal] = useState("")
+  const [planFormDiscountType, setPlanFormDiscountType] = useState<"none" | "percent" | "fixed">("none")
+  const [planFormDiscountPercent, setPlanFormDiscountPercent] = useState("")
+  const [planFormDiscountFixed, setPlanFormDiscountFixed] = useState("")
+  const [planFormDiscountLabel, setPlanFormDiscountLabel] = useState("")
+  const [planFormDiscountExpiresLocal, setPlanFormDiscountExpiresLocal] = useState("")
   const [planBusy, setPlanBusy] = useState(false)
   const [planError, setPlanError] = useState<string | null>(null)
   const [planSaveNotice, setPlanSaveNotice] = useState<string | null>(null)
@@ -236,8 +325,9 @@ function AccountsTab({
   const discountPreview = useMemo(() => {
     if (!discountTarget) return null
     const expIso = dateInputToExpiresIso(discountExpiresDate)
-    const baseM = resolveListMrrCents(discountTarget.planId, "monthly")
-    const baseA = resolveListMrrCents(discountTarget.planId, "annual")
+    const pid = normalizePlanIdForRead(String(discountTarget.planId ?? "solo"))
+    const baseM = resolveListMrrCents(pid, "monthly")
+    const baseA = resolveListMrrCents(pid, "annual")
 
     if (discountFormType === "none") {
       return {
@@ -281,19 +371,40 @@ function AccountsTab({
     return accounts.filter((a) => {
       const q = search.toLowerCase()
       const matchQ = !q || a.name.toLowerCase().includes(q) || a.ownerEmail.toLowerCase().includes(q)
-      const matchPlan = planFilter === "All" || a.plan === planFilter
+      const planPill = adminPlanPillFromAccount(a)
+      const statusPill = adminStatusPillFromAccount(a)
+      const planForFilter = planPill === "—" ? "No plan" : planPill
+      const matchPlan = planFilter === "All" || planForFilter === planFilter
 
       if (statusFilter === "Archived") {
         if (!a.organizationArchived) return false
       } else {
         if (a.organizationArchived) return false
-        if (statusFilter === "Active" && a.status !== "Active") return false
-        if (statusFilter === "Trialing" && a.status !== "Trialing") return false
+        if (statusFilter === "Active" && statusPill !== "Active") return false
+        if (statusFilter === "Trialing" && statusPill !== "Trialing") return false
       }
 
       return matchQ && matchPlan
     })
   }, [accounts, search, planFilter, statusFilter])
+
+  const [trialSortUrgentFirst, setTrialSortUrgentFirst] = useState(false)
+
+  const displayedAccounts = useMemo(() => {
+    const rows = [...filtered]
+    if (!trialSortUrgentFirst) return rows
+    rows.sort((a, b) => {
+      const key = (x: PlatformAccount) => {
+        const st = x.subscriptionStatus?.trim().toLowerCase()
+        if (st !== "trialing") return Number.POSITIVE_INFINITY
+        const iso = x.trialEndsAt ?? x.trial_ends_at
+        if (!iso) return Number.POSITIVE_INFINITY
+        return new Date(iso).getTime()
+      }
+      return key(a) - key(b)
+    })
+    return rows
+  }, [filtered, trialSortUrgentFirst])
 
   async function archiveAccount(account: PlatformAccount) {
     if (
@@ -341,8 +452,29 @@ function AccountsTab({
     setPlanTarget(account)
     setPlanFormPlanId(initialPlanKey(account))
     setPlanFormBillingCycle(account.billingCycle === "annual" ? "annual" : "monthly")
-    setPlanFormStatus(normalizeAdminBillingStatus(account.billingStatus))
+    setPlanFormStatus(normalizeAdminBillingStatus(account.subscriptionStatus ?? account.billingStatus))
     setPlanFormTrialLocal(isoToDatetimeLocal(account.trialEndsAt))
+    const dt = account.discountType?.trim().toLowerCase()
+    if (dt === "percent") {
+      setPlanFormDiscountType("percent")
+      setPlanFormDiscountPercent(
+        account.discountValue != null && Number.isFinite(Number(account.discountValue))
+          ? String(account.discountValue)
+          : "",
+      )
+      setPlanFormDiscountFixed("")
+    } else if (dt === "fixed") {
+      setPlanFormDiscountType("fixed")
+      const cents = account.discountValue != null ? Number(account.discountValue) : 0
+      setPlanFormDiscountFixed(Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : "")
+      setPlanFormDiscountPercent("")
+    } else {
+      setPlanFormDiscountType("none")
+      setPlanFormDiscountPercent("")
+      setPlanFormDiscountFixed("")
+    }
+    setPlanFormDiscountLabel((account.discountLabel ?? account.discountReason ?? "").trim())
+    setPlanFormDiscountExpiresLocal(isoToDatetimeLocal(account.discountExpiresAt))
     setPlanError(null)
     setPlanSaveNotice(null)
     setMenuOpen(null)
@@ -369,7 +501,7 @@ function AccountsTab({
       setDiscountPercentValue("")
       setDiscountFixedDollars("")
     }
-    setDiscountReason(account.discountReason ?? "")
+    setDiscountReason((account.discountLabel ?? account.discountReason ?? "").trim())
     setDiscountExpiresDate(isoToDateInput(account.discountExpiresAt))
     setDiscountError(null)
     setPlanSaveNotice(null)
@@ -394,33 +526,32 @@ function AccountsTab({
           return
         }
         const cents = Math.round(dollars * 100)
-        const base = resolveListMrrCents(discountTarget.planId, discountTarget.billingCycle)
+        const cycle = discountTarget.billingCycle === "annual" ? "annual" : "monthly"
+        const base = resolveListMrrCents(
+          normalizePlanIdForRead(String(discountTarget.planId ?? "solo")),
+          cycle,
+        )
         if (cents > base) {
           setDiscountError("Fixed discount cannot exceed list price for the current billing cycle.")
           return
         }
       }
 
-      const payload: Record<string, unknown> = {}
-      if (discountFormType === "none") {
-        payload.discount_type = null
-        payload.discount_value = null
-        payload.discount_reason = null
-        payload.discount_expires_at = null
-      } else {
-        payload.discount_type = discountFormType
-        payload.discount_value =
-          discountFormType === "percent"
-            ? parseFloat(discountPercentValue)
-            : Math.round(parseFloat(discountFixedDollars) * 100)
-        payload.discount_reason = discountReason.trim() || null
-        payload.discount_expires_at = dateInputToExpiresIso(discountExpiresDate)
-      }
-
-      const res = await fetch(`/api/platform/accounts/${discountTarget.id}/discount`, {
+      const res = await fetch(`/api/platform/accounts/${discountTarget.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          discountType: discountFormType === "none" ? null : discountFormType,
+          discountValue:
+            discountFormType === "percent"
+              ? parseFloat(discountPercentValue)
+              : discountFormType === "fixed"
+                ? Math.round(parseFloat(discountFixedDollars) * 100)
+                : null,
+          discountLabel: discountReason.trim() || null,
+          discountReason: discountReason.trim() || null,
+          discountExpiresAt: dateInputToExpiresIso(discountExpiresDate),
+        }),
       })
       const data = (await res.json()) as { message?: string }
       if (!res.ok) {
@@ -441,6 +572,27 @@ function AccountsTab({
       setPlanError("Trial end date is required when status is Trialing.")
       return
     }
+    if (planFormDiscountType === "percent") {
+      const p = parseFloat(planFormDiscountPercent)
+      if (!Number.isFinite(p) || p < 1 || p > 100) {
+        setPlanError("Percent discount must be between 1 and 100.")
+        return
+      }
+    } else if (planFormDiscountType === "fixed") {
+      const dollars = parseFloat(planFormDiscountFixed)
+      if (!Number.isFinite(dollars) || dollars <= 0) {
+        setPlanError("Fixed discount amount must be greater than 0.")
+        return
+      }
+      const cents = Math.round(dollars * 100)
+      const cycle = planFormBillingCycle === "annual" ? "annual" : "monthly"
+      const base = resolveListMrrCents(normalizePlanIdForRead(planFormPlanId), cycle)
+      if (cents > base) {
+        setPlanError("Fixed discount cannot exceed list price for the selected plan and billing cycle.")
+        return
+      }
+    }
+
     setPlanBusy(true)
     setPlanError(null)
     try {
@@ -467,6 +619,30 @@ function AccountsTab({
         setPlanError(data.message ?? "Could not update subscription.")
         return
       }
+
+      const discRes = await fetch(`/api/platform/accounts/${planTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          discountType: planFormDiscountType === "none" ? null : planFormDiscountType,
+          discountValue:
+            planFormDiscountType === "percent"
+              ? parseFloat(planFormDiscountPercent)
+              : planFormDiscountType === "fixed"
+                ? Math.round(parseFloat(planFormDiscountFixed) * 100)
+                : null,
+          discountLabel: planFormDiscountLabel.trim() || null,
+          discountReason: planFormDiscountLabel.trim() || null,
+          discountExpiresAt: datetimeLocalToIso(planFormDiscountExpiresLocal),
+        }),
+      })
+      const discData = (await discRes.json()) as { message?: string }
+      if (!discRes.ok) {
+        setPlanError(discData.message ?? "Plan saved, but discount update failed.")
+        onRefresh()
+        return
+      }
+
       setPlanSaveNotice("Subscription updated.")
       setPlanTarget(null)
       onRefresh()
@@ -504,26 +680,37 @@ function AccountsTab({
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <select
-          value={planFilter}
-          onChange={(e) => setPlanFilter(e.target.value)}
-          className="input-base w-36 text-sm"
-        >
-          {["All", "Starter", "Core", "Growth", "Enterprise"].map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="input-base w-40 text-sm"
-        >
-          {(["All", "Active", "Trialing", "Archived"] as const).map((s) => (
-            <option key={s} value={s}>
-              {s === "All" ? "All (live)" : s}
-            </option>
-          ))}
-        </select>
+        <div className="flex gap-4 items-end shrink-0">
+          <div className="flex flex-col gap-1 w-[220px]">
+            <span className="text-xs text-muted-foreground mb-1">Status</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="input-base w-full text-sm"
+            >
+              <option value="All">All</option>
+              <option value="Active">Active</option>
+              <option value="Trialing">Trialing</option>
+              <option value="Archived">Archived</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1 w-[220px]">
+            <span className="text-xs text-muted-foreground mb-1">Plan</span>
+            <select
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              className="input-base w-full text-sm"
+            >
+              <option value="All">All Plans</option>
+              <option value="Starter">Starter</option>
+              <option value="Core">Core</option>
+              <option value="Growth">Growth</option>
+              <option value="Scale">Scale</option>
+              <option value="Enterprise">Enterprise</option>
+              <option value="No plan">No plan</option>
+            </select>
+          </div>
+        </div>
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} accounts</span>
       </div>
 
@@ -533,9 +720,29 @@ function AccountsTab({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-secondary/40">
-                {["Account", "Plan", "Status", "MRR", "Seats", "Work Orders", "Last Active", ""].map((h) => (
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  Account
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  Plan
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  Status
+                </th>
+                <th
+                  className="text-left px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap cursor-pointer select-none hover:text-foreground w-[1%]"
+                  title={
+                    trialSortUrgentFirst
+                      ? "Click to use default order"
+                      : "Sort by trial end (soonest first)"
+                  }
+                  onClick={() => setTrialSortUrgentFirst((v) => !v)}
+                >
+                  Trial{trialSortUrgentFirst ? " ↑" : ""}
+                </th>
+                {["MRR", "Seats", "Work Orders", "Last Active", ""].map((h) => (
                   <th
-                    key={h}
+                    key={h || "actions"}
                     className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap"
                   >
                     {h}
@@ -544,9 +751,11 @@ function AccountsTab({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((account) => {
-                const sc = statusColor(account.status)
-                const pc = planColor(account.plan)
+              {displayedAccounts.map((account) => {
+                const pillPlan = adminPlanPillFromAccount(account)
+                const pillStatus = adminStatusPillFromAccount(account)
+                const sc = statusColor(pillStatus)
+                const pc = planColor(pillPlan)
                 const archived = Boolean(account.organizationArchived)
                 const loginDisabled = archived
                 return (
@@ -573,22 +782,22 @@ function AccountsTab({
                         className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ color: pc.color, background: pc.bg }}
                       >
-                        {account.plan}
+                        {pillPlan}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5 items-start">
-                        <span
-                          className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={{ color: sc.color, background: sc.bg }}
-                        >
-                          {account.status}
-                        </span>
-                        {trialHint(account)}
-                      </div>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: sc.color, background: sc.bg }}
+                      >
+                        {pillStatus}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 align-top whitespace-nowrap max-w-[160px]">
+                      <TrialColumnCell account={account} />
                     </td>
                     <td className="px-4 py-3 text-sm ds-tabular">
-                      {account.planId == null && account.billingStatus == null ? (
+                      {account.planId == null && account.subscriptionStatus == null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
                         <div className="flex flex-col gap-0.5 items-start font-medium">
@@ -603,9 +812,9 @@ function AccountsTab({
                             {account.hasActiveDiscount && (
                               <Badge
                                 variant="secondary"
-                                className="text-[10px] px-1 py-0 h-5 font-normal shrink-0"
+                                className="text-[10px] px-1 py-0 h-5 font-normal shrink-0 tabular-nums"
                               >
-                                Discount
+                                {adminDiscountShortLabel(account) ?? "Discount"}
                               </Badge>
                             )}
                           </span>
@@ -663,9 +872,9 @@ function AccountsTab({
                             <button
                               type="button"
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left disabled:opacity-50"
-                              disabled={account.planId == null && account.billingStatus == null}
+                              disabled={account.planId == null && account.subscriptionStatus == null}
                               title={
-                                account.planId == null && account.billingStatus == null
+                                account.planId == null && account.subscriptionStatus == null
                                   ? "No subscription row yet — use Change plan first."
                                   : undefined
                               }
@@ -803,12 +1012,14 @@ function AccountsTab({
               <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs space-y-1">
                 <p>
                   <span className="text-muted-foreground">Current plan (display):</span>{" "}
-                  <span className="font-medium text-foreground">{planTarget.plan}</span>
+                  <span className="font-medium text-foreground">
+                    {adminPlanPillFromAccount(planTarget)}
+                  </span>
                 </p>
                 <p>
                   <span className="text-muted-foreground">Billing status:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {billingStatusLabel(planTarget.billingStatus)}
+                    {billingStatusLabel(planTarget.subscriptionStatus ?? planTarget.billingStatus)}
                   </span>
                 </p>
               </div>
@@ -839,6 +1050,80 @@ function AccountsTab({
                     <option value="annual">Annual</option>
                   </select>
                 </div>
+
+                <div className="rounded-lg border border-border bg-card px-3 py-3 space-y-3">
+                  <p className="text-xs font-semibold text-foreground">Discount</p>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Discount type</label>
+                    <select
+                      className="input-base w-full text-sm"
+                      value={planFormDiscountType}
+                      onChange={(e) =>
+                        setPlanFormDiscountType(e.target.value as "none" | "percent" | "fixed")
+                      }
+                    >
+                      {DISCOUNT_TYPE_OPTIONS.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {planFormDiscountType === "percent" && (
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">
+                        Percent off (1–100)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        className="input-base w-full text-sm"
+                        value={planFormDiscountPercent}
+                        onChange={(e) => setPlanFormDiscountPercent(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {planFormDiscountType === "fixed" && (
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">
+                        Fixed amount off (USD)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className="input-base w-full text-sm"
+                        value={planFormDiscountFixed}
+                        onChange={(e) => setPlanFormDiscountFixed(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Label (optional)
+                    </label>
+                    <input
+                      type="text"
+                      className="input-base w-full text-sm"
+                      placeholder="e.g. Partner pilot"
+                      value={planFormDiscountLabel}
+                      onChange={(e) => setPlanFormDiscountLabel(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Expiration (optional, local time)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="input-base w-full text-sm"
+                      value={planFormDiscountExpiresLocal}
+                      onChange={(e) => setPlanFormDiscountExpiresLocal(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Subscription status</label>
                   <select
@@ -908,24 +1193,38 @@ function AccountsTab({
               <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs space-y-1">
                 <p>
                   <span className="text-muted-foreground">Plan:</span>{" "}
-                  <span className="font-medium text-foreground">{discountTarget.plan}</span>
+                  <span className="font-medium text-foreground">
+                    {adminPlanPillFromAccount(discountTarget)}
+                  </span>
                 </p>
                 <p>
                   <span className="text-muted-foreground">Billing status:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {billingStatusLabel(discountTarget.billingStatus)}
+                    {billingStatusLabel(discountTarget.subscriptionStatus ?? discountTarget.billingStatus)}
                   </span>
                 </p>
                 <p>
                   <span className="text-muted-foreground">List price (monthly):</span>{" "}
                   <span className="font-medium tabular-nums">
-                    {fmt$(resolveListMrrCents(discountTarget.planId, "monthly"))}/mo
+                    {fmt$(
+                      resolveListMrrCents(
+                        normalizePlanIdForRead(String(discountTarget.planId ?? "solo")),
+                        "monthly",
+                      ),
+                    )}
+                    /mo
                   </span>
                 </p>
                 <p>
                   <span className="text-muted-foreground">List price (annual billing cycle):</span>{" "}
                   <span className="font-medium tabular-nums">
-                    {fmt$(resolveListMrrCents(discountTarget.planId, "annual"))}/mo
+                    {fmt$(
+                      resolveListMrrCents(
+                        normalizePlanIdForRead(String(discountTarget.planId ?? "solo")),
+                        "annual",
+                      ),
+                    )}
+                    /mo
                   </span>
                 </p>
               </div>
@@ -1400,7 +1699,7 @@ export default function PlatformAdminPage() {
     setAccountsLoading(true)
     setAccountsError(null)
     try {
-      const res = await fetch("/api/platform/accounts")
+      const res = await fetch("/api/platform/accounts", { cache: "no-store" })
       const data = (await res.json()) as {
         accounts?: PlatformAccount[]
         message?: string
@@ -1410,7 +1709,10 @@ export default function PlatformAdminPage() {
         setAccounts([])
         return
       }
-      setAccounts(data.accounts ?? [])
+      const list = data.accounts ?? []
+      setAccounts(list)
+      // TODO(platform-admin): remove after verifying planId / subscriptionStatus vs DB
+      if (list.length > 0) console.log("ADMIN ROW", list[0])
     } catch {
       setAccountsError("Could not load accounts.")
       setAccounts([])

@@ -17,6 +17,30 @@ export type ParsedDiscount = {
 }
 
 /**
+ * Pure price reduction (amounts in **cents** for fixed discounts).
+ * `discountValue` for `fixed` is cents off; for `percent` it is 1–100.
+ */
+export function applyDiscount(
+  price: number,
+  discountType: string | null | undefined,
+  discountValue: number | null | undefined,
+): number {
+  if (discountType == null || discountValue == null) return price
+  const t = String(discountType).trim().toLowerCase()
+  if (!t || t === "none") return price
+  const raw = typeof discountValue === "number" ? discountValue : parseFloat(String(discountValue))
+  if (!Number.isFinite(raw)) return price
+  if (t === "percent") {
+    const pct = Math.min(100, Math.max(0, raw))
+    return Math.max(0, Math.round(price * (1 - pct / 100)))
+  }
+  if (t === "fixed") {
+    return Math.max(0, Math.round(price - raw))
+  }
+  return price
+}
+
+/**
  * Applies internal discount fields to list MRR (cents).
  * `discount_value` for `fixed` is **cents** off; for `percent` it is 1–100.
  */
@@ -44,15 +68,9 @@ export function applyDiscountToMrrCents(
     return { finalCents: baseCents, active: false }
   }
 
-  if (t === "percent") {
-    const pct = Math.min(100, Math.max(0, raw))
-    const finalCents = Math.round(baseCents * (1 - pct / 100))
-    return { finalCents: Math.max(0, finalCents), active: true }
-  }
-
-  if (t === "fixed") {
-    const finalCents = Math.round(baseCents - raw)
-    return { finalCents: Math.max(0, finalCents), active: true }
+  if (t === "percent" || t === "fixed") {
+    const finalCents = applyDiscount(baseCents, t, raw)
+    return { finalCents, active: true }
   }
 
   return { finalCents: baseCents, active: false }

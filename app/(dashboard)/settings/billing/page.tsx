@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense } from "react"
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { EmbeddedCheckoutProvider, EmbeddedCheckout, Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
@@ -22,6 +22,7 @@ import {
 import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } from "@/lib/billing/usage"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
+import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
 import { createCheckoutSession, createPortalSession } from "@/app/actions/stripe"
 import { createSetupIntent } from "@/app/actions/stripe-setup"
 import {
@@ -500,6 +501,23 @@ function BillingPageContent() {
   const currentMonthlyRate =
     billingCycle === "annual" ? pricingPlanForDisplay.priceAnnual : pricingPlanForDisplay.priceMonthly
 
+  const monthlyCostAfterDiscount = useMemo(() => {
+    const base = currentMonthlyRate
+    if (!subscription) {
+      return { baseCents: base, finalCents: base, showStrike: false as boolean }
+    }
+    const parsed = applyDiscountToMrrCents(
+      base,
+      subscription.discount_type,
+      subscription.discount_value,
+      subscription.discount_expires_at,
+    )
+    const t = subscription.discount_type?.trim().toLowerCase()
+    const showStrike =
+      parsed.active && (t === "percent" || t === "fixed") && parsed.finalCents < base
+    return { baseCents: base, finalCents: parsed.finalCents, showStrike }
+  }, [currentMonthlyRate, subscription])
+
   async function openAddCardModal() {
     setSetupError(null)
     setSetupBusy(true)
@@ -623,8 +641,22 @@ function BillingPageContent() {
                 <p className="text-xs text-muted-foreground">
                   {trialLive && intendedPlanData ? "Est. monthly (after trial)" : "Monthly cost"}
                 </p>
-                <p className="text-sm font-semibold text-foreground mt-0.5">
-                  {`$${(currentMonthlyRate / 100).toFixed(0)}/mo`}
+                <p className="text-sm mt-0.5">
+                  {monthlyCostAfterDiscount.showStrike ? (
+                    <>
+                      <span className="text-muted-foreground line-through font-normal mr-2">
+                        ${(monthlyCostAfterDiscount.baseCents / 100).toFixed(0)}
+                      </span>
+                      <span className="font-bold text-foreground">
+                        ${(monthlyCostAfterDiscount.finalCents / 100).toFixed(0)}
+                      </span>
+                      <span className="font-semibold text-foreground">/mo</span>
+                    </>
+                  ) : (
+                    <span className="font-semibold text-foreground">
+                      {`$${(monthlyCostAfterDiscount.finalCents / 100).toFixed(0)}/mo`}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

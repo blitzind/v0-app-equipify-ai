@@ -2,36 +2,63 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
-import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
 import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
 import { listMrrBaseCentsForSubscriptionRow } from "@/lib/billing/org-subscription-mrr"
-import type { AccountStatus, PlatformAccount } from "@/lib/admin-data"
+import type { AccountDisplayStatus, PlatformAccount } from "@/lib/admin-data"
 
-function mapPlanTier(planId: string | null | undefined): PlatformAccount["plan"] {
-  const p = normalizePlanIdForRead(planId ?? "")
-  if (p === "growth") return "Growth"
-  if (p === "scale") return "Enterprise"
-  if (p === "core") return "Core"
-  return "Starter"
+function normalizeOrgKey(id: string): string {
+  return String(id).trim().toLowerCase()
 }
 
-function subscriptionDisplayStatus(
-  sub: { status: string; trial_ends_at: string | null } | null,
-  orgArchived: boolean,
-): AccountStatus {
-  if (orgArchived) return "Archived"
-  if (!sub) return "Trialing"
-  const st = sub.status
-  if (st === "trialing") {
-    if (sub.trial_ends_at && new Date(sub.trial_ends_at).getTime() > Date.now()) return "Trialing"
-    return "Canceled"
+/** Display label from `organization_subscriptions.plan_id` (DB is source of truth). */
+function mapPlanIdToDisplay(planId: string | null | undefined): string {
+  if (planId == null || String(planId).trim() === "") return "—"
+  const p = String(planId).trim().toLowerCase()
+  switch (p) {
+    case "starter":
+    case "solo":
+      return "Starter"
+    case "core":
+      return "Core"
+    case "growth":
+      return "Growth"
+    case "scale":
+      return "Scale"
+    case "enterprise":
+      return "Enterprise"
+    default:
+      return String(planId).trim()
   }
-  if (st === "active") return "Active"
-  if (st === "past_due") return "Past Due"
-  if (st === "canceled" || st === "unpaid") return "Canceled"
-  if (st === "paused") return "Suspended"
-  return "Trialing"
+}
+
+/** Display pill from org archive flag + raw `organization_subscriptions.status`. */
+function mapSubscriptionStatusToDisplay(
+  orgArchived: boolean,
+  raw: string | null | undefined,
+): AccountDisplayStatus {
+  if (orgArchived) return "Archived"
+  if (raw == null || String(raw).trim() === "") return "—"
+  const st = String(raw).trim().toLowerCase()
+  switch (st) {
+    case "trialing":
+      return "Trialing"
+    case "active":
+      return "Active"
+    case "past_due":
+      return "Past Due"
+    case "canceled":
+    case "unpaid":
+      return "Canceled"
+    case "paused":
+      return "Suspended"
+    case "incomplete":
+      return "Trialing"
+    case "incomplete_expired":
+      return "Canceled"
+    default:
+      return "—"
+  }
 }
 
 export async function GET() {
@@ -69,14 +96,24 @@ export async function GET() {
     return NextResponse.json({ accounts: [] as PlatformAccount[] })
   }
 
-  const { data: subs } = await admin
+  const { data: subs, error: subsErr } = await admin
     .from("organization_subscriptions")
     .select(
-      "organization_id, plan_id, intended_plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id, stripe_price_id, discount_type, discount_value, discount_reason, discount_expires_at",
+      "organization_id, plan_id, intended_plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id, stripe_price_id, discount_type, discount_value, discount_label, discount_reason, discount_expires_at, created_at",
     )
     .in("organization_id", ids)
+    .order("created_at", { ascending: false })
 
-  const subByOrg = new Map((subs ?? []).map((s) => [s.organization_id, s]))
+  if (subsErr) {
+    return NextResponse.json({ error: "query_failed", message: subsErr.message }, { status: 500 })
+  }
+
+  /** Latest row per org when multiple rows exist (should be unique per org). */
+  const subByOrg = new Map<string, (typeof subs)[number]>()
+  for (const s of subs ?? []) {
+    const k = normalizeOrgKey(s.organization_id)
+    if (!subByOrg.has(k)) subByOrg.set(k, s)
+  }
 
   const { data: ownerRows } = await admin
     .from("organization_members")
@@ -108,10 +145,11 @@ export async function GET() {
 
   const accounts: PlatformAccount[] = list.map((o) => {
     const orgArchived = o.status === "archived"
-    const sub = subByOrg.get(o.id) ?? null
+    const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
     const owner = ownerByOrg.get(o.id) ?? { email: "", name: "" }
+
     const billingCycle =
-      sub?.billing_cycle === "annual" || sub?.billing_cycle === "monthly" ? sub.billing_cycle : "monthly"
+      sub?.billing_cycle === "annual" || sub?.billing_cycle === "monthly" ? sub.billing_cycle : null
 
     const trialEndsAtIso = sub?.trial_ends_at ?? null
     const trialDaysLeft = trialDaysLeftFromIso(trialEndsAtIso)
@@ -131,18 +169,22 @@ export async function GET() {
     const mrrBaseCents =
       hasActiveDiscount && baseMrrCents > discountParsed.finalCents ? baseMrrCents : null
 
+    const subscriptionStatus = sub?.status ?? null
+
+    const displayPlan = orgArchived && !sub ? "—" : mapPlanIdToDisplay(sub?.plan_id ?? null)
+    const displayStatus = mapSubscriptionStatusToDisplay(orgArchived, sub?.status ?? null)
+
     return {
       id: o.id,
       name: o.name,
       slug: String(o.slug ?? ""),
       ownerName: owner.name || "—",
       ownerEmail: owner.email || "—",
-      plan: mapPlanTier(sub?.plan_id),
+      plan: displayPlan,
+      displayPlan,
       billingCycle,
-      status: subscriptionDisplayStatus(
-        sub ? { status: sub.status, trial_ends_at: sub.trial_ends_at } : null,
-        orgArchived,
-      ),
+      status: displayStatus,
+      displayStatus,
       organizationArchived: orgArchived,
       mrr: sub ? discountParsed.finalCents : 0,
       mrrBaseCents,
@@ -152,6 +194,7 @@ export async function GET() {
         sub?.discount_value != null && sub.discount_value !== ""
           ? Number(sub.discount_value)
           : null,
+      discountLabel: sub?.discount_label ?? null,
       discountReason: sub?.discount_reason ?? null,
       discountExpiresAt: sub?.discount_expires_at ?? null,
       seats: seatCount.get(o.id) ?? 0,
@@ -160,10 +203,14 @@ export async function GET() {
       createdAt: o.created_at?.slice(0, 10) ?? "",
       lastActive: (o.updated_at ?? o.created_at)?.slice(0, 10) ?? "",
       trialEndsAt: trialEndsAtIso,
+      trial_ends_at: trialEndsAtIso,
       trialDaysLeft,
-      billingStatus: sub?.status ?? null,
+      subscriptionStatus,
+      billingStatus: subscriptionStatus,
       planId: sub?.plan_id ?? null,
       intendedPlanId: sub?.intended_plan_id ?? null,
+      stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
+      stripePriceId: sub?.stripe_price_id ?? null,
       country: "",
       industry: "",
     }

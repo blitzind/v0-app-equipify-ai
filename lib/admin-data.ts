@@ -1,5 +1,5 @@
-// ─── Platform Admin demo data ─────────────────────────────────────────────────
-// Audit tab examples only — live identity comes from auth / profiles.
+// ─── Platform Admin static samples ───────────────────────────────────────────
+// Audit tab and KPI strip use in-file samples; live accounts come from GET /api/platform/accounts.
 
 export type PlatformAdminRole = "Super Admin" | "Support Admin" | "Sales Admin" | "Finance Admin"
 
@@ -7,15 +7,24 @@ export type PlatformAdminRole = "Super Admin" | "Support Admin" | "Sales Admin" 
 
 export type AccountStatus = "Active" | "Trialing" | "Past Due" | "Canceled" | "Suspended" | "Archived"
 
+/** Admin table status pill when no subscription row exists (workspace not archived). */
+export type AccountDisplayStatus = AccountStatus | "Unassigned" | "—"
+
 export interface PlatformAccount {
   id: string
   name: string
   slug: string
   ownerName: string
   ownerEmail: string
-  plan: "Starter" | "Growth" | "Enterprise" | "Core"
-  billingCycle: "monthly" | "annual"
-  status: AccountStatus
+  /** Tier label for pills / filters; mirrored by displayPlan when present. */
+  plan: string
+  /** Server-computed pill label from GET /api/platform/accounts (preferred for table UI). */
+  displayPlan?: string
+  billingCycle: "monthly" | "annual" | null
+  /** Display pill + filters; mirrored by displayStatus when present. */
+  status: AccountDisplayStatus
+  /** Server-computed pill label from GET /api/platform/accounts (preferred for table UI). */
+  displayStatus?: AccountDisplayStatus
   /** Soft-delete: organization.status === 'archived' */
   organizationArchived?: boolean
   mrr: number           // effective MRR in cents (after internal discount when active)
@@ -24,6 +33,7 @@ export interface PlatformAccount {
   hasActiveDiscount?: boolean
   discountType?: string | null
   discountValue?: number | null
+  discountLabel?: string | null
   discountReason?: string | null
   discountExpiresAt?: string | null
   seats: number
@@ -33,201 +43,23 @@ export interface PlatformAccount {
   lastActive: string
   /** ISO 8601 trial end from `organization_subscriptions.trial_ends_at` */
   trialEndsAt?: string | null
+  /** Same as trialEndsAt (snake_case alias from API). */
+  trial_ends_at?: string | null
   /** Whole days until trial ends; negative if expired; null if no trial end date */
   trialDaysLeft?: number | null
-  /** Raw `organization_subscriptions.status` (e.g. trialing, active, canceled) */
+  /** Raw `organization_subscriptions.status` */
+  subscriptionStatus?: string | null
+  /** @deprecated same as subscriptionStatus */
   billingStatus?: string | null
   /** Raw `organization_subscriptions.plan_id` */
   planId?: string | null
   /** Raw `organization_subscriptions.intended_plan_id` when set */
   intendedPlanId?: string | null
+  stripeSubscriptionId?: string | null
+  stripePriceId?: string | null
   country: string
   industry: string
 }
-
-export const PLATFORM_ACCOUNTS: PlatformAccount[] = [
-  {
-    id: "ws-acme",
-    name: "Acme Field Services",
-    slug: "acme",
-    ownerName: "Sarah Mitchell",
-    ownerEmail: "sarah@acme.com",
-    plan: "Growth",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 26500,
-    seats: 4,
-    equipmentCount: 94,
-    workOrderCount: 312,
-    createdAt: "2024-01-15",
-    lastActive: "2026-04-30",
-    country: "US",
-    industry: "Heavy Equipment",
-  },
-  {
-    id: "ws-medology",
-    name: "Medology Solutions",
-    slug: "medology",
-    ownerName: "Megan Brooks",
-    ownerEmail: "m.brooks@medology.com",
-    plan: "Growth",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 26500,
-    seats: 4,
-    equipmentCount: 73,
-    workOrderCount: 218,
-    createdAt: "2024-06-01",
-    lastActive: "2026-04-30",
-    country: "US",
-    industry: "Medical Equipment",
-  },
-  {
-    id: "ws-precision-biomedical",
-    name: "Precision Biomedical Services",
-    slug: "precision-biomedical-demo",
-    ownerName: "Riley Park",
-    ownerEmail: "r.park@precisionbiomedical.demo",
-    plan: "Growth",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 31200,
-    seats: 8,
-    equipmentCount: 72,
-    workOrderCount: 58,
-    createdAt: "2023-06-01",
-    lastActive: "2026-05-01",
-    country: "US",
-    industry: "Medical Equipment",
-  },
-  {
-    id: "ws-zephyr",
-    name: "Zephyr Equipment Co.",
-    slug: "zephyr",
-    ownerName: "Priya Mehta",
-    ownerEmail: "priya@zephyr.com",
-    plan: "Starter",
-    billingCycle: "monthly",
-    status: "Trialing",
-    mrr: 0,
-    seats: 2,
-    equipmentCount: 18,
-    workOrderCount: 24,
-    createdAt: "2026-04-14",
-    lastActive: "2026-04-30",
-    trialEndsAt: "2026-05-14",
-    country: "US",
-    industry: "Construction",
-  },
-  {
-    id: "ws-hartwell",
-    name: "Hartwell Industrial",
-    slug: "hartwell",
-    ownerName: "Greg Hartwell",
-    ownerEmail: "g.hartwell@hartwell.com",
-    plan: "Enterprise",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 89900,
-    seats: 22,
-    equipmentCount: 340,
-    workOrderCount: 1204,
-    createdAt: "2023-09-01",
-    lastActive: "2026-04-29",
-    country: "US",
-    industry: "Manufacturing",
-  },
-  {
-    id: "ws-pacific",
-    name: "Pacific Lift Solutions",
-    slug: "pacific",
-    ownerName: "Naomi Yee",
-    ownerEmail: "n.yee@pacificlift.com",
-    plan: "Growth",
-    billingCycle: "monthly",
-    status: "Past Due",
-    mrr: 29900,
-    seats: 7,
-    equipmentCount: 61,
-    workOrderCount: 189,
-    createdAt: "2025-02-18",
-    lastActive: "2026-04-22",
-    country: "US",
-    industry: "Crane & Lift",
-  },
-  {
-    id: "ws-volta",
-    name: "Volta Energy Systems",
-    slug: "volta",
-    ownerName: "Andre Volta",
-    ownerEmail: "a.volta@voltaenergy.com",
-    plan: "Starter",
-    billingCycle: "monthly",
-    status: "Active",
-    mrr: 9900,
-    seats: 3,
-    equipmentCount: 27,
-    workOrderCount: 88,
-    createdAt: "2025-11-05",
-    lastActive: "2026-04-28",
-    country: "US",
-    industry: "Electrical",
-  },
-  {
-    id: "ws-summit",
-    name: "Summit HVAC Corp",
-    slug: "summit",
-    ownerName: "Lisa Park",
-    ownerEmail: "l.park@summithvac.com",
-    plan: "Growth",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 26500,
-    seats: 9,
-    equipmentCount: 112,
-    workOrderCount: 401,
-    createdAt: "2024-03-22",
-    lastActive: "2026-04-30",
-    country: "US",
-    industry: "HVAC",
-  },
-  {
-    id: "ws-ridgeline",
-    name: "Ridgeline Fleet Services",
-    slug: "ridgeline",
-    ownerName: "Carlos Ruiz",
-    ownerEmail: "c.ruiz@ridgeline.com",
-    plan: "Enterprise",
-    billingCycle: "annual",
-    status: "Active",
-    mrr: 89900,
-    seats: 18,
-    equipmentCount: 287,
-    workOrderCount: 976,
-    createdAt: "2023-06-14",
-    lastActive: "2026-04-30",
-    country: "US",
-    industry: "Fleet Management",
-  },
-  {
-    id: "ws-clearwater",
-    name: "Clearwater Plumbing",
-    slug: "clearwater",
-    ownerName: "Ben Waters",
-    ownerEmail: "b.waters@clearwater.com",
-    plan: "Starter",
-    billingCycle: "monthly",
-    status: "Canceled",
-    mrr: 0,
-    seats: 2,
-    equipmentCount: 14,
-    workOrderCount: 45,
-    createdAt: "2025-07-01",
-    lastActive: "2026-03-15",
-    country: "US",
-    industry: "Plumbing",
-  },
-]
 
 // ─── Platform-level usage stats ───────────────────────────────────────────────
 
