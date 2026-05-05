@@ -5,6 +5,8 @@ import { cn, looksLikeUuid } from "@/lib/utils"
 import { usePurchaseOrders, type PurchaseOrder, type POStatus, type POLineItem } from "@/lib/purchase-order-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -126,6 +128,7 @@ export function PurchaseOrderDrawer({
   onClose,
 }: Props) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const { orders, updateOrder, archiveOrder } = usePurchaseOrders()
   const order = orders.find((o) => o.id === orderId) ?? null
 
@@ -434,6 +437,7 @@ export function PurchaseOrderDrawer({
                       <button
                         type="button"
                         onClick={() => {
+                          if (blockCreateIfNotEligible(standardCreateEligibility)) return
                           setVendorMenuOpen(false)
                           setAddVendorOpen(true)
                         }}

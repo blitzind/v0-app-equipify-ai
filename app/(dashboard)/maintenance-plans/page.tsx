@@ -95,6 +95,8 @@ import { EditMaintenancePlanDialog } from "@/components/maintenance-plans/edit-m
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockMaintenancePlanDialogIfNotEligible } from "@/lib/billing/guard-toast"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1028,6 +1030,7 @@ function MaintenancePlansPageInner() {
   const { plans, loading, error } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<PlanStatus | "All">("All")
   const [intervalFilter, setIntervalFilter] = useState<PlanInterval | "All">("All")
@@ -1037,6 +1040,11 @@ function MaintenancePlansPageInner() {
 
   const prefillCustomerId = searchParams.get("customerId")
   const prefillEquipmentId = searchParams.get("equipmentId")
+
+  function openCreatePlanModal() {
+    if (blockMaintenancePlanDialogIfNotEligible(standardCreateEligibility, maintenancePlansFeatureAllowed)) return
+    setCreateOpen(true)
+  }
 
   function handleCloseCreateModal() {
     setCreateOpen(false)
@@ -1053,9 +1061,18 @@ function MaintenancePlansPageInner() {
   // Open create modal from Customer / Equipment quick actions (?new=1&customerId=&equipmentId=)
   useEffect(() => {
     if (searchParams.get("new") === "1") {
+      if (blockMaintenancePlanDialogIfNotEligible(standardCreateEligibility, maintenancePlansFeatureAllowed)) {
+        const sp = new URLSearchParams(searchParams.toString())
+        sp.delete("new")
+        sp.delete("customerId")
+        sp.delete("equipmentId")
+        const q = sp.toString()
+        router.replace(q ? `/maintenance-plans?${q}` : "/maintenance-plans", { scroll: false })
+        return
+      }
       setCreateOpen(true)
     }
-  }, [searchParams])
+  }, [searchParams, router, standardCreateEligibility, maintenancePlansFeatureAllowed])
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
@@ -1168,7 +1185,7 @@ function MaintenancePlansPageInner() {
             view={view === "cards" ? "card" : "table"}
             onViewChange={(v) => setView(v === "card" ? "cards" : "table")}
           />
-          <Button onClick={() => setCreateOpen(true)} className="gap-2 h-9">
+          <Button onClick={() => openCreatePlanModal()} className="gap-2 h-9">
             <Plus className="w-4 h-4" /> New Plan
           </Button>
         </div>
@@ -1181,7 +1198,7 @@ function MaintenancePlansPageInner() {
             <p className="text-sm text-muted-foreground max-w-sm">
               No maintenance plans yet. Create a plan to schedule recurring service and reminders for customer equipment.
             </p>
-            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+            <Button onClick={() => openCreatePlanModal()} className="gap-2">
               <Plus className="w-4 h-4" /> New Plan
             </Button>
           </CardContent>

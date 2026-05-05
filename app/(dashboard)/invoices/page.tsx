@@ -20,6 +20,8 @@ import {
   Search, Plus, ArrowUpDown, ChevronRight,
   Receipt, CheckCircle2, AlertTriangle, Clock, FilePen, Ban, Send, Building2, Wrench,
 } from "lucide-react"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { InvoiceDrawer } from "@/components/drawers/invoice-drawer"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
@@ -118,10 +120,19 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 function InvoicesPageInner() {
   const { invoices, loading, error, refreshInvoices } = useInvoices()
   const { toast } = useToast()
+  const { standardCreateEligibility } = useBillingAccess()
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [invoicePrefillWo, setInvoicePrefillWo] = useState<string | undefined>(undefined)
   const [invoicePrefillCal, setInvoicePrefillCal] = useState<string | undefined>(undefined)
-  useQuickAdd("new-invoice", () => setNewModalOpen(true))
+
+  function openNewInvoiceModal(prefillWo?: string, prefillCal?: string) {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    setInvoicePrefillWo(prefillWo)
+    setInvoicePrefillCal(prefillCal)
+    setNewModalOpen(true)
+  }
+
+  useQuickAdd("new-invoice", () => openNewInvoiceModal(undefined, undefined))
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | InvoiceStatus>("all")
   const [sortKey, setSortKey]         = useState<SortKey>("issueDate")
@@ -143,13 +154,17 @@ function InvoicesPageInner() {
   useEffect(() => {
     const action = searchParams.get("action")
     if (action !== "new-invoice") return
+    if (blockCreateIfNotEligible(standardCreateEligibility)) {
+      router.replace("/invoices", { scroll: false })
+      return
+    }
     const wo = searchParams.get("workOrderId") ?? undefined
     const cal = searchParams.get("calibrationRecordId") ?? undefined
     setInvoicePrefillWo(wo)
     setInvoicePrefillCal(cal)
     setNewModalOpen(true)
     router.replace("/invoices", { scroll: false })
-  }, [searchParams, router])
+  }, [searchParams, router, standardCreateEligibility])
 
   useEffect(() => {
     const s = searchParams.get("status")
@@ -249,7 +264,7 @@ function InvoicesPageInner() {
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setNewModalOpen(true)}>
+          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewInvoiceModal(undefined, undefined)}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Invoice</span>
             <span className="sm:hidden">New</span>
@@ -460,7 +475,7 @@ function InvoicesPageInner() {
         }}
       />
       <Toaster />
-      <QuickAddParamBridge action="new-invoice" onTrigger={() => setNewModalOpen(true)} />
+      <QuickAddParamBridge action="new-invoice" onTrigger={() => openNewInvoiceModal(undefined, undefined)} />
     </div>
   )
 }

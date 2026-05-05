@@ -6,6 +6,8 @@ import { AppTopbar } from "@/components/app-topbar"
 import { MobileBottomNav } from "@/components/mobile-bottom-nav"
 import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 import { useQuickAdd } from "@/lib/quick-add-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, Building2,
@@ -232,7 +234,11 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const meta = resolveMeta(pathname)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  useQuickAdd("schedule-service", () => setScheduleOpen(true))
+  const { standardCreateEligibility } = useBillingAccess()
+  useQuickAdd("schedule-service", () => {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    setScheduleOpen(true)
+  })
 
   return (
     <>

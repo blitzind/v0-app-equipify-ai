@@ -9,9 +9,12 @@ import type { PlanId } from "@/lib/plans"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
+  getEffectiveBillingStatus,
   getOrganizationSubscription,
   getTrialDaysRemaining,
+  isSubscriptionActive,
   isTrialActive,
+  type EffectiveBillingStatus,
   type OrganizationSubscription,
 } from "@/lib/billing/subscriptions"
 import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } from "@/lib/billing/usage"
@@ -82,6 +85,16 @@ function barLimit(n: number | "unlimited"): number {
 }
 
 const CHECKOUT_PLAN_ORDER: PlanId[] = ["solo", "core", "growth", "scale"]
+
+const PAYMENT_ATTENTION_STATUSES = new Set<EffectiveBillingStatus>([
+  "unpaid",
+  "past_due",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+  "paused",
+  "trial_expired",
+])
 
 function nextCheckoutPlanId(id: PlanId | string): PlanId {
   const p = normalizePlanIdForRead(typeof id === "string" ? id : id)
@@ -265,6 +278,20 @@ export default function BillingPage() {
 
   const storedPlanId = subscription?.plan_id ?? workspace.planId
   const effectivePlanId = getEffectivePlanId(storedPlanId, subscription)
+  const billingIsActive = subscription ? isSubscriptionActive(subscription) : false
+  const effectiveBillingStatus: EffectiveBillingStatus = subscription
+    ? getEffectiveBillingStatus(subscription)
+    : "none"
+
+  const showPaymentAttentionBanner =
+    subscription != null && PAYMENT_ATTENTION_STATUSES.has(effectiveBillingStatus)
+  const hasStripeCustomer = Boolean(subscription?.stripe_customer_id)
+  const portalPrimaryLabel =
+    subscription?.status === "past_due" || subscription?.status === "incomplete"
+      ? "Fix billing"
+      : "Manage billing"
+  const pricingFriction =
+    subscription?.status === "past_due" || subscription?.status === "incomplete"
 
   const currentPlanData = getPlan(effectivePlanId)
   const trialLive = subscription ? isTrialActive(subscription) : false
@@ -282,18 +309,12 @@ export default function BillingPage() {
   const subscriptionStatusDisplay =
     subscription?.status ? formatBillingStatus(subscription.status) : formatBillingStatus(workspace.subscriptionStatus)
 
-  const billingTrialing = subscription?.status === "trialing"
-
   const periodEndIso = subscription?.current_period_end ?? workspace.currentPeriodEnd
   const nextRenewalDate = periodEndIso ? fmtIsoDate(periodEndIso.slice(0, 10)) : ""
   const billingCycleLabel = subscription?.billing_cycle ?? workspace.billingCycle
 
   async function openBillingPortal() {
     setPortalMessage(null)
-    if (!subscription?.stripe_customer_id) {
-      setPortalMessage("Billing portal will be available after your first checkout.")
-      return
-    }
     setPortalBusy(true)
     try {
       const { url, error } = await createPortalSession()
@@ -305,6 +326,22 @@ export default function BillingPage() {
     } finally {
       setPortalBusy(false)
     }
+  }
+
+  function jumpToPlanComparison() {
+    const planSection = document.getElementById("plan-comparison")
+    if (!planSection) return
+    planSection.scrollIntoView({ behavior: "smooth", block: "start" })
+    planSection.focus({ preventScroll: true })
+  }
+
+  function handleBillingPrimaryAction() {
+    if (!hasStripeCustomer) {
+      setPortalMessage(null)
+      jumpToPlanComparison()
+      return
+    }
+    void openBillingPortal()
   }
 
   const fetchClientSecret = useCallback(async () => {
@@ -354,6 +391,24 @@ export default function BillingPage() {
           )}
           {billingLoading && orgStatus === "ready" && (
             <p className="text-xs text-muted-foreground mb-3">Loading subscription…</p>
+          )}
+          {showPaymentAttentionBanner && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-foreground">Payment required</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your subscription needs attention. Manage billing to restore access.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-1"
+                disabled={portalBusy}
+                onClick={handleBillingPrimaryAction}
+              >
+                {portalBusy && hasStripeCustomer ? "Opening…" : hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
+              </Button>
+            </div>
           )}
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between gap-4">
@@ -440,30 +495,34 @@ export default function BillingPage() {
 
             {/* Action buttons — full width on mobile, inline on sm+ */}
             <div className="flex flex-col gap-2">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  disabled={portalBusy}
-                  onClick={() => void openBillingPortal()}
-                  className="flex items-center justify-center gap-1.5 min-h-[44px] sm:h-8 px-3 text-sm font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60">
-                  <CreditCard size={13} /> {portalBusy ? "Opening…" : "Manage billing"}
-                </button>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Need to change or cancel? Manage billing in the customer portal.
-              </p>
-              {!subscription?.stripe_customer_id && orgStatus === "ready" && !billingLoading && (
-                <p className="text-xs text-muted-foreground">
-                  Billing portal will be available after your first checkout.
+              {!showPaymentAttentionBanner && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    disabled={portalBusy && hasStripeCustomer}
+                    onClick={handleBillingPrimaryAction}
+                    className="flex items-center justify-center gap-1.5 min-h-[44px] sm:h-8 px-3 text-sm font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60">
+                    <CreditCard size={13} /> {portalBusy && hasStripeCustomer ? "Opening…" : hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
+                  </button>
+                </div>
+              )}
+              {hasStripeCustomer ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Need to change or cancel? Manage billing in the customer portal.
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Choose a plan to activate billing. The customer portal will be available after checkout.
                 </p>
               )}
-              {portalMessage && (
+              {hasStripeCustomer && portalMessage && (
                 <p className="text-xs text-muted-foreground">{portalMessage}</p>
               )}
             </div>
           </div>
 
-          {(subscription?.status === "past_due" || workspace.subscriptionStatus === "past_due") && (
+          {!showPaymentAttentionBanner &&
+            (subscription?.status === "past_due" || workspace.subscriptionStatus === "past_due") && (
             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-danger text-sm">
               <AlertTriangle size={14} />
               <span>Your subscription payment is past due. Please update your payment method to avoid service interruption.</span>
@@ -573,14 +632,18 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <button
-                type="button"
-                disabled={portalBusy}
-                onClick={() => void openBillingPortal()}
-                className="flex items-center justify-center min-h-[44px] sm:h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60"
-              >
-                {portalBusy ? "Opening…" : "Manage billing"}
-              </button>
+              {hasStripeCustomer ? (
+                <button
+                  type="button"
+                  disabled={portalBusy}
+                  onClick={() => void openBillingPortal()}
+                  className="flex items-center justify-center min-h-[44px] sm:h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60"
+                >
+                  {portalBusy ? "Opening…" : "Manage billing"}
+                </button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Available after checkout</p>
+              )}
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-4">
@@ -590,7 +653,7 @@ export default function BillingPage() {
       </div>
 
       {/* ── Plan selector ────────────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div id="plan-comparison" tabIndex={-1} className="bg-card border border-border rounded-lg overflow-hidden focus:outline-none">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Change plan</h3>
@@ -626,13 +689,47 @@ export default function BillingPage() {
 
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
           {PLANS.map((p) => {
-            const isCurrent = p.id === effectivePlanId
+            const matchesStoredPlan = p.id === effectivePlanId
+            const isCurrent = billingIsActive && matchesStoredPlan
             const tierCurrent = planTierIndex(effectivePlanId)
             const tierP = planTierIndex(p.id)
-            const isUpgrade = !isCurrent && tierP > tierCurrent
-            const isDowngrade = !isCurrent && tierP < tierCurrent
+            const isUpgrade = !matchesStoredPlan && tierP > tierCurrent
+            const isDowngrade = !matchesStoredPlan && tierP < tierCurrent
             const monthly = billingCycle === "annual" ? p.priceAnnual : p.priceMonthly
             const isPopular = p.id === "growth"
+
+            const planCta = (() => {
+              if (isCurrent) {
+                return trialLive ? (
+                  <><Check size={12} /> Current trial</>
+                ) : (
+                  <><Check size={12} /> Current plan</>
+                )
+              }
+              if (!billingIsActive && matchesStoredPlan) {
+                const st = subscription?.status
+                if (st === "canceled" || st === "paused") {
+                  return <>Reactivate {p.name}</>
+                }
+                return <>Choose {p.name}</>
+              }
+              if (!billingIsActive && !matchesStoredPlan && pricingFriction) {
+                return <>Change to {p.name} <ArrowRight size={12} /></>
+              }
+              if (!billingIsActive && !matchesStoredPlan) {
+                return <>Choose {p.name}</>
+              }
+              if (trialLive && !matchesStoredPlan) {
+                return <>Choose {p.name}</>
+              }
+              if (isUpgrade) {
+                return <>Upgrade to {p.name} <ArrowRight size={12} /></>
+              }
+              if (isDowngrade) {
+                return <>Downgrade to {p.name} <ArrowRight size={12} /></>
+              }
+              return <>Choose {p.name}</>
+            })()
 
             return (
               <div
@@ -654,10 +751,10 @@ export default function BillingPage() {
                   <span
                     className={cn(
                       "absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground",
-                      !billingTrialing && "uppercase",
+                      !trialLive && "uppercase",
                     )}
                   >
-                    {billingTrialing ? "Scale (Trial)" : "Current"}
+                    {trialLive ? "Scale (Trial)" : "Current"}
                   </span>
                 )}
 
@@ -727,19 +824,7 @@ export default function BillingPage() {
                       : "bg-cta text-cta-foreground hover:bg-cta-hover active:bg-cta-active shadow-sm"
                   }`}
                 >
-                  {isCurrent && billingTrialing ? (
-                    <><Check size={12} /> Current trial</>
-                  ) : isCurrent ? (
-                    <><Check size={12} /> Current plan</>
-                  ) : billingTrialing ? (
-                    <>Choose {p.name}</>
-                  ) : isUpgrade ? (
-                    <>Upgrade to {p.name} <ArrowRight size={12} /></>
-                  ) : isDowngrade ? (
-                    <>Downgrade to {p.name} <ArrowRight size={12} /></>
-                  ) : (
-                    <>Choose {p.name}</>
-                  )}
+                  {planCta}
                 </button>
               </div>
             )

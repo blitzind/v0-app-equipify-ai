@@ -9,6 +9,8 @@ import { AIScanModal } from "@/components/equipment/ai-scan-modal"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -208,6 +210,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
 
 function EquipmentPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { equipmentCreateEligibility } = useBillingAccess()
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
@@ -234,20 +237,35 @@ function EquipmentPageInner() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addEquipmentPrefillCustomerId, setAddEquipmentPrefillCustomerId] = useState<string | null>(null)
   const [scanModalOpen, setScanModalOpen] = useState(false)
-  useQuickAdd("new-equipment", () => {
-    setAddEquipmentPrefillCustomerId(null)
+
+  function openAddEquipmentModal(prefillCustomerId: string | null) {
+    if (blockCreateIfNotEligible(equipmentCreateEligibility)) return
+    setAddEquipmentPrefillCustomerId(prefillCustomerId)
     setAddModalOpen(true)
+  }
+
+  function openScanModal() {
+    if (blockCreateIfNotEligible(equipmentCreateEligibility)) return
+    setScanModalOpen(true)
+  }
+
+  useQuickAdd("new-equipment", () => {
+    openAddEquipmentModal(null)
   })
 
   useEffect(() => {
     const action = searchParams.get("action")
     const cid = searchParams.get("customerId")
     if (action === "new-equipment") {
+      if (blockCreateIfNotEligible(equipmentCreateEligibility)) {
+        router.replace("/equipment", { scroll: false })
+        return
+      }
       setAddEquipmentPrefillCustomerId(cid)
       setAddModalOpen(true)
       router.replace("/equipment", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, equipmentCreateEligibility])
 
   useEffect(() => {
     let active = true
@@ -452,8 +470,7 @@ function EquipmentPageInner() {
               <DropdownMenuItem
                 className="gap-2.5 cursor-pointer py-2.5"
                 onClick={() => {
-                  setAddEquipmentPrefillCustomerId(null)
-                  setAddModalOpen(true)
+                  openAddEquipmentModal(null)
                 }}
               >
                 <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -465,7 +482,7 @@ function EquipmentPageInner() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2.5 cursor-pointer py-2.5"
-                onClick={() => setScanModalOpen(true)}
+                onClick={() => openScanModal()}
               >
                 <Sparkles className="w-4 h-4 text-[color:var(--ds-info-subtle)] shrink-0" />
                 <div>
@@ -693,8 +710,7 @@ function EquipmentPageInner() {
       <QuickAddParamBridge
         action="new-equipment"
         onTrigger={() => {
-          setAddEquipmentPrefillCustomerId(null)
-          setAddModalOpen(true)
+          openAddEquipmentModal(null)
         }}
       />
     </div>

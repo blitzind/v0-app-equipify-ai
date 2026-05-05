@@ -20,6 +20,8 @@ import {
   Search, Plus, ArrowUpDown, ChevronRight,
   FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban, Building2,
 } from "lucide-react"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
@@ -115,13 +117,20 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 function QuotesPageInner() {
   const { quotes, loading, error, refreshQuotes } = useQuotes()
   const { toast } = useToast()
+  const { standardCreateEligibility } = useBillingAccess()
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [newQuotePrefillCustomerId, setNewQuotePrefillCustomerId] = useState<string | null>(null)
   const [newQuotePrefillEquipmentId, setNewQuotePrefillEquipmentId] = useState<string | null>(null)
-  useQuickAdd("new-quote", () => {
-    setNewQuotePrefillCustomerId(null)
-    setNewQuotePrefillEquipmentId(null)
+
+  function openNewQuoteModal(prefillCustomerId: string | null, prefillEquipmentId: string | null) {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    setNewQuotePrefillCustomerId(prefillCustomerId)
+    setNewQuotePrefillEquipmentId(prefillEquipmentId)
     setNewModalOpen(true)
+  }
+
+  useQuickAdd("new-quote", () => {
+    openNewQuoteModal(null, null)
   })
   const [search, setSearch]           = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | QuoteStatus>("all")
@@ -146,12 +155,16 @@ function QuotesPageInner() {
     const cid = searchParams.get("customerId")
     const eid = searchParams.get("equipmentId")
     if (action === "new-quote") {
+      if (blockCreateIfNotEligible(standardCreateEligibility)) {
+        router.replace("/quotes", { scroll: false })
+        return
+      }
       setNewQuotePrefillCustomerId(cid)
       setNewQuotePrefillEquipmentId(eid)
       setNewModalOpen(true)
       router.replace("/quotes", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, standardCreateEligibility])
 
   const filtered = useMemo(() => {
     let list = [...quotes]
@@ -251,9 +264,7 @@ function QuotesPageInner() {
             size="sm"
             className="gap-2 cursor-pointer"
             onClick={() => {
-              setNewQuotePrefillCustomerId(null)
-              setNewQuotePrefillEquipmentId(null)
-              setNewModalOpen(true)
+              openNewQuoteModal(null, null)
             }}
           >
             <Plus className="w-4 h-4" />
@@ -453,14 +464,7 @@ function QuotesPageInner() {
         }}
       />
       <Toaster />
-      <QuickAddParamBridge
-        action="new-quote"
-        onTrigger={() => {
-          setNewQuotePrefillCustomerId(null)
-          setNewQuotePrefillEquipmentId(null)
-          setNewModalOpen(true)
-        }}
-      />
+      <QuickAddParamBridge action="new-quote" onTrigger={() => openNewQuoteModal(null, null)} />
     </div>
   )
 }

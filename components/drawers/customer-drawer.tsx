@@ -23,6 +23,8 @@ import type { Location } from "@/lib/mock-data"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockMaintenancePlanDialogIfNotEligible } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -443,6 +445,7 @@ function drawerWoStatusLabel(s: string): string {
 
 export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [drawerRefresh, setDrawerRefresh] = useState(0)
 
@@ -822,7 +825,16 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               size="sm"
               variant="outline"
               className="gap-1.5 text-xs cursor-pointer"
-              onClick={() => setCreatePlanModalOpen(true)}
+              onClick={() => {
+                if (
+                  blockMaintenancePlanDialogIfNotEligible(
+                    standardCreateEligibility,
+                    maintenancePlansFeatureAllowed,
+                  )
+                )
+                  return
+                setCreatePlanModalOpen(true)
+              }}
             >
               <Plus className="w-3.5 h-3.5" /> Plan
             </Button>

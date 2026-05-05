@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { Search, Plus, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VendorDrawer } from "@/components/drawers/vendor-drawer"
@@ -52,6 +54,7 @@ function StatusBadge({ archived }: { archived: boolean }) {
 
 function VendorsPageInner() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [rows, setRows] = useState<VendorListRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -162,7 +165,14 @@ function VendorsPageInner() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2 ml-auto shrink-0">
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setAddOpen(true)}>
+          <Button
+            size="sm"
+            className="gap-2 cursor-pointer"
+            onClick={() => {
+              if (blockCreateIfNotEligible(standardCreateEligibility)) return
+              setAddOpen(true)
+            }}
+          >
             <Plus className="w-4 h-4" />
             Add Vendor
           </Button>

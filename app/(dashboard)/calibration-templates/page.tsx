@@ -29,6 +29,8 @@ import { cn } from "@/lib/utils"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   archiveCalibrationTemplate,
   buildCompletedCertificatePdfHtml,
@@ -188,6 +190,7 @@ export default function CertificatesPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /** True after "+ New Template" / "+ Create Template" until save or cancel — distinct from "no selection" idle. */
@@ -369,6 +372,7 @@ export default function CertificatesPage() {
   }
 
   function beginNewTemplate() {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
     if (!confirmDiscardIfNeeded()) return
     setError(null)
     setSelectedId(null)

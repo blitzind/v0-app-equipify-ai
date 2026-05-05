@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import type {
   WorkOrder,
@@ -542,6 +544,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 
 function WorkOrdersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
 
@@ -752,10 +755,16 @@ function WorkOrdersPageInner() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createModalCustomerId, setCreateModalCustomerId] = useState<string | null>(null)
   const [createModalEquipmentId, setCreateModalEquipmentId] = useState<string | null>(null)
-  useQuickAdd("new-work-order", () => {
-    setCreateModalCustomerId(null)
-    setCreateModalEquipmentId(null)
+
+  function openCreateWorkOrderModal(customerId: string | null, equipmentId: string | null) {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    setCreateModalCustomerId(customerId)
+    setCreateModalEquipmentId(equipmentId)
     setCreateOpen(true)
+  }
+
+  useQuickAdd("new-work-order", () => {
+    openCreateWorkOrderModal(null, null)
   })
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const [drawerInitialTab, setDrawerInitialTab] = useState<string | undefined>(undefined)
@@ -779,12 +788,16 @@ function WorkOrdersPageInner() {
     const cid = searchParams.get("customerId")
     const eid = searchParams.get("equipmentId")
     if (action === "new-work-order") {
+      if (blockCreateIfNotEligible(standardCreateEligibility)) {
+        router.replace("/work-orders", { scroll: false })
+        return
+      }
       setCreateModalCustomerId(cid)
       setCreateModalEquipmentId(eid)
       setCreateOpen(true)
       router.replace("/work-orders", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, standardCreateEligibility])
 
   useEffect(() => {
     const s = searchParams.get("status")
@@ -948,9 +961,7 @@ function WorkOrdersPageInner() {
 
           <Button
             onClick={() => {
-              setCreateModalCustomerId(null)
-              setCreateModalEquipmentId(null)
-              setCreateOpen(true)
+              openCreateWorkOrderModal(null, null)
             }}
             className="gap-2 shrink-0"
           >
@@ -1005,7 +1016,7 @@ function WorkOrdersPageInner() {
         onUpdated={() => setRefreshToken((v) => v + 1)}
       />
 
-      <QuickAddParamBridge action="new-work-order" onTrigger={() => setCreateOpen(true)} />
+      <QuickAddParamBridge action="new-work-order" onTrigger={() => openCreateWorkOrderModal(null, null)} />
     </div>
   )
 }

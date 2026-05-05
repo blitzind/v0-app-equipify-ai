@@ -32,7 +32,7 @@ export function BillingWarningBanner() {
   return (
     <div
       className={cn(
-        "shrink-0 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5",
+        "relative z-[220] shrink-0 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5",
         "border-b border-amber-500/25 bg-amber-500/10 text-amber-950 dark:text-amber-100",
         "text-xs sm:text-sm",
       )}

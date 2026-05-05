@@ -793,7 +793,7 @@ export function EditMaintenancePlanDialog({
             <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
               {services.map((svc, idx) => (
                 <div
-                  key={svc.id}
+                  key={svc.id || `service-${idx}`}
                   className="rounded-lg border border-border p-3 space-y-2 bg-muted/20"
                 >
                   <div className="flex justify-between gap-2">

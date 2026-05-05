@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { TechnicianDrawer } from "@/components/drawers/technician-drawer"
 import { DispatchDrawer } from "@/components/drawers/dispatch-drawer"
 import { ScheduleJobModal } from "@/components/technicians/schedule-job-modal"
@@ -874,6 +876,7 @@ function TechCard({
 
 function TechniciansPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { seatInviteEligibility } = useBillingAccess()
   const [techs, setTechs] = useState<Technician[]>([])
   const [woRows, setWoRows] = useState<WoRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -894,6 +897,11 @@ function TechniciansPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  function openInviteTechnicianModal() {
+    if (blockCreateIfNotEligible(seatInviteEligibility)) return
+    setAddTechOpen(true)
+  }
 
   useEffect(() => {
     if (searchParams.get("dispatch") !== "1") return
@@ -1339,7 +1347,7 @@ function TechniciansPageInner() {
                   ? "Select an organization first."
                   : "Invite a technician by email (requires owner or admin)."
               }
-              onClick={() => setAddTechOpen(true)}
+              onClick={() => openInviteTechnicianModal()}
             >
               <Plus className="w-4 h-4" /> Add Technician
             </Button>

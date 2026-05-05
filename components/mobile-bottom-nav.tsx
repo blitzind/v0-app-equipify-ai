@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuickAddDispatch } from "@/lib/quick-add-context"
 import type { QuickAddAction } from "@/lib/quick-add-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
@@ -66,8 +68,14 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const dispatch = useQuickAddDispatch()
   const router = useRouter()
   const pathname = usePathname()
+  const { standardCreateEligibility, equipmentCreateEligibility } = useBillingAccess()
 
   function fire(action: QuickAddAction) {
+    if (action === "new-equipment") {
+      if (blockCreateIfNotEligible(equipmentCreateEligibility)) return
+    } else {
+      if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    }
     onClose()
     const target = ACTION_ROUTES[action]
     if (pathname === target) {

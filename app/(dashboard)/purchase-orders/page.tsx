@@ -13,6 +13,8 @@ import { PurchaseOrderDrawer } from "@/components/drawers/purchase-order-drawer"
 import { AddVendorModal } from "@/components/vendors/add-vendor-modal"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
   ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2, Trash2,
@@ -85,6 +87,7 @@ type VendorRow = {
 function PurchaseOrdersPageInner() {
   const { orders, loading, error, addOrder } = usePurchaseOrders()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -201,6 +204,7 @@ function PurchaseOrdersPageInner() {
   }
 
   function handleStartCreatePo() {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
     setNewDraft(emptyNewPoDraft())
     setVendorQuery("")
     setVendorMenuOpen(false)

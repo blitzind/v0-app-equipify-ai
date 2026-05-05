@@ -7,6 +7,8 @@ import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useBillingAccess } from "@/lib/billing-access-context"
+import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useCustomers } from "@/lib/customer-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -179,11 +181,16 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
 function CustomersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { standardCreateEligibility } = useBillingAccess()
   const [customers, setCustomers] = useState<Customer[]>([])
   const { customers: drawerCustomers, addCustomer } = useCustomers()
   const [refreshToken, setRefreshToken] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
-  useQuickAdd("new-customer", () => setShowAddModal(true))
+  function openNewCustomerModal() {
+    if (blockCreateIfNotEligible(standardCreateEligibility)) return
+    setShowAddModal(true)
+  }
+  useQuickAdd("new-customer", () => openNewCustomerModal())
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "Active" | "Inactive">("all")
   const [sortKey, setSortKey] = useState<SortKey>("company")
@@ -436,7 +443,7 @@ function CustomersPageInner() {
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setShowAddModal(true)}>
+          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewCustomerModal()}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Customer</span>
             <span className="sm:hidden">Add</span>
@@ -590,7 +597,7 @@ function CustomersPageInner() {
         onCreated={() => setRefreshToken((v) => v + 1)}
       />
 
-      <QuickAddParamBridge action="new-customer" onTrigger={() => setShowAddModal(true)} />
+      <QuickAddParamBridge action="new-customer" onTrigger={() => openNewCustomerModal()} />
     </div>
   )
 }
