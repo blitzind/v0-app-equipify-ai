@@ -71,7 +71,7 @@ function CertRow({
   }
 
   return (
-    <div className="flex items-start gap-3 p-2.5 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 dark:hover:bg-accent transition-colors group">
+    <div className="flex items-start gap-3 p-2.5 rounded-lg border border-border bg-muted/20 ds-hover-list-row-lg group">
       {/* File icon */}
       <div className="w-8 h-8 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
         <FileText className="w-4 h-4 text-primary" />
@@ -156,7 +156,7 @@ function UploadZone({ onUpload }: { onUpload: (files: FileList) => void }) {
     <div
       className={cn(
         "relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-6 px-4 text-center transition-colors cursor-pointer",
-        dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/30 dark:hover:bg-accent"
+        dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 ds-hover-list-row"
       )}
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}

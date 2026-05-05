@@ -46,7 +46,7 @@ export function RevenueChart({
     <div className="bg-card rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] h-full flex flex-col">
       <Link
         href="/reports"
-        className="flex items-center justify-between px-5 py-4 border-b border-border group hover:bg-muted/30 dark:hover:bg-accent transition-colors cursor-pointer"
+        className="flex items-center justify-between px-5 py-4 border-b border-border group ds-hover-list-row cursor-pointer"
         title="View revenue report"
       >
         <div>

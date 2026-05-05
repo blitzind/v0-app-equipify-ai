@@ -168,7 +168,7 @@ export function NewQuoteModal({
         .eq("organization_id", orgId)
         .eq("customer_id", custId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name")
 
       if (eqError) {
@@ -245,7 +245,7 @@ export function NewQuoteModal({
         .select("id, company_name")
         .eq("organization_id", orgId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("company_name")
 
       if (custError || cancelled) {
@@ -288,14 +288,14 @@ export function NewQuoteModal({
           .eq("organization_id", organizationId)
           .eq("customer_id", customerId)
           .eq("status", "active")
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("name"),
         supabase
           .from("work_orders")
           .select(woSelectWithNum)
           .eq("organization_id", organizationId)
           .eq("customer_id", customerId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(100),
       ])
@@ -307,7 +307,7 @@ export function NewQuoteModal({
           .select(woSelect)
           .eq("organization_id", organizationId)
           .eq("customer_id", customerId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(100)
       }

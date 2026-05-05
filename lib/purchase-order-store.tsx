@@ -222,7 +222,7 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
       .from("org_purchase_orders")
       .select("*")
       .eq("organization_id", activeOrg.organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
     if (fetchError) {
       setError(fetchError.message)
@@ -354,9 +354,15 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
       const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       const { error: archiveError } = await supabase
         .from("org_purchase_orders")
-        .update({ is_archived: true, archived_at: new Date().toISOString() })
+        .update({
+          archived_at: new Date().toISOString(),
+          archived_by: user?.id ?? null,
+        })
         .eq("id", id)
         .eq("organization_id", activeOrg.organizationId)
       if (archiveError) return { error: archiveError.message }

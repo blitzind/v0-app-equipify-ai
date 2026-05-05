@@ -56,6 +56,7 @@ import {
 } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { equipmentMatchesSearch, getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 type SortKey = "model" | "customerName" | "nextDueDate" | "lastServiceDate" | "category"
@@ -92,7 +93,7 @@ type DbEquipmentRow = {
   last_service_at: string | null
   next_due_at: string | null
   location_label: string | null
-  is_archived: boolean
+  archived_at: string | null
 }
 
 const statusColors: Record<Equipment["status"], string> = {
@@ -302,12 +303,11 @@ function EquipmentPageInner() {
 
       let eqQuery = supabase
         .from("equipment")
-        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label, is_archived")
+        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label, archived_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
-      if (archiveScope === "active") eqQuery = eqQuery.eq("is_archived", false)
-      else if (archiveScope === "archived") eqQuery = eqQuery.eq("is_archived", true)
+      eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
 
       const { data: equipmentRows, error: equipmentError } = await eqQuery
 
@@ -351,7 +351,7 @@ function EquipmentPageInner() {
         nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
         status: statusMap[row.status] ?? "Active",
         location: row.location_label ?? "—",
-        isArchived: row.is_archived,
+        isArchived: Boolean(row.archived_at),
       }))
 
       if (active) setEquipment(mapped)
@@ -608,7 +608,7 @@ function EquipmentPageInner() {
                   <TableRow
                     key={eq.id}
                     className={cn(
-                      "group cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors h-14",
+                      "group cursor-pointer ds-hover-list-row h-14",
                       selected.has(eq.id) && "bg-primary/5",
                     )}
                     onClick={() => setSelectedEquipmentId(eq.id)}

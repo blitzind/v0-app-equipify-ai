@@ -935,7 +935,7 @@ function MapView({
             key={loc}
             className={cn(
               "rounded-lg border p-3 flex flex-col gap-2 transition-colors cursor-pointer",
-              selected === loc ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:bg-muted/30 dark:hover:bg-accent"
+              selected === loc ? "border-primary/50 bg-primary/5" : "border-border bg-card ds-hover-list-row"
             )}
             onClick={() => setSelected(selected === loc ? null : loc)}
           >
@@ -1247,7 +1247,7 @@ function ServiceSchedulePageInner() {
         .from("work_orders")
         .select(schedWoSelWithNum)
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .not("scheduled_on", "is", null)
         .order("scheduled_on", { ascending: true })
         .order("scheduled_time", { ascending: true, nullsFirst: false })
@@ -1257,7 +1257,7 @@ function ServiceSchedulePageInner() {
           .from("work_orders")
           .select(schedWoSel)
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .not("scheduled_on", "is", null)
           .order("scheduled_on", { ascending: true })
           .order("scheduled_time", { ascending: true, nullsFirst: false })

@@ -48,7 +48,7 @@ async function hasDuplicateWoForDueCycle(
     .eq("organization_id", organizationId)
     .eq("maintenance_plan_id", planId)
     .eq("scheduled_on", scheduledOn)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .maybeSingle()
 
   if (error) return false
@@ -95,7 +95,7 @@ export async function processDuePlansForOrganization(
     .from("maintenance_plans")
     .select("*")
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .eq("status", "active")
     .eq("auto_create_work_order", true)
     .lte("next_due_date", todayStr)
@@ -262,7 +262,7 @@ export async function processDuePlansAllOrganizations(
   const { data: orgRows, error } = await supabase
     .from("maintenance_plans")
     .select("organization_id")
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .eq("status", "active")
     .eq("auto_create_work_order", true)
     .lte("next_due_date", todayStr)

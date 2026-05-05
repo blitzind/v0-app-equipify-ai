@@ -231,7 +231,7 @@ export function EditMaintenancePlanDialog({
         .select("id, company_name")
         .eq("organization_id", orgId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("company_name")
 
       if (custError || cancelled) {
@@ -302,7 +302,7 @@ export function EditMaintenancePlanDialog({
         .eq("organization_id", organizationId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name")
 
       if (cancelled) return
@@ -354,7 +354,7 @@ export function EditMaintenancePlanDialog({
       .select("email, phone")
       .eq("organization_id", organizationId)
       .eq("customer_id", form.customerId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
 
     const emails = (
       (contactRows as Array<{ email: string | null; phone: string | null }> | null) ?? []

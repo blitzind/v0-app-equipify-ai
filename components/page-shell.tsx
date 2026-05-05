@@ -95,7 +95,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Manage supplier contacts and addresses for purchase orders.",
     icon: Store,
   },
-  "/archived": {
+  "/settings/archived": {
     title: "Archived Center",
     subtitle: "Find and restore archived customers, assets, jobs, quotes, invoices, and more.",
     icon: Archive,
@@ -161,7 +161,7 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/invoices": "#06B6D4",
   "/purchase-orders": "#06B6D4",
   "/vendors": "#F59E0B",
-  "/archived": "#64748B",
+  "/settings/archived": "#64748B",
   "/reports": "#6366F1",
   "/portal": "#2563EB",
   "/settings/workspace": "#64748B",

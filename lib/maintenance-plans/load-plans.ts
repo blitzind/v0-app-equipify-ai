@@ -1,5 +1,6 @@
 import type { MaintenancePlan } from "@/lib/mock-data"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { rowToMaintenancePlan, type MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
@@ -16,8 +17,7 @@ export async function loadMaintenancePlansForOrg(
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
 
-  if (visibility === "active") q = q.eq("is_archived", false)
-  else if (visibility === "archived") q = q.eq("is_archived", true)
+  q = applyArchivedAtScope(q, visibility)
 
   const { data: rows, error } = await q
 

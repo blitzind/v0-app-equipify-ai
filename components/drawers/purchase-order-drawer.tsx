@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  DetailDrawer, DrawerSection, DrawerRow, DrawerToastStack, type ToastItem,
+  DetailDrawer,
+  DrawerSection,
+  DrawerRow,
+  DrawerToastStack,
+  DRAWER_NESTED_CARD,
+  type ToastItem,
 } from "@/components/detail-drawer"
 import {
   Mail, Download, CheckCircle2, Copy, X, PackageCheck,
@@ -103,14 +108,18 @@ type VendorRow = {
 // ─── Drawer shell (aligned with Invoice / Quote drawers) ─────────────────────
 
 const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
-const sectionCardClass = "rounded-xl border border-border bg-white shadow-sm"
+const sectionCardClass = DRAWER_NESTED_CARD
 
 // ─── Edit form field density (aligned with PO create modal) ───────────────────
 
-const editField = "h-9 w-full min-w-0 text-sm bg-white border-border text-foreground"
-const editTextarea = "min-h-[100px] resize-none text-sm leading-relaxed bg-white border-border text-foreground"
-const lineItemField = "h-9 w-full min-w-0 text-sm tabular-nums bg-white border-border text-foreground"
-const lineItemDesc = "h-9 w-full min-w-0 text-sm bg-white border-border text-foreground"
+const editField =
+  "h-9 w-full min-w-0 text-sm bg-background border-border text-foreground dark:bg-background"
+const editTextarea =
+  "min-h-[100px] resize-none text-sm leading-relaxed bg-background border-border text-foreground dark:bg-background"
+const lineItemField =
+  "h-9 w-full min-w-0 text-sm tabular-nums bg-background border-border text-foreground dark:bg-background"
+const lineItemDesc =
+  "h-9 w-full min-w-0 text-sm bg-background border-border text-foreground dark:bg-background"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -162,7 +171,7 @@ export function PurchaseOrderDrawer({
         .from("org_vendors")
         .select("id, name, email, phone, contact_name, billing_address, shipping_address")
         .eq("organization_id", organizationId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name")
       if (cancelled) return
       setVendors((data ?? []) as VendorRow[])
@@ -428,7 +437,7 @@ export function PurchaseOrderDrawer({
                             key={v.id}
                             type="button"
                             onClick={() => selectVendor(v)}
-                            className="w-full text-left px-3 py-2.5 hover:bg-muted/60 dark:hover:bg-accent text-sm"
+                            className="w-full text-left px-3 py-2.5 ds-hover-list-row-menu text-sm"
                           >
                             <div className="font-medium text-foreground">{v.name}</div>
                             {v.email && <div className="text-xs text-muted-foreground">{v.email}</div>}
@@ -441,7 +450,7 @@ export function PurchaseOrderDrawer({
                           setVendorMenuOpen(false)
                           setAddVendorOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2.5 border-t border-border text-sm text-primary hover:bg-muted/60 dark:hover:bg-accent"
+                        className="w-full text-left px-3 py-2.5 border-t border-border text-sm text-primary ds-hover-list-row-menu"
                       >
                         + Add New Vendor
                       </button>
@@ -687,7 +696,7 @@ export function PurchaseOrderDrawer({
               ) : (
                 <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-card">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-card">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-sm text-foreground flex-1 truncate">{a}</span>
                       <button
@@ -824,7 +833,7 @@ export function PurchaseOrderDrawer({
                   </thead>
                   <tbody className="divide-y divide-border">
                     {order.lineItems.map((item, i) => (
-                      <tr key={i} className="bg-white">
+                      <tr key={i} className="bg-card">
                         <td className="px-3 py-2 text-foreground">{item.description}</td>
                         <td className="px-3 py-2 text-right text-foreground tabular-nums">{item.quantity}</td>
                         <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmtCurrency(item.unitCostCents / 100)}</td>
@@ -847,7 +856,7 @@ export function PurchaseOrderDrawer({
             <DrawerSection title="Notes">
               <div className={cn(sectionCardClass, "p-4")}>
                 {order.notes ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap p-3 rounded-lg border border-border bg-white">
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap p-3 rounded-lg border border-border bg-background dark:bg-background">
                     {order.notes}
                   </p>
                 ) : (
@@ -868,7 +877,7 @@ export function PurchaseOrderDrawer({
               ) : (
                 <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-white">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-card">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-xs text-foreground flex-1 truncate">{a}</span>
                       <button

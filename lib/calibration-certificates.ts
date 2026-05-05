@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { applyArchivedAtScope, rowIsArchived, type ArchivedAtScope } from "@/lib/archive-scope"
 import type { RepairLog } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { buildCertificatePdfHtml } from "@/lib/certificates/certificate-pdf-html"
@@ -55,7 +56,7 @@ type CalibrationTemplateRow = {
   name: string
   equipment_category_id: string | null
   fields: unknown
-  is_archived: boolean
+  archived_at: string | null
   created_at: string
   updated_at: string
 }
@@ -163,7 +164,7 @@ function mapTemplateRow(row: CalibrationTemplateRow): CalibrationTemplate {
     name: row.name,
     equipmentCategoryId: row.equipment_category_id,
     fields: normalizeTemplateFields(row.fields),
-    isArchived: row.is_archived,
+    isArchived: rowIsArchived(row.archived_at),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -188,11 +189,10 @@ export async function listCalibrationTemplates(
 ): Promise<CalibrationTemplate[]> {
   let q = supabase
     .from("calibration_templates")
-    .select("id, organization_id, name, equipment_category_id, fields, is_archived, created_at, updated_at")
+    .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
     .eq("organization_id", organizationId)
     .order("name", { ascending: true })
-  if (visibility === "active") q = q.eq("is_archived", false)
-  else if (visibility === "archived") q = q.eq("is_archived", true)
+  q = applyArchivedAtScope(q, visibility)
 
   const { data, error } = await q
   if (error) throw new Error(error.message)
@@ -222,7 +222,7 @@ export async function upsertCalibrationTemplate(
       .update(row)
       .eq("id", payload.id)
       .eq("organization_id", organizationId)
-      .select("id, organization_id, name, equipment_category_id, fields, is_archived, created_at, updated_at")
+      .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
       .single()
     if (error) throw new Error(error.message)
     return mapTemplateRow(data as CalibrationTemplateRow)
@@ -231,7 +231,7 @@ export async function upsertCalibrationTemplate(
   const { data, error } = await supabase
     .from("calibration_templates")
     .insert(row)
-    .select("id, organization_id, name, equipment_category_id, fields, is_archived, created_at, updated_at")
+    .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
     .single()
   if (error) throw new Error(error.message)
   return mapTemplateRow(data as CalibrationTemplateRow)
@@ -246,7 +246,6 @@ export async function archiveCalibrationTemplate(
   const { error } = await supabase
     .from("calibration_templates")
     .update({
-      is_archived: true,
       archived_at: new Date().toISOString(),
       archived_by: archivedBy ?? null,
     })
@@ -263,7 +262,6 @@ export async function restoreCalibrationTemplate(
   const { error } = await supabase
     .from("calibration_templates")
     .update({
-      is_archived: false,
       archived_at: null,
       archived_by: null,
       archive_reason: null,
@@ -452,7 +450,7 @@ export async function listCompletedCertificatesForOrg(
     fetchWorkOrdersForCertificateList(supabase, organizationId, woIds),
     supabase
       .from("calibration_templates")
-      .select("id, organization_id, name, equipment_category_id, fields, is_archived, created_at, updated_at")
+      .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
       .eq("organization_id", organizationId)
       .in("id", templateIds),
   ])

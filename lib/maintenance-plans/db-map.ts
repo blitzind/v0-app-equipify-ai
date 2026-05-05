@@ -7,6 +7,7 @@ import type {
   WorkOrderPriority,
   WorkOrderType,
 } from "@/lib/mock-data"
+import { rowIsArchived } from "@/lib/archive-scope"
 
 /** Embedded in `services` JSONB to persist WO template fields not modeled as columns. */
 export const WO_DEFAULTS_SERVICE_ID = "__equipify_wo_defaults"
@@ -28,7 +29,7 @@ export type MaintenancePlanRow = {
   notes: string | null
   services: unknown
   notification_rules: unknown
-  is_archived: boolean
+  archived_at: string | null
   created_at: string
   updated_at: string
   last_auto_wo_at?: string | null
@@ -258,7 +259,7 @@ export function rowToMaintenancePlan(
     notes: row.notes ?? "",
     createdAt: row.created_at,
     totalServicesCompleted: 0,
-    isArchived: row.is_archived,
+    isArchived: rowIsArchived(row.archived_at),
   }
 }
 

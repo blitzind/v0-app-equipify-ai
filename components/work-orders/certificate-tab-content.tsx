@@ -174,7 +174,7 @@ export function CertificateTabContent({
             <select
               value={selectedTemplateId}
               onChange={(e) => onTemplateChange(e.target.value)}
-              className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+              className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
             >
               <option value="">Select template…</option>
               {templates.map((t) => (
@@ -386,7 +386,7 @@ export function CertificateTabContent({
                     <select
                       value={raw === "fail" ? "fail" : "pass"}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
-                      className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                      className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
                     >
                       <option value="pass">Pass</option>
                       <option value="fail">Fail</option>

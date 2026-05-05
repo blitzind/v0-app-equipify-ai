@@ -264,7 +264,7 @@ function ActivityTimeline({ items }: { items: ActivityEntry[] }) {
             {item.icon === "plan" && <Repeat className="w-3.5 h-3.5 text-muted-foreground" />}
           </div>
           <Link href={item.href} className="block group">
-            <div className="bg-card/80 border border-border rounded-xl p-4 hover:border-primary/35 hover:bg-muted/20 dark:hover:bg-accent transition-all">
+            <div className="bg-card/80 border border-border rounded-xl p-4 hover:border-primary/35 ds-hover-list-row-xs transition-all">
               <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{item.title}</p>
               <p className="text-xs text-muted-foreground mt-1">{item.subtitle}</p>
               <p className="text-[10px] text-muted-foreground/80 mt-2 font-medium uppercase tracking-wide">
@@ -292,7 +292,7 @@ function EquipmentRow({ eq, customerName }: { eq: Equipment; customerName?: stri
 
   return (
     <Link href={`/equipment/${eq.id}`}>
-      <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group cursor-pointer">
+      <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 ds-hover-list-row-xs transition-all group cursor-pointer">
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
           <Wrench className="w-4 h-4" />
         </div>
@@ -424,7 +424,7 @@ export default function CustomerDetailPage() {
 
       const { data: customerRow, error: customerError } = await supabase
         .from("customers")
-        .select("id, company_name, status, joined_at, notes, is_archived")
+        .select("id, company_name, status, joined_at, notes, archived_at")
         .eq("id", id)
         .eq("organization_id", orgId)
         .single()
@@ -444,14 +444,14 @@ export default function CustomerDetailPage() {
             .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
             .eq("customer_id", id)
             .eq("organization_id", orgId)
-            .eq("is_archived", false)
+            .is("archived_at", null)
             .order("is_primary", { ascending: false }),
           supabase
             .from("customer_locations")
             .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
             .eq("customer_id", id)
             .eq("organization_id", orgId)
-            .eq("is_archived", false),
+            .is("archived_at", null),
           supabase
             .from("customer_contracts")
             .select("id, name, contract_type, start_date, end_date, value_cents")
@@ -535,7 +535,7 @@ export default function CustomerDetailPage() {
           endDate: contract.end_date ?? new Date().toISOString().slice(0, 10),
           value: Math.floor((contract.value_cents ?? 0) / 100),
         })),
-        isArchived: Boolean((customerRow as { is_archived?: boolean }).is_archived),
+        isArchived: Boolean((customerRow as { archived_at?: string | null }).archived_at),
       }
 
       if (active) {
@@ -577,7 +577,7 @@ export default function CustomerDetailPage() {
         )
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name", { ascending: true })
 
       if (!active) return
@@ -587,7 +587,7 @@ export default function CustomerDetailPage() {
         .select(WO_LIST_SELECT_WITH_NUM)
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(200)
 
@@ -597,7 +597,7 @@ export default function CustomerDetailPage() {
           .select(WO_LIST_SELECT)
           .eq("organization_id", customer.organizationId)
           .eq("customer_id", customer.id)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(200)
       }
@@ -652,7 +652,7 @@ export default function CustomerDetailPage() {
         .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id, created_at")
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("next_due_date", { ascending: true, nullsFirst: false })
 
       if (!active) return
@@ -703,7 +703,7 @@ export default function CustomerDetailPage() {
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
         .in("maintenance_plan_id", planIds)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(50)
 
@@ -714,7 +714,7 @@ export default function CustomerDetailPage() {
           .eq("organization_id", customer.organizationId)
           .eq("customer_id", customer.id)
           .in("maintenance_plan_id", planIds)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(50)
       }
@@ -870,7 +870,6 @@ export default function CustomerDetailPage() {
       const { error } = await supabase
         .from("customers")
         .update({
-          is_archived: true,
           archived_at: new Date().toISOString(),
           archived_by: user?.id ?? null,
         })
@@ -898,7 +897,6 @@ export default function CustomerDetailPage() {
       const { error } = await supabase
         .from("customers")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -1028,7 +1026,7 @@ export default function CustomerDetailPage() {
     const supabase = createBrowserSupabaseClient()
     const { error } = await supabase
       .from("customer_locations")
-      .update({ is_archived: true })
+      .update({ archived_at: new Date().toISOString() })
       .eq("id", locationId)
       .eq("organization_id", customer.organizationId)
       .eq("customer_id", customer.id)
@@ -1138,7 +1136,6 @@ export default function CustomerDetailPage() {
     const { error } = await supabase
       .from("customer_contacts")
       .update({
-        is_archived: true,
         archived_at: new Date().toISOString(),
       })
       .eq("id", contactId)
@@ -1643,7 +1640,7 @@ export default function CustomerDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {customerWorkOrders.map((wo) => (
-                    <tr key={wo.id} className="bg-card hover:bg-muted/25 dark:hover:bg-accent transition-colors">
+                    <tr key={wo.id} className="bg-card ds-hover-list-row-sm">
                       <td className="px-4 py-3">
                         <p className="text-xs font-mono text-primary">
                           {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
@@ -1745,7 +1742,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={plan.id}
                           href={`/maintenance-plans?open=${plan.id}`}
-                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group"
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 ds-hover-list-row-xs transition-all group"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
                             <Repeat className="h-5 w-5 text-muted-foreground" />
@@ -1782,7 +1779,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={plan.id}
                           href={`/maintenance-plans?open=${plan.id}`}
-                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/20 dark:hover:bg-accent transition-all group opacity-95"
+                          className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 ds-hover-list-row-xs transition-all group opacity-95"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/50">
                             <Repeat className="h-5 w-5 text-muted-foreground" />
@@ -1823,7 +1820,7 @@ export default function CustomerDetailPage() {
                         <Link
                           key={wo.id}
                           href={`/work-orders?open=${wo.id}`}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/30 dark:hover:bg-accent transition-colors group"
+                          className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border hover:border-primary/40 ds-hover-list-row group"
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-mono text-primary truncate">{formatWorkOrderDisplay(wo.work_order_number, wo.id)}</p>

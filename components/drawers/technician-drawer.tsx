@@ -507,7 +507,7 @@ export function TechnicianDrawer({
         .select("id, title, status, scheduled_on, work_order_number")
         .eq("organization_id", activeOrgId)
         .eq("assigned_user_id", techId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .in("status", ["open", "scheduled", "in_progress"])
         .order("scheduled_on", { ascending: true, nullsFirst: false })
 
@@ -566,7 +566,7 @@ export function TechnicianDrawer({
         .select(techSchedSelectWithNum)
         .eq("organization_id", activeOrgId)
         .eq("assigned_user_id", techId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .not("scheduled_on", "is", null)
 
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
@@ -575,7 +575,7 @@ export function TechnicianDrawer({
           .select(techSchedSelect)
           .eq("organization_id", activeOrgId)
           .eq("assigned_user_id", techId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .not("scheduled_on", "is", null)
       }
 
@@ -744,7 +744,7 @@ export function TechnicianDrawer({
         .select(selectWithNum)
         .eq("organization_id", activeOrgId)
         .eq("assigned_user_id", techId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(150)
 
@@ -754,7 +754,7 @@ export function TechnicianDrawer({
           .select(selectNoNum)
           .eq("organization_id", activeOrgId)
           .eq("assigned_user_id", techId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(150)
       }
@@ -872,7 +872,7 @@ export function TechnicianDrawer({
         .select("status, scheduled_on, completed_at, created_at, total_labor_cents, total_parts_cents")
         .eq("organization_id", activeOrgId)
         .eq("assigned_user_id", techId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .limit(5000)
 
       if (cancelled) return
@@ -1768,7 +1768,7 @@ export function TechnicianDrawer({
                       {historyRows.map((r) => (
                         <TableRow
                           key={r.id}
-                          className="cursor-pointer hover:bg-muted/30 dark:hover:bg-accent"
+                          className="cursor-pointer ds-hover-list-row"
                           onClick={() => setOpenScheduleWoId(r.id)}
                         >
                           <TableCell className="text-sm font-mono text-primary whitespace-nowrap">
@@ -1889,7 +1889,7 @@ export function TechnicianDrawer({
                     onChange={(e) => setNoteDraft(e.target.value)}
                     placeholder="Add an internal note about this technician…"
                     rows={3}
-                    className="text-sm resize-y min-h-[72px] bg-white dark:bg-background"
+                    className="text-sm resize-y min-h-[72px] bg-background dark:bg-background"
                   />
                   <div className="flex justify-end">
                     <Button
@@ -1997,7 +1997,7 @@ export function TechnicianDrawer({
                             value={noteEditBody}
                             onChange={(e) => setNoteEditBody(e.target.value)}
                             rows={4}
-                            className="text-sm resize-y bg-white dark:bg-background"
+                            className="text-sm resize-y bg-background dark:bg-background"
                           />
                         ) : (
                           <p className="text-sm text-foreground whitespace-pre-wrap">{n.note}</p>

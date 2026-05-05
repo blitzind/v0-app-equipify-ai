@@ -773,7 +773,7 @@ export default function CertificatesPage() {
                           "w-full text-left px-3 py-2.5 text-sm border-b border-border/70 transition-colors",
                           isSelected
                             ? "bg-primary/12 border-l-[3px] border-l-primary pl-[9px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)]"
-                            : "border-l-[3px] border-l-transparent hover:bg-muted/40 dark:hover:bg-accent pl-3",
+                            : "border-l-[3px] border-l-transparent ds-hover-list-row-lg pl-3",
                         )}
                       >
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -1118,7 +1118,7 @@ export default function CertificatesPage() {
                   }}
                   className={cn(
                     "p-4 sm:p-5 text-left transition-colors cursor-pointer",
-                    "hover:bg-muted/30 dark:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    "ds-hover-list-row focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                   )}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between gap-y-2">

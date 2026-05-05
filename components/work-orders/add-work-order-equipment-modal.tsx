@@ -127,7 +127,7 @@ export function AddWorkOrderEquipmentModal({
         .select("id, name, equipment_code, serial_number, category, manufacturer, location_label")
         .eq("organization_id", organizationId)
         .eq("customer_id", customerId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name", { ascending: true })
       if (cancelled) return
       if (error) {
@@ -302,7 +302,7 @@ export function AddWorkOrderEquipmentModal({
                           "rounded-lg border px-3 py-3 sm:px-4 sm:py-3.5 transition-colors",
                           checked
                             ? "border-primary/35 bg-primary/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                            : "border-border/90 bg-card/40 hover:bg-muted/30 dark:hover:bg-accent",
+                            : "border-border/90 bg-card/40 ds-hover-list-row",
                         )}
                       >
                         <div className="flex flex-col gap-3">

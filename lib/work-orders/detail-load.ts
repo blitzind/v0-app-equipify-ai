@@ -108,7 +108,7 @@ type WoRow = {
   warranty_review_required?: boolean | null
   warranty_vendor_id?: string | null
   calibration_template_id?: string | null
-  is_archived?: boolean | null
+  archived_at?: string | null
 }
 
 export type WorkOrderPhotoGalleryItem = {
@@ -539,7 +539,7 @@ export async function loadWorkOrderDetailForOrg(
     equipmentWarrantyActive,
     equipmentCode: eqRow?.equipment_code?.trim() || null,
     equipmentSerialNumber: eqRow?.serial_number?.trim() || null,
-    isArchived: Boolean(w.is_archived),
+    isArchived: Boolean(w.archived_at),
   }
 
   return {

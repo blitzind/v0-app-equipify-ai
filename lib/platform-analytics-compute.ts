@@ -184,7 +184,7 @@ export async function computePlatformMetrics(admin: SupabaseClient): Promise<Pla
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .in("organization_id", nonArchivedIds)
-      .eq("is_archived", false)
+      .is("archived_at", null)
 
     if (woErr) {
       throw new Error(woErr.message)

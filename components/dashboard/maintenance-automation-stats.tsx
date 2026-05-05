@@ -73,7 +73,7 @@ export function MaintenanceAutomationStats() {
           .from("maintenance_plans")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "active")
 
       const [dueMonthRes, overdueRes, autoRes] = await Promise.all([
@@ -86,7 +86,7 @@ export function MaintenanceAutomationStats() {
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("created_by_pm_automation", true)
           .gte("created_at", startIso)
           .lte("created_at", endIso),

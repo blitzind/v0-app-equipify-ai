@@ -134,7 +134,7 @@ function PurchaseOrdersPageInner() {
         .from("org_vendors")
         .select("id, name, email, phone, contact_name, billing_address, shipping_address")
         .eq("organization_id", organizationId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name")
       if (cancelled) return
       setVendors((data ?? []) as VendorRow[])
@@ -402,7 +402,7 @@ function PurchaseOrdersPageInner() {
                   return (
                     <tr
                       key={po.id}
-                      className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors group"
+                      className="ds-hover-list-row cursor-pointer group"
                       onClick={() => setSelectedId(po.id)}
                     >
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-primary group-hover:underline underline-offset-2 whitespace-nowrap">
@@ -483,7 +483,7 @@ function PurchaseOrdersPageInner() {
                             key={vendor.id}
                             type="button"
                             onClick={() => selectVendor(vendor)}
-                            className="w-full text-left px-3 py-2 hover:bg-muted/60 dark:hover:bg-accent text-sm"
+                            className="w-full text-left px-3 py-2 ds-hover-list-row-menu text-sm"
                           >
                             <div className="font-medium">{vendor.name}</div>
                             {vendor.email && <div className="text-xs text-muted-foreground">{vendor.email}</div>}
@@ -495,7 +495,7 @@ function PurchaseOrdersPageInner() {
                           setVendorMenuOpen(false)
                           setAddVendorOpen(true)
                         }}
-                        className="w-full text-left px-3 py-2 border-t border-border text-sm text-primary hover:bg-muted/60 dark:hover:bg-accent"
+                        className="w-full text-left px-3 py-2 border-t border-border text-sm text-primary ds-hover-list-row-menu"
                       >
                         + Add New Vendor
                       </button>

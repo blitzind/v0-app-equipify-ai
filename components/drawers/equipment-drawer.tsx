@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { rowIsArchived } from "@/lib/archive-scope"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -172,7 +173,7 @@ function ageYears(installDate: string) {
 }
 
 const drawerInputClass =
-  "h-8 min-h-8 w-full px-2 text-xs md:text-xs bg-white border-border text-foreground"
+  "h-8 min-h-8 w-full px-2 text-xs md:text-xs bg-background border-border text-foreground dark:bg-background"
 
 function EditableRow({ label, value, editing, children }: {
   label: string; value: React.ReactNode; editing: boolean; children?: React.ReactNode
@@ -336,7 +337,7 @@ type DbEquipmentRow = {
   next_due_at: string | null
   location_label: string | null
   notes: string | null
-  is_archived: boolean
+  archived_at: string | null
 }
 
 type DrawerCustomer = {
@@ -495,7 +496,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         .eq("organization_id", activeOrgId)
         .eq("equipment_id", eq.id)
         .in("maintenance_plan_id", planIds)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(40)
 
@@ -506,7 +507,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           .eq("organization_id", activeOrgId)
           .eq("equipment_id", eq.id)
           .in("maintenance_plan_id", planIds)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(40)
       }
@@ -565,7 +566,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         .from("customers")
         .select("id, company_name")
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("company_name", { ascending: true })
 
       setCustomers((customerRows ?? []) as DrawerCustomer[])
@@ -573,7 +574,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes, is_archived"
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes, archived_at"
         )
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
@@ -621,7 +622,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         photos: [],
         manuals: [],
         serviceHistory: [],
-        isArchived: equipmentRow.is_archived,
+        isArchived: rowIsArchived(equipmentRow.archived_at),
       })
       setWarrantyDraftStartDate(equipmentRow.warranty_start_date ?? "")
       setWarrantyDraftExpirationDate(
@@ -633,7 +634,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         .select(WO_LIST_SELECT_WITH_NUM)
         .eq("organization_id", orgId)
         .eq("equipment_id", equipmentRow.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(150)
 
@@ -643,7 +644,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           .select(WO_LIST_SELECT)
           .eq("organization_id", orgId)
           .eq("equipment_id", equipmentRow.id)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(150)
       }
@@ -659,7 +660,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id")
         .eq("organization_id", orgId)
         .eq("equipment_id", equipmentRow.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("next_due_date", { ascending: true, nullsFirst: false })
 
       setDrawerPlans((planData ?? []) as EqDrawerPlanRow[])
@@ -752,7 +753,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
     const { error } = await supabase
       .from("equipment")
-      .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: user?.id ?? null })
+      .update({ archived_at: new Date().toISOString(), archived_by: user?.id ?? null })
       .eq("id", eq.id)
       .eq("organization_id", activeOrgId)
 
@@ -774,7 +775,6 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
     const { error } = await supabase
       .from("equipment")
       .update({
-        is_archived: false,
         archived_at: null,
         archived_by: null,
         archive_reason: null,
@@ -1302,7 +1302,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                         <Link
                           key={wo.id}
                           href={`/work-orders?open=${wo.id}`}
-                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 ds-hover-table-row group"
                         >
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <p className="text-xs font-semibold font-mono text-primary truncate">
@@ -1358,7 +1358,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                             <Link
                               key={plan.id}
                               href={`/maintenance-plans?open=${plan.id}`}
-                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 ds-hover-table-row group"
                             >
                               <div className="min-w-0">
                                 <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
@@ -1395,7 +1395,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                             <Link
                               key={plan.id}
                               href={`/maintenance-plans?open=${plan.id}`}
-                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group opacity-90"
+                              className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 ds-hover-table-row group opacity-90"
                             >
                               <div className="min-w-0">
                                 <p className="text-xs font-semibold text-foreground truncate">{plan.name}</p>
@@ -1440,7 +1440,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                         <Link
                           key={wo.id}
                           href={`/work-orders?open=${wo.id}`}
-                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 hover:bg-muted/50 transition-colors group"
+                          className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:border-primary/30 ds-hover-table-row group"
                         >
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <p className="text-xs font-semibold font-mono text-primary truncate">{formatWorkOrderDisplay(wo.work_order_number, wo.id)}</p>
@@ -1650,7 +1650,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 value={draft.notes ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
                 placeholder="Add notes about this equipment..."
-                className="min-h-[88px] resize-none px-2 py-2 text-xs md:text-xs bg-white border-border text-foreground"
+                className="min-h-[88px] resize-none px-2 py-2 text-xs md:text-xs bg-background border-border text-foreground dark:bg-background"
               />
             </DrawerSection>
           )}

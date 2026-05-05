@@ -1035,7 +1035,7 @@ function TechniciansPageInner() {
         .from("work_orders")
         .select("assigned_user_id, status, scheduled_on")
         .eq("organization_id", orgId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
 
       const woList = (woError ? [] : ((woData ?? []) as WoRow[])) as WoRow[]
 
@@ -1424,7 +1424,7 @@ function TechniciansPageInner() {
                   </TableRow>
                 )}
                 {!loading && filtered.map((tech) => (
-                  <TableRow key={tech.id} className="cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors" onClick={() => setSelectedTech(tech)}>
+                  <TableRow key={tech.id} className="cursor-pointer ds-hover-list-row" onClick={() => setSelectedTech(tech)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <TechAvatar tech={tech} size="sm" />

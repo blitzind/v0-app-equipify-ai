@@ -1,4 +1,5 @@
 import type { AdminInvoice, AdminQuote, InvoiceStatus, QuoteStatus } from "@/lib/mock-data"
+import { rowIsArchived } from "@/lib/archive-scope"
 
 export type OrgQuoteRow = {
   id: string
@@ -19,7 +20,6 @@ export type OrgQuoteRow = {
   internal_notes: string | null
   sent_at: string | null
   archived_at: string | null
-  is_archived: boolean
   archived_by?: string | null
   archive_reason?: string | null
 }
@@ -47,7 +47,6 @@ export type OrgInvoiceRow = {
   quote_id: string | null
   archived_at: string | null
   sent_at: string | null
-  is_archived: boolean
   archived_by?: string | null
   archive_reason?: string | null
 }
@@ -163,7 +162,7 @@ export function mapOrgQuoteToAdmin(
     lineItems,
     notes: row.notes ?? "",
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
-    isArchived: Boolean(row.is_archived),
+    isArchived: rowIsArchived(row.archived_at),
   }
 }
 
@@ -199,6 +198,6 @@ export function mapOrgInvoiceToAdmin(
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
     sentAt: row.sent_at ?? undefined,
     calibrationRecordId: row.calibration_record_id ?? undefined,
-    isArchived: Boolean(row.is_archived),
+    isArchived: rowIsArchived(row.archived_at),
   }
 }

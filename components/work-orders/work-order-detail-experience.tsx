@@ -690,7 +690,7 @@ function SignatureCaptureDialog({
             className="max-w-full sm:max-w-md"
             disabled={submitting}
           />
-          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-white touch-none select-none">
+          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-background touch-none select-none dark:bg-background">
             <canvas
               ref={canvasRef}
               width={600}
@@ -1852,7 +1852,7 @@ export function WorkOrderDetailExperience({
                 tasks.map((t) => (
                   <div
                     key={t.id}
-                    className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5 hover:bg-muted/30 dark:hover:bg-accent"
+                    className="flex flex-col gap-2 rounded-lg border border-border px-3 py-2.5 ds-hover-list-row"
                   >
                     {tasksEditable ? (
                       <>

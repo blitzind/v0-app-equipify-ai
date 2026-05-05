@@ -20,6 +20,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DRAWER_NESTED_CARD,
+  DRAWER_STACKED_MODAL,
+} from "@/components/detail-drawer"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
@@ -345,7 +349,7 @@ function InvoicePreview({
   return (
     <div className={cn("mx-auto transition-all duration-300", wrapClass)}>
       <div className={cn(
-        "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm font-sans text-gray-800",
+        "bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg overflow-hidden shadow-sm font-sans text-gray-800 dark:text-card-foreground",
         device === "pdf" && "rounded-none shadow-none",
       )}>
         {/* Header band */}
@@ -621,7 +625,7 @@ function SettingsPanel({
             value={settings.customTitle}
             onChange={(e) => set("customTitle", e.target.value)}
             placeholder="INVOICE"
-            className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
         <div>
@@ -629,7 +633,7 @@ function SettingsPanel({
           <select
             value={settings.paymentTerms}
             onChange={(e) => set("paymentTerms", e.target.value)}
-            className="w-full rounded border border-border bg-white px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
           >
             {["Net 15", "Net 30", "Net 45", "Net 60", "Due on Receipt"].map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -648,7 +652,7 @@ function SettingsPanel({
                   "flex-1 py-1.5 rounded border text-xs font-medium transition-colors cursor-pointer",
                   settings.invoiceTheme === t.value
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-white text-foreground border-border hover:border-primary/50",
+                    : "bg-background dark:bg-background text-foreground border-border hover:border-primary/50",
                 )}
               >
                 {t.label}
@@ -767,7 +771,7 @@ function EmailModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !sending && onClose()} />
-      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
+      <div className={cn(DRAWER_STACKED_MODAL, "max-w-lg")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Mail className="w-4 h-4 text-primary" />{" "}
@@ -781,17 +785,17 @@ function EmailModal({
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">To</label>
             <input type="email" value={to} onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Subject</label>
             <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border">
             <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -837,7 +841,7 @@ function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+      <div className={cn(DRAWER_STACKED_MODAL, "max-w-md")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary" /> SMS Invoice to Customer
@@ -850,12 +854,12 @@ function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => 
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
             <p className="text-[10px] text-muted-foreground mt-1 text-right">{msg.length} / 160 chars</p>
           </div>
         </div>
@@ -880,7 +884,7 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+      <div className={cn(DRAWER_STACKED_MODAL, "max-w-md")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" /> Record Payment
@@ -897,12 +901,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Amount Received</label>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Method</label>
             <select value={method} onChange={(e) => setMethod(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
               {["Check", "ACH / Bank Transfer", "Credit Card", "Cash", "Zelle", "Other"].map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
@@ -911,12 +915,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Reference / Check Number</label>
             <input type="text" value={refNum} onChange={(e) => setRefNum(e.target.value)} placeholder="Optional"
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Date</label>
             <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
@@ -1004,7 +1008,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Due Date">
             <input type="date" value={draft.dueDate ?? ""} onChange={(e) => setField("dueDate", e.target.value)}
-              className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </EditRow>
         ) : (
           <Row label="Due Date" value={
@@ -1014,7 +1018,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Status">
             <select value={draft.status ?? invoice.status} onChange={(e) => setField("status", e.target.value as InvoiceStatus)}
-              className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </EditRow>
@@ -1058,10 +1062,10 @@ function InfoTab({
             value={draft.notes ?? ""}
             onChange={(e) => setField("notes", e.target.value)}
             placeholder="Add notes..."
-            className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
           />
         ) : invoice.notes ? (
-          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-white rounded-lg border border-border">{invoice.notes}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background dark:bg-background rounded-lg border border-border">{invoice.notes}</p>
         ) : (
           <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
         )}
@@ -1084,7 +1088,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
           { label: "Amount Paid", value: isPaid ? fmtCurrency(grandTotal) : "$0.00", color: isPaid ? "text-[color:var(--status-success)]" : "text-muted-foreground" },
           { label: "Balance", value: isPaid ? "$0.00" : fmtCurrency(grandTotal), color: isPaid ? "text-muted-foreground" : "text-[color:var(--status-warning)]" },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-3 text-center">
+          <div key={s.label} className={cn(DRAWER_NESTED_CARD, "ds-shadow-card p-3 text-center")}>
             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{s.label}</p>
             <p className={cn("text-base font-bold tabular-nums mt-0.5", s.color)}>{s.value}</p>
           </div>
@@ -1118,7 +1122,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
             { date: fmtDate(invoice.dueDate),   event: "Payment due",    detail: "",                     type: invoice.status === "Overdue" ? "danger" : "neutral" },
             ...(invoice.paidDate ? [{ date: fmtDate(invoice.paidDate), event: "Payment received", detail: fmtCurrency(grandTotal), type: "success" }] : []),
           ].map((e, i) => (
-            <div key={i} className="flex items-center gap-3 p-2.5 rounded-md bg-white border border-border">
+            <div key={i} className="flex items-center gap-3 p-2.5 rounded-md bg-card border border-border">
               <div className={cn(
                 "w-2 h-2 rounded-full shrink-0",
                 e.type === "success" ? "bg-[color:var(--status-success)]"
@@ -1195,7 +1199,7 @@ function CommentsTab() {
                 )}
                 <span className="text-[10px] text-muted-foreground">{c.time}</span>
               </div>
-              <p className="text-xs text-foreground leading-relaxed bg-white border border-border rounded-lg px-3 py-2">{c.text}</p>
+              <p className="text-xs text-foreground leading-relaxed bg-background dark:bg-background border border-border rounded-lg px-3 py-2">{c.text}</p>
             </div>
           </div>
         ))}
@@ -1207,7 +1211,7 @@ function CommentsTab() {
           onChange={(e) => setComment(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addComment()}
           placeholder="Add a comment..."
-          className="flex-1 rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+          className="flex-1 rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
         />
         <Button size="sm" variant="outline" onClick={addComment} className="text-xs cursor-pointer px-3">Post</Button>
       </div>
@@ -1229,7 +1233,7 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
     <div className="space-y-2">
       <Link
         href={`/work-orders?open=${invoice.workOrderId}`}
-        className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:bg-muted/20 dark:hover:bg-accent hover:border-primary/30 transition-colors cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:border-primary/30 ds-hover-list-row-xs cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -1283,7 +1287,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{title}</p>
-      <div className="rounded-xl border border-border bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden divide-y divide-border">
+      <div className={cn(DRAWER_NESTED_CARD, "ds-shadow-card overflow-hidden divide-y divide-border")}>
         {children}
       </div>
     </div>
@@ -1335,15 +1339,15 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
             <tr key={i}>
               <td className="px-1 py-1.5">
                 <input type="text" value={item.description} onChange={(e) => updateItem(i, "description", e.target.value)} placeholder="Item description"
-                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)}
-                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.unit} onChange={(e) => updateItem(i, "unit", e.target.value)}
-                  className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
               </td>
               <td className="px-2 py-1.5 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
               <td className="px-1 py-1.5 text-center">
@@ -1669,7 +1673,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                           "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
                           "soon" in item && item.soon
                             ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground hover:bg-muted/60 dark:hover:bg-accent cursor-pointer",
+                            : "text-foreground ds-hover-list-row-menu cursor-pointer",
                         )}
                       >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>
@@ -1770,7 +1774,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                           "flex items-center gap-2.5 w-full px-3 py-2.5 text-left text-xs transition-colors",
                           "soon" in item && item.soon
                             ? "text-muted-foreground cursor-not-allowed opacity-60"
-                            : "text-foreground hover:bg-muted/60 dark:hover:bg-accent cursor-pointer",
+                            : "text-foreground ds-hover-list-row-menu cursor-pointer",
                         )}
                       >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>

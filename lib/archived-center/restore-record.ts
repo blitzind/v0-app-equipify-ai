@@ -43,7 +43,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("customers")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -58,7 +57,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("equipment")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -73,7 +71,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("work_orders")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -88,7 +85,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("org_quotes")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -103,7 +99,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("org_invoices")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -118,7 +113,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("maintenance_plans")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -133,7 +127,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("calibration_templates")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -148,7 +141,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("calibration_records")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -163,7 +155,6 @@ export async function restoreArchivedRecord(
       const { error } = await admin
         .from("org_vendors")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,

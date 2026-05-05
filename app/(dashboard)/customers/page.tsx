@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
 import { AddCustomerModal } from "@/components/customers/add-customer-modal"
+import { applyArchivedAtScope } from "@/lib/archive-scope"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
@@ -80,7 +81,7 @@ type DbCustomerRow = {
   company_name: string
   status: "active" | "inactive"
   joined_at: string | null
-  is_archived: boolean
+  archived_at: string | null
 }
 
 type DbContactRow = {
@@ -234,12 +235,11 @@ function CustomersPageInner() {
 
       let custQuery = supabase
         .from("customers")
-        .select("id, company_name, status, joined_at, is_archived")
+        .select("id, company_name, status, joined_at, archived_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
-      if (archiveScope === "active") custQuery = custQuery.eq("is_archived", false)
-      else if (archiveScope === "archived") custQuery = custQuery.eq("is_archived", true)
+      custQuery = applyArchivedAtScope(custQuery, archiveScope)
 
       const { data, error } = await custQuery
 
@@ -260,14 +260,14 @@ function CustomersPageInner() {
             .from("customer_contacts")
             .select("customer_id, full_name, email, phone, is_primary")
             .eq("organization_id", orgId)
-            .eq("is_archived", false)
+            .is("archived_at", null)
             .in("customer_id", customerIds)
             .order("is_primary", { ascending: false }),
           supabase
             .from("customer_locations")
             .select("customer_id, id, address_line1, city, state, postal_code, is_default")
             .eq("organization_id", orgId)
-            .eq("is_archived", false)
+            .is("archived_at", null)
             .in("customer_id", customerIds)
             .order("is_default", { ascending: false }),
         ])
@@ -318,7 +318,7 @@ function CustomersPageInner() {
           equipmentCount: 0,
           openWorkOrders: 0,
           joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
-          isArchived: row.is_archived,
+          isArchived: Boolean(row.archived_at),
         }
       })
 
@@ -539,7 +539,7 @@ function CustomersPageInner() {
                 </TableRow>
               ) : (
                 filtered.map((c) => (
-                  <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/30 dark:hover:bg-accent transition-colors" onClick={() => openCustomerDrawer(c)}>
+                  <TableRow key={c.id} className="group cursor-pointer ds-hover-list-row" onClick={() => openCustomerDrawer(c)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">

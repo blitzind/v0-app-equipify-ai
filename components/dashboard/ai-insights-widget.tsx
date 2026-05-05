@@ -167,7 +167,7 @@ export function OperationalInsightsWidget({
             "inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors shrink-0",
             activeCategory === null
               ? "bg-[color:var(--ds-info-subtle)] text-white"
-              : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 dark:hover:bg-accent",
+              : "bg-muted text-muted-foreground hover:text-foreground ds-hover-list-row-xl",
           )}
         >
           All
@@ -186,7 +186,7 @@ export function OperationalInsightsWidget({
                 "inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors shrink-0",
                 activeCategory === cat
                   ? "bg-[color:var(--ds-info-subtle)] text-white"
-                  : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 dark:hover:bg-accent",
+                  : "bg-muted text-muted-foreground hover:text-foreground ds-hover-list-row-xl",
                 count === 0 && "opacity-40",
               )}
               disabled={count === 0}
@@ -271,7 +271,7 @@ function InsightRow({
   return (
     <li
       className={cn(
-        "flex items-start gap-3 px-5 py-4 border-l-2 transition-colors bg-card hover:bg-accent",
+        "flex items-start gap-3 px-5 py-4 border-l-2 ds-hover-card-row",
         meta.border,
       )}
     >

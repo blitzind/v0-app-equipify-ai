@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { AdminInvoice, AdminQuote, InvoiceStatus, QuoteStatus } from "@/lib/mock-data"
+import { applyArchivedAtScope, type ArchivedAtScope } from "@/lib/archive-scope"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/lib/org-quotes-invoices/map"
 
 /** Default lists hide archived rows; use `archived` or `all` for recovery views. */
-export type RecordArchiveVisibility = "active" | "archived" | "all"
+export type RecordArchiveVisibility = ArchivedAtScope
 
 async function profileLabelsById(
   supabase: SupabaseClient,
@@ -43,8 +44,8 @@ export async function fetchQuotesForOrganization(
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
 
-  if (visibility === "active") q = q.eq("is_archived", false)
-  else if (visibility === "archived") q = q.eq("is_archived", true)
+  if (visibility === "active") q = q.is("archived_at", null)
+  else if (visibility === "archived") q = q.not("archived_at", "is", null)
 
   const { data: rows, error } = await q
 
@@ -131,8 +132,7 @@ export async function fetchInvoicesForOrganization(
     .eq("organization_id", organizationId)
     .order("issued_at", { ascending: false })
 
-  if (visibility === "active") q = q.eq("is_archived", false)
-  else if (visibility === "archived") q = q.eq("is_archived", true)
+  q = applyArchivedAtScope(q, visibility)
 
   const { data: rows, error } = await q
 
@@ -286,7 +286,6 @@ export async function archiveOrgQuote(
   const { error } = await supabase
     .from("org_quotes")
     .update({
-      is_archived: true,
       archived_at: archivedAt,
       archived_by: user?.id ?? null,
       archive_reason: options?.archiveReason?.trim() ? options.archiveReason.trim() : null,
@@ -306,7 +305,6 @@ export async function restoreOrgQuote(
   const { error } = await supabase
     .from("org_quotes")
     .update({
-      is_archived: false,
       archived_at: null,
       archived_by: null,
       archive_reason: null,
@@ -418,7 +416,6 @@ export async function archiveOrgInvoice(
   const { error } = await supabase
     .from("org_invoices")
     .update({
-      is_archived: true,
       archived_at: archivedAt,
       archived_by: user?.id ?? null,
       archive_reason: options?.archiveReason?.trim() ? options.archiveReason.trim() : null,
@@ -438,7 +435,6 @@ export async function restoreOrgInvoice(
   const { error } = await supabase
     .from("org_invoices")
     .update({
-      is_archived: false,
       archived_at: null,
       archived_by: null,
       archive_reason: null,

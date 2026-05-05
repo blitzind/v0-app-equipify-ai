@@ -207,7 +207,7 @@ export default function EquipmentDetailPage() {
         )
         .eq("id", id)
         .eq("organization_id", oid)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .maybeSingle()
 
       if (error || !row) {
@@ -233,7 +233,7 @@ export default function EquipmentDetailPage() {
         .select(WO_LIST_SELECT_WITH_NUM)
         .eq("organization_id", oid)
         .eq("equipment_id", er.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(150)
 
@@ -243,7 +243,7 @@ export default function EquipmentDetailPage() {
           .select(WO_LIST_SELECT)
           .eq("organization_id", oid)
           .eq("equipment_id", er.id)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(150)
       }
@@ -254,7 +254,7 @@ export default function EquipmentDetailPage() {
         .select("id, name, status, interval_value, interval_unit, next_due_date, equipment_id")
         .eq("organization_id", oid)
         .eq("equipment_id", er.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("next_due_date", { ascending: true, nullsFirst: false })
 
       setPlans((planData ?? []) as PlanRow[])

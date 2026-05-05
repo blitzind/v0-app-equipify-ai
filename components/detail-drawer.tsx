@@ -16,6 +16,18 @@ export const EQUIPIFY_SCRIM =
 /** Slide-over / sheet panel: light uses page bg token; dark uses elevated card (#121B2C). */
 export const DRAWER_PANEL_SURFACE = "bg-background dark:bg-card"
 
+/** Nested cards / table shells inside drawer body (theme --card; dark #121B2C). */
+export const DRAWER_NESTED_CARD =
+  "rounded-xl border border-border bg-card shadow-sm"
+
+/** Compact inline inputs & selects in drawers (dark canvas #0B111E via --background). */
+export const DRAWER_FIELD_CLASS =
+  "rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none transition-colors focus:ring-2 focus:ring-primary/30 focus:border-primary dark:bg-background"
+
+/** Modal/dialog shells stacked inside a drawer (avoid raw bg-white in dark). */
+export const DRAWER_STACKED_MODAL =
+  "relative bg-card border border-border rounded-xl shadow-2xl w-full flex flex-col"
+
 /** Backdrop sits below the panel; above main app chrome. */
 export const DRAWER_BACKDROP_Z = "z-[100]"
 /** Sliding panel above backdrop. */

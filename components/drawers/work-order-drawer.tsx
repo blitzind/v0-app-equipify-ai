@@ -53,7 +53,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  DetailDrawer, DrawerSection, DrawerRow, DrawerToastStack,
+  DetailDrawer,
+  DrawerSection,
+  DrawerRow,
+  DrawerToastStack,
+  DRAWER_STACKED_MODAL,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -177,7 +181,7 @@ function EditInput({
       step={step}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 dark:bg-background"
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 dark:bg-background"
     />
   )
 }
@@ -189,7 +193,7 @@ function EditSelect({ value, onChange, options }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -205,7 +209,7 @@ function EditTextarea({ value, onChange, placeholder, rows = 3 }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none dark:bg-background"
+      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none dark:bg-background"
     />
   )
 }
@@ -1162,7 +1166,6 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     const { error } = await supabase
       .from("work_orders")
       .update({
-        is_archived: true,
         archived_at: new Date().toISOString(),
         archived_by: user?.id ?? null,
       })
@@ -1186,7 +1189,6 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     const { error } = await supabase
       .from("work_orders")
       .update({
-        is_archived: false,
         archived_at: null,
         archived_by: null,
         archive_reason: null,
@@ -1471,7 +1473,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                         technicianAvatarUrl: opt?.avatarUrl ?? null,
                       }))
                     }}
-                    className="w-full rounded border border-border bg-white px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+                    className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
                   >
                     <option value="unassigned">Unassigned</option>
                     {technicianOptions.map((t) => (
@@ -1860,7 +1862,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       {woSummaryEmailOpen ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !woSummaryEmailBusy && setWoSummaryEmailOpen(false)} />
-          <div className="relative bg-white border border-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col">
+          <div className={cn(DRAWER_STACKED_MODAL, "max-w-lg")}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" /> Email work order summary
@@ -1884,7 +1886,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   value={woSummaryEmailTo}
                   onChange={(e) => setWoSummaryEmailTo(e.target.value)}
                   placeholder="customer@example.com"
-                  className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors dark:bg-background"
                 />
               </div>
               <div>
@@ -1895,7 +1897,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   rows={4}
                   value={woSummaryEmailNote}
                   onChange={(e) => setWoSummaryEmailNote(e.target.value)}
-                  className="w-full rounded border border-border bg-white px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none dark:bg-background"
                 />
               </div>
             </div>

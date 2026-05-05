@@ -44,7 +44,7 @@ interface MaintenanceContextValue {
   updateRules: (id: string, rules: NotificationRule[]) => Promise<{ error?: string }>
   plansListVisibility: RecordArchiveVisibility
   setPlansListVisibility: (v: RecordArchiveVisibility) => void
-  /** Soft-archive: hides plan from active lists (sets `is_archived`, `archived_at`). */
+  /** Soft-archive: hides plan from active lists via `archived_at`. */
   archivePlan: (id: string) => Promise<{ error?: string }>
   restorePlan: (id: string) => Promise<{ error?: string }>
   /** Soft-remove: archives and marks plan expired; disables auto work orders. */
@@ -277,7 +277,6 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
-          is_archived: true,
           archived_at: archivedAt,
           archived_by: user?.id ?? null,
         })
@@ -298,7 +297,6 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
-          is_archived: false,
           archived_at: null,
           archived_by: null,
           archive_reason: null,
@@ -324,7 +322,6 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
-          is_archived: true,
           archived_at: archivedAt,
           archived_by: user?.id ?? null,
           status: "expired",

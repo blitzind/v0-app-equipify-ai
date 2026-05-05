@@ -408,6 +408,34 @@
     @apply bg-muted/30 dark:bg-card;
   }
 
+  /* ── List/table/interactive hover (Operational Insights card rows use `ds-hover-card-row`) ──
+     Dark hover uses `--accent` (#111724). Light uses muted washes.                      */
+  .ds-hover-card-row {
+    @apply transition-colors bg-card hover:bg-accent;
+  }
+  .ds-hover-list-row {
+    @apply transition-colors hover:bg-muted/30 dark:hover:bg-accent;
+  }
+  .ds-hover-list-row-sm {
+    @apply transition-colors hover:bg-muted/25 dark:hover:bg-accent;
+  }
+  .ds-hover-list-row-xs {
+    @apply transition-colors hover:bg-muted/20 dark:hover:bg-accent;
+  }
+  .ds-hover-list-row-lg {
+    @apply transition-colors hover:bg-muted/40 dark:hover:bg-accent;
+  }
+  .ds-hover-list-row-menu {
+    @apply transition-colors hover:bg-muted/60 dark:hover:bg-accent;
+  }
+  .ds-hover-list-row-xl {
+    @apply transition-colors hover:bg-muted/80 dark:hover:bg-accent;
+  }
+  /** Default `<TableRow>` hover (stronger wash than list rows). */
+  .ds-hover-table-row {
+    @apply transition-colors hover:bg-muted/50 dark:hover:bg-accent;
+  }
+
   /* ── Interactive card lift ────────────────────────────────────────────────
      Apply to any card that should lift on hover (opt-in, not global).      */
   .ds-card-interactive {

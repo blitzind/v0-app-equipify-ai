@@ -31,7 +31,7 @@ type VendorListRow = {
   contact_name: string | null
   email: string | null
   phone: string | null
-  is_archived: boolean
+  archived_at: string | null
 }
 
 type StatusFilter = "all" | "active" | "archived"
@@ -96,7 +96,7 @@ function VendorsPageInner() {
     void (async () => {
       const { data, error } = await supabase
         .from("org_vendors")
-        .select("id, name, contact_name, email, phone, is_archived")
+        .select("id, name, contact_name, email, phone, archived_at")
         .eq("organization_id", organizationId)
         .order("name")
       if (cancelled) return
@@ -115,8 +115,8 @@ function VendorsPageInner() {
 
   const filtered = useMemo(() => {
     let list = rows
-    if (statusFilter === "active") list = list.filter((r) => !r.is_archived)
-    if (statusFilter === "archived") list = list.filter((r) => r.is_archived)
+    if (statusFilter === "active") list = list.filter((r) => !r.archived_at)
+    if (statusFilter === "archived") list = list.filter((r) => Boolean(r.archived_at))
     const q = search.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -209,7 +209,7 @@ function VendorsPageInner() {
                 filtered.map((r) => (
                   <tr
                     key={r.id}
-                    className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors group"
+                    className="ds-hover-list-row cursor-pointer group"
                     onClick={() => setSelectedId(r.id)}
                   >
                     <td className="px-4 py-3 font-medium text-foreground max-w-[200px] truncate">{r.name}</td>
@@ -223,7 +223,7 @@ function VendorsPageInner() {
                       {r.phone?.trim() || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge archived={r.is_archived} />
+                      <StatusBadge archived={Boolean(r.archived_at)} />
                     </td>
                     <td className="px-4 py-3">
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />

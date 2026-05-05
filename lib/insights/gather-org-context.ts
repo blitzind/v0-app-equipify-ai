@@ -90,18 +90,18 @@ export async function gatherOrgInsightsContext(
       .from("customers")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false),
+      .is("archived_at", null),
     supabase
       .from("equipment")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("status", "active"),
     supabase
       .from("equipment")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("status", "active")
       .not("next_due_at", "is", null)
       .lt("next_due_at", today),
@@ -109,7 +109,7 @@ export async function gatherOrgInsightsContext(
       .from("equipment")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("status", "active")
       .not("next_due_at", "is", null)
       .gte("next_due_at", monthStart)
@@ -118,7 +118,7 @@ export async function gatherOrgInsightsContext(
       .from("equipment")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .not("warranty_expires_at", "is", null)
       .gte("warranty_expires_at", today)
       .lte("warranty_expires_at", warrantyBefore),
@@ -126,18 +126,18 @@ export async function gatherOrgInsightsContext(
       .from("work_orders")
       .select("status, priority")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false),
+      .is("archived_at", null),
     supabase
       .from("work_orders")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["open", "scheduled", "in_progress"]),
     supabase
       .from("work_orders")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .not("scheduled_on", "is", null)
       .lt("scheduled_on", today)
       .in("status", ["open", "scheduled", "in_progress", "completed_pending_signature"]),
@@ -145,26 +145,26 @@ export async function gatherOrgInsightsContext(
       .from("maintenance_plans")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false),
+      .is("archived_at", null),
     supabase
       .from("maintenance_plans")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .not("next_due_date", "is", null)
       .lte("next_due_date", today),
     supabase
       .from("work_orders")
       .select("equipment_id, created_at")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .gte("created_at", `${ninetyDaysAgo}T00:00:00.000Z`)
       .not("equipment_id", "is", null),
     supabase
       .from("work_orders")
       .select("total_labor_cents, total_parts_cents, updated_at, status")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["completed", "invoiced"])
       .gte("updated_at", `${monthStart}T00:00:00.000Z`),
     supabase
@@ -179,7 +179,7 @@ export async function gatherOrgInsightsContext(
       .from("org_purchase_orders")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false),
+      .is("archived_at", null),
   ])
 
   const woRows = (woListRes.data ?? []) as Array<{ status: string; priority: string }>

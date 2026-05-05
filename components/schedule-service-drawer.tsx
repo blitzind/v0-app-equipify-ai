@@ -218,7 +218,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
         .select("id, company_name")
         .eq("organization_id", orgId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("company_name")
 
       if (custError || cancelled) {
@@ -288,7 +288,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
         .eq("organization_id", activeOrgId)
         .eq("customer_id", form.customerId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name")
 
       if (cancelled) return
@@ -303,7 +303,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
         .select("id, name, city, state")
         .eq("organization_id", activeOrgId)
         .eq("customer_id", form.customerId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("is_default", { ascending: false })
         .order("name")
 

@@ -15,6 +15,7 @@ import {
   type ToastItem,
 } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
+import { rowIsArchived } from "@/lib/archive-scope"
 import { Pencil, Check, X, Archive, Trash2, AlertTriangle } from "lucide-react"
 
 let toastCounter = 0
@@ -28,7 +29,6 @@ type VendorRow = {
   billing_address: string | null
   shipping_address: string | null
   notes: string | null
-  is_archived: boolean
   archived_at: string | null
 }
 
@@ -44,15 +44,16 @@ type Draft = {
 
 /** Aligned with purchase-order drawer: gray canvas + white section cards */
 const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
-const sectionCardClass = "rounded-xl border border-border bg-white shadow-sm dark:bg-card"
+const sectionCardClass =
+  "rounded-xl border border-border bg-card shadow-sm dark:bg-card"
 
 /** Drawer fields use compact sizing on top of shared Input/Textarea styles (editable = white surfaces) */
 const fieldControl =
-  "h-8 px-2.5 py-1 text-xs bg-white border-border text-foreground dark:bg-background"
+  "h-8 px-2.5 py-1 text-xs bg-background border-border text-foreground dark:bg-background"
 const fieldTextarea =
-  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-background"
+  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-background"
 const fieldNotesTextarea =
-  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-white border-border text-foreground dark:bg-background"
+  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-background"
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -120,7 +121,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       const { data, error } = await supabase
         .from("org_vendors")
         .select(
-          "id, name, email, phone, contact_name, billing_address, shipping_address, notes, is_archived, archived_at",
+          "id, name, email, phone, contact_name, billing_address, shipping_address, notes, archived_at",
         )
         .eq("id", vendorId)
         .eq("organization_id", organizationId)
@@ -213,7 +214,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
     const archivedAt = new Date().toISOString()
     const { error } = await supabase
       .from("org_vendors")
-      .update({ is_archived: true, archived_at: archivedAt })
+      .update({ archived_at: archivedAt })
       .eq("id", vendor.id)
       .eq("organization_id", organizationId)
     setDestructiveBusy(false)
@@ -222,7 +223,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       toast(error.message, "info")
       return
     }
-    setVendor((prev) => (prev ? { ...prev, is_archived: true, archived_at: archivedAt } : null))
+    setVendor((prev) => (prev ? { ...prev, archived_at: archivedAt } : null))
     toast("Vendor archived")
     onVendorChanged?.()
   }
@@ -233,7 +234,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
     const supabase = createBrowserSupabaseClient()
     const { error } = await supabase
       .from("org_vendors")
-      .update({ is_archived: false, archived_at: null })
+      .update({ archived_at: null, archived_by: null, archive_reason: null })
       .eq("id", vendor.id)
       .eq("organization_id", organizationId)
     setDestructiveBusy(false)
@@ -241,7 +242,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
       toast(error.message, "info")
       return
     }
-    setVendor((prev) => (prev ? { ...prev, is_archived: false, archived_at: null } : null))
+    setVendor((prev) => (prev ? { ...prev, archived_at: null } : null))
     toast("Vendor restored")
     onVendorChanged?.()
   }
@@ -263,7 +264,7 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
   }
 
   const title = vendor?.name?.trim() || "Vendor"
-  const subtitle = vendor?.is_archived ? "Archived" : undefined
+  const subtitle = vendor && rowIsArchived(vendor.archived_at) ? "Archived" : undefined
 
   return (
     <>
@@ -279,12 +280,12 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
               variant="outline"
               className={cn(
                 "text-[10px] font-semibold",
-                vendor.is_archived
+                rowIsArchived(vendor.archived_at)
                   ? "bg-muted text-muted-foreground border-border"
                   : "bg-[color:var(--status-success)]/15 text-[color:var(--status-success)] border-[color:var(--status-success)]/30",
               )}
             >
-              {vendor.is_archived ? "Archived" : "Active"}
+              {rowIsArchived(vendor.archived_at) ? "Archived" : "Active"}
             </Badge>
           ) : null
         }
@@ -293,11 +294,11 @@ export function VendorDrawer({ vendorId, onClose, onVendorChanged }: Props) {
             <div className="flex flex-wrap items-center gap-2 w-full">
               {!editing ? (
                 <>
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={startEdit} disabled={vendor.is_archived}>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={startEdit} disabled={rowIsArchived(vendor.archived_at)}>
                     <Pencil className="w-3.5 h-3.5" />
                     Edit
                   </Button>
-                  {vendor.is_archived ? (
+                  {rowIsArchived(vendor.archived_at) ? (
                     <Button
                       size="sm"
                       variant="outline"

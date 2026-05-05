@@ -19,6 +19,7 @@ import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
+import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
@@ -126,7 +127,7 @@ type DbWorkOrderRow = {
   notes: string | null
   maintenance_plan_id: string | null
   created_by_pm_automation?: boolean | null
-  is_archived?: boolean | null
+  archived_at?: string | null
 }
 
 function emptyRepairLog(): RepairLog {
@@ -364,7 +365,7 @@ function TableView({
         </TableHeader>
         <TableBody>
           {workOrders.map((wo) => (
-            <TableRow key={wo.id} className="hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors" onClick={() => onOpen(wo.id)}>
+            <TableRow key={wo.id} className="ds-hover-list-row cursor-pointer" onClick={() => onOpen(wo.id)}>
               <TableCell>
                 <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
               </TableCell>
@@ -592,8 +593,7 @@ function WorkOrdersPageInner() {
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
-      if (archiveScope === "active") woQuery = woQuery.eq("is_archived", false)
-      else if (archiveScope === "archived") woQuery = woQuery.eq("is_archived", true)
+      woQuery = applyArchivedAtScope(woQuery, archiveScope)
 
       let woRes = await woQuery
 
@@ -603,8 +603,7 @@ function WorkOrdersPageInner() {
           .select(WO_LIST_SELECT)
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
-        if (archiveScope === "active") woRetry = woRetry.eq("is_archived", false)
-        else if (archiveScope === "archived") woRetry = woRetry.eq("is_archived", true)
+        woRetry = applyArchivedAtScope(woRetry, archiveScope)
         woRes = await woRetry
       }
 
@@ -755,7 +754,7 @@ function WorkOrdersPageInner() {
             ? (planNameById.get(row.maintenance_plan_id) ?? null)
             : null,
           createdByPmAutomation: Boolean(row.created_by_pm_automation),
-          isArchived: Boolean(row.is_archived),
+          isArchived: Boolean(row.archived_at),
         }
       })
 

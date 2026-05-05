@@ -242,7 +242,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
         .select(planHistSelWithNum)
         .eq("organization_id", organizationId)
         .eq("maintenance_plan_id", plan.id)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
 
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
@@ -251,7 +251,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           .select(planHistSel)
           .eq("organization_id", organizationId)
           .eq("maintenance_plan_id", plan.id)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
       }
 
@@ -651,7 +651,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   {plan.services.map((svc, i) => (
                     <div
                       key={`${svc.id ?? "service"}-${i}`}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/30 dark:hover:bg-accent"
+                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ds-hover-list-row"
                     >
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold shrink-0 mt-0.5">
                         {i + 1}
@@ -1298,7 +1298,7 @@ function MaintenancePlansPageInner() {
                   <tr
                     key={plan.id}
                     className={cn(
-                      "bg-card hover:bg-muted/30 dark:hover:bg-accent cursor-pointer transition-colors",
+                      "bg-card ds-hover-list-row cursor-pointer",
                       accent === "overdue" && "bg-destructive/[0.06]",
                       accent === "dueToday" && "bg-amber-500/[0.06]",
                     )}

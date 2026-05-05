@@ -33,7 +33,7 @@ export async function getOrganizationUsage(
     .from("equipment")
     .select("*", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
 
   if (eqErr) throw new Error(eqErr.message)
 

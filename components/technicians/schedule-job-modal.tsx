@@ -282,7 +282,7 @@ export function ScheduleJobModal({
           .select("id, company_name")
           .eq("organization_id", orgId)
           .eq("status", "active")
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("company_name"),
         supabase
           .from("organization_job_types")
@@ -459,7 +459,7 @@ export function ScheduleJobModal({
       .eq("organization_id", activeOrgId)
       .eq("customer_id", customerId)
       .eq("status", "active")
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .order("name")
       .limit(1)
       .maybeSingle()

@@ -357,7 +357,7 @@ export function useSupabaseDashboard() {
           .from("equipment")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "active")
           .not("next_due_at", "is", null)
           .gte("next_due_at", monthStart)
@@ -366,7 +366,7 @@ export function useSupabaseDashboard() {
           .from("equipment")
           .select("id, name, category, next_due_at, customer_id")
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "active")
           .not("next_due_at", "is", null)
           .gte("next_due_at", monthStart)
@@ -377,7 +377,7 @@ export function useSupabaseDashboard() {
           .from("equipment")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "active")
           .not("next_due_at", "is", null)
           .lt("next_due_at", today),
@@ -385,56 +385,56 @@ export function useSupabaseDashboard() {
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .in("status", ["open", "scheduled", "in_progress"]),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "open"),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "scheduled"),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "in_progress"),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "completed"),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "completed_pending_signature"),
         supabase
           .from("work_orders")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .eq("status", "invoiced"),
         supabase
           .from("work_orders")
           .select("total_labor_cents, total_parts_cents, completed_at, updated_at, status")
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .in("status", ["completed", "invoiced"])
           .gte("updated_at", `${monthStart}T00:00:00.000Z`),
         supabase
           .from("equipment")
           .select("*", { count: "exact", head: true })
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .not("warranty_expires_at", "is", null)
           .gte("warranty_expires_at", today)
           .lte("warranty_expires_at", warrantyBefore),
@@ -442,7 +442,7 @@ export function useSupabaseDashboard() {
           .from("equipment")
           .select("id, name, warranty_expires_at, customer_id")
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .not("warranty_expires_at", "is", null)
           .gte("warranty_expires_at", today)
           .lte("warranty_expires_at", warrantyBefore)
@@ -452,21 +452,21 @@ export function useSupabaseDashboard() {
           .from("work_orders")
           .select(recentWoSelectWithNum)
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(10),
         supabase
           .from("work_orders")
           .select("equipment_id, created_at, title")
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .gte("created_at", `${ninetyDaysAgo}T00:00:00.000Z`)
           .not("equipment_id", "is", null),
         supabase
           .from("work_orders")
           .select("total_labor_cents, total_parts_cents, updated_at, status")
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .in("status", ["completed", "invoiced"])
           .gte("updated_at", chartWindowStartIso),
       ])
@@ -476,7 +476,7 @@ export function useSupabaseDashboard() {
           .from("work_orders")
           .select(recentWoSelect)
           .eq("organization_id", orgId)
-          .eq("is_archived", false)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(10)
       }

@@ -100,7 +100,7 @@ export interface Equipment {
   photos: string[]
   manuals: string[]
   serviceHistory: ServiceHistoryEntry[]
-  /** Soft-archive; hidden from default lists when true (Supabase `equipment.is_archived`). */
+  /** Soft-archive; hidden from default lists when archived (Supabase `equipment.archived_at`). */
   isArchived?: boolean
   /** Estimated replacement cost in USD */
   replacementCost?: number
@@ -536,7 +536,7 @@ export interface WorkOrder {
   warrantyReviewRequired?: boolean
   warrantyVendorId?: string | null
   warrantyVendorName?: string | null
-  /** Soft-archive (Supabase `work_orders.is_archived`). */
+  /** Soft-archive (Supabase `work_orders.archived_at`). */
   isArchived?: boolean
   /** Derived from linked equipment dates in detail loader. */
   equipmentWarrantyActive?: boolean

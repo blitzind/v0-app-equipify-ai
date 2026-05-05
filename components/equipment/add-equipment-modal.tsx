@@ -149,7 +149,7 @@ export function AddEquipmentModal({
         .select("id, company_name")
         .eq("organization_id", activeOrgId)
         .eq("status", "active")
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("company_name", { ascending: true })
 
       setCustomers((data as CustomerOption[] | null) ?? [])

@@ -463,8 +463,7 @@ export function AppTopbar() {
                     onClick={() => handleNotifClick(n)}
                     className={cn(
                       "w-full flex items-start gap-3 px-4 py-3 text-left cursor-pointer",
-                      "transition-colors duration-100",
-                      "hover:bg-muted/60 dark:hover:bg-accent",
+                      "transition-colors duration-100 ds-hover-list-row-menu",
                       n.unread ? "bg-primary/[0.03]" : "bg-card"
                     )}
                     aria-label={`${n.title}: ${n.desc}`}
