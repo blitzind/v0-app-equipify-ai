@@ -17,11 +17,14 @@ import type {
 } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import {
+  missingAssignedTechnicianColumn,
+  missingWorkOrderNumberColumn,
+} from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
-import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import { buildWorkOrderListSelect } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
@@ -672,6 +675,7 @@ function WorkOrdersPageInner() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
+  const [workOrdersLoadError, setWorkOrdersLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -683,43 +687,71 @@ function WorkOrdersPageInner() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        if (active) setWorkOrders([])
+        if (active) {
+          setWorkOrders([])
+          setWorkOrdersLoadError(null)
+        }
         return
       }
 
       if (orgStatus !== "ready" || !activeOrgId) {
-        if (active) setWorkOrders([])
+        if (active) {
+          setWorkOrders([])
+          setWorkOrdersLoadError(null)
+        }
         return
       }
 
       const orgId = activeOrgId
 
-      let woQuery = supabase
-        .from("work_orders")
-        .select(WO_LIST_SELECT_WITH_NUM)
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
-
-      woQuery = applyArchivedAtScope(woQuery, archiveScope)
-
-      let woRes = await woQuery
-
-      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-        let woRetry = supabase
+      async function runWorkOrdersQuery(includeNum: boolean, includeTech: boolean) {
+        let q = supabase
           .from("work_orders")
-          .select(WO_LIST_SELECT)
+          .select(buildWorkOrderListSelect({ includeWorkOrderNumber: includeNum, includeAssignedTechnician: includeTech }))
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
-        woRetry = applyArchivedAtScope(woRetry, archiveScope)
-        woRes = await woRetry
+        q = applyArchivedAtScope(q, archiveScope)
+        return q
+      }
+
+      let includeNum = true
+      let includeTech = true
+      let woRes = await runWorkOrdersQuery(includeNum, includeTech)
+
+      for (;;) {
+        const err = woRes.error
+        if (!err) break
+        if (missingWorkOrderNumberColumn(err) && includeNum) {
+          includeNum = false
+          woRes = await runWorkOrdersQuery(includeNum, includeTech)
+          continue
+        }
+        if (missingAssignedTechnicianColumn(err) && includeTech) {
+          includeTech = false
+          woRes = await runWorkOrdersQuery(includeNum, includeTech)
+          continue
+        }
+        break
       }
 
       const { data: rows, error: woError } = woRes
 
       if (woError || !rows) {
-        if (active) setWorkOrders([])
+        if (process.env.NODE_ENV === "development" && woError) {
+          console.error("[work-orders] load failed", { orgId, message: woError.message, code: woError.code })
+        }
+        if (active) {
+          setWorkOrders([])
+          setWorkOrdersLoadError(
+            process.env.NODE_ENV === "development" && woError
+              ? woError.message || "Failed to load work orders"
+              : null,
+          )
+        }
         return
       }
+
+      if (active) setWorkOrdersLoadError(null)
 
       const list = rows as DbWorkOrderRow[]
       const customerIds = [...new Set(list.map((r) => r.customer_id))]
@@ -1000,6 +1032,16 @@ function WorkOrdersPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
+      {process.env.NODE_ENV === "development" && workOrdersLoadError ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <span className="font-medium">Work orders failed to load (dev)</span>
+          <span className="mt-1 block font-mono text-xs opacity-90">{workOrdersLoadError}</span>
+        </div>
+      ) : null}
+
       {/* Status KPI cards — responsive grid (no horizontal slider / arrows) */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
         {ALL_STATUSES.map((s) => (
