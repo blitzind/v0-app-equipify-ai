@@ -29,7 +29,7 @@ const HINT_PROD =
   "Apply pending SQL migrations to your Supabase project (Dashboard → SQL Editor, or `supabase db push`). If the table exists but this persists, open Project Settings → API → reload PostgREST schema cache."
 
 const HINT_DEV =
-  "From `equipify-app`: run `supabase db reset` (local) or `supabase db push` (linked project). Migrations: `20260616100000_catalog_items_price_list_imports.sql`, `20260620120000_ai_human_verification.sql`."
+  "From `equipify-app`: run `supabase db reset` (local) or `supabase db push` (linked project). Catalog migrations include `20260616100000_catalog_items_price_list_imports.sql`, follow-ups through `20260631100000_catalog_items_schema_repair_idempotent.sql`."
 
 export function catalogSchemaNotReadyResponse(opts?: { dev?: boolean }): NextResponse {
   const useDevHint =
