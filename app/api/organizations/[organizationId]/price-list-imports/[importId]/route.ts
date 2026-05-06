@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getActiveCatalogJobForImport } from "@/lib/ai/jobs/active-catalog-job"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
 import type { StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { requireOrgCatalogWrite, requireOrgMemberRead } from "@/lib/catalog/require-org-catalog-write"
@@ -41,9 +42,12 @@ export async function GET(
 
   const payload = parseStoredPriceListPayload(row.extracted_json)
 
+  const activeJobId = await getActiveCatalogJobForImport(gate.svc, organizationId, importId)
+
   return NextResponse.json({
     import: row,
     payload,
+    activeJobId,
   })
 }
 
@@ -86,6 +90,13 @@ export async function PATCH(
   }
   if (!existing) {
     return NextResponse.json({ error: "not_found", message: "Import not found." }, { status: 404 })
+  }
+
+  if ((existing.status as string) === "cancelled") {
+    return NextResponse.json(
+      { error: "cannot_patch_cancelled", message: "This import was cancelled. Start a new upload or re-run extraction." },
+      { status: 409 },
+    )
   }
 
   const { error: upErr } = await gate.svc

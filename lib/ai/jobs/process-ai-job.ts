@@ -1,8 +1,8 @@
 import "server-only"
 
 /**
- * Route handlers schedule work with `after()` from Next.js. When a real queue (worker/cron) exists,
- * enqueue `jobId` there instead and keep this runner as the shared executor.
+ * Route handlers schedule work via `waitUntil` (@vercel/functions) with `after()` fallback; cron at
+ * `/api/cron/process-ai-jobs` drains any remaining `queued` jobs. Single runner entrypoint: {@link runPriceListImportExtractionJob}.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -29,6 +29,30 @@ export function sanitizeAiJobError(err: unknown): string {
   const safe = raw.replace(/\s+/g, " ").trim()
   if (safe.length <= 500) return safe
   return `${safe.slice(0, 497)}…`
+}
+
+/** User or API cancelled the job/import — stop without saving extracted rows or marking failure. */
+export async function isPriceListImportCancellationRequested(
+  svc: SupabaseClient,
+  organizationId: string,
+  jobId: string,
+  importId: string,
+): Promise<boolean> {
+  const { data: job } = await svc
+    .from("ai_jobs")
+    .select("status")
+    .eq("id", jobId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+  if ((job?.status as string) === "cancelled") return true
+  const { data: imp } = await svc
+    .from("price_list_imports")
+    .select("status")
+    .eq("id", importId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+  if ((imp?.status as string) === "cancelled") return true
+  return false
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
@@ -150,7 +174,8 @@ function parseInput(raw: unknown): PriceListImportJobInput | null {
 
 /**
  * Runs price list AI extraction for a queued job (download PDF → extract → persist).
- * Invoked from `after()` or a future queue worker. Uses service role client.
+ * Invoked via `waitUntil` (Vercel), `after()` fallback, or cron worker. Uses service role.
+ * Idempotent: only the caller that atomically claims `queued` → `processing` runs the pipeline.
  */
 export async function runPriceListImportExtractionJob(params: {
   svc: SupabaseClient
@@ -169,23 +194,53 @@ export async function runPriceListImportExtractionJob(params: {
   if (loadErr || !jobRow) {
     return
   }
-  if ((jobRow.status as string) === "cancelled") {
+  const st = jobRow.status as string
+  if (st === "cancelled") {
+    return
+  }
+  if (st === "completed" || st === "failed") {
+    return
+  }
+  if (st === "processing") {
+    // Another invocation is already running (or crashed mid-flight). Avoid duplicate extraction.
     return
   }
 
-  const input = parseInput(jobRow.input_json)
+  if (st !== "queued") {
+    return
+  }
+
+  const now = new Date().toISOString()
+  const { data: claimed, error: claimErr } = await svc
+    .from("ai_jobs")
+    .update({
+      status: "processing",
+      started_at: now,
+      progress_percent: 4,
+      current_step: "Starting…",
+      error_message: null,
+      updated_at: now,
+    })
+    .eq("id", jobId)
+    .eq("status", "queued")
+    .select("id, organization_id, input_json")
+    .maybeSingle()
+
+  if (claimErr || !claimed) {
+    return
+  }
+
+  const input = parseInput(claimed.input_json)
   if (!input) {
     await failAiJob(svc, jobId, "Invalid job payload.")
     return
   }
 
-  await markAiJobStatus(svc, jobId, "processing", {
-    progress_percent: 5,
-    current_step: "Starting extraction…",
-    error_message: null,
-  })
-
   const importId = input.importId
+
+  if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+    return
+  }
 
   const { data: imp0, error: impErr } = await svc
     .from("price_list_imports")
@@ -212,8 +267,8 @@ export async function runPriceListImportExtractionJob(params: {
 
   if (input.kind === "price_list_import_upload") {
     await updateAiJobProgress(svc, jobId, {
-      progressPercent: 15,
-      currentStep: "Loading uploaded PDF…",
+      progressPercent: 12,
+      currentStep: "Uploaded · Reading file…",
     })
     const path = input.storagePath
     const { data: bin, error: dlErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).download(path)
@@ -234,8 +289,8 @@ export async function runPriceListImportExtractionJob(params: {
     fileName = input.fileName || fileName
   } else {
     await updateAiJobProgress(svc, jobId, {
-      progressPercent: 15,
-      currentStep: "Loading PDF from storage…",
+      progressPercent: 12,
+      currentStep: "Reading file from storage…",
     })
     const path = imp0.file_url as string
     const { data: bin, error: dlErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).download(path)
@@ -255,6 +310,10 @@ export async function runPriceListImportExtractionJob(params: {
     buffer = Buffer.from(await bin.arrayBuffer())
   }
 
+  if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+    return
+  }
+
   await svc
     .from("price_list_imports")
     .update({ status: "processing", error_message: null, updated_at: new Date().toISOString() })
@@ -263,9 +322,13 @@ export async function runPriceListImportExtractionJob(params: {
   let payload: Awaited<ReturnType<typeof extractPriceListPayloadFromPdf>>
   try {
     await updateAiJobProgress(svc, jobId, {
-      progressPercent: 35,
-      currentStep: "Running AI extraction (this may take a few minutes)…",
+      progressPercent: 38,
+      currentStep: "Extracting with AI (may take a few minutes)…",
     })
+
+    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+      return
+    }
 
     const extraction = extractPriceListPayloadFromPdf({
       buffer,
@@ -279,11 +342,31 @@ export async function runPriceListImportExtractionJob(params: {
       "Extraction timed out. Try a smaller PDF or retry.",
     )
 
+    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+      return
+    }
+
     await updateAiJobProgress(svc, jobId, {
-      progressPercent: 85,
-      currentStep: "Saving extracted rows…",
+      progressPercent: 76,
+      currentStep: "Validating extracted rows…",
     })
+
+    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+      return
+    }
+
+    await updateAiJobProgress(svc, jobId, {
+      progressPercent: 88,
+      currentStep: "Saving draft for review…",
+    })
+
+    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+      return
+    }
   } catch (e) {
+    if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+      return
+    }
     const msg =
       e instanceof PriceListExtractConfigError
         ? e.message
@@ -300,6 +383,10 @@ export async function runPriceListImportExtractionJob(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", importId)
+    return
+  }
+
+  if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
     return
   }
 
@@ -320,6 +407,10 @@ export async function runPriceListImportExtractionJob(params: {
     }))
   }
 
+  if (await isPriceListImportCancellationRequested(svc, organizationId, jobId, importId)) {
+    return
+  }
+
   await svc
     .from("price_list_imports")
     .update({
@@ -330,6 +421,11 @@ export async function runPriceListImportExtractionJob(params: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", importId)
+
+  await updateAiJobProgress(svc, jobId, {
+    progressPercent: 97,
+    currentStep: "Ready for review",
+  })
 
   const pr = getPromptForTask("catalog_extraction")
   const pm = promptMetadataForLog(pr)

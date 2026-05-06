@@ -1,12 +1,8 @@
-import { NextResponse, after } from "next/server"
+import { NextResponse } from "next/server"
+import { getActiveCatalogJobForImport } from "@/lib/ai/jobs/active-catalog-job"
 import { insertQueuedAiJob } from "@/lib/ai/jobs/create-ai-job"
-import {
-  failAiJob,
-  runPriceListImportExtractionJob,
-  sanitizeAiJobError,
-} from "@/lib/ai/jobs/process-ai-job"
+import { scheduleCatalogExtractionProcessing } from "@/lib/ai/jobs/schedule-catalog-extraction"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
-import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
@@ -45,6 +41,18 @@ export async function POST(
     return NextResponse.json({ error: "not_found", message: "Import or stored PDF missing." }, { status: 404 })
   }
 
+  const existingActive = await getActiveCatalogJobForImport(svc, organizationId, importId)
+  if (existingActive) {
+    return NextResponse.json({
+      ok: true,
+      jobId: existingActive,
+      importId,
+      resumed: true,
+      status: "queued",
+      message: "Extraction already running for this import.",
+    })
+  }
+
   await svc
     .from("price_list_imports")
     .update({ status: "processing", error_message: null, updated_at: new Date().toISOString() })
@@ -68,41 +76,16 @@ export async function POST(
 
   const jobId = jobInsert.jobId
 
-  after(async () => {
-    let sr
-    try {
-      sr = createServiceRoleSupabaseClient()
-    } catch {
-      return
-    }
-    try {
-      await runPriceListImportExtractionJob({
-        svc: sr,
-        organizationId,
-        jobId,
-      })
-    } catch (e) {
-      console.error("[ai_jobs] catalog re-extract:", e)
-      const msg = sanitizeAiJobError(e)
-      try {
-        await failAiJob(sr, jobId, msg)
-        await sr
-          .from("price_list_imports")
-          .update({
-            status: "failed",
-            error_message: msg,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", importId)
-      } catch (inner) {
-        console.error("[ai_jobs] catalog re-extract cleanup:", inner)
-      }
-    }
+  scheduleCatalogExtractionProcessing({
+    organizationId,
+    jobId,
+    importIdForCleanup: importId,
   })
 
   return NextResponse.json({
     ok: true,
     jobId,
     importId,
+    status: "queued",
   })
 }

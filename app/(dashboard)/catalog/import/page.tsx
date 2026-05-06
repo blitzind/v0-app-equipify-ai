@@ -12,6 +12,16 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -35,6 +45,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
+
+const SS_IMPORT = "equipify.catalogImport.importId"
+const SS_JOB = "equipify.catalogImport.jobId"
 
 export default function ImportPriceListPage() {
   const router = useRouter()
@@ -61,8 +74,13 @@ export default function ImportPriceListPage() {
   const [jobProgress, setJobProgress] = useState(0)
   const [jobStep, setJobStep] = useState<string | null>(null)
   const [jobError, setJobError] = useState<string | null>(null)
+  const [importCancelled, setImportCancelled] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingJobKindRef = useRef<"upload" | "reextract">("upload")
+  /** Avoid duplicate toast when cancel dialog already showed success. */
+  const suppressCancelPollToastRef = useRef(false)
 
   useEffect(() => {
     if (status !== "ready" || !organizationId) return
@@ -90,6 +108,91 @@ export default function ImportPriceListPage() {
     }
   }, [status, organizationId])
 
+  /** Resume polling / draft after refresh using URL params or sessionStorage + active job from API. */
+  useEffect(() => {
+    if (status !== "ready" || !organizationId) return
+
+    let cancelled = false
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "")
+    const qImp = params.get("importId")
+    const qJob = params.get("jobId")
+    const sImp = typeof window !== "undefined" ? sessionStorage.getItem(SS_IMPORT) : null
+    const sJob = typeof window !== "undefined" ? sessionStorage.getItem(SS_JOB) : null
+
+    const imp = qImp ?? sImp
+    const job = qJob ?? sJob
+
+    if (!imp) return
+
+    setImportId(imp)
+    try {
+      sessionStorage.setItem(SS_IMPORT, imp)
+    } catch {
+      /* ignore quota */
+    }
+
+    if (job) {
+      try {
+        sessionStorage.setItem(SS_JOB, job)
+      } catch {
+        /* ignore */
+      }
+      setActiveJobId(job)
+      setJobPolling(true)
+      setJobError(null)
+      return
+    }
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(imp)}`,
+          { cache: "no-store" },
+        )
+        const data = (await res.json()) as {
+          activeJobId?: string | null
+          import?: { status?: string; error_message?: string | null }
+          payload?: StoredPriceListPayload | null
+        }
+        if (cancelled || !res.ok) return
+
+        if (data.activeJobId) {
+          try {
+            sessionStorage.setItem(SS_JOB, data.activeJobId)
+          } catch {
+            /* ignore */
+          }
+          setActiveJobId(data.activeJobId)
+          setJobPolling(true)
+          setJobError(null)
+          return
+        }
+
+        if (data.import?.status === "cancelled") {
+          setImportCancelled(true)
+          setPayload(null)
+          setJobError(null)
+          return
+        }
+
+        if (data.import?.status === "failed") {
+          setJobError(data.import.error_message?.trim() || "Extraction failed.")
+          return
+        }
+
+        if (data.payload?.rows?.length) {
+          setPayload(data.payload)
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [status, organizationId])
+
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current)
@@ -97,7 +200,46 @@ export default function ImportPriceListPage() {
     }
     setJobPolling(false)
     setActiveJobId(null)
+    try {
+      sessionStorage.removeItem(SS_JOB)
+    } catch {
+      /* ignore */
+    }
   }, [])
+
+  async function confirmCancelImport() {
+    if (!organizationId || !importId) return
+    setCancelBusy(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}/cancel`,
+        { method: "POST" },
+      )
+      const data = (await res.json()) as { ok?: boolean; message?: string; error?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not cancel",
+          description: data.message ?? data.error ?? `Request failed (${res.status})`,
+        })
+        return
+      }
+      suppressCancelPollToastRef.current = true
+      stopPolling()
+      setPayload(null)
+      setImportCancelled(true)
+      setJobError(null)
+      setCancelDialogOpen(false)
+      toast({
+        title: "Import cancelled",
+        description: "You can upload a new price list, re-run extraction, or return to the catalog.",
+      })
+    } catch {
+      toast({ variant: "destructive", title: "Network error", description: "Try again." })
+    } finally {
+      setCancelBusy(false)
+    }
+  }
 
   const loadImportPayload = useCallback(async () => {
     if (!organizationId || !importId) return false
@@ -164,18 +306,32 @@ export default function ImportPriceListPage() {
           return
         }
 
-        if (st === "failed" || st === "cancelled") {
+        if (st === "cancelled") {
+          stopPolling()
+          setImportCancelled(true)
+          setPayload(null)
+          setJobError(null)
+          if (suppressCancelPollToastRef.current) {
+            suppressCancelPollToastRef.current = false
+          } else {
+            toast({
+              title: "Import cancelled",
+              description: "You can upload a new price list or return to the catalog.",
+            })
+          }
+          return
+        }
+
+        if (st === "failed") {
           stopPolling()
           const msg =
             typeof data.job.error_message === "string" && data.job.error_message.trim()
               ? data.job.error_message.trim()
-              : st === "cancelled"
-                ? "Extraction was cancelled."
-                : "Extraction failed."
+              : "Extraction failed."
           setJobError(msg)
           toast({
             variant: "destructive",
-            title: st === "cancelled" ? "Cancelled" : "Extraction failed",
+            title: "Extraction failed",
             description: msg,
           })
         }
@@ -221,6 +377,7 @@ export default function ImportPriceListPage() {
     }
     pendingJobKindRef.current = "upload"
     stopPolling()
+    setImportCancelled(false)
     setJobError(null)
     setPayload(null)
     setJobProgress(0)
@@ -256,6 +413,12 @@ export default function ImportPriceListPage() {
       const jobId = data.jobId ?? null
       setImportId(newImportId)
       if (newImportId && jobId) {
+        try {
+          sessionStorage.setItem(SS_IMPORT, newImportId)
+          sessionStorage.setItem(SS_JOB, jobId)
+        } catch {
+          /* ignore */
+        }
         setActiveJobId(jobId)
         setJobPolling(true)
       } else {
@@ -276,6 +439,7 @@ export default function ImportPriceListPage() {
     if (!organizationId || !importId) return
     pendingJobKindRef.current = "reextract"
     stopPolling()
+    setImportCancelled(false)
     setJobError(null)
     setJobProgress(0)
     setJobStep(null)
@@ -288,6 +452,7 @@ export default function ImportPriceListPage() {
       const data = (await res.json()) as {
         ok?: boolean
         jobId?: string
+        resumed?: boolean
         message?: string
         error?: string
       }
@@ -300,9 +465,21 @@ export default function ImportPriceListPage() {
         return
       }
       const jobId = data.jobId ?? null
-      if (jobId) {
+      if (jobId && importId) {
+        try {
+          sessionStorage.setItem(SS_IMPORT, importId)
+          sessionStorage.setItem(SS_JOB, jobId)
+        } catch {
+          /* ignore */
+        }
         setActiveJobId(jobId)
         setJobPolling(true)
+        if (data.resumed) {
+          toast({
+            title: "Extraction in progress",
+            description: "Already running for this import — reconnecting to progress.",
+          })
+        }
       } else {
         toast({
           variant: "destructive",
@@ -561,9 +738,20 @@ export default function ImportPriceListPage() {
 
       {jobPolling ? (
         <div className="rounded-lg border border-border bg-card p-4 max-w-xl space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-            Extracting price list…
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground min-w-0">
+              <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+              Extracting price list…
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setCancelDialogOpen(true)}
+            >
+              Cancel import
+            </Button>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div
@@ -575,17 +763,77 @@ export default function ImportPriceListPage() {
             {jobStep ?? "Queued…"}
             {jobProgress > 0 ? ` · ${jobProgress}%` : ""}
           </p>
-          <p className="text-[11px] text-muted-foreground">
-            You can leave this page open — extraction runs in the background and updates automatically.
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Extraction is running in the background. You can leave this page and return later — progress is saved; we reconnect
+            automatically when you come back.
           </p>
         </div>
       ) : null}
 
-      {jobError && !jobPolling ? (
+      {importCancelled && !jobPolling ? (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 max-w-xl space-y-2">
+          <p className="text-sm font-medium text-foreground">Import cancelled</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Extraction was stopped and unsaved extracted rows were discarded. Upload a new PDF, re-run extraction on the stored file,
+            or return to the catalog.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportCancelled(false)
+                setImportId(null)
+                setPayload(null)
+                setFile(null)
+                try {
+                  sessionStorage.removeItem(SS_IMPORT)
+                  sessionStorage.removeItem(SS_JOB)
+                } catch {
+                  /* ignore */
+                }
+              }}
+            >
+              Clear and upload new file
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/catalog">Back to catalog</Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {jobError && !jobPolling && !importCancelled ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive max-w-xl">
           {jobError}
         </div>
       ) : null}
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel price list import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop the current extraction and discard any unsaved extracted rows. You can start a new import afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelBusy}>Keep importing</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelBusy}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmCancelImport()
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Cancel import
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {payload?.warnings?.length ? (
         <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">

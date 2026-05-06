@@ -57,7 +57,7 @@ export async function POST(
 
   const { data: imp, error: loadErr } = await gate.svc
     .from("price_list_imports")
-    .select("id, file_name, file_url, vendor_id, manufacturer_name, extracted_json")
+    .select("id, file_name, file_url, vendor_id, manufacturer_name, extracted_json, status")
     .eq("id", importId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -69,6 +69,12 @@ export async function POST(
   }
   if (!imp) {
     return NextResponse.json({ error: "not_found", message: "Import not found." }, { status: 404 })
+  }
+  if ((imp.status as string) === "cancelled") {
+    return NextResponse.json(
+      { error: "import_cancelled", message: "This import was cancelled. Start a new import to save catalog items." },
+      { status: 409 },
+    )
   }
 
   const payload = parseStoredPriceListPayload(imp.extracted_json)

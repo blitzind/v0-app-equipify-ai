@@ -269,7 +269,7 @@ export async function GET(request: Request) {
   let jobsQ = admin
     .from("ai_jobs")
     .select(
-      "id, organization_id, task, status, created_at, started_at, completed_at, error_message",
+      "id, organization_id, task, status, created_at, started_at, completed_at, error_message, progress_percent, current_step, source_type, source_id",
     )
     .gte("created_at", startIso)
     .lt("created_at", endIso)
@@ -309,6 +309,13 @@ export async function GET(request: Request) {
       completed_at: r.completed_at as string | null,
       duration_ms: durationMs,
       error_message: typeof r.error_message === "string" ? r.error_message : null,
+      progress_percent:
+        typeof r.progress_percent === "number"
+          ? r.progress_percent
+          : Number(r.progress_percent ?? 0),
+      current_step: typeof r.current_step === "string" ? r.current_step : null,
+      source_type: typeof r.source_type === "string" ? r.source_type : null,
+      source_id: typeof r.source_id === "string" ? r.source_id : null,
     }
   })
 

@@ -66,6 +66,10 @@ type AiOperationsResponse = {
     created_at: string
     duration_ms: number | null
     error_message: string | null
+    progress_percent: number
+    current_step: string | null
+    source_type: string | null
+    source_id: string | null
   }>
   recentLogs: Array<{
     id: string
@@ -533,7 +537,7 @@ export default function AiOperationsPage() {
                 <div className="px-4 py-2 border-b border-border bg-muted/30">
                   <p className="text-sm font-semibold">Recent AI jobs (month, filtered)</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Long-running tasks (e.g. catalog extraction). Duration is started→completed when both exist.
+                    Long-running tasks (catalog extraction, etc.). Duration is started→completed when both exist. Progress reflects polling state for imports.
                   </p>
                 </div>
                 <Table>
@@ -543,8 +547,11 @@ export default function AiOperationsPage() {
                       <TableHead>Organization</TableHead>
                       <TableHead>Task</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right tabular-nums">%</TableHead>
+                      <TableHead className="max-w-[140px]">Step</TableHead>
+                      <TableHead className="max-w-[100px]">Source</TableHead>
                       <TableHead className="text-right">Duration</TableHead>
-                      <TableHead className="max-w-[220px]">Error</TableHead>
+                      <TableHead className="max-w-[180px]">Error</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -558,8 +565,17 @@ export default function AiOperationsPage() {
                         </TableCell>
                         <TableCell className="font-mono text-[11px]">{j.task}</TableCell>
                         <TableCell className="text-xs">{j.status}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {Number.isFinite(j.progress_percent) ? `${j.progress_percent}%` : "—"}
+                        </TableCell>
+                        <TableCell className="text-[11px] text-muted-foreground max-w-[140px] truncate">
+                          {j.current_step ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono text-muted-foreground max-w-[100px] truncate" title={j.source_id ?? undefined}>
+                          {j.source_type ?? "—"}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{fmtDurationMs(j.duration_ms)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">
+                        <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">
                           {j.error_message ?? "—"}
                         </TableCell>
                       </TableRow>
