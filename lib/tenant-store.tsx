@@ -114,12 +114,23 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
       const tmpl = MOCK_WORKSPACES.find((w) => w.id === action.payload.templateWorkspaceId)
       if (!tmpl) return state
       const sub = action.payload.organizationSubscription
+      const slug = action.payload.slug
+      const sameOrg = slug.length > 0 && state.workspace.slug === slug
       return {
         ...state,
         workspace: {
           ...tmpl,
+          ...(sameOrg
+            ? {
+                logoUrl: state.workspace.logoUrl,
+                documentLogoUrl: state.workspace.documentLogoUrl,
+                primaryColor: state.workspace.primaryColor,
+                secondaryBrandColor: state.workspace.secondaryBrandColor,
+                whiteLabelSettings: state.workspace.whiteLabelSettings,
+              }
+            : {}),
           name: action.payload.displayName,
-          slug: action.payload.slug,
+          slug,
           organizationSubscription: sub,
           planId: sub ? sub.planId : tmpl.planId,
           subscriptionStatus: sub ? mapDbSubscriptionStatus(sub.status) : tmpl.subscriptionStatus,

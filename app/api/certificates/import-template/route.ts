@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
+import { resolveFirstOrganizationIdForUser } from "@/lib/ai/resolve-org-for-logging"
 import {
   ConfigError,
   generateTemplateDraftFromCertificateFile,
 } from "@/lib/calibration-templates/openai-generate-template"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -25,6 +27,16 @@ function resolveMime(file: File): string | null {
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user?.id) {
+      return NextResponse.json({ error: "Sign in required." }, { status: 401 })
+    }
+
+    const organizationId = await resolveFirstOrganizationIdForUser(user.id)
+
     const form = await req.formData()
     const entry = form.get("file")
     if (!entry || !(entry instanceof File)) {
@@ -51,6 +63,7 @@ export async function POST(req: Request) {
       buffer,
       fileName: entry.name || "certificate",
       mimeType,
+      organizationId,
     })
 
     return NextResponse.json({
@@ -59,6 +72,7 @@ export async function POST(req: Request) {
       fields: draft.fields,
       confidenceMessage: draft.confidenceMessage,
       extractionWarnings: draft.extractionWarnings,
+      aiConfidence: draft.aiConfidence,
     })
   } catch (e) {
     if (e instanceof ConfigError) {

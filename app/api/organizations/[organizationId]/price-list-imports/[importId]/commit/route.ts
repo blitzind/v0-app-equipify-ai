@@ -102,6 +102,10 @@ export async function POST(
       continue
     }
 
+    const nowIso = new Date().toISOString()
+    const aiConf =
+      typeof row.confidence === "number" && Number.isFinite(row.confidence) ? row.confidence : null
+
     const base = {
       organization_id: organizationId,
       vendor_id: (imp.vendor_id as string | null) ?? null,
@@ -125,8 +129,12 @@ export async function POST(
       effective_date: effectiveDate,
       notes: row.notes,
       raw_extracted_text: row.rawExtractedText,
-      confidence_score: row.confidence,
-      updated_at: new Date().toISOString(),
+      confidence_score: aiConf,
+      ai_generated: true,
+      ai_confidence: aiConf,
+      human_verified_at: nowIso,
+      human_verified_by: gate.userId,
+      updated_at: nowIso,
     }
 
     if (action === "update") {
@@ -164,11 +172,15 @@ export async function POST(
     saved++
   }
 
+  const reviewIso = new Date().toISOString()
   await gate.svc
     .from("price_list_imports")
     .update({
       status: errors.length === 0 ? "approved" : "needs_review",
-      updated_at: new Date().toISOString(),
+      updated_at: reviewIso,
+      ...(errors.length === 0 && saved > 0
+        ? { human_reviewed_at: reviewIso, human_reviewed_by: gate.userId }
+        : {}),
     })
     .eq("id", importId)
 

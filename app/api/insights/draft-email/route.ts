@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
-import OpenAI from "openai"
+import { z } from "zod"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { runAiTask } from "@/lib/ai/server"
+import { aiDebugLog } from "@/lib/ai/ai-debug"
+import { applyUserPromptTemplate, getPromptForTask } from "@/lib/ai/prompts"
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -12,6 +16,24 @@ type Body = {
   recommendedAction?: string
   relatedMetric?: string
 }
+
+const draftEmailOutputSchema = z
+  .object({
+    subject: z.string(),
+    body: z.string(),
+  })
+  .transform((d) => ({
+    subject: d.subject.trim(),
+    body: d.body.trim(),
+  }))
+  .superRefine((d, ctx) => {
+    if (!d.subject) {
+      ctx.addIssue({ code: "custom", message: "subject required", path: ["subject"] })
+    }
+    if (!d.body) {
+      ctx.addIssue({ code: "custom", message: "body required", path: ["body"] })
+    }
+  })
 
 export async function POST(request: Request) {
   let body: Body
@@ -64,72 +86,67 @@ export async function POST(request: Request) {
     )
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey?.trim()) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "not_configured",
-        message: "Draft email is not configured. Add OPENAI_API_KEY to the server environment.",
-      },
-      { status: 503 },
-    )
+  const prompt = getPromptForTask("customer_email")
+  const userMessage = applyUserPromptTemplate(prompt.userPromptTemplate, {
+    insightCategory: insightCategory || "general",
+    insightTitle,
+    insightText,
+    recommendedActionBlock: recommendedAction ? `Suggested next step: ${recommendedAction}\n` : "",
+    relatedMetricBlock: relatedMetric ? `Related metric: ${relatedMetric}\n` : "",
+  })
+
+  const envModel = process.env.OPENAI_INSIGHTS_MODEL?.trim()
+  const taskOverrides = {
+    structuredMode: "json_object" as const,
+    ...(envModel != null && envModel.length > 0
+      ? { primaryModel: { provider: "openai" as const, model: envModel } }
+      : {}),
   }
 
-  const model = process.env.OPENAI_INSIGHTS_MODEL?.trim() || "gpt-4o-mini"
-  const client = new OpenAI({ apiKey })
-
-  const system = `You are helping a field service company write a professional customer email.
-
-Return a single JSON object (no markdown) with exactly:
-{
-  "subject": string,
-  "body": string
-}
-
-Rules:
-- Tone: clear, helpful, professional; no hype.
-- Do not invent customer names, dollar amounts, or specific dates not provided in the prompt.
-- Body should be plain text with short paragraphs; suitable for copy-paste into an email client.
-- Do not include a signature block or automated disclaimer unless the user context implies it.
-`
-
-  const userContent = [
-    `Organization context: internal Equipify user drafting follow-up (category: ${insightCategory || "general"}).`,
-    `Insight title: ${insightTitle}`,
-    `Insight: ${insightText}`,
-    recommendedAction ? `Suggested next step: ${recommendedAction}` : null,
-    relatedMetric ? `Related metric: ${relatedMetric}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n")
-
   try {
-    const completion = await client.chat.completions.create({
-      model,
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userContent },
-      ],
+    const result = await runAiTask({
+      task: "customer_email",
+      organizationId,
+      input: {
+        system: prompt.systemPrompt,
+        user: userMessage,
+      },
+      schema: draftEmailOutputSchema,
+      taskOverrides,
+      cacheSchemaVersion: prompt.schemaVersion,
     })
 
-    const text = completion.choices[0]?.message?.content?.trim()
-    if (!text) {
-      return NextResponse.json({ error: "empty_response", message: "AI returned an empty response." }, { status: 500 })
+    if (!result.ok) {
+      const message = result.error.message
+      aiDebugLog("draft_email_failed", {
+        organizationId,
+        message: message.slice(0, 500),
+        escalationReasons: result.meta.escalationReasons,
+      })
+      if (message.includes("No AI provider is configured")) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "not_configured",
+            message:
+              "Draft email is not configured. Add OPENAI_API_KEY (and optional ANTHROPIC_API_KEY, GOOGLE_AI_API_KEY) and AI_ENABLED_PROVIDERS.",
+          },
+          { status: 503 },
+        )
+      }
+      return NextResponse.json({ ok: false, error: "generation_failed", message }, { status: 500 })
     }
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text)
-    } catch {
-      return NextResponse.json({ error: "parse_failed", message: "Failed to parse AI response." }, { status: 500 })
-    }
+    aiDebugLog("draft_email_ok", {
+      organizationId,
+      model: result.meta.model,
+      provider: result.meta.provider,
+      escalated: result.meta.escalated,
+      promptId: prompt.promptId,
+      promptVersion: prompt.version,
+    })
 
-    const o = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {}
-    const subject = typeof o.subject === "string" ? o.subject.trim() : ""
-    const emailBody = typeof o.body === "string" ? o.body.trim() : ""
+    const { subject, body: emailBody } = result.output
     if (!subject || !emailBody) {
       return NextResponse.json({ error: "invalid_ai_shape", message: "AI response missing subject or body." }, { status: 500 })
     }

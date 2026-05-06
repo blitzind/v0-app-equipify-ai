@@ -1,8 +1,12 @@
-import { NextResponse } from "next/server"
-import { PRICE_LIST_IMPORTS_BUCKET } from "@/lib/catalog/constants"
-import { extractPriceListPayloadFromPdf, PriceListExtractConfigError } from "@/lib/catalog/extract-price-list-from-pdf"
-import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
+import { NextResponse, after } from "next/server"
+import { insertQueuedAiJob } from "@/lib/ai/jobs/create-ai-job"
+import {
+  failAiJob,
+  runPriceListImportExtractionJob,
+  sanitizeAiJobError,
+} from "@/lib/ai/jobs/process-ai-job"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -22,11 +26,11 @@ export async function POST(
   const gate = await requireOrgCatalogWrite(organizationId)
   if ("error" in gate) return gate.error
 
-  const { svc } = gate
+  const { svc, userId } = gate
 
   const { data: row, error: loadErr } = await svc
     .from("price_list_imports")
-    .select("id, file_name, file_url, manufacturer_name, extracted_json")
+    .select("id, file_url")
     .eq("id", importId)
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -35,70 +39,64 @@ export async function POST(
     return NextResponse.json({ error: "not_found", message: "Import or stored PDF missing." }, { status: 404 })
   }
 
-  const path = row.file_url as string
-  const { data: bin, error: dlErr } = await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).download(path)
-  if (dlErr || !bin) {
-    return NextResponse.json({ error: "download_failed", message: dlErr?.message ?? "Could not read PDF." }, { status: 400 })
-  }
-
-  const buffer = Buffer.from(await bin.arrayBuffer())
-  const prev = parseStoredPriceListPayload(row.extracted_json)
-
   await svc
     .from("price_list_imports")
     .update({ status: "processing", error_message: null, updated_at: new Date().toISOString() })
     .eq("id", importId)
 
-  try {
-    const payload = await extractPriceListPayloadFromPdf({
-      buffer,
-      fileName: (row.file_name as string) || "price-list.pdf",
-    })
+  const jobInsert = await insertQueuedAiJob(svc, {
+    organization_id: organizationId,
+    created_by: userId,
+    task: "catalog_extraction",
+    input_json: {
+      kind: "price_list_import_reextract",
+      importId,
+    },
+    source_type: "price_list_import",
+    source_id: importId,
+  })
 
-    const mergedMfg = payload.manufacturerName ?? (row.manufacturer_name as string | null)
-    payload.manufacturerName = mergedMfg ?? null
-
-    if (prev?.rows?.length) {
-      const prevByPart = new Map(
-        prev.rows.map((r) => [`${r.partNumber.trim().toLowerCase()}::${r.name.trim().toLowerCase()}`, r.selected]),
-      )
-      payload.rows = payload.rows.map((r) => ({
-        ...r,
-        selected: prevByPart.get(`${r.partNumber.trim().toLowerCase()}::${r.name.trim().toLowerCase()}`) ?? true,
-      }))
-    }
-
-    await svc
-      .from("price_list_imports")
-      .update({
-        extracted_json: payload as unknown as Record<string, unknown>,
-        manufacturer_name: mergedMfg ?? (row.manufacturer_name as string | null),
-        status: "needs_review",
-        error_message: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", importId)
-
-    return NextResponse.json({ ok: true, payload })
-  } catch (e) {
-    const msg =
-      e instanceof PriceListExtractConfigError
-        ? e.message
-        : e instanceof Error
-          ? e.message
-          : "Extraction failed."
-    await svc
-      .from("price_list_imports")
-      .update({
-        status: "failed",
-        error_message: msg,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", importId)
-
-    if (e instanceof PriceListExtractConfigError) {
-      return NextResponse.json({ error: "not_configured", message: msg }, { status: 503 })
-    }
-    return NextResponse.json({ error: "extract_failed", message: msg }, { status: 422 })
+  if ("error" in jobInsert) {
+    return NextResponse.json({ error: "job_create_failed", message: jobInsert.error }, { status: 500 })
   }
+
+  const jobId = jobInsert.jobId
+
+  after(async () => {
+    let sr
+    try {
+      sr = createServiceRoleSupabaseClient()
+    } catch {
+      return
+    }
+    try {
+      await runPriceListImportExtractionJob({
+        svc: sr,
+        organizationId,
+        jobId,
+      })
+    } catch (e) {
+      console.error("[ai_jobs] catalog re-extract:", e)
+      const msg = sanitizeAiJobError(e)
+      try {
+        await failAiJob(sr, jobId, msg)
+        await sr
+          .from("price_list_imports")
+          .update({
+            status: "failed",
+            error_message: msg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", importId)
+      } catch (inner) {
+        console.error("[ai_jobs] catalog re-extract cleanup:", inner)
+      }
+    }
+  })
+
+  return NextResponse.json({
+    ok: true,
+    jobId,
+    importId,
+  })
 }

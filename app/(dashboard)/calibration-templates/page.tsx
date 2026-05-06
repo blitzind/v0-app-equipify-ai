@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   BadgeCheck,
@@ -25,6 +26,7 @@ import {
   Search,
   Upload,
 } from "lucide-react"
+import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
 import { cn } from "@/lib/utils"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -219,6 +221,8 @@ export default function CertificatesPage() {
   /** After adding a field, focus and scroll to its label input. */
   const [pendingFieldFocusId, setPendingFieldFocusId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [certificateAiImportAllowed, setCertificateAiImportAllowed] = useState(true)
+  const [planAiGateLoading, setPlanAiGateLoading] = useState(false)
   const [completedRows, setCompletedRows] = useState<CompletedCertificateListItem[]>([])
   const [completedLoading, setCompletedLoading] = useState(false)
   const [completedError, setCompletedError] = useState<string | null>(null)
@@ -266,6 +270,31 @@ export default function CertificatesPage() {
       cancelled = true
     }
   }, [orgStatus, organizationId, fetchTemplates, templateListVisibility])
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !organizationId) return
+    let cancelled = false
+    setPlanAiGateLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/ai-usage`, {
+          cache: "no-store",
+        })
+        const data = (await res.json()) as { planAi?: { certificateCleanupAllowed?: boolean } }
+        if (cancelled || !res.ok) return
+        const allowed =
+          data.planAi == null ? true : Boolean(data.planAi.certificateCleanupAllowed)
+        setCertificateAiImportAllowed(allowed)
+      } catch {
+        if (!cancelled) setCertificateAiImportAllowed(true)
+      } finally {
+        if (!cancelled) setPlanAiGateLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgStatus, organizationId])
 
   const fetchCompletedCertificates = useCallback(async () => {
     if (!organizationId) return []
@@ -533,16 +562,37 @@ export default function CertificatesPage() {
 
   async function handleImportCommit(importReview: ImportReviewDraft) {
     if (!confirmDiscardIfNeeded()) return
+    if (!organizationId) return
     setSaving(true)
     setError(null)
     try {
-      const saved = await saveDraftState({
-        name: importReview.name,
-        equipmentCategoryId: importReview.equipmentCategoryId,
-        fields: importReview.fields,
-      })
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/calibration-templates/import-commit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: importReview.name,
+            equipmentCategoryId: importReview.equipmentCategoryId,
+            fields: importReview.fields,
+            aiConfidence: importReview.aiConfidence,
+          }),
+        },
+      )
+      const data = (await res.json()) as {
+        template?: CalibrationTemplate
+        message?: string
+        error?: string
+      }
+      if (!res.ok) {
+        throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`)
+      }
+      if (!data.template) {
+        throw new Error("Invalid server response.")
+      }
+      const saved = data.template
       const supabase = createBrowserSupabaseClient()
-      const rows = await listCalibrationTemplates(supabase, organizationId!, templateListVisibility)
+      const rows = await listCalibrationTemplates(supabase, organizationId, templateListVisibility)
       setTemplates(rows)
       setIsCreatingNew(false)
       setSelectedId(saved.id)
@@ -681,12 +731,21 @@ export default function CertificatesPage() {
               Completed Certificates
             </TabsTrigger>
           </TabsList>
-          <div className="flex shrink-0 items-center gap-2 mb-px">
+          <div className="flex shrink-0 items-center gap-2 mb-px flex-wrap justify-end">
+            {!certificateAiImportAllowed ? (
+              <p className="text-[11px] text-muted-foreground max-w-[220px] text-right leading-snug">
+                AI certificate import is available on Growth and Scale plans.{" "}
+                <Link href="/settings/billing" className="text-primary underline-offset-4 hover:underline">
+                  Billing
+                </Link>
+              </p>
+            ) : null}
             <Button
               type="button"
               size="sm"
               variant="outline"
               className="h-9 gap-1.5"
+              disabled={!certificateAiImportAllowed || planAiGateLoading}
               onClick={() => setImportOpen(true)}
             >
               <Upload className="w-4 h-4" />
@@ -786,6 +845,40 @@ export default function CertificatesPage() {
                               Archived
                             </Badge>
                           ) : null}
+                          {(() => {
+                            const aiLabel = getCatalogAiStatusLabel({
+                              ai_generated: t.aiGenerated,
+                              ai_confidence: t.aiConfidence,
+                              confidence_score: null,
+                              human_verified_at: t.humanVerifiedAt,
+                            })
+                            if (!aiLabel) return null
+                            if (aiLabel === "verified") {
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-semibold px-1 py-0 h-5 border-emerald-500/35 text-emerald-800/90 bg-emerald-500/5"
+                                >
+                                  Verified
+                                </Badge>
+                              )
+                            }
+                            if (aiLabel === "needs_review") {
+                              return (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-semibold px-1 py-0 h-5 border-amber-500/35 text-amber-900/85 bg-amber-500/5"
+                                >
+                                  Needs review
+                                </Badge>
+                              )
+                            }
+                            return (
+                              <Badge variant="outline" className="text-[9px] font-semibold px-1 py-0 h-5 text-muted-foreground">
+                                AI
+                              </Badge>
+                            )
+                          })()}
                         </div>
                         {metaParts.length > 0 ? (
                           <p className="text-[11px] text-muted-foreground mt-0.5">{metaParts.join(" · ")}</p>
@@ -1206,6 +1299,7 @@ export default function CertificatesPage() {
         onOpenChange={setImportOpen}
         saving={saving}
         onCommit={handleImportCommit}
+        certificateAiImportAllowed={certificateAiImportAllowed && !planAiGateLoading}
       />
     </div>
   )

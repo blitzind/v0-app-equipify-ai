@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, ArrowLeft, Loader2, RefreshCw, Upload } from "lucide-react"
@@ -53,6 +53,147 @@ export default function ImportPriceListPage() {
   const [dupOpen, setDupOpen] = useState(false)
   const [dupConflicts, setDupConflicts] = useState<{ rowId: string; existingCatalogItemId: string }[]>([])
   const [dupChoices, setDupChoices] = useState<Record<string, DuplicateAction>>({})
+  const [catalogAiAllowed, setCatalogAiAllowed] = useState(true)
+  const [planAiLoading, setPlanAiLoading] = useState(false)
+
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [jobPolling, setJobPolling] = useState(false)
+  const [jobProgress, setJobProgress] = useState(0)
+  const [jobStep, setJobStep] = useState<string | null>(null)
+  const [jobError, setJobError] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pendingJobKindRef = useRef<"upload" | "reextract">("upload")
+
+  useEffect(() => {
+    if (status !== "ready" || !organizationId) return
+    let cancelled = false
+    setPlanAiLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/ai-usage`, {
+          cache: "no-store",
+        })
+        const data = (await res.json()) as {
+          planAi?: { catalogExtractionAllowed?: boolean }
+        }
+        if (cancelled || !res.ok) return
+        const allowed = data.planAi == null ? true : Boolean(data.planAi.catalogExtractionAllowed)
+        setCatalogAiAllowed(allowed)
+      } catch {
+        if (!cancelled) setCatalogAiAllowed(true)
+      } finally {
+        if (!cancelled) setPlanAiLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [status, organizationId])
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    setJobPolling(false)
+    setActiveJobId(null)
+  }, [])
+
+  const loadImportPayload = useCallback(async () => {
+    if (!organizationId || !importId) return false
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}`,
+        { cache: "no-store" },
+      )
+      const data = (await res.json()) as { payload?: StoredPriceListPayload; error?: string }
+      if (!res.ok || !data.payload) {
+        return false
+      }
+      setPayload(data.payload)
+      return true
+    } catch {
+      return false
+    }
+  }, [organizationId, importId])
+
+  useEffect(() => {
+    if (!organizationId || !importId || !activeJobId || !jobPolling) return
+
+    async function pollOnce() {
+      if (!organizationId || !activeJobId) return
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/ai-jobs/${encodeURIComponent(activeJobId)}`,
+          { cache: "no-store" },
+        )
+        const data = (await res.json()) as {
+          job?: {
+            status: string
+            progress_percent?: number
+            current_step?: string | null
+            error_message?: string | null
+          }
+        }
+        if (!res.ok || !data.job) return
+
+        const st = data.job.status
+        const pct =
+          typeof data.job.progress_percent === "number"
+            ? data.job.progress_percent
+            : Number(data.job.progress_percent ?? 0)
+        setJobProgress(Number.isFinite(pct) ? pct : 0)
+        setJobStep(typeof data.job.current_step === "string" ? data.job.current_step : null)
+
+        if (st === "completed") {
+          stopPolling()
+          const ok = await loadImportPayload()
+          if (ok) {
+            const kind = pendingJobKindRef.current
+            toast({
+              title: kind === "reextract" ? "Re-extracted" : "Extracted",
+              description: "Review rows below before saving.",
+            })
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Could not load results",
+              description: "Job finished but the import payload could not be loaded. Refresh the page.",
+            })
+          }
+          return
+        }
+
+        if (st === "failed" || st === "cancelled") {
+          stopPolling()
+          const msg =
+            typeof data.job.error_message === "string" && data.job.error_message.trim()
+              ? data.job.error_message.trim()
+              : st === "cancelled"
+                ? "Extraction was cancelled."
+                : "Extraction failed."
+          setJobError(msg)
+          toast({
+            variant: "destructive",
+            title: st === "cancelled" ? "Cancelled" : "Extraction failed",
+            description: msg,
+          })
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+
+    void pollOnce()
+    pollRef.current = setInterval(() => void pollOnce(), 2500)
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+  }, [organizationId, importId, activeJobId, jobPolling, loadImportPayload, stopPolling, toast])
 
   const updateRow = useCallback((id: string, patch: Partial<ExtractedCatalogRow>) => {
     setPayload((p) => {
@@ -78,6 +219,12 @@ export default function ImportPriceListPage() {
       toast({ variant: "destructive", title: "Choose a PDF", description: "Select a price list file first." })
       return
     }
+    pendingJobKindRef.current = "upload"
+    stopPolling()
+    setJobError(null)
+    setPayload(null)
+    setJobProgress(0)
+    setJobStep(null)
     setUploadBusy(true)
     try {
       const fd = new FormData()
@@ -91,7 +238,7 @@ export default function ImportPriceListPage() {
       const data = (await res.json()) as {
         ok?: boolean
         importId?: string
-        payload?: StoredPriceListPayload
+        jobId?: string
         message?: string
         error?: string
       }
@@ -105,9 +252,19 @@ export default function ImportPriceListPage() {
         return
       }
 
-      setImportId(data.importId ?? null)
-      setPayload(data.payload ?? null)
-      toast({ title: "Extracted", description: "Review rows below before saving." })
+      const newImportId = data.importId ?? null
+      const jobId = data.jobId ?? null
+      setImportId(newImportId)
+      if (newImportId && jobId) {
+        setActiveJobId(jobId)
+        setJobPolling(true)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Unexpected response",
+          description: "Missing job id. Try again.",
+        })
+      }
     } catch {
       toast({ variant: "destructive", title: "Network error", description: "Try again." })
     } finally {
@@ -117,13 +274,23 @@ export default function ImportPriceListPage() {
 
   async function handleReExtract() {
     if (!organizationId || !importId) return
+    pendingJobKindRef.current = "reextract"
+    stopPolling()
+    setJobError(null)
+    setJobProgress(0)
+    setJobStep(null)
     setExtractBusy(true)
     try {
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/price-list-imports/${encodeURIComponent(importId)}/extract`,
         { method: "POST" },
       )
-      const data = (await res.json()) as { ok?: boolean; payload?: StoredPriceListPayload; message?: string; error?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        jobId?: string
+        message?: string
+        error?: string
+      }
       if (!res.ok) {
         toast({
           variant: "destructive",
@@ -132,8 +299,17 @@ export default function ImportPriceListPage() {
         })
         return
       }
-      setPayload(data.payload ?? null)
-      toast({ title: "Re-extracted", description: "Review updated rows." })
+      const jobId = data.jobId ?? null
+      if (jobId) {
+        setActiveJobId(jobId)
+        setJobPolling(true)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Unexpected response",
+          description: "Missing job id.",
+        })
+      }
     } catch {
       toast({ variant: "destructive", title: "Network error" })
     } finally {
@@ -334,6 +510,15 @@ export default function ImportPriceListPage() {
         </div>
       </div>
 
+      {!catalogAiAllowed ? (
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground max-w-xl">
+          AI catalog import is available on Growth and Scale plans.{" "}
+          <Link href="/settings/billing" className="text-primary underline-offset-4 hover:underline">
+            Billing &amp; plans
+          </Link>
+        </div>
+      ) : null}
+
       <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-4 max-w-xl">
         <div>
           <Label htmlFor="mfg">Manufacturer (optional hint)</Label>
@@ -360,7 +545,7 @@ export default function ImportPriceListPage() {
           <Button
             type="button"
             className="gap-2"
-            disabled={uploadBusy || !file}
+            disabled={uploadBusy || !file || !catalogAiAllowed || planAiLoading || jobPolling}
             onClick={() => void handleUploadAndExtract()}
           >
             {uploadBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -370,7 +555,7 @@ export default function ImportPriceListPage() {
             type="button"
             variant="outline"
             className="gap-2"
-            disabled={extractBusy || !importId}
+            disabled={extractBusy || !importId || !catalogAiAllowed || planAiLoading || jobPolling}
             onClick={() => void handleReExtract()}
           >
             {extractBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -378,6 +563,34 @@ export default function ImportPriceListPage() {
           </Button>
         </div>
       </div>
+
+      {jobPolling ? (
+        <div className="rounded-lg border border-border bg-card p-4 max-w-xl space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+            Extracting price list…
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary/80 rounded-full transition-[width] duration-300"
+              style={{ width: `${Math.min(100, Math.max(0, jobProgress))}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {jobStep ?? "Queued…"}
+            {jobProgress > 0 ? ` · ${jobProgress}%` : ""}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            You can leave this page open — extraction runs in the background and updates automatically.
+          </p>
+        </div>
+      ) : null}
+
+      {jobError && !jobPolling ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive max-w-xl">
+          {jobError}
+        </div>
+      ) : null}
 
       {payload?.warnings?.length ? (
         <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">

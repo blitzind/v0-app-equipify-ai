@@ -193,6 +193,15 @@ export async function PATCH(
     return jsonError("invalid_json", "Invalid request body.", 400)
   }
 
+  logWorkspaceDev("PATCH request", {
+    organizationId,
+    keys: Object.keys(body),
+    hasLogoUrl: body.logoUrl !== undefined,
+    hasDocumentLogoUrl: body.documentLogoUrl !== undefined,
+    logoUrlIsNull: body.logoUrl === null,
+    documentLogoUrlIsNull: body.documentLogoUrl === null,
+  })
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -336,32 +345,40 @@ export async function PATCH(
   }
 
   if (body.logoUrl !== undefined) {
-    if (!brandingOk) {
-      return jsonError("plan_branding", "Custom logo is available on Growth and Scale plans.", 403)
-    }
-    if (body.logoUrl === null || body.logoUrl === "") {
-      patch.logo_url = null
+    if (body.logoUrl === "") {
+      logWorkspaceDev("PATCH preserve logo_url (ignored blank string)", { organizationId })
     } else {
-      const url = String(body.logoUrl).trim()
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        return jsonError("invalid_logo_url", "Logo URL must be an http(s) URL.", 400)
+      if (!brandingOk) {
+        return jsonError("plan_branding", "Custom logo is available on Growth and Scale plans.", 403)
       }
-      patch.logo_url = url
+      if (body.logoUrl === null) {
+        patch.logo_url = null
+      } else {
+        const url = String(body.logoUrl).trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          return jsonError("invalid_logo_url", "Logo URL must be an http(s) URL.", 400)
+        }
+        patch.logo_url = url
+      }
     }
   }
 
   if (body.documentLogoUrl !== undefined) {
-    if (!brandingOk) {
-      return jsonError("plan_branding", "Document logo is available on Growth and Scale plans.", 403)
-    }
-    if (body.documentLogoUrl === null || body.documentLogoUrl === "") {
-      patch.document_logo_url = null
+    if (body.documentLogoUrl === "") {
+      logWorkspaceDev("PATCH preserve document_logo_url (ignored blank string)", { organizationId })
     } else {
-      const url = String(body.documentLogoUrl).trim()
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        return jsonError("invalid_document_logo_url", "Document logo URL must be an http(s) URL.", 400)
+      if (!brandingOk) {
+        return jsonError("plan_branding", "Document logo is available on Growth and Scale plans.", 403)
       }
-      patch.document_logo_url = url
+      if (body.documentLogoUrl === null) {
+        patch.document_logo_url = null
+      } else {
+        const url = String(body.documentLogoUrl).trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          return jsonError("invalid_document_logo_url", "Document logo URL must be an http(s) URL.", 400)
+        }
+        patch.document_logo_url = url
+      }
     }
   }
 
@@ -407,7 +424,7 @@ export async function PATCH(
     return jsonError("update_failed", upErr.message, 400)
   }
 
-  if (body.logoUrl !== undefined && (body.logoUrl === null || body.logoUrl === "")) {
+  if (body.logoUrl === null) {
     const prevPath = pathFromOrganizationLogoPublicUrl(
       (orgBefore as { logo_url?: string | null }).logo_url,
     )
@@ -416,10 +433,7 @@ export async function PATCH(
     }
   }
 
-  if (
-    body.documentLogoUrl !== undefined &&
-    (body.documentLogoUrl === null || body.documentLogoUrl === "")
-  ) {
+  if (body.documentLogoUrl === null) {
     const prevPath = pathFromOrganizationLogoPublicUrl(
       (orgBefore as { document_logo_url?: string | null }).document_logo_url,
     )

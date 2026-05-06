@@ -99,6 +99,13 @@ export function TenantWorkspaceSync() {
         }
         const o = wBody.organization
         if (!o || cancelled) return
+        if (process.env.NODE_ENV === "development") {
+          console.error("[tenant-workspace-sync] HYDRATE_ORGANIZATION_PROFILE", {
+            organizationId,
+            logoUrl: o.logoUrl,
+            documentLogoUrl: o.documentLogoUrl,
+          })
+        }
         dispatch({
           type: "HYDRATE_ORGANIZATION_PROFILE",
           payload: {
@@ -130,7 +137,7 @@ export function TenantWorkspaceSync() {
     return () => {
       cancelled = true
     }
-  }, [status, organizationId, organizationSlug, organizationName, workspace.name, dispatch])
+  }, [status, organizationId, organizationSlug, organizationName, dispatch])
 
   return null
 }

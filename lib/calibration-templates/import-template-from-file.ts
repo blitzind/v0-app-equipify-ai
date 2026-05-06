@@ -1,6 +1,6 @@
 /**
  * Client-side certificate template import: POST multipart to /api/certificates/import-template
- * (OpenAI runs only on the server; OPENAI_API_KEY is never exposed to the browser).
+ * (AI runs only on the server; API keys are never exposed to the browser).
  */
 
 import type { CalibrationTemplateField } from "@/lib/calibration-certificates"
@@ -11,6 +11,7 @@ export type ImportDraftResult = {
   fields: CalibrationTemplateField[]
   confidenceMessage: string
   extractionWarnings: string[]
+  aiConfidence: number | null
 }
 
 function parseErrorPayload(body: unknown): string | null {
@@ -58,6 +59,10 @@ export async function runCertificateTemplateImport(file: File): Promise<ImportDr
     throw new Error("Invalid response from import service.")
   }
 
+  const rawConf = (d as { aiConfidence?: unknown }).aiConfidence
+  const aiConfidence =
+    typeof rawConf === "number" && Number.isFinite(rawConf) ? Math.min(1, Math.max(0, rawConf)) : null
+
   return {
     suggestedName: typeof d.suggestedName === "string" ? d.suggestedName : "Imported template",
     equipmentCategoryId: typeof d.equipmentCategoryId === "string" ? d.equipmentCategoryId : "",
@@ -69,5 +74,6 @@ export async function runCertificateTemplateImport(file: File): Promise<ImportDr
     extractionWarnings: Array.isArray(d.extractionWarnings)
       ? d.extractionWarnings.filter((x): x is string => typeof x === "string")
       : [],
+    aiConfidence,
   }
 }

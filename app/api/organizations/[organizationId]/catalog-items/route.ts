@@ -24,7 +24,7 @@ export async function GET(
   const { data, error } = await gate.svc
     .from("catalog_items")
     .select(
-      "id, manufacturer_name, category, item_type, part_number, sku, name, description, list_price, cost, sale_price, unit, status, replacement_part_number, effective_date, notes, confidence_score, source_file_name, created_at",
+      "id, manufacturer_name, category, item_type, part_number, sku, name, description, list_price, cost, sale_price, unit, status, replacement_part_number, effective_date, notes, confidence_score, ai_generated, ai_confidence, human_verified_at, human_verified_by, source_file_name, created_at",
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })

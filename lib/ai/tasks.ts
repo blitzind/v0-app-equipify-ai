@@ -1,10 +1,32 @@
 import type { AiTaskDefinition, AiTaskId } from "@/lib/ai/types"
 
-/** Central registry — router resolves models from here (never scatter literals in features). */
+/**
+ * Central registry — router resolves models from here (never scatter literals in features).
+ * TODO(ai-prompts): Add `promptId` + `AI_PROMPT_REGISTRY` rows for remaining tasks when their prompts stabilize.
+ */
 export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
+  insights_generation: {
+    id: "insights_generation",
+    label: "Operational AI insights",
+    promptId: "equipify.insights.operational_snapshot",
+    requiredPlan: "core",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.35,
+    maxOutputTokens: 8192,
+    structuredMode: "json_object",
+    timeoutMs: 120_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+  },
   catalog_extraction: {
     id: "catalog_extraction",
     label: "Catalog / price list extraction",
+    promptId: "equipify.catalog.price_list_extraction",
+    requiredPlan: "growth",
     costTier: "medium",
     modelTier: "balanced",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -16,10 +38,13 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 180_000,
     maxRetries: 2,
     confidenceThreshold: 0.65,
+    cacheable: true,
+    cacheTtlSeconds: 604800,
   },
   work_order_summary: {
     id: "work_order_summary",
     label: "Work order summarization",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -31,10 +56,13 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 60_000,
     maxRetries: 2,
     confidenceThreshold: null,
+    cacheable: true,
+    cacheTtlSeconds: 86400,
   },
   dispatch_recommendation: {
     id: "dispatch_recommendation",
     label: "Dispatch recommendation",
+    requiredPlan: "core",
     costTier: "medium",
     modelTier: "balanced",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -50,6 +78,7 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   quote_generation: {
     id: "quote_generation",
     label: "Quote draft generation",
+    requiredPlan: "core",
     costTier: "medium",
     modelTier: "balanced",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -65,6 +94,7 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   invoice_summary: {
     id: "invoice_summary",
     label: "Invoice summary",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -80,6 +110,8 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   certificate_cleanup: {
     id: "certificate_cleanup",
     label: "Certificate / calibration cleanup",
+    promptId: "equipify.certificate.template_extraction",
+    requiredPlan: "growth",
     costTier: "medium",
     modelTier: "balanced",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -91,10 +123,13 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 120_000,
     maxRetries: 2,
     confidenceThreshold: 0.75,
+    cacheable: true,
+    cacheTtlSeconds: 604800,
   },
   maintenance_prediction: {
     id: "maintenance_prediction",
     label: "Maintenance prediction",
+    requiredPlan: "scale",
     costTier: "medium",
     modelTier: "reasoning",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -110,6 +145,8 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   customer_email: {
     id: "customer_email",
     label: "Customer-facing email drafting",
+    promptId: "equipify.email.customer_followup_draft",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -125,6 +162,7 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   workflow_builder: {
     id: "workflow_builder",
     label: "Workflow builder assistance",
+    requiredPlan: "growth",
     costTier: "high",
     modelTier: "reasoning",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -140,6 +178,7 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   scheduling_assistant: {
     id: "scheduling_assistant",
     label: "Scheduling assistant",
+    requiredPlan: "core",
     costTier: "medium",
     modelTier: "balanced",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -155,6 +194,8 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   OCR_cleanup: {
     id: "OCR_cleanup",
     label: "OCR cleanup / normalization",
+    promptId: "equipify.ocr.plaintext_cleanup",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -166,10 +207,13 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 90_000,
     maxRetries: 2,
     confidenceThreshold: null,
+    cacheable: true,
+    cacheTtlSeconds: 604800,
   },
   classification: {
     id: "classification",
     label: "Classification",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -181,10 +225,13 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 45_000,
     maxRetries: 2,
     confidenceThreshold: 0.85,
+    cacheable: true,
+    cacheTtlSeconds: 86400,
   },
   tagging: {
     id: "tagging",
     label: "Tagging / labeling",
+    requiredPlan: "core",
     costTier: "low",
     modelTier: "fast",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -196,11 +243,23 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     timeoutMs: 45_000,
     maxRetries: 2,
     confidenceThreshold: 0.8,
+    cacheable: true,
+    cacheTtlSeconds: 86400,
   },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {
   const def = AI_TASK_REGISTRY[id]
   if (!def) throw new Error(`Unknown AI task: ${id}`)
-  return def
+  return {
+    ...def,
+    cacheable: def.cacheable ?? false,
+    allowResponseCaching: def.allowResponseCaching ?? false,
+    cacheTtlSeconds: def.cacheTtlSeconds ?? null,
+    requiredPlan: def.requiredPlan ?? "solo",
+    enabledPlans: def.enabledPlans,
+    monthlyRequestLimit: def.monthlyRequestLimit ?? null,
+    monthlyCostLimitCents: def.monthlyCostLimitCents ?? null,
+    promptId: def.promptId,
+  }
 }

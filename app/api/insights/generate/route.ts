@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
   try {
     const context = await gatherOrgInsightsContext(supabase, organizationId)
-    const ai = await generateOperationalInsightsWithOpenAI(context)
+    const ai = await generateOperationalInsightsWithOpenAI(context, organizationId)
     return NextResponse.json({
       ok: true,
       generatedAt: context.generatedAtIso,

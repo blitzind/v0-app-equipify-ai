@@ -28,6 +28,12 @@ function logDocLogoRoute(context: string, payload: Record<string, unknown>) {
   console.error(`[workspace/document-logo] ${context}`, payload)
 }
 
+function devDocLogo(context: string, payload: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "development") {
+    console.error(`[workspace/document-logo] ${context}`, payload)
+  }
+}
+
 function planAllowsBranding(planId: PlanId): boolean {
   return planId === "growth" || planId === "scale"
 }
@@ -199,6 +205,14 @@ export async function POST(
       })
     }
   }
+
+  devDocLogo("upload_complete", {
+    organizationId,
+    userId: user.id,
+    storagePath: path,
+    documentLogoUrl: publicUrl,
+    dbRowId: (updatedOrg as { id?: string }).id,
+  })
 
   return NextResponse.json({ ok: true, documentLogoUrl: publicUrl })
 }

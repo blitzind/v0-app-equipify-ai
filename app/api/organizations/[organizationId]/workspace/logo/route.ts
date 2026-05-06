@@ -23,6 +23,16 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ error: code, message }, { status })
 }
 
+function logLogoRoute(context: string, payload: Record<string, unknown>) {
+  console.error(`[workspace/logo] ${context}`, payload)
+}
+
+function devLogo(context: string, payload: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "development") {
+    console.error(`[workspace/logo] ${context}`, payload)
+  }
+}
+
 function planAllowsBranding(planId: PlanId): boolean {
   return planId === "growth" || planId === "scale"
 }
@@ -191,6 +201,14 @@ export async function POST(
       logLogoRoute("remove_previous_logo_failed", { organizationId, path: prevPath, message: rmErr.message })
     }
   }
+
+  devLogo("upload_complete", {
+    organizationId,
+    userId: user.id,
+    storagePath: path,
+    logoUrl: publicUrl,
+    dbRowId: (updatedOrg as { id?: string }).id,
+  })
 
   return NextResponse.json({ ok: true, logoUrl: publicUrl })
 }

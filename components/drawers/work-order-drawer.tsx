@@ -355,6 +355,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setWarrantyVendorOptions(((vendorRows ?? []) as Array<{ id: string; name: string }>).filter((v) => v.name?.trim()))
 
     const res = await loadWorkOrderDetailForOrg(supabase, orgId, workOrderId)
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[work-order-drawer] detail load", {
+        workOrderId,
+        organizationId: orgId,
+        orgStatus,
+        ok: res.ok,
+        ...(res.ok ? {} : { notFound: res.notFound, message: "message" in res ? res.message : undefined }),
+      })
+    }
     if (!res.ok) {
       setWo(null)
       setLoading(false)

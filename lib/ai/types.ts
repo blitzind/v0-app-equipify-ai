@@ -1,8 +1,10 @@
 import type { z } from "zod"
+import type { PlanId } from "@/lib/plans"
 
 /** Registered router tasks — extend `tasks.ts` when adding capabilities. */
 export type AiTaskId =
   | "catalog_extraction"
+  | "insights_generation"
   | "work_order_summary"
   | "dispatch_recommendation"
   | "quote_generation"
@@ -71,6 +73,28 @@ export type AiTaskDefinition = {
   maxRetries: number
   /** When structured JSON includes a numeric confidence, escalate if below this. */
   confidenceThreshold: number | null
+  /** When true, identical normalized inputs may return cached results (see router + TTL). */
+  cacheable?: boolean
+  /**
+   * Privacy guard: response payload caching is allowed only for explicitly safe tasks.
+   * Defaults to false when omitted.
+   */
+  allowResponseCaching?: boolean
+  /** TTL for cached rows; null = no expiry. */
+  cacheTtlSeconds?: number | null
+  /** Minimum subscription tier that may invoke this task (see `lib/ai/plan-ai-config.ts`). */
+  requiredPlan?: PlanId
+  /** When set, only these exact plans may invoke (overrides tier ladder with explicit allowlist). */
+  enabledPlans?: PlanId[]
+  /** Max logged AI rows per calendar month for this task (org-scoped); null = unlimited. */
+  monthlyRequestLimit?: number | null
+  /** Max estimated spend (cents USD) MTD for this task; null = unlimited. */
+  monthlyCostLimitCents?: number | null
+  /**
+   * When set, prompts load from `lib/ai/prompts` via `getPromptForTask(id)`.
+   * Version/schema come from the registry row, not this object.
+   */
+  promptId?: string
 }
 
 export type EscalationReason =
@@ -80,6 +104,10 @@ export type EscalationReason =
   | "schema_rejected"
   | "low_confidence"
   | "caller_rejected"
+  /** Monthly org AI budget exceeded (block mode). */
+  | "budget_exceeded"
+  /** Subscription plan does not include this task or plan limits exceeded. */
+  | "plan_blocked"
 
 export type AiUsageTotals = {
   promptTokens: number
@@ -95,6 +123,8 @@ export type AiRunMeta = {
   escalationReasons: EscalationReason[]
   attempts: number
   durationMs: number
+  /** Result served from ai_cache without calling the provider. */
+  cacheHit?: boolean
 }
 
 export type AiTaskSuccess<T> = {
@@ -129,6 +159,18 @@ export type RunAiTaskOptions<T = string> = {
   taskOverrides?: Partial<AiTaskDefinition>
   /** Skip persistence (tests / scripts). */
   skipUsageLog?: boolean
+  /** Skip organization monthly budget enforcement (non–org-scoped / platform flows). */
+  skipBudgetCheck?: boolean
+  /** Skip subscription plan / per-task limit checks (tests / platform overrides). */
+  skipPlanGateCheck?: boolean
+  /** Skip ai_cache lookup/write (debug / emergency). */
+  skipCache?: boolean
+  /** Stable extras folded into input hash (e.g. file_sha256 for extraction-aligned tasks). */
+  cacheKeyExtras?: Record<string, string>
+  /** Bump when the Zod schema or prompt contract changes for the same task id. */
+  cacheSchemaVersion?: string
+  /** Pin a registry prompt `version` (defaults to active). */
+  promptVersionOverride?: number
 }
 
 /** Unified provider completion contract — implemented per vendor in `providers/`. */

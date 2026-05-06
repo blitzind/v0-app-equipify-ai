@@ -2,9 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Package, Upload, Loader2 } from "lucide-react"
+import { Loader2, MoreHorizontal, Package, Upload } from "lucide-react"
+import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -13,6 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useToast } from "@/hooks/use-toast"
+
+const CATALOG_MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
 type CatalogRow = {
   id: string
@@ -26,15 +38,58 @@ type CatalogRow = {
   unit: string
   status: string
   confidence_score: number | null
+  ai_generated: boolean | null
+  ai_confidence: number | null
+  human_verified_at: string | null
   source_file_name: string | null
   created_at: string
 }
 
+function CatalogAiIndicator({ row }: { row: CatalogRow }) {
+  const st = getCatalogAiStatusLabel({
+    ai_generated: Boolean(row.ai_generated),
+    ai_confidence: row.ai_confidence,
+    confidence_score: row.confidence_score,
+    human_verified_at: row.human_verified_at,
+  })
+  if (!st) {
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+  if (st === "verified") {
+    return (
+      <Badge
+        variant="outline"
+        className="text-[10px] font-medium px-1.5 py-0 h-5 text-emerald-800/90 border-emerald-500/30 bg-emerald-500/5"
+      >
+        Verified
+      </Badge>
+    )
+  }
+  if (st === "needs_review") {
+    return (
+      <Badge
+        variant="outline"
+        className="text-[10px] font-medium px-1.5 py-0 h-5 text-amber-900/80 border-amber-500/35 bg-amber-500/5"
+      >
+        Needs review
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 h-5 text-muted-foreground">
+      AI
+    </Badge>
+  )
+}
+
 export default function CatalogPage() {
+  const { toast } = useToast()
   const { organizationId, status } = useActiveOrganization()
   const [items, setItems] = useState<CatalogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [canManageCatalog, setCanManageCatalog] = useState(false)
+  const [verifyingId, setVerifyingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready") {
@@ -66,6 +121,70 @@ export default function CatalogPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!organizationId || status !== "ready") {
+      setCanManageCatalog(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user?.id || cancelled) return
+      const { data: mem } = await supabase
+        .from("organization_members")
+        .select("role")
+        .eq("organization_id", organizationId)
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle()
+      if (!cancelled) {
+        setCanManageCatalog(CATALOG_MANAGER_ROLES.has((mem?.role as string) ?? ""))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, status])
+
+  const patchVerification = useCallback(
+    async (itemId: string, action: "verify" | "needs_review") => {
+      if (!organizationId) return
+      setVerifyingId(itemId)
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/catalog-items/${encodeURIComponent(itemId)}/verification`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          },
+        )
+        const body = (await res.json()) as { message?: string; error?: string }
+        if (!res.ok) {
+          toast({
+            variant: "destructive",
+            title: "Update failed",
+            description: body.message ?? body.error ?? `HTTP ${res.status}`,
+          })
+          return
+        }
+        await load()
+        toast({
+          title: action === "verify" ? "Marked verified" : "Flagged for review",
+          description: "Catalog item updated.",
+        })
+      } catch {
+        toast({ variant: "destructive", title: "Network error" })
+      } finally {
+        setVerifyingId(null)
+      }
+    },
+    [organizationId, load, toast],
+  )
 
   if (status === "loading") {
     return (
@@ -128,7 +247,9 @@ export default function CatalogPage() {
                 <TableHead className="text-right">List</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="whitespace-nowrap">Review</TableHead>
                 <TableHead>Source</TableHead>
+                {canManageCatalog ? <TableHead className="w-[44px] pr-2" /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -150,9 +271,42 @@ export default function CatalogPage() {
                     {r.cost != null ? `$${Number(r.cost).toFixed(2)}` : "—"}
                   </TableCell>
                   <TableCell className="text-xs capitalize">{r.status}</TableCell>
+                  <TableCell className="align-middle">
+                    <CatalogAiIndicator row={r} />
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
                     {r.source_file_name ?? "—"}
                   </TableCell>
+                  {canManageCatalog ? (
+                    <TableCell className="pr-2 text-right align-middle">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
+                            disabled={verifyingId === r.id}
+                            aria-label="Row actions"
+                          >
+                            {verifyingId === r.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => void patchVerification(r.id, "verify")}>
+                            Mark verified
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void patchVerification(r.id, "needs_review")}>
+                            Mark needs review
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>

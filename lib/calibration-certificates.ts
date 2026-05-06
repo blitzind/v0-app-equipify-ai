@@ -32,6 +32,10 @@ export type CalibrationTemplate = {
   equipmentCategoryId: string | null
   fields: CalibrationTemplateField[]
   isArchived: boolean
+  /** From AI certificate import when true. */
+  aiGenerated: boolean
+  aiConfidence: number | null
+  humanVerifiedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -56,6 +60,10 @@ type CalibrationTemplateRow = {
   equipment_category_id: string | null
   fields: unknown
   archived_at: string | null
+  ai_generated?: boolean | null
+  ai_confidence?: number | null
+  human_verified_at?: string | null
+  human_verified_by?: string | null
   created_at: string
   updated_at: string
 }
@@ -156,7 +164,9 @@ export function normalizeTemplateFields(raw: unknown): CalibrationTemplateField[
     .filter((x): x is CalibrationTemplateField => Boolean(x))
 }
 
-function mapTemplateRow(row: CalibrationTemplateRow): CalibrationTemplate {
+export function mapTemplateRow(row: CalibrationTemplateRow): CalibrationTemplate {
+  const aiConf =
+    typeof row.ai_confidence === "number" && Number.isFinite(row.ai_confidence) ? row.ai_confidence : null
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -164,6 +174,9 @@ function mapTemplateRow(row: CalibrationTemplateRow): CalibrationTemplate {
     equipmentCategoryId: row.equipment_category_id,
     fields: normalizeTemplateFields(row.fields),
     isArchived: rowIsArchived(row.archived_at),
+    aiGenerated: Boolean(row.ai_generated),
+    aiConfidence: aiConf,
+    humanVerifiedAt: row.human_verified_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -188,7 +201,9 @@ export async function listCalibrationTemplates(
 ): Promise<CalibrationTemplate[]> {
   let q = supabase
     .from("calibration_templates")
-    .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
+    .select(
+      "id, organization_id, name, equipment_category_id, fields, archived_at, ai_generated, ai_confidence, human_verified_at, human_verified_by, created_at, updated_at",
+    )
     .eq("organization_id", organizationId)
     .order("name", { ascending: true })
   q = applyArchivedAtScope(q, visibility)
@@ -221,7 +236,9 @@ export async function upsertCalibrationTemplate(
       .update(row)
       .eq("id", payload.id)
       .eq("organization_id", organizationId)
-      .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
+      .select(
+        "id, organization_id, name, equipment_category_id, fields, archived_at, ai_generated, ai_confidence, human_verified_at, human_verified_by, created_at, updated_at",
+      )
       .single()
     if (error) throw new Error(error.message)
     return mapTemplateRow(data as CalibrationTemplateRow)
@@ -230,7 +247,9 @@ export async function upsertCalibrationTemplate(
   const { data, error } = await supabase
     .from("calibration_templates")
     .insert(row)
-    .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
+    .select(
+      "id, organization_id, name, equipment_category_id, fields, archived_at, ai_generated, ai_confidence, human_verified_at, human_verified_by, created_at, updated_at",
+    )
     .single()
   if (error) throw new Error(error.message)
   return mapTemplateRow(data as CalibrationTemplateRow)
@@ -450,7 +469,9 @@ export async function listCompletedCertificatesForOrg(
     fetchWorkOrdersForCertificateList(supabase, organizationId, woIds),
     supabase
       .from("calibration_templates")
-      .select("id, organization_id, name, equipment_category_id, fields, archived_at, created_at, updated_at")
+      .select(
+        "id, organization_id, name, equipment_category_id, fields, archived_at, ai_generated, ai_confidence, human_verified_at, human_verified_by, created_at, updated_at",
+      )
       .eq("organization_id", organizationId)
       .in("id", templateIds),
   ])

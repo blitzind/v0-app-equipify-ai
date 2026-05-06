@@ -11,7 +11,7 @@ import {
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
-import { WO_DETAIL_SELECT, WO_DETAIL_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import { buildWorkOrderDetailSelect } from "@/lib/work-orders/supabase-select"
 import {
   fetchWorkOrderTasks,
   fetchWorkOrderLineItems,
@@ -304,6 +304,21 @@ async function fetchWorkOrderEquipmentAssets(
   })
 }
 
+/** WO-42 or pure digits → numeric work_order_number when migration present. */
+function parseWorkOrderNumberLookup(raw: string): number | null {
+  const t = raw.trim()
+  if (/^\d+$/.test(t)) {
+    const n = parseInt(t, 10)
+    return Number.isFinite(n) ? n : null
+  }
+  const m = /^wo-?(\d+)$/i.exec(t)
+  if (m) {
+    const n = parseInt(m[1], 10)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 export async function loadWorkOrderDetailForOrg(
   supabase: SupabaseClient,
   organizationId: string,
@@ -312,27 +327,67 @@ export async function loadWorkOrderDetailForOrg(
   | { ok: true; data: LoadedWorkOrderDetail }
   | { ok: false; notFound?: boolean; message?: string }
 > {
-  let woRes = await supabase
-    .from("work_orders")
-    .select(WO_DETAIL_SELECT_WITH_NUM)
-    .eq("id", workOrderId)
-    .eq("organization_id", organizationId)
-    .maybeSingle()
+  const trimmed = workOrderId.trim()
 
-  if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-    woRes = await supabase
-      .from("work_orders")
-      .select(WO_DETAIL_SELECT)
-      .eq("id", workOrderId)
-      .eq("organization_id", organizationId)
-      .maybeSingle()
+  async function selectWorkOrderRow(filter: {
+    by: "id" | "work_order_number"
+    value: string | number
+  }) {
+    async function runQuery(includeNum: boolean, includeTech: boolean) {
+      let q = supabase
+        .from("work_orders")
+        .select(
+          buildWorkOrderDetailSelect({
+            includeWorkOrderNumber: includeNum,
+            includeAssignedTechnician: includeTech,
+          }),
+        )
+        .eq("organization_id", organizationId)
+      q =
+        filter.by === "id"
+          ? q.eq("id", filter.value as string)
+          : q.eq("work_order_number", filter.value as number)
+      return q.maybeSingle()
+    }
+
+    let includeNum = true
+    let includeTech = true
+    let woRes = await runQuery(includeNum, includeTech)
+
+    for (;;) {
+      const err = woRes.error
+      if (!err) break
+      if (missingWorkOrderNumberColumn(err) && includeNum) {
+        includeNum = false
+        woRes = await runQuery(includeNum, includeTech)
+        continue
+      }
+      if (missingAssignedTechnicianColumn(err) && includeTech) {
+        includeTech = false
+        woRes = await runQuery(includeNum, includeTech)
+        continue
+      }
+      break
+    }
+
+    return woRes
+  }
+
+  let woRes = await selectWorkOrderRow({ by: "id", value: trimmed })
+
+  if (!woRes.error && !woRes.data) {
+    const n = parseWorkOrderNumberLookup(trimmed)
+    if (n != null) {
+      woRes = await selectWorkOrderRow({ by: "work_order_number", value: n })
+    }
   }
 
   const { data: row, error } = woRes
   if (error) return { ok: false, message: error.message }
   if (!row) return { ok: false, notFound: true }
 
-  const w = row as WoRow
+  const w = row as unknown as WoRow
+  const resolvedWorkOrderId = w.id
 
   const techIdCol = w.assigned_technician_id ?? null
 
@@ -379,7 +434,11 @@ export async function loadWorkOrderDetailForOrg(
       .eq("organization_id", organizationId)
       .maybeSingle()
     if (!tRes.error && tRes.data) {
-      techAssignRow = tRes.data as typeof techAssignRow
+      techAssignRow = tRes.data as {
+        full_name: string | null
+        email: string | null
+        avatar_url: string | null
+      }
     }
   }
 
@@ -439,9 +498,9 @@ export async function loadWorkOrderDetailForOrg(
   }
 
   const [dbTasks, dbLineItems, dbAttachments] = await Promise.all([
-    safeLoadTabs(() => fetchWorkOrderTasks(supabase, organizationId, workOrderId), []),
-    safeLoadTabs(() => fetchWorkOrderLineItems(supabase, organizationId, workOrderId), []),
-    safeLoadTabs(() => fetchWorkOrderAttachments(supabase, organizationId, workOrderId), []),
+    safeLoadTabs(() => fetchWorkOrderTasks(supabase, organizationId, resolvedWorkOrderId), []),
+    safeLoadTabs(() => fetchWorkOrderLineItems(supabase, organizationId, resolvedWorkOrderId), []),
+    safeLoadTabs(() => fetchWorkOrderAttachments(supabase, organizationId, resolvedWorkOrderId), []),
   ])
 
   const parsedBase = parseRepairLog(w.repair_log)
@@ -527,7 +586,7 @@ export async function loadWorkOrderDetailForOrg(
     warrantyVendorName = (vendorRow as { name?: string } | null)?.name?.trim() || null
   }
 
-  const equipmentAssets = await fetchWorkOrderEquipmentAssets(supabase, organizationId, workOrderId, {
+  const equipmentAssets = await fetchWorkOrderEquipmentAssets(supabase, organizationId, resolvedWorkOrderId, {
     equipmentId: w.equipment_id,
     typeDb: w.type,
     priorityDb: w.priority,

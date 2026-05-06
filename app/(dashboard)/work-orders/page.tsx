@@ -1,6 +1,15 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react"
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  Suspense,
+} from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -290,7 +299,18 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
 
 const KANBAN_LANE_GAP_PX = 16 // tailwind gap-4
 
-function KanbanView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (id: string) => void }) {
+type KanbanViewHandle = {
+  scrollLanes: (dir: "left" | "right") => void
+}
+
+const KanbanView = forwardRef<
+  KanbanViewHandle,
+  {
+    workOrders: WorkOrder[]
+    onOpen: (id: string) => void
+    onLaneScrollCapabilities?: (s: { canScroll: boolean; showLeft: boolean; showRight: boolean }) => void
+  }
+>(function KanbanView({ workOrders, onOpen, onLaneScrollCapabilities }, ref) {
   const columns = useMemo(
     () =>
       KANBAN_COLUMNS.map((status) => ({
@@ -360,45 +380,20 @@ function KanbanView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (
     [laneScrollStepPx, updateHScroll],
   )
 
-  const arrowBtnClass =
-    "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent hover:text-foreground dark:bg-background/90"
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollLanes: (dir: "left" | "right") => scrollKanban(dir),
+    }),
+    [scrollKanban],
+  )
+
+  useEffect(() => {
+    onLaneScrollCapabilities?.(hScroll)
+  }, [hScroll, onLaneScrollCapabilities])
 
   return (
     <div className="relative min-w-0">
-      {hScroll.canScroll && hScroll.showLeft && (
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-10 bg-gradient-to-r from-background via-background/85 to-transparent sm:w-14"
-          aria-hidden
-        />
-      )}
-      {hScroll.canScroll && hScroll.showRight && (
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-10 bg-gradient-to-l from-background via-background/85 to-transparent sm:w-14"
-          aria-hidden
-        />
-      )}
-
-      {hScroll.canScroll && hScroll.showLeft && (
-        <button
-          type="button"
-          aria-label="Scroll kanban left"
-          className={cn(arrowBtnClass, "left-0 sm:-left-1")}
-          onClick={() => scrollKanban("left")}
-        >
-          <ChevronLeft className="h-5 w-5" aria-hidden />
-        </button>
-      )}
-      {hScroll.canScroll && hScroll.showRight && (
-        <button
-          type="button"
-          aria-label="Scroll kanban right"
-          className={cn(arrowBtnClass, "right-0 sm:-right-1")}
-          onClick={() => scrollKanban("right")}
-        >
-          <ChevronRight className="h-5 w-5" aria-hidden />
-        </button>
-      )}
-
       <div
         ref={scrollRef}
         onScroll={updateHScroll}
@@ -428,7 +423,7 @@ function KanbanView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (
       </div>
     </div>
   )
-}
+})
 
 // ─── Table view ───────────────────────────────────────────────────────────────
 
@@ -914,6 +909,12 @@ function WorkOrdersPageInner() {
   const [techFilter, setTechFilter] = useState<string>("all")
   const [sortKey, setSortKey] = useState<SortKey>("scheduledDate")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const kanbanRef = useRef<KanbanViewHandle>(null)
+  const [kanbanLaneScroll, setKanbanLaneScroll] = useState({
+    canScroll: false,
+    showLeft: false,
+    showRight: false,
+  })
   const [createOpen, setCreateOpen] = useState(false)
   const [createModalCustomerId, setCreateModalCustomerId] = useState<string | null>(null)
   const [createModalEquipmentId, setCreateModalEquipmentId] = useState<string | null>(null)
@@ -1122,6 +1123,33 @@ function WorkOrdersPageInner() {
                 <SelectItem value="all">All</SelectItem>
               </SelectContent>
             </Select>
+
+            {view === "kanban" && kanbanLaneScroll.canScroll ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  disabled={!kanbanLaneScroll.showLeft}
+                  aria-label="Scroll kanban lanes left"
+                  onClick={() => kanbanRef.current?.scrollLanes("left")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  disabled={!kanbanLaneScroll.showRight}
+                  aria-label="Scroll kanban lanes right"
+                  onClick={() => kanbanRef.current?.scrollLanes("right")}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -1176,7 +1204,14 @@ function WorkOrdersPageInner() {
           view === "kanban" ? "overflow-x-visible overflow-y-visible pb-1" : "overflow-y-auto",
         )}
       >
-        {view === "kanban" && <KanbanView workOrders={filtered} onOpen={setSelectedWoId} />}
+        {view === "kanban" && (
+          <KanbanView
+            ref={kanbanRef}
+            workOrders={filtered}
+            onOpen={setSelectedWoId}
+            onLaneScrollCapabilities={setKanbanLaneScroll}
+          />
+        )}
         {view === "table" && (
           <TableView
             workOrders={filtered}

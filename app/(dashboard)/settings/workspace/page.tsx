@@ -25,6 +25,11 @@ function apiErrorDescription(body: { error?: string; message?: string } | null |
   return parts.length ? parts.join(": ") : fallback
 }
 
+function withLogoPreviewBust(url: string, nonce: number) {
+  if (!url.trim() || nonce < 1) return url
+  return `${url}${url.includes("?") ? "&" : "?"}v=${nonce}`
+}
+
 function SettingCard({
   title,
   description,
@@ -95,6 +100,8 @@ export default function WorkspacePage() {
   })
   const [logoUrl, setLogoUrl] = useState("")
   const [documentLogoUrl, setDocumentLogoUrl] = useState("")
+  const [logoPreviewNonce, setLogoPreviewNonce] = useState(0)
+  const [docLogoPreviewNonce, setDocLogoPreviewNonce] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const documentFileRef = useRef<HTMLInputElement>(null)
 
@@ -157,6 +164,13 @@ export default function WorkspacePage() {
         planId?: PlanId
       }
       if (!res.ok || !data.organization) return false
+      if (process.env.NODE_ENV === "development") {
+        console.error("[workspace settings] GET workspace (refetch)", {
+          organizationId,
+          logoUrl: data.organization.logoUrl,
+          documentLogoUrl: data.organization.documentLogoUrl,
+        })
+      }
       setBrandingAllowed(Boolean(data.brandingAllowed))
       setCanEdit(Boolean(data.canEdit))
       setPlanId(data.planId ?? "solo")
@@ -306,6 +320,9 @@ export default function WorkspacePage() {
       if (brandingAllowed) {
         body.primaryColor = form.primaryColor.trim()
       }
+      if (process.env.NODE_ENV === "development") {
+        console.error("[workspace settings] PATCH workspace body", { organizationId, body })
+      }
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -362,6 +379,14 @@ export default function WorkspacePage() {
         credentials: "same-origin",
       })
       const data = (await res.json()) as { ok?: boolean; logoUrl?: string; message?: string; error?: string }
+      if (process.env.NODE_ENV === "development") {
+        console.error("[workspace settings] POST /workspace/logo response", {
+          organizationId,
+          ok: res.ok,
+          status: res.status,
+          data,
+        })
+      }
       if (!res.ok) {
         toast({
           variant: "destructive",
@@ -372,10 +397,11 @@ export default function WorkspacePage() {
       }
       if (data.logoUrl) {
         setLogoUrl(data.logoUrl)
+        setLogoPreviewNonce((n) => n + 1)
         dispatch({ type: "SET_LOGO", payload: data.logoUrl })
       }
       await refetchWorkspace()
-      toast({ title: "Logo updated" })
+      toast({ title: "Logo updated", description: "Your app branding logo was saved." })
     } catch {
       toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
     } finally {
@@ -401,6 +427,14 @@ export default function WorkspacePage() {
         message?: string
         error?: string
       }
+      if (process.env.NODE_ENV === "development") {
+        console.error("[workspace settings] POST /workspace/document-logo response", {
+          organizationId,
+          ok: res.ok,
+          status: res.status,
+          data,
+        })
+      }
       if (!res.ok) {
         toast({
           variant: "destructive",
@@ -411,10 +445,11 @@ export default function WorkspacePage() {
       }
       if (data.documentLogoUrl) {
         setDocumentLogoUrl(data.documentLogoUrl)
+        setDocLogoPreviewNonce((n) => n + 1)
         dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
       }
       await refetchWorkspace()
-      toast({ title: "Document logo updated" })
+      toast({ title: "Document logo updated", description: "Saved for PDFs and documents." })
     } catch {
       toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
     } finally {
@@ -713,7 +748,11 @@ export default function WorkspacePage() {
                   {uploadingLogo ? (
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   ) : logoUrl ? (
-                    <img src={logoUrl} alt="App branding logo" className="w-full h-full object-contain p-1" />
+                    <img
+                      src={withLogoPreviewBust(logoUrl, logoPreviewNonce)}
+                      alt="App branding logo"
+                      className="w-full h-full object-contain p-1"
+                    />
                   ) : (
                     <Upload size={20} className="text-muted-foreground" />
                   )}
@@ -773,7 +812,7 @@ export default function WorkspacePage() {
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   ) : documentLogoUrl ? (
                     <img
-                      src={documentLogoUrl}
+                      src={withLogoPreviewBust(documentLogoUrl, docLogoPreviewNonce)}
                       alt="Document logo preview"
                       className="max-w-full max-h-full object-contain"
                     />
@@ -860,7 +899,11 @@ export default function WorkspacePage() {
                     style={{ background: form.primaryColor }}
                   >
                     {logoUrl ? (
-                      <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={withLogoPreviewBust(logoUrl, logoPreviewNonce)}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       (form.name.trim()[0] ?? "?").toUpperCase()
                     )}

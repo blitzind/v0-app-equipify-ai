@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { PRICE_LIST_IMPORTS_BUCKET } from "@/lib/catalog/constants"
-import { extractPriceListPayloadFromPdf, PriceListExtractConfigError } from "@/lib/catalog/extract-price-list-from-pdf"
+import { insertQueuedAiJob } from "@/lib/ai/jobs/create-ai-job"
+import {
+  failAiJob,
+  runPriceListImportExtractionJob,
+  sanitizeAiJobError,
+} from "@/lib/ai/jobs/process-ai-job"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -103,50 +109,65 @@ export async function POST(
     .update({ file_url: storagePath, updated_at: new Date().toISOString() })
     .eq("id", importId)
 
-  try {
-    const payload = await extractPriceListPayloadFromPdf({
-      buffer,
-      fileName: file.name || "price-list.pdf",
-    })
-
-    const mergedMfg = payload.manufacturerName ?? manufacturerName
-    payload.manufacturerName = mergedMfg ?? null
-
-    await svc
-      .from("price_list_imports")
-      .update({
-        extracted_json: payload as unknown as Record<string, unknown>,
-        manufacturer_name: mergedMfg ?? manufacturerName,
-        status: "needs_review",
-        error_message: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", importId)
-
-    return NextResponse.json({
-      ok: true,
+  const jobInsert = await insertQueuedAiJob(svc, {
+    organization_id: organizationId,
+    created_by: userId,
+    task: "catalog_extraction",
+    input_json: {
+      kind: "price_list_import_upload",
       importId,
-      payload,
-    })
-  } catch (e) {
-    const msg =
-      e instanceof PriceListExtractConfigError
-        ? e.message
-        : e instanceof Error
-          ? e.message
-          : "Extraction failed."
-    await svc
-      .from("price_list_imports")
-      .update({
-        status: "failed",
-        error_message: msg,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", importId)
+      storagePath,
+      fileName: file.name || "price-list.pdf",
+      manufacturerName,
+      vendorId,
+    },
+    source_type: "price_list_import",
+    source_id: importId,
+  })
 
-    if (e instanceof PriceListExtractConfigError) {
-      return NextResponse.json({ error: "not_configured", message: msg }, { status: 503 })
-    }
-    return NextResponse.json({ error: "extract_failed", message: msg }, { status: 422 })
+  if ("error" in jobInsert) {
+    await svc.from("price_list_imports").delete().eq("id", importId)
+    await svc.storage.from(PRICE_LIST_IMPORTS_BUCKET).remove([storagePath])
+    return NextResponse.json({ error: "job_create_failed", message: jobInsert.error }, { status: 500 })
   }
+
+  const jobId = jobInsert.jobId
+
+  after(async () => {
+    let sr
+    try {
+      sr = createServiceRoleSupabaseClient()
+    } catch {
+      return
+    }
+    try {
+      await runPriceListImportExtractionJob({
+        svc: sr,
+        organizationId,
+        jobId,
+      })
+    } catch (e) {
+      console.error("[ai_jobs] catalog upload extraction:", e)
+      const msg = sanitizeAiJobError(e)
+      try {
+        await failAiJob(sr, jobId, msg)
+        await sr
+          .from("price_list_imports")
+          .update({
+            status: "failed",
+            error_message: msg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", importId)
+      } catch (inner) {
+        console.error("[ai_jobs] catalog upload cleanup:", inner)
+      }
+    }
+  })
+
+  return NextResponse.json({
+    ok: true,
+    importId,
+    jobId,
+  })
 }

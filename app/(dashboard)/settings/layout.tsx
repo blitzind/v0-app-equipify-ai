@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   User, Building2, Users, CreditCard, Bell,
-  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload,
+  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload, Sparkles,
 } from "lucide-react"
 import {
   NAV_ICON_INACTIVE_CARD,
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { label: "Team",            href: "/settings/team",            icon: Users },
   { label: "Permissions",     href: "/settings/permissions",     icon: Lock },
   { label: "Billing",         href: "/settings/billing",         icon: CreditCard },
+  { label: "AI Usage",        href: "/settings/ai-usage",        icon: Sparkles },
   { label: "Notifications",   href: "/settings/notifications",   icon: Bell },
   { label: "Automations",     href: "/settings/automations",     icon: Zap },
   { label: "Customer Portal", href: "/settings/portal",          icon: Globe },

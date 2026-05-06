@@ -42,6 +42,7 @@ function taskEnvKey(task: AiTaskId): string {
 function loadTaskOverrides(): Partial<Record<AiTaskId, string>> {
   const tasks: AiTaskId[] = [
     "catalog_extraction",
+    "insights_generation",
     "work_order_summary",
     "dispatch_recommendation",
     "quote_generation",

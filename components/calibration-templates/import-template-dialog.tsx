@@ -92,6 +92,7 @@ export type ImportReviewDraft = {
   fields: CalibrationTemplateField[]
   confidenceMessage: string
   extractionWarnings: string[]
+  aiConfidence: number | null
 }
 
 type Step = "upload" | "processing" | "review"
@@ -103,8 +104,10 @@ export function ImportTemplateDialog(props: {
   onOpenChange: (open: boolean) => void
   onCommit: (draft: ImportReviewDraft) => Promise<void>
   saving?: boolean
+  /** When false, AI file analysis is disabled (subscription tier). Manual template creation still works elsewhere. */
+  certificateAiImportAllowed?: boolean
 }) {
-  const { open, onOpenChange, onCommit, saving } = props
+  const { open, onOpenChange, onCommit, saving, certificateAiImportAllowed = true } = props
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>("upload")
   const [review, setReview] = useState<ImportReviewDraft | null>(null)
@@ -173,6 +176,10 @@ export function ImportTemplateDialog(props: {
   }
 
   async function processFile(file: File) {
+    if (!certificateAiImportAllowed) {
+      setLocalError("AI certificate import is available on Growth and Scale plans.")
+      return
+    }
     setLocalError(null)
     if (file.size > MAX_BYTES) {
       setLocalError(`File is too large (max ${Math.round(MAX_BYTES / (1024 * 1024))} MB).`)
@@ -187,6 +194,7 @@ export function ImportTemplateDialog(props: {
         fields: result.fields,
         confidenceMessage: result.confidenceMessage,
         extractionWarnings: result.extractionWarnings,
+        aiConfidence: result.aiConfidence,
       })
       setStep("review")
     } catch (e) {
@@ -239,17 +247,32 @@ export function ImportTemplateDialog(props: {
 
           {step === "upload" ? (
             <div className="space-y-4">
+              {!certificateAiImportAllowed ? (
+                <Alert>
+                  <AlertTitle className="text-sm">Not available on this plan</AlertTitle>
+                  <AlertDescription className="text-xs leading-relaxed">
+                    AI certificate import is available on Growth and Scale plans.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
                 className="sr-only"
                 accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                 onChange={onPickFile}
+                disabled={!certificateAiImportAllowed}
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-xl border-2 border-dashed border-border bg-muted/20 hover:bg-muted/35 transition-colors px-6 py-12 flex flex-col items-center gap-3 text-center"
+                disabled={!certificateAiImportAllowed}
+                className={cn(
+                  "w-full rounded-xl border-2 border-dashed border-border px-6 py-12 flex flex-col items-center gap-3 text-center transition-colors",
+                  certificateAiImportAllowed
+                    ? "bg-muted/20 hover:bg-muted/35"
+                    : "bg-muted/10 opacity-60 cursor-not-allowed",
+                )}
               >
                 <div className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center">
                   <Upload className="w-6 h-6 text-muted-foreground" />
@@ -260,7 +283,13 @@ export function ImportTemplateDialog(props: {
                     PDF, PNG, or JPEG. The file is sent to your server for OpenAI analysis and is not stored.
                   </p>
                 </div>
-                <Button type="button" variant="secondary" size="sm" className="gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="gap-2 mt-1"
+                  disabled={!certificateAiImportAllowed}
+                >
                   <Upload className="w-4 h-4" />
                   Browse
                 </Button>

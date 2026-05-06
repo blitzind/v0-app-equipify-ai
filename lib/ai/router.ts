@@ -7,7 +7,18 @@ import {
   parseJsonSafe,
   parseWithSchemaSafe,
 } from "@/lib/ai/structured"
-import { recordAiUsageLog, sumUsage } from "@/lib/ai/usage"
+import {
+  canonicalizeMessagesForCache,
+  computeInputHash,
+  computeModelSignature,
+  computeStorageKey,
+} from "@/lib/ai/cache-key"
+import { precheckOrganizationAiBudget } from "@/lib/ai/budget"
+import { evaluateAiPlanGate, logAiPlanGateDenial } from "@/lib/ai/plan-gate"
+import { readAiCache, recordCacheHitMeta, writeAiCache } from "@/lib/ai/result-cache"
+import { recordAiUsageLog, safeAiFailureReason, sumUsage } from "@/lib/ai/usage"
+import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
+import { buildAiUsageOperationalMetadata } from "@/lib/ai/redaction"
 import { getProviderAdapter, isProviderAvailable } from "@/lib/ai/providers/index"
 import type {
   AiChatMessage,
@@ -23,7 +34,118 @@ import type {
 } from "@/lib/ai/types"
 
 function mergeTaskDef(base: AiTaskDefinition, patch?: Partial<AiTaskDefinition>): AiTaskDefinition {
-  return patch ? { ...base, ...patch } : base
+  const merged = patch ? { ...base, ...patch } : base
+  return {
+    ...merged,
+    cacheable: merged.cacheable ?? false,
+    allowResponseCaching: merged.allowResponseCaching ?? false,
+    cacheTtlSeconds: merged.cacheTtlSeconds ?? null,
+  }
+}
+
+function routerShouldUseCache(def: AiTaskDefinition, options: RunAiTaskOptions): boolean {
+  if (!def.cacheable || !def.allowResponseCaching || options.skipCache) return false
+  const oid = options.organizationId?.trim()
+  if (!oid) return false
+  if (def.id === "catalog_extraction" || def.id === "certificate_cleanup") {
+    return Boolean(options.cacheKeyExtras?.file_sha256?.trim())
+  }
+  return true
+}
+
+function messagesHaveNonTextParts(messages: AiChatMessage[]): boolean {
+  return messages.some((m) => {
+    if (typeof m.content === "string") return false
+    return m.content.some((p) => p.type !== "text")
+  })
+}
+
+async function tryRouterCacheHit<T>(params: {
+  def: AiTaskDefinition
+  options: RunAiTaskOptions<T>
+  primaryRef: AiModelRef
+  started: number
+  cacheWrite: { storageKey: string }
+  usagePromptMeta?: Record<string, unknown>
+}): Promise<AiTaskSuccess<T> | null> {
+  const { def, options, primaryRef, started, cacheWrite, usagePromptMeta } = params
+  const orgId = options.organizationId.trim()
+
+  const row = await readAiCache({
+    storageKey: cacheWrite.storageKey,
+    organizationId: orgId,
+  })
+  if (!row) return null
+
+  const zeroUsage = { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 }
+  const metaBase: AiRunMeta = {
+    task: def.id,
+    provider: primaryRef.provider,
+    model: primaryRef.model,
+    escalated: false,
+    escalationReasons: [],
+    attempts: 0,
+    durationMs: Date.now() - started,
+    cacheHit: true,
+  }
+
+  const bumpHit = async () => {
+    await recordCacheHitMeta({
+      storageKey: cacheWrite.storageKey,
+      organizationId: orgId,
+      task: def.id,
+      provider: primaryRef.provider,
+      model: primaryRef.model,
+      skipUsageLog: Boolean(options.skipUsageLog),
+      usageMetadata: usagePromptMeta,
+    })
+  }
+
+  if (!options.schema) {
+    const text = row.response_text?.trim() ?? ""
+    if (!text) return null
+    await bumpHit()
+    return {
+      ok: true,
+      output: text as T,
+      rawText: text,
+      usage: zeroUsage,
+      meta: metaBase,
+    }
+  }
+
+  const rawJson = row.response_json != null ? JSON.stringify(row.response_json) : ""
+  if (!rawJson) return null
+
+  const schemaResult = await parseWithSchemaSafe(rawJson, options.schema)
+  if (!schemaResult.ok) return null
+
+  const data = schemaResult.data
+  let parsedForConfidence: unknown
+  try {
+    parsedForConfidence = parseJsonSafe(rawJson)
+  } catch {
+    parsedForConfidence = data as unknown
+  }
+
+  if (def.confidenceThreshold != null) {
+    const minConf = extractMinConfidence(parsedForConfidence)
+    if (minConf != null && minConf < def.confidenceThreshold) return null
+  }
+
+  if (options.acceptResult) {
+    const ok = await options.acceptResult(data, rawJson)
+    if (!ok) return null
+  }
+
+  await bumpHit()
+  return {
+    ok: true,
+    output: data,
+    rawText: rawJson,
+    usage: zeroUsage,
+    meta: metaBase,
+  }
 }
 
 function messagesFromInput(input: RunAiTaskOptions["input"]): AiChatMessage[] {
@@ -116,6 +238,30 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
   const def = mergeTaskDef(baseDef, options.taskOverrides)
   const primaryRef = applyPrimaryModelRef(def.id, def.primaryModel)
 
+  let usagePromptMeta: Record<string, unknown> | undefined
+  if (def.promptId?.trim()) {
+    try {
+      const pr = getPromptForTask(def.id, { version: options.promptVersionOverride })
+      usagePromptMeta = promptMetadataForLog(pr) as unknown as Record<string, unknown>
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e))
+      return {
+        ok: false,
+        error: err,
+        usage: { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 },
+        meta: {
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          escalated: false,
+          escalationReasons,
+          attempts: 0,
+          durationMs: Date.now() - started,
+        },
+      }
+    }
+  }
+
   const chain = dedupeModelChain([primaryRef, def.fallbackModel, def.escalationModel])
   const available = filterAvailable(chain)
 
@@ -161,6 +307,132 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
     }
   }
 
+  if (!options.skipPlanGateCheck && options.organizationId?.trim()) {
+    const gate = await evaluateAiPlanGate({
+      organizationId: options.organizationId.trim(),
+      taskDef: def,
+    })
+    if (!gate.ok) {
+      const durationMs = Date.now() - started
+      await logAiPlanGateDenial({
+        organizationId: options.organizationId.trim(),
+        taskDef: def,
+        primaryRef,
+        durationMs,
+        gate,
+        skipUsageLog: options.skipUsageLog,
+      })
+      return {
+        ok: false,
+        error: new Error(gate.message),
+        usage: { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 },
+        meta: {
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          escalated: false,
+          escalationReasons: [...escalationReasons, "plan_blocked"],
+          attempts: 0,
+          durationMs,
+        },
+      }
+    }
+  }
+
+  if (!options.skipBudgetCheck && options.organizationId?.trim()) {
+    const pre = await precheckOrganizationAiBudget(options.organizationId.trim())
+    if (pre.action === "block") {
+      const durationMs = Date.now() - started
+      if (!options.skipUsageLog) {
+        const usageMeta = buildAiUsageOperationalMetadata({
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          attemptCount: 0,
+          budgetBlocked: true,
+          cacheHit: false,
+          durationMs,
+          promptMeta: usagePromptMeta,
+        })
+        await recordAiUsageLog({
+          organization_id: options.organizationId.trim(),
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          estimated_cost: 0,
+          duration_ms: durationMs,
+          success: false,
+          budget_blocked: true,
+          failure_reason: "budget_exceeded",
+          cache_hit: false,
+          metadata: usageMeta,
+        })
+      }
+      return {
+        ok: false,
+        error: new Error(pre.message),
+        usage: { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 },
+        meta: {
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          escalated: false,
+          escalationReasons: [...escalationReasons, "budget_exceeded"],
+          attempts: 0,
+          durationMs,
+        },
+      }
+    }
+  }
+
+  let cacheWrite:
+    | {
+        inputHash: string
+        storageKey: string
+        modelSig: string
+      }
+    | undefined
+
+  if (routerShouldUseCache(def, options) && !messagesHaveNonTextParts(messages)) {
+    const msgsForHash = augmentForStructuredJson(def, messages)
+    const inputHash = computeInputHash({
+      taskId: def.id,
+      messagesCanonical: canonicalizeMessagesForCache(msgsForHash),
+      schemaVersion:
+        options.cacheSchemaVersion ??
+        (usagePromptMeta?.schemaVersion as string | undefined) ??
+        "default",
+      prompt: usagePromptMeta
+        ? {
+            promptId: usagePromptMeta.promptId as string,
+            promptVersion: usagePromptMeta.promptVersion as number,
+            schemaVersion: usagePromptMeta.schemaVersion as string,
+          }
+        : undefined,
+      extras: options.cacheKeyExtras,
+    })
+    const modelSig = computeModelSignature(def, primaryRef)
+    const storageKey = computeStorageKey(
+      options.organizationId.trim(),
+      def.id,
+      inputHash,
+      modelSig,
+    )
+    cacheWrite = { inputHash, storageKey, modelSig }
+
+    const cached = await tryRouterCacheHit<T>({
+      def,
+      options,
+      primaryRef,
+      started,
+      cacheWrite: { storageKey },
+      usagePromptMeta,
+    })
+    if (cached) return cached
+  }
+
   let attempts = 0
   let lastError: Error | null = null
   let lastText = ""
@@ -202,6 +474,16 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
         meta,
       }
       if (!options.skipUsageLog) {
+        const usageMeta = buildAiUsageOperationalMetadata({
+          task: def.id,
+          provider: modelRef.provider,
+          model: modelRef.model,
+          attemptCount: attempts,
+          escalationReasons,
+          cacheHit: false,
+          budgetBlocked: false,
+          durationMs: meta.durationMs,
+        })
         await recordAiUsageLog({
           organization_id: options.organizationId,
           task: def.id,
@@ -212,6 +494,21 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
           estimated_cost: usage.estimatedCostUsd,
           duration_ms: meta.durationMs,
           success: true,
+          cache_hit: false,
+          budget_blocked: false,
+        })
+      }
+      if (cacheWrite && !options.skipCache && def.allowResponseCaching) {
+        await writeAiCache({
+          organizationId: options.organizationId.trim(),
+          storageKey: cacheWrite.storageKey,
+          task: def.id,
+          inputHash: cacheWrite.inputHash,
+          modelSignature: cacheWrite.modelSig,
+          responseJson: null,
+          responseText: text,
+          confidenceScore: null,
+          ttlSeconds: def.cacheTtlSeconds ?? null,
         })
       }
       return success
@@ -276,6 +573,17 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
       meta,
     }
     if (!options.skipUsageLog) {
+      const usageMeta = buildAiUsageOperationalMetadata({
+        task: def.id,
+        provider: modelRef.provider,
+        model: modelRef.model,
+        attemptCount: attempts,
+        escalationReasons,
+        cacheHit: false,
+        budgetBlocked: false,
+        durationMs: meta.durationMs,
+        promptMeta: usagePromptMeta,
+      })
       await recordAiUsageLog({
         organization_id: options.organizationId,
         task: def.id,
@@ -286,6 +594,23 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
         estimated_cost: usage.estimatedCostUsd,
         duration_ms: meta.durationMs,
         success: true,
+        cache_hit: false,
+        budget_blocked: false,
+        metadata: usageMeta,
+      })
+    }
+    if (cacheWrite && !options.skipCache && def.allowResponseCaching) {
+      const confVal = extractMinConfidence(parsedUnknown)
+      await writeAiCache({
+        organizationId: options.organizationId.trim(),
+        storageKey: cacheWrite.storageKey,
+        task: def.id,
+        inputHash: cacheWrite.inputHash,
+        modelSignature: cacheWrite.modelSig,
+        responseJson: data as unknown,
+        responseText: null,
+        confidenceScore: confVal != null ? confVal : null,
+        ttlSeconds: def.cacheTtlSeconds ?? null,
       })
     }
     return success
@@ -303,18 +628,52 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
     durationMs: Date.now() - started,
   }
 
-  if (!options.skipUsageLog && usageParts.length > 0) {
-    await recordAiUsageLog({
-      organization_id: options.organizationId,
+  if (!options.skipUsageLog && options.organizationId?.trim()) {
+    const metaSmall = buildAiUsageOperationalMetadata({
       task: def.id,
       provider: failMeta.provider,
       model: failMeta.model,
-      prompt_tokens: usage.promptTokens,
-      completion_tokens: usage.completionTokens,
-      estimated_cost: usage.estimatedCostUsd,
-      duration_ms: failMeta.durationMs,
-      success: false,
+      attemptCount: attempts,
+      escalationReasons: failMeta.escalationReasons,
+      cacheHit: false,
+      budgetBlocked: false,
+      durationMs: failMeta.durationMs,
+      promptMeta: usagePromptMeta,
     })
+    const metaPayload = Object.keys(metaSmall).length > 0 ? metaSmall : undefined
+    if (usageParts.length > 0) {
+      await recordAiUsageLog({
+        organization_id: options.organizationId,
+        task: def.id,
+        provider: failMeta.provider,
+        model: failMeta.model,
+        prompt_tokens: usage.promptTokens,
+        completion_tokens: usage.completionTokens,
+        estimated_cost: usage.estimatedCostUsd,
+        duration_ms: failMeta.durationMs,
+        success: false,
+        failure_reason: safeAiFailureReason(lastError?.message ?? err.message),
+        cache_hit: false,
+        budget_blocked: false,
+        metadata: metaPayload,
+      })
+    } else {
+      await recordAiUsageLog({
+        organization_id: options.organizationId.trim(),
+        task: def.id,
+        provider: failMeta.provider,
+        model: failMeta.model,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        estimated_cost: 0,
+        duration_ms: failMeta.durationMs,
+        success: false,
+        failure_reason: safeAiFailureReason(lastError?.message ?? err.message),
+        cache_hit: false,
+        budget_blocked: false,
+        metadata: metaPayload,
+      })
+    }
   }
 
   return {

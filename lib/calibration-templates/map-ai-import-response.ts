@@ -45,6 +45,8 @@ export type MappedImportDraft = {
   fields: CalibrationTemplateField[]
   confidenceMessage: string
   extractionWarnings: string[]
+  /** Model self-reported layout confidence (0–1), if present. */
+  aiConfidence: number | null
 }
 
 export function mapAiImportResponseToDraft(parsed: AiImportResponse): MappedImportDraft {
@@ -59,5 +61,6 @@ export function mapAiImportResponseToDraft(parsed: AiImportResponse): MappedImpo
     fields,
     confidenceMessage: REVIEW_MESSAGE,
     extractionWarnings: warn,
+    aiConfidence: Number.isFinite(parsed.confidence) ? Math.min(1, Math.max(0, parsed.confidence)) : null,
   }
 }

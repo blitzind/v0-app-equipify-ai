@@ -1893,6 +1893,12 @@ export default function PlatformAdminPage() {
           </span>
         </div>
         <div className="flex-1" />
+        <Link
+          href="/admin/ai-operations"
+          className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors mr-2"
+        >
+          AI Operations
+        </Link>
         {/* Admin identity */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#7c3aed] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
