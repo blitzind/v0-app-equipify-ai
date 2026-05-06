@@ -53,6 +53,7 @@ type WorkspaceApiOrganization = {
   dateFormat: string
   currency: string
   logoUrl: string
+  documentLogoUrl: string
   primaryColor: string
   secondaryBrandColor: string
   whiteLabelSettings: Record<string, unknown>
@@ -67,6 +68,8 @@ export default function WorkspacePage() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [removingLogo, setRemovingLogo] = useState(false)
+  const [uploadingDocLogo, setUploadingDocLogo] = useState(false)
+  const [removingDocLogo, setRemovingDocLogo] = useState(false)
   const [brandingAllowed, setBrandingAllowed] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [planId, setPlanId] = useState<PlanId>("solo")
@@ -86,7 +89,9 @@ export default function WorkspacePage() {
     primaryColor: "#2563eb",
   })
   const [logoUrl, setLogoUrl] = useState("")
+  const [documentLogoUrl, setDocumentLogoUrl] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
+  const documentFileRef = useRef<HTMLInputElement>(null)
 
   const applyOrganization = useCallback(
     (org: WorkspaceApiOrganization) => {
@@ -108,6 +113,7 @@ export default function WorkspacePage() {
         primaryColor: org.primaryColor,
       })
       setLogoUrl(org.logoUrl ?? "")
+      setDocumentLogoUrl(org.documentLogoUrl ?? "")
       setWorkspaceSlug(org.slug ?? "")
       setWorkspaceCreatedAt(org.createdAt ?? null)
       dispatch({
@@ -123,6 +129,7 @@ export default function WorkspacePage() {
           dateFormat: org.dateFormat,
           currency: org.currency,
           logoUrl: org.logoUrl ?? "",
+          documentLogoUrl: org.documentLogoUrl ?? "",
           primaryColor: org.primaryColor,
           secondaryBrandColor: org.secondaryBrandColor ?? "",
           whiteLabelSettings: wl,
@@ -370,6 +377,73 @@ export default function WorkspacePage() {
     }
   }
 
+  async function handleDocumentLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !organizationId || !canEdit || !brandingAllowed || uploadingDocLogo) return
+    setUploadingDocLogo(true)
+    try {
+      const fd = new FormData()
+      fd.set("file", file)
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/workspace/document-logo`,
+        { method: "POST", body: fd },
+      )
+      const data = (await res.json()) as { ok?: boolean; documentLogoUrl?: string; message?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: typeof data.message === "string" ? data.message : "Could not upload document logo.",
+        })
+        return
+      }
+      if (data.documentLogoUrl) {
+        setDocumentLogoUrl(data.documentLogoUrl)
+      }
+      await refetchWorkspace()
+      toast({ title: "Document logo updated" })
+    } catch {
+      toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
+    } finally {
+      setUploadingDocLogo(false)
+    }
+  }
+
+  async function handleRemoveDocumentLogo() {
+    if (!organizationId || !canEdit || !brandingAllowed || removingDocLogo) return
+    setRemovingDocLogo(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentLogoUrl: null }),
+      })
+      const data = (await res.json()) as { message?: string; organization?: WorkspaceApiOrganization }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not remove document logo",
+          description: typeof data.message === "string" ? data.message : "Try again.",
+        })
+        return
+      }
+      const synced = await refetchWorkspace()
+      if (!synced) {
+        if (data.organization) {
+          applyOrganization(data.organization)
+        } else {
+          setDocumentLogoUrl("")
+        }
+      }
+      toast({ title: "Document logo removed" })
+    } catch {
+      toast({ variant: "destructive", title: "Could not remove document logo", description: "Network error." })
+    } finally {
+      setRemovingDocLogo(false)
+    }
+  }
+
   async function handleRemoveLogo() {
     if (!organizationId || !canEdit || !brandingAllowed || removingLogo) return
     setRemovingLogo(true)
@@ -451,7 +525,7 @@ export default function WorkspacePage() {
   }
 
   const inputLocked = !canEdit
-  const brandBusy = uploadingLogo || removingLogo
+  const brandBusy = uploadingLogo || removingLogo || uploadingDocLogo || removingDocLogo
 
   return (
     <div className="flex flex-col gap-6">
@@ -611,7 +685,11 @@ export default function WorkspacePage() {
         ) : (
           <div className="flex flex-col gap-6">
             <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Company logo</p>
+              <p className="text-xs font-medium text-muted-foreground mb-1">App branding logo</p>
+              <p className="text-[11px] text-muted-foreground mb-2 max-w-xl leading-relaxed">
+                Used in the sidebar, app chrome, and customer portal. Any aspect ratio is fine — we generate a centered{" "}
+                256×256 square PNG automatically (transparent background when possible).
+              </p>
               <div className="flex items-center gap-4">
                 <button
                   type="button"
@@ -623,7 +701,7 @@ export default function WorkspacePage() {
                   {uploadingLogo ? (
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   ) : logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                    <img src={logoUrl} alt="App branding logo" className="w-full h-full object-contain p-1" />
                   ) : (
                     <Upload size={20} className="text-muted-foreground" />
                   )}
@@ -637,9 +715,9 @@ export default function WorkspacePage() {
                     className="text-primary hover:text-primary gap-1"
                     disabled={inputLocked || brandBusy}
                   >
-                    <Upload size={13} /> Upload logo
+                    <Upload size={13} /> Upload app logo
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-1">PNG or SVG, max 2MB. Recommended: 200×200px.</p>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP, GIF, or SVG — max 2MB.</p>
                   {logoUrl && (
                     <Button
                       type="button"
@@ -659,6 +737,69 @@ export default function WorkspacePage() {
                   accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
                   className="hidden"
                   onChange={handleLogoUpload}
+                  disabled={inputLocked || brandBusy}
+                />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Company logo (PDFs &amp; documents)</p>
+              <p className="text-[11px] text-muted-foreground mb-2 max-w-xl leading-relaxed">
+                Used for certificates, invoices, PDFs, and printed documents. Prefer a wide horizontal logo; raster images are
+                sized down (max ~1600×480) while keeping aspect ratio. SVG uploads are kept as vectors when supported by your
+                browser print preview.
+              </p>
+              <div className="flex flex-wrap items-start gap-4">
+                <button
+                  type="button"
+                  className="w-[180px] h-[72px] rounded-xl border-2 border-dashed border-border flex items-center justify-center overflow-hidden bg-secondary disabled:opacity-50 px-2"
+                  style={{ cursor: inputLocked || brandBusy ? "not-allowed" : "pointer" }}
+                  onClick={() => !inputLocked && !brandBusy && documentFileRef.current?.click()}
+                  disabled={inputLocked || brandBusy}
+                >
+                  {uploadingDocLogo ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ) : documentLogoUrl ? (
+                    <img
+                      src={documentLogoUrl}
+                      alt="Document logo preview"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  ) : (
+                    <Upload size={20} className="text-muted-foreground" />
+                  )}
+                </button>
+                <div className="min-w-[160px]">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => documentFileRef.current?.click()}
+                    className="text-primary hover:text-primary gap-1"
+                    disabled={inputLocked || brandBusy}
+                  >
+                    <Upload size={13} /> Upload document logo
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP, GIF, or SVG — max 4MB.</p>
+                  {documentLogoUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleRemoveDocumentLogo()}
+                      className="text-xs ds-text-danger h-6 px-1 mt-1"
+                      disabled={inputLocked || brandBusy}
+                    >
+                      {removingDocLogo ? "Removing…" : "Remove"}
+                    </Button>
+                  )}
+                </div>
+                <input
+                  ref={documentFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  className="hidden"
+                  onChange={handleDocumentLogoUpload}
                   disabled={inputLocked || brandBusy}
                 />
               </div>

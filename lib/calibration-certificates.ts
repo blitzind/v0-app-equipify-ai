@@ -586,17 +586,23 @@ async function fetchOrganizationCertificateBranding(
 ): Promise<{ companyName: string; logoUrl: string | null }> {
   const { data, error } = await supabase
     .from("organizations")
-    .select("name, logo_url")
+    .select("name, logo_url, document_logo_url")
     .eq("id", organizationId)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
 
-  const row = data as { name?: string | null; logo_url?: string | null } | null
+  const row = data as {
+    name?: string | null
+    logo_url?: string | null
+    document_logo_url?: string | null
+  } | null
   const rawName = row?.name?.trim() ?? ""
   const companyName = rawName || "Organization"
-  const logoRaw = row?.logo_url != null ? String(row.logo_url).trim() : ""
-  const logoUrl = logoRaw.length ? logoRaw : null
+  const docRaw =
+    row?.document_logo_url != null ? String(row.document_logo_url).trim() : ""
+  const squareRaw = row?.logo_url != null ? String(row.logo_url).trim() : ""
+  const logoUrl = docRaw.length ? docRaw : squareRaw.length ? squareRaw : null
 
   return { companyName, logoUrl }
 }

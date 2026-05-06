@@ -180,9 +180,12 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       margin-bottom: 8px;
     }
     .logo {
-      max-height: 40px;
-      max-width: 220px;
+      max-height: 48px;
+      max-width: min(280px, 100%);
+      width: auto;
+      height: auto;
       object-fit: contain;
+      object-position: left center;
       display: block;
     }
     .logo-text {

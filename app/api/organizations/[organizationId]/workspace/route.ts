@@ -50,6 +50,8 @@ function serializeOrg(row: Record<string, unknown>) {
     dateFormat: row.date_format != null ? String(row.date_format) : "MM/DD/YYYY",
     currency: row.currency != null ? String(row.currency) : "USD",
     logoUrl: row.logo_url != null ? String(row.logo_url) : "",
+    documentLogoUrl:
+      row.document_logo_url != null ? String(row.document_logo_url) : "",
     primaryColor: row.primary_color != null ? String(row.primary_color) : "#2563eb",
     secondaryBrandColor:
       row.secondary_brand_color != null ? String(row.secondary_brand_color) : "",
@@ -171,6 +173,7 @@ type PatchBody = {
   currency?: string
   primaryColor?: string
   logoUrl?: string | null
+  documentLogoUrl?: string | null
   whiteLabelSettings?: Record<string, unknown>
 }
 
@@ -347,6 +350,21 @@ export async function PATCH(
     }
   }
 
+  if (body.documentLogoUrl !== undefined) {
+    if (!brandingOk) {
+      return jsonError("plan_branding", "Document logo is available on Growth and Scale plans.", 403)
+    }
+    if (body.documentLogoUrl === null || body.documentLogoUrl === "") {
+      patch.document_logo_url = null
+    } else {
+      const url = String(body.documentLogoUrl).trim()
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        return jsonError("invalid_document_logo_url", "Document logo URL must be an http(s) URL.", 400)
+      }
+      patch.document_logo_url = url
+    }
+  }
+
   if (body.whiteLabelSettings !== undefined) {
     if (!brandingOk) {
       return jsonError("plan_branding", "White-label settings require Growth or Scale.", 403)
@@ -392,6 +410,18 @@ export async function PATCH(
   if (body.logoUrl !== undefined && (body.logoUrl === null || body.logoUrl === "")) {
     const prevPath = pathFromOrganizationLogoPublicUrl(
       (orgBefore as { logo_url?: string | null }).logo_url,
+    )
+    if (prevPath) {
+      await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
+    }
+  }
+
+  if (
+    body.documentLogoUrl !== undefined &&
+    (body.documentLogoUrl === null || body.documentLogoUrl === "")
+  ) {
+    const prevPath = pathFromOrganizationLogoPublicUrl(
+      (orgBefore as { document_logo_url?: string | null }).document_logo_url,
     )
     if (prevPath) {
       await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])

@@ -91,6 +91,7 @@ export function TenantWorkspaceSync() {
             dateFormat: string
             currency: string
             logoUrl: string
+            documentLogoUrl: string
             primaryColor: string
             secondaryBrandColor: string
             whiteLabelSettings: Record<string, unknown>
@@ -111,6 +112,7 @@ export function TenantWorkspaceSync() {
             dateFormat: o.dateFormat,
             currency: o.currency,
             logoUrl: o.logoUrl,
+            documentLogoUrl: o.documentLogoUrl ?? "",
             primaryColor: o.primaryColor,
             secondaryBrandColor: o.secondaryBrandColor ?? "",
             whiteLabelSettings:

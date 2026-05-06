@@ -81,7 +81,8 @@ export function CertificateMultiTabContent({
 }: CertificateMultiTabContentProps) {
   const { workspace } = useTenant()
   const workspaceCompanyName = workspace.name?.trim() || "Organization"
-  const workspaceLogoUrl = workspace.logoUrl?.trim() ? workspace.logoUrl.trim() : null
+  const workspaceLogoUrl =
+    workspace.documentLogoUrl?.trim() || workspace.logoUrl?.trim() || null
   const { toast } = useToast()
   const orgId = organizationId?.trim() ?? ""
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])

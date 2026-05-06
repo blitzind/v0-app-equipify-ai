@@ -138,7 +138,9 @@ export interface TenantWorkspace {
   subscriptionStatus: "active" | "trialing" | "past_due" | "canceled"
   trialEndsAt: string
   currentPeriodEnd: string
-  logoUrl: string          // white-label logo
+  logoUrl: string          // square app / sidebar branding (processed upload)
+  /** Wide logo for PDFs, certificates, invoices; optional — falls back to logoUrl then name. */
+  documentLogoUrl: string
   primaryColor: string     // white-label accent
   companyEmail: string
   companyPhone: string
@@ -180,6 +182,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     trialEndsAt: "",
     currentPeriodEnd: "2026-12-31",
     logoUrl: "",
+    documentLogoUrl: "",
     primaryColor: "#2563eb",
     companyEmail: "admin@acme.com",
     companyPhone: "(614) 555-0100",
@@ -206,6 +209,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     trialEndsAt: "2026-05-14",
     currentPeriodEnd: "2026-05-14",
     logoUrl: "",
+    documentLogoUrl: "",
     primaryColor: "#2563eb",
     companyEmail: "admin@zephyr.com",
     companyPhone: "(212) 555-0299",
@@ -232,6 +236,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     trialEndsAt: "",
     currentPeriodEnd: "2026-12-31",
     logoUrl: "",
+    documentLogoUrl: "",
     primaryColor: "#0891b2",
     companyEmail: "admin@medology.net",
     companyPhone: "(423) 555-2000",
@@ -258,6 +263,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     trialEndsAt: "",
     currentPeriodEnd: "2026-12-31",
     logoUrl: "",
+    documentLogoUrl: "",
     primaryColor: "#0d9488",
     companyEmail: "dispatch@precisionbiomedical.demo",
     companyPhone: "(559) 555-0140",
@@ -285,6 +291,7 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     trialEndsAt: "",
     currentPeriodEnd: "2026-12-31",
     logoUrl: "",
+    documentLogoUrl: "",
     primaryColor: "#64748b",
     companyEmail: "",
     companyPhone: "",

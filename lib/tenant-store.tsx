@@ -53,6 +53,7 @@ type TenantAction =
         | "dateFormat"
         | "currency"
         | "logoUrl"
+        | "documentLogoUrl"
         | "primaryColor"
         | "secondaryBrandColor"
         | "whiteLabelSettings"

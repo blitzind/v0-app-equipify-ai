@@ -8,14 +8,15 @@ import {
   ORGANIZATION_LOGOS_BUCKET,
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
-import { processAppBrandingSquare } from "@/lib/organization/process-logos"
+import { processDocumentLogoRaster } from "@/lib/organization/process-logos"
 
 export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-const MAX_BYTES = 2 * 1024 * 1024
+/** Larger allowance for wide raster originals (processed output stays bounded). */
+const MAX_BYTES = 4 * 1024 * 1024
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"])
 const RASTER_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
 
@@ -55,7 +56,7 @@ export async function POST(
       .eq("status", "active")
       .maybeSingle()
     if (!mem || (mem.role !== "owner" && mem.role !== "admin")) {
-      return jsonError("forbidden", "Only owners and admins can upload a workspace logo.", 403)
+      return jsonError("forbidden", "Only owners and admins can upload a document logo.", 403)
     }
   }
 
@@ -65,7 +66,7 @@ export async function POST(
     return jsonError("invalid_file", "Choose an image file to upload.", 400)
   }
   if (file.size > MAX_BYTES) {
-    return jsonError("file_too_large", "Logo must be 2MB or smaller.", 400)
+    return jsonError("file_too_large", "Document logo must be 4MB or smaller.", 400)
   }
 
   const mime = (file.type || "application/octet-stream").toLowerCase()
@@ -82,7 +83,7 @@ export async function POST(
 
   const { data: orgRow, error: orgErr } = await db
     .from("organizations")
-    .select("id, status, logo_url")
+    .select("id, status, document_logo_url")
     .eq("id", organizationId)
     .maybeSingle()
 
@@ -93,37 +94,32 @@ export async function POST(
     return jsonError("org_archived", "This workspace is archived.", 403)
   }
 
-  const { data: sub } = await db
-    .from("organization_subscriptions")
-    .select("plan_id")
-    .eq("organization_id", organizationId)
-    .maybeSingle()
+  const { data: sub } = await db.from("organization_subscriptions").select("plan_id").eq("organization_id", organizationId).maybeSingle()
 
   const planId = normalizePlanIdForRead((sub as { plan_id?: string } | null)?.plan_id ?? "solo")
   if (!planAllowsBranding(planId)) {
-    return jsonError("plan_branding", "Custom logo is available on Growth and Scale plans.", 403)
+    return jsonError("plan_branding", "Document logo is available on Growth and Scale plans.", 403)
   }
 
-  const prevPath = pathFromOrganizationLogoPublicUrl((orgRow as { logo_url?: string | null }).logo_url)
+  const prevPath = pathFromOrganizationLogoPublicUrl((orgRow as { document_logo_url?: string | null }).document_logo_url)
 
   const buf = Buffer.from(await file.arrayBuffer())
   let uploadBody: Buffer = buf
   let uploadContentType = mime
-  let ext = "png"
+  let ext =
+    mime === "image/svg+xml"
+      ? "svg"
+      : mime === "image/jpeg"
+        ? "jpg"
+        : mime === "image/gif"
+          ? "gif"
+          : mime === "image/webp"
+            ? "webp"
+            : "png"
 
   try {
-    if (mime === "image/svg+xml") {
-      try {
-        uploadBody = await processAppBrandingSquare(buf)
-        uploadContentType = "image/png"
-        ext = "png"
-      } catch {
-        uploadBody = buf
-        uploadContentType = "image/svg+xml"
-        ext = "svg"
-      }
-    } else if (RASTER_MIMES.has(mime)) {
-      uploadBody = await processAppBrandingSquare(buf)
+    if (RASTER_MIMES.has(mime)) {
+      uploadBody = await processDocumentLogoRaster(buf)
       uploadContentType = "image/png"
       ext = "png"
     }
@@ -149,17 +145,17 @@ export async function POST(
 
   const { error: dbErr } = await db
     .from("organizations")
-    .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+    .update({ document_logo_url: publicUrl, updated_at: new Date().toISOString() })
     .eq("id", organizationId)
 
   if (dbErr) {
     await db.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([path])
-    return jsonError("save_failed", dbErr.message ?? "Could not save logo URL.", 400)
+    return jsonError("save_failed", dbErr.message ?? "Could not save document logo URL.", 400)
   }
 
   if (prevPath) {
     await db.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
   }
 
-  return NextResponse.json({ ok: true, logoUrl: publicUrl })
+  return NextResponse.json({ ok: true, documentLogoUrl: publicUrl })
 }
