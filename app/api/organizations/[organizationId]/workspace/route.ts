@@ -26,41 +26,39 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ error: code, message }, { status })
 }
 
-type OrgRow = {
-  id: string
-  name: string
-  slug: string
-  status: string
-  company_email: string | null
-  company_phone: string | null
-  company_website: string | null
-  company_address: string | null
-  timezone: string | null
-  date_format: string | null
-  currency: string | null
-  logo_url: string | null
-  primary_color: string | null
-  secondary_brand_color: string | null
-  white_label_settings: Record<string, unknown> | null
+/** Built from `organizations.*` so loads succeed even if workspace migrations are behind (missing columns). */
+function serializeOrg(row: Record<string, unknown>) {
+  const wlRaw = row.white_label_settings
+  const whiteLabelSettings =
+    wlRaw && typeof wlRaw === "object" && !Array.isArray(wlRaw)
+      ? (wlRaw as Record<string, unknown>)
+      : {}
+  const createdAt =
+    row.created_at != null ? String(row.created_at as string | number | Date) : null
+  return {
+    id: String(row.id ?? ""),
+    name: String(row.name ?? ""),
+    slug: String(row.slug ?? ""),
+    status: String(row.status ?? ""),
+    createdAt,
+    companyEmail: row.company_email != null ? String(row.company_email) : "",
+    companyPhone: row.company_phone != null ? String(row.company_phone) : "",
+    companyWebsite: row.company_website != null ? String(row.company_website) : "",
+    companyAddress: row.company_address != null ? String(row.company_address) : "",
+    timezone: row.timezone != null ? String(row.timezone) : "America/New_York",
+    dateFormat: row.date_format != null ? String(row.date_format) : "MM/DD/YYYY",
+    currency: row.currency != null ? String(row.currency) : "USD",
+    logoUrl: row.logo_url != null ? String(row.logo_url) : "",
+    primaryColor: row.primary_color != null ? String(row.primary_color) : "#2563eb",
+    secondaryBrandColor:
+      row.secondary_brand_color != null ? String(row.secondary_brand_color) : "",
+    whiteLabelSettings,
+  }
 }
 
-function serializeOrg(row: OrgRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    status: row.status,
-    companyEmail: row.company_email ?? "",
-    companyPhone: row.company_phone ?? "",
-    companyWebsite: row.company_website ?? "",
-    companyAddress: row.company_address ?? "",
-    timezone: row.timezone ?? "America/New_York",
-    dateFormat: row.date_format ?? "MM/DD/YYYY",
-    currency: row.currency ?? "USD",
-    logoUrl: row.logo_url ?? "",
-    primaryColor: row.primary_color ?? "#2563eb",
-    secondaryBrandColor: row.secondary_brand_color ?? "",
-    whiteLabelSettings: row.white_label_settings ?? {},
+function logWorkspaceDev(context: string, payload: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "development") {
+    console.error(`[workspace API] ${context}`, payload)
   }
 }
 
@@ -82,7 +80,7 @@ export async function GET(
   }
 
   const platformAdmin = isPlatformAdminEmail(user.email)
-  let org: OrgRow | null = null
+  let org: Record<string, unknown> | null = null
   let memberRole: string | null = null
 
   if (!platformAdmin) {
@@ -100,15 +98,20 @@ export async function GET(
 
     const { data: o, error } = await supabase
       .from("organizations")
-      .select(
-        "id, name, slug, status, company_email, company_phone, company_website, company_address, timezone, date_format, currency, logo_url, primary_color, secondary_brand_color, white_label_settings",
-      )
+      .select("*")
       .eq("id", organizationId)
       .maybeSingle()
     if (error) {
+      logWorkspaceDev("GET organization (member)", {
+        organizationId,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       return jsonError("load_failed", error.message, 500)
     }
-    org = o as OrgRow | null
+    org = o as Record<string, unknown> | null
   } else {
     const svc = createServiceRoleClient()
     if (!svc) {
@@ -116,15 +119,20 @@ export async function GET(
     }
     const { data: o, error } = await svc
       .from("organizations")
-      .select(
-        "id, name, slug, status, company_email, company_phone, company_website, company_address, timezone, date_format, currency, logo_url, primary_color, secondary_brand_color, white_label_settings",
-      )
+      .select("*")
       .eq("id", organizationId)
       .maybeSingle()
     if (error) {
+      logWorkspaceDev("GET organization (platform admin)", {
+        organizationId,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       return jsonError("load_failed", error.message, 500)
     }
-    org = o as OrgRow | null
+    org = o as Record<string, unknown> | null
     memberRole = "owner"
   }
 
@@ -213,11 +221,21 @@ export async function PATCH(
 
   const { data: orgBefore, error: loadErr } = await readClient
     .from("organizations")
-    .select("id, status, slug, logo_url")
+    .select("*")
     .eq("id", organizationId)
     .maybeSingle()
 
-  if (loadErr || !orgBefore) {
+  if (loadErr) {
+    logWorkspaceDev("PATCH load organization", {
+      organizationId,
+      message: loadErr.message,
+      code: loadErr.code,
+      details: loadErr.details,
+      hint: loadErr.hint,
+    })
+    return jsonError("load_failed", loadErr.message, 500)
+  }
+  if (!orgBefore) {
     return jsonError("not_found", "Organization not found.", 404)
   }
 
@@ -348,12 +366,18 @@ export async function PATCH(
     .from("organizations")
     .update(patch)
     .eq("id", organizationId)
-    .select(
-      "id, name, slug, status, company_email, company_phone, company_website, company_address, timezone, date_format, currency, logo_url, primary_color, secondary_brand_color, white_label_settings",
-    )
+    .select("*")
     .single()
 
   if (upErr) {
+    logWorkspaceDev("PATCH update organization", {
+      organizationId,
+      message: upErr.message,
+      code: upErr.code,
+      details: upErr.details,
+      hint: upErr.hint,
+      patchKeys: Object.keys(patch),
+    })
     return jsonError("update_failed", upErr.message, 400)
   }
 
@@ -368,7 +392,7 @@ export async function PATCH(
 
   return NextResponse.json({
     ok: true,
-    organization: serializeOrg(updated as OrgRow),
+    organization: serializeOrg(updated as Record<string, unknown>),
     planId,
     brandingAllowed: brandingOk,
   })

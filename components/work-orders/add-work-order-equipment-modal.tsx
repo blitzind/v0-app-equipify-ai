@@ -24,7 +24,11 @@ import { uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
-import { DrawerSection, DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
+import {
+  DrawerSection,
+  DRAWER_DIALOG_FOOTER_SURFACE,
+  DRAWER_FIELD_CLASS,
+} from "@/components/detail-drawer"
 
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
 const TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
@@ -431,7 +435,9 @@ export function AddWorkOrderEquipmentModal({
           </DrawerSection>
         </div>
 
-        <DialogFooter className="px-6 pb-6 pt-0 gap-2 sm:gap-2">
+        <DialogFooter
+          className={cn("px-6 pb-6 pt-0 gap-2 sm:gap-2", DRAWER_DIALOG_FOOTER_SURFACE)}
+        >
           <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>

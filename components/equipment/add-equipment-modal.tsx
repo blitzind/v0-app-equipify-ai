@@ -8,6 +8,7 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { Button } from "@/components/ui/button"
 import { CalendarPlus, CheckCircle2, X } from "lucide-react"
+import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -309,9 +310,14 @@ export function AddEquipmentModal({
         aria-label={postSave ? "Equipment saved" : "Add Equipment"}
         className="fixed inset-0 z-[230] flex items-start justify-center pt-12 px-4 pb-8"
       >
-        <div className="relative w-full max-w-2xl bg-background dark:bg-card rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
+        <div
+          className={cn(
+            "relative w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]",
+            DRAWER_PANEL_SURFACE,
+          )}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-[#25324C] shrink-0">
             <div>
               <h2 className="text-base font-semibold text-foreground">
                 {postSave ? "Equipment saved" : "Add Equipment"}

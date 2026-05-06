@@ -553,39 +553,50 @@ export default function TeamPage() {
           </div>
         )}
 
-        {/* Pending invites */}
-        {!loading && !loadError && organizationId && pendingInvites.length > 0 && (
-          <div className="border-t border-border px-6 py-4 bg-secondary/20">
+        {/* Pending invitations */}
+        {!loading && !loadError && organizationId && (
+          <div
+            className={cn(
+              "border-t border-border px-6 py-4",
+              pendingInvites.length > 0 && "bg-secondary/20",
+            )}
+          >
             <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
               <Mail size={12} /> Pending invitations
             </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    {["Email", "Role", "Expires", ""].map((h) => (
-                      <th key={h} className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingInvites.map((inv) => (
-                    <tr key={inv.id} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-4 text-foreground">{inv.email}</td>
-                      <td className="py-2 pr-4">
-                        <RoleBadge role={inv.role} />
-                      </td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">
-                        {new Date(inv.expiresAt).toLocaleString()}
-                      </td>
-                      <td className="py-2 text-xs text-muted-foreground">Pending</td>
+            {pendingInvites.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                No pending invitations. Use “Invite member” above to send a link.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      {["Email", "Role", "Expires", ""].map((h) => (
+                        <th key={h} className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {pendingInvites.map((inv) => (
+                      <tr key={inv.id} className="border-b border-border last:border-0">
+                        <td className="py-2 pr-4 text-foreground">{inv.email}</td>
+                        <td className="py-2 pr-4">
+                          <RoleBadge role={inv.role} />
+                        </td>
+                        <td className="py-2 pr-4 text-xs text-muted-foreground">
+                          {new Date(inv.expiresAt).toLocaleString()}
+                        </td>
+                        <td className="py-2 text-xs text-muted-foreground">Pending</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -29,7 +29,11 @@ import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
-import { DrawerSection, DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
+import {
+  DrawerSection,
+  DRAWER_DIALOG_FOOTER_SURFACE,
+  DRAWER_FIELD_CLASS,
+} from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -784,7 +788,12 @@ export function CreateWorkOrderModal({
             )}
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t border-border bg-muted/10 gap-2 sm:justify-end">
+          <DialogFooter
+            className={cn(
+              "px-6 py-4 gap-2 sm:justify-end",
+              DRAWER_DIALOG_FOOTER_SURFACE,
+            )}
+          >
             <Button variant="outline" onClick={handleClose} disabled={submitting}>
               Cancel
             </Button>

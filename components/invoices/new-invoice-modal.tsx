@@ -11,6 +11,7 @@ import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import type { AdminQuote, InvoiceStatus } from "@/lib/mock-data"
 
@@ -517,8 +518,13 @@ export function NewInvoiceModal({
             onClick={() => !submitting && onClose()}
           />
 
-          <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-border bg-background dark:bg-card shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+          <div
+            className={cn(
+              "relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl shadow-2xl",
+              DRAWER_PANEL_SURFACE,
+            )}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-[#25324C] shrink-0">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Create New Invoice</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">Fill in the details below to create an invoice.</p>

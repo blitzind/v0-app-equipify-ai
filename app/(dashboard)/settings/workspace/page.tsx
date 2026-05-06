@@ -43,6 +43,8 @@ function SettingCard({
 type WorkspaceApiOrganization = {
   name: string
   slug: string
+  /** ISO timestamp when present on the row */
+  createdAt?: string | null
   companyEmail: string
   companyPhone: string
   companyWebsite: string
@@ -68,6 +70,9 @@ export default function WorkspacePage() {
   const [brandingAllowed, setBrandingAllowed] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [planId, setPlanId] = useState<PlanId>("solo")
+  const [loadErrorDetail, setLoadErrorDetail] = useState<string | null>(null)
+  const [workspaceSlug, setWorkspaceSlug] = useState<string>("")
+  const [workspaceCreatedAt, setWorkspaceCreatedAt] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: "",
@@ -103,6 +108,8 @@ export default function WorkspacePage() {
         primaryColor: org.primaryColor,
       })
       setLogoUrl(org.logoUrl ?? "")
+      setWorkspaceSlug(org.slug ?? "")
+      setWorkspaceCreatedAt(org.createdAt ?? null)
       dispatch({
         type: "HYDRATE_ORGANIZATION_PROFILE",
         payload: {
@@ -133,12 +140,13 @@ export default function WorkspacePage() {
     }
     let cancelled = false
     setLoadState("loading")
+    setLoadErrorDetail(null)
     void (async () => {
       try {
         const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace`, {
           cache: "no-store",
         })
-        const data = (await res.json()) as {
+        let data: {
           error?: string
           message?: string
           organization?: WorkspaceApiOrganization
@@ -146,18 +154,65 @@ export default function WorkspacePage() {
           canEdit?: boolean
           planId?: PlanId
         }
+        try {
+          data = (await res.json()) as typeof data
+        } catch (parseErr) {
+          const detail = `Invalid JSON response (${res.status})`
+          if (process.env.NODE_ENV === "development") {
+            console.error("[workspace settings] Failed to parse GET response", {
+              organizationId,
+              status: res.status,
+              parseErr,
+            })
+          }
+          if (!cancelled) {
+            setLoadErrorDetail(detail)
+            setLoadState("error")
+            toast({
+              variant: "destructive",
+              title: "Could not load workspace",
+              description: detail,
+            })
+          }
+          return
+        }
         if (cancelled) return
         if (!res.ok) {
+          const detail =
+            typeof data.message === "string"
+              ? data.message
+              : typeof data.error === "string"
+                ? `${data.error}${res.status ? ` (${res.status})` : ""}`
+                : `Request failed (${res.status})`
+          setLoadErrorDetail(detail)
+          if (process.env.NODE_ENV === "development") {
+            console.error("[workspace settings] GET /workspace failed", {
+              organizationId,
+              status: res.status,
+              error: data.error,
+              message: data.message,
+            })
+          }
           setLoadState("error")
           toast({
             variant: "destructive",
             title: "Could not load workspace",
-            description: typeof data.message === "string" ? data.message : "Try again or refresh the page.",
+            description: detail,
           })
           return
         }
         if (!data.organization) {
+          const detail = "Response missing organization payload."
+          setLoadErrorDetail(detail)
+          if (process.env.NODE_ENV === "development") {
+            console.error("[workspace settings] Missing organization in response", { organizationId, data })
+          }
           setLoadState("error")
+          toast({
+            variant: "destructive",
+            title: "Could not load workspace",
+            description: detail,
+          })
           return
         }
         setBrandingAllowed(Boolean(data.brandingAllowed))
@@ -165,8 +220,13 @@ export default function WorkspacePage() {
         setPlanId(data.planId ?? "solo")
         applyOrganization(data.organization)
         setLoadState("ready")
-      } catch {
+      } catch (e) {
         if (!cancelled) {
+          const detail = e instanceof Error ? e.message : "Network error."
+          setLoadErrorDetail(detail)
+          if (process.env.NODE_ENV === "development") {
+            console.error("[workspace settings] GET failed", { organizationId, error: e })
+          }
           setLoadState("error")
           toast({
             variant: "destructive",
@@ -311,6 +371,13 @@ export default function WorkspacePage() {
 
   const planMeta = useMemo(() => getPlan(planId), [planId])
 
+  const createdAtLabel = useMemo(() => {
+    if (!workspaceCreatedAt) return null
+    const d = new Date(workspaceCreatedAt)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+  }, [workspaceCreatedAt])
+
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground gap-2">
@@ -335,9 +402,14 @@ export default function WorkspacePage() {
 
   if (loadState === "error") {
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center">
+      <div className="rounded-lg border border-border bg-card p-6 text-center space-y-2">
         <p className="text-sm text-foreground font-medium">Could not load settings</p>
-        <p className="text-xs text-muted-foreground mt-1">Refresh the page or switch organization and try again.</p>
+        <p className="text-xs text-muted-foreground">Refresh the page or switch organization and try again.</p>
+        {loadErrorDetail && (
+          <p className="text-xs text-left mt-3 rounded-md bg-secondary/80 border border-border px-3 py-2 font-mono break-all text-muted-foreground">
+            {loadErrorDetail}
+          </p>
+        )}
       </div>
     )
   }
@@ -356,6 +428,20 @@ export default function WorkspacePage() {
       {/* General */}
       <SettingCard title="General" description="Basic workspace information shown across the platform.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(workspaceSlug || createdAtLabel) && (
+            <div className="sm:col-span-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground border-b border-border pb-4 mb-1">
+              {workspaceSlug ? (
+                <span>
+                  <span className="font-medium text-foreground/80">Slug:</span> {workspaceSlug}
+                </span>
+              ) : null}
+              {createdAtLabel ? (
+                <span>
+                  <span className="font-medium text-foreground/80">Created:</span> {createdAtLabel}
+                </span>
+              ) : null}
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">Workspace name</label>
             <input

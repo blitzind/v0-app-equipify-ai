@@ -18,6 +18,7 @@ import {
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
+  DRAWER_INNER_SCROLL_CANVAS,
   DRAWER_NESTED_CARD,
   type ToastItem,
 } from "@/components/detail-drawer"
@@ -109,7 +110,7 @@ type VendorRow = {
 
 // ─── Drawer shell (aligned with Invoice / Quote drawers) ─────────────────────
 
-const drawerBodyClass = "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5"
+const drawerBodyClass = DRAWER_INNER_SCROLL_CANVAS
 const sectionCardClass = DRAWER_NESTED_CARD
 
 // ─── Edit form field density (aligned with PO create modal) ───────────────────

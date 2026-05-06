@@ -52,18 +52,22 @@ function FieldRow({ label, description, children }: {
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative w-9 h-5 rounded-full transition-colors",
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         checked ? "bg-primary" : "bg-muted-foreground/25"
       )}
     >
-      <span className={cn(
-        "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform",
-        checked ? "translate-x-4" : "translate-x-0.5"
-      )} />
+      <span
+        className={cn(
+          "pointer-events-none absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm ring-0 transition-transform duration-200",
+          checked ? "translate-x-4" : "translate-x-0",
+        )}
+      />
     </button>
   )
 }
@@ -200,16 +204,23 @@ export default function PortalSettingsPage() {
         description="Control which features are available to customers by default. These can be overridden per customer."
         icon={LayoutGrid}
       >
-        <div className="space-y-0">
+        <div className="divide-y divide-border/60">
           {MODULE_OPTIONS.map(({ key, label, description }) => (
-            <FieldRow key={key} label={label} description={description}>
-              <div className="flex justify-end">
+            <div
+              key={key}
+              className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground">{label}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
+              </div>
+              <div className="flex shrink-0 items-center self-center">
                 <Toggle
-                  checked={modules[key]}
+                  checked={Boolean(modules[key])}
                   onChange={(v) => setModules((m) => ({ ...m, [key]: v }))}
                 />
               </div>
-            </FieldRow>
+            </div>
           ))}
         </div>
       </SectionCard>

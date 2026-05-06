@@ -13,9 +13,20 @@ import { Badge } from "@/components/ui/badge"
 export const EQUIPIFY_SCRIM =
   "bg-black/40 backdrop-blur-[2px]"
 
-/** Main drawer panel (right sheet / DetailDrawer / vaul). Light unchanged; dark #121B2C. */
+/** Main drawer / dialog / sheet panel surface. Light unchanged; dark canvas #121B2C. */
 export const DRAWER_PANEL_SURFACE =
-  "bg-background border-border dark:bg-[#121B2C] dark:border-[#25324C]"
+  "bg-background border-border text-foreground dark:bg-[#121B2C] dark:border-[#25324C] dark:text-slate-100"
+
+/**
+ * Full-bleed scroll body under DetailDrawer header (negative margin to edge-to-edge).
+ * Muted light canvas; dark nested field area #0B111E.
+ */
+export const DRAWER_INNER_SCROLL_CANVAS =
+  "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5 dark:bg-[#0B111E]"
+
+/** Sticky footers on dialog/modal content (e.g. Create WO). */
+export const DRAWER_DIALOG_FOOTER_SURFACE =
+  "border-t border-border bg-muted/10 dark:bg-[#0B111E] dark:border-[#25324C]"
 
 /** Nested cards / sections inside drawer body. Dark secondary surface #0B111E. */
 export const DRAWER_NESTED_CARD =
@@ -269,7 +280,7 @@ export function DrawerTimeline({ items }: {
         {items.map((item, i) => (
           <div key={i} className="relative flex gap-3">
             <div className={cn(
-              "absolute -left-4 top-1 w-2 h-2 rounded-full border-2 border-background dark:border-card shrink-0",
+              "absolute -left-4 top-1 w-2 h-2 rounded-full border-2 border-background dark:border-[#25324C] shrink-0",
               accentMap[item.accent ?? "muted"]
             )} />
             <div>
@@ -362,3 +373,10 @@ export function DrawerToastStack({ toasts, onRemove }: { toasts: ToastItem[]; on
     </div>
   )
 }
+
+// ─── Verification (shell audit, 2026-05) ────────────────────────────────────────
+// Remaining `dark:bg-card` / `bg-background dark:bg-card` under components/** modal/dialog:
+//   — none (grep `*modal*.tsx`, `*dialog*.tsx`). Custom modal shells now use DRAWER_PANEL_SURFACE.
+// Remaining in components/ui: `components/ui/table.tsx` thead uses `dark:bg-card` for table chrome (not a drawer).
+// Remaining on app pages (technicians, POs, service-schedule, etc.): local dialog shells still use legacy pair —
+//   out of this task’s scope; migrate with DRAWER_PANEL_SURFACE when those flows are touched.

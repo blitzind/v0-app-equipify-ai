@@ -99,18 +99,27 @@ export async function GET(request: Request) {
 
     const nowIso = new Date().toISOString()
     const { data: inviteRows, error: iErr } = await admin
-      .from("invites")
+      .from("organization_invites")
       .select("id, email, role, expires_at, created_at")
       .eq("organization_id", organizationId)
+      .eq("status", "pending")
       .is("accepted_at", null)
       .gt("expires_at", nowIso)
       .order("created_at", { ascending: false })
 
     if (iErr) {
-      return NextResponse.json({ error: "load_invites_failed", message: iErr.message }, { status: 500 })
+      const soft =
+        /does not exist|schema cache|relation/i.test(iErr.message ?? "") ||
+        (iErr as { code?: string }).code === "42P01"
+      if (soft) {
+        console.error("[api/team/members] organization_invites unavailable:", iErr.message)
+      } else {
+        return NextResponse.json({ error: "load_invites_failed", message: iErr.message }, { status: 500 })
+      }
     }
 
-    const pendingInvites = (inviteRows ?? []).map((inv) => ({
+    const inviteList = iErr ? [] : (inviteRows ?? [])
+    const pendingInvites = inviteList.map((inv) => ({
       id: inv.id as string,
       email: inv.email as string,
       role: inv.role as string,

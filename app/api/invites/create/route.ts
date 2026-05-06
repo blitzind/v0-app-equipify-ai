@@ -71,13 +71,15 @@ export async function POST(request: Request) {
   const organizationName = (org as { name?: string } | null)?.name?.trim() || "Equipify"
 
   const { data: insertedInvite, error: inviteErr } = await admin
-    .from("invites")
+    .from("organization_invites")
     .insert({
       email,
       organization_id: organizationId,
       role,
       token,
       expires_at: expiresAt,
+      invited_by: user.id,
+      status: "pending",
     })
     .select("id")
     .single()

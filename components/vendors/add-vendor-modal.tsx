@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
+import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
+import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 
@@ -116,8 +118,13 @@ export function AddVendorModal({
         onClick={() => !saving && onClose()}
         aria-hidden
       />
-      <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90dvh]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+      <div
+        className={cn(
+          "relative rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90dvh]",
+          DRAWER_PANEL_SURFACE,
+        )}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border dark:border-[#25324C] shrink-0">
           <h3 className="text-sm font-semibold text-foreground">Add Vendor</h3>
           <button
             type="button"

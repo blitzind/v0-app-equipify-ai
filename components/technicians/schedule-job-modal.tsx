@@ -12,6 +12,7 @@ import { normalizeTimeForDb, uiPriorityToDb } from "@/lib/work-orders/db-map"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -524,8 +525,13 @@ export function ScheduleJobModal({
     <>
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-        <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background dark:bg-card shadow-2xl">
-          <div className="flex items-center justify-between border-b border-border p-6">
+        <div
+          className={cn(
+            "relative z-10 w-full max-w-md rounded-xl shadow-2xl",
+            DRAWER_PANEL_SURFACE,
+          )}
+        >
+          <div className="flex items-center justify-between border-b border-border dark:border-[#25324C] p-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
                 {isAssignExisting ? "Assign work order" : "Schedule Job"}

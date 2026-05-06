@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
+import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -297,10 +298,14 @@ export function AIScanModal({ open, onClose }: AIScanModalProps) {
         aria-label="Scan Equipment with AI"
         className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 pb-8"
       >
-        <div className="relative w-full max-w-2xl bg-background dark:bg-card rounded-xl border border-border shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]">
-
+        <div
+          className={cn(
+            "relative w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]",
+            DRAWER_PANEL_SURFACE,
+          )}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-[#25324C] shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-[color:var(--ds-info-subtle)] flex items-center justify-center shrink-0">
                 <Sparkles className="w-4 h-4 text-white" />
