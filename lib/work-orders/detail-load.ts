@@ -6,7 +6,10 @@ import type {
   WorkOrderType,
 } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import {
+  missingAssignedTechnicianColumn,
+  missingWorkOrderNumberColumn,
+} from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { WO_DETAIL_SELECT, WO_DETAIL_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import {
@@ -93,6 +96,7 @@ type WoRow = {
   scheduled_time: string | null
   completed_at: string | null
   assigned_user_id: string | null
+  assigned_technician_id?: string | null
   created_at: string
   invoice_number: string | null
   total_labor_cents: number
@@ -330,6 +334,8 @@ export async function loadWorkOrderDetailForOrg(
 
   const w = row as WoRow
 
+  const techIdCol = w.assigned_technician_id ?? null
+
   const [{ data: cust }, { data: eq }, { data: assigneeProf }, planRes] = await Promise.all([
     supabase
       .from("customers")
@@ -359,6 +365,23 @@ export async function loadWorkOrderDetailForOrg(
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ])
+
+  let techAssignRow: {
+    full_name: string | null
+    email: string | null
+    avatar_url: string | null
+  } | null = null
+  if (techIdCol) {
+    const tRes = await supabase
+      .from("technicians")
+      .select("full_name, email, avatar_url")
+      .eq("id", techIdCol)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+    if (!tRes.error && tRes.data) {
+      techAssignRow = tRes.data as typeof techAssignRow
+    }
+  }
 
   const customerName = (cust as { company_name: string } | null)?.company_name ?? "Unknown Customer"
   const eqRow = eq as {
@@ -394,10 +417,19 @@ export async function loadWorkOrderDetailForOrg(
     email: string | null
     avatar_url: string | null
   } | null
-  const techName = w.assigned_user_id
-    ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
-    : "Unassigned"
-  const techId = w.assigned_user_id ?? "unassigned"
+  const tr = techAssignRow
+  const techName =
+    tr != null
+      ? (tr.full_name && tr.full_name.trim()) ||
+        (tr.email && tr.email.trim()) ||
+        "Technician"
+      : w.assigned_user_id
+        ? (ap?.full_name && ap.full_name.trim()) || (ap?.email && ap.email.trim()) || "Unknown"
+        : "Unassigned"
+  const techId =
+    (w.assigned_technician_id && String(w.assigned_technician_id)) ||
+    w.assigned_user_id ||
+    "unassigned"
 
   const planRow = planRes.data as { name: string; services: unknown } | null
   const planName = w.maintenance_plan_id ? (planRow?.name ?? null) : null
@@ -514,7 +546,7 @@ export async function loadWorkOrderDetailForOrg(
     priority: mapDbPriority(w.priority),
     technicianId: techId,
     technicianName: techName,
-    technicianAvatarUrl: w.assigned_user_id ? ap?.avatar_url?.trim() || null : null,
+    technicianAvatarUrl: tr?.avatar_url?.trim() || (w.assigned_user_id ? ap?.avatar_url?.trim() || null : null),
     scheduledDate: w.scheduled_on ?? "",
     scheduledTime: formatScheduledTime(w.scheduled_time),
     completedDate: w.completed_at ? w.completed_at.slice(0, 10) : "",

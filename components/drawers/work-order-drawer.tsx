@@ -13,6 +13,7 @@ import {
   type WorkOrderPhotoGalleryItem,
 } from "@/lib/work-orders/detail-load"
 import { loadTechnicianAssignOptions } from "@/lib/work-orders/load-technician-assign-options"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { AssignTechnicianDialog } from "@/components/work-orders/assign-technician-dialog"
 import { repairLogJsonForPersist } from "@/lib/work-orders/parse-repair-log"
 import {
@@ -513,10 +514,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setAssignSavingKey(key)
     try {
       const supabase = createBrowserSupabaseClient()
+      const assign = await workOrderAssignmentColumns(supabase, activeOrgId, userId)
       const { error } = await supabase
         .from("work_orders")
         .update({
-          assigned_user_id: userId,
+          ...assign,
           updated_at: new Date().toISOString(),
         })
         .eq("id", wo.id)
@@ -812,6 +814,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     const partsCents = Math.max(0, Math.round(parseFloat(draftPartsDollars || "0") * 100))
 
     const tid = (draft.technicianId ?? wo.technicianId) === "unassigned" ? null : (draft.technicianId ?? wo.technicianId)
+    const assign = await workOrderAssignmentColumns(supabase, activeOrgId, tid)
 
     const repairPayload: RepairLog = {
       ...wo.repairLog,
@@ -828,7 +831,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       type: uiTypeToDb((draft.type ?? wo.type) as WorkOrderType),
       scheduled_on: (draft.scheduledDate ?? wo.scheduledDate) || null,
       scheduled_time: normalizeTimeForDb(draft.scheduledTime ?? wo.scheduledTime ?? ""),
-      assigned_user_id: tid,
+      ...assign,
       notes: notesInternal.trim() || null,
       total_labor_cents: laborCents,
       repair_log: repairLogJsonForPersist(repairPayload, {

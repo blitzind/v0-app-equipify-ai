@@ -59,6 +59,7 @@ import {
   type SuggestTech,
 } from "@/lib/dispatch/suggest-assignee"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
   DISPATCH_SLOT_COUNT,
   slotIndexToTimeHhMm,
@@ -1158,10 +1159,11 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
         .maybeSingle()
       const st = (prev as { status?: string } | null)?.status
       if (!st) return
+      const assign = await workOrderAssignmentColumns(supabase, organizationId, techId)
       const patch = buildSchedulePatch({
         scheduledOn: ymd,
         scheduledTimeHhMm: timeHhMm,
-        assignedUserId: techId,
+        assignment: assign,
         previousStatus: st,
       })
       const { error } = await supabase

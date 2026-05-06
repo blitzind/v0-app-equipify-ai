@@ -1,6 +1,7 @@
 import type { MaintenancePlan } from "@/lib/mock-data"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 export async function createWorkOrderFromMaintenancePlan(params: {
@@ -31,6 +32,12 @@ export async function createWorkOrderFromMaintenancePlan(params: {
   const planName = plan.name.trim() || "Maintenance plan"
   const problemReported = `Maintenance plan: ${planName}`
 
+  const assign = await workOrderAssignmentColumns(
+    supabase,
+    organizationId,
+    plan.technicianId?.trim() ? plan.technicianId.trim() : null,
+  )
+
   const { error } = await supabase.from("work_orders").insert({
     organization_id: organizationId,
     customer_id: plan.customerId,
@@ -41,7 +48,7 @@ export async function createWorkOrderFromMaintenancePlan(params: {
     type: uiTypeToDb(plan.workOrderType),
     scheduled_on: scheduledDate || null,
     scheduled_time: normalizeTimeForDb(scheduledTime),
-    assigned_user_id: plan.technicianId || null,
+    ...assign,
     maintenance_plan_id: plan.id,
     notes: null,
     problem_reported: problemReported,

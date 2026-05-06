@@ -4,6 +4,7 @@ import { useState, useEffect, type ComponentProps, type ElementType } from "reac
 import type { WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -453,6 +454,11 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
 
     const scheduledTime = normalizeTimeForDb(windowStartTime(form.timeWindow))
     const problemReported = form.notes.trim() || title
+    const assign = await workOrderAssignmentColumns(
+      supabase,
+      activeOrgId,
+      form.technicianId?.trim() ? form.technicianId.trim() : null,
+    )
 
     const { error: insertError } = await supabase.from("work_orders").insert({
       organization_id: activeOrgId,
@@ -464,7 +470,7 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       type: uiTypeToDb(form.serviceType as WorkOrderType),
       scheduled_on: form.date,
       scheduled_time: scheduledTime,
-      assigned_user_id: form.technicianId,
+      ...assign,
       notes: notesCombined,
       problem_reported: problemReported,
       repair_log: {

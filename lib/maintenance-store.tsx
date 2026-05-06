@@ -27,6 +27,7 @@ import {
   serializeServicesForDb,
 } from "@/lib/maintenance-plans/db-map"
 import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
+import { maintenancePlanAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 export type { RecordArchiveVisibility }
@@ -181,13 +182,18 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
       const { interval_value, interval_unit } = intervalToDb(merged.interval, merged.customIntervalDays)
 
       const supabase = createBrowserSupabaseClient()
+      const assign = await maintenancePlanAssignmentColumns(
+        supabase,
+        organizationId,
+        merged.technicianId?.trim() ? merged.technicianId.trim() : null,
+      )
       const { error: upError } = await supabase
         .from("maintenance_plans")
         .update({
           customer_id: merged.customerId,
           equipment_id: merged.equipmentId?.trim() ? merged.equipmentId : null,
           status: planStatusUiToDb(merged.status),
-          assigned_user_id: merged.technicianId?.trim() ? merged.technicianId : null,
+          ...assign,
           name: merged.name.trim(),
           interval_value,
           interval_unit,

@@ -34,6 +34,9 @@ export async function loadMaintenancePlansForOrg(
   const equipmentIds = [
     ...new Set(list.map((r) => r.equipment_id).filter((id): id is string => Boolean(id))),
   ]
+  const assignedTechRowIds = [
+    ...new Set(list.map((r) => r.assigned_technician_id).filter((id): id is string => Boolean(id))),
+  ]
   const techIds = [...new Set(list.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id)))]
 
   const customerMap = new Map<string, string>()
@@ -80,6 +83,22 @@ export async function loadMaintenancePlansForOrg(
     })
   }
 
+  const technicianRowNameById = new Map<string, string>()
+  if (assignedTechRowIds.length > 0) {
+    const { data: techRows } = await supabase
+      .from("technicians")
+      .select("id, full_name")
+      .eq("organization_id", organizationId)
+      .in("id", assignedTechRowIds)
+
+    ;(
+      (techRows as Array<{ id: string; full_name: string | null }> | null) ?? []
+    ).forEach((t) => {
+      const label = (t.full_name && t.full_name.trim()) || "Technician"
+      technicianRowNameById.set(t.id, label)
+    })
+  }
+
   const profileMap = new Map<string, string>()
   if (techIds.length > 0) {
     const { data: profRows } = await supabase
@@ -112,7 +131,11 @@ export async function loadMaintenancePlansForOrg(
         : "Equipment",
       equipmentCategory: eq?.category ?? "",
       location: eq?.location ?? "",
-      technicianName: row.assigned_user_id ? profileMap.get(row.assigned_user_id) ?? "—" : "—",
+      technicianName: row.assigned_technician_id
+        ? technicianRowNameById.get(row.assigned_technician_id) ?? "—"
+        : row.assigned_user_id
+          ? profileMap.get(row.assigned_user_id) ?? "—"
+          : "—",
     })
   })
 

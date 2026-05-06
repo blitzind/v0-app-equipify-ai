@@ -8,6 +8,7 @@ import {
   type MaintenancePlanRow,
 } from "@/lib/maintenance-plans/db-map"
 import { uiPriorityToDb, uiTypeToDb, normalizeTimeForDb } from "@/lib/work-orders/db-map"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 
 export type ProcessDuePlansResult = {
   processed: number
@@ -162,6 +163,12 @@ export async function processDuePlansForOrganization(
     const planTitle = String(row.name ?? "").trim() || "Maintenance plan"
     const problemReported = `${planTitle} — Preventive maintenance due ${dueDate}.`
 
+    const assign = await workOrderAssignmentColumns(
+      supabase,
+      row.organization_id,
+      row.assigned_technician_id ?? row.assigned_user_id ?? null,
+    )
+
     const insertPayload: Record<string, unknown> = {
       organization_id: row.organization_id,
       customer_id: row.customer_id,
@@ -172,7 +179,7 @@ export async function processDuePlansForOrganization(
       type: uiTypeToDb(workOrderType),
       scheduled_on: dueDate,
       scheduled_time: windowTime,
-      assigned_user_id: row.assigned_user_id,
+      ...assign,
       maintenance_plan_id: row.id,
       notes: pmNotes,
       problem_reported: problemReported,

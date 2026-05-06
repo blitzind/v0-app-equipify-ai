@@ -9,6 +9,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { normalizeTimeForDb, uiPriorityToDb } from "@/lib/work-orders/db-map"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
@@ -479,6 +480,7 @@ export function ScheduleJobModal({
 
     const notesCombined = notes.trim() || null
     const problemReported = notes.trim() || title
+    const assign = await workOrderAssignmentColumns(supabase, activeOrgId, tech.id)
 
     const { error: insertErr } = await supabase.from("work_orders").insert({
       organization_id: activeOrgId,
@@ -492,7 +494,7 @@ export function ScheduleJobModal({
       scheduled_time: timeDb,
       notes: notesCombined,
       problem_reported: problemReported,
-      assigned_user_id: tech.id,
+      ...assign,
       repair_log: {
         problemReported,
         diagnosis: "",

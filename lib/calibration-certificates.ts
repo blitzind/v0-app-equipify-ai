@@ -4,7 +4,6 @@ import type { RepairLog } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { buildCertificatePdfHtml } from "@/lib/certificates/certificate-pdf-html"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { signedUrlForAttachmentPath } from "@/lib/work-orders/work-order-tab-data"
 
@@ -360,6 +359,7 @@ type WoCertListRow = {
   completed_at: string | null
   scheduled_on: string | null
   assigned_user_id: string | null
+  assigned_technician_id?: string | null
   repair_log: unknown
   signature_url: string | null
   signature_captured_at: string | null
@@ -371,30 +371,30 @@ async function fetchWorkOrdersForCertificateList(
   workOrderIds: string[],
 ): Promise<Map<string, WoCertListRow>> {
   if (workOrderIds.length === 0) return new Map()
-  const baseFields =
-    "id, work_order_number, customer_id, equipment_id, title, status, completed_at, scheduled_on, assigned_user_id, repair_log, signature_url, signature_captured_at"
-  const withNum = baseFields
-  const withoutNum = baseFields.replace("work_order_number, ", "")
+  const selectAttempts = [
+    "id, work_order_number, customer_id, equipment_id, title, status, completed_at, scheduled_on, assigned_user_id, assigned_technician_id, repair_log, signature_url, signature_captured_at",
+    "id, work_order_number, customer_id, equipment_id, title, status, completed_at, scheduled_on, assigned_user_id, repair_log, signature_url, signature_captured_at",
+    "id, customer_id, equipment_id, title, status, completed_at, scheduled_on, assigned_user_id, assigned_technician_id, repair_log, signature_url, signature_captured_at",
+    "id, customer_id, equipment_id, title, status, completed_at, scheduled_on, assigned_user_id, repair_log, signature_url, signature_captured_at",
+  ]
 
-  const first = await supabase
-    .from("work_orders")
-    .select(withNum)
-    .eq("organization_id", organizationId)
-    .in("id", workOrderIds)
-
-  let rowList: WoCertListRow[] = (first.data ?? []) as unknown as WoCertListRow[]
-  let err = first.error
-  if (err && missingWorkOrderNumberColumn(err)) {
-    const second = await supabase
+  let rowList: WoCertListRow[] = []
+  let lastErr: { message: string } | null = null
+  for (const sel of selectAttempts) {
+    const res = await supabase
       .from("work_orders")
-      .select(withoutNum)
+      .select(sel)
       .eq("organization_id", organizationId)
       .in("id", workOrderIds)
-    rowList = (second.data ?? []) as unknown as WoCertListRow[]
-    err = second.error
+    if (!res.error) {
+      rowList = (res.data ?? []) as unknown as WoCertListRow[]
+      lastErr = null
+      break
+    }
+    lastErr = res.error
   }
+  if (lastErr) throw new Error(lastErr.message)
 
-  if (err) throw new Error(err.message)
   const map = new Map<string, WoCertListRow>()
   for (const row of rowList) {
     const r = row as WoCertListRow
@@ -464,6 +464,7 @@ export async function listCompletedCertificatesForOrg(
   const customerIds = new Set<string>()
   const equipmentIds = new Set<string>()
   const assigneeIds = new Set<string>()
+  const assignedTechnicianRowIds = new Set<string>()
 
   for (const r of records as CalibrationRecordRow[]) {
     const wo = woMap.get(r.work_order_id)
@@ -471,11 +472,13 @@ export async function listCompletedCertificatesForOrg(
     customerIds.add(wo.customer_id)
     equipmentIds.add(r.equipment_id ?? wo.equipment_id)
     if (wo.assigned_user_id) assigneeIds.add(wo.assigned_user_id)
+    if (wo.assigned_technician_id) assignedTechnicianRowIds.add(wo.assigned_technician_id)
   }
 
   const emptyProfiles: { id: string; full_name: string | null; email: string | null }[] = []
+  const emptyTechRows: { id: string; full_name: string | null }[] = []
 
-  const [custRes, eqRes, profRes] = await Promise.all([
+  const [custRes, eqRes, profRes, techRes] = await Promise.all([
     customerIds.size
       ? supabase
           .from("customers")
@@ -503,11 +506,19 @@ export async function listCompletedCertificatesForOrg(
     assigneeIds.size
       ? supabase.from("profiles").select("id, full_name, email").in("id", [...assigneeIds])
       : Promise.resolve({ data: emptyProfiles, error: null }),
+    assignedTechnicianRowIds.size
+      ? supabase
+          .from("technicians")
+          .select("id, full_name")
+          .eq("organization_id", organizationId)
+          .in("id", [...assignedTechnicianRowIds])
+      : Promise.resolve({ data: emptyTechRows, error: null }),
   ])
 
   if (custRes.error) throw new Error(custRes.error.message)
   if (eqRes.error) throw new Error(eqRes.error.message)
   if (profRes.error) throw new Error(profRes.error.message)
+  if (techRes.error) throw new Error(techRes.error.message)
 
   const custMap = new Map((custRes.data ?? []).map((c) => [c.id, c.company_name]))
   const eqMap = new Map(
@@ -526,6 +537,12 @@ export async function listCompletedCertificatesForOrg(
     (profRes.data ?? []).map((p) => [
       p.id,
       (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || null,
+    ]),
+  )
+  const techProfMap = new Map(
+    (techRes.data ?? []).map((t) => [
+      t.id,
+      (t.full_name && t.full_name.trim()) || null,
     ]),
   )
 
@@ -548,7 +565,11 @@ export async function listCompletedCertificatesForOrg(
       : "Equipment"
     const customerName = custMap.get(wo.customer_id)?.trim() || "Unknown customer"
     const serviceLocation = eqRow?.location_label?.trim() ?? ""
-    const technicianName = wo.assigned_user_id ? profMap.get(wo.assigned_user_id) ?? null : null
+    const technicianName = wo.assigned_technician_id
+      ? techProfMap.get(wo.assigned_technician_id) ?? null
+      : wo.assigned_user_id
+        ? profMap.get(wo.assigned_user_id) ?? null
+        : null
     const repairLog = parseRepairLog(wo.repair_log)
 
     rows.push({

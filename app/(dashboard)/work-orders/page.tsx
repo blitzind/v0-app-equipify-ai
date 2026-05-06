@@ -285,37 +285,144 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
 
 // ─── Kanban view ──────────────────────────────────────────────────────────────
 
+const KANBAN_LANE_GAP_PX = 16 // tailwind gap-4
+
 function KanbanView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen: (id: string) => void }) {
-  const columns = KANBAN_COLUMNS.map((status) => ({
-    status,
-    items: workOrders.filter((wo) => wo.status === status),
-  }))
+  const columns = useMemo(
+    () =>
+      KANBAN_COLUMNS.map((status) => ({
+        status,
+        items: workOrders.filter((wo) => wo.status === status),
+      })),
+    [workOrders],
+  )
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [hScroll, setHScroll] = useState({ showLeft: false, showRight: false, canScroll: false })
+
+  const updateHScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    const maxScroll = Math.max(0, scrollWidth - clientWidth)
+    const canScroll = maxScroll > 4
+    setHScroll({
+      canScroll,
+      showLeft: canScroll && scrollLeft > 4,
+      showRight: canScroll && scrollLeft < maxScroll - 4,
+    })
+  }, [])
+
+  useEffect(() => {
+    updateHScroll()
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => updateHScroll())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updateHScroll, columns])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth + 1) return
+      if (e.shiftKey) return
+      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
+      if (Math.abs(e.deltaY) < 1) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [columns])
+
+  const laneScrollStepPx = useCallback(() => {
+    const root = scrollRef.current
+    if (!root) return 288 + KANBAN_LANE_GAP_PX
+    const lane = root.querySelector("[data-kanban-lane]") as HTMLElement | null
+    if (lane) return lane.getBoundingClientRect().width + KANBAN_LANE_GAP_PX
+    return Math.min(320, root.clientWidth * 0.85)
+  }, [])
+
+  const scrollKanban = useCallback(
+    (dir: "left" | "right") => {
+      const el = scrollRef.current
+      if (!el) return
+      const step = laneScrollStepPx() * (dir === "left" ? -1 : 1)
+      el.scrollBy({ left: step, behavior: "smooth" })
+      window.requestAnimationFrame(updateHScroll)
+      window.setTimeout(updateHScroll, 380)
+    },
+    [laneScrollStepPx, updateHScroll],
+  )
+
+  const arrowBtnClass =
+    "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-accent hover:text-foreground dark:bg-background/90"
 
   return (
-    <div className="flex gap-4 overflow-x-auto scrollbar-none pb-4 h-full">
-      {columns.map(({ status, items }) => (
-        <div key={status} className="flex flex-col gap-3 w-72 shrink-0">
-          {/* Column header */}
-          <div className={cn("flex items-center justify-between px-3 py-2 rounded-lg border", KANBAN_HEADER[status])}>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">{status}</span>
-            </div>
-            <span className="text-xs font-medium text-muted-foreground bg-card border border-border rounded-full px-2 py-0.5">
-              {items.length}
-            </span>
-          </div>
-          {/* Cards */}
-          <div className="flex flex-col gap-2.5 min-h-24">
-            {items.length === 0 ? (
-              <div className="flex items-center justify-center h-20 border border-dashed border-border rounded-lg">
-                <span className="text-xs text-muted-foreground">No work orders</span>
+    <div className="relative min-w-0">
+      {hScroll.canScroll && hScroll.showLeft && (
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-10 bg-gradient-to-r from-background via-background/85 to-transparent sm:w-14"
+          aria-hidden
+        />
+      )}
+      {hScroll.canScroll && hScroll.showRight && (
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-10 bg-gradient-to-l from-background via-background/85 to-transparent sm:w-14"
+          aria-hidden
+        />
+      )}
+
+      {hScroll.canScroll && hScroll.showLeft && (
+        <button
+          type="button"
+          aria-label="Scroll kanban left"
+          className={cn(arrowBtnClass, "left-0 sm:-left-1")}
+          onClick={() => scrollKanban("left")}
+        >
+          <ChevronLeft className="h-5 w-5" aria-hidden />
+        </button>
+      )}
+      {hScroll.canScroll && hScroll.showRight && (
+        <button
+          type="button"
+          aria-label="Scroll kanban right"
+          className={cn(arrowBtnClass, "right-0 sm:-right-1")}
+          onClick={() => scrollKanban("right")}
+        >
+          <ChevronRight className="h-5 w-5" aria-hidden />
+        </button>
+      )}
+
+      <div
+        ref={scrollRef}
+        onScroll={updateHScroll}
+        className="flex gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth pb-4 [-webkit-overflow-scrolling:touch] scrollbar-none"
+      >
+        {columns.map(({ status, items }) => (
+          <div key={status} data-kanban-lane className="flex w-72 shrink-0 flex-col gap-3">
+            <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2", KANBAN_HEADER[status])}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">{status}</span>
               </div>
-            ) : (
-              items.map((wo) => <KanbanCard key={wo.id} wo={wo} onOpen={() => onOpen(wo.id)} />)
-            )}
+              <span className="rounded-full border border-border bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {items.length}
+              </span>
+            </div>
+            <div className="flex min-h-24 flex-col gap-2.5">
+              {items.length === 0 ? (
+                <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
+                  <span className="text-xs text-muted-foreground">No work orders</span>
+                </div>
+              ) : (
+                items.map((wo) => <KanbanCard key={wo.id} wo={wo} onOpen={() => onOpen(wo.id)} />)
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
@@ -557,7 +664,7 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
   )
 }
 
-// ─── Main page ─────────────────────────────────────────��──────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 function WorkOrdersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
@@ -891,84 +998,26 @@ function WorkOrdersPageInner() {
     return m
   }, [workOrders])
 
-  const statusStripRef = useRef<HTMLDivElement>(null)
-  const [statusScroll, setStatusScroll] = useState({ showLeft: false, showRight: false, canScroll: false })
-
-  const updateStatusScroll = useCallback(() => {
-    const el = statusStripRef.current
-    if (!el) return
-    const { scrollLeft, scrollWidth, clientWidth } = el
-    const maxScroll = Math.max(0, scrollWidth - clientWidth)
-    const canScroll = maxScroll > 4
-    setStatusScroll({
-      canScroll,
-      showLeft: canScroll && scrollLeft > 4,
-      showRight: canScroll && scrollLeft < maxScroll - 4,
-    })
-  }, [])
-
-  useEffect(() => {
-    updateStatusScroll()
-    const el = statusStripRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => updateStatusScroll())
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [updateStatusScroll, counts])
-
-  const scrollStatusStrip = useCallback((dir: "left" | "right") => {
-    const el = statusStripRef.current
-    if (!el) return
-    const delta = Math.min(280, el.clientWidth * 0.85) * (dir === "left" ? -1 : 1)
-    el.scrollBy({ left: delta, behavior: "smooth" })
-    window.requestAnimationFrame(() => updateStatusScroll())
-    setTimeout(updateStatusScroll, 320)
-  }, [updateStatusScroll])
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Stat strip — horizontal scroll on narrow viewports; arrow controls when overflowing */}
-      <div className="relative min-w-0 flex items-center gap-1 sm:gap-2">
-        {statusScroll.canScroll && statusScroll.showLeft && (
+      {/* Status KPI cards — responsive grid (no horizontal slider / arrows) */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
+        {ALL_STATUSES.map((s) => (
           <button
+            key={s}
             type="button"
-            aria-label="Scroll status cards left"
-            className="shrink-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground md:h-10 md:w-10"
-            onClick={() => scrollStatusStrip("left")}
+            onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+            className={cn(
+              "flex w-full flex-col gap-0.5 rounded-lg border bg-card p-3 text-left transition-all hover:border-primary/40",
+              statusFilter === s && "border-primary ring-1 ring-primary/20",
+            )}
           >
-            <ChevronLeft className="h-5 w-5" aria-hidden />
+            <span className="text-xl font-bold text-foreground sm:text-2xl">{counts[s] ?? 0}</span>
+            <span className={cn("w-fit max-w-full truncate rounded-full border px-2 py-0.5 text-xs font-medium", STATUS_STYLE[s])}>
+              {s}
+            </span>
           </button>
-        )}
-        <div
-          ref={statusStripRef}
-          onScroll={updateStatusScroll}
-          className="flex min-w-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden scroll-smooth scrollbar-none pb-1 sm:gap-3"
-        >
-          {ALL_STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
-              className={cn(
-                "flex min-w-[9.25rem] shrink-0 flex-col gap-0.5 rounded-lg border bg-card p-3 text-left transition-all hover:border-primary/40 sm:min-w-[10rem]",
-                statusFilter === s && "border-primary ring-1 ring-primary/20"
-              )}
-            >
-              <span className="text-xl font-bold text-foreground sm:text-2xl">{counts[s] ?? 0}</span>
-              <span className={cn("max-w-full truncate rounded-full border px-2 py-0.5 text-xs font-medium w-fit", STATUS_STYLE[s])}>{s}</span>
-            </button>
-          ))}
-        </div>
-        {statusScroll.canScroll && statusScroll.showRight && (
-          <button
-            type="button"
-            aria-label="Scroll status cards right"
-            className="shrink-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground md:h-10 md:w-10"
-            onClick={() => scrollStatusStrip("right")}
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden />
-          </button>
-        )}
+        ))}
       </div>
 
       {/* Toolbar: search & filters (left) · view mode + primary action (right) */}
@@ -1079,7 +1128,12 @@ function WorkOrdersPageInner() {
       )}
 
       {/* Views */}
-      <div className={cn("flex-1 overflow-hidden", view !== "kanban" && "overflow-y-auto")}>
+      <div
+        className={cn(
+          "min-h-0 flex-1",
+          view === "kanban" ? "overflow-x-visible overflow-y-visible pb-1" : "overflow-y-auto",
+        )}
+      >
         {view === "kanban" && <KanbanView workOrders={filtered} onOpen={setSelectedWoId} />}
         {view === "table" && (
           <TableView

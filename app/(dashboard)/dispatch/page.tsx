@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
   queryOrganizationMembersForRoster,
   queryProfilesForRoster,
@@ -233,10 +234,11 @@ function DispatchPageInner() {
 
     setPersistBusy(true)
     const supabase = createBrowserSupabaseClient()
+    const assign = await workOrderAssignmentColumns(supabase, activeOrgId, args.assignedUserId)
     const patch = buildSchedulePatch({
       scheduledOn: args.scheduledOn,
       scheduledTimeHhMm: args.scheduledTimeHhMm,
-      assignedUserId: args.assignedUserId,
+      assignment: assign,
       previousStatus: wo.status,
     })
 

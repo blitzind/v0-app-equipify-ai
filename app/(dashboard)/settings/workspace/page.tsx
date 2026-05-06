@@ -20,6 +20,11 @@ const DATE_FORMATS = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"]
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD"]
 const ACCENT_PRESETS = ["#2563eb", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#16a34a", "#0284c7", "#db2777"]
 
+function apiErrorDescription(body: { error?: string; message?: string } | null | undefined, fallback: string) {
+  const parts = [body?.error, body?.message].filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+  return parts.length ? parts.join(": ") : fallback
+}
+
 function SettingCard({
   title,
   description,
@@ -354,13 +359,14 @@ export default function WorkspacePage() {
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace/logo`, {
         method: "POST",
         body: fd,
+        credentials: "same-origin",
       })
-      const data = (await res.json()) as { ok?: boolean; logoUrl?: string; message?: string }
+      const data = (await res.json()) as { ok?: boolean; logoUrl?: string; message?: string; error?: string }
       if (!res.ok) {
         toast({
           variant: "destructive",
           title: "Upload failed",
-          description: typeof data.message === "string" ? data.message : "Could not upload logo.",
+          description: apiErrorDescription(data, "Could not upload logo."),
         })
         return
       }
@@ -387,19 +393,25 @@ export default function WorkspacePage() {
       fd.set("file", file)
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/workspace/document-logo`,
-        { method: "POST", body: fd },
+        { method: "POST", body: fd, credentials: "same-origin" },
       )
-      const data = (await res.json()) as { ok?: boolean; documentLogoUrl?: string; message?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        documentLogoUrl?: string
+        message?: string
+        error?: string
+      }
       if (!res.ok) {
         toast({
           variant: "destructive",
           title: "Upload failed",
-          description: typeof data.message === "string" ? data.message : "Could not upload document logo.",
+          description: apiErrorDescription(data, "Could not upload document logo."),
         })
         return
       }
       if (data.documentLogoUrl) {
         setDocumentLogoUrl(data.documentLogoUrl)
+        dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
       }
       await refetchWorkspace()
       toast({ title: "Document logo updated" })

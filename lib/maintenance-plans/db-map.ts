@@ -18,6 +18,7 @@ export type MaintenancePlanRow = {
   customer_id: string
   equipment_id: string | null
   assigned_user_id: string | null
+  assigned_technician_id?: string | null
   name: string
   status: "active" | "paused" | "expired"
   priority: "low" | "normal" | "high" | "critical"
@@ -242,7 +243,7 @@ export function rowToMaintenancePlan(
     equipmentName: names.equipmentName,
     equipmentCategory: names.equipmentCategory,
     location: names.location,
-    technicianId: row.assigned_user_id ?? "",
+    technicianId: row.assigned_technician_id ?? row.assigned_user_id ?? "",
     technicianName: names.technicianName,
     interval,
     customIntervalDays,

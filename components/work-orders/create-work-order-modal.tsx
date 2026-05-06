@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
@@ -332,6 +333,11 @@ export function CreateWorkOrderModal({
     const supabase = createBrowserSupabaseClient()
 
     const problemText = problemReported.trim()
+    const assign = await workOrderAssignmentColumns(
+      supabase,
+      organizationId!,
+      technicianId && technicianId.trim() ? technicianId.trim() : null,
+    )
 
     const { data: inserted, error: insertError } = await supabase
       .from("work_orders")
@@ -347,7 +353,7 @@ export function CreateWorkOrderModal({
         scheduled_time: normalizeTimeForDb(scheduledTime),
         notes: null,
         problem_reported: problemText,
-        assigned_user_id: technicianId,
+        ...assign,
         repair_log: {
           problemReported: problemText,
           diagnosis: "",
