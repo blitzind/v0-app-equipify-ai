@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { sendEmail } from "@/lib/email/resend"
+import { insertTeamAuditEvent } from "@/lib/team-audit"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -69,16 +70,29 @@ export async function POST(request: Request) {
     .maybeSingle()
   const organizationName = (org as { name?: string } | null)?.name?.trim() || "Equipify"
 
-  const { error: inviteErr } = await admin.from("invites").insert({
-    email,
-    organization_id: organizationId,
-    role,
-    token,
-    expires_at: expiresAt,
-  })
+  const { data: insertedInvite, error: inviteErr } = await admin
+    .from("invites")
+    .insert({
+      email,
+      organization_id: organizationId,
+      role,
+      token,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single()
   if (inviteErr) {
     return NextResponse.json({ error: "invite_failed", message: inviteErr.message }, { status: 400 })
   }
+
+  await insertTeamAuditEvent({
+    organizationId,
+    action: "member_invited",
+    actorUserId: user.id,
+    recordType: "invite",
+    recordId: insertedInvite.id as string,
+    metadata: { email, role },
+  })
 
   const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.equipify.ai").replace(/\/$/, "")
   const inviteLink = `${appBaseUrl}/onboarding?inviteToken=${encodeURIComponent(token)}`

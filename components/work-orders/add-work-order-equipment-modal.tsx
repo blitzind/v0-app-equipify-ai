@@ -24,7 +24,7 @@ import { uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
-import { DrawerSection } from "@/components/detail-drawer"
+import { DrawerSection, DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
 
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
 const TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
@@ -267,7 +267,10 @@ export function AddWorkOrderEquipmentModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter by name, model, serial, code…"
-              className="mb-3 bg-white dark:bg-background"
+              className={cn(
+                DRAWER_FIELD_CLASS,
+                "mb-3 h-9 rounded-md px-3 text-sm shadow-xs transition-[color,box-shadow,border-color]",
+              )}
             />
 
             <div
@@ -347,7 +350,12 @@ export function AddWorkOrderEquipmentModal({
                                   disabled={!checked}
                                   onValueChange={(v) => setJobForEquipment(e.id, { type: v as WorkOrderType })}
                                 >
-                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                                  <SelectTrigger
+                                    className={cn(
+                                      DRAWER_FIELD_CLASS,
+                                      "w-full h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                                    )}
+                                  >
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -366,7 +374,12 @@ export function AddWorkOrderEquipmentModal({
                                   disabled={!checked}
                                   onValueChange={(v) => setJobForEquipment(e.id, { priority: v as WorkOrderPriority })}
                                 >
-                                  <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                                  <SelectTrigger
+                                    className={cn(
+                                      DRAWER_FIELD_CLASS,
+                                      "w-full h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                                    )}
+                                  >
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -387,7 +400,10 @@ export function AddWorkOrderEquipmentModal({
                                 onChange={(ev) => setJobForEquipment(e.id, { problemReported: ev.target.value })}
                                 placeholder="Problem reported for this asset…"
                                 rows={2}
-                                className="text-sm bg-white dark:bg-background resize-y min-h-[52px]"
+                                className={cn(
+                                  DRAWER_FIELD_CLASS,
+                                  "min-h-[52px] rounded-md px-3 py-2 text-sm shadow-xs resize-y transition-[color,box-shadow,border-color]",
+                                )}
                               />
                             </div>
                             <div className="flex flex-col gap-1.5">
@@ -398,7 +414,10 @@ export function AddWorkOrderEquipmentModal({
                                 onChange={(ev) => setJobForEquipment(e.id, { notes: ev.target.value })}
                                 placeholder="Technician or office notes for this asset…"
                                 rows={2}
-                                className="text-sm bg-white dark:bg-background resize-y min-h-[52px]"
+                                className={cn(
+                                  DRAWER_FIELD_CLASS,
+                                  "min-h-[52px] rounded-md px-3 py-2 text-sm shadow-xs resize-y transition-[color,box-shadow,border-color]",
+                                )}
                               />
                             </div>
                           </div>

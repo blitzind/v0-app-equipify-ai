@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { CheckCircle2, FileDown, Loader2, Mail, Save } from "lucide-react"
+import { DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
+import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -174,7 +176,10 @@ export function CertificateTabContent({
             <select
               value={selectedTemplateId}
               onChange={(e) => onTemplateChange(e.target.value)}
-              className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+              className={cn(
+                DRAWER_FIELD_CLASS,
+                "w-full px-2 py-1.5 cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+              )}
             >
               <option value="">Select template…</option>
               {templates.map((t) => (
@@ -386,7 +391,10 @@ export function CertificateTabContent({
                     <select
                       value={raw === "fail" ? "fail" : "pass"}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
-                      className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+                      className={cn(
+                DRAWER_FIELD_CLASS,
+                "w-full px-2 py-1.5 cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+              )}
                     >
                       <option value="pass">Pass</option>
                       <option value="fail">Fail</option>

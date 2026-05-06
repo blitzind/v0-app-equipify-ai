@@ -93,6 +93,7 @@ export function DrawerViewport({
   width = "md",
   transitionMs = DRAWER_TRANSITION_MS,
   ariaLabel = "Details",
+  /** Layout/animation only — never put `bg-*` here; `DRAWER_PANEL_SURFACE` is applied after and wins. */
   panelClassName,
   children,
 }: {
@@ -131,6 +132,7 @@ export function DrawerViewport({
         aria-label={ariaLabel}
         className={cn(
           "fixed top-0 right-0 h-full max-h-dvh w-full border-l border-border shadow-2xl",
+          panelClassName,
           DRAWER_PANEL_SURFACE,
           DRAWER_DESCENDANT_FIELD_OVERRIDES,
           DRAWER_DESCENDANT_LIST_HOVER,
@@ -138,7 +140,6 @@ export function DrawerViewport({
           DRAWER_PANEL_Z,
           widthClass,
           open ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none",
-          panelClassName
         )}
         style={{ transitionDuration: `${transitionMs}ms` }}
       >

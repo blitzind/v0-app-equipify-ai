@@ -35,15 +35,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname()
 
   return (
-    <div className="flex flex-col gap-0 md:gap-6">
-      {/* Page header — desktop only (mobile uses topbar) */}
-      <div className="hidden md:block border-b border-border pb-5">
-        <h1 className="text-xl font-semibold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Manage your workspace, account, and platform configuration.
-        </p>
-      </div>
-
+    <div className="flex flex-col gap-0 md:gap-5">
       {/* Mobile: scrollable horizontal tab strip */}
       <nav
         className="md:hidden flex items-center gap-1 overflow-x-auto scrollbar-none border-b border-border bg-card px-3 py-2 -mx-4 sticky top-0 z-20"
@@ -70,7 +62,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         })}
       </nav>
 
-      <div className="flex gap-8 items-start mt-4 md:mt-0">
+      <div className="flex gap-8 items-start mt-3 md:mt-0">
         {/* Desktop: left sidebar nav */}
         <nav className="hidden md:flex w-48 shrink-0 flex-col gap-0.5 sticky top-4" aria-label="Settings navigation">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {

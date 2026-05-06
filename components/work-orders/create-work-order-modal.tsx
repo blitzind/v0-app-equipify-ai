@@ -29,7 +29,7 @@ import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
-import { DrawerSection } from "@/components/detail-drawer"
+import { DrawerSection, DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -488,7 +488,13 @@ export function CreateWorkOrderModal({
                     setJobByEquipmentId({})
                   }}
                 >
-                  <SelectTrigger id="create-wo-customer" className="w-full max-w-none bg-white dark:bg-background">
+                  <SelectTrigger
+                    id="create-wo-customer"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "w-full max-w-none h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                    )}
+                  >
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -607,7 +613,12 @@ export function CreateWorkOrderModal({
                                     disabled={!checked}
                                     onValueChange={(v) => setJobForEquipment(e.id, { type: v as WorkOrderType })}
                                   >
-                                    <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                                    <SelectTrigger
+                                      className={cn(
+                                        DRAWER_FIELD_CLASS,
+                                        "w-full h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                                      )}
+                                    >
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -628,7 +639,12 @@ export function CreateWorkOrderModal({
                                       setJobForEquipment(e.id, { priority: v as WorkOrderPriority })
                                     }
                                   >
-                                    <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                                    <SelectTrigger
+                                      className={cn(
+                                        DRAWER_FIELD_CLASS,
+                                        "w-full h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                                      )}
+                                    >
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -666,7 +682,12 @@ export function CreateWorkOrderModal({
                     Assign technician <span className="text-destructive">*</span>
                   </Label>
                   <Select value={technicianId} onValueChange={setTechnicianId}>
-                    <SelectTrigger className="w-full bg-white dark:bg-background">
+                    <SelectTrigger
+                      className={cn(
+                        DRAWER_FIELD_CLASS,
+                        "w-full h-9 rounded-md px-3 text-sm shadow-xs justify-between",
+                      )}
+                    >
                       <SelectValue placeholder="Select technician" />
                     </SelectTrigger>
                     <SelectContent>
@@ -693,7 +714,10 @@ export function CreateWorkOrderModal({
                   </Label>
                   <Input
                     type="date"
-                    className="bg-white dark:bg-background"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "h-9 rounded-md px-3 text-sm shadow-xs transition-[color,box-shadow,border-color]",
+                    )}
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
                   />
@@ -702,7 +726,10 @@ export function CreateWorkOrderModal({
                   <Label>Scheduled time</Label>
                   <Input
                     type="time"
-                    className="bg-white dark:bg-background"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "h-9 rounded-md px-3 text-sm shadow-xs transition-[color,box-shadow,border-color]",
+                    )}
                     value={scheduledTime}
                     onChange={(e) => setScheduledTime(e.target.value)}
                   />
@@ -722,6 +749,10 @@ export function CreateWorkOrderModal({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "min-h-[4.5rem] rounded-md px-3 py-2 text-sm shadow-xs resize-y transition-[color,box-shadow,border-color]",
+                    )}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -734,6 +765,10 @@ export function CreateWorkOrderModal({
                     value={problemReported}
                     onChange={(e) => setProblemReported(e.target.value)}
                     rows={3}
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "min-h-[4.5rem] rounded-md px-3 py-2 text-sm shadow-xs resize-y transition-[color,box-shadow,border-color]",
+                    )}
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Stored on the work order and copied to each selected asset row for traceability.

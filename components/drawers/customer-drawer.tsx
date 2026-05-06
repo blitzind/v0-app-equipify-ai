@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch"
 import {
   DetailDrawer,
   DRAWER_ANCHORED_SURFACE,
+  DRAWER_FIELD_CLASS,
+  DRAWER_NESTED_CARD,
   DrawerRow,
   DrawerToastStack,
   type ToastItem,
@@ -57,7 +59,7 @@ function EditInput({ value, onChange, placeholder }: { value: string; onChange: 
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+      className={cn(DRAWER_FIELD_CLASS, "w-full focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
     />
   )
 }
@@ -69,7 +71,7 @@ function EditTextarea({ value, onChange, placeholder }: { value: string; onChang
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+      className={cn(DRAWER_FIELD_CLASS, "w-full resize-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
     />
   )
 }
@@ -79,7 +81,7 @@ function EditSelect({ value, onChange, options }: { value: string; onChange: (v:
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+      className={cn(DRAWER_FIELD_CLASS, "w-full cursor-pointer focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -284,7 +286,7 @@ function LocationForm({ title, initial = EMPTY_LOCATION_DRAFT, onSave, onCancel 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground ds-hover-list-row-menu transition-colors"
+            className={cn(DRAWER_ANCHORED_SURFACE, "px-3.5 py-1.5 text-xs font-medium rounded-md text-foreground ds-hover-list-row-menu transition-colors")}
           >
             Cancel
           </button>
@@ -328,7 +330,7 @@ function DeleteConfirm({ hasRelatedRecords, onArchive, onDelete, onCancel }: Del
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/20">
           <button
             onClick={onCancel}
-            className="px-3.5 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground ds-hover-list-row-menu transition-colors"
+            className={cn(DRAWER_ANCHORED_SURFACE, "px-3.5 py-1.5 text-xs font-medium rounded-md text-foreground ds-hover-list-row-menu transition-colors")}
           >
             Cancel
           </button>
@@ -1388,7 +1390,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 type="button"
                 disabled
                 title="Coming soon"
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60"
+                className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
               >
                 <Paintbrush size={12} className="text-muted-foreground" />
                 Edit Branding
@@ -1397,7 +1399,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 type="button"
                 disabled
                 title="Coming soon"
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60"
+                className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
               >
                 <UserCog size={12} className="text-muted-foreground" />
                 Portal Contacts
@@ -1407,7 +1409,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             {/* Module toggles */}
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Enabled modules</p>
-              <div className="divide-y divide-border/60 rounded-lg border border-border/80 bg-card">
+              <div className={cn(DRAWER_NESTED_CARD, "divide-y divide-border/60 rounded-lg shadow-none")}>
                 {(Object.entries(portalModules) as [keyof typeof portalModules, boolean][]).map(([key, enabled]) => {
                   const labels: Record<keyof typeof portalModules, string> = {
                     workOrders: "Work Orders",
@@ -1753,9 +1755,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               if (!activeOrgId || !customerId) return
               const supabase = createBrowserSupabaseClient()
               void (async () => {
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser()
                 const { error } = await supabase
                   .from("customer_locations")
-                  .update({ archived_at: new Date().toISOString() })
+                  .update({
+                    archived_at: new Date().toISOString(),
+                    archived_by: user?.id ?? null,
+                  })
                   .eq("id", deleteTarget)
                   .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)
@@ -1770,9 +1778,15 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               if (!activeOrgId || !customerId) return
               const supabase = createBrowserSupabaseClient()
               void (async () => {
+                const {
+                  data: { user },
+                } = await supabase.auth.getUser()
                 const { error } = await supabase
                   .from("customer_locations")
-                  .update({ archived_at: new Date().toISOString() })
+                  .update({
+                    archived_at: new Date().toISOString(),
+                    archived_by: user?.id ?? null,
+                  })
                   .eq("id", deleteTarget)
                   .eq("organization_id", activeOrgId)
                   .eq("customer_id", customerId)

@@ -4,6 +4,7 @@ import { useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useCertificates } from "@/lib/certificate-store"
 import type { CalibrationCertificate } from "@/lib/mock-data"
+import { DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
 import { Button } from "@/components/ui/button"
 import {
   Upload, FileText, Trash2, Download, Link2, Unlink,
@@ -197,7 +198,7 @@ function ExpiryRow({ value, onChange }: { value: string; onChange: (v: string) =
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 rounded border border-border bg-background px-2 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/40 transition-colors"
+        className={cn(DRAWER_FIELD_CLASS, "flex-1 py-0.5 focus:ring-1 focus:ring-primary/40 transition-colors")}
       />
     </div>
   )
@@ -275,7 +276,7 @@ export function CertificatePanel({
           value={pendingNotes}
           onChange={(e) => setPendingNotes(e.target.value)}
           placeholder="Notes (optional)"
-          className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/40 transition-colors"
+          className={cn(DRAWER_FIELD_CLASS, "focus:ring-1 focus:ring-primary/40 transition-colors")}
         />
         <UploadZone onUpload={handleUpload} />
       </div>

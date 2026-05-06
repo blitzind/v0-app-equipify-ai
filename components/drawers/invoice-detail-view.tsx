@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
+  DRAWER_FIELD_CLASS,
   DRAWER_NESTED_CARD,
   DRAWER_STACKED_MODAL,
 } from "@/components/detail-drawer"
@@ -625,7 +626,7 @@ function SettingsPanel({
             value={settings.customTitle}
             onChange={(e) => set("customTitle", e.target.value)}
             placeholder="INVOICE"
-            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className={cn(DRAWER_FIELD_CLASS, "w-full px-2 py-1.5")}
           />
         </div>
         <div>
@@ -633,7 +634,7 @@ function SettingsPanel({
           <select
             value={settings.paymentTerms}
             onChange={(e) => set("paymentTerms", e.target.value)}
-            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
+            className={cn(DRAWER_FIELD_CLASS, "w-full px-2 py-1.5 cursor-pointer")}
           >
             {["Net 15", "Net 30", "Net 45", "Net 60", "Due on Receipt"].map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -652,7 +653,7 @@ function SettingsPanel({
                   "flex-1 py-1.5 rounded border text-xs font-medium transition-colors cursor-pointer",
                   settings.invoiceTheme === t.value
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background dark:bg-background text-foreground border-border hover:border-primary/50",
+                    : "bg-transparent text-foreground border-border hover:border-primary/50",
                 )}
               >
                 {t.label}
@@ -785,17 +786,17 @@ function EmailModal({
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">To</label>
             <input type="email" value={to} onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Subject</label>
             <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 resize-none")} />
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border">
             <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -854,12 +855,12 @@ function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => 
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Message</label>
             <textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 resize-none")} />
             <p className="text-[10px] text-muted-foreground mt-1 text-right">{msg.length} / 160 chars</p>
           </div>
         </div>
@@ -901,12 +902,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Amount Received</label>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Method</label>
             <select value={method} onChange={(e) => setMethod(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 cursor-pointer")}>
               {["Check", "ACH / Bank Transfer", "Credit Card", "Cash", "Zelle", "Other"].map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
@@ -915,12 +916,12 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Reference / Check Number</label>
             <input type="text" value={refNum} onChange={(e) => setRefNum(e.target.value)} placeholder="Optional"
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Date</label>
             <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
@@ -1008,7 +1009,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Due Date">
             <input type="date" value={draft.dueDate ?? ""} onChange={(e) => setField("dueDate", e.target.value)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+              className={cn(DRAWER_FIELD_CLASS, "w-full")} />
           </EditRow>
         ) : (
           <Row label="Due Date" value={
@@ -1018,7 +1019,7 @@ function InfoTab({
         {editing ? (
           <EditRow label="Status">
             <select value={draft.status ?? invoice.status} onChange={(e) => setField("status", e.target.value as InvoiceStatus)}
-              className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer">
+              className={cn(DRAWER_FIELD_CLASS, "w-full cursor-pointer")}>
               {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </EditRow>
@@ -1062,10 +1063,10 @@ function InfoTab({
             value={draft.notes ?? ""}
             onChange={(e) => setField("notes", e.target.value)}
             placeholder="Add notes..."
-            className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
+            className={cn(DRAWER_FIELD_CLASS, "w-full resize-none")}
           />
         ) : invoice.notes ? (
-          <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background dark:bg-background rounded-lg border border-border">{invoice.notes}</p>
+          <p className={cn(DRAWER_NESTED_CARD, "text-xs text-muted-foreground leading-relaxed p-3")}>{invoice.notes}</p>
         ) : (
           <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
         )}
@@ -1122,7 +1123,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
             { date: fmtDate(invoice.dueDate),   event: "Payment due",    detail: "",                     type: invoice.status === "Overdue" ? "danger" : "neutral" },
             ...(invoice.paidDate ? [{ date: fmtDate(invoice.paidDate), event: "Payment received", detail: fmtCurrency(grandTotal), type: "success" }] : []),
           ].map((e, i) => (
-            <div key={i} className="flex items-center gap-3 p-2.5 rounded-md bg-card border border-border">
+            <div key={i} className={cn(DRAWER_NESTED_CARD, "flex items-center gap-3 p-2.5 rounded-md shadow-none")}>
               <div className={cn(
                 "w-2 h-2 rounded-full shrink-0",
                 e.type === "success" ? "bg-[color:var(--status-success)]"
@@ -1199,7 +1200,7 @@ function CommentsTab() {
                 )}
                 <span className="text-[10px] text-muted-foreground">{c.time}</span>
               </div>
-              <p className="text-xs text-foreground leading-relaxed bg-background dark:bg-background border border-border rounded-lg px-3 py-2">{c.text}</p>
+              <p className={cn(DRAWER_NESTED_CARD, "text-xs text-foreground leading-relaxed px-3 py-2")}>{c.text}</p>
             </div>
           </div>
         ))}
@@ -1211,7 +1212,7 @@ function CommentsTab() {
           onChange={(e) => setComment(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addComment()}
           placeholder="Add a comment..."
-          className="flex-1 rounded border border-border bg-background dark:bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+          className={cn(DRAWER_FIELD_CLASS, "flex-1 px-3 py-2")}
         />
         <Button size="sm" variant="outline" onClick={addComment} className="text-xs cursor-pointer px-3">Post</Button>
       </div>
@@ -1233,7 +1234,10 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
     <div className="space-y-2">
       <Link
         href={`/work-orders?open=${invoice.workOrderId}`}
-        className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:border-primary/30 ds-hover-list-row-xs cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        className={cn(
+          DRAWER_NESTED_CARD,
+          "flex items-center justify-between p-3 rounded-xl hover:border-primary/30 ds-hover-list-row-xs cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
+        )}
       >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -1339,15 +1343,15 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
             <tr key={i}>
               <td className="px-1 py-1.5">
                 <input type="text" value={item.description} onChange={(e) => updateItem(i, "description", e.target.value)} placeholder="Item description"
-                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className={cn(DRAWER_FIELD_CLASS, "w-full focus:ring-1")} />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)}
-                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className={cn(DRAWER_FIELD_CLASS, "w-full text-right focus:ring-1")} />
               </td>
               <td className="px-1 py-1.5">
                 <input type="number" value={item.unit} onChange={(e) => updateItem(i, "unit", e.target.value)}
-                  className="w-full rounded border border-border bg-background dark:bg-background px-2 py-1 text-xs text-right text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors" />
+                  className={cn(DRAWER_FIELD_CLASS, "w-full text-right focus:ring-1")} />
               </td>
               <td className="px-2 py-1.5 text-right font-medium text-foreground">{fmtCurrency(item.qty * item.unit)}</td>
               <td className="px-1 py-1.5 text-center">
@@ -1551,7 +1555,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   return (
     <>
       {/* ── Top action bar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-background flex-wrap shrink-0">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] flex-wrap shrink-0">
         {editing ? (
           <>
             <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
@@ -1794,13 +1798,13 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
       {/* ── Preview + Settings toggle bar ──────────────────────────────────── */}
       {!editing && !invoice.isArchived && (
-        <div className="flex items-center gap-2 px-5 py-2 border-b border-border bg-background shrink-0">
+        <div className="flex items-center gap-2 px-5 py-2 border-b border-border dark:border-[#25324C] shrink-0">
           <button
             type="button"
             onClick={() => setShowPreview((p) => !p)}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors cursor-pointer",
-              showPreview ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border-border hover:border-primary/50",
+              showPreview ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-foreground border-border hover:border-primary/50",
             )}
           >
             {showPreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1827,7 +1831,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
             onClick={() => setShowSettings((p) => !p)}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors cursor-pointer ml-auto",
-              showSettings ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border-border hover:border-primary/50",
+              showSettings ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-foreground border-border hover:border-primary/50",
             )}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1844,7 +1848,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           {/* Tabs — match Work Order drawer (inline underline tabs + icons) */}
           <div
             className={cn(
-              "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none bg-background p-0 border-0 border-b border-border shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+              "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none p-0 border-0 border-b border-border dark:border-[#25324C] shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             )}
           >
             {TABS.map((tab) => (
@@ -1889,7 +1893,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
         {/* Right: Settings panel */}
         {showSettings && !editing && (
-          <div className="w-64 shrink-0 border-l border-border bg-background flex flex-col">
+          <div className="w-64 shrink-0 border-l border-border dark:border-[#25324C] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
                 <Settings className="w-3.5 h-3.5 text-muted-foreground" />

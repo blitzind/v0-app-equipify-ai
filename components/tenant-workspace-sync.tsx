@@ -72,13 +72,63 @@ export function TenantWorkspaceSync() {
           organizationSubscription,
         },
       })
+
+      try {
+        const wRes = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/workspace`,
+          { cache: "no-store" },
+        )
+        if (!wRes.ok) return
+        const wBody = (await wRes.json()) as {
+          organization?: {
+            name: string
+            slug: string
+            companyEmail: string
+            companyPhone: string
+            companyWebsite: string
+            companyAddress: string
+            timezone: string
+            dateFormat: string
+            currency: string
+            logoUrl: string
+            primaryColor: string
+            secondaryBrandColor: string
+            whiteLabelSettings: Record<string, unknown>
+          }
+        }
+        const o = wBody.organization
+        if (!o || cancelled) return
+        dispatch({
+          type: "HYDRATE_ORGANIZATION_PROFILE",
+          payload: {
+            name: o.name,
+            slug: o.slug,
+            companyEmail: o.companyEmail,
+            companyPhone: o.companyPhone,
+            companyWebsite: o.companyWebsite,
+            companyAddress: o.companyAddress,
+            timezone: o.timezone,
+            dateFormat: o.dateFormat,
+            currency: o.currency,
+            logoUrl: o.logoUrl,
+            primaryColor: o.primaryColor,
+            secondaryBrandColor: o.secondaryBrandColor ?? "",
+            whiteLabelSettings:
+              o.whiteLabelSettings && typeof o.whiteLabelSettings === "object" && !Array.isArray(o.whiteLabelSettings)
+                ? o.whiteLabelSettings
+                : {},
+          },
+        })
+      } catch {
+        /* profile optional — subscription sync still applied */
+      }
     }
 
     void run()
     return () => {
       cancelled = true
     }
-  }, [status, organizationId, organizationSlug, organizationName, dispatch])
+  }, [status, organizationId, organizationSlug, organizationName, workspace.name, dispatch])
 
   return null
 }

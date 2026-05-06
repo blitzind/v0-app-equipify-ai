@@ -30,6 +30,7 @@ import {
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
+  DRAWER_NESTED_CARD,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -383,7 +384,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
               {activePlan.services.map((svc) => (
                 <div
                   key={svc.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  className={cn(DRAWER_NESTED_CARD, "flex items-start justify-between gap-3 p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]")}
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground">{svc.name}</p>
@@ -427,7 +428,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
               {autoEvents.map((ev) => (
                 <li
                   key={ev.id}
-                  className="rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  className={cn(DRAWER_NESTED_CARD, "p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]")}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-muted-foreground">
                     <span>{fmtDateTime(ev.created_at)}</span>
@@ -468,7 +469,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
         {/* Notes */}
         {activePlan.notes && (
           <DrawerSection title="Notes">
-            <p className="rounded-xl border border-border bg-card p-3 text-xs leading-relaxed text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <p className={cn(DRAWER_NESTED_CARD, "p-3 text-xs leading-relaxed text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06)]")}>
               {activePlan.notes}
             </p>
           </DrawerSection>

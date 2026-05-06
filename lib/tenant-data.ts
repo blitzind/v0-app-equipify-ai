@@ -142,9 +142,13 @@ export interface TenantWorkspace {
   primaryColor: string     // white-label accent
   companyEmail: string
   companyPhone: string
+  companyWebsite: string
   companyAddress: string
   timezone: string
   dateFormat: string
+  currency: string
+  secondaryBrandColor: string
+  whiteLabelSettings: Record<string, unknown>
   seatCount: number        // used seats
   ownerId: string
   createdAt: string
@@ -179,9 +183,13 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     primaryColor: "#2563eb",
     companyEmail: "admin@acme.com",
     companyPhone: "(614) 555-0100",
+    companyWebsite: "https://acme.com",
     companyAddress: "1200 Tech Park Dr, Columbus, OH 43215",
     timezone: "America/New_York",
     dateFormat: "MM/DD/YYYY",
+    currency: "USD",
+    secondaryBrandColor: "",
+    whiteLabelSettings: {},
     seatCount: 4,
     ownerId: "u-01",
     createdAt: "2024-01-15T08:00:00Z",
@@ -201,9 +209,13 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     primaryColor: "#2563eb",
     companyEmail: "admin@zephyr.com",
     companyPhone: "(212) 555-0299",
+    companyWebsite: "",
     companyAddress: "400 Commerce Ave, New York, NY 10001",
     timezone: "America/New_York",
     dateFormat: "MM/DD/YYYY",
+    currency: "USD",
+    secondaryBrandColor: "",
+    whiteLabelSettings: {},
     seatCount: 2,
     ownerId: "u-06",
     createdAt: "2026-04-14T10:00:00Z",
@@ -223,9 +235,13 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     primaryColor: "#0891b2",
     companyEmail: "admin@medology.net",
     companyPhone: "(423) 555-2000",
+    companyWebsite: "",
     companyAddress: "812 Wellness Pkwy, Kingsport, TN 37660",
     timezone: "America/New_York",
     dateFormat: "MM/DD/YYYY",
+    currency: "USD",
+    secondaryBrandColor: "",
+    whiteLabelSettings: {},
     seatCount: 4,
     ownerId: "u-08",
     createdAt: "2024-06-01T08:00:00Z",
@@ -245,9 +261,13 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     primaryColor: "#0d9488",
     companyEmail: "dispatch@precisionbiomedical.demo",
     companyPhone: "(559) 555-0140",
+    companyWebsite: "",
     companyAddress: "4280 Biomedical Way, Fresno, CA 93726",
     timezone: "America/Los_Angeles",
     dateFormat: "MM/DD/YYYY",
+    currency: "USD",
+    secondaryBrandColor: "",
+    whiteLabelSettings: {},
     seatCount: 8,
     ownerId: "u-12",
     createdAt: "2023-06-01T08:00:00Z",
@@ -268,9 +288,13 @@ export const MOCK_WORKSPACES: TenantWorkspace[] = [
     primaryColor: "#64748b",
     companyEmail: "",
     companyPhone: "",
+    companyWebsite: "",
     companyAddress: "",
     timezone: "America/Los_Angeles",
     dateFormat: "MM/DD/YYYY",
+    currency: "USD",
+    secondaryBrandColor: "",
+    whiteLabelSettings: {},
     seatCount: 1,
     ownerId: "u-01",
     createdAt: "2026-01-01T08:00:00Z",

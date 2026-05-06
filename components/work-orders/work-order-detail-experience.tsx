@@ -68,7 +68,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { DrawerTimeline } from "@/components/detail-drawer"
+import { DrawerTimeline, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import {
@@ -690,7 +690,7 @@ function SignatureCaptureDialog({
             className="max-w-full sm:max-w-md"
             disabled={submitting}
           />
-          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-background touch-none select-none dark:bg-background">
+          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden touch-none select-none dark:bg-[#0B111E] dark:border-[#25324C]">
             <canvas
               ref={canvasRef}
               width={600}
@@ -998,7 +998,7 @@ export function WorkOrderDetailExperience({
   const qaVariant = isDrawer ? "secondary" : "outline"
   const qaBtnClass = isDrawer ? "h-8 gap-1.5 text-xs shadow-sm" : "gap-1.5"
   const kpiCellClass = isDrawer
-    ? "bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+    ? cn(DRAWER_NESTED_CARD, "p-3 flex flex-col gap-1 min-h-[88px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]")
     : "flex items-start gap-2.5 p-3 rounded-lg bg-card border border-border"
   const kpiLabelClass = isDrawer
     ? "text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1021,7 +1021,7 @@ export function WorkOrderDetailExperience({
   }
 
   const tabListClass = isDrawer
-    ? "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none bg-background p-0 border-0 border-b border-border shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    ? "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none p-0 border-0 border-b border-border dark:border-[#25324C] shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     : "h-auto min-h-10 w-full flex flex-wrap justify-start gap-1 rounded-xl bg-muted/60 p-1 border border-border"
 
   const tabTriggerClass = (extra?: string) =>
@@ -1693,7 +1693,7 @@ export function WorkOrderDetailExperience({
             <div
               className={
                 isDrawer
-                  ? "bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+                  ? cn(DRAWER_NESTED_CARD, "p-3 flex flex-col gap-1 min-h-[88px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]")
                   : "p-3 rounded-lg bg-card border border-border"
               }
             >
@@ -1710,7 +1710,7 @@ export function WorkOrderDetailExperience({
             <div
               className={
                 isDrawer
-                  ? "bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+                  ? cn(DRAWER_NESTED_CARD, "p-3 flex flex-col gap-1 min-h-[88px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]")
                   : "p-3 rounded-lg bg-card border border-border"
               }
             >
@@ -1724,7 +1724,7 @@ export function WorkOrderDetailExperience({
             <div
               className={
                 isDrawer
-                  ? "bg-card rounded-xl border border-border p-3 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[88px]"
+                  ? cn(DRAWER_NESTED_CARD, "p-3 flex flex-col gap-1 min-h-[88px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]")
                   : "p-3 rounded-lg bg-card border border-border"
               }
             >

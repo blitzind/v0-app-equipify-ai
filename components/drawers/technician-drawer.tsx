@@ -1502,7 +1502,7 @@ export function TechnicianDrawer({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <div className={cn(DRAWER_NESTED_CARD, "p-4 space-y-3")}>
                 <div className="flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-primary shrink-0" />
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Open work orders</p>
@@ -2358,7 +2358,7 @@ export function TechnicianDrawer({
                       "text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer",
                       draftSkills.includes(s)
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground",
+                        : "bg-transparent text-muted-foreground border-border hover:border-primary/50 hover:text-foreground",
                     )}
                   >
                     {s}

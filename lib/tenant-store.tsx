@@ -38,6 +38,26 @@ type TenantAction =
         } | null
       }
     }
+  /** Profile + branding fields from GET `/api/organizations/.../workspace` (Supabase-backed). */
+  | {
+      type: "HYDRATE_ORGANIZATION_PROFILE"
+      payload: Pick<
+        TenantWorkspace,
+        | "name"
+        | "slug"
+        | "companyEmail"
+        | "companyPhone"
+        | "companyWebsite"
+        | "companyAddress"
+        | "timezone"
+        | "dateFormat"
+        | "currency"
+        | "logoUrl"
+        | "primaryColor"
+        | "secondaryBrandColor"
+        | "whiteLabelSettings"
+      >
+    }
 
 function mapDbSubscriptionStatus(st: string): TenantWorkspace["subscriptionStatus"] {
   const s = String(st).toLowerCase()
@@ -105,6 +125,11 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
         },
       }
     }
+    case "HYDRATE_ORGANIZATION_PROFILE":
+      return {
+        ...state,
+        workspace: { ...state.workspace, ...action.payload },
+      }
     default:
       return state
   }

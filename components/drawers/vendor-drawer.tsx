@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   DetailDrawer,
   DRAWER_ANCHORED_SURFACE,
+  DRAWER_FIELD_CLASS,
   DRAWER_NESTED_CARD,
   DrawerSection,
   DrawerRow,
@@ -49,13 +50,10 @@ const drawerBodyClass =
   "-mx-5 -my-5 min-h-full bg-muted/20 dark:bg-[#0B111E]/40 px-5 py-5 space-y-5"
 const sectionCardClass = DRAWER_NESTED_CARD
 
-/** Drawer fields — light unchanged; dark surfaces via drawer scope + explicit borders */
-const fieldControl =
-  "h-8 px-2.5 py-1 text-xs bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
-const fieldTextarea =
-  "min-h-[76px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
-const fieldNotesTextarea =
-  "min-h-[96px] resize-none px-2.5 py-2 text-xs leading-relaxed bg-background border-border text-foreground dark:bg-[#0B111E] dark:border-[#25324C]"
+/** Drawer fields — canonical `DRAWER_FIELD_CLASS` for dark drawer canvas */
+const fieldControl = cn(DRAWER_FIELD_CLASS, "h-8 px-2.5 py-1 border-border")
+const fieldTextarea = cn(DRAWER_FIELD_CLASS, "min-h-[76px] resize-none px-2.5 py-2 leading-relaxed border-border")
+const fieldNotesTextarea = cn(DRAWER_FIELD_CLASS, "min-h-[96px] resize-none px-2.5 py-2 leading-relaxed border-border")
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>

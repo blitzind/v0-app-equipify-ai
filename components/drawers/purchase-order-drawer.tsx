@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   DetailDrawer,
   DRAWER_ANCHORED_SURFACE,
+  DRAWER_FIELD_CLASS,
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
@@ -113,14 +114,10 @@ const sectionCardClass = DRAWER_NESTED_CARD
 
 // ─── Edit form field density (aligned with PO create modal) ───────────────────
 
-const editField =
-  "h-9 w-full min-w-0 text-sm bg-background border-border text-foreground dark:bg-background"
-const editTextarea =
-  "min-h-[100px] resize-none text-sm leading-relaxed bg-background border-border text-foreground dark:bg-background"
-const lineItemField =
-  "h-9 w-full min-w-0 text-sm tabular-nums bg-background border-border text-foreground dark:bg-background"
-const lineItemDesc =
-  "h-9 w-full min-w-0 text-sm bg-background border-border text-foreground dark:bg-background"
+const editField = cn(DRAWER_FIELD_CLASS, "h-9 w-full min-w-0 text-sm border-border")
+const editTextarea = cn(DRAWER_FIELD_CLASS, "min-h-[100px] w-full resize-none text-sm leading-relaxed border-border")
+const lineItemField = cn(DRAWER_FIELD_CLASS, "h-9 w-full min-w-0 text-sm tabular-nums border-border")
+const lineItemDesc = cn(DRAWER_FIELD_CLASS, "h-9 w-full min-w-0 text-sm border-border")
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="text-xs font-medium text-foreground block mb-1.5">{children}</span>
@@ -697,7 +694,7 @@ export function PurchaseOrderDrawer({
               ) : (
                 <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-card">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-transparent dark:bg-[#111724]/35">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-sm text-foreground flex-1 truncate">{a}</span>
                       <button
@@ -834,7 +831,7 @@ export function PurchaseOrderDrawer({
                   </thead>
                   <tbody className="divide-y divide-border">
                     {order.lineItems.map((item, i) => (
-                      <tr key={i} className="bg-card">
+                      <tr key={i} className="bg-transparent dark:bg-[#111724]/35">
                         <td className="px-3 py-2 text-foreground">{item.description}</td>
                         <td className="px-3 py-2 text-right text-foreground tabular-nums">{item.quantity}</td>
                         <td className="px-3 py-2 text-right text-foreground tabular-nums">{fmtCurrency(item.unitCostCents / 100)}</td>
@@ -857,7 +854,7 @@ export function PurchaseOrderDrawer({
             <DrawerSection title="Notes">
               <div className={cn(sectionCardClass, "p-4")}>
                 {order.notes ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap p-3 rounded-lg border border-border bg-background dark:bg-background">
+                  <p className={cn(DRAWER_NESTED_CARD, "text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap p-3 shadow-none")}>
                     {order.notes}
                   </p>
                 ) : (
@@ -878,7 +875,7 @@ export function PurchaseOrderDrawer({
               ) : (
                 <div className={cn(sectionCardClass, "divide-y divide-border overflow-hidden p-0")}>
                   {order.attachments.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-card">
+                    <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-transparent dark:bg-[#111724]/35">
                       <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="text-xs text-foreground flex-1 truncate">{a}</span>
                       <button

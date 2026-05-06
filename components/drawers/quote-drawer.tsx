@@ -22,6 +22,7 @@ import {
   DrawerRow,
   DrawerTimeline,
   DrawerToastStack,
+  DRAWER_FIELD_CLASS,
   DRAWER_NESTED_CARD,
   DRAWER_STACKED_MODAL,
   type ToastItem,
@@ -370,11 +371,7 @@ function EditInput({ value, onChange, type = "text", placeholder, className }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className={cn(
-        "w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none dark:bg-background",
-        "focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
-        className,
-      )}
+      className={cn(DRAWER_FIELD_CLASS, "w-full focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors", className)}
     />
   )
 }
@@ -384,7 +381,7 @@ function EditSelect({ value, onChange, options }: { value: string; onChange: (v:
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer dark:bg-background"
+      className={cn(DRAWER_FIELD_CLASS, "w-full cursor-pointer focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -398,7 +395,7 @@ function EditTextarea({ value, onChange, placeholder }: { value: string; onChang
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none dark:bg-background"
+      className={cn(DRAWER_FIELD_CLASS, "w-full resize-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
     />
   )
 }
@@ -443,7 +440,7 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           </thead>
           <tbody className="divide-y divide-border">
             {items.map((item, i) => (
-              <tr key={i} className="bg-card">
+              <tr key={i} className="bg-transparent dark:bg-[#111724]/35">
                 <td className="px-2 py-1.5"><EditInput value={item.description} onChange={(v) => updateItem(i, "description", v)} placeholder="Item description" /></td>
                 <td className="px-2 py-1.5"><EditInput type="number" value={item.qty} onChange={(v) => updateItem(i, "qty", v)} className="text-right" /></td>
                 <td className="px-2 py-1.5"><EditInput type="number" value={item.unit} onChange={(v) => updateItem(i, "unit", v)} className="text-right" /></td>
@@ -486,7 +483,7 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
         </thead>
         <tbody className="divide-y divide-border">
           {items.map((item, i) => (
-            <tr key={i} className="bg-card">
+            <tr key={i} className="bg-transparent dark:bg-[#111724]/35">
               <td className="px-3 py-2 text-foreground">{item.description}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
               <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unit)}</td>
@@ -1044,9 +1041,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
 
           <DrawerSection title="Description">
             <div className={cn(DRAWER_NESTED_CARD, "p-4")}>
-              <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">
-                {quote.description}
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{quote.description}</p>
             </div>
           </DrawerSection>
 
@@ -1065,7 +1060,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               {editing ? (
                 <EditTextarea value={draft.notes ?? ""} onChange={(v) => setField("notes", v)} placeholder="Add notes..." />
               ) : quote.notes ? (
-                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">{quote.notes}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{quote.notes}</p>
               ) : (
                 <p className="text-xs text-muted-foreground text-center py-3">No notes.</p>
               )}
@@ -1081,9 +1076,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   placeholder="Internal team notes…"
                 />
               ) : quote.internalNotes ? (
-                <p className="text-xs text-muted-foreground leading-relaxed p-3 bg-background rounded-lg border border-border dark:bg-[#0B111E] dark:border-[#25324C]">
-                  {quote.internalNotes}
-                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{quote.internalNotes}</p>
               ) : (
                 <p className="text-xs text-muted-foreground text-center py-3">No internal notes.</p>
               )}
@@ -1125,7 +1118,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   type="email"
                   value={quoteEmailTo}
                   onChange={(e) => setQuoteEmailTo(e.target.value)}
-                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors dark:bg-background"
+                  className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
                 />
               </div>
               <div>
@@ -1136,7 +1129,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   rows={5}
                   value={quoteEmailNote}
                   onChange={(e) => setQuoteEmailNote(e.target.value)}
-                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none dark:bg-background"
+                  className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 resize-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
                 />
               </div>
               <p className="text-[11px] text-muted-foreground">

@@ -1012,7 +1012,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           )}
 
           {!editing && (
-            <div className="shrink-0 border-b border-border z-[11] bg-background dark:bg-[#121B2C] dark:border-[#25324C]">
+            <div className="shrink-0 border-b border-border z-[11] dark:border-[#25324C]">
               <div className="flex min-w-0 gap-0 overflow-x-auto scrollbar-none px-5">
                 {TABS.map((tab) => {
                   const Icon = tab.icon

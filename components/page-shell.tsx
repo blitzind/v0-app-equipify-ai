@@ -8,11 +8,11 @@ import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
 import { useQuickAdd } from "@/lib/quick-add-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
+import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
-  HardHat, BarChart3, Globe, Settings, Building2,
-  CreditCard, Shield, Sparkles, FileText, Receipt, Plug, ShoppingCart,
-  CalendarRange, Store, Archive,
+  HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
+  CalendarRange, Store,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -95,11 +95,6 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Manage supplier contacts and addresses for purchase orders.",
     icon: Store,
   },
-  "/settings/archived": {
-    title: "Archived Center",
-    subtitle: "Find and restore archived customers, assets, jobs, quotes, invoices, and more.",
-    icon: Archive,
-  },
   "/reports": {
     title: "Reports",
     subtitle: "Track revenue, service performance, asset activity, and technician productivity.",
@@ -110,31 +105,6 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "Customer Portal",
     subtitle: "Self-service access for customers to view equipment, requests, and invoices.",
     icon: Globe,
-  },
-  "/settings/workspace": {
-    title: "Workspace Settings",
-    subtitle: "Configure your company profile, branding, and regional preferences.",
-    icon: Building2,
-  },
-  "/settings/team": {
-    title: "Team Members",
-    subtitle: "Invite users, assign roles, and manage seat allocations.",
-    icon: Users,
-  },
-  "/settings/billing": {
-    title: "Billing & Subscription",
-    subtitle: "Manage your plan, payment methods, and invoice history.",
-    icon: CreditCard,
-  },
-  "/settings/permissions": {
-    title: "Permissions",
-    subtitle: "Role-based access control across all modules.",
-    icon: Shield,
-  },
-  "/settings/equipment-types": {
-    title: "Equipment Types",
-    subtitle: "Manage the categories used to classify equipment across your workspace.",
-    icon: Wrench,
   },
   "/integrations": {
     title: "Integrations",
@@ -161,14 +131,8 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/invoices": "#06B6D4",
   "/purchase-orders": "#06B6D4",
   "/vendors": "#F59E0B",
-  "/settings/archived": "#64748B",
   "/reports": "#6366F1",
   "/portal": "#2563EB",
-  "/settings/workspace": "#64748B",
-  "/settings/team": "#64748B",
-  "/settings/billing": "#06B6D4",
-  "/settings/permissions": "#64748B",
-  "/settings/equipment-types": "#64748B",
   "/integrations": "#2563EB",
 }
 
@@ -176,16 +140,23 @@ function getFeatureIconColor(pathname: string): string {
   if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
   if (pathname.startsWith("/customers/")) return "#2563EB"
   if (pathname.startsWith("/work-orders/")) return "#22C55E"
-  if (pathname.startsWith("/settings/")) return FEATURE_ICON_HEX[pathname] ?? "#64748B"
+  if (pathname.startsWith("/settings/")) return "#6366F1"
   return "#64748B"
+}
+
+const SETTINGS_AREA_HERO: RouteMeta = {
+  title: "Workspace Settings",
+  subtitle:
+    "Manage your organization, branding, team, billing, integrations, and platform preferences.",
+  icon: Settings,
 }
 
 function resolveMeta(pathname: string): RouteMeta | null {
   if (HERO_SUPPRESS.has(pathname)) return null
+  if (pathname.startsWith("/settings/")) return SETTINGS_AREA_HERO
   if (ROUTE_META[pathname]) return ROUTE_META[pathname]
   if (pathname.startsWith("/customers/")) return { title: "Customer Detail", subtitle: "Full account overview — equipment, work orders, and service history.", icon: Users }
   if (pathname.startsWith("/work-orders/")) return { title: "Work Order Detail", subtitle: "Full details, activity timeline, and technician notes.", icon: ClipboardList }
-  if (pathname.startsWith("/settings/")) return ROUTE_META["/settings/workspace"] ?? null
   return null
 }
 
@@ -205,9 +176,20 @@ function PageHero({
   pathname: string
 }) {
   const maintenancePlansHero = pathname === "/maintenance-plans"
+  const isSettingsArea = pathname.startsWith("/settings/")
   return (
-    <div className="px-3 sm:px-6 pt-4 sm:pt-5 pb-1 shrink-0">
-      <div className="flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6 py-4 sm:py-5">
+    <div
+      className={cn(
+        "px-3 sm:px-6 shrink-0",
+        isSettingsArea ? "pt-4 sm:pt-6 pb-2" : "pt-4 sm:pt-5 pb-1",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6",
+          isSettingsArea ? "py-4 sm:py-6" : "py-4 sm:py-5",
+        )}
+      >
         {maintenancePlansHero ? (
           <MaintenancePlansBrandTile size="md" />
         ) : (
@@ -221,11 +203,23 @@ function PageHero({
           <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: featureColor }} />
         </div>
         )}
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-tight text-balance">
+        <div className="min-w-0 flex-1">
+          <h1
+            className={cn(
+              "font-semibold text-foreground tracking-tight leading-tight text-balance",
+              isSettingsArea ? "text-lg sm:text-xl" : "text-base sm:text-lg",
+            )}
+          >
             {title}
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed line-clamp-1">
+          <p
+            className={cn(
+              "text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed",
+              isSettingsArea
+                ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
+                : "text-xs sm:text-sm line-clamp-1",
+            )}
+          >
             {subtitle}
           </p>
         </div>

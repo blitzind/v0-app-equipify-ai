@@ -28,7 +28,7 @@ import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
-import { DetailDrawer } from "@/components/detail-drawer"
+import { DetailDrawer, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import {
   MapPin, Clock, Wrench,
   CheckCircle2, Circle, PlayCircle, Package,
@@ -236,7 +236,8 @@ function JobCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-card overflow-hidden transition-shadow cursor-pointer",
+        DRAWER_NESTED_CARD,
+        "rounded-2xl overflow-hidden transition-shadow cursor-pointer",
         wo.status === "In Progress" && "ring-2 ring-primary/30 shadow-md",
         wo.status === "Completed" && "opacity-70",
       )}
@@ -452,7 +453,7 @@ function DroppableTechPill({
         "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-all cursor-pointer shrink-0",
         selected
           ? "bg-primary text-primary-foreground border-primary shadow-sm"
-          : "bg-card border-border text-foreground hover:bg-muted",
+          : cn(DRAWER_NESTED_CARD, "shadow-sm text-foreground hover:opacity-90"),
         isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background",
       )}
     >
@@ -1324,7 +1325,7 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
                     key={date}
                     className={cn(
                       "flex flex-col items-center justify-center min-w-[48px] py-1.5 rounded-lg transition-colors",
-                      isSelected ? "bg-primary/15 ring-1 ring-primary/30" : "bg-background/60",
+                      isSelected ? "bg-primary/15 ring-1 ring-primary/30" : "bg-muted/30 dark:bg-[#111724]/55",
                     )}
                   >
                     <span
@@ -1346,7 +1347,7 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
         {selectedTech && !rosterLoading && (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-              <div className="rounded-2xl border border-border bg-card p-4 flex items-start gap-4 flex-1 min-w-0">
+              <div className={cn(DRAWER_NESTED_CARD, "rounded-2xl p-4 flex items-start gap-4 flex-1 min-w-0")}>
                 <TechnicianAvatar
                   userId={selectedTech.id}
                   name={selectedTech.name}
@@ -1599,7 +1600,7 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
 
       <DragOverlay dropAnimation={null}>
         {dragOverlayRow ? (
-          <div className="rounded-xl border border-primary/35 bg-card px-4 py-3 shadow-2xl max-w-[240px]">
+          <div className={cn(DRAWER_NESTED_CARD, "rounded-xl border-primary/35 px-4 py-3 shadow-2xl max-w-[240px]")}>
             <p className="font-mono text-[10px] text-primary">
               {getWorkOrderDisplay({
                 id: dragOverlayRow.id,

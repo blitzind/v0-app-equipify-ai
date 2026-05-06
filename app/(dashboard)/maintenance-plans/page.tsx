@@ -10,7 +10,7 @@ import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import { computeNextDueDate } from "@/lib/maintenance-plans/db-map"
-import { DrawerViewport } from "@/components/detail-drawer"
+import { DrawerViewport, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -617,7 +617,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           onValueChange={setDetailSheetTab}
           className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden"
         >
-          <TabsList className="h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none border-0 border-b border-border bg-background p-0 shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none border-0 border-b border-border dark:border-[#25324C] p-0 shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
               { value: "services",      label: "Services" },
               { value: "work_orders",   label: "Work Orders" },
@@ -650,7 +650,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   {plan.services.map((svc, i) => (
                     <div
                       key={`${svc.id ?? "service"}-${i}`}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ds-hover-list-row"
+                      className={cn(DRAWER_NESTED_CARD, "flex items-start gap-3 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ds-hover-list-row")}
                     >
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs font-bold shrink-0 mt-0.5">
                         {i + 1}
@@ -724,7 +724,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   No work orders have been created from this plan yet. Use <strong>Create WO</strong> or enable auto-create to generate one.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <div className={cn(DRAWER_NESTED_CARD, "overflow-x-auto shadow-[0_1px_3px_rgba(0,0,0,0.06)]")}>
                   <Table>
                     <TableHeader>
                       <TableRow className="ds-table-header-row-subtle">
@@ -807,7 +807,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                             className={cn(
                               "flex items-center gap-3 rounded-xl border p-3 transition-colors",
                               rule.enabled
-                                ? "border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                                ? cn(DRAWER_NESTED_CARD, "shadow-[0_1px_3px_rgba(0,0,0,0.06)]")
                                 : "border-dashed border-border/60 bg-muted/25 opacity-60",
                             )}
                           >
@@ -836,7 +836,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   return (
                     <div
                       key={`${log.id ?? "log"}-${i}`}
-                      className="flex items-start gap-3 rounded-xl border border-border bg-card p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                      className={cn(DRAWER_NESTED_CARD, "flex items-start gap-3 p-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]")}
                     >
                       <cfg.Icon className={cn("w-4 h-4 shrink-0 mt-0.5", cfg.color)} />
                       <div className="flex-1 min-w-0">
@@ -874,7 +874,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                       }}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors",
-                        plan.status === s ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-muted"
+                        plan.status === s ? "bg-primary text-primary-foreground border-primary" : cn(DRAWER_NESTED_CARD, "rounded-md shadow-none text-foreground hover:opacity-90")
                       )}
                     >
                       {s}

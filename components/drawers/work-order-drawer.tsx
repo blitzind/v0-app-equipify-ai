@@ -57,6 +57,7 @@ import {
   DrawerSection,
   DrawerRow,
   DrawerToastStack,
+  DRAWER_FIELD_CLASS,
   DRAWER_STACKED_MODAL,
   type ToastItem,
 } from "@/components/detail-drawer"
@@ -181,7 +182,10 @@ function EditInput({
       step={step}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 dark:bg-background"
+      className={cn(
+        DRAWER_FIELD_CLASS,
+        "w-full shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+      )}
     />
   )
 }
@@ -193,7 +197,10 @@ function EditSelect({ value, onChange, options }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+      className={cn(
+        DRAWER_FIELD_CLASS,
+        "w-full cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+      )}
     >
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -209,7 +216,10 @@ function EditTextarea({ value, onChange, placeholder, rows = 3 }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none dark:bg-background"
+      className={cn(
+        DRAWER_FIELD_CLASS,
+        "w-full resize-none shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+      )}
     />
   )
 }
@@ -1473,7 +1483,10 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                         technicianAvatarUrl: opt?.avatarUrl ?? null,
                       }))
                     }}
-                    className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer dark:bg-background"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "w-full cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+                    )}
                   >
                     <option value="unassigned">Unassigned</option>
                     {technicianOptions.map((t) => (
@@ -1839,7 +1852,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               <select
                 value={billingVendorId}
                 onChange={(e) => setBillingVendorId(e.target.value)}
-                className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                className={cn(DRAWER_FIELD_CLASS, "w-full")}
                 disabled={billingSaving}
               >
                 <option value="">No vendor selected</option>
@@ -1886,7 +1899,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   value={woSummaryEmailTo}
                   onChange={(e) => setWoSummaryEmailTo(e.target.value)}
                   placeholder="customer@example.com"
-                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors dark:bg-background"
+                  className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors")}
                 />
               </div>
               <div>
@@ -1897,7 +1910,10 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   rows={4}
                   value={woSummaryEmailNote}
                   onChange={(e) => setWoSummaryEmailNote(e.target.value)}
-                  className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none dark:bg-background"
+                  className={cn(
+                    DRAWER_FIELD_CLASS,
+                    "w-full px-3 py-2 resize-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors",
+                  )}
                 />
               </div>
             </div>

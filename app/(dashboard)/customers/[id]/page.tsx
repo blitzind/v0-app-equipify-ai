@@ -1038,9 +1038,15 @@ export default function CustomerDetailPage() {
 
     setLocationError("")
     const supabase = createBrowserSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     const { error } = await supabase
       .from("customer_locations")
-      .update({ archived_at: new Date().toISOString() })
+      .update({
+        archived_at: new Date().toISOString(),
+        archived_by: user?.id ?? null,
+      })
       .eq("id", locationId)
       .eq("organization_id", customer.organizationId)
       .eq("customer_id", customer.id)

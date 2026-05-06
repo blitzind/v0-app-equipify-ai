@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea"
 import type { CalibrationFieldType, CalibrationTemplateField } from "@/lib/calibration-certificates"
 import { runCertificateTemplateImport } from "@/lib/calibration-templates/import-template-from-file"
 import { cn } from "@/lib/utils"
+import { DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
 
 const FIELD_TYPE_OPTIONS: Array<{ value: CalibrationFieldType; label: string }> = [
   { value: "section_heading", label: "Section Heading" },
@@ -359,7 +360,10 @@ export function ImportTemplateDialog(props: {
                           onChange={(e) =>
                             updateField(field.id, { type: e.target.value as CalibrationFieldType })
                           }
-                          className="w-full h-9 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                          className={cn(
+                            DRAWER_FIELD_CLASS,
+                            "w-full h-9 rounded-md px-2 py-1.5 text-xs cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+                          )}
                         >
                           {FIELD_TYPE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
