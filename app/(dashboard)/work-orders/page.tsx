@@ -252,7 +252,18 @@ function initialsFromTechName(name: string): string {
 
 function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
   return (
-    <div onClick={onOpen} className="bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group">
+    <div
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+      className="touch-manipulation bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm active:scale-[0.99] transition-all cursor-pointer group"
+    >
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-mono text-muted-foreground">{getWorkOrderDisplay(wo)}</span>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -400,10 +411,14 @@ const KanbanView = forwardRef<
       <div
         ref={scrollRef}
         onScroll={updateHScroll}
-        className="flex gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth pb-4 [-webkit-overflow-scrolling:touch] scrollbar-none"
+        className="flex gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth scroll-px-3 pb-4 [-webkit-overflow-scrolling:touch] scrollbar-none snap-x snap-mandatory lg:snap-none px-1 sm:px-0"
       >
         {columns.map(({ status, items }) => (
-          <div key={status} data-kanban-lane className="flex w-72 shrink-0 flex-col gap-3">
+          <div
+            key={status}
+            data-kanban-lane
+            className="flex w-[min(20rem,calc(100vw-2rem))] shrink-0 snap-start flex-col gap-3 sm:w-72"
+          >
             <div className={cn("flex items-center justify-between rounded-lg border px-3 py-2", KANBAN_HEADER[status])}>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{status}</span>
@@ -1130,7 +1145,7 @@ function WorkOrdersPageInner() {
               placeholder="Search work orders..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
+              className="pl-9 min-h-11 lg:min-h-10"
             />
           </div>
 
@@ -1188,7 +1203,7 @@ function WorkOrdersPageInner() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-11 w-11 sm:h-9 sm:w-9 touch-manipulation"
                   disabled={!kanbanLaneScroll.showLeft}
                   aria-label="Scroll kanban lanes left"
                   onClick={() => kanbanRef.current?.scrollLanes("left")}
@@ -1199,7 +1214,7 @@ function WorkOrdersPageInner() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9"
+                  className="h-11 w-11 sm:h-9 sm:w-9 touch-manipulation"
                   disabled={!kanbanLaneScroll.showRight}
                   aria-label="Scroll kanban lanes right"
                   onClick={() => kanbanRef.current?.scrollLanes("right")}
@@ -1223,7 +1238,7 @@ function WorkOrdersPageInner() {
                 onClick={() => setView(mode)}
                 title={label}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 text-xs transition-colors",
+                  "flex min-h-11 min-w-[44px] items-center justify-center gap-1.5 px-3 py-2 text-xs transition-colors sm:min-h-0 lg:min-w-0",
                   view === mode
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"

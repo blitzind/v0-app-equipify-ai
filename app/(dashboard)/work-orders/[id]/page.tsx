@@ -51,6 +51,8 @@ import {
 } from "@/components/work-orders/work-order-detail-experience"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
+import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
+import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 
 function uiStatusToDb(s: WorkOrderStatus): string {
   const m: Record<WorkOrderStatus, string> = {
@@ -537,7 +539,8 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
   }
 
   async function handleAttachmentUpload(files: FileList) {
-    if (!editable || !activeOrg.organizationId) return
+    if (!activeOrg.organizationId) return
+    if (workOrder.isArchived) return
     const list = Array.from(files)
     if (list.length === 0) return
     const supabase = createBrowserSupabaseClient()
@@ -625,6 +628,14 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
 
   const quoteHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(workOrder.customerId)}&equipmentId=${encodeURIComponent(workOrder.equipmentId)}`
 
+  const primaryPhone = useCustomerPrimaryPhone(
+    workOrder.customerId,
+    activeOrg.status === "ready" ? activeOrg.organizationId : null,
+  )
+  const navigateQuery = useMemo(() => {
+    return [workOrder.customerName, workOrder.location].filter(Boolean).join(" ").trim()
+  }, [workOrder.customerName, workOrder.location])
+
   const closeCertificateGate = certificateGateForCompletionAllAssets({
     calibrationTemplateId: workOrder.calibrationTemplateId,
     slots: completionCertSlots,
@@ -675,7 +686,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
   ) : null
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto max-lg:pb-24">
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/work-orders">
@@ -825,6 +836,17 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
           handleCreateInvoiceAction()
         }
       />
+
+      {!editing && !workOrder.isArchived ? (
+        <TechnicianMobileQuickBar
+          fixedAboveMobileNav
+          phone={primaryPhone}
+          navigateQuery={navigateQuery}
+          showComplete={["Open", "Scheduled", "In Progress"].includes(workOrder.status)}
+          onComplete={() => void handleMarkComplete()}
+          onPhotoFiles={(files) => void handleAttachmentUpload(files)}
+        />
+      ) : null}
 
       {editing && (
         <div className={cn("flex justify-end gap-2 pb-8 border-t border-border pt-4")}>

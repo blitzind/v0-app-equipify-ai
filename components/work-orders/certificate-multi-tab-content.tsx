@@ -338,11 +338,11 @@ export function CertificateMultiTabContent({
                       <span className="mx-1.5 text-border">·</span>
                       Serial <span className="font-mono">{sn}</span>
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground break-words">
                       Template: <span className="font-medium text-foreground">{tmpl?.name ?? "—"}</span>
                       <span className="mx-2 text-border">·</span>
                       Last saved:{" "}
-                      <span className="font-medium text-foreground">
+                      <span className="font-medium text-foreground whitespace-normal">
                         {st?.savedAt ? fmtDateTime(st.savedAt) : "—"}
                       </span>
                     </p>

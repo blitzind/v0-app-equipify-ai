@@ -519,7 +519,7 @@ function ServiceCard({
             {/* Reschedule */}
             <button
               onClick={(e) => { e.stopPropagation(); onReschedule(plan) }}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-medium transition-colors bg-background border-border text-foreground hover:bg-muted"
+              className="inline-flex items-center gap-1.5 min-h-11 px-3 rounded-md border text-xs font-medium transition-colors bg-background border-border text-foreground hover:bg-muted sm:h-8 sm:min-h-0 touch-manipulation"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Reschedule
@@ -531,7 +531,7 @@ function ServiceCard({
                 onClick={(e) => { e.stopPropagation(); onCreateWo(plan) }}
                 disabled={alreadyCreated || plan.status === "Paused"}
                 className={cn(
-                  "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-medium transition-colors",
+                  "inline-flex items-center gap-1.5 min-h-11 px-3 rounded-md border text-xs font-medium transition-colors sm:h-8 sm:min-h-0 touch-manipulation",
                   alreadyCreated
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default"
                     : plan.status === "Paused"
@@ -1510,7 +1510,7 @@ function ServiceSchedulePageInner() {
               key={id}
               onClick={() => setViewTab(id)}
               className={cn(
-                "flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-colors",
+                "flex items-center gap-1.5 min-h-11 px-3 rounded-md text-sm font-medium transition-colors sm:h-8 sm:min-h-0 touch-manipulation",
                 viewTab === id
                   ? "bg-background text-foreground shadow-sm border border-border"
                   : "text-muted-foreground hover:text-foreground"
@@ -1530,7 +1530,7 @@ function ServiceSchedulePageInner() {
                 key={sub}
                 onClick={() => setCalSub(sub)}
                 className={cn(
-                  "h-8 px-3 rounded-md text-sm font-medium transition-colors capitalize",
+                  "min-h-11 px-3 rounded-md text-sm font-medium transition-colors capitalize sm:h-8 sm:min-h-0 touch-manipulation",
                   calSub === sub
                     ? "bg-background text-foreground shadow-sm border border-border"
                     : "text-muted-foreground hover:text-foreground"
@@ -1555,7 +1555,7 @@ function ServiceSchedulePageInner() {
               key={id}
               onClick={() => setTeamScope(id)}
               className={cn(
-                "flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-colors",
+                "flex items-center gap-1.5 min-h-11 px-3 rounded-md text-sm font-medium transition-colors sm:h-8 sm:min-h-0 touch-manipulation",
                 teamScope === id
                   ? "bg-background text-foreground shadow-sm border border-border"
                   : "text-muted-foreground hover:text-foreground"

@@ -149,7 +149,7 @@ export function DrawerViewport({
         aria-modal="true"
         aria-label={ariaLabel}
         className={cn(
-          "fixed top-0 right-0 h-full max-h-dvh w-full border-l border-border shadow-2xl",
+          "fixed top-0 right-0 h-full max-h-dvh w-full border-l border-border shadow-2xl pt-[env(safe-area-inset-top)]",
           panelClassName,
           DRAWER_PANEL_SURFACE,
           DRAWER_DESCENDANT_FIELD_OVERRIDES,

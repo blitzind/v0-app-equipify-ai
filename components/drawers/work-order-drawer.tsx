@@ -82,6 +82,8 @@ import { buildWorkOrderSummaryDocumentHtml } from "@/lib/documents/simple-docume
 import { printHtmlDocument } from "@/lib/certificates/certificate-pdf-html"
 import { buildWorkOrderPartFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
+import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
+import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 
 let toastCounter = 0
 
@@ -467,6 +469,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   const { workspace } = useTenant()
   const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+
+  const primaryPhone = useCustomerPrimaryPhone(
+    wo?.customerId,
+    orgStatus === "ready" ? activeOrgId : null,
+  )
+  const navigateQuery = useMemo(() => {
+    if (!wo) return ""
+    return [wo.customerName, wo.location].filter(Boolean).join(" ").trim()
+  }, [wo?.customerName, wo?.location])
 
   async function handlePrintWorkOrderSummary() {
     const w = displayWo ?? wo
@@ -1629,7 +1640,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </div>
           )}
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
           <WorkOrderDetailExperience
             layout="drawer"
             workOrder={displayWo ?? wo}
@@ -1876,6 +1887,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                 : undefined
             }
           />
+          {!editing && !wo.isArchived ? (
+            <TechnicianMobileQuickBar
+              phone={primaryPhone}
+              navigateQuery={navigateQuery}
+              showComplete={["Open", "Scheduled", "In Progress"].includes(wo.status)}
+              onComplete={() => setCloseOutOpen(true)}
+              onPhotoFiles={(files) => void handleAttachmentUpload(files)}
+            />
+          ) : null}
           </div>
         </div>
       </DetailDrawer>

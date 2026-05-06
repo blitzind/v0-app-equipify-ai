@@ -460,7 +460,7 @@ function CustomersPageInner() {
     <div className="flex flex-col gap-6">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-1.5">
+        <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
