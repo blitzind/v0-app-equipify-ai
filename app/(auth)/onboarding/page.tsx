@@ -85,7 +85,10 @@ function OnboardingPageContent() {
     parseOnboardingText(searchParams.get("inviteToken")) ??
     parseOnboardingText(searchParams.get("invite")) ??
     parseOnboardingText(searchParams.get("token"))
-  const seedDemoParam = searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
+  /** Self-serve: sample data on by default; use ?seedDemo=false to skip. Invites: off unless ?seedDemo=true. */
+  const seedDemoChoice = inviteTokenParam
+    ? searchParams.get("seedDemo")?.trim().toLowerCase() === "true"
+    : searchParams.get("seedDemo")?.trim().toLowerCase() !== "false"
   const industryParam = normalizeIndustryKey(searchParams.get("industry"))
   const hasMarketingIdentity = Boolean(firstNameParam && lastNameParam && emailParam)
   const trialFromQuery = hasScaleTrialParam(searchParams.get("trial"))
@@ -299,10 +302,13 @@ function OnboardingPageContent() {
           body: JSON.stringify({
             organizationId: organizationIdParam || null,
             organizationName: form.companyName || undefined,
-            seedDemo: seedDemoParam,
+            seedDemo: seedDemoChoice,
             industry: normalizeIndustryKey(form.industry || industryParam),
             selectedPlan,
             billingCycle: billing,
+            firstName: effectiveFirstName,
+            lastName: effectiveLastName,
+            phone: form.phone.trim() || undefined,
           }),
         })
         if (!provisionRes.ok) {

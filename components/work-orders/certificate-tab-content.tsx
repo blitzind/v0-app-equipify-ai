@@ -27,6 +27,8 @@ type CertificateTabContentProps = {
   lastSavedAt?: string | null
   workOrderLabel: string
   companyName: string
+  /** Workspace logo URL from Organization settings; when absent, PDF shows company name as text. */
+  logoUrl?: string | null
   equipmentName: string
   customerName: string
   workOrderDescription?: string
@@ -79,6 +81,7 @@ export function CertificateTabContent({
   lastSavedAt,
   workOrderLabel,
   companyName,
+  logoUrl,
   equipmentName,
   customerName,
   workOrderDescription,
@@ -104,6 +107,7 @@ export function CertificateTabContent({
   embedded = false,
 }: CertificateTabContentProps) {
   const { toast } = useToast()
+  const resolvedLogoUrl = logoUrl?.trim() ? logoUrl.trim() : undefined
   const [certEmailTo, setCertEmailTo] = useState("")
   const [certEmailSending, setCertEmailSending] = useState(false)
   const selectedTemplate = useMemo(
@@ -255,6 +259,7 @@ export function CertificateTabContent({
               try {
                 const html = buildCertificatePdfHtml({
                   companyName,
+                  logoUrl: resolvedLogoUrl,
                   templateName: selectedTemplate.name,
                   template: selectedTemplate,
                   values,

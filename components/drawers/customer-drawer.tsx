@@ -36,8 +36,6 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
-import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
-import { clearOtherDefaultCustomerLocations } from "@/lib/customer-locations/clear-default"
 
 let toastCounter = 0
 
@@ -1588,70 +1586,38 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
       {/* Add Location modal */}
       {locationModal === "add" && (
         <LocationForm
+          key="add-location"
           title="Add Location"
           onCancel={() => setLocationModal(null)}
           onSave={(d) => {
             if (!activeOrgId || !customerId) return
-            const supabase = createBrowserSupabaseClient()
             void (async () => {
-              const gate = await enforceCanCreateRecord(activeOrgId, "customer")
-              if (!gate.ok) {
-                toast(gate.message, "error")
-                return
-              }
-              if (d.isDefault) {
-                const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
-                  organizationId: activeOrgId,
-                  customerId,
-                })
-                if (clearErr) {
-                  toast(clearErr.message, "error")
-                  return
-                }
-              }
-              const { data: inserted, error } = await supabase
-                .from("customer_locations")
-                .insert({
-                  organization_id: activeOrgId,
-                  customer_id: customerId,
-                  name: d.name,
-                  address_line1: d.address,
-                  address_line2: d.addressLine2 || null,
-                  city: d.city,
-                  state: d.state,
-                  postal_code: d.zip,
-                  phone: d.phone || null,
-                  contact_person: d.contactPerson || null,
-                  notes: d.notes || null,
-                  is_default: d.isDefault,
-                })
-                .select("id")
-              const newId = inserted?.[0]?.id
-              if (error) {
-                toast(error.message, "error")
-                return
-              }
-              if (!newId) {
-                toast("Could not save location. Check permissions or refresh and try again.", "error")
-                return
-              }
-              setDrawerLocations((prev) => [
+              const res = await fetch(
+                `/api/organizations/${encodeURIComponent(activeOrgId)}/customers/${encodeURIComponent(customerId)}/locations`,
                 {
-                  id: newId,
-                  name: d.name,
-                  address: d.address,
-                  addressLine2: d.addressLine2 || undefined,
-                  city: d.city,
-                  state: d.state,
-                  zip: d.zip,
-                  phone: d.phone || undefined,
-                  contactPerson: d.contactPerson || undefined,
-                  notes: d.notes || undefined,
-                  isDefault: d.isDefault,
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name: d.name,
+                    address: d.address,
+                    addressLine2: d.addressLine2 || null,
+                    city: d.city,
+                    state: d.state,
+                    zip: d.zip,
+                    phone: d.phone || null,
+                    contactPerson: d.contactPerson || null,
+                    notes: d.notes || null,
+                    isDefault: d.isDefault,
+                  }),
                 },
-                ...prev.map((loc) => ({ ...loc, isDefault: d.isDefault ? false : loc.isDefault })),
-              ])
+              )
+              const payload = (await res.json()) as { message?: string }
+              if (!res.ok) {
+                toast(payload.message ?? "Could not save location.", "error")
+                return
+              }
               setLocationModal(null)
+              setDrawerRefresh((n) => n + 1)
               toast("Location added successfully")
             })()
           }}
@@ -1664,6 +1630,7 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
         if (!loc) return null
         return (
           <LocationForm
+            key={`edit-location-${editingLocationId}`}
             title="Edit Location"
             initial={{
               name: loc.name,
@@ -1679,62 +1646,35 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
             }}
             onCancel={() => { setLocationModal(null); setEditingLocationId(null) }}
             onSave={(d) => {
-              if (!activeOrgId || !customerId) return
-              const supabase = createBrowserSupabaseClient()
+              if (!activeOrgId || !customerId || !editingLocationId) return
               void (async () => {
-                if (d.isDefault) {
-                  const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
-                    organizationId: activeOrgId,
-                    customerId,
-                    exceptLocationId: editingLocationId,
-                  })
-                  if (clearErr) {
-                    toast(clearErr.message, "error")
-                    return
-                  }
-                }
-                const { error } = await supabase
-                  .from("customer_locations")
-                  .update({
-                    name: d.name,
-                    address_line1: d.address,
-                    address_line2: d.addressLine2 || null,
-                    city: d.city,
-                    state: d.state,
-                    postal_code: d.zip,
-                    phone: d.phone || null,
-                    contact_person: d.contactPerson || null,
-                    notes: d.notes || null,
-                    is_default: d.isDefault,
-                  })
-                  .eq("id", editingLocationId)
-                  .eq("organization_id", activeOrgId)
-                  .eq("customer_id", customerId)
-                if (error) {
-                  toast(error.message, "error")
+                const res = await fetch(
+                  `/api/organizations/${encodeURIComponent(activeOrgId)}/customers/${encodeURIComponent(customerId)}/locations/${encodeURIComponent(editingLocationId)}`,
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: d.name,
+                      address: d.address,
+                      addressLine2: d.addressLine2 || null,
+                      city: d.city,
+                      state: d.state,
+                      zip: d.zip,
+                      phone: d.phone || null,
+                      contactPerson: d.contactPerson || null,
+                      notes: d.notes || null,
+                      isDefault: d.isDefault,
+                    }),
+                  },
+                )
+                const payload = (await res.json()) as { message?: string }
+                if (!res.ok) {
+                  toast(payload.message ?? "Could not update location.", "error")
                   return
                 }
-                setDrawerLocations((prev) =>
-                  prev.map((x) =>
-                    x.id === editingLocationId
-                      ? {
-                          ...x,
-                          name: d.name,
-                          address: d.address,
-                          addressLine2: d.addressLine2 || undefined,
-                          city: d.city,
-                          state: d.state,
-                          zip: d.zip,
-                          phone: d.phone || undefined,
-                          contactPerson: d.contactPerson || undefined,
-                          notes: d.notes || undefined,
-                          isDefault: d.isDefault,
-                        }
-                      : { ...x, isDefault: d.isDefault ? false : x.isDefault },
-                  ),
-                )
                 setLocationModal(null)
                 setEditingLocationId(null)
+                setDrawerRefresh((n) => n + 1)
                 toast("Location updated successfully")
               })()
             }}

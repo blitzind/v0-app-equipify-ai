@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, Suspense } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -891,23 +891,84 @@ function WorkOrdersPageInner() {
     return m
   }, [workOrders])
 
+  const statusStripRef = useRef<HTMLDivElement>(null)
+  const [statusScroll, setStatusScroll] = useState({ showLeft: false, showRight: false, canScroll: false })
+
+  const updateStatusScroll = useCallback(() => {
+    const el = statusStripRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    const maxScroll = Math.max(0, scrollWidth - clientWidth)
+    const canScroll = maxScroll > 4
+    setStatusScroll({
+      canScroll,
+      showLeft: canScroll && scrollLeft > 4,
+      showRight: canScroll && scrollLeft < maxScroll - 4,
+    })
+  }, [])
+
+  useEffect(() => {
+    updateStatusScroll()
+    const el = statusStripRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => updateStatusScroll())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updateStatusScroll, counts])
+
+  const scrollStatusStrip = useCallback((dir: "left" | "right") => {
+    const el = statusStripRef.current
+    if (!el) return
+    const delta = Math.min(280, el.clientWidth * 0.85) * (dir === "left" ? -1 : 1)
+    el.scrollBy({ left: delta, behavior: "smooth" })
+    window.requestAnimationFrame(() => updateStatusScroll())
+    setTimeout(updateStatusScroll, 320)
+  }, [updateStatusScroll])
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Stat strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3">
-        {ALL_STATUSES.map((s) => (
+      {/* Stat strip — horizontal scroll on narrow viewports; arrow controls when overflowing */}
+      <div className="relative min-w-0 flex items-center gap-1 sm:gap-2">
+        {statusScroll.canScroll && statusScroll.showLeft && (
           <button
-            key={s}
-            onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
-            className={cn(
-              "flex flex-col gap-0.5 p-3 rounded-lg border bg-card text-left transition-all hover:border-primary/40",
-              statusFilter === s && "border-primary ring-1 ring-primary/20"
-            )}
+            type="button"
+            aria-label="Scroll status cards left"
+            className="shrink-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground md:h-10 md:w-10"
+            onClick={() => scrollStatusStrip("left")}
           >
-            <span className="text-xl sm:text-2xl font-bold text-foreground">{counts[s] ?? 0}</span>
-            <span className={cn("text-xs font-medium border rounded-full px-2 py-0.5 w-fit truncate max-w-full", STATUS_STYLE[s])}>{s}</span>
+            <ChevronLeft className="h-5 w-5" aria-hidden />
           </button>
-        ))}
+        )}
+        <div
+          ref={statusStripRef}
+          onScroll={updateStatusScroll}
+          className="flex min-w-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden scroll-smooth scrollbar-none pb-1 sm:gap-3"
+        >
+          {ALL_STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+              className={cn(
+                "flex min-w-[9.25rem] shrink-0 flex-col gap-0.5 rounded-lg border bg-card p-3 text-left transition-all hover:border-primary/40 sm:min-w-[10rem]",
+                statusFilter === s && "border-primary ring-1 ring-primary/20"
+              )}
+            >
+              <span className="text-xl font-bold text-foreground sm:text-2xl">{counts[s] ?? 0}</span>
+              <span className={cn("max-w-full truncate rounded-full border px-2 py-0.5 text-xs font-medium w-fit", STATUS_STYLE[s])}>{s}</span>
+            </button>
+          ))}
+        </div>
+        {statusScroll.canScroll && statusScroll.showRight && (
+          <button
+            type="button"
+            aria-label="Scroll status cards right"
+            className="shrink-0 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground md:h-10 md:w-10"
+            onClick={() => scrollStatusStrip("right")}
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </button>
+        )}
       </div>
 
       {/* Toolbar: search & filters (left) · view mode + primary action (right) */}

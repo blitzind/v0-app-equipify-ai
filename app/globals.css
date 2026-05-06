@@ -475,6 +475,34 @@
       disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed
       read-only:bg-zinc-50 read-only:text-foreground dark:read-only:bg-muted/30;
   }
+
+  /* Native date/time picker icons: readable on dark canvas (#0B111E) — keeps input bg via .input-base dark:bg-background */
+  .dark input.input-base[type='date'],
+  .dark input.input-base[type='time'],
+  .dark input.input-base[type='datetime-local'] {
+    color-scheme: dark;
+  }
+  .dark input.input-base[type='date']::-webkit-calendar-picker-indicator,
+  .dark input.input-base[type='time']::-webkit-calendar-picker-indicator,
+  .dark input.input-base[type='datetime-local']::-webkit-calendar-picker-indicator {
+    opacity: 0.9;
+    cursor: pointer;
+    /* ~slate-300 on dark navy — avoid pure white */
+    filter: invert(0.78) brightness(1.2);
+  }
+
+  .dark [data-slot='input'][type='date'],
+  .dark [data-slot='input'][type='time'],
+  .dark [data-slot='input'][type='datetime-local'] {
+    color-scheme: dark;
+  }
+  .dark [data-slot='input'][type='date']::-webkit-calendar-picker-indicator,
+  .dark [data-slot='input'][type='time']::-webkit-calendar-picker-indicator,
+  .dark [data-slot='input'][type='datetime-local']::-webkit-calendar-picker-indicator {
+    opacity: 0.9;
+    cursor: pointer;
+    filter: invert(0.78) brightness(1.2);
+  }
   .portal-card {
     background: var(--portal-surface);
     border: 1px solid var(--portal-border);

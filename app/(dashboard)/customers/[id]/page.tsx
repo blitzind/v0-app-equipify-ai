@@ -39,7 +39,6 @@ import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
-import { clearOtherDefaultCustomerLocations } from "@/lib/customer-locations/clear-default"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -974,54 +973,31 @@ export default function CustomerDetailPage() {
 
     setLocationSaving(true)
     try {
-      if (!editingLocationId) {
-        const gate = await enforceCanCreateRecord(customer.organizationId, "customer")
-        if (!gate.ok) {
-          setLocationError(gate.message)
-          return
-        }
-      }
-      const supabase = createBrowserSupabaseClient()
-
-      if (locationForm.is_default) {
-        const { error: clearErr } = await clearOtherDefaultCustomerLocations(supabase, {
-          organizationId: customer.organizationId,
-          customerId: customer.id,
-          exceptLocationId: editingLocationId ?? undefined,
-        })
-        if (clearErr) {
-          setLocationError(clearErr.message)
-          return
-        }
-      }
-
-      const payload = {
-        organization_id: customer.organizationId,
-        customer_id: customer.id,
+      const body = {
         name: locationForm.name.trim(),
-        address_line1: locationForm.address_line1.trim(),
-        address_line2: locationForm.address_line2.trim() || null,
+        address: locationForm.address_line1.trim(),
+        addressLine2: locationForm.address_line2.trim() || null,
         city: locationForm.city.trim(),
         state: locationForm.state.trim(),
-        postal_code: locationForm.postal_code.trim(),
+        zip: locationForm.postal_code.trim(),
         phone: locationForm.phone.trim() || null,
-        contact_person: locationForm.contact_person.trim() || null,
+        contactPerson: locationForm.contact_person.trim() || null,
         notes: locationForm.notes.trim() || null,
-        is_default: locationForm.is_default,
+        isDefault: locationForm.is_default,
       }
 
-      const query = editingLocationId
-        ? supabase
-            .from("customer_locations")
-            .update(payload)
-            .eq("id", editingLocationId)
-            .eq("organization_id", customer.organizationId)
-            .eq("customer_id", customer.id)
-        : supabase.from("customer_locations").insert(payload)
+      const url = editingLocationId
+        ? `/api/organizations/${encodeURIComponent(customer.organizationId)}/customers/${encodeURIComponent(customer.id)}/locations/${encodeURIComponent(editingLocationId)}`
+        : `/api/organizations/${encodeURIComponent(customer.organizationId)}/customers/${encodeURIComponent(customer.id)}/locations`
 
-      const { error } = await query
-      if (error) {
-        setLocationError(error.message)
+      const res = await fetch(url, {
+        method: editingLocationId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        setLocationError(json.message ?? "Could not save location.")
         return
       }
 

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { gateDemoDataManagement } from "@/lib/demo-data/access"
 import { seedDemoForIndustry } from "@/lib/demo-seeding/seed-engine"
 import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "organizationId and industry are required." }, { status: 400 })
     }
 
-    normalizeIndustryKey(industry)
+    const industryKey = normalizeIndustryKey(industry)
 
     const supabase = await createServerSupabaseClient()
     const {
@@ -39,22 +38,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: gate.message }, { status: gate.status })
     }
 
-    let db: SupabaseClient = supabase
-    if (gate.platformAdmin) {
-      try {
-        db = createServiceRoleSupabaseClient()
-      } catch {
-        return NextResponse.json({ message: "Server is not configured." }, { status: 503 })
-      }
+    let db
+    try {
+      db = createServiceRoleSupabaseClient()
+    } catch {
+      return NextResponse.json(
+        { message: "Server is not configured (missing service role key)." },
+        { status: 503 },
+      )
     }
 
     const result = await seedDemoForIndustry({
       supabase: db,
       organizationId: gate.organizationId,
       ownerUserId: gate.userId,
-      industry,
+      industry: industryKey,
       import: true,
     })
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("[demo-data/import]", {
+        organizationId: gate.organizationId,
+        industry: industryKey,
+        seedDemo: true,
+        counts: result.counts,
+        techniciansSeeded: result.techniciansSeeded,
+      })
+    }
 
     return NextResponse.json({
       ok: true,

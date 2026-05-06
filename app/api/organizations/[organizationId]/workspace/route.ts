@@ -359,7 +359,13 @@ export async function PATCH(
   }
 
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ ok: true, unchanged: true })
+    return NextResponse.json({
+      ok: true,
+      unchanged: true,
+      organization: serializeOrg(orgBefore as Record<string, unknown>),
+      planId,
+      brandingAllowed: brandingOk,
+    })
   }
 
   patch.updated_at = new Date().toISOString()

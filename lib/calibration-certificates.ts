@@ -580,13 +580,40 @@ export async function listCompletedCertificatesForOrg(
   return rows
 }
 
+async function fetchOrganizationCertificateBranding(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<{ companyName: string; logoUrl: string | null }> {
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("name, logo_url")
+    .eq("id", organizationId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  const row = data as { name?: string | null; logo_url?: string | null } | null
+  const rawName = row?.name?.trim() ?? ""
+  const companyName = rawName || "Organization"
+  const logoRaw = row?.logo_url != null ? String(row.logo_url).trim() : ""
+  const logoUrl = logoRaw.length ? logoRaw : null
+
+  return { companyName, logoUrl }
+}
+
 /** Build print-ready HTML for a saved certificate (matches Work Order certificate PDF content). */
 export async function buildCompletedCertificatePdfHtml(
   supabase: SupabaseClient,
   item: CompletedCertificateListItem,
-  options?: { companyName?: string },
+  options?: { companyName?: string; logoUrl?: string | null },
 ): Promise<string> {
-  const companyName = options?.companyName ?? "Equipify Service Co."
+  const branding = await fetchOrganizationCertificateBranding(supabase, item.template.organizationId)
+  const companyNameRaw =
+    options?.companyName !== undefined ? options.companyName : branding.companyName
+  const companyName = (companyNameRaw ?? "").trim() || "Organization"
+  const logoUrl =
+    options?.logoUrl !== undefined ? options.logoUrl ?? null : branding.logoUrl
+
   let customerSignatureUrl: string | null = null
   if (item.customerSignaturePath) {
     customerSignatureUrl = await signedUrlForAttachmentPath(supabase, item.customerSignaturePath)
@@ -600,6 +627,7 @@ export async function buildCompletedCertificatePdfHtml(
 
   return buildCertificatePdfHtml({
     companyName,
+    logoUrl,
     templateName: item.template.name,
     template: item.template,
     values: item.values,

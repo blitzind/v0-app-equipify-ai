@@ -63,9 +63,10 @@ export async function POST(
     return NextResponse.json({ error: "forbidden", message: "You are not a member of this organization." }, { status: 403 })
   }
 
-  if (callerRow.role !== "owner" && callerRow.role !== "admin") {
+  const isSelf = user.id === userId
+  if (!isSelf && callerRow.role !== "owner" && callerRow.role !== "admin") {
     return NextResponse.json(
-      { error: "forbidden", message: "Only owners and admins can set profile photos for technicians." },
+      { error: "forbidden", message: "Only owners and admins can set profile photos for other members." },
       { status: 403 },
     )
   }

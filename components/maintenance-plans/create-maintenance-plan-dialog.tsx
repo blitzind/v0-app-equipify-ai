@@ -499,7 +499,7 @@ export function CreateMaintenancePlanDialog({
         onClose();
       }}
     >
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Maintenance Plan</DialogTitle>
         </DialogHeader>

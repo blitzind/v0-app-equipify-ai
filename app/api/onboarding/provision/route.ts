@@ -18,6 +18,9 @@ type Body = {
   /** Paid plan chosen in onboarding; trial access is always Scale until checkout. */
   selectedPlan?: string | null
   billingCycle?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  phone?: string | null
 }
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
@@ -115,7 +118,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
   }
 
-  const seedDemo = Boolean(body.seedDemo)
+  const seedDemo = body.seedDemo !== false
   let organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
   let createdNewOrganization = false
 
@@ -189,10 +192,53 @@ export async function POST(request: Request) {
     }
   }
 
-  await supabase
-    .from("profiles")
-    .update({ default_organization_id: organizationId, updated_at: new Date().toISOString() })
-    .eq("id", user.id)
+  let svc
+  try {
+    svc = createServiceRoleSupabaseClient()
+  } catch {
+    return NextResponse.json({ error: "service_unavailable", message: "Server configuration error." }, { status: 503 })
+  }
+
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+  const fn =
+    (typeof body.firstName === "string" ? body.firstName.trim() : "") ||
+    String(meta.first_name ?? "").trim()
+  const ln =
+    (typeof body.lastName === "string" ? body.lastName.trim() : "") ||
+    String(meta.last_name ?? "").trim()
+  const composedFull = [fn, ln].filter(Boolean).join(" ").trim()
+  const fullName =
+    composedFull ||
+    String(meta.full_name ?? "").trim() ||
+    (user.email ? user.email.split("@")[0]?.trim() ?? "" : "") ||
+    null
+  const profileUpsert: Record<string, unknown> = {
+    id: user.id,
+    email: user.email ?? null,
+    full_name: fullName,
+    default_organization_id: organizationId,
+    updated_at: new Date().toISOString(),
+  }
+  if (typeof body.phone === "string") {
+    profileUpsert.phone = body.phone.trim().slice(0, 64) || null
+  }
+
+  const { error: profUpsertErr } = await svc.from("profiles").upsert(profileUpsert, { onConflict: "id" })
+  if (profUpsertErr) {
+    return NextResponse.json(
+      { error: "profile_failed", message: profUpsertErr.message, organizationId },
+      { status: 400 },
+    )
+  }
+
+  await svc.auth.admin.updateUserById(user.id, {
+    user_metadata: {
+      ...meta,
+      full_name: fullName ?? meta.full_name,
+      first_name: fn || meta.first_name,
+      last_name: ln || meta.last_name,
+    },
+  })
 
   let seeded = false
   let seedSkipped = false
@@ -203,7 +249,7 @@ export async function POST(request: Request) {
   if (seedDemo) {
     try {
       const seedResult = await seedDemoForIndustry({
-        supabase,
+        supabase: svc,
         organizationId,
         ownerUserId: user.id,
         industry: body.industry,
@@ -213,6 +259,18 @@ export async function POST(request: Request) {
       seedSkipped = seedResult.skipped
       techniciansSeeded = Boolean(seedResult.techniciansSeeded)
       seedCounts = (seedResult.counts ?? null) as Record<string, number> | null
+      if (process.env.NODE_ENV === "development") {
+        console.info("[onboarding/provision] demo seed", {
+          organizationId,
+          industry: body.industry,
+          seedDemo,
+          seeded,
+          seedSkipped,
+          seededIndustry,
+          seedCounts,
+          techniciansSeeded,
+        })
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to seed demo data."
       return NextResponse.json(
@@ -220,6 +278,8 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+  } else if (process.env.NODE_ENV === "development") {
+    console.info("[onboarding/provision] demo seed skipped", { organizationId, seedDemo })
   }
 
   return NextResponse.json({

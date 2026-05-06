@@ -24,6 +24,7 @@ import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { CertificateTabContent } from "@/components/work-orders/certificate-tab-content"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { useTenant } from "@/lib/tenant-store"
 
 type SlotState = {
   templateId: string
@@ -78,6 +79,9 @@ export function CertificateMultiTabContent({
   focusEquipmentId,
   onFocusEquipmentApplied,
 }: CertificateMultiTabContentProps) {
+  const { workspace } = useTenant()
+  const workspaceCompanyName = workspace.name?.trim() || "Organization"
+  const workspaceLogoUrl = workspace.logoUrl?.trim() ? workspace.logoUrl.trim() : null
   const { toast } = useToast()
   const orgId = organizationId?.trim() ?? ""
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])
@@ -364,7 +368,8 @@ export function CertificateMultiTabContent({
                     onSave={() => void handleSave(asset.id)}
                     saveBusy={savingAssetId === asset.id}
                     lastSavedAt={st.savedAt}
-                    companyName="Equipify Service Co."
+                    companyName={workspaceCompanyName}
+                    logoUrl={workspaceLogoUrl}
                     workOrderLabel={getWorkOrderDisplay(workOrder)}
                     customerName={workOrder.customerName}
                     equipmentName={asset.name}
