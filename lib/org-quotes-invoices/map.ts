@@ -65,7 +65,7 @@ export type LineItemJson = {
 
 export type QuoteInvoiceLineItem = LineItemJson
 
-function parseLineItems(raw: unknown): LineItemJson[] {
+export function parseLineItems(raw: unknown): LineItemJson[] {
   if (!Array.isArray(raw)) return []
   const out: LineItemJson[] = []
   for (const item of raw) {

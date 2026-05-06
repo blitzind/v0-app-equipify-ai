@@ -10,9 +10,10 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
-  ChevronLeft, Sparkles, ChevronDown, Check,
+  ChevronLeft, Sparkles, ChevronDown, Check, Bot,
   Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package,
   Bell,
+  Warehouse,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -42,9 +43,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { label: "Dashboard",         href: "/",                  icon: LayoutDashboard },
-      { label: "Communications",    href: "/communications",    icon: Bell },
       { label: "Customers",         href: "/customers",         icon: Users },
       { label: "Equipment",         href: "/equipment",         icon: Wrench },
+      { label: "Inventory",         href: "/inventory",         icon: Warehouse },
       { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },
       { label: "Dispatch Board",    href: "/dispatch",          icon: CalendarRange },
       { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
@@ -58,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Quotes",           href: "/quotes",           icon: FileText },
       { label: "Invoices",         href: "/invoices",         icon: Receipt },
+      { label: "Communications",   href: "/communications",   icon: Bell },
       { label: "Purchase Orders",  href: "/purchase-orders",  icon: ShoppingCart },
       { label: "Vendors",          href: "/vendors",          icon: Store },
       { label: "Catalog",          href: "/catalog",          icon: Package },
@@ -67,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
+      { label: "AI Assistants", href: "/ai-assistants", icon: Bot, highlight: true, requirePerm: "canViewInsights" },
       { label: "Reports",     href: "/reports",  icon: BarChart3 },
     ],
   },

@@ -681,7 +681,7 @@ function SignatureCaptureDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl" showCloseButton={!submitting}>
+      <DialogContent className="max-h-[min(90vh,560px)] overflow-y-auto sm:max-w-xl" showCloseButton={!submitting}>
         <DialogHeader>
           <DialogTitle>Customer signature</DialogTitle>
           <DialogDescription>
@@ -700,8 +700,8 @@ function SignatureCaptureDialog({
             <canvas
               ref={canvasRef}
               width={600}
-              height={160}
-              className="w-full cursor-crosshair max-h-40"
+              height={220}
+              className="w-full min-h-[140px] cursor-crosshair max-h-56 touch-none sm:max-h-44"
               onMouseDown={startDraw}
               onMouseMove={draw}
               onMouseUp={endDraw}
@@ -2010,13 +2010,14 @@ export function WorkOrderDetailExperience({
               </p>
             )}
           </Section>
-          <Section title="Technician notes" icon={PenLine}>
+          <Section title="Technician notes" icon={PenLine} id="technician-notes-section">
             {technicianNotesEditable ? (
               <Textarea
                 value={technicianNotes}
                 onChange={(e) => onTechnicianNotesChange(e.target.value)}
-                rows={4}
+                rows={5}
                 placeholder="Internal notes, follow-up recommendations…"
+                className="min-h-[132px] text-base leading-relaxed touch-manipulation lg:min-h-[100px] lg:text-sm"
               />
             ) : (
               <p className="text-sm text-foreground leading-relaxed">

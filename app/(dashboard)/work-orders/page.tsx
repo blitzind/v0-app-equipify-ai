@@ -959,13 +959,20 @@ function WorkOrdersPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  // Auto-open drawer from ?open= query param
+  // Auto-open drawer from ?workOrderId= or legacy ?open=
   useEffect(() => {
-    const openId = searchParams.get("open")
+    const deepLinkId =
+      searchParams.get("workOrderId")?.trim() || searchParams.get("open")?.trim() || null
     const rawTab = searchParams.get("tab") ?? undefined
     const tab = rawTab === "certificate" ? "certificates" : rawTab
-    if (openId) {
-      setSelectedWoId(openId)
+    if (deepLinkId) {
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[work-orders] deep-link open drawer", {
+          workOrderId: deepLinkId,
+          fromParam: searchParams.get("workOrderId") ? "workOrderId" : "open",
+        })
+      }
+      setSelectedWoId(deepLinkId)
       setDrawerInitialTab(tab)
       setArchiveScope("all")
       router.replace("/work-orders", { scroll: false })

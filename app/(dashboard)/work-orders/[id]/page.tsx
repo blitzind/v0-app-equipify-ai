@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -84,14 +84,23 @@ const nextStatus: Partial<Record<WorkOrderStatus, WorkOrderStatus>> = {
 export default function WorkOrderDetailPage() {
   const routeParams = useParams<{ id?: string | string[] }>()
   const rawId = routeParams?.id
-  const id =
+  const rawSegment =
     typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] ?? "" : ""
+  const workOrderRouteId = useMemo(() => {
+    const t = rawSegment.trim()
+    if (!t) return ""
+    try {
+      return decodeURIComponent(t)
+    } catch {
+      return t
+    }
+  }, [rawSegment])
   const router = useRouter()
   const { toast } = useToast()
   const activeOrg = useActiveOrganization()
   const { getById, updateStatus, updateRepairLog, updateWorkOrder } = useWorkOrders()
 
-  const storeWo = getById(id)
+  const storeWo = getById(workOrderRouteId)
   const [dbWo, setDbWo] = useState<WorkOrder | null | undefined>(undefined)
   const [internalNotes, setInternalNotes] = useState("")
   const [planServices, setPlanServices] = useState<unknown[] | null>(null)
@@ -104,6 +113,7 @@ export default function WorkOrderDetailPage() {
   const [attachmentUploadLabel, setAttachmentUploadLabel] = useState("")
   const partsPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dbLoadFailed, setDbLoadFailed] = useState(false)
+  const [detailLoadMessage, setDetailLoadMessage] = useState<string | null>(null)
 
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -129,26 +139,56 @@ export default function WorkOrderDetailPage() {
   const [pageCertificateFocusEqId, setPageCertificateFocusEqId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
+    if (!workOrderRouteId) {
+      setDbWo(null)
+      setDetailLoadMessage("No work order id in the URL.")
+      setDbLoadFailed(true)
+      return
+    }
+
     const supabase = createBrowserSupabaseClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
       setDbWo(null)
+      setDetailLoadMessage(null)
+      setDbLoadFailed(false)
       return
     }
-    if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
-      setDbWo(null)
+    // Wait for org context — do not setDbWo(null) here or we flash "not found" before org is ready.
+    if (activeOrg.switching || activeOrg.status !== "ready" || !activeOrg.organizationId) {
       return
     }
     const orgId = activeOrg.organizationId
-    const res = await loadWorkOrderDetailForOrg(supabase, orgId, id)
+    const res = await loadWorkOrderDetailForOrg(supabase, orgId, workOrderRouteId)
+
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[work-order-detail-page] loadWorkOrderDetailForOrg", {
+        rawParam: rawSegment,
+        decodedRouteId: workOrderRouteId,
+        organizationId: orgId,
+        orgStatus: activeOrg.status,
+        switching: activeOrg.switching,
+        ok: res.ok,
+        ...(res.ok
+          ? { workOrderId: res.data.workOrder.id }
+          : { notFound: res.notFound, message: "message" in res ? res.message : undefined }),
+      })
+    }
+
     if (!res.ok) {
       setDbWo(null)
+      setDetailLoadMessage(
+        res.notFound
+          ? null
+          : ("message" in res && res.message) ? res.message : "Could not load this work order.",
+      )
       if (!res.notFound) setDbLoadFailed(true)
       return
     }
     setDbLoadFailed(false)
+    setDetailLoadMessage(null)
     setDbWo(res.data.workOrder)
     setInternalNotes(res.data.notes)
     setPlanServices(res.data.planServices)
@@ -160,7 +200,19 @@ export default function WorkOrderDetailPage() {
     const ts = cloneTasks(res.data.workOrder.repairLog.tasks ?? [])
     setTabTasks(ts)
     setSavedTasks(ts)
-  }, [id, activeOrg.status, activeOrg.organizationId])
+  }, [
+    workOrderRouteId,
+    rawSegment,
+    activeOrg.status,
+    activeOrg.organizationId,
+    activeOrg.switching,
+  ])
+
+  useLayoutEffect(() => {
+    setDbWo(undefined)
+    setDbLoadFailed(false)
+    setDetailLoadMessage(null)
+  }, [workOrderRouteId])
 
   useEffect(() => {
     void reload()
@@ -181,8 +233,15 @@ export default function WorkOrderDetailPage() {
   }, [activeOrg.status, activeOrg.organizationId])
 
   const wo = dbWo ?? storeWo
-  const resolved = dbWo !== undefined || Boolean(storeWo)
-  const loading = !resolved
+  const orgBlockingDetail =
+    activeOrg.switching || activeOrg.status !== "ready" || !activeOrg.organizationId
+  const awaitingDb =
+    !orgBlockingDetail &&
+    Boolean(workOrderRouteId) &&
+    dbWo === undefined &&
+    !storeWo
+  const loading =
+    Boolean(workOrderRouteId) && (orgBlockingDetail || awaitingDb)
 
   useEffect(() => {
     if (!wo) return
@@ -205,24 +264,69 @@ export default function WorkOrderDetailPage() {
     [tabTasks, savedTasks],
   )
 
+  if (!workOrderRouteId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 max-w-md mx-auto text-center px-4">
+        <AlertTriangle className="w-8 h-8 text-muted-foreground" />
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">Invalid work order link</p>
+          <p className="text-sm text-muted-foreground">
+            The URL is missing a work order id. Open the job from Work Orders or use a shared link that includes the id.
+          </p>
+        </div>
+        <Link href="/work-orders">
+          <Button variant="outline">Back to Work Orders</Button>
+        </Link>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p className="text-sm text-muted-foreground">Loading work order…</p>
+        <p className="text-sm text-muted-foreground">
+          {orgBlockingDetail ? "Loading workspace…" : "Loading work order…"}
+        </p>
       </div>
     )
   }
 
   if (!wo) {
+    const devOrg =
+      process.env.NODE_ENV === "development"
+        ? activeOrg.organizationId ?? "(no organization id)"
+        : null
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 max-w-lg mx-auto text-center px-4">
         <AlertTriangle className="w-8 h-8 text-muted-foreground" />
-        <p className="text-muted-foreground">
-          {dbLoadFailed ? "Could not load this work order." : "Work order not found."}
-        </p>
-        <Link href="/work-orders">
-          <Button variant="outline">Back to Work Orders</Button>
-        </Link>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">
+            {dbLoadFailed ? "Could not load this work order" : "Work order not found"}
+          </p>
+          <p className="text-xs text-muted-foreground font-mono break-all">
+            Attempted id: {workOrderRouteId}
+          </p>
+          {detailLoadMessage ? (
+            <p className="text-sm text-muted-foreground">{detailLoadMessage}</p>
+          ) : dbLoadFailed ? null : (
+            <p className="text-sm text-muted-foreground">
+              This id may not exist in your current workspace, or it may belong to another organization.
+            </p>
+          )}
+          {process.env.NODE_ENV === "development" ? (
+            <p className="text-[11px] text-muted-foreground font-mono">
+              organizationId: {String(devOrg)}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Link href="/work-orders">
+            <Button variant="outline">Back to Work Orders</Button>
+          </Link>
+          <Link href={`/work-orders?workOrderId=${encodeURIComponent(workOrderRouteId)}`}>
+            <Button variant="secondary">Open in Work Orders drawer</Button>
+          </Link>
+        </div>
       </div>
     )
   }
@@ -639,6 +743,17 @@ export default function WorkOrderDetailPage() {
     return [workOrder.customerName, workOrder.location].filter(Boolean).join(" ").trim()
   }, [workOrder.customerName, workOrder.location])
 
+  const mobileJumpToSection = useCallback((tab: string, sectionId: string) => {
+    setPageWoTab(tab)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "center" })
+        }, 100)
+      })
+    })
+  }, [])
+
   const closeCertificateGate = certificateGateForCompletionAllAssets({
     calibrationTemplateId: workOrder.calibrationTemplateId,
     slots: completionCertSlots,
@@ -689,7 +804,7 @@ export default function WorkOrderDetailPage() {
   ) : null
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto max-lg:pb-24">
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto max-lg:pb-[min(40vh,14rem)]">
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/work-orders">
@@ -830,7 +945,9 @@ export default function WorkOrderDetailPage() {
         partsPhotosEditable={editable}
         tasksEditable={editable}
         onEditWorkOrder={() => setEditing(true)}
-        onAssignTechnician={() => router.push(`/work-orders?open=${encodeURIComponent(workOrder.id)}`)}
+        onAssignTechnician={() =>
+          router.push(`/work-orders?workOrderId=${encodeURIComponent(workOrder.id)}`)
+        }
         onMarkComplete={handleMarkComplete}
         quoteHref={quoteHref}
         workflowHints={workflowHints}
@@ -848,6 +965,12 @@ export default function WorkOrderDetailPage() {
           showComplete={["Open", "Scheduled", "In Progress"].includes(workOrder.status)}
           onComplete={() => void handleMarkComplete()}
           onPhotoFiles={(files) => void handleAttachmentUpload(files)}
+          onSignature={() => mobileJumpToSection("overview", "customer-signature-section")}
+          onTechnicianNotes={() => mobileJumpToSection("notes", "technician-notes-section")}
+          onCertificates={() => setPageWoTab("certificates")}
+          showCertificatesShortcut={
+            Boolean(workOrder.calibrationTemplateId) || equipmentAssets.length > 0
+          }
         />
       ) : null}
 

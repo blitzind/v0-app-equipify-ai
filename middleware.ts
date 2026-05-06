@@ -8,6 +8,7 @@ import {
   isPlatformAdminEmail,
   logPlatformAdminDevDiagnostics,
 } from "@/lib/platform-admin-policy"
+import { portalAuthGate } from "@/lib/portal/middleware-gate"
 
 const PUBLIC_ROUTES = new Set(["/login", "/onboarding"])
 
@@ -15,6 +16,7 @@ const DASHBOARD_PREFIXES = [
   "/customers",
   "/communications",
   "/equipment",
+  "/inventory",
   "/work-orders",
   "/service-schedule",
   "/maintenance-plans",
@@ -24,14 +26,15 @@ const DASHBOARD_PREFIXES = [
   "/purchase-orders",
   "/integrations",
   "/insights",
+  "/ai-assistants",
   "/reports",
   "/settings",
 ]
 
 function isProtectedRoute(pathname: string) {
+  if (pathname.startsWith("/portal")) return false
   if (pathname === "/") return true
   if (pathname === "/test-maintenance-plan-create") return true
-  if (pathname.startsWith("/portal")) return true
   if (pathname.startsWith("/admin")) return true
   return DASHBOARD_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
@@ -42,12 +45,17 @@ function skipArchivedOrgGuard(pathname: string) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/api")
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/portal")
   )
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  const portalRedirect = await portalAuthGate(request)
+  if (portalRedirect) return portalRedirect
+
   const { response, user } = await updateSession(request)
   const isAuthenticated = Boolean(user)
 

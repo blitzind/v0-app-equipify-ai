@@ -17,6 +17,7 @@ import { RecentWorkOrders } from "@/components/dashboard/recent-work-orders"
 import { EquipmentDue } from "@/components/dashboard/equipment-due"
 import { RepeatRepairs } from "@/components/dashboard/repeat-repairs"
 import { ExpiringWarranties } from "@/components/dashboard/expiring-warranties"
+import { TechnicianTodayMobileCard } from "@/components/dashboard/technician-today-mobile"
 import { RevenueChart } from "@/components/dashboard/revenue-chart"
 import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
 import { OperationalInsightsWidget } from "@/components/dashboard/ai-insights-widget"
@@ -46,6 +47,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <TechnicianTodayMobileCard />
       {error && (
         <div
           className={cn(

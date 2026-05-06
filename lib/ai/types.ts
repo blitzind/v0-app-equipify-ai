@@ -17,6 +17,7 @@ export type AiTaskId =
   | "OCR_cleanup"
   | "classification"
   | "tagging"
+  | "inventory_operations"
 
 export type AiProviderId = "openai" | "anthropic" | "google"
 

@@ -23,6 +23,7 @@ const TRIGGER_LABELS: Record<WorkflowTriggerType, string> = {
   quote_accepted: "Quote accepted",
   equipment_warranty_expiring: "Equipment warranty expiring",
   certificate_uploaded: "Certificate uploaded",
+  ai_assistant_digest_ready: "AI operational assistant digest ready",
 }
 
 const TRIGGER_OPTIONS = Object.entries(TRIGGER_LABELS) as [WorkflowTriggerType, string][]

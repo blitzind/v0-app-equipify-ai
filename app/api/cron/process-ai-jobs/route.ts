@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
-import { processQueuedCatalogExtractionJobs } from "@/lib/ai/jobs/process-ai-job-queue"
+import {
+  processQueuedCatalogExtractionJobs,
+  processQueuedOperationalAssistantJobs,
+} from "@/lib/ai/jobs/process-ai-job-queue"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -32,11 +35,13 @@ async function runCron(request: Request) {
   }
 
   const maxJobs = Math.min(Math.max(Number.parseInt(process.env.AI_JOB_CRON_BATCH ?? "5", 10) || 5, 1), 10)
-  const result = await processQueuedCatalogExtractionJobs(svc, maxJobs)
+  const catalog_extraction = await processQueuedCatalogExtractionJobs(svc, maxJobs)
+  const operational_assistant = await processQueuedOperationalAssistantJobs(svc, maxJobs)
 
   return NextResponse.json({
     ok: true,
-    catalog_extraction: result,
+    catalog_extraction,
+    operational_assistant,
     maxJobs,
   })
 }

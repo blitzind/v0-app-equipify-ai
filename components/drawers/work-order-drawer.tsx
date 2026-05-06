@@ -1500,8 +1500,20 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               ) : null}
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
                 <Link
-                  href={`/work-orders/${encodeURIComponent(workOrderId)}`}
+                  href={`/work-orders?workOrderId=${encodeURIComponent(workOrderId)}`}
                   className="flex items-center gap-1.5"
+                  onClick={() => {
+                    if (process.env.NODE_ENV === "development") {
+                      const href = `/work-orders?workOrderId=${encodeURIComponent(workOrderId)}`
+                      console.debug("[work-order-drawer] Full profile navigation", {
+                        workOrderId,
+                        href,
+                        display: getWorkOrderDisplay(wo),
+                        organizationId: activeOrgId,
+                        orgStatus,
+                      })
+                    }
+                  }}
                 >
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
                 </Link>
@@ -1932,11 +1944,40 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           />
           {!editing && !wo.isArchived ? (
             <TechnicianMobileQuickBar
+              stickyDock
               phone={primaryPhone}
               navigateQuery={navigateQuery}
               showComplete={["Open", "Scheduled", "In Progress"].includes(wo.status)}
               onComplete={() => setCloseOutOpen(true)}
               onPhotoFiles={(files) => void handleAttachmentUpload(files)}
+              onSignature={() => {
+                handleDrawerTabChange("overview")
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    window.setTimeout(() => {
+                      document
+                        .getElementById("customer-signature-section")
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                    }, 100)
+                  })
+                })
+              }}
+              onTechnicianNotes={() => {
+                handleDrawerTabChange("notes")
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    window.setTimeout(() => {
+                      document
+                        .getElementById("technician-notes-section")
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                    }, 100)
+                  })
+                })
+              }}
+              onCertificates={() => handleDrawerTabChange("certificates")}
+              showCertificatesShortcut={
+                Boolean(wo.calibrationTemplateId) || equipmentAssets.length > 0
+              }
             />
           ) : null}
           </div>

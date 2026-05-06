@@ -22,6 +22,20 @@ export async function GET(
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? "40")))
   const channel = url.searchParams.get("channel")?.trim()
 
+  const deliveryParam = url.searchParams.get("deliveryStatus")?.trim()
+  const deliveryStatuses = deliveryParam
+    ? deliveryParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) =>
+          ["pending", "queued", "sent", "delivered", "failed", "bounced", "skipped"].includes(s),
+        )
+    : []
+
+  const dateFrom = url.searchParams.get("dateFrom")?.trim()
+  const dateTo = url.searchParams.get("dateTo")?.trim()
+  const searchRaw = url.searchParams.get("search")?.trim() ?? ""
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -61,6 +75,22 @@ export async function GET(
     q = q.eq("channel", channel)
   }
 
+  if (deliveryStatuses.length > 0) {
+    q = q.in("delivery_status", deliveryStatuses)
+  }
+
+  if (dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+    q = q.gte("created_at", `${dateFrom}T00:00:00.000Z`)
+  }
+  if (dateTo && /^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+    q = q.lte("created_at", `${dateTo}T23:59:59.999Z`)
+  }
+
+  if (searchRaw.length >= 2) {
+    const safe = searchRaw.replace(/,/g, " ").slice(0, 80)
+    q = q.or(`title.ilike.%${safe}%,summary.ilike.%${safe}%`)
+  }
+
   const { data: rawEvents, error: listErr } = await q
 
   if (listErr) {
@@ -91,6 +121,35 @@ export async function GET(
     return { ...r, is_read: isRead }
   })
 
+  const custIds = [
+    ...new Set(
+      enriched
+        .map((row) => row.recipient_customer_id as string | null | undefined)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ]
+
+  let customerNameMap = new Map<string, string>()
+  if (custIds.length > 0) {
+    const { data: custRows } = await supabase
+      .from("customers")
+      .select("id, company_name")
+      .eq("organization_id", organizationId)
+      .in("id", custIds)
+    customerNameMap = new Map(
+      ((custRows ?? []) as { id: string; company_name: string }[]).map((c) => [c.id, c.company_name]),
+    )
+  }
+
+  const withCustomers = enriched.map((row) => {
+    const cid = row.recipient_customer_id as string | null | undefined
+    return {
+      ...row,
+      customer_display_name:
+        cid && customerNameMap.has(cid) ? customerNameMap.get(cid) ?? null : null,
+    }
+  })
+
   const { data: unreadRow, error: rpcErr } = await supabase.rpc("communication_unread_count_for_user", {
     p_organization_id: organizationId,
   })
@@ -102,7 +161,7 @@ export async function GET(
   const unreadCount = typeof unreadRow === "number" ? unreadRow : Number(unreadRow ?? 0)
 
   return NextResponse.json({
-    events: enriched,
+    events: withCustomers,
     unreadCount,
   })
 }

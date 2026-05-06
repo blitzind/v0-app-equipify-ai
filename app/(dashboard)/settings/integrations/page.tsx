@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Check, ExternalLink, Plug, RefreshCw } from "lucide-react"
+import Link from "next/link"
+import { Check, ExternalLink, Plug, RefreshCw, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -13,6 +14,8 @@ interface Integration {
   connected: boolean
   connectedAs?: string
   logo: string
+  /** Settings sub-route for integrations with a dedicated config page. */
+  detailHref?: string
 }
 
 const INTEGRATIONS: Integration[] = [
@@ -21,9 +24,9 @@ const INTEGRATIONS: Integration[] = [
     name: "QuickBooks Online",
     description: "Sync invoices, customers, and payments with QuickBooks automatically.",
     category: "Accounting",
-    connected: true,
-    connectedAs: "acmecorp@quickbooks.com",
+    connected: false,
     logo: "QB",
+    detailHref: "/settings/integrations/quickbooks",
   },
   {
     id: "stripe",
@@ -137,22 +140,32 @@ function IntegrationCard({ integration, onToggle }: {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant={integration.connected ? "outline" : "default"}
-          className={cn(
-            "text-xs h-7 gap-1.5",
-            integration.connected && "border-destructive/30 text-destructive hover:bg-destructive/5"
-          )}
-          onClick={() => onToggle(integration.id)}
-        >
-          {integration.connected ? "Disconnect" : <><Plug size={11} /> Connect</>}
-        </Button>
-        {integration.connected && (
-          <Button size="sm" variant="ghost" className="text-xs h-7 gap-1.5 text-muted-foreground">
-            <RefreshCw size={11} /> Sync now
+      <div className="flex items-center gap-2 flex-wrap">
+        {integration.detailHref ? (
+          <Button size="sm" variant="outline" className="text-xs h-7 gap-1.5" asChild>
+            <Link href={integration.detailHref}>
+              <Settings2 size={11} /> Manage
+            </Link>
           </Button>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant={integration.connected ? "outline" : "default"}
+              className={cn(
+                "text-xs h-7 gap-1.5",
+                integration.connected && "border-destructive/30 text-destructive hover:bg-destructive/5",
+              )}
+              onClick={() => onToggle(integration.id)}
+            >
+              {integration.connected ? "Disconnect" : <><Plug size={11} /> Connect</>}
+            </Button>
+            {integration.connected && (
+              <Button size="sm" variant="ghost" className="text-xs h-7 gap-1.5 text-muted-foreground">
+                <RefreshCw size={11} /> Sync now
+              </Button>
+            )}
+          </>
         )}
         <Button size="sm" variant="ghost" className="text-xs h-7 gap-1.5 text-muted-foreground ml-auto">
           Docs <ExternalLink size={10} />

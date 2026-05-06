@@ -327,7 +327,7 @@ export function CertificateMultiTabContent({
             <div
               key={asset.id}
               id={`wo-cert-asset-${asset.id}`}
-              className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden"
+              className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden scroll-mt-20 touch-manipulation lg:scroll-mt-8"
             >
               <div className="border-b border-border/80 bg-muted/20 px-4 py-3 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">

@@ -129,7 +129,7 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
   maintenance_prediction: {
     id: "maintenance_prediction",
     label: "Maintenance prediction",
-    requiredPlan: "scale",
+    requiredPlan: "core",
     costTier: "medium",
     modelTier: "reasoning",
     primaryModel: { provider: "openai", model: "gpt-4o-mini" },
@@ -245,6 +245,22 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     confidenceThreshold: 0.8,
     cacheable: true,
     cacheTtlSeconds: 86400,
+  },
+  inventory_operations: {
+    id: "inventory_operations",
+    label: "Inventory operations assistant",
+    requiredPlan: "core",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "openai", model: "gpt-4o" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.2,
+    maxOutputTokens: 4096,
+    structuredMode: "json_object",
+    timeoutMs: 90_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
   },
 }
 

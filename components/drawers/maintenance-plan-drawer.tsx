@@ -439,7 +439,7 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
                   <p className="text-xs text-foreground mt-1.5 leading-snug">{ev.message}</p>
                   {ev.work_order_id ? (
                     <Link
-                      href={`/work-orders/${ev.work_order_id}`}
+                      href={`/work-orders?workOrderId=${encodeURIComponent(ev.work_order_id)}`}
                       className="inline-flex text-xs font-medium text-primary hover:underline mt-2"
                     >
                       Open work order

@@ -13,6 +13,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
   CalendarRange, Store, Package, Upload, Bell,
+  Warehouse,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -72,6 +73,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     icon: HardHat,
     cta: { label: "+ Add Technician" },
   },
+  "/technicians/today": {
+    title: "My jobs today",
+    subtitle: "Field view — work orders assigned to you for today and open undated jobs.",
+    icon: HardHat,
+  },
   "/quotes": {
     title: "Quotes",
     subtitle: "Create, send, and track service quotes awaiting customer approval.",
@@ -125,24 +131,27 @@ const ROUTE_META: Record<string, RouteMeta> = {
   },
   "/communications": {
     title: "Communications",
-    subtitle: "Central log of emails, SMS, reminders, and customer-facing notifications with delivery status.",
+    subtitle:
+      "Track customer emails, reminders, delivery status, quote follow-ups, invoice notifications, and automated outreach activity.",
     icon: Bell,
   },
 }
 
 // Routes that render their own full-bleed hero — PageHero is suppressed.
-const HERO_SUPPRESS = new Set(["/insights", "/integrations"])
+const HERO_SUPPRESS = new Set(["/insights", "/ai-assistants", "/integrations"])
 
 /** Per-area hero icon color (title card only); primary CTAs stay orange via `Button`. */
 const FEATURE_ICON_HEX: Record<string, string> = {
   "/": "#6366F1",
   "/customers": "#2563EB",
   "/equipment": "#64748B",
+  "/inventory": "#78716C",
   "/work-orders": "#22C55E",
   "/dispatch": "#0EA5E9",
   "/service-schedule": "#A855F7",
   "/maintenance-plans": "#F59E0B",
   "/technicians": "#4F46E5",
+  "/technicians/today": "#4F46E5",
   "/quotes": "#06B6D4",
   "/invoices": "#06B6D4",
   "/purchase-orders": "#06B6D4",
@@ -158,6 +167,7 @@ const FEATURE_ICON_HEX: Record<string, string> = {
 function getFeatureIconColor(pathname: string): string {
   if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
   if (pathname.startsWith("/customers/")) return "#2563EB"
+  if (pathname.startsWith("/technicians/today")) return "#4F46E5"
   if (pathname.startsWith("/work-orders/")) return "#22C55E"
   if (pathname.startsWith("/settings/")) return "#6366F1"
   return "#64748B"
@@ -175,6 +185,13 @@ function resolveMeta(pathname: string): RouteMeta | null {
   if (pathname.startsWith("/settings/")) return SETTINGS_AREA_HERO
   if (ROUTE_META[pathname]) return ROUTE_META[pathname]
   if (pathname.startsWith("/customers/")) return { title: "Customer Detail", subtitle: "Full account overview — equipment, work orders, and service history.", icon: Users }
+  if (
+    pathname.startsWith("/technicians/") &&
+    pathname !== "/technicians" &&
+    !pathname.startsWith("/technicians/today")
+  ) {
+    return { title: "Technicians", subtitle: "Workforce, assignments, and certifications.", icon: HardHat }
+  }
   if (pathname.startsWith("/work-orders/")) return { title: "Work Order Detail", subtitle: "Full details, activity timeline, and technician notes.", icon: ClipboardList }
   return null
 }

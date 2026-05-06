@@ -12,7 +12,6 @@ import {
   quoteStatusUiToDb,
   type LineItemJson,
 } from "@/lib/org-quotes-invoices/map"
-
 /** Default lists hide archived rows; use `archived` or `all` for recovery views. */
 export type RecordArchiveVisibility = ArchivedAtScope
 
@@ -30,6 +29,19 @@ async function profileLabelsById(
     map.set(row.id, label)
   }
   return map
+}
+
+/** Client-safe hook: server QuickBooks code runs in the API route (no server-only imports here). */
+function queueQuickBooksInvoiceAutoSync(organizationId: string, invoiceId: string): void {
+  void fetch(
+    `/api/organizations/${encodeURIComponent(organizationId)}/integrations/quickbooks/invoice-auto-sync`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceId }),
+      credentials: "include",
+    },
+  ).catch(() => {})
 }
 
 export async function fetchQuotesForOrganization(
@@ -363,6 +375,9 @@ export async function insertOrgInvoice(
 
   if (error) return { error: error.message }
   const id = (data as { id: string } | null)?.id
+  if (id) {
+    queueQuickBooksInvoiceAutoSync(payload.organizationId, id)
+  }
   return { id }
 }
 
@@ -400,6 +415,7 @@ export async function updateOrgInvoice(
     .eq("organization_id", organizationId)
 
   if (error) return { error: error.message }
+  queueQuickBooksInvoiceAutoSync(organizationId, invoiceId)
   return {}
 }
 

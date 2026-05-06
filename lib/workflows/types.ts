@@ -9,6 +9,7 @@ export type WorkflowTriggerType =
   | "quote_accepted"
   | "equipment_warranty_expiring"
   | "certificate_uploaded"
+  | "ai_assistant_digest_ready"
 
 export type WorkflowActionType =
   | "send_email"
@@ -56,6 +57,8 @@ export type WorkflowEventContext = {
   quote?: Record<string, unknown>
   equipment?: Record<string, unknown>
   calibration_record?: Record<string, unknown>
+  /** Operational AI assistant digest (trigger `ai_assistant_digest_ready`). */
+  ai_assistant?: Record<string, unknown>
   /** Flattened helpers */
   equipment_category?: string | null
 }
