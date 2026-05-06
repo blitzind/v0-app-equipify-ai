@@ -1,6 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import {
+  documentBrandingFromFields,
+  type OrganizationDocumentBranding,
+} from "@/lib/organization/document-branding"
 import Link from "next/link"
 import { CheckCircle2, FileDown, Loader2, Mail, Save } from "lucide-react"
 import { DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
@@ -29,6 +33,8 @@ type CertificateTabContentProps = {
   companyName: string
   /** Workspace logo URL from Organization settings; when absent, PDF shows company name as text. */
   logoUrl?: string | null
+  /** Full org branding for print/PDF (accent, address, contact). Falls back to name + logo only. */
+  documentBranding?: OrganizationDocumentBranding | null
   equipmentName: string
   customerName: string
   workOrderDescription?: string
@@ -82,6 +88,7 @@ export function CertificateTabContent({
   workOrderLabel,
   companyName,
   logoUrl,
+  documentBranding,
   equipmentName,
   customerName,
   workOrderDescription,
@@ -108,6 +115,16 @@ export function CertificateTabContent({
 }: CertificateTabContentProps) {
   const { toast } = useToast()
   const resolvedLogoUrl = logoUrl?.trim() ? logoUrl.trim() : undefined
+  const certificateBranding = useMemo(
+    () =>
+      documentBranding ??
+      documentBrandingFromFields({
+        name: companyName,
+        documentLogoUrl: resolvedLogoUrl ?? null,
+        logoUrl: resolvedLogoUrl ?? null,
+      }),
+    [documentBranding, companyName, resolvedLogoUrl],
+  )
   const [certEmailTo, setCertEmailTo] = useState("")
   const [certEmailSending, setCertEmailSending] = useState(false)
   const selectedTemplate = useMemo(
@@ -208,6 +225,8 @@ export function CertificateTabContent({
                 try {
                   const html = buildCertificatePdfHtml({
                     companyName,
+                    logoUrl: certificateBranding.preferredLogoUrl,
+                    branding: certificateBranding,
                     templateName: selectedTemplate.name,
                     template: selectedTemplate,
                     values,
@@ -259,7 +278,8 @@ export function CertificateTabContent({
               try {
                 const html = buildCertificatePdfHtml({
                   companyName,
-                  logoUrl: resolvedLogoUrl,
+                  logoUrl: certificateBranding.preferredLogoUrl,
+                  branding: certificateBranding,
                   templateName: selectedTemplate.name,
                   template: selectedTemplate,
                   values,

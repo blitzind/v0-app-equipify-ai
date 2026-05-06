@@ -45,6 +45,13 @@ interface Props {
   initialCustomerId?: string | null
   /** After equipment loads for the customer, select this asset when present in the list. */
   initialEquipmentId?: string | null
+  /** Seed parts tab with a catalog-linked line after the work order is created. */
+  catalogPartPrefill?: {
+    catalogItemId: string
+    description: string
+    unitCostCents: number
+    quantity?: number
+  } | null
 }
 
 const PRIORITIES: WorkOrderPriority[] = ["Low", "Normal", "High", "Critical"]
@@ -82,6 +89,7 @@ export function CreateWorkOrderModal({
   onSuccess,
   initialCustomerId = null,
   initialEquipmentId = null,
+  catalogPartPrefill = null,
 }: Props) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
@@ -391,6 +399,22 @@ export function CreateWorkOrderModal({
       if (woeErr) {
         setSubmitting(false)
         setSubmitError(woeErr.message)
+        return
+      }
+    }
+
+    if (catalogPartPrefill?.catalogItemId) {
+      const { error: partErr } = await supabase.from("work_order_line_items").insert({
+        organization_id: organizationId,
+        work_order_id: woId,
+        description: catalogPartPrefill.description.trim() || "Catalog item",
+        quantity: catalogPartPrefill.quantity ?? 1,
+        unit_cost_cents: Math.max(0, Math.round(catalogPartPrefill.unitCostCents)),
+        catalog_item_id: catalogPartPrefill.catalogItemId,
+      })
+      if (partErr) {
+        setSubmitting(false)
+        setSubmitError(partErr.message)
         return
       }
     }

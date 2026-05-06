@@ -8,7 +8,7 @@ export function wrapEquipifyEmail(organizationName: string, innerHtml: string, f
   return `<!DOCTYPE html><html><body style="font-family:system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5;color:#0f172a;max-width:560px;">
 ${innerHtml}
 ${foot}
-<p style="margin-top:24px;font-size:12px;color:#94a3b8;">This message was sent by Equipify on behalf of ${escapeHtml(
+<p style="margin-top:24px;font-size:12px;color:#94a3b8;">Sent on behalf of ${escapeHtml(
     organizationName,
   )}. Reply to this email if you have questions.</p>
 </body></html>`
@@ -105,7 +105,7 @@ export function buildInvoiceCustomerEmailContent(args: InvoiceCustomerEmailArgs)
   const pay =
     args.paymentPlaceholder?.trim() ||
     "A secure online payment link will appear here once your organization connects payment processing."
-  const defaultSubject = `Invoice ${args.invoiceLabel} from Equipify`
+  const defaultSubject = `Invoice ${args.invoiceLabel} from ${args.organizationName}`
   const subject = args.subjectOverride?.trim() || defaultSubject
 
   const listItems = [
@@ -149,7 +149,7 @@ ${args.certificatesList
   )
   .join("\n")}
 </ul>
-<p style="margin:8px 0 0;font-size:13px;color:#334155;"><strong>Certificates are available in Equipify.</strong> Reply if you need copies.</p>
+<p style="margin:8px 0 0;font-size:13px;color:#334155;"><strong>Certificates are on file for your job.</strong> Reply if you need copies.</p>
 <p style="margin:10px 0 0;font-size:12px;color:#64748b;">PDF attachments may be included automatically when document delivery is enabled.</p>
 </div>`
     : args.certificate?.included ?
@@ -159,7 +159,7 @@ ${args.certificatesList
         args.certificate.templateName?.trim() ?
           ` (<strong>${escapeHtml(args.certificate.templateName.trim())}</strong>)`
         : ""
-      } is on file for this work. <strong>Certificate is available in Equipify.</strong> Reply to this email if you need a copy sent separately.</p>
+      } is on file for this work. <strong>Reply to this email if you need a copy sent separately.</strong></p>
 <p style="margin:10px 0 0;font-size:12px;color:#64748b;">A downloadable certificate file may be attached automatically when document delivery is enabled.</p>
 </div>`
     : ""
@@ -198,11 +198,11 @@ ${args.certificatesList
         `- ${c.equipmentLabel}${c.templateName?.trim() ? ` (${c.templateName.trim()})` : ""}`,
       )
     }
-    textLines.push("", "Certificates are available in Equipify.")
+    textLines.push("", "Certificates are on file — reply to request copies.")
   } else if (args.certificate?.included) {
     textLines.push(
       "",
-      "Certificate included — available in Equipify.",
+      "Certificate included — reply if you need a copy.",
       args.certificate.templateName?.trim() ? `Template: ${args.certificate.templateName.trim()}` : "",
     )
   }

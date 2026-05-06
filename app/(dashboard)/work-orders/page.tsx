@@ -30,6 +30,9 @@ import {
   missingAssignedTechnicianColumn,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
+
+const UUID_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
@@ -918,11 +921,18 @@ function WorkOrdersPageInner() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createModalCustomerId, setCreateModalCustomerId] = useState<string | null>(null)
   const [createModalEquipmentId, setCreateModalEquipmentId] = useState<string | null>(null)
+  const [createCatalogPartPrefill, setCreateCatalogPartPrefill] = useState<{
+    catalogItemId: string
+    description: string
+    unitCostCents: number
+    quantity?: number
+  } | null>(null)
 
   function openCreateWorkOrderModal(customerId: string | null, equipmentId: string | null) {
     if (blockCreateIfNotEligible(standardCreateEligibility)) return
     setCreateModalCustomerId(customerId)
     setCreateModalEquipmentId(equipmentId)
+    setCreateCatalogPartPrefill(null)
     setCreateOpen(true)
   }
 
@@ -946,6 +956,54 @@ function WorkOrdersPageInner() {
       router.replace("/work-orders", { scroll: false })
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    const catId = searchParams.get("catalogItem")
+    if (!catId || !UUID_PARAM.test(catId)) return
+    if (orgStatus !== "ready" || !activeOrgId) return
+    if (blockCreateIfNotEligible(standardCreateEligibility)) {
+      router.replace("/work-orders", { scroll: false })
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/catalog-items/${encodeURIComponent(catId)}`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as {
+        item?: {
+          id: string
+          name: string
+          part_number?: string | null
+          cost?: number | null
+          list_price?: number | null
+        }
+      }
+      if (cancelled || !res.ok || !body.item) {
+        router.replace("/work-orders", { scroll: false })
+        return
+      }
+      const unit = body.item.cost ?? body.item.list_price ?? 0
+      const cents = Math.max(0, Math.round(Number(unit) * 100))
+      const desc =
+        body.item.name.trim() +
+        (body.item.part_number?.trim() ? ` (${body.item.part_number.trim()})` : "")
+      setCreateCatalogPartPrefill({
+        catalogItemId: body.item.id,
+        description: desc,
+        unitCostCents: cents,
+        quantity: 1,
+      })
+      setCreateModalCustomerId(null)
+      setCreateModalEquipmentId(null)
+      setCreateOpen(true)
+      router.replace("/work-orders", { scroll: false })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, router, orgStatus, activeOrgId, standardCreateEligibility])
 
   useEffect(() => {
     const action = searchParams.get("action")
@@ -1228,10 +1286,12 @@ function WorkOrdersPageInner() {
         open={createOpen}
         initialCustomerId={createModalCustomerId}
         initialEquipmentId={createModalEquipmentId}
+        catalogPartPrefill={createCatalogPartPrefill}
         onClose={() => {
           setCreateOpen(false)
           setCreateModalCustomerId(null)
           setCreateModalEquipmentId(null)
+          setCreateCatalogPartPrefill(null)
         }}
         onSuccess={() => setRefreshToken((v) => v + 1)}
       />

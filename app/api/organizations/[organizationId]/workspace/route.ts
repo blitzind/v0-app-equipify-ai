@@ -6,7 +6,7 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
 import {
-  ORGANIZATION_LOGOS_BUCKET,
+  getOrganizationLogosBucket,
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
 import { serializeWorkspaceOrganization } from "@/lib/organization/workspace-org-serialize"
@@ -406,7 +406,7 @@ export async function PATCH(
       (orgBefore as { logo_url?: string | null }).logo_url,
     )
     if (prevPath) {
-      await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
+      await svc.storage.from(getOrganizationLogosBucket()).remove([prevPath])
     }
   }
 
@@ -415,7 +415,7 @@ export async function PATCH(
       (orgBefore as { document_logo_url?: string | null }).document_logo_url,
     )
     if (prevPath) {
-      await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
+      await svc.storage.from(getOrganizationLogosBucket()).remove([prevPath])
     }
   }
 

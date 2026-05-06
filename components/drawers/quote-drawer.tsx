@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react"
 import Link from "next/link"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
@@ -30,7 +30,7 @@ import {
 } from "@/components/detail-drawer"
 import {
   CheckCircle2, Download, Send, Pencil, X, Check,
-  FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp,
+  FileText, Plus, Trash2, Sparkles, RefreshCw, ChevronDown, ThumbsUp, PackageSearch,
   ThumbsDown, DollarSign, FileEdit, Loader2, Wrench, Archive, RotateCcw,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
@@ -43,6 +43,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useTenant } from "@/lib/tenant-store"
+import { documentBrandingFromTenantWorkspace } from "@/lib/organization/document-branding"
+import { buildQuoteDocumentHtml } from "@/lib/documents/simple-document-html"
+import { downloadCertificateHtmlFile } from "@/lib/certificates/certificate-pdf-html"
+import { escapeHtml } from "@/lib/email/format"
+import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
+import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
+import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
+import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 
 let toastCounter = 0
 
@@ -89,7 +98,7 @@ function quoteDrawerTitle(q: AdminQuote): string {
   return "Quote"
 }
 
-type LineItem = { description: string; qty: number; unit: number }
+type LineItem = QuoteInvoiceLineItem
 
 // ─── AI mock generators ───────────────────────────────────────────────────────
 
@@ -416,7 +425,15 @@ function EditRow({ label, view, editing, children }: {
 
 // ─── Line items ───────────────────────────────────────────────────────────────
 
-function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (items: LineItem[]) => void }) {
+function EditableLineItems({
+  items,
+  onChange,
+  extraActions,
+}: {
+  items: LineItem[]
+  onChange: (items: LineItem[]) => void
+  extraActions?: ReactNode
+}) {
   function updateItem(idx: number, field: keyof LineItem, raw: string) {
     onChange(items.map((item, i) =>
       i !== idx ? item : { ...item, [field]: field === "description" ? raw : parseFloat(raw) || 0 }
@@ -463,9 +480,12 @@ function EditableLineItems({ items, onChange }: { items: LineItem[]; onChange: (
           </tfoot>
         </table>
       </div>
-      <button onClick={addItem} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer font-medium">
-        <Plus className="w-3.5 h-3.5" /> Add Line Item
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {extraActions}
+        <button onClick={addItem} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer font-medium">
+          <Plus className="w-3.5 h-3.5" /> Add Line Item
+        </button>
+      </div>
     </div>
   )
 }
@@ -529,8 +549,42 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [restoreBusy, setRestoreBusy] = useState(false)
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
+
+  const { workspace } = useTenant()
+  const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+
+  function handleDownloadQuotePdf() {
+    if (!quote) return
+    const fmtMoney = (n: number) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
+    const rows =
+      quote.lineItems.filter((li) => li.description.trim()).length > 0 ?
+        quote.lineItems
+          .filter((li) => li.description.trim())
+          .map(
+            (li) =>
+              `<tr><td>${escapeHtml(li.description.trim())}</td><td class="num">${fmtMoney(li.qty * li.unit)}</td></tr>`,
+          )
+          .join("")
+      : `<tr><td>${escapeHtml(quote.description.trim() || "Quoted services")}</td><td class="num">${fmtMoney(quote.amount)}</td></tr>`
+    const html = buildQuoteDocumentHtml({
+      branding: documentBranding,
+      quoteNumber: quote.quoteNumber?.trim() || quote.id.slice(0, 8),
+      customerName: quote.customerName,
+      equipmentLabel: quote.equipmentName?.trim() || "—",
+      description: quote.description,
+      status: quote.status,
+      amount: quote.amount,
+      expiresDate: fmtDate(quote.expiresDate),
+      createdDate: fmtDate(quote.createdDate),
+      lineItemsHtml: rows,
+      notes: quote.notes?.trim() || null,
+    })
+    downloadCertificateHtmlFile(html, `Quote-${quote.quoteNumber?.trim() || "estimate"}`)
+  }
 
   useEffect(() => {
     setEditing(false)
@@ -560,17 +614,30 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     setEditing(false)
     setDraft({})
     setDraftItems([])
+    setCatalogPickerOpen(false)
+  }
+
+  function appendCatalogLineFromPicker(row: CatalogListItemRow, qty: number) {
+    const snap = buildQuoteInvoiceLineSnapshot(row, qty)
+    setDraftItems((prev) => [...prev, snap])
   }
 
   async function saveEdit() {
     if (!quote) return
     const newTotal = draftItems.reduce((s, i) => s + i.qty * i.unit, 0)
     const internal = (draft.internalNotes ?? "").trim()
-    const lineItems = draftItems.map((li) => ({
-      description: li.description,
-      qty: li.qty,
-      unit: li.unit,
-    }))
+    const lineItems = draftItems.map((li) => {
+      const row: QuoteInvoiceLineItem = {
+        description: li.description,
+        qty: li.qty,
+        unit: li.unit,
+      }
+      if (li.catalog_item_id) row.catalog_item_id = li.catalog_item_id
+      if (li.sku) row.sku = li.sku
+      if (li.item_type) row.item_type = li.item_type
+      if (li.unit_label) row.unit_label = li.unit_label
+      return row
+    })
     const nextStatus = (draft.status ?? quote.status) as QuoteStatus
     const patch: Parameters<typeof updateOrgQuote>[3] = {
       status: nextStatus,
@@ -967,7 +1034,13 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                   )}
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed opacity-60" disabled title="Coming soon">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs cursor-pointer"
+                type="button"
+                onClick={() => handleDownloadQuotePdf()}
+              >
                 <Download className="w-3.5 h-3.5" /> Download PDF
               </Button>
               <Button
@@ -1049,7 +1122,24 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           <DrawerSection title="Line Items">
             <div className={cn(DRAWER_NESTED_CARD, "p-4")}>
               {editing ? (
-                <EditableLineItems items={draftItems} onChange={setDraftItems} />
+                <EditableLineItems
+                  items={draftItems}
+                  onChange={setDraftItems}
+                  extraActions={
+                    orgStatus === "ready" && activeOrgId ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1.5"
+                        onClick={() => setCatalogPickerOpen(true)}
+                      >
+                        <PackageSearch className="w-3.5 h-3.5" />
+                        Add from catalog
+                      </Button>
+                    ) : null
+                  }
+                />
               ) : (
                 <ReadOnlyLineItems items={quote.lineItems} total={quote.amount} />
               )}
@@ -1173,6 +1263,13 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AddFromCatalogDialog
+        open={catalogPickerOpen}
+        onOpenChange={setCatalogPickerOpen}
+        organizationId={orgStatus === "ready" ? activeOrgId : null}
+        onPick={(row, qty) => appendCatalogLineFromPicker(row, qty)}
+      />
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
     </>

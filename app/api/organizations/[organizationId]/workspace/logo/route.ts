@@ -5,9 +5,14 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
 import {
-  ORGANIZATION_LOGOS_BUCKET,
+  getOrganizationLogosBucket,
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
+import {
+  logoRouteJsonError,
+  logoUploadVerboseLogs,
+  normalizePublicUrl,
+} from "@/lib/organization/logo-upload-route-shared"
 import { processAppBrandingSquare } from "@/lib/organization/process-logos"
 import { serializeWorkspaceOrganization } from "@/lib/organization/workspace-org-serialize"
 
@@ -20,18 +25,8 @@ const MAX_BYTES = 2 * 1024 * 1024
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"])
 const RASTER_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"])
 
-function jsonError(code: string, message: string, status: number) {
-  return NextResponse.json({ error: code, message }, { status })
-}
-
 function logLogoRoute(context: string, payload: Record<string, unknown>) {
   console.error(`[workspace/logo] ${context}`, payload)
-}
-
-function devLogo(context: string, payload: Record<string, unknown>) {
-  if (process.env.NODE_ENV === "development") {
-    console.error(`[workspace/logo] ${context}`, payload)
-  }
 }
 
 function planAllowsBranding(planId: PlanId): boolean {
@@ -44,7 +39,7 @@ export async function POST(
 ) {
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) {
-    return jsonError("invalid_organization", "Invalid organization.", 400)
+    return logoRouteJsonError("invalid_organization", "Invalid organization.", 400, { step: "validate_org_id" })
   }
 
   const supabase = await createServerSupabaseClient()
@@ -52,7 +47,7 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user?.email) {
-    return jsonError("unauthorized", "Sign in required.", 401)
+    return logoRouteJsonError("unauthorized", "Sign in required.", 401, { step: "auth_session" })
   }
 
   const platformAdmin = isPlatformAdminEmail(user.email)
@@ -66,22 +61,39 @@ export async function POST(
       .eq("status", "active")
       .maybeSingle()
     if (!mem || (mem.role !== "owner" && mem.role !== "admin")) {
-      return jsonError("forbidden", "Only owners and admins can upload a workspace logo.", 403)
+      return logoRouteJsonError(
+        "forbidden",
+        "Only owners and admins can upload a workspace logo.",
+        403,
+        { step: "auth_membership" },
+      )
     }
   }
 
   const formData = await request.formData()
   const file = formData.get("file")
   if (!(file instanceof File) || file.size < 1) {
-    return jsonError("invalid_file", "Choose an image file to upload.", 400)
+    return logoRouteJsonError("invalid_file", "Choose an image file to upload.", 400, { step: "parse_formdata" })
   }
   if (file.size > MAX_BYTES) {
-    return jsonError("file_too_large", "Logo must be 2MB or smaller.", 400)
+    return logoRouteJsonError("file_too_large", "Logo must be 2MB or smaller.", 400, { step: "validate_file" })
   }
 
   const mime = (file.type || "application/octet-stream").toLowerCase()
   if (!ALLOWED.has(mime)) {
-    return jsonError("invalid_type", "Use PNG, JPG, WebP, GIF, or SVG.", 400)
+    return logoRouteJsonError("invalid_type", "Use PNG, JPG, WebP, GIF, or SVG.", 400, { step: "validate_file" })
+  }
+
+  const bucket = getOrganizationLogosBucket()
+  if (logoUploadVerboseLogs()) {
+    console.info("[workspace/logo] request", {
+      organizationId,
+      userId: user.id,
+      fileName: file.name,
+      fileSize: file.size,
+      mime,
+      bucket,
+    })
   }
 
   let svc
@@ -93,10 +105,11 @@ export async function POST(
       userId: user.id,
       err: e instanceof Error ? e.message : String(e),
     })
-    return jsonError(
+    return logoRouteJsonError(
       "service_unavailable",
-      "Server is missing SUPABASE_SERVICE_ROLE_KEY; logo upload cannot persist.",
+      e instanceof Error ? e.message : "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.",
       503,
+      { step: "service_role_client", details: e instanceof Error ? e.message : null },
     )
   }
 
@@ -106,16 +119,22 @@ export async function POST(
     .eq("id", organizationId)
     .maybeSingle()
 
-  if (orgErr || !orgRow) {
+  if (orgErr) {
     logLogoRoute("load_org_failed", {
       organizationId,
-      message: orgErr?.message,
-      code: orgErr?.code,
+      message: orgErr.message,
+      code: orgErr.code,
     })
-    return jsonError("not_found", "Organization not found.", 404)
+    return logoRouteJsonError("load_failed", orgErr.message, 500, {
+      step: "load_org",
+      details: orgErr.code,
+    })
+  }
+  if (!orgRow) {
+    return logoRouteJsonError("not_found", "Organization not found.", 404, { step: "load_org" })
   }
   if ((orgRow as { status?: string }).status === "archived") {
-    return jsonError("org_archived", "This workspace is archived.", 403)
+    return logoRouteJsonError("org_archived", "This workspace is archived.", 403, { step: "load_org" })
   }
 
   const { data: sub } = await svc
@@ -126,7 +145,12 @@ export async function POST(
 
   const planId = normalizePlanIdForRead((sub as { plan_id?: string } | null)?.plan_id ?? "solo")
   if (!planAllowsBranding(planId)) {
-    return jsonError("plan_branding", "Custom logo is available on Growth and Scale plans.", 403)
+    return logoRouteJsonError(
+      "plan_branding",
+      "Custom logo is available on Growth and Scale plans.",
+      403,
+      { step: "plan_check", details: planId },
+    )
   }
 
   const prevPath = pathFromOrganizationLogoPublicUrl((orgRow as { logo_url?: string | null }).logo_url)
@@ -155,12 +179,15 @@ export async function POST(
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not process image."
     logLogoRoute("process_image_failed", { organizationId, message: msg })
-    return jsonError("process_failed", msg, 400)
+    return logoRouteJsonError("process_failed", msg, 400, {
+      step: "process_image",
+      details: e instanceof Error ? e.name : null,
+    })
   }
 
   const path = `${organizationId}/${crypto.randomUUID()}.${ext}`
 
-  const { error: upErr } = await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).upload(path, uploadBody, {
+  const { error: upErr } = await svc.storage.from(bucket).upload(path, uploadBody, {
     contentType: uploadContentType,
     cacheControl: "3600",
     upsert: false,
@@ -169,13 +196,17 @@ export async function POST(
   if (upErr) {
     logLogoRoute("storage_upload_failed", {
       organizationId,
+      bucket,
       path,
       message: upErr.message,
     })
-    return jsonError("upload_failed", upErr.message, 400)
+    return logoRouteJsonError("upload_failed", upErr.message, 400, {
+      step: "storage_upload",
+      details: "Confirm bucket exists and service role can write Storage.",
+    })
   }
 
-  const { data: pub } = svc.storage.from(ORGANIZATION_LOGOS_BUCKET).getPublicUrl(path)
+  const { data: pub } = svc.storage.from(bucket).getPublicUrl(path)
   const publicUrl = pub.publicUrl
 
   const { data: updatedOrg, error: dbErr } = await svc
@@ -186,18 +217,48 @@ export async function POST(
     .single()
 
   if (dbErr || !updatedOrg) {
-    await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([path])
+    await svc.storage.from(bucket).remove([path])
     logLogoRoute("org_update_failed", {
       organizationId,
       message: dbErr?.message,
       code: dbErr?.code,
       details: dbErr?.details,
     })
-    return jsonError("save_failed", dbErr?.message ?? "Could not save logo URL.", 500)
+    return logoRouteJsonError("save_failed", dbErr?.message ?? "Could not save logo URL.", 500, {
+      step: "db_update",
+      details: dbErr?.code ?? null,
+    })
   }
 
+  const serializedCheck = serializeWorkspaceOrganization(updatedOrg as Record<string, unknown>)
+  if (normalizePublicUrl(serializedCheck.logoUrl) !== normalizePublicUrl(publicUrl)) {
+    await svc.storage.from(bucket).remove([path])
+    logLogoRoute("verify_failed", {
+      organizationId,
+      expected: publicUrl,
+      gotFromRow: serializedCheck.logoUrl,
+    })
+    return logoRouteJsonError(
+      "verify_failed",
+      "organizations.logo_url did not match after UPDATE (check schema and triggers).",
+      500,
+      {
+        step: "verify_db_row",
+        details: serializedCheck.logoUrl || "(empty)",
+      },
+    )
+  }
+
+  const { data: verifyRow } = await svc
+    .from("organizations")
+    .select("logo_url, document_logo_url")
+    .eq("id", organizationId)
+    .maybeSingle()
+
+  const reread = String((verifyRow as { logo_url?: string | null } | null)?.logo_url ?? "").trim()
+
   if (prevPath) {
-    const { error: rmErr } = await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
+    const { error: rmErr } = await svc.storage.from(bucket).remove([prevPath])
     if (rmErr) {
       logLogoRoute("remove_previous_logo_failed", { organizationId, path: prevPath, message: rmErr.message })
     }
@@ -205,19 +266,29 @@ export async function POST(
 
   const serialized = serializeWorkspaceOrganization(updatedOrg as Record<string, unknown>)
 
-  devLogo("upload_complete", {
-    organizationId,
-    userId: user.id,
-    storagePath: path,
-    logoUrl: serialized.logoUrl,
-    documentLogoUrl: serialized.documentLogoUrl,
-    dbRowId: serialized.id,
-  })
+  if (logoUploadVerboseLogs()) {
+    console.info("[workspace/logo] complete", {
+      organizationId,
+      userId: user.id,
+      bucket,
+      storagePath: path,
+      publicUrl,
+      dbLogoUrl: serialized.logoUrl,
+      documentLogoUrl: serialized.documentLogoUrl,
+      secondSelectLogoUrl: reread,
+    })
+  }
 
-  return NextResponse.json({
+  const payload: Record<string, unknown> = {
     ok: true,
     logoUrl: publicUrl,
     documentLogoUrl: serialized.documentLogoUrl,
     organization: serialized,
-  })
+    savedVerified: true,
+  }
+  if (logoUploadVerboseLogs()) {
+    payload.debug = { bucket, storagePath: path, organizationsRowLogoUrl: reread }
+  }
+
+  return NextResponse.json(payload)
 }

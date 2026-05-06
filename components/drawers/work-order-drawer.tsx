@@ -73,8 +73,15 @@ import {
   PenLine,
   Receipt,
   Loader2,
+  PackageSearch,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
+import { useTenant } from "@/lib/tenant-store"
+import { documentBrandingFromTenantWorkspace } from "@/lib/organization/document-branding"
+import { buildWorkOrderSummaryDocumentHtml } from "@/lib/documents/simple-document-html"
+import { printHtmlDocument } from "@/lib/certificates/certificate-pdf-html"
+import { buildWorkOrderPartFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
+import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 
 let toastCounter = 0
 
@@ -305,6 +312,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [billingSaving, setBillingSaving] = useState(false)
   const [warrantyVendorOptions, setWarrantyVendorOptions] = useState<Array<{ id: string; name: string }>>([])
   const [billingVendorId, setBillingVendorId] = useState<string>("")
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<WorkOrder>>({})
   /** Notes tab + global save: diagnosis & technician in repair_log; internal = work_orders.notes */
@@ -456,6 +464,41 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       scheduledTime: (draft.scheduledTime ?? wo.scheduledTime) as string,
     }
   }, [wo, editing, draft])
+
+  const { workspace } = useTenant()
+  const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+
+  async function handlePrintWorkOrderSummary() {
+    const w = displayWo ?? wo
+    if (!w) return
+    const fmtShort = (d: string) =>
+      d ?
+        new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : null
+    const html = buildWorkOrderSummaryDocumentHtml({
+      branding: documentBranding,
+      workOrderLabel: getWorkOrderDisplay({ id: w.id, workOrderNumber: w.workOrderNumber }),
+      title: w.description?.trim() || "Work order",
+      status: w.status,
+      priority: w.priority,
+      type: w.type,
+      customerName: w.customerName,
+      equipmentSummary: w.equipmentName,
+      scheduledOn: fmtShort(w.scheduledDate),
+      completedAt: fmtShort(w.completedDate),
+      problemReported: w.repairLog?.problemReported,
+      diagnosis: w.repairLog?.diagnosis,
+      technicianNotes: w.repairLog?.technicianNotes,
+    })
+    const result = await printHtmlDocument(html)
+    if (!result.success && result.message) {
+      pushToast({
+        variant: "destructive",
+        title: "Print preview unavailable",
+        description: result.message,
+      })
+    }
+  }
 
   const equipmentIdsOnWorkOrder = useMemo(
     () => Array.from(new Set(equipmentAssets.map((a) => a.id))),
@@ -1668,6 +1711,20 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                 </div>
               ) : null
             }
+            partsTableExtraActions={
+              !wo.isArchived && orgStatus === "ready" && activeOrgId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => setCatalogPickerOpen(true)}
+                >
+                  <PackageSearch className="w-3.5 h-3.5" />
+                  Add from catalog
+                </Button>
+              ) : null
+            }
             laborHours={tabLaborHours}
             onLaborHoursChange={setTabLaborHours}
             laborRatePerHour={DRAWER_LABOR_RATE}
@@ -1812,9 +1869,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             postCompletionActions={postCompletionActions}
             quoteHref={quoteHref}
             onInvoicePlaceholder={() => handleCreateInvoiceAction()}
-            onPrint={() =>
-              toast("Print preview is not available yet — coming in a future release.")
-            }
+            onPrint={() => void handlePrintWorkOrderSummary()}
             onArchive={
               canArchiveRestore
                 ? () => void (wo.isArchived ? restoreWorkOrder() : archiveWorkOrder())
@@ -2010,6 +2065,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         currentTechnicianId={wo.technicianId}
         savingKey={assignSavingKey}
         onSelect={(userId) => void persistTechnicianAssignment(userId)}
+      />
+
+      <AddFromCatalogDialog
+        open={catalogPickerOpen}
+        onOpenChange={setCatalogPickerOpen}
+        organizationId={orgStatus === "ready" ? activeOrgId : null}
+        pricingMode="sale"
+        onPick={(row, qty) => {
+          setTabParts((prev) => [...prev, buildWorkOrderPartFromCatalog(row, qty)])
+        }}
       />
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

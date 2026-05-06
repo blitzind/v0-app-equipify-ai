@@ -112,10 +112,15 @@ export async function POST(
     const aiConf =
       typeof row.confidence === "number" && Number.isFinite(row.confidence) ? row.confidence : null
 
+    const priceSourceLabel =
+      (imp.file_name as string)?.trim() ? `Price list import — ${(imp.file_name as string).trim()}` : "Price list import"
+
     const base = {
       organization_id: organizationId,
+      source_type: "imported" as const,
       vendor_id: (imp.vendor_id as string | null) ?? null,
       manufacturer_name: docMfg,
+      price_source: priceSourceLabel,
       source_file_name: (imp.file_name as string) ?? "",
       source_file_url: (imp.file_url as string | null) ?? null,
       source_import_id: importId,

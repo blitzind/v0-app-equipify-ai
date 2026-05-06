@@ -28,6 +28,11 @@ export interface POLineItem {
   quantity: number
   unitCostCents: number
   lineTotalCents: number
+  catalogItemId?: string | null
+  /** Snapshot fields when the line was added from catalog (historical PO rows stay stable). */
+  skuSnapshot?: string | null
+  itemTypeSnapshot?: string | null
+  unitLabelSnapshot?: string | null
 }
 
 export interface PurchaseOrder {
@@ -132,11 +137,39 @@ function parseLineItems(raw: unknown): POLineItem[] {
           : typeof row.line_total_cents === "number"
             ? Number(row.line_total_cents)
             : Math.round(quantity * unitCostCents)
+      const catalogItemId =
+        typeof row.catalogItemId === "string"
+          ? row.catalogItemId
+          : typeof row.catalog_item_id === "string"
+            ? row.catalog_item_id
+            : null
+      const skuSnap =
+        typeof row.skuSnapshot === "string"
+          ? row.skuSnapshot
+          : typeof row.sku_snapshot === "string"
+            ? row.sku_snapshot
+            : null
+      const typeSnap =
+        typeof row.itemTypeSnapshot === "string"
+          ? row.itemTypeSnapshot
+          : typeof row.item_type_snapshot === "string"
+            ? row.item_type_snapshot
+            : null
+      const unitSnap =
+        typeof row.unitLabelSnapshot === "string"
+          ? row.unitLabelSnapshot
+          : typeof row.unit_label_snapshot === "string"
+            ? row.unit_label_snapshot
+            : null
       return {
         description: String(row.description ?? ""),
         quantity,
         unitCostCents,
         lineTotalCents,
+        catalogItemId: catalogItemId?.trim() || undefined,
+        skuSnapshot: skuSnap?.trim() || undefined,
+        itemTypeSnapshot: typeSnap?.trim() || undefined,
+        unitLabelSnapshot: unitSnap?.trim() || undefined,
       }
     })
     .filter((item): item is POLineItem => Boolean(item))
@@ -282,12 +315,19 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
           order_date: payload.orderedDate || null,
           expected_date: payload.eta || null,
           total_cents: total,
-          line_items: payload.lineItems.map((item) => ({
-            description: item.description,
-            quantity: item.quantity,
-            unitCostCents: item.unitCostCents,
-            lineTotalCents: item.lineTotalCents,
-          })),
+          line_items: payload.lineItems.map((item) => {
+            const row: Record<string, unknown> = {
+              description: item.description,
+              quantity: item.quantity,
+              unitCostCents: item.unitCostCents,
+              lineTotalCents: item.lineTotalCents,
+            }
+            if (item.catalogItemId) row.catalog_item_id = item.catalogItemId
+            if (item.skuSnapshot) row.sku_snapshot = item.skuSnapshot
+            if (item.itemTypeSnapshot) row.item_type_snapshot = item.itemTypeSnapshot
+            if (item.unitLabelSnapshot) row.unit_label_snapshot = item.unitLabelSnapshot
+            return row
+          }),
           notes: payload.notes.trim() || null,
           customer_id: payload.customerId || null,
           equipment_id: payload.equipmentId || null,
@@ -326,12 +366,19 @@ export function PurchaseOrderProvider({ children }: { children: ReactNode }) {
       if (payload.equipmentId !== undefined) update.equipment_id = payload.equipmentId || null
       if (payload.workOrderId !== undefined) update.work_order_id = payload.workOrderId || null
       if (payload.lineItems !== undefined) {
-        update.line_items = payload.lineItems.map((item) => ({
-          description: item.description,
-          quantity: item.quantity,
-          unitCostCents: item.unitCostCents,
-          lineTotalCents: item.lineTotalCents,
-        }))
+        update.line_items = payload.lineItems.map((item) => {
+          const row: Record<string, unknown> = {
+            description: item.description,
+            quantity: item.quantity,
+            unitCostCents: item.unitCostCents,
+            lineTotalCents: item.lineTotalCents,
+          }
+          if (item.catalogItemId) row.catalog_item_id = item.catalogItemId
+          if (item.skuSnapshot) row.sku_snapshot = item.skuSnapshot
+          if (item.itemTypeSnapshot) row.item_type_snapshot = item.itemTypeSnapshot
+          if (item.unitLabelSnapshot) row.unit_label_snapshot = item.unitLabelSnapshot
+          return row
+        })
         update.total_cents = payload.lineItems.reduce((sum, item) => sum + item.lineTotalCents, 0)
       } else if (payload.amount !== undefined) {
         update.total_cents = Math.round(payload.amount * 100)

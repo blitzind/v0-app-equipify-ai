@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  MapPin, Mail, Phone, MessageSquare, MoreHorizontal,
+  MapPin, Mail, Phone, MessageSquare,
   ExternalLink, Copy, Check, ChevronDown,
 } from "lucide-react"
 
@@ -195,44 +195,33 @@ function EmailDropdown({ params }: { params: ContactEmailParams }) {
   )
 }
 
-// ─── More dropdown (Call + Message) ───────────────────────────────────────────
+// ─── Phone links (tel: / sms:) ─────────────────────────────────────────────────
 
-function MoreDropdown({ phone, email }: { phone?: string; email?: string }) {
-  const [open, setOpen] = useState(false)
+/** Strip formatting for tel:/sms: hrefs (keep leading + and digits). */
+function phoneForSmsTel(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ""
+  const cleaned = t.replace(/[^\d+]/g, "")
+  return cleaned || encodeURIComponent(t)
+}
 
-  if (!phone && !email) return null
-
+function CallLink({ phone }: { phone: string }) {
+  const href = phoneForSmsTel(phone)
+  if (!href) return null
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="More contact options">
-          <TriggerBtn
-            label=""
-            icon={<MoreHorizontal className="w-3.5 h-3.5" />}
-            open={undefined}
-            className="px-2"
-          />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={6} className="w-44 z-[200]">
-        {phone && (
-          <>
-            <DropdownMenuItem asChild>
-              <a href={`tel:${phone}`} className="flex items-center gap-2.5 cursor-pointer">
-                <Phone className="w-3.5 h-3.5 text-primary shrink-0" />
-                Call {phone}
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href={`sms:${phone}`} className="flex items-center gap-2.5 cursor-pointer">
-                <MessageSquare className="w-3.5 h-3.5 text-primary shrink-0" />
-                Message {phone}
-              </a>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <a href={`tel:${href}`} aria-label={`Call ${phone}`}>
+      <TriggerBtn label="Call" icon={<Phone className="w-3.5 h-3.5 text-primary" />} />
+    </a>
+  )
+}
+
+function TextLink({ phone }: { phone: string }) {
+  const href = phoneForSmsTel(phone)
+  if (!href) return null
+  return (
+    <a href={`sms:${href}`} aria-label={`Text ${phone}`}>
+      <TriggerBtn label="Text" icon={<MessageSquare className="w-3.5 h-3.5 text-primary" />} />
+    </a>
   )
 }
 
@@ -250,20 +239,28 @@ export interface ContactActionsProps {
 
 /**
  * Compact row of quick-contact action buttons.
- * Shows Navigate (if address), Email (if email params), and More... (call/SMS if phone).
- * All dropdowns use Radix portals so they escape any overflow:hidden ancestor.
+ * Shows Navigate (if address), Email (if customerEmail set), Call + Text (if phone).
+ * Email uses template dropdown; Navigate uses maps dropdown.
  */
 export function ContactActions({ address, email, phone, className }: ContactActionsProps) {
-  if (!address && !email && !phone) return null
+  const hasAddress = Boolean(address?.trim())
+  const hasEmail = Boolean(email?.customerEmail?.trim())
+  const hasPhone = Boolean(phone?.trim())
+
+  if (!hasAddress && !hasEmail && !hasPhone) return null
+
+  const emailParams = hasEmail && email ? email : null
+  const phoneRaw = hasPhone && phone ? phone.trim() : ""
 
   return (
     <div
-      className={cn("flex items-center gap-1.5 flex-nowrap", className)}
+      className={cn("flex items-center gap-1.5 flex-nowrap justify-end", className)}
       onClick={(e) => e.stopPropagation()}
     >
-      {address && <NavigateDropdown address={address} />}
-      {email   && <EmailDropdown params={email} />}
-      {phone   && <MoreDropdown phone={phone} />}
+      {hasAddress && <NavigateDropdown address={address!.trim()} />}
+      {emailParams && <EmailDropdown params={{ ...emailParams, customerEmail: emailParams.customerEmail!.trim() }} />}
+      {hasPhone && <CallLink phone={phoneRaw} />}
+      {hasPhone && <TextLink phone={phoneRaw} />}
     </div>
   )
 }

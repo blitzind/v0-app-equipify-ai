@@ -44,7 +44,16 @@ function fmtDate(s: string) {
 }
 
 type SortKey = "id" | "vendor" | "amount" | "orderDate" | "expectedDate" | "status"
-type DraftLineItem = { description: string; quantity: number; unitCostCents: number; lineTotalCents: number }
+type DraftLineItem = {
+  description: string
+  quantity: number
+  unitCostCents: number
+  lineTotalCents: number
+  catalogItemId?: string
+}
+
+const UUID_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 type NewPoDraft = {
   vendorId?: string
   vendor: string
@@ -124,6 +133,63 @@ function PurchaseOrdersPageInner() {
       router.replace("/purchase-orders", { scroll: false })
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    const catId = searchParams.get("catalogItem")
+    if (!catId || !UUID_PARAM.test(catId)) return
+    if (orgStatus !== "ready" || !organizationId) return
+    if (blockCreateIfNotEligible(standardCreateEligibility)) {
+      router.replace("/purchase-orders", { scroll: false })
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/catalog-items/${encodeURIComponent(catId)}`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as {
+        item?: {
+          id: string
+          name: string
+          part_number?: string | null
+          vendor_id?: string | null
+          vendor_name?: string | null
+          cost?: number | null
+          list_price?: number | null
+        }
+      }
+      if (cancelled || !res.ok || !body.item) {
+        router.replace("/purchase-orders", { scroll: false })
+        return
+      }
+      const unit = body.item.cost ?? body.item.list_price ?? 0
+      const unitCents = Math.max(0, Math.round(Number(unit) * 100))
+      const qty = 1
+      const desc =
+        body.item.name.trim() +
+        (body.item.part_number?.trim() ? ` — PN ${body.item.part_number.trim()}` : "")
+      const draft = emptyNewPoDraft()
+      draft.vendorId = body.item.vendor_id ?? undefined
+      draft.vendor = body.item.vendor_name?.trim() || draft.vendor
+      draft.lineItems = [
+        {
+          description: desc,
+          quantity: qty,
+          unitCostCents: unitCents,
+          lineTotalCents: computeLineTotalCents(qty, unitCents),
+          catalogItemId: body.item.id,
+        },
+      ]
+      setNewDraft(draft)
+      setVendorQuery(body.item.vendor_name?.trim() ?? "")
+      setCreateOpen(true)
+      router.replace("/purchase-orders", { scroll: false })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, router, orgStatus, organizationId, standardCreateEligibility])
 
   useEffect(() => {
     if (!createOpen || orgStatus !== "ready" || !organizationId) return

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { usePurchaseOrders, type PurchaseOrder, type POStatus, type POLineItem } from "@/lib/purchase-order-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -27,10 +27,18 @@ import {
   Mail, Download, CheckCircle2, Copy, X, PackageCheck,
   Building2, Truck, CreditCard, FileText, Paperclip,
   Wrench, User, Plus, Trash2, ChevronRight, Pencil, Check, AlertTriangle,
+  PackageSearch,
 } from "lucide-react"
 import Link from "next/link"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { AddVendorModal } from "@/components/vendors/add-vendor-modal"
+import { useTenant } from "@/lib/tenant-store"
+import { documentBrandingFromTenantWorkspace } from "@/lib/organization/document-branding"
+import { buildPurchaseOrderDocumentHtml } from "@/lib/documents/simple-document-html"
+import { downloadCertificateHtmlFile } from "@/lib/certificates/certificate-pdf-html"
+import { escapeHtml } from "@/lib/email/format"
+import { buildPurchaseOrderLineFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
+import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 
 let toastCounter = 0
 
@@ -141,6 +149,38 @@ export function PurchaseOrderDrawer({
   const { orders, updateOrder, archiveOrder } = usePurchaseOrders()
   const order = orders.find((o) => o.id === orderId) ?? null
 
+  const { workspace } = useTenant()
+  const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+
+  function handleDownloadPoPdf() {
+    if (!order) return
+    const fmtMoney = (n: number) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
+    const totalCents = order.lineItems.reduce((s, li) => s + li.lineTotalCents, 0)
+    const rows = order.lineItems.map(
+      (li) =>
+        `<tr><td>${escapeHtml(li.description)}</td><td class="num">${li.quantity}</td><td class="num">${fmtMoney(li.unitCostCents / 100)}</td><td class="num">${fmtMoney(li.lineTotalCents / 100)}</td></tr>`,
+    ).join("")
+    const woLabel = order.workOrderId ? getWorkOrderDisplay({ id: order.workOrderId }) : null
+    const html = buildPurchaseOrderDocumentHtml({
+      branding: documentBranding,
+      poNumber: order.purchaseOrderNumber?.trim() || order.id.slice(0, 8),
+      vendor: order.vendor,
+      vendorEmail: order.vendorEmail,
+      vendorPhone: order.vendorPhone,
+      shipTo: order.shipTo,
+      billTo: order.billTo,
+      status: order.status,
+      orderedDate: fmtDate(order.orderedDate),
+      eta: fmtDate(order.eta),
+      totalCents,
+      lineRowsHtml: rows,
+      notes: order.notes?.trim() || null,
+      workOrderLabel: woLabel,
+    })
+    downloadCertificateHtmlFile(html, `PO-${order.purchaseOrderNumber?.trim() || "order"}`)
+  }
+
   const [toasts, setToasts]               = useState<ToastItem[]>([])
   const [editing, setEditing]             = useState(false)
   const [draft, setDraft]                 = useState<Draft | null>(null)
@@ -151,6 +191,7 @@ export function PurchaseOrderDrawer({
   const [addVendorOpen, setAddVendorOpen] = useState(false)
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
 
   function toast(message: string, type: "success" | "info" = "success") {
     const id = ++toastCounter
@@ -366,7 +407,13 @@ export function PurchaseOrderDrawer({
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-not-allowed opacity-60" disabled title="Coming soon">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8 text-xs cursor-pointer"
+                type="button"
+                onClick={() => handleDownloadPoPdf()}
+              >
                 <Download className="w-3.5 h-3.5" /> Download PDF
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-not-allowed opacity-60" disabled title="Coming soon">
@@ -649,18 +696,28 @@ export function PurchaseOrderDrawer({
                     ))}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setField("lineItems", [
-                      ...draft.lineItems,
-                      { description: "", quantity: 1, unitCostCents: 0, lineTotalCents: 0 },
-                    ])
-                  }
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
-                >
-                  <Plus className="w-4 h-4" /> Add line item
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogPickerOpen(true)}
+                    disabled={orgStatus !== "ready" || !organizationId}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium rounded-md border border-border bg-background px-2.5 py-1.5 text-foreground hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <PackageSearch className="w-4 h-4" /> Add from catalog
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setField("lineItems", [
+                        ...draft.lineItems,
+                        { description: "", quantity: 1, unitCostCents: 0, lineTotalCents: 0 },
+                      ])
+                    }
+                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                  >
+                    <Plus className="w-4 h-4" /> Add line item
+                  </button>
+                </div>
                 {draft.lineItems.length > 0 && (
                   <div className="flex justify-end pt-3 border-t border-border">
                     <div className="text-right">
@@ -947,6 +1004,17 @@ export function PurchaseOrderDrawer({
           </div>
         </div>
       )}
+
+      <AddFromCatalogDialog
+        open={catalogPickerOpen}
+        onOpenChange={setCatalogPickerOpen}
+        organizationId={orgStatus === "ready" ? organizationId : null}
+        pricingMode="purchase"
+        onPick={(row, qty) => {
+          const line = buildPurchaseOrderLineFromCatalog(row, qty)
+          setDraft((prev) => (prev ? { ...prev, lineItems: [...prev.lineItems, line] } : prev))
+        }}
+      />
 
       <DrawerToastStack toasts={toasts} onRemove={removeToast} />
     </>

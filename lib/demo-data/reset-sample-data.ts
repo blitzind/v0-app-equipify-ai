@@ -5,6 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 export type ResetSampleSummary = {
   organizationInvoices: number
   organizationQuotes: number
+  organizationPurchaseOrders: number
+  catalogItems: number
+  calibrationTemplates: number
+  techniciansOperational: number
+  orgVendors: number
   workOrders: number
   maintenancePlans: number
   equipment: number
@@ -24,6 +29,11 @@ export async function resetSampleDataForOrganization(
   const summary: ResetSampleSummary = {
     organizationInvoices: 0,
     organizationQuotes: 0,
+    organizationPurchaseOrders: 0,
+    catalogItems: 0,
+    calibrationTemplates: 0,
+    techniciansOperational: 0,
+    orgVendors: 0,
     workOrders: 0,
     maintenancePlans: 0,
     equipment: 0,
@@ -79,6 +89,33 @@ export async function resetSampleDataForOrganization(
   if (delQt.error) throw new Error(delQt.error.message)
   summary.organizationQuotes = delQt.data?.length ?? 0
 
+  const delPo = await admin
+    .from("org_purchase_orders")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  if (delPo.error) throw new Error(delPo.error.message)
+  summary.organizationPurchaseOrders = delPo.data?.length ?? 0
+
+  const delCat = await admin
+    .from("catalog_items")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  if (delCat.error) throw new Error(delCat.error.message)
+  summary.catalogItems = delCat.data?.length ?? 0
+
+  const delTechOp = await admin
+    .from("technicians")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  if (delTechOp.error) throw new Error(delTechOp.error.message)
+  summary.techniciansOperational = delTechOp.data?.length ?? 0
+
   const delWo = await admin
     .from("work_orders")
     .delete()
@@ -87,6 +124,15 @@ export async function resetSampleDataForOrganization(
     .select("id")
   if (delWo.error) throw new Error(delWo.error.message)
   summary.workOrders = delWo.data?.length ?? 0
+
+  const delTpl = await admin
+    .from("calibration_templates")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  if (delTpl.error) throw new Error(delTpl.error.message)
+  summary.calibrationTemplates = delTpl.data?.length ?? 0
 
   const delMp = await admin
     .from("maintenance_plans")
@@ -105,6 +151,15 @@ export async function resetSampleDataForOrganization(
     .select("id")
   if (delEq.error) throw new Error(delEq.error.message)
   summary.equipment = delEq.data?.length ?? 0
+
+  const delVend = await admin
+    .from("org_vendors")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  if (delVend.error) throw new Error(delVend.error.message)
+  summary.orgVendors = delVend.data?.length ?? 0
 
   const delCust = await admin
     .from("customers")

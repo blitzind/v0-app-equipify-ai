@@ -51,7 +51,19 @@ export type OrgInvoiceRow = {
   archive_reason?: string | null
 }
 
-export type LineItemJson = { description: string; qty: number; unit: number }
+export type LineItemJson = {
+  description: string
+  qty: number
+  unit: number
+  /** When present, ties the line back to a reusable catalog template for usage reporting. */
+  catalog_item_id?: string
+  /** Snapshot fields copied from catalog at line creation; later catalog edits do not change stored quotes/invoices. */
+  sku?: string
+  item_type?: string
+  unit_label?: string
+}
+
+export type QuoteInvoiceLineItem = LineItemJson
 
 function parseLineItems(raw: unknown): LineItemJson[] {
   if (!Array.isArray(raw)) return []
@@ -59,11 +71,20 @@ function parseLineItems(raw: unknown): LineItemJson[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue
     const o = item as Record<string, unknown>
-    out.push({
+    const cid = o.catalog_item_id
+    const row: LineItemJson = {
       description: String(o.description ?? ""),
       qty: typeof o.qty === "number" ? o.qty : Number(o.qty) || 0,
       unit: typeof o.unit === "number" ? o.unit : Number(o.unit) || 0,
-    })
+    }
+    if (typeof cid === "string" && cid.trim()) row.catalog_item_id = cid.trim()
+    const sku = o.sku
+    const itemType = o.item_type
+    const unitLabel = o.unit_label
+    if (typeof sku === "string" && sku.trim()) row.sku = sku.trim()
+    if (typeof itemType === "string" && itemType.trim()) row.item_type = itemType.trim()
+    if (typeof unitLabel === "string" && unitLabel.trim()) row.unit_label = unitLabel.trim()
+    out.push(row)
   }
   return out
 }

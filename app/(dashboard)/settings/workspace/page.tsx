@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getPlan, type PlanId } from "@/lib/plans"
+import {
+  logWorkspaceLogoUpload,
+  showWorkspaceLogoDiagnostics,
+} from "@/lib/workspace-logo-diagnostics-client"
 
 const TIMEZONES = [
   "America/New_York",
@@ -20,8 +24,16 @@ const DATE_FORMATS = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"]
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD"]
 const ACCENT_PRESETS = ["#2563eb", "#0f766e", "#7c3aed", "#dc2626", "#d97706", "#16a34a", "#0284c7", "#db2777"]
 
-function apiErrorDescription(body: { error?: string; message?: string } | null | undefined, fallback: string) {
-  const parts = [body?.error, body?.message].filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+function apiErrorDescription(
+  body: { error?: string; message?: string; step?: string; details?: string | null } | null | undefined,
+  fallback: string,
+) {
+  const parts = [body?.step, body?.error, body?.message]
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim())
+  if (body?.details && String(body.details).trim()) {
+    parts.push(String(body.details).trim())
+  }
   return parts.length ? parts.join(": ") : fallback
 }
 
@@ -72,7 +84,7 @@ type WorkspaceApiOrganization = {
 
 export default function WorkspacePage() {
   const { toast } = useToast()
-  const { dispatch } = useTenant()
+  const { dispatch, workspace } = useTenant()
   const { status, organizationId } = useActiveOrganization()
 
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error" | "ready">("idle")
@@ -103,6 +115,8 @@ export default function WorkspacePage() {
   const [documentLogoUrl, setDocumentLogoUrl] = useState("")
   const [logoPreviewNonce, setLogoPreviewNonce] = useState(0)
   const [docLogoPreviewNonce, setDocLogoPreviewNonce] = useState(0)
+  /** Last successful GET `/workspace` JSON (diagnostics). */
+  const [diagWorkspaceGetSnapshot, setDiagWorkspaceGetSnapshot] = useState<string>("")
   const fileRef = useRef<HTMLInputElement>(null)
   const documentFileRef = useRef<HTMLInputElement>(null)
 
@@ -176,6 +190,20 @@ export default function WorkspacePage() {
       setCanEdit(Boolean(data.canEdit))
       setPlanId(data.planId ?? "solo")
       applyOrganization(data.organization)
+      setDiagWorkspaceGetSnapshot(
+        JSON.stringify(
+          {
+            source: "GET /workspace refetch",
+            organizationId,
+            organization: data.organization,
+            planId: data.planId,
+            brandingAllowed: data.brandingAllowed,
+            canEdit: data.canEdit,
+          },
+          null,
+          2,
+        ),
+      )
       return true
     } catch {
       return false
@@ -269,6 +297,20 @@ export default function WorkspacePage() {
         setCanEdit(Boolean(data.canEdit))
         setPlanId(data.planId ?? "solo")
         applyOrganization(data.organization)
+        setDiagWorkspaceGetSnapshot(
+          JSON.stringify(
+            {
+              source: "GET /workspace initial load",
+              organizationId,
+              organization: data.organization,
+              planId: data.planId,
+              brandingAllowed: data.brandingAllowed,
+              canEdit: data.canEdit,
+            },
+            null,
+            2,
+          ),
+        )
         setLoadState("ready")
       } catch (e) {
         if (!cancelled) {
@@ -374,27 +416,46 @@ export default function WorkspacePage() {
     try {
       const fd = new FormData()
       fd.set("file", file)
+      logWorkspaceLogoUpload("[workspace settings] POST /workspace/logo FormData", {
+        organizationId,
+        fileFieldPresent: fd.has("file"),
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      })
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace/logo`, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
       })
-      const data = (await res.json()) as {
+      const rawText = await res.text()
+      let data: {
         ok?: boolean
         logoUrl?: string
         documentLogoUrl?: string
         organization?: WorkspaceApiOrganization
+        savedVerified?: boolean
         message?: string
         error?: string
+        step?: string
+        details?: string | null
       }
-      if (process.env.NODE_ENV === "development") {
-        console.info("[workspace settings] POST /workspace/logo response", {
-          organizationId,
-          ok: res.ok,
-          status: res.status,
-          data,
+      try {
+        data = rawText ? (JSON.parse(rawText) as typeof data) : {}
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: `Invalid response (${res.status}). First bytes: ${rawText.slice(0, 240)}`,
         })
+        return
       }
+      logWorkspaceLogoUpload("[workspace settings] POST /workspace/logo response", {
+        organizationId,
+        httpStatus: res.status,
+        ok: res.ok,
+        body: data,
+      })
       if (!res.ok) {
         toast({
           variant: "destructive",
@@ -403,20 +464,36 @@ export default function WorkspacePage() {
         })
         return
       }
+      const savedUrl = (data.organization?.logoUrl ?? data.logoUrl ?? "").trim()
+      if (!savedUrl) {
+        toast({
+          variant: "destructive",
+          title: "Logo not saved",
+          description:
+            typeof data.message === "string" && data.message.trim()
+              ? data.message
+              : "The server responded OK but did not return a saved logo URL. Check Supabase organizations.logo_url, Storage bucket, and SUPABASE_SERVICE_ROLE_KEY on the server.",
+        })
+        return
+      }
       if (data.organization) {
         applyOrganization(data.organization)
-      } else if (data.logoUrl) {
-        setLogoUrl(data.logoUrl)
+      } else {
+        setLogoUrl(savedUrl)
         setLogoPreviewNonce((n) => n + 1)
-        dispatch({ type: "SET_LOGO", payload: data.logoUrl })
+        dispatch({ type: "SET_LOGO", payload: savedUrl })
         if (typeof data.documentLogoUrl === "string") {
           dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
         }
       }
       await refetchWorkspace()
       toast({ title: "Logo updated", description: "Your app branding logo was saved." })
-    } catch {
-      toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Network error.",
+      })
     } finally {
       setUploadingLogo(false)
     }
@@ -430,26 +507,45 @@ export default function WorkspacePage() {
     try {
       const fd = new FormData()
       fd.set("file", file)
+      logWorkspaceLogoUpload("[workspace settings] POST /workspace/document-logo FormData", {
+        organizationId,
+        fileFieldPresent: fd.has("file"),
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      })
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/workspace/document-logo`,
         { method: "POST", body: fd, credentials: "same-origin" },
       )
-      const data = (await res.json()) as {
+      const rawText = await res.text()
+      let data: {
         ok?: boolean
         logoUrl?: string
         documentLogoUrl?: string
         organization?: WorkspaceApiOrganization
+        savedVerified?: boolean
         message?: string
         error?: string
+        step?: string
+        details?: string | null
       }
-      if (process.env.NODE_ENV === "development") {
-        console.info("[workspace settings] POST /workspace/document-logo response", {
-          organizationId,
-          ok: res.ok,
-          status: res.status,
-          data,
+      try {
+        data = rawText ? (JSON.parse(rawText) as typeof data) : {}
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: `Invalid response (${res.status}). First bytes: ${rawText.slice(0, 240)}`,
         })
+        return
       }
+      logWorkspaceLogoUpload("[workspace settings] POST /workspace/document-logo response", {
+        organizationId,
+        httpStatus: res.status,
+        ok: res.ok,
+        body: data,
+      })
       if (!res.ok) {
         toast({
           variant: "destructive",
@@ -458,20 +554,36 @@ export default function WorkspacePage() {
         })
         return
       }
+      const savedDocUrl = (data.organization?.documentLogoUrl ?? data.documentLogoUrl ?? "").trim()
+      if (!savedDocUrl) {
+        toast({
+          variant: "destructive",
+          title: "Document logo not saved",
+          description:
+            typeof data.message === "string" && data.message.trim()
+              ? data.message
+              : "The server responded OK but did not return a saved document logo URL. Check organizations.document_logo_url and Storage.",
+        })
+        return
+      }
       if (data.organization) {
         applyOrganization(data.organization)
-      } else if (data.documentLogoUrl) {
-        setDocumentLogoUrl(data.documentLogoUrl)
+      } else {
+        setDocumentLogoUrl(savedDocUrl)
         setDocLogoPreviewNonce((n) => n + 1)
-        dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
+        dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: savedDocUrl } })
         if (typeof data.logoUrl === "string") {
           dispatch({ type: "SET_LOGO", payload: data.logoUrl })
         }
       }
       await refetchWorkspace()
       toast({ title: "Document logo updated", description: "Saved for PDFs and documents." })
-    } catch {
-      toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Network error.",
+      })
     } finally {
       setUploadingDocLogo(false)
     }
@@ -600,6 +712,53 @@ export default function WorkspacePage() {
         <p className="text-xs text-muted-foreground rounded-lg border border-border bg-secondary/40 px-4 py-3">
           You can view workspace details, but only owners and admins can make changes.
         </p>
+      )}
+
+      {showWorkspaceLogoDiagnostics() && organizationId && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">Logo upload diagnostics (dev / preview)</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => void refetchWorkspace()}
+              disabled={!organizationId}
+            >
+              Re-fetch GET /workspace
+            </Button>
+          </div>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-mono text-muted-foreground">
+            <div>
+              <dt className="text-muted-foreground/80">organizationId</dt>
+              <dd className="break-all text-foreground">{organizationId}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground/80">tenant workspace.logoUrl</dt>
+              <dd className="break-all text-foreground">{workspace.logoUrl || "(empty)"}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground/80">tenant workspace.documentLogoUrl</dt>
+              <dd className="break-all text-foreground">{workspace.documentLogoUrl || "(empty)"}</dd>
+            </div>
+          </dl>
+          <details className="text-[11px] font-mono">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Last GET /workspace payload</summary>
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-border bg-background p-2 text-[10px]">
+              {diagWorkspaceGetSnapshot || "(none yet — load or re-fetch)"}
+            </pre>
+          </details>
+          <p className="text-[10px] text-muted-foreground">
+            Production env: set{" "}
+            <code className="rounded bg-secondary px-1">NEXT_PUBLIC_SUPABASE_URL</code>,{" "}
+            <code className="rounded bg-secondary px-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>,{" "}
+            <code className="rounded bg-secondary px-1">SUPABASE_SERVICE_ROLE_KEY</code> on the server. Optional bucket
+            override: <code className="rounded bg-secondary px-1">ORGANIZATION_LOGOS_BUCKET</code> (default{" "}
+            <code className="rounded bg-secondary px-1">organization-logos</code>). Enable this panel on a custom domain
+            with <code className="rounded bg-secondary px-1">NEXT_PUBLIC_WORKSPACE_LOGO_DEBUG=1</code>.
+          </p>
+        </div>
       )}
 
       {/* General */}

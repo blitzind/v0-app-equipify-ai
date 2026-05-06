@@ -42,7 +42,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { CustomerDrawer } from "@/components/drawers/customer-drawer"
-import { ContactActions } from "@/components/contact-actions"
+import { ContactActions, type ContactActionsProps } from "@/components/contact-actions"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
@@ -100,6 +100,34 @@ type DbLocationRow = {
   state: string
   postal_code: string
   is_default: boolean | null
+}
+
+/** Non-empty address string for maps when any location field is present. */
+function formatLocationForMaps(loc: Customer["locations"][number]): string | undefined {
+  const street = (loc.address ?? "").trim()
+  const city = (loc.city ?? "").trim()
+  const state = (loc.state ?? "").trim()
+  const zip = (loc.zip ?? "").trim()
+  const parts: string[] = []
+  if (street) parts.push(street)
+  const cityState = [city, state].filter(Boolean).join(", ")
+  if (cityState) parts.push(cityState)
+  else if (city || state) parts.push([city, state].filter(Boolean).join(", "))
+  if (zip) parts.push(zip)
+  const s = parts.join(", ").trim()
+  return s || undefined
+}
+
+function buildCustomerContactActionProps(c: Customer): Pick<ContactActionsProps, "address" | "email" | "phone"> {
+  const primaryLoc = c.locations[0]
+  const address = primaryLoc ? formatLocationForMaps(primaryLoc) : undefined
+  const emailAddr = c.contacts.map((ct) => ct.email).find((e) => e?.trim())
+  const phone = c.contacts.map((ct) => ct.phone).find((p) => p?.trim())
+  return {
+    address,
+    email: emailAddr ? { customerName: c.company, customerEmail: emailAddr.trim() } : undefined,
+    phone: phone?.trim(),
+  }
 }
 
 function StatusBadge({ status }: { status: Customer["status"] }) {
@@ -166,18 +194,9 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
           </div>
 
           {/* Quick contact actions */}
-          {(customer.locations[0] || customer.contacts[0]) && (
-            <div className="mt-4 pt-3 border-t border-border">
-              <ContactActions
-                address={customer.locations[0] ? `${customer.locations[0].address}, ${customer.locations[0].city}, ${customer.locations[0].state} ${customer.locations[0].zip}` : undefined}
-                email={customer.contacts[0] ? {
-                  customerName: customer.company,
-                  customerEmail: customer.contacts[0].email,
-                } : undefined}
-                phone={customer.contacts[0]?.phone}
-              />
-            </div>
-          )}
+          <div className="mt-4 pt-3 border-t border-border">
+            <ContactActions {...buildCustomerContactActionProps(customer)} />
+          </div>
 
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
             <span className="text-xs text-muted-foreground">
@@ -251,8 +270,8 @@ function CustomersPageInner() {
       const customerRows = data as DbCustomerRow[]
       const customerIds = customerRows.map((row) => row.id)
 
-      let contactsByCustomer = new Map<string, { email: string; phone: string; name: string }>()
-      let locationsByCustomer = new Map<string, { id: string; address: string; city: string; state: string; zip: string }>()
+      const contactsByCustomer = new Map<string, DbContactRow[]>()
+      const locationsByCustomer = new Map<string, DbLocationRow[]>()
 
       if (customerIds.length > 0) {
         const [{ data: contactRows }, { data: locationRows }] = await Promise.all([
@@ -272,48 +291,53 @@ function CustomersPageInner() {
             .order("is_default", { ascending: false }),
         ])
 
-        ;(contactRows as DbContactRow[] | null)?.forEach((row) => {
-          if (!contactsByCustomer.has(row.customer_id)) {
-            contactsByCustomer.set(row.customer_id, {
-              email: row.email ?? "",
-              phone: row.phone ?? "",
-              name: (row.full_name ?? "").trim(),
-            })
-          }
+        ;(contactRows as DbContactRow[] | null)?.forEach((r) => {
+          const list = contactsByCustomer.get(r.customer_id) ?? []
+          list.push(r)
+          contactsByCustomer.set(r.customer_id, list)
         })
 
-        ;(locationRows as DbLocationRow[] | null)?.forEach((row) => {
-          if (!locationsByCustomer.has(row.customer_id)) {
-            locationsByCustomer.set(row.customer_id, {
-              id: row.id,
-              address: row.address_line1,
-              city: row.city,
-              state: row.state,
-              zip: row.postal_code,
-            })
-          }
+        ;(locationRows as DbLocationRow[] | null)?.forEach((r) => {
+          const list = locationsByCustomer.get(r.customer_id) ?? []
+          list.push(r)
+          locationsByCustomer.set(r.customer_id, list)
         })
       }
 
       const mapped = customerRows.map((row) => {
-        const primaryContact = contactsByCustomer.get(row.id)
+        const rawContacts = contactsByCustomer.get(row.id) ?? []
+        const sortedContacts = [...rawContacts].sort(
+          (a, b) => Number(!!b.is_primary) - Number(!!a.is_primary),
+        )
+        const primaryRow = sortedContacts[0]
         const displayName =
-          primaryContact?.name?.trim() ? primaryContact.name.trim() : row.company_name
+          primaryRow?.full_name?.trim() ? primaryRow.full_name.trim() : row.company_name
+
+        const rawLocs = locationsByCustomer.get(row.id) ?? []
+        const sortedLocs = [...rawLocs].sort(
+          (a, b) => Number(!!b.is_default) - Number(!!a.is_default),
+        )
+        const locations = sortedLocs.map((loc) => ({
+          id: loc.id,
+          address: loc.address_line1 ?? "",
+          city: loc.city ?? "",
+          state: loc.state ?? "",
+          zip: loc.postal_code ?? "",
+        }))
+
+        const contacts = sortedContacts.map((c) => ({
+          email: c.email ?? "",
+          phone: c.phone ?? "",
+          name: (c.full_name ?? "").trim() || displayName,
+        }))
+
         return {
           id: row.id,
           company: row.company_name,
           name: displayName,
           status: row.status === "inactive" ? "Inactive" : "Active",
-          locations: locationsByCustomer.has(row.id) ? [locationsByCustomer.get(row.id)!] : [],
-          contacts: primaryContact
-            ? [
-                {
-                  email: primaryContact.email,
-                  phone: primaryContact.phone,
-                  name: displayName,
-                },
-              ]
-            : [],
+          locations,
+          contacts,
           contracts: [],
           equipmentCount: 0,
           openWorkOrders: 0,
@@ -579,24 +603,7 @@ function CustomersPageInner() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="w-[200px] whitespace-nowrap">
                       <div className="flex justify-end">
-                        {(() => {
-                          const primaryLocation = c.locations[0]
-                          const primaryContact = c.contacts[0]
-                          return (
-                        <ContactActions
-                          address={
-                            primaryLocation
-                              ? `${primaryLocation.address}, ${primaryLocation.city}, ${primaryLocation.state} ${primaryLocation.zip}`
-                              : undefined
-                          }
-                          email={{
-                            customerName: c.company,
-                            customerEmail: primaryContact?.email || undefined,
-                          }}
-                          phone={primaryContact?.phone}
-                        />
-                          )
-                        })()}
+                        <ContactActions {...buildCustomerContactActionProps(c)} />
                       </div>
                     </TableCell>
                   </TableRow>

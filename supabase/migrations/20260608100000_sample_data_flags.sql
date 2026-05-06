@@ -56,6 +56,58 @@ create index if not exists idx_org_members_org_sample
   where is_sample = true;
 
 -- -----------------------------------------------------------------------------
+-- Trigger repair (must run before UPDATE backfills):
+-- `equipment_foundation` replaces public.prevent_organization_id_change() with a version
+-- that references NEW.customer_id for immutability. The same function name is reused by
+-- triggers on customers, customer_contacts, customer_locations, and organization_job_types —
+-- those row types have no customer_id (customers uses id; job types have no customer).
+-- Updates below fail with: record "new" has no field "customer_id".
+--
+-- Restore org-only immutability on the shared name; split equipment onto its own function.
+-- -----------------------------------------------------------------------------
+create or replace function public.prevent_organization_id_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.organization_id is distinct from old.organization_id then
+    raise exception 'organization_id is immutable once created';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.prevent_organization_id_change() from public, anon, authenticated;
+alter function public.prevent_organization_id_change() owner to postgres;
+
+create or replace function public.prevent_equipment_identity_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+begin
+  if new.organization_id is distinct from old.organization_id then
+    raise exception 'organization_id is immutable once created';
+  end if;
+  if new.customer_id is distinct from old.customer_id then
+    raise exception 'customer_id is immutable once created';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.prevent_equipment_identity_change() from public, anon, authenticated;
+alter function public.prevent_equipment_identity_change() owner to postgres;
+
+drop trigger if exists trg_equipment_immutable_org on public.equipment;
+create trigger trg_equipment_immutable_org
+before update on public.equipment
+for each row execute function public.prevent_equipment_identity_change();
+
+-- -----------------------------------------------------------------------------
 -- Backfill: existing demo rows from known seed patterns (best-effort).
 -- -----------------------------------------------------------------------------
 update public.customers

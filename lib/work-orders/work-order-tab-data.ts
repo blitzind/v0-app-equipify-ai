@@ -63,6 +63,7 @@ export type DbWorkOrderLineItemRow = {
   line_total_cents: number
   vendor_id: string | null
   purchase_order_id: string | null
+  catalog_item_id?: string | null
 }
 
 export type DbWorkOrderAttachmentRow = {
@@ -86,6 +87,7 @@ export function mapLineItemRowToPart(row: DbWorkOrderLineItemRow): Part {
     unitCost: row.unit_cost_cents / 100,
     vendorId: row.vendor_id,
     purchaseOrderId: row.purchase_order_id,
+    catalogItemId: row.catalog_item_id ?? null,
   }
 }
 
@@ -102,6 +104,7 @@ export function mapPartToLineItemInsert(
     unit_cost_cents: Math.max(0, Math.round(p.unitCost * 100)),
     vendor_id: p.vendorId ?? null,
     purchase_order_id: p.purchaseOrderId ?? null,
+    catalog_item_id: p.catalogItemId ?? null,
   }
 }
 
@@ -129,7 +132,7 @@ export async function fetchWorkOrderLineItems(
 ): Promise<DbWorkOrderLineItemRow[]> {
   const { data, error } = await supabase
     .from("work_order_line_items")
-    .select("id,description,quantity,unit_cost_cents,line_total_cents,vendor_id,purchase_order_id")
+    .select("id,description,quantity,unit_cost_cents,line_total_cents,vendor_id,purchase_order_id,catalog_item_id")
     .eq("organization_id", organizationId)
     .eq("work_order_id", workOrderId)
     .order("created_at", { ascending: true })

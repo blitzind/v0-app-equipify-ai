@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { X, Plus, Trash2, Send, FilePen } from "lucide-react"
+import { X, Plus, Trash2, Send, FilePen, PackageSearch } from "lucide-react"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -14,6 +14,9 @@ import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equ
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import type { AdminQuote, InvoiceStatus } from "@/lib/mock-data"
+import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
+import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
+import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 
 function quoteOptionLabel(q: AdminQuote) {
   const num = q.quoteNumber?.trim()
@@ -95,6 +98,10 @@ interface LineItem {
   description: string
   qty: string
   unit: string
+  catalogItemId?: string
+  skuSnapshot?: string
+  itemTypeSnapshot?: string
+  unitLabelSnapshot?: string
 }
 
 function newLineItem(): LineItem {
@@ -129,6 +136,13 @@ interface NewInvoiceModalProps {
   onSuccess?: (id: string, status: InvoiceStatus) => void
   initialWorkOrderId?: string
   initialCalibrationRecordId?: string
+  prefilledCatalogItem?: {
+    catalogItemId: string
+    name: string
+    description?: string | null
+    unitPrice: number
+    partNumber?: string | null
+  } | null
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -139,6 +153,7 @@ export function NewInvoiceModal({
   onSuccess,
   initialWorkOrderId,
   initialCalibrationRecordId,
+  prefilledCatalogItem = null,
 }: NewInvoiceModalProps) {
   const { addInvoiceFromPayload } = useInvoices()
   const { quotes } = useQuotes()
@@ -155,6 +170,7 @@ export function NewInvoiceModal({
   const [workOrderOptions, setWorkOrderOptions] = useState<WorkOrderOption[]>([])
   const [workOrdersLoading, setWorkOrdersLoading] = useState(false)
   const [addEquipmentOpen, setAddEquipmentOpen] = useState(false)
+  const [catalogOpen, setCatalogOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState("")
   const [workOrderId, setWorkOrderId] = useState("")
@@ -205,7 +221,7 @@ export function NewInvoiceModal({
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      const hasPrefill = Boolean(initialWorkOrderId || initialCalibrationRecordId)
+      const hasPrefill = Boolean(initialWorkOrderId || initialCalibrationRecordId || prefilledCatalogItem?.catalogItemId)
       if (!hasPrefill) {
         setCustomerId("")
         setWorkOrderId("")
@@ -221,6 +237,20 @@ export function NewInvoiceModal({
         setInternalNotes("")
         setStatus("Draft")
       }
+      if (prefilledCatalogItem?.catalogItemId && !initialWorkOrderId && !initialCalibrationRecordId) {
+        const desc =
+          prefilledCatalogItem.name.trim() +
+          (prefilledCatalogItem.partNumber?.trim() ? ` — PN ${prefilledCatalogItem.partNumber.trim()}` : "")
+        setLineItems([
+          {
+            id: crypto.randomUUID(),
+            description: desc,
+            qty: "1",
+            unit: String(prefilledCatalogItem.unitPrice ?? 0),
+            catalogItemId: prefilledCatalogItem.catalogItemId,
+          },
+        ])
+      }
       setCalibrationRecordId(initialCalibrationRecordId ?? "")
       setErrors({})
       setLoadError(null)
@@ -231,7 +261,7 @@ export function NewInvoiceModal({
     if (!open) {
       setAddEquipmentOpen(false)
     }
-  }, [open, initialWorkOrderId, initialCalibrationRecordId])
+  }, [open, initialWorkOrderId, initialCalibrationRecordId, prefilledCatalogItem])
 
   useEffect(() => {
     if (!open) return
@@ -404,11 +434,11 @@ export function NewInvoiceModal({
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !addEquipmentOpen) onClose()
+      if (e.key === "Escape" && !addEquipmentOpen && !catalogOpen) onClose()
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose, addEquipmentOpen])
+  }, [open, onClose, addEquipmentOpen, catalogOpen])
 
   const subtotal = lineItems.reduce((sum, li) => {
     const qty = parseFloat(li.qty) || 0
@@ -449,11 +479,26 @@ export function NewInvoiceModal({
     const issuedAt = new Date().toISOString().split("T")[0]
     const lineItemsJson = lineItems
       .filter((li) => li.description.trim())
-      .map((li) => ({
-        description: li.description.trim(),
-        qty: parseFloat(li.qty) || 1,
-        unit: parseFloat(li.unit) || 0,
-      }))
+      .map((li) => {
+        const row: {
+          description: string
+          qty: number
+          unit: number
+          catalog_item_id?: string
+          sku?: string
+          item_type?: string
+          unit_label?: string
+        } = {
+          description: li.description.trim(),
+          qty: parseFloat(li.qty) || 1,
+          unit: parseFloat(li.unit) || 0,
+        }
+        if (li.catalogItemId) row.catalog_item_id = li.catalogItemId
+        if (li.skuSnapshot) row.sku = li.skuSnapshot
+        if (li.itemTypeSnapshot) row.item_type = li.itemTypeSnapshot
+        if (li.unitLabelSnapshot) row.unit_label = li.unitLabelSnapshot
+        return row
+      })
     const { id, error: saveError } = await addInvoiceFromPayload({
       customerId,
       equipmentId: equipmentId || null,
@@ -477,6 +522,23 @@ export function NewInvoiceModal({
     }
     if (id) onSuccess?.(id, submitStatus)
     onClose()
+  }
+
+  function handleCatalogPick(row: CatalogListItemRow, qty: number) {
+    const snap = buildQuoteInvoiceLineSnapshot(row, qty)
+    setLineItems((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        description: snap.description,
+        qty: String(snap.qty),
+        unit: String(snap.unit),
+        catalogItemId: snap.catalog_item_id,
+        skuSnapshot: snap.sku,
+        itemTypeSnapshot: snap.item_type,
+        unitLabelSnapshot: snap.unit_label,
+      },
+    ])
   }
 
   function handleOpenAddEquipment() {
@@ -656,15 +718,25 @@ export function NewInvoiceModal({
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                   <Label required>Line Items</Label>
-                  <button
-                    type="button"
-                    onClick={addLineItem}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add item
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCatalogOpen(true)}
+                      disabled={orgContextStatus !== "ready" || !activeOrgId}
+                      className="flex items-center gap-1 text-xs font-medium rounded-md border border-border bg-background px-2.5 py-1 text-foreground hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <PackageSearch className="w-3.5 h-3.5" /> Add from catalog
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addLineItem}
+                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add item
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-[1fr_60px_90px_80px_32px] gap-2 mb-1.5 px-0.5">
@@ -860,6 +932,13 @@ export function NewInvoiceModal({
           </div>
         </div>
       )}
+
+      <AddFromCatalogDialog
+        open={catalogOpen}
+        onOpenChange={setCatalogOpen}
+        organizationId={organizationId}
+        onPick={handleCatalogPick}
+      />
 
       <AddEquipmentModal
         open={addEquipmentOpen}

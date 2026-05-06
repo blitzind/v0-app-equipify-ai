@@ -221,10 +221,12 @@ function PartsTable({
   parts,
   editable,
   onChange,
+  extraActions,
 }: {
   parts: Part[]
   editable: boolean
   onChange: (parts: Part[]) => void
+  extraActions?: ReactNode
 }) {
   function update(id: string, field: keyof Part, value: string | number) {
     onChange(parts.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
@@ -334,13 +336,16 @@ function PartsTable({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between">
-        {editable && (
-          <Button variant="outline" size="sm" onClick={addRow} className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" />
-            Add Part
-          </Button>
-        )}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {editable && extraActions}
+          {editable && (
+            <Button variant="outline" size="sm" onClick={addRow} className="gap-1.5">
+              <Plus className="w-3.5 h-3.5" />
+              Add Part
+            </Button>
+          )}
+        </div>
         <div className="ml-auto text-sm font-medium">
           Parts total:{" "}
           <span className="text-foreground font-semibold tabular-nums">${total.toFixed(2)}</span>
@@ -872,6 +877,8 @@ export interface WorkOrderDetailExperienceProps {
   onTabsValueChange?: (value: string) => void
   /** Inserted above the parts table (e.g. save / revert bar in the drawer). */
   partsTabToolbar?: ReactNode
+  /** Next to "Add Part" when parts are editable (e.g. Add from catalog). */
+  partsTableExtraActions?: ReactNode
   /** Inserted above the tasks checklist (e.g. save / revert bar). */
   tasksTabToolbar?: ReactNode
   /** Inserted above Labor hours (e.g. save / revert bar). */
@@ -962,6 +969,7 @@ export function WorkOrderDetailExperience({
   tabsValue,
   onTabsValueChange,
   partsTabToolbar,
+  partsTableExtraActions,
   tasksTabToolbar,
   laborTabToolbar,
   notesTabToolbar,
@@ -1915,7 +1923,12 @@ export function WorkOrderDetailExperience({
         <TabsContent value="parts" className="mt-0">
           {partsTabToolbar ? <div className="mb-3">{partsTabToolbar}</div> : null}
           <Section title="Parts / materials" icon={Package}>
-            <PartsTable parts={parts} editable={partsPhotosEditable} onChange={onPartsChange} />
+            <PartsTable
+              parts={parts}
+              editable={partsPhotosEditable}
+              onChange={onPartsChange}
+              extraActions={partsTableExtraActions}
+            />
           </Section>
         </TabsContent>
 

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Loader2, MoreHorizontal, Package, Search, Upload } from "lucide-react"
+import { Loader2, MoreHorizontal, Package, Plus, Search, Upload } from "lucide-react"
+import { CatalogAddItemDrawer } from "@/components/catalog/catalog-add-item-drawer"
+import { CatalogItemDrawer } from "@/components/catalog/catalog-item-drawer"
 import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
@@ -41,8 +43,10 @@ const ITEM_TYPES = [
   "part",
   "accessory",
   "service",
+  "labor",
   "rental",
   "option",
+  "kit",
   "other",
 ] as const
 
@@ -51,13 +55,16 @@ const ROW_STATUSES = ["active", "inactive", "discontinued", "needs_review"] as c
 type CatalogRow = {
   id: string
   manufacturer_name: string | null
+  vendor_name?: string | null
   category: string
   item_type: string
   part_number: string
+  sku?: string | null
   name: string
   description: string | null
   list_price: number | null
   cost: number | null
+  sale_price?: number | null
   unit: string
   status: string
   confidence_score: number | null
@@ -65,7 +72,31 @@ type CatalogRow = {
   ai_confidence: number | null
   human_verified_at: string | null
   source_file_name: string | null
+  source_type?: string | null
   created_at: string
+}
+
+function CatalogSourceBadge({ sourceType }: { sourceType?: string | null }) {
+  const s = sourceType ?? "manual"
+  if (s === "imported") {
+    return (
+      <Badge variant="outline" className="text-[10px] font-medium border-sky-500/35 bg-sky-500/5 text-sky-900 dark:text-sky-100">
+        Imported
+      </Badge>
+    )
+  }
+  if (s === "ai_generated") {
+    return (
+      <Badge variant="outline" className="text-[10px] font-medium">
+        AI
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" className="text-[10px] font-medium text-foreground">
+      Manual
+    </Badge>
+  )
 }
 
 function rowVerificationKey(row: CatalogRow): "verified" | "needs_review" | "ai_generated" | "manual" {
@@ -139,6 +170,9 @@ export default function CatalogPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [verificationFilter, setVerificationFilter] = useState<string>("all")
   const [manufacturerFilter, setManufacturerFilter] = useState<string>("all")
+  const [vendorFilter, setVendorFilter] = useState<string>("all")
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null)
+  const [addItemOpen, setAddItemOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready") {
@@ -221,6 +255,15 @@ export default function CatalogPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
   }, [items])
 
+  const vendors = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of items) {
+      const v = r.vendor_name?.trim()
+      if (v) set.add(v)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+  }, [items])
+
   const filtered = useMemo(() => {
     let list = [...items]
     const q = search.trim().toLowerCase()
@@ -230,8 +273,10 @@ export default function CatalogPage() {
           r.name,
           r.description ?? "",
           r.part_number,
+          r.sku ?? "",
           r.category,
           r.manufacturer_name ?? "",
+          r.vendor_name ?? "",
         ]
           .join(" ")
           .toLowerCase()
@@ -250,8 +295,11 @@ export default function CatalogPage() {
     if (manufacturerFilter !== "all") {
       list = list.filter((r) => (r.manufacturer_name ?? "").trim() === manufacturerFilter)
     }
+    if (vendorFilter !== "all") {
+      list = list.filter((r) => (r.vendor_name ?? "").trim() === vendorFilter)
+    }
     return list
-  }, [items, search, typeFilter, statusFilter, verificationFilter, manufacturerFilter])
+  }, [items, search, typeFilter, statusFilter, verificationFilter, manufacturerFilter, vendorFilter])
 
   const patchVerification = useCallback(
     async (itemId: string, action: "verify" | "needs_review") => {
@@ -304,7 +352,7 @@ export default function CatalogPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Toolbar — matches Equipment / list pages */}
+      {/* Search + filters + primary Add Item, secondary Import */}
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
         <div className="flex items-center gap-2 w-full lg:flex-1 lg:max-w-md rounded-md border border-border bg-card px-3 py-1.5 min-w-0">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -317,7 +365,7 @@ export default function CatalogPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Item type" />
@@ -374,10 +422,36 @@ export default function CatalogPage() {
               </SelectContent>
             </Select>
           ) : null}
+
+          {vendors.length > 0 ? (
+            <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All vendors</SelectItem>
+                {vendors.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
 
-        <div className="flex justify-end lg:ml-auto shrink-0">
-          <Button asChild className="gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 lg:ml-auto">
+          {canManageCatalog ? (
+            <Button
+              type="button"
+              className="gap-2 w-full sm:w-auto bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
+              onClick={() => setAddItemOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Item
+            </Button>
+          ) : null}
+          <Button asChild variant="outline" className="gap-2 w-full sm:w-auto text-muted-foreground border-border">
             <Link href="/catalog/import">
               <Upload className="h-4 w-4" />
               Import price list
@@ -417,18 +491,31 @@ export default function CatalogPage() {
             >
               <Package className="w-6 h-6" style={{ color: "#D97706" }} />
             </div>
-            <div className="space-y-1 max-w-md">
-              <p className="text-sm font-medium text-foreground">No catalog items yet</p>
-              <p className="text-sm text-muted-foreground">
-                Import a manufacturer price list to build your item catalog.
+            <div className="space-y-2 max-w-lg">
+              <p className="text-base font-semibold text-foreground">Build your item catalog</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Create reusable products, parts, labor items, services, and equipment templates for quotes, invoices,
+                work orders, and purchase orders.
               </p>
             </div>
-            <Button asChild className="gap-2">
-              <Link href="/catalog/import">
-                <Upload className="h-4 w-4" />
-                Import price list
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full max-w-md justify-center">
+              {canManageCatalog ? (
+                <Button
+                  type="button"
+                  className="gap-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
+                  onClick={() => setAddItemOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Item
+                </Button>
+              ) : null}
+              <Button asChild variant="outline" className="gap-2 border-border">
+                <Link href="/catalog/import">
+                  <Upload className="h-4 w-4" />
+                  Import price list
+                </Link>
+              </Button>
+            </div>
           </div>
         </Card>
       ) : (
@@ -445,9 +532,12 @@ export default function CatalogPage() {
                   <TableRow className="ds-table-header-row-subtle">
                     <TableHead className="min-w-[200px]">Item / description</TableHead>
                     <TableHead className="whitespace-nowrap">Part number</TableHead>
+                    <TableHead className="whitespace-nowrap">SKU</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="min-w-[120px]">Manufacturer</TableHead>
+                    <TableHead className="min-w-[100px]">Vendor</TableHead>
+                    <TableHead className="whitespace-nowrap">Source</TableHead>
                     <TableHead className="text-right whitespace-nowrap">List price</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Cost</TableHead>
                     <TableHead>Status</TableHead>
@@ -459,7 +549,7 @@ export default function CatalogPage() {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManageCatalog ? 10 : 9}
+                        colSpan={canManageCatalog ? 13 : 12}
                         className="text-center text-sm text-muted-foreground py-12"
                       >
                         No items match your filters.
@@ -467,7 +557,11 @@ export default function CatalogPage() {
                     </TableRow>
                   ) : (
                     filtered.map((r) => (
-                      <TableRow key={r.id}>
+                      <TableRow
+                        key={r.id}
+                        className="cursor-pointer hover:bg-muted/40"
+                        onClick={() => setDrawerItemId(r.id)}
+                      >
                         <TableCell className="align-top max-w-[280px]">
                           <div className="flex flex-col gap-0.5">
                             <span className="font-medium text-foreground text-sm line-clamp-2">{r.name || "—"}</span>
@@ -479,10 +573,19 @@ export default function CatalogPage() {
                         <TableCell className="font-mono text-xs align-top whitespace-nowrap">
                           {r.part_number || "—"}
                         </TableCell>
+                        <TableCell className="font-mono text-xs align-top whitespace-nowrap">
+                          {r.sku?.trim() || "—"}
+                        </TableCell>
                         <TableCell className="text-xs capitalize align-top">{formatItemType(r.item_type)}</TableCell>
                         <TableCell className="max-w-[140px] truncate align-top">{r.category || "—"}</TableCell>
                         <TableCell className="text-muted-foreground max-w-[160px] truncate align-top">
                           {r.manufacturer_name ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[140px] truncate align-top text-xs">
+                          {r.vendor_name ?? "—"}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <CatalogSourceBadge sourceType={r.source_type} />
                         </TableCell>
                         <TableCell className="text-right tabular-nums align-top whitespace-nowrap">
                           {r.list_price != null ? `$${Number(r.list_price).toFixed(2)}` : "—"}
@@ -495,7 +598,7 @@ export default function CatalogPage() {
                           <CatalogAiIndicator row={r} />
                         </TableCell>
                         {canManageCatalog ? (
-                          <TableCell className="pr-2 text-right align-top">
+                          <TableCell className="pr-2 text-right align-top" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -505,6 +608,7 @@ export default function CatalogPage() {
                                   className="h-8 w-8 text-muted-foreground"
                                   disabled={verifyingId === r.id}
                                   aria-label="Row actions"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   {verifyingId === r.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -513,7 +617,49 @@ export default function CatalogPage() {
                                   )}
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/quotes?catalogItem=${encodeURIComponent(r.id)}`}>Add to quote</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/invoices?catalogItem=${encodeURIComponent(r.id)}`}>Add to invoice</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/work-orders?catalogItem=${encodeURIComponent(r.id)}`}>
+                                    Add to work order
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/purchase-orders?catalogItem=${encodeURIComponent(r.id)}`}>
+                                    Add to purchase order
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href="/equipment">Equipment assets</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    void (async () => {
+                                      if (!organizationId) return
+                                      const res = await fetch(
+                                        `/api/organizations/${encodeURIComponent(organizationId)}/catalog-items/${encodeURIComponent(r.id)}`,
+                                        {
+                                          method: "PATCH",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ archived: true }),
+                                        },
+                                      )
+                                      if (!res.ok) {
+                                        toast({ variant: "destructive", title: "Could not archive item" })
+                                        return
+                                      }
+                                      toast({ title: "Item archived" })
+                                      await load()
+                                    })()
+                                  }}
+                                >
+                                  Archive item
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => void patchVerification(r.id, "verify")}>
                                   Mark verified
                                 </DropdownMenuItem>
@@ -533,6 +679,22 @@ export default function CatalogPage() {
           </Card>
         </>
       )}
+
+      <CatalogAddItemDrawer
+        open={addItemOpen}
+        onOpenChange={setAddItemOpen}
+        organizationId={organizationId}
+        onCreated={() => void load()}
+      />
+
+      <CatalogItemDrawer
+        organizationId={organizationId}
+        itemId={drawerItemId}
+        open={Boolean(drawerItemId)}
+        onClose={() => setDrawerItemId(null)}
+        canManage={canManageCatalog}
+        onUpdated={() => void load()}
+      />
     </div>
   )
 }

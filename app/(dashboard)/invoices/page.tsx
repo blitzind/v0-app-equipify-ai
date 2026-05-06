@@ -27,6 +27,10 @@ import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/d
 import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+
+const UUID_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,9 +132,17 @@ function InvoicesPageInner() {
   } = useInvoices()
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
+  const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [invoicePrefillWo, setInvoicePrefillWo] = useState<string | undefined>(undefined)
   const [invoicePrefillCal, setInvoicePrefillCal] = useState<string | undefined>(undefined)
+  const [catalogPrefill, setCatalogPrefill] = useState<{
+    catalogItemId: string
+    name: string
+    description?: string | null
+    unitPrice: number
+    partNumber?: string | null
+  } | null>(null)
 
   function openNewInvoiceModal(prefillWo?: string, prefillCal?: string) {
     if (blockCreateIfNotEligible(standardCreateEligibility)) return
@@ -170,9 +182,56 @@ function InvoicesPageInner() {
     const cal = searchParams.get("calibrationRecordId") ?? undefined
     setInvoicePrefillWo(wo)
     setInvoicePrefillCal(cal)
+    setCatalogPrefill(null)
     setNewModalOpen(true)
     router.replace("/invoices", { scroll: false })
   }, [searchParams, router, standardCreateEligibility])
+
+  useEffect(() => {
+    const catId = searchParams.get("catalogItem")
+    if (!catId || !UUID_PARAM.test(catId)) return
+    if (activeOrgStatus !== "ready" || !activeOrgId) return
+    if (blockCreateIfNotEligible(standardCreateEligibility)) {
+      router.replace("/invoices", { scroll: false })
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/catalog-items/${encodeURIComponent(catId)}`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as {
+        item?: {
+          id: string
+          name: string
+          description?: string | null
+          list_price?: number | null
+          sale_price?: number | null
+          part_number?: string | null
+        }
+      }
+      if (cancelled || !res.ok || !body.item) {
+        router.replace("/invoices", { scroll: false })
+        return
+      }
+      const unit = body.item.sale_price ?? body.item.list_price ?? 0
+      setCatalogPrefill({
+        catalogItemId: body.item.id,
+        name: body.item.name,
+        description: body.item.description ?? null,
+        unitPrice: Number(unit) || 0,
+        partNumber: body.item.part_number ?? null,
+      })
+      setInvoicePrefillWo(undefined)
+      setInvoicePrefillCal(undefined)
+      setNewModalOpen(true)
+      router.replace("/invoices", { scroll: false })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, router, activeOrgId, activeOrgStatus, standardCreateEligibility])
 
   useEffect(() => {
     const s = searchParams.get("status")
@@ -504,9 +563,11 @@ function InvoicesPageInner() {
           setNewModalOpen(false)
           setInvoicePrefillWo(undefined)
           setInvoicePrefillCal(undefined)
+          setCatalogPrefill(null)
         }}
         initialWorkOrderId={invoicePrefillWo}
         initialCalibrationRecordId={invoicePrefillCal}
+        prefilledCatalogItem={catalogPrefill}
         onSuccess={(_id, status) => {
           toast({
             title: status === "Sent" ? "Invoice sent to customer" : "Invoice saved as draft",

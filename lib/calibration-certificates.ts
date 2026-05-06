@@ -6,6 +6,10 @@ import { buildCertificatePdfHtml } from "@/lib/certificates/certificate-pdf-html
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { signedUrlForAttachmentPath } from "@/lib/work-orders/work-order-tab-data"
+import {
+  documentBrandingFromFields,
+  getOrganizationDocumentBranding,
+} from "@/lib/organization/document-branding"
 
 export type CalibrationFieldType =
   | "text"
@@ -622,45 +626,26 @@ export async function listCompletedCertificatesForOrg(
   return rows
 }
 
-async function fetchOrganizationCertificateBranding(
-  supabase: SupabaseClient,
-  organizationId: string,
-): Promise<{ companyName: string; logoUrl: string | null }> {
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("name, logo_url, document_logo_url")
-    .eq("id", organizationId)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-
-  const row = data as {
-    name?: string | null
-    logo_url?: string | null
-    document_logo_url?: string | null
-  } | null
-  const rawName = row?.name?.trim() ?? ""
-  const companyName = rawName || "Organization"
-  const docRaw =
-    row?.document_logo_url != null ? String(row.document_logo_url).trim() : ""
-  const squareRaw = row?.logo_url != null ? String(row.logo_url).trim() : ""
-  const logoUrl = docRaw.length ? docRaw : squareRaw.length ? squareRaw : null
-
-  return { companyName, logoUrl }
-}
-
 /** Build print-ready HTML for a saved certificate (matches Work Order certificate PDF content). */
 export async function buildCompletedCertificatePdfHtml(
   supabase: SupabaseClient,
   item: CompletedCertificateListItem,
   options?: { companyName?: string; logoUrl?: string | null },
 ): Promise<string> {
-  const branding = await fetchOrganizationCertificateBranding(supabase, item.template.organizationId)
+  const baseBranding = await getOrganizationDocumentBranding(supabase, item.template.organizationId)
   const companyNameRaw =
-    options?.companyName !== undefined ? options.companyName : branding.companyName
+    options?.companyName !== undefined ? options.companyName : baseBranding.organizationName
   const companyName = (companyNameRaw ?? "").trim() || "Organization"
-  const logoUrl =
-    options?.logoUrl !== undefined ? options.logoUrl ?? null : branding.logoUrl
+  const branding = documentBrandingFromFields({
+    name: companyName,
+    documentLogoUrl: options?.logoUrl !== undefined ? options.logoUrl : baseBranding.documentLogoUrl,
+    logoUrl: options?.logoUrl !== undefined ? options.logoUrl : baseBranding.appLogoUrl,
+    primaryColor: baseBranding.accentColor,
+    companyEmail: baseBranding.companyEmail,
+    companyPhone: baseBranding.companyPhone,
+    companyWebsite: baseBranding.companyWebsite,
+    companyAddress: baseBranding.companyAddress,
+  })
 
   let customerSignatureUrl: string | null = null
   if (item.customerSignaturePath) {
@@ -675,7 +660,8 @@ export async function buildCompletedCertificatePdfHtml(
 
   return buildCertificatePdfHtml({
     companyName,
-    logoUrl,
+    logoUrl: branding.preferredLogoUrl,
+    branding,
     templateName: item.template.name,
     template: item.template,
     values: item.values,

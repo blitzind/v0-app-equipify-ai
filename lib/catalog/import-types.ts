@@ -5,8 +5,10 @@ export const CATALOG_ITEM_TYPES = [
   "part",
   "accessory",
   "service",
+  "labor",
   "rental",
   "option",
+  "kit",
   "other",
 ] as const
 export type CatalogItemType = (typeof CATALOG_ITEM_TYPES)[number]
@@ -74,10 +76,15 @@ export function normalizeItemType(raw: string | undefined | null): CatalogItemTy
     accessories: "accessory",
     service: "service",
     services: "service",
+    labor: "labor",
+    labour: "labor",
     rental: "rental",
     rentals: "rental",
     option: "option",
     options: "option",
+    kit: "kit",
+    kits: "kit",
+    bundle: "kit",
     other: "other",
   }
   return map[k] ?? "other"

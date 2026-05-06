@@ -1,4 +1,10 @@
 import type { CalibrationTemplate, CalibrationTemplateField } from "@/lib/calibration-certificates"
+import {
+  buildDocumentRootCssDeclarations,
+  buildOrganizationDocumentHeaderHtml,
+  documentBrandingFromFields,
+  type OrganizationDocumentBranding,
+} from "@/lib/organization/document-branding"
 
 function escapeHtml(s: string): string {
   return s
@@ -53,6 +59,8 @@ function formatFieldCells(
 export type CertificatePdfModel = {
   companyName: string
   logoUrl?: string | null
+  /** Full workspace branding (accent, contact block). Overrides legacy logoUrl/companyName when set. */
+  branding?: OrganizationDocumentBranding | null
   /** Template name (shown as subtitle under main title). */
   templateName: string
   workOrderLabel: string
@@ -84,6 +92,15 @@ export type CertificatePdfModel = {
   technicianNotes?: string
 }
 
+function resolveCertificateBranding(model: CertificatePdfModel): OrganizationDocumentBranding {
+  if (model.branding) return model.branding
+  return documentBrandingFromFields({
+    name: model.companyName,
+    documentLogoUrl: model.logoUrl,
+    logoUrl: model.logoUrl,
+  })
+}
+
 function shortCertificateId(id: string | null | undefined): string {
   if (!id?.trim()) return ""
   const t = id.trim()
@@ -92,7 +109,10 @@ function shortCertificateId(id: string | null | undefined): string {
 }
 
 export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
+  const resolvedBranding = resolveCertificateBranding(model)
   const printed = model.printedAtLabel ?? new Date().toLocaleString("en-US")
+  const rootDecl = buildDocumentRootCssDeclarations(resolvedBranding.accentColor)
+  const rootStyleTag = rootDecl ? `<style>:root { ${rootDecl} }</style>` : ""
 
   const bodyRows: string[] = []
   for (const field of model.template.fields) {
@@ -108,9 +128,7 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
 </tr>`)
   }
 
-  const logoBlock = model.logoUrl
-    ? `<img class="logo" src="${escapeHtml(model.logoUrl)}" alt="" />`
-    : `<div class="logo-text">${escapeHtml(model.companyName)}</div>`
+  const brandHeaderHtml = buildOrganizationDocumentHeaderHtml(resolvedBranding)
 
   const certIdLine =
     model.calibrationRecordId?.trim() &&
@@ -147,7 +165,8 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(model.companyName)} — Calibration Certificate</title>
+  ${rootStyleTag}
+  <title>${escapeHtml(resolvedBranding.organizationName)} — Calibration Certificate</title>
   <style>
     @page {
       size: letter;
@@ -179,6 +198,12 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       gap: 24px;
       margin-bottom: 8px;
     }
+    .logo-slot {
+      display: inline-block;
+      vertical-align: top;
+      max-width: min(280px, 100%);
+      text-align: left;
+    }
     .logo {
       max-height: 48px;
       max-width: min(280px, 100%);
@@ -196,6 +221,21 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       max-width: 240px;
       line-height: 1.2;
     }
+    .doc-org-header-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
+      max-width: 360px;
+    }
+    .doc-org-contact {
+      font-size: 10px;
+      line-height: 1.35;
+      color: #444;
+    }
+    .doc-org-contact-line {
+      margin: 0 0 2px;
+    }
     .header-right {
       text-align: right;
       flex: 1;
@@ -206,7 +246,7 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       font-size: 24px;
       font-weight: 700;
       letter-spacing: -0.03em;
-      color: #0a0a0a;
+      color: var(--doc-accent, #0a0a0a);
     }
     .doc-subtitle {
       margin: 6px 0 0;
@@ -215,8 +255,8 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       color: #444;
     }
     .divider {
-      height: 1px;
-      background: #ccc;
+      height: 2px;
+      background: var(--doc-accent, #cccccc);
       margin: 14px 0 18px;
       border: 0;
     }
@@ -401,7 +441,7 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
   <div class="page">
     <header>
       <div class="header-top">
-        <div class="header-left">${logoBlock}</div>
+        <div class="header-left">${brandHeaderHtml}</div>
         <div class="header-right">
           <h1 class="doc-title">Calibration Certificate</h1>
           <p class="doc-subtitle">${escapeHtml(model.templateName)}</p>
@@ -492,7 +532,7 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
     </section>
 
     <p class="footer-note">
-      This document reflects calibration data recorded at the time of service. For archival or regulatory use, retain the signed copy issued by ${escapeHtml(model.companyName)}.
+      This document reflects calibration data recorded at the time of service. For archival or regulatory use, retain the signed copy issued by ${escapeHtml(resolvedBranding.organizationName)}.
     </p>
   </div>
 </body>
@@ -622,6 +662,11 @@ export async function printCertificatePdfHtml(html: string): Promise<Certificate
       message: e instanceof Error ? e.message : String(e),
     }
   }
+}
+
+/** Print any full HTML document (certificates, quotes, POs, work order summaries). Same iframe pipeline as certificates. */
+export async function printHtmlDocument(html: string): Promise<CertificatePrintResult> {
+  return printCertificatePdfHtml(html)
 }
 
 /** Download as HTML for offline printing / PDF conversion (Save as PDF from browser). */

@@ -25,6 +25,10 @@ import { CertificateTabContent } from "@/components/work-orders/certificate-tab-
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useTenant } from "@/lib/tenant-store"
+import {
+  documentBrandingFromTenantWorkspace,
+  pickPreferredDocumentLogoUrl,
+} from "@/lib/organization/document-branding"
 
 type SlotState = {
   templateId: string
@@ -81,8 +85,11 @@ export function CertificateMultiTabContent({
 }: CertificateMultiTabContentProps) {
   const { workspace } = useTenant()
   const workspaceCompanyName = workspace.name?.trim() || "Organization"
-  const workspaceLogoUrl =
-    workspace.documentLogoUrl?.trim() || workspace.logoUrl?.trim() || null
+  const workspaceLogoUrl = pickPreferredDocumentLogoUrl(workspace.documentLogoUrl, workspace.logoUrl)
+  const workspaceDocumentBranding = useMemo(
+    () => documentBrandingFromTenantWorkspace(workspace),
+    [workspace],
+  )
   const { toast } = useToast()
   const orgId = organizationId?.trim() ?? ""
   const [templates, setTemplates] = useState<CalibrationTemplate[]>([])
@@ -371,6 +378,7 @@ export function CertificateMultiTabContent({
                     lastSavedAt={st.savedAt}
                     companyName={workspaceCompanyName}
                     logoUrl={workspaceLogoUrl}
+                    documentBranding={workspaceDocumentBranding}
                     workOrderLabel={getWorkOrderDisplay(workOrder)}
                     customerName={workOrder.customerName}
                     equipmentName={asset.name}

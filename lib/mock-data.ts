@@ -475,6 +475,8 @@ export interface Part {
   unitCost: number
   vendorId?: string | null
   purchaseOrderId?: string | null
+  /** Optional link to org catalog template when this part row originated from the item library. */
+  catalogItemId?: string | null
 }
 
 export interface RepairLog {
@@ -1559,7 +1561,15 @@ export interface AdminQuote {
   workOrderId: string
   /** When linked to a Supabase work order, enables WO-####### display without an extra fetch. */
   workOrderNumber?: number
-  lineItems: { description: string; qty: number; unit: number }[]
+  lineItems: {
+    description: string
+    qty: number
+    unit: number
+    catalog_item_id?: string
+    sku?: string
+    item_type?: string
+    unit_label?: string
+  }[]
   notes: string
   /** Team-only notes (not shown on customer-facing materials). */
   internalNotes?: string
@@ -1737,7 +1747,15 @@ export interface AdminInvoice {
   amount: number
   status: InvoiceStatus
   createdBy: string
-  lineItems: { description: string; qty: number; unit: number }[]
+  lineItems: {
+    description: string
+    qty: number
+    unit: number
+    catalog_item_id?: string
+    sku?: string
+    item_type?: string
+    unit_label?: string
+  }[]
   notes: string
   /** Linked quote UUID from org_invoices.quote_id. */
   quoteId?: string

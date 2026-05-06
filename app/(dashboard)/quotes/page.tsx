@@ -27,6 +27,10 @@ import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/d
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+
+const UUID_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,9 +129,17 @@ function QuotesPageInner() {
   } = useQuotes()
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
+  const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [newQuotePrefillCustomerId, setNewQuotePrefillCustomerId] = useState<string | null>(null)
   const [newQuotePrefillEquipmentId, setNewQuotePrefillEquipmentId] = useState<string | null>(null)
+  const [catalogPrefill, setCatalogPrefill] = useState<{
+    catalogItemId: string
+    name: string
+    description?: string | null
+    unitPrice: number
+    partNumber?: string | null
+  } | null>(null)
 
   function openNewQuoteModal(prefillCustomerId: string | null, prefillEquipmentId: string | null) {
     if (blockCreateIfNotEligible(standardCreateEligibility)) return
@@ -169,10 +181,60 @@ function QuotesPageInner() {
       }
       setNewQuotePrefillCustomerId(cid)
       setNewQuotePrefillEquipmentId(eid)
+      setCatalogPrefill(null)
       setNewModalOpen(true)
       router.replace("/quotes", { scroll: false })
     }
   }, [searchParams, router, standardCreateEligibility])
+
+  useEffect(() => {
+    const catId = searchParams.get("catalogItem")
+    if (!catId || !UUID_PARAM.test(catId)) return
+    if (activeOrgStatus !== "ready" || !activeOrgId) return
+    if (blockCreateIfNotEligible(standardCreateEligibility)) {
+      router.replace("/quotes", { scroll: false })
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/catalog-items/${encodeURIComponent(catId)}`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as {
+        item?: {
+          id: string
+          name: string
+          description?: string | null
+          list_price?: number | null
+          sale_price?: number | null
+          part_number?: string | null
+        }
+      }
+      if (cancelled || !res.ok || !body.item) {
+        router.replace("/quotes", { scroll: false })
+        return
+      }
+      const unit =
+        body.item.sale_price ??
+        body.item.list_price ??
+        0
+      setCatalogPrefill({
+        catalogItemId: body.item.id,
+        name: body.item.name,
+        description: body.item.description ?? null,
+        unitPrice: Number(unit) || 0,
+        partNumber: body.item.part_number ?? null,
+      })
+      setNewQuotePrefillCustomerId(null)
+      setNewQuotePrefillEquipmentId(null)
+      setNewModalOpen(true)
+      router.replace("/quotes", { scroll: false })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, router, activeOrgId, activeOrgStatus, standardCreateEligibility])
 
   /** Stat cards always exclude archived rows (even when browsing “All” or “Archived”). */
   const quotesForStats = useMemo(() => quotes.filter((q) => !q.isArchived), [quotes])
@@ -492,10 +554,12 @@ function QuotesPageInner() {
         open={newModalOpen}
         prefilledCustomerId={newQuotePrefillCustomerId}
         prefilledEquipmentId={newQuotePrefillEquipmentId}
+        prefilledCatalogItem={catalogPrefill}
         onClose={() => {
           setNewModalOpen(false)
           setNewQuotePrefillCustomerId(null)
           setNewQuotePrefillEquipmentId(null)
+          setCatalogPrefill(null)
         }}
         onSuccess={(_id, status) => {
           toast({
