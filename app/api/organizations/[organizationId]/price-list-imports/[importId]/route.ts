@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
 import type { StoredPriceListPayload } from "@/lib/catalog/import-types"
 import { requireOrgCatalogWrite, requireOrgMemberRead } from "@/lib/catalog/require-org-catalog-write"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 
@@ -30,6 +31,8 @@ export async function GET(
     .maybeSingle()
 
   if (error) {
+    const schema = maybeCatalogSchemaErrorResponse(error.message)
+    if (schema) return schema
     return NextResponse.json({ error: "load_failed", message: error.message }, { status: 500 })
   }
   if (!row) {
@@ -76,7 +79,12 @@ export async function PATCH(
     .eq("organization_id", organizationId)
     .maybeSingle()
 
-  if (loadErr || !existing) {
+  if (loadErr) {
+    const schema = maybeCatalogSchemaErrorResponse(loadErr.message)
+    if (schema) return schema
+    return NextResponse.json({ error: "load_failed", message: loadErr.message }, { status: 500 })
+  }
+  if (!existing) {
     return NextResponse.json({ error: "not_found", message: "Import not found." }, { status: 404 })
   }
 
@@ -91,6 +99,8 @@ export async function PATCH(
     .eq("id", importId)
 
   if (upErr) {
+    const schema = maybeCatalogSchemaErrorResponse(upErr.message)
+    if (schema) return schema
     return NextResponse.json({ error: "save_failed", message: upErr.message }, { status: 500 })
   }
 

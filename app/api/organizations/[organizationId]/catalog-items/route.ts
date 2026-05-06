@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOrgMemberRead } from "@/lib/catalog/require-org-catalog-write"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 
@@ -31,6 +32,8 @@ export async function GET(
     .limit(limit)
 
   if (error) {
+    const schema = maybeCatalogSchemaErrorResponse(error.message)
+    if (schema) return schema
     return NextResponse.json({ error: "load_failed", message: error.message }, { status: 500 })
   }
 

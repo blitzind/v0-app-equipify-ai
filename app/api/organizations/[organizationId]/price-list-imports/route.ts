@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/jobs/process-ai-job"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -84,6 +85,8 @@ export async function POST(
     .single()
 
   if (insErr || !inserted?.id) {
+    const schema = maybeCatalogSchemaErrorResponse(insErr?.message)
+    if (schema) return schema
     return NextResponse.json(
       { error: "insert_failed", message: insErr?.message ?? "Could not create import." },
       { status: 500 },

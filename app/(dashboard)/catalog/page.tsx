@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 const CATALOG_MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
@@ -129,6 +130,7 @@ export default function CatalogPage() {
   const [items, setItems] = useState<CatalogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [schemaHint, setSchemaHint] = useState<string | null>(null)
   const [canManageCatalog, setCanManageCatalog] = useState(false)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
 
@@ -146,18 +148,27 @@ export default function CatalogPage() {
     }
     setLoading(true)
     setError(null)
+    setSchemaHint(null)
     try {
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/catalog-items`, {
         cache: "no-store",
       })
-      const body = (await res.json()) as { items?: CatalogRow[]; message?: string; error?: string }
+      const body = (await res.json()) as {
+        items?: CatalogRow[]
+        message?: string
+        error?: string
+        hint?: string
+      }
       if (!res.ok) {
+        const schemaNotReady = body.error === "catalog_schema_not_ready"
+        setSchemaHint(schemaNotReady ? body.hint ?? null : null)
         setError(body.message ?? body.error ?? "Could not load catalog.")
         setItems([])
         return
       }
       setItems(body.items ?? [])
     } catch {
+      setSchemaHint(null)
       setError("Network error.")
       setItems([])
     } finally {
@@ -381,8 +392,18 @@ export default function CatalogPage() {
           Loading catalog…
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
+        <div
+          className={cn(
+            "rounded-xl border px-4 py-3 text-sm",
+            schemaHint
+              ? "border-amber-500/40 bg-amber-500/10 text-foreground"
+              : "border-destructive/30 bg-destructive/5 text-destructive",
+          )}
+        >
+          <p className={cn("font-medium", schemaHint && "text-foreground")}>{error}</p>
+          {schemaHint ? (
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{schemaHint}</p>
+          ) : null}
         </div>
       ) : items.length === 0 ? (
         <Card className="border-dashed">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 
@@ -48,6 +49,8 @@ export async function PATCH(
     .eq("organization_id", organizationId)
 
   if (error) {
+    const schema = maybeCatalogSchemaErrorResponse(error.message)
+    if (schema) return schema
     return NextResponse.json({ error: "update_failed", message: error.message }, { status: 500 })
   }
 

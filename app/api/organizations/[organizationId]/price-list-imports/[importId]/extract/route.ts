@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/jobs/process-ai-job"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -35,7 +36,12 @@ export async function POST(
     .eq("organization_id", organizationId)
     .maybeSingle()
 
-  if (loadErr || !row?.file_url) {
+  if (loadErr) {
+    const schema = maybeCatalogSchemaErrorResponse(loadErr.message)
+    if (schema) return schema
+    return NextResponse.json({ error: "load_failed", message: loadErr.message }, { status: 500 })
+  }
+  if (!row?.file_url) {
     return NextResponse.json({ error: "not_found", message: "Import or stored PDF missing." }, { status: 404 })
   }
 

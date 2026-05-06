@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { findDuplicateCatalogItemId } from "@/lib/catalog/duplicate-find"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
 import { requireOrgCatalogWrite } from "@/lib/catalog/require-org-catalog-write"
+import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
 
@@ -36,7 +37,12 @@ export async function POST(
     .eq("organization_id", organizationId)
     .maybeSingle()
 
-  if (error || !row) {
+  if (error) {
+    const schema = maybeCatalogSchemaErrorResponse(error.message)
+    if (schema) return schema
+    return NextResponse.json({ error: "load_failed", message: error.message }, { status: 500 })
+  }
+  if (!row) {
     return NextResponse.json({ error: "not_found", message: "Import not found." }, { status: 404 })
   }
 
