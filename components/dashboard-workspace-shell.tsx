@@ -1,14 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, type ReactNode } from "react"
-import { cn } from "@/lib/utils"
 import { useWorkspaceAppearance } from "@/lib/workspace-appearance-context"
 
-/**
- * Wraps main workspace (sidebar excluded). Applies Tailwind `dark` variant scope + portal mount target.
- */
+/** Wraps main workspace (sidebar excluded). Ref target for Radix/Vaul portals (`portalContainer`). */
 export function DashboardWorkspaceShell({ children }: { children: ReactNode }) {
-  const { resolved, setPortalContainer } = useWorkspaceAppearance()
+  const { setPortalContainer } = useWorkspaceAppearance()
 
   const ref = useCallback(
     (node: HTMLDivElement | null) => {
@@ -24,10 +21,7 @@ export function DashboardWorkspaceShell({ children }: { children: ReactNode }) {
   return (
     <div
       ref={ref}
-      className={cn(
-        "flex flex-col flex-1 min-w-0 overflow-hidden bg-background text-foreground",
-        resolved === "dark" && "dark",
-      )}
+      className="flex flex-col flex-1 min-w-0 overflow-hidden bg-background text-foreground"
     >
       {children}
     </div>

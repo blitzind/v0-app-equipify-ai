@@ -101,6 +101,15 @@ export function WorkspaceAppearanceProvider({ children }: { children: ReactNode 
     [preference, resolved, setPreference, portalContainer],
   )
 
+  /**
+   * Slide-out drawers (`DrawerViewport` → `createPortal(..., document.body)`) must inherit dark tokens.
+   * Tailwind `dark:` maps to `@custom-variant dark (&:is(.dark *))` — portaled UI is only themed if `.dark`
+   * exists on an ancestor of `document.body`, i.e. `<html>`. Do not scope `.dark` only on an inner shell.
+   */
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", resolved === "dark")
+  }, [resolved])
+
   return (
     <WorkspaceAppearanceContext.Provider value={value}>{children}</WorkspaceAppearanceContext.Provider>
   )
