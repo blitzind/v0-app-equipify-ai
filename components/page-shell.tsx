@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
-  CalendarRange, Store,
+  CalendarRange, Store, Package, Upload,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -95,6 +95,17 @@ const ROUTE_META: Record<string, RouteMeta> = {
     subtitle: "Manage supplier contacts and addresses for purchase orders.",
     icon: Store,
   },
+  "/catalog": {
+    title: "Catalog",
+    subtitle:
+      "Manage reusable items imported from manufacturer price lists for quotes, invoices, work orders, and purchase orders.",
+    icon: Package,
+  },
+  "/catalog/import": {
+    title: "Import price list",
+    subtitle: "Upload a manufacturer or vendor price list to extract catalog lines with AI review.",
+    icon: Upload,
+  },
   "/reports": {
     title: "Reports",
     subtitle: "Track revenue, service performance, asset activity, and technician productivity.",
@@ -131,6 +142,8 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/invoices": "#06B6D4",
   "/purchase-orders": "#06B6D4",
   "/vendors": "#F59E0B",
+  "/catalog": "#D97706",
+  "/catalog/import": "#D97706",
   "/reports": "#6366F1",
   "/portal": "#2563EB",
   "/integrations": "#2563EB",

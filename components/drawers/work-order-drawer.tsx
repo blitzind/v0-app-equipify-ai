@@ -60,6 +60,7 @@ import {
   DrawerToastStack,
   DRAWER_FIELD_CLASS,
   DRAWER_STACKED_MODAL,
+  NESTED_OVER_DRAWER_Z,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -1885,9 +1886,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       </Dialog>
 
       {woSummaryEmailOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !woSummaryEmailBusy && setWoSummaryEmailOpen(false)} />
-          <div className={cn(DRAWER_STACKED_MODAL, "max-w-lg")}>
+          <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-lg")}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Mail className="w-4 h-4 text-primary" /> Email work order summary

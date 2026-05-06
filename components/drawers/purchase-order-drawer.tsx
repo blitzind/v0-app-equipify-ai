@@ -20,6 +20,7 @@ import {
   DrawerToastStack,
   DRAWER_INNER_SCROLL_CANVAS,
   DRAWER_NESTED_CARD,
+  NESTED_OVER_DRAWER_Z,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -910,9 +911,9 @@ export function PurchaseOrderDrawer({
       />
 
       {confirmArchiveOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmArchiveOpen(false)} />
-          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
+          <div className={cn("relative z-[1] rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[color:var(--status-warning)]" />
               <h3 className="text-sm font-semibold text-foreground">Archive Purchase Order?</h3>
@@ -929,9 +930,9 @@ export function PurchaseOrderDrawer({
       )}
 
       {confirmDeleteOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDeleteOpen(false)} />
-          <div className={cn("relative rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
+          <div className={cn("relative z-[1] rounded-xl shadow-2xl w-full max-w-sm p-5 space-y-3", DRAWER_ANCHORED_SURFACE)}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-destructive" />
               <h3 className="text-sm font-semibold text-foreground">Delete Purchase Order?</h3>

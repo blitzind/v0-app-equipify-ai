@@ -485,19 +485,14 @@ export default function ImportPriceListPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1400px]">
-      <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" asChild>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" className="gap-1.5 shrink-0" asChild>
           <Link href="/catalog" aria-label="Back to catalog">
             <ArrowLeft className="h-4 w-4" />
+            Catalog
           </Link>
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Import price list</h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Upload a manufacturer or vendor price list and Equipify will extract equipment, parts, services, and pricing into your item catalog.
-          </p>
-        </div>
       </div>
 
       <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 flex gap-3 text-sm text-foreground">

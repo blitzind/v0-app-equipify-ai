@@ -24,6 +24,7 @@ import {
   DRAWER_FIELD_CLASS,
   DRAWER_NESTED_CARD,
   DRAWER_STACKED_MODAL,
+  NESTED_OVER_DRAWER_Z,
 } from "@/components/detail-drawer"
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
@@ -771,9 +772,9 @@ function EmailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !sending && onClose()} />
-      <div className={cn(DRAWER_STACKED_MODAL, "max-w-lg")}>
+      <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-lg")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Mail className="w-4 h-4 text-primary" />{" "}
@@ -841,9 +842,9 @@ function SmsModal({ invoice, onClose }: { invoice: AdminInvoice; onClose: () => 
   const [msg,   setMsg]   = useState(`Hi, this is ${COMPANY.name}. Invoice ${invoiceLabel} for ${fmtCurrency(invoice.amount)} is due ${fmtDate(invoice.dueDate)}. Pay online: pay.equipify.ai/inv/${invoiceLabel.toLowerCase()}`)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn(DRAWER_STACKED_MODAL, "max-w-md")}>
+      <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-md")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary" /> SMS Invoice to Customer
@@ -884,9 +885,9 @@ function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; o
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10))
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn(DRAWER_STACKED_MODAL, "max-w-md")}>
+      <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-md")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" /> Record Payment

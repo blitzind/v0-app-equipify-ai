@@ -1,19 +1,28 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Loader2, MoreHorizontal, Package, Upload } from "lucide-react"
+import { Loader2, MoreHorizontal, Package, Search, Upload } from "lucide-react"
 import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useAdmin } from "@/lib/admin-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -26,6 +35,18 @@ import { useToast } from "@/hooks/use-toast"
 
 const CATALOG_MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
+const ITEM_TYPES = [
+  "equipment",
+  "part",
+  "accessory",
+  "service",
+  "rental",
+  "option",
+  "other",
+] as const
+
+const ROW_STATUSES = ["active", "inactive", "discontinued", "needs_review"] as const
+
 type CatalogRow = {
   id: string
   manufacturer_name: string | null
@@ -33,6 +54,7 @@ type CatalogRow = {
   item_type: string
   part_number: string
   name: string
+  description: string | null
   list_price: number | null
   cost: number | null
   unit: string
@@ -43,6 +65,19 @@ type CatalogRow = {
   human_verified_at: string | null
   source_file_name: string | null
   created_at: string
+}
+
+function rowVerificationKey(row: CatalogRow): "verified" | "needs_review" | "ai_generated" | "manual" {
+  const label = getCatalogAiStatusLabel({
+    ai_generated: Boolean(row.ai_generated),
+    ai_confidence: row.ai_confidence,
+    confidence_score: row.confidence_score,
+    human_verified_at: row.human_verified_at,
+  })
+  if (label === "verified") return "verified"
+  if (label === "needs_review") return "needs_review"
+  if (label === "ai_generated") return "ai_generated"
+  return "manual"
 }
 
 function CatalogAiIndicator({ row }: { row: CatalogRow }) {
@@ -82,14 +117,26 @@ function CatalogAiIndicator({ row }: { row: CatalogRow }) {
   )
 }
 
+function formatItemType(raw: string): string {
+  if (!raw) return "—"
+  return raw.replace(/_/g, " ")
+}
+
 export default function CatalogPage() {
   const { toast } = useToast()
+  const { isPlatformAdmin } = useAdmin()
   const { organizationId, status } = useActiveOrganization()
   const [items, setItems] = useState<CatalogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [canManageCatalog, setCanManageCatalog] = useState(false)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
+
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [verificationFilter, setVerificationFilter] = useState<string>("all")
+  const [manufacturerFilter, setManufacturerFilter] = useState<string>("all")
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready") {
@@ -129,6 +176,10 @@ export default function CatalogPage() {
     }
     let cancelled = false
     ;(async () => {
+      if (isPlatformAdmin) {
+        if (!cancelled) setCanManageCatalog(true)
+        return
+      }
       const supabase = createBrowserSupabaseClient()
       const {
         data: { user },
@@ -148,7 +199,48 @@ export default function CatalogPage() {
     return () => {
       cancelled = true
     }
-  }, [organizationId, status])
+  }, [organizationId, status, isPlatformAdmin])
+
+  const manufacturers = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of items) {
+      const m = r.manufacturer_name?.trim()
+      if (m) set.add(m)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+  }, [items])
+
+  const filtered = useMemo(() => {
+    let list = [...items]
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter((r) => {
+        const hay = [
+          r.name,
+          r.description ?? "",
+          r.part_number,
+          r.category,
+          r.manufacturer_name ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+        return hay.includes(q)
+      })
+    }
+    if (typeFilter !== "all") {
+      list = list.filter((r) => r.item_type === typeFilter)
+    }
+    if (statusFilter !== "all") {
+      list = list.filter((r) => r.status === statusFilter)
+    }
+    if (verificationFilter !== "all") {
+      list = list.filter((r) => rowVerificationKey(r) === verificationFilter)
+    }
+    if (manufacturerFilter !== "all") {
+      list = list.filter((r) => (r.manufacturer_name ?? "").trim() === manufacturerFilter)
+    }
+    return list
+  }, [items, search, typeFilter, statusFilter, verificationFilter, manufacturerFilter])
 
   const patchVerification = useCallback(
     async (itemId: string, action: "verify" | "needs_review") => {
@@ -201,22 +293,86 @@ export default function CatalogPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold text-foreground">Catalog</h1>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Reusable items imported from manufacturer price lists (quotes, invoices, work orders, and PO line linkage coming next).
-          </p>
+      {/* Toolbar — matches Equipment / list pages */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="flex items-center gap-2 w-full lg:flex-1 lg:max-w-md rounded-md border border-border bg-card px-3 py-1.5 min-w-0">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            placeholder="Search catalog items…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
+          />
         </div>
-        <Button asChild className="gap-2 shrink-0">
-          <Link href="/catalog/import">
-            <Upload className="h-4 w-4" />
-            Import price list
-          </Link>
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Item type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {ITEM_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {formatItemType(t)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {ROW_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {formatItemType(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+            <SelectTrigger className="w-[168px]">
+              <SelectValue placeholder="Verification" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All verification</SelectItem>
+              <SelectItem value="verified">Verified</SelectItem>
+              <SelectItem value="needs_review">Needs review</SelectItem>
+              <SelectItem value="ai_generated">AI (ok)</SelectItem>
+              <SelectItem value="manual">Not AI-sourced</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {manufacturers.length > 0 ? (
+            <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Manufacturer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All manufacturers</SelectItem>
+                {manufacturers.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+
+        <div className="flex justify-end lg:ml-auto shrink-0">
+          <Button asChild className="gap-2 w-full sm:w-auto">
+            <Link href="/catalog/import">
+              <Upload className="h-4 w-4" />
+              Import price list
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -225,93 +381,136 @@ export default function CatalogPage() {
           Loading catalog…
         </div>
       ) : error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-          No catalog items yet.{" "}
-          <Link href="/catalog/import" className="text-primary underline font-medium">
-            Import a price list PDF
-          </Link>
-          .
-        </div>
+        <Card className="border-dashed">
+          <div className="flex flex-col items-center justify-center px-6 py-14 text-center gap-4">
+            <div
+              className="w-12 h-12 rounded-xl border flex items-center justify-center"
+              style={{
+                backgroundColor: "color-mix(in srgb, #D97706 14%, var(--card))",
+                borderColor: "color-mix(in srgb, #D97706 24%, var(--border))",
+              }}
+            >
+              <Package className="w-6 h-6" style={{ color: "#D97706" }} />
+            </div>
+            <div className="space-y-1 max-w-md">
+              <p className="text-sm font-medium text-foreground">No catalog items yet</p>
+              <p className="text-sm text-muted-foreground">
+                Import a manufacturer price list to build your item catalog.
+              </p>
+            </div>
+            <Button asChild className="gap-2">
+              <Link href="/catalog/import">
+                <Upload className="h-4 w-4" />
+                Import price list
+              </Link>
+            </Button>
+          </div>
+        </Card>
       ) : (
-        <div className="rounded-lg border border-border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="ds-table-header-row-subtle">
-                <TableHead>Manufacturer</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Part #</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="text-right">List</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="whitespace-nowrap">Review</TableHead>
-                <TableHead>Source</TableHead>
-                {canManageCatalog ? <TableHead className="w-[44px] pr-2" /> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground max-w-[120px] truncate">
-                    {r.manufacturer_name ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-xs capitalize">{r.item_type}</TableCell>
-                  <TableCell className="max-w-[140px] truncate">{r.category || "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.part_number || "—"}</TableCell>
-                  <TableCell className="max-w-[240px]">
-                    <span className="line-clamp-2">{r.name}</span>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.list_price != null ? `$${Number(r.list_price).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.cost != null ? `$${Number(r.cost).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs capitalize">{r.status}</TableCell>
-                  <TableCell className="align-middle">
-                    <CatalogAiIndicator row={r} />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
-                    {r.source_file_name ?? "—"}
-                  </TableCell>
-                  {canManageCatalog ? (
-                    <TableCell className="pr-2 text-right align-middle">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground"
-                            disabled={verifyingId === r.id}
-                            aria-label="Row actions"
-                          >
-                            {verifyingId === r.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <MoreHorizontal className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => void patchVerification(r.id, "verify")}>
-                            Mark verified
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => void patchVerification(r.id, "needs_review")}>
-                            Mark needs review
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <p className="text-sm text-muted-foreground -mt-1">
+            Showing{" "}
+            <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
+            <span className="font-medium text-foreground">{items.length}</span> items
+          </p>
+          <Card className="overflow-hidden p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="ds-table-header-row-subtle">
+                    <TableHead className="min-w-[200px]">Item / description</TableHead>
+                    <TableHead className="whitespace-nowrap">Part number</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="min-w-[120px]">Manufacturer</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">List price</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Cost</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Verification</TableHead>
+                    {canManageCatalog ? <TableHead className="w-[44px] pr-2" /> : null}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canManageCatalog ? 10 : 9}
+                        className="text-center text-sm text-muted-foreground py-12"
+                      >
+                        No items match your filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="align-top max-w-[280px]">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium text-foreground text-sm line-clamp-2">{r.name || "—"}</span>
+                            {r.description ? (
+                              <span className="text-xs text-muted-foreground line-clamp-2">{r.description}</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs align-top whitespace-nowrap">
+                          {r.part_number || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs capitalize align-top">{formatItemType(r.item_type)}</TableCell>
+                        <TableCell className="max-w-[140px] truncate align-top">{r.category || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground max-w-[160px] truncate align-top">
+                          {r.manufacturer_name ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums align-top whitespace-nowrap">
+                          {r.list_price != null ? `$${Number(r.list_price).toFixed(2)}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums align-top whitespace-nowrap">
+                          {r.cost != null ? `$${Number(r.cost).toFixed(2)}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs capitalize align-top">{r.status}</TableCell>
+                        <TableCell className="align-top">
+                          <CatalogAiIndicator row={r} />
+                        </TableCell>
+                        {canManageCatalog ? (
+                          <TableCell className="pr-2 text-right align-top">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground"
+                                  disabled={verifyingId === r.id}
+                                  aria-label="Row actions"
+                                >
+                                  {verifyingId === r.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => void patchVerification(r.id, "verify")}>
+                                  Mark verified
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => void patchVerification(r.id, "needs_review")}>
+                                  Mark needs review
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        ) : null}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </>
       )}
     </div>
   )

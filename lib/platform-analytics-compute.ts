@@ -18,7 +18,8 @@ type SubRow = {
   discount_expires_at: string | null
 }
 
-function subscriptionDisplayStatus(
+/** Exported for platform admin accounts API KPIs (keep in sync with aggregate analytics). */
+export function subscriptionDisplayStatus(
   sub: { status: string; trial_ends_at: string | null } | null,
   orgArchived: boolean,
 ): "Active" | "Trialing" | "Archived" | "Past Due" | "Canceled" | "Suspended" {

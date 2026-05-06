@@ -60,6 +60,13 @@ export const DRAWER_BACKDROP_Z = "z-[100]"
 /** Sliding panel above backdrop. */
 export const DRAWER_PANEL_Z = "z-[101]"
 
+/**
+ * Hand-rolled `fixed inset-0` modals opened while a `DetailDrawer` is open must use this (or higher),
+ * not ad-hoc `z-[60]` / `z-[80]`, or they paint under {@link DRAWER_PANEL_Z}.
+ * Aligns with `components/ui/dialog` overlay/content (`z-[110]`).
+ */
+export const NESTED_OVER_DRAWER_Z = "z-[110]"
+
 export const DRAWER_TRANSITION_MS = 300
 
 export type DrawerShellWidth = "md" | "lg" | "xl" | "2xl"

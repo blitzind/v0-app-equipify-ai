@@ -25,6 +25,7 @@ import {
   DRAWER_FIELD_CLASS,
   DRAWER_NESTED_CARD,
   DRAWER_STACKED_MODAL,
+  NESTED_OVER_DRAWER_Z,
   type ToastItem,
 } from "@/components/detail-drawer"
 import {
@@ -1092,9 +1093,9 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       </DetailDrawer>
 
       {quoteEmailOpen && quote ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !quoteEmailBusy && setQuoteEmailOpen(false)} />
-          <div className={cn(DRAWER_STACKED_MODAL, "max-w-lg")}>
+          <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-lg")}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Send className="w-4 h-4 text-primary" />{" "}

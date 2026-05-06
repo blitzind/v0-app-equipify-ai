@@ -3,7 +3,7 @@
 create table if not exists public.ai_cache (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references public.organizations (id) on delete cascade,
-  /** Deterministic lookup key (sha256 of org + task + input_hash + model_signature). */
+  -- Deterministic lookup key (sha256 of org + task + input_hash + model_signature).
   storage_key text not null,
   task text not null,
   input_hash text not null,

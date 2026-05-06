@@ -1,5 +1,5 @@
 // ─── Platform Admin shared types & sample audit log ────────────────────────────
-// Live KPIs: GET /api/platform/analytics. Accounts grid: GET /api/platform/accounts.
+// Platform KPI strip: GET /api/platform/accounts (`summary`) + MoM from GET /api/platform/analytics. Accounts grid: same accounts route.
 
 export type PlatformAdminRole = "Super Admin" | "Support Admin" | "Sales Admin" | "Finance Admin"
 
@@ -9,6 +9,17 @@ export type AccountStatus = "Active" | "Trialing" | "Past Due" | "Canceled" | "S
 
 /** Admin table status pill when no subscription row exists (workspace not archived). */
 export type AccountDisplayStatus = AccountStatus | "Unassigned" | "—"
+
+/** Server-computed KPIs from GET /api/platform/accounts (`summary`). */
+export type PlatformAccountsSummary = {
+  totalNonArchivedAccounts: number
+  activeAccounts: number
+  trialingAccounts: number
+  paidMrrCents: number
+  trialPipelineMrrCents: number
+  activeSeats: number
+  newAccountsLast30Days: number
+}
 
 export interface PlatformAccount {
   id: string

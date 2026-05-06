@@ -13,7 +13,9 @@ import { useAdmin } from "@/lib/admin-store"
 import {
   FEATURE_FLAGS, ADMIN_AUDIT_LOG,
   type AccountDisplayStatus,
-  type PlatformAccount, type FeatureFlag,
+  type PlatformAccount,
+  type PlatformAccountsSummary,
+  type FeatureFlag,
 } from "@/lib/admin-data"
 import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
@@ -1822,8 +1824,10 @@ export default function PlatformAdminPage() {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
   const [accountsError, setAccountsError] = useState<string | null>(null)
+  const [accountsSummary, setAccountsSummary] = useState<PlatformAccountsSummary | null>(null)
   const [overview, setOverview] = useState<PlatformAnalyticsResponse | null>(null)
   const [overviewLoading, setOverviewLoading] = useState(true)
+  const [overviewError, setOverviewError] = useState<string | null>(null)
 
   const loadAccounts = useCallback(async () => {
     setAccountsLoading(true)
@@ -1832,17 +1836,28 @@ export default function PlatformAdminPage() {
       const res = await fetch("/api/platform/accounts", { cache: "no-store" })
       const data = (await res.json()) as {
         accounts?: PlatformAccount[]
+        summary?: PlatformAccountsSummary
         message?: string
       }
       if (!res.ok) {
-        setAccountsError(data.message ?? "Could not load accounts.")
+        setAccountsError(
+          typeof data.message === "string" ? data.message : "Could not load accounts.",
+        )
         setAccounts([])
+        setAccountsSummary(null)
         return
       }
-      setAccounts(data.accounts ?? [])
+      const rows = data.accounts ?? []
+      setAccounts(rows)
+      if (data.summary && typeof data.summary === "object") {
+        setAccountsSummary(data.summary)
+      } else {
+        setAccountsSummary(null)
+      }
     } catch {
       setAccountsError("Could not load accounts.")
       setAccounts([])
+      setAccountsSummary(null)
     } finally {
       setAccountsLoading(false)
     }
@@ -1850,16 +1865,28 @@ export default function PlatformAdminPage() {
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true)
+    setOverviewError(null)
     try {
       const res = await fetch("/api/platform/analytics", { cache: "no-store" })
-      const data = (await res.json()) as PlatformAnalyticsResponse & { message?: string; error?: string }
+      const data = (await res.json()) as PlatformAnalyticsResponse & {
+        message?: string
+        error?: string
+      }
       if (!res.ok) {
         setOverview(null)
+        const msg =
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : `Analytics request failed (${res.status})`
+        setOverviewError(msg)
         return
       }
       setOverview(data)
-    } catch {
+    } catch (e) {
       setOverview(null)
+      setOverviewError(e instanceof Error ? e.message : "Could not load analytics.")
     } finally {
       setOverviewLoading(false)
     }
@@ -1869,6 +1896,48 @@ export default function PlatformAdminPage() {
     void loadAccounts()
     void loadOverview()
   }, [loadAccounts, loadOverview])
+
+  const nonArchivedAccounts = useMemo(
+    () => accounts.filter((a) => !a.organizationArchived),
+    [accounts],
+  )
+
+  /** Legacy fallback if an older API omits `summary` (should not happen in production). */
+  const summaryFallback = useMemo((): PlatformAccountsSummary => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+    return {
+      totalNonArchivedAccounts: nonArchivedAccounts.length,
+      activeAccounts: nonArchivedAccounts.filter(
+        (a) => a.subscriptionStatus?.trim().toLowerCase() === "active",
+      ).length,
+      trialingAccounts: nonArchivedAccounts.filter(
+        (a) => a.subscriptionStatus?.trim().toLowerCase() === "trialing",
+      ).length,
+      paidMrrCents: nonArchivedAccounts
+        .filter((a) => a.subscriptionStatus?.trim().toLowerCase() === "active")
+        .reduce((sum, a) => sum + (Number.isFinite(a.mrr) ? a.mrr : 0), 0),
+      trialPipelineMrrCents: nonArchivedAccounts
+        .filter((a) => a.subscriptionStatus?.trim().toLowerCase() === "trialing")
+        .reduce((sum, a) => sum + (Number.isFinite(a.mrr) ? a.mrr : 0), 0),
+      activeSeats: nonArchivedAccounts.reduce(
+        (sum, a) => sum + (Number.isFinite(a.seats) ? a.seats : 0),
+        0,
+      ),
+      newAccountsLast30Days: nonArchivedAccounts.filter((a) => {
+        const t = new Date(a.createdAt).getTime()
+        return Number.isFinite(t) && t >= cutoff
+      }).length,
+    }
+  }, [nonArchivedAccounts])
+
+  const kpi =
+    accountsLoading || accountsError ? null : (accountsSummary ?? summaryFallback)
+
+  const totalAccountsValue = kpi?.totalNonArchivedAccounts
+  const activeSeatsValue = kpi?.activeSeats
+  const paidMrrValue = kpi?.paidMrrCents
+  const trialPipelineValue = kpi?.trialPipelineMrrCents
+  const newAccountsLast30Days = kpi?.newAccountsLast30Days
 
   function handleImpersonate(account: PlatformAccount) {
     startImpersonation(account)
@@ -1915,15 +1984,27 @@ export default function PlatformAdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-8">
-        {/* KPI strip — live aggregates from organizations + organization_subscriptions */}
+        {process.env.NODE_ENV === "development" && overviewError ? (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:text-amber-100">
+            <span className="font-semibold">Analytics (dev):</span> {overviewError} — KPIs above use the
+            accounts API; charts on the Analytics tab may be incomplete.
+          </div>
+        ) : null}
+        {/* KPI strip — server aggregates from GET /api/platform/accounts; MoM from analytics when available */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             icon={Building2}
             label="Total Accounts"
-            value={overviewLoading ? "…" : String(overview?.current.total_accounts ?? "—")}
+            value={
+              accountsError
+                ? "—"
+                : accountsLoading || totalAccountsValue == null
+                  ? "…"
+                  : String(totalAccountsValue)
+            }
             sub={
-              overview?.current
-                ? `${overview.current.active_accounts} active · ${overview.current.trialing_accounts} trialing · ${overview.current.archived_accounts} archived`
+              kpi != null
+                ? `${kpi.activeAccounts} active · ${kpi.trialingAccounts} trialing`
                 : ""
             }
             color="#1d4ed8"
@@ -1931,10 +2012,16 @@ export default function PlatformAdminPage() {
           <StatCard
             icon={DollarSign}
             label="Paid MRR"
-            value={overviewLoading ? "…" : fmt$(overview?.current.paid_mrr_cents ?? 0)}
+            value={
+              accountsError
+                ? "—"
+                : accountsLoading || paidMrrValue == null
+                  ? "…"
+                  : fmt$(paidMrrValue)
+            }
             sub={
               overviewLoading || overview?.mrr_growth_pct == null
-                ? "Stripe status active, after discounts"
+                ? "Active subscriptions after discounts"
                 : `${overview.mrr_growth_pct >= 0 ? "+" : ""}${overview.mrr_growth_pct.toFixed(1)}% MoM (chart)`
             }
             color="#15803d"
@@ -1942,32 +2029,40 @@ export default function PlatformAdminPage() {
           <StatCard
             icon={Ticket}
             label="Trial pipeline"
-            value={overviewLoading ? "…" : fmt$(overview?.current.trial_pipeline_mrr_cents ?? 0)}
-            sub="Estimated if trials convert"
+            value={
+              accountsError
+                ? "—"
+                : accountsLoading || trialPipelineValue == null
+                  ? "…"
+                  : fmt$(trialPipelineValue)
+            }
+            sub="If active trials converted at list − discount"
             color="#b45309"
           />
           <StatCard
             icon={Users}
             label="Active Seats"
-            value={overviewLoading ? "…" : String(overview?.current.active_seats ?? "—")}
-            sub="Members in non-archived orgs"
+            value={
+              accountsError
+                ? "—"
+                : accountsLoading || activeSeatsValue == null
+                  ? "…"
+                  : String(activeSeatsValue)
+            }
+            sub="Active members in non-archived orgs"
             color="#0f766e"
           />
           <StatCard
             icon={TrendingUp}
             label="Account Growth"
             value={
-              overviewLoading
-                ? "…"
-                : overview?.account_growth_pct == null
-                  ? "—"
-                  : `${overview.account_growth_pct >= 0 ? "+" : ""}${overview.account_growth_pct.toFixed(1)}%`
+              accountsError
+                ? "—"
+                : accountsLoading || newAccountsLast30Days == null
+                  ? "…"
+                  : `+${newAccountsLast30Days}`
             }
-            sub={
-              overview?.account_growth_pct == null
-                ? "Needs daily snapshots (~30d)"
-                : "vs accounts ~30d ago"
-            }
+            sub="New accounts last 30 days"
             color="#7c3aed"
           />
         </div>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
+import { NESTED_OVER_DRAWER_Z } from "@/components/detail-drawer"
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<POStatus, { icon: React.ElementType; className: string }> = {
@@ -446,9 +447,9 @@ function PurchaseOrdersPageInner() {
       />
 
       {createOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !creatingNew && setCreateOpen(false)} />
-          <div className="relative bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col">
+          <div className="relative z-[1] bg-background dark:bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-foreground">Create Purchase Order</h3>
               <button

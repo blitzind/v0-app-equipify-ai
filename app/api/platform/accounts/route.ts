@@ -5,7 +5,8 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { trialDaysLeftFromIso } from "@/lib/billing/trial-days-left"
 import { computePlatformAdminMrr } from "@/lib/billing/platform-admin-mrr"
 import { planTierLabelFromDbPlanId } from "@/lib/plan-display"
-import type { AccountDisplayStatus, PlatformAccount } from "@/lib/admin-data"
+import { subscriptionDisplayStatus } from "@/lib/platform-analytics-compute"
+import type { AccountDisplayStatus, PlatformAccount, PlatformAccountsSummary } from "@/lib/admin-data"
 
 function normalizeOrgKey(id: string): string {
   return String(id).trim().toLowerCase()
@@ -127,6 +128,23 @@ export async function GET() {
     seatCount.set(r.organization_id, (seatCount.get(r.organization_id) ?? 0) + 1)
   }
 
+  const { data: woRows, error: woErr } = await admin
+    .from("work_orders")
+    .select("organization_id")
+    .in("organization_id", ids)
+    .is("archived_at", null)
+
+  if (woErr) {
+    return NextResponse.json({ error: "query_failed", message: woErr.message }, { status: 500 })
+  }
+
+  const workOrderCountByOrg = new Map<string, number>()
+  for (const r of woRows ?? []) {
+    const oid = String(r.organization_id ?? "")
+    if (!oid) continue
+    workOrderCountByOrg.set(oid, (workOrderCountByOrg.get(oid) ?? 0) + 1)
+  }
+
   const accounts: PlatformAccount[] = list.map((o) => {
     const orgArchived = o.status === "archived"
     const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
@@ -174,7 +192,7 @@ export async function GET() {
       discountExpiresAt: sub?.discount_expires_at ?? null,
       seats: seatCount.get(o.id) ?? 0,
       equipmentCount: 0,
-      workOrderCount: 0,
+      workOrderCount: workOrderCountByOrg.get(o.id) ?? 0,
       createdAt: o.created_at?.slice(0, 10) ?? "",
       lastActive: (o.updated_at ?? o.created_at)?.slice(0, 10) ?? "",
       trialEndsAt: trialEndsAtIso,
@@ -199,8 +217,48 @@ export async function GET() {
     trialPipelineMrrCents += parts.trialPipelineMrrCents
   }
 
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+  const newSince = Date.now() - thirtyDaysMs
+
+  let totalNonArchivedAccounts = 0
+  let activeAccounts = 0
+  let trialingAccounts = 0
+  let activeSeats = 0
+  let newAccountsLast30Days = 0
+
+  for (const o of list) {
+    const orgArchived = o.status === "archived"
+    const sub = subByOrg.get(normalizeOrgKey(o.id)) ?? null
+    if (!orgArchived) {
+      totalNonArchivedAccounts += 1
+      activeSeats += seatCount.get(o.id) ?? 0
+      const disp = subscriptionDisplayStatus(
+        sub ? { status: String(sub.status ?? ""), trial_ends_at: sub.trial_ends_at ?? null } : null,
+        false,
+      )
+      if (disp === "Active") activeAccounts += 1
+      if (disp === "Trialing") trialingAccounts += 1
+
+      const createdMs = o.created_at ? new Date(o.created_at).getTime() : NaN
+      if (Number.isFinite(createdMs) && createdMs >= newSince) {
+        newAccountsLast30Days += 1
+      }
+    }
+  }
+
+  const summary: PlatformAccountsSummary = {
+    totalNonArchivedAccounts,
+    activeAccounts,
+    trialingAccounts,
+    paidMrrCents,
+    trialPipelineMrrCents,
+    activeSeats,
+    newAccountsLast30Days,
+  }
+
   return NextResponse.json({
     accounts,
+    summary,
     paidMrrCents,
     trialPipelineMrrCents,
     /** @deprecated same as paidMrrCents */
