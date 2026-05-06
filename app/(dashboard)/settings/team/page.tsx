@@ -1,11 +1,11 @@
 "use client"
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTenant } from "@/lib/tenant-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   UserPlus, MoreHorizontal, Check, X, Mail, Shield,
-  UserX, RotateCcw,
+  UserX, RotateCcw, Pencil, Loader2, Camera,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Toaster } from "@/components/ui/toaster"
 import { toast as pushToast } from "@/hooks/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { MEMBERSHIP_ROLES, type MembershipRole } from "@/lib/team/membership"
 
 // ─── Role definitions (DB roles) ──────────────────────────────────────────────
@@ -62,6 +72,7 @@ type TeamMemberRow = {
   email: string | null
   fullName: string | null
   avatarUrl: string | null
+  phone: string | null
 }
 
 type PendingInviteRow = {
@@ -149,6 +160,15 @@ export default function TeamPage() {
   const [removeTarget, setRemoveTarget] = useState<TeamMemberRow | null>(null)
   const [removeSubmitting, setRemoveSubmitting] = useState(false)
 
+  const [editMember, setEditMember] = useState<TeamMemberRow | null>(null)
+  const [editFullName, setEditFullName] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editRole, setEditRole] = useState<MembershipRole>("tech")
+  const [editStatus, setEditStatus] = useState<"active" | "suspended">("active")
+  const [editSaving, setEditSaving] = useState(false)
+  const [editAvatarUploading, setEditAvatarUploading] = useState(false)
+
   const loadTeam = useCallback(async () => {
     if (!organizationId) {
       setMembers([])
@@ -198,6 +218,130 @@ export default function TeamPage() {
     if (currentUserRole === "owner") return [...MEMBERSHIP_ROLES]
     return MEMBERSHIP_ROLES.filter((r) => r !== "owner")
   }, [currentUserRole])
+
+  const editAvatarInputRef = useRef<HTMLInputElement>(null)
+
+  const roleSelectOptions = useMemo((): MembershipRole[] => {
+    if (editMember?.role === "owner" && !assignableRoles.includes("owner")) {
+      return ["owner", ...assignableRoles.filter((r) => r !== "owner")]
+    }
+    return assignableRoles
+  }, [assignableRoles, editMember?.role])
+
+  function openEditMember(m: TeamMemberRow) {
+    setEditMember(m)
+    setEditFullName(m.fullName ?? "")
+    setEditEmail(m.email ?? "")
+    setEditPhone(m.phone ?? "")
+    setEditRole(isMembershipRoleString(m.role) ? m.role : "tech")
+    setEditStatus(m.status === "suspended" ? "suspended" : "active")
+    setMenuOpen(null)
+  }
+
+  async function saveMemberEdit() {
+    if (!editMember || !organizationId) return
+    const emailT = editEmail.trim()
+    if (emailT && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailT)) {
+      pushToast({ title: "Invalid email", description: "Enter a valid email address.", variant: "destructive" })
+      return
+    }
+    setEditSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        organizationId,
+        fullName: editFullName.trim(),
+        email: emailT,
+        phone: editPhone.trim(),
+        role: editRole,
+      }
+      if (editMember.status !== "invited") {
+        body.status = editStatus
+      }
+      const res = await fetch(`/api/team/members/${encodeURIComponent(editMember.userId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = (await res.json()) as { message?: string; error?: string; unchanged?: boolean }
+      if (!res.ok) {
+        pushToast({
+          title: "Could not save member",
+          description: data.message ?? data.error ?? "Request failed.",
+          variant: "destructive",
+        })
+        return
+      }
+      pushToast({
+        title: data.unchanged ? "No changes" : "Member updated",
+        description: data.unchanged ? undefined : "Profile and membership saved.",
+      })
+      setEditMember(null)
+      await loadTeam()
+    } catch {
+      pushToast({ title: "Could not save member", description: "Network error.", variant: "destructive" })
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function uploadMemberAvatar(file: File) {
+    if (!editMember || !organizationId) return
+    setEditAvatarUploading(true)
+    try {
+      const fd = new FormData()
+      fd.set("file", file)
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(editMember.userId)}/avatar`,
+        { method: "POST", body: fd },
+      )
+      const data = (await res.json()) as { message?: string; error?: string; avatarUrl?: string }
+      if (!res.ok) {
+        pushToast({
+          title: "Upload failed",
+          description: data.message ?? data.error ?? "Could not upload photo.",
+          variant: "destructive",
+        })
+        return
+      }
+      pushToast({ title: "Photo updated" })
+      if (data.avatarUrl) {
+        setEditMember((prev) => (prev ? { ...prev, avatarUrl: data.avatarUrl! } : null))
+      }
+      await loadTeam()
+    } catch {
+      pushToast({ title: "Upload failed", description: "Network error.", variant: "destructive" })
+    } finally {
+      setEditAvatarUploading(false)
+    }
+  }
+
+  async function clearMemberAvatar() {
+    if (!editMember || !organizationId) return
+    setEditAvatarUploading(true)
+    try {
+      const res = await fetch(`/api/team/members/${encodeURIComponent(editMember.userId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId, clearAvatar: true }),
+      })
+      const data = (await res.json()) as { message?: string; error?: string }
+      if (!res.ok) {
+        pushToast({
+          title: "Could not remove photo",
+          description: data.message ?? data.error ?? "Request failed.",
+          variant: "destructive",
+        })
+        return
+      }
+      setEditMember((prev) => (prev ? { ...prev, avatarUrl: null } : null))
+      pushToast({ title: "Photo removed" })
+      await loadTeam()
+    } catch {
+      pushToast({ title: "Could not remove photo", description: "Network error.", variant: "destructive" })
+    } finally {
+      setEditAvatarUploading(false)
+    }
+  }
 
   async function sendInvite() {
     if (!inviteEmail.trim() || !organizationId) return
@@ -492,6 +636,15 @@ export default function TeamPage() {
                                 className="absolute right-0 top-9 z-50 w-52 bg-card border border-border rounded-lg shadow-lg overflow-hidden"
                                 onMouseLeave={() => setMenuOpen(null)}
                               >
+                                <button
+                                  type="button"
+                                  onClick={() => openEditMember(user)}
+                                  className={cn(
+                                    "w-full flex items-center gap-2 text-left px-3 py-2 text-sm text-foreground hover:bg-secondary/80 transition-colors cursor-default border-b border-border",
+                                  )}
+                                >
+                                  <Pencil size={12} /> Edit member
+                                </button>
                                 <div className="px-3 py-2 border-b border-border">
                                   <p className="text-xs font-semibold text-muted-foreground">Change role</p>
                                 </div>
@@ -600,6 +753,160 @@ export default function TeamPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={Boolean(editMember)} onOpenChange={(o) => !o && setEditMember(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit member</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Update profile and membership. Owners and admins only; admins cannot modify owners.
+            </DialogDescription>
+          </DialogHeader>
+          {editMember && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-center gap-4">
+                <div className="relative shrink-0">
+                  {editMember.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={editMember.avatarUrl}
+                      alt=""
+                      className="w-14 h-14 rounded-full object-cover border border-border"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold bg-primary text-primary-foreground border border-border">
+                      {initials(editMember)}
+                    </div>
+                  )}
+                  <input
+                    ref={editAvatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      e.target.value = ""
+                      if (f) void uploadMemberAvatar(f)
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit gap-1.5"
+                    disabled={editAvatarUploading || editSaving}
+                    onClick={() => editAvatarInputRef.current?.click()}
+                  >
+                    {editAvatarUploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                    {editMember.avatarUrl ? "Change photo" : "Upload photo"}
+                  </Button>
+                  {editMember.avatarUrl ? (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground underline text-left"
+                      disabled={editAvatarUploading || editSaving}
+                      onClick={() => void clearMemberAvatar()}
+                    >
+                      Remove photo
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="team-edit-name">Full name</Label>
+                <Input
+                  id="team-edit-name"
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  disabled={editSaving}
+                  autoComplete="name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="team-edit-email">Email</Label>
+                <Input
+                  id="team-edit-email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  disabled={editSaving}
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="team-edit-phone">Phone</Label>
+                <Input
+                  id="team-edit-phone"
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  disabled={editSaving}
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="team-edit-role">Role</Label>
+                  <select
+                    id="team-edit-role"
+                    className="input-base w-full"
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as MembershipRole)}
+                    disabled={editSaving}
+                  >
+                    {roleSelectOptions.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="team-edit-status">Status</Label>
+                  {editMember.status === "invited" ? (
+                    <p className="text-xs text-muted-foreground rounded-md border border-border px-3 py-2 bg-secondary/30">
+                      Pending invitation — status updates when they accept.
+                    </p>
+                  ) : (
+                    <select
+                      id="team-edit-status"
+                      className="input-base w-full"
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as "active" | "suspended")}
+                      disabled={editSaving}
+                    >
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setEditMember(null)} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void saveMemberEdit()} disabled={editSaving}>
+              {editSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving…
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(removeTarget)} onOpenChange={(o) => !o && setRemoveTarget(null)}>
         <AlertDialogContent>

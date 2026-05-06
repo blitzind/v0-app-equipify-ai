@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { tabsListDrawerRowClassName, tabsTriggerDrawerRowClassName } from "@/components/ui/tabs-chrome"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateTemplatePreview } from "@/components/certificates/certificate-template-preview"
 import {
@@ -662,17 +663,19 @@ export default function CertificatesPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex flex-nowrap items-end justify-between gap-3 border-b border-border bg-background px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabsList className="h-auto min-h-0 min-w-0 flex flex-1 flex-nowrap overflow-x-auto justify-start gap-0 rounded-none bg-background p-0 border-0 shadow-none">
+          <TabsList
+            className={cn(tabsListDrawerRowClassName, "min-w-0 flex-1 bg-background py-2")}
+          >
             <TabsTrigger
               value="templates"
-              className="inline-flex grow-0 items-center gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              className={tabsTriggerDrawerRowClassName("inline-flex grow-0 items-center gap-2")}
             >
               <FileText className="h-4 w-4 shrink-0" aria-hidden />
               Templates
             </TabsTrigger>
             <TabsTrigger
               value="completed"
-              className="inline-flex grow-0 items-center gap-2 rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              className={tabsTriggerDrawerRowClassName("inline-flex grow-0 items-center gap-2")}
             >
               <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden />
               Completed Certificates

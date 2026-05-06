@@ -60,6 +60,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { tabsListDrawerRowClassName, tabsTriggerDrawerRowClassName } from "@/components/ui/tabs-chrome"
 import {
   Table,
   TableBody,
@@ -1021,25 +1022,13 @@ export function WorkOrderDetailExperience({
   }
 
   const tabListClass = isDrawer
-    ? "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none p-0 border-0 border-b border-border dark:border-[#25324C] shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    ? tabsListDrawerRowClassName
     : "h-auto min-h-10 w-full flex flex-wrap justify-start gap-1 rounded-xl bg-muted/60 p-1 border border-border"
 
   const tabTriggerClass = (extra?: string) =>
-    cn(
-      "text-xs font-medium gap-1.5 whitespace-nowrap shrink-0 transition-colors",
-      isDrawer
-        ? cn(
-            "grow-0 basis-auto",
-            "rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 shadow-none",
-            "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none",
-            "text-muted-foreground hover:text-foreground hover:border-border",
-            extra,
-          )
-        : cn(
-            "data-[state=active]:bg-card rounded-md border border-transparent px-2 py-1",
-            extra,
-          ),
-    )
+    isDrawer
+      ? tabsTriggerDrawerRowClassName(extra)
+      : cn("text-xs font-medium gap-1.5 whitespace-nowrap shrink-0", extra)
 
   const tabScrollWrapClass = isDrawer
     ? "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5 space-y-5"

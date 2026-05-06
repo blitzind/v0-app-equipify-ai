@@ -510,10 +510,10 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
         type="button"
         onClick={() => onChange(!checked)}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors",
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-transparent text-xs font-medium transition-all duration-150",
           checked
-            ? "bg-primary text-primary-foreground border-primary"
-            : "bg-transparent text-muted-foreground border-border hover:bg-muted"
+            ? "bg-primary text-primary-foreground border-primary shadow-sm dark:bg-[#13233F] dark:text-[#6EA8FF] dark:border-[#296cff]/30 dark:shadow-[0_0_18px_-6px_rgba(41,108,255,0.45)]"
+            : "bg-transparent text-muted-foreground border-border hover:bg-muted dark:hover:bg-[#13233F]/25",
         )}
       >
         <Icon className="w-3.5 h-3.5" />

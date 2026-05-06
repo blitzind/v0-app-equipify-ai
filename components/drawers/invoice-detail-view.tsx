@@ -25,6 +25,7 @@ import {
   DRAWER_NESTED_CARD,
   DRAWER_STACKED_MODAL,
 } from "@/components/detail-drawer"
+import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
@@ -1803,8 +1804,10 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
             type="button"
             onClick={() => setShowPreview((p) => !p)}
             className={cn(
-              "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors cursor-pointer",
-              showPreview ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-foreground border-border hover:border-primary/50",
+              "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-transparent transition-all duration-150 cursor-pointer",
+              showPreview
+                ? "bg-primary text-primary-foreground border-primary shadow-sm dark:bg-[#13233F] dark:text-[#6EA8FF] dark:border-[#296cff]/30 dark:shadow-[0_0_18px_-6px_rgba(41,108,255,0.45)]"
+                : "bg-transparent text-foreground border-border hover:border-primary/50 dark:hover:bg-[#13233F]/25",
             )}
           >
             {showPreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1817,8 +1820,10 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 <button key={d.id} type="button" onClick={() => setPreviewDevice(d.id)}
                   title={d.label}
                   className={cn(
-                    "p-1.5 rounded-md border text-xs transition-colors cursor-pointer",
-                    previewDevice === d.id ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground hover:border-primary/30",
+                    "p-1.5 rounded-md border text-xs transition-all duration-150 cursor-pointer",
+                    previewDevice === d.id
+                      ? "bg-primary/10 border-primary text-primary dark:bg-[#13233F] dark:border-[#296cff]/30 dark:text-[#6EA8FF] dark:shadow-[0_0_14px_-6px_rgba(41,108,255,0.4)]"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-primary/30 dark:hover:bg-[#13233F]/25",
                   )}>
                   {d.icon}
                 </button>
@@ -1830,8 +1835,10 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
             type="button"
             onClick={() => setShowSettings((p) => !p)}
             className={cn(
-              "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors cursor-pointer ml-auto",
-              showSettings ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-foreground border-border hover:border-primary/50",
+              "flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-transparent transition-all duration-150 cursor-pointer ml-auto",
+              showSettings
+                ? "bg-primary text-primary-foreground border-primary shadow-sm dark:bg-[#13233F] dark:text-[#6EA8FF] dark:border-[#296cff]/30 dark:shadow-[0_0_18px_-6px_rgba(41,108,255,0.45)]"
+                : "bg-transparent text-foreground border-border hover:border-primary/50 dark:hover:bg-[#13233F]/25",
             )}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1848,7 +1855,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           {/* Tabs — match Work Order drawer (inline underline tabs + icons) */}
           <div
             className={cn(
-              "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none p-0 border-0 border-b border-border dark:border-[#25324C] shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+              "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-1 rounded-none p-0 border-0 border-b border-border dark:border-[#25324C] shrink-0 z-[11] px-5 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             )}
           >
             {TABS.map((tab) => (
@@ -1856,13 +1863,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex items-center text-xs font-medium gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer",
-                  "grow-0 basis-auto rounded-none border-0 border-b-2 bg-transparent px-3 py-2.5 shadow-none",
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
-                )}
+                className={cnDrawerTabButton(activeTab === tab.id)}
               >
                 {tab.icon}
                 {tab.label}

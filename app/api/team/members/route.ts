@@ -73,10 +73,16 @@ export async function GET(request: Request) {
     }
 
     const userIds = [...new Set((memberRows ?? []).map((r) => r.user_id as string))]
-    let profilesById = new Map<string, { id: string; email: string | null; full_name: string | null; avatar_url: string | null }>()
+    let profilesById = new Map<
+      string,
+      { id: string; email: string | null; full_name: string | null; avatar_url: string | null; phone: string | null }
+    >()
 
     if (userIds.length > 0) {
-      const { data: profs, error: pErr } = await admin.from("profiles").select("id, email, full_name, avatar_url").in("id", userIds)
+      const { data: profs, error: pErr } = await admin
+        .from("profiles")
+        .select("id, email, full_name, avatar_url, phone")
+        .in("id", userIds)
       if (!pErr && profs) {
         profilesById = new Map(profs.map((p) => [p.id as string, p as (typeof profs)[number]]))
       }
@@ -94,6 +100,7 @@ export async function GET(request: Request) {
         email: p?.email ?? null,
         fullName: p?.full_name ?? null,
         avatarUrl: p?.avatar_url ?? null,
+        phone: p?.phone ?? null,
       }
     })
 

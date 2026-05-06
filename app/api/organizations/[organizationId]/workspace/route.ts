@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
@@ -212,14 +213,15 @@ export async function PATCH(
     }
   }
 
-  const admin = createServiceRoleClient()
-  if (platformAdmin && !admin) {
+  /** Persist with service role after authz — avoids RLS/session edge cases blocking updates. */
+  let svc
+  try {
+    svc = createServiceRoleSupabaseClient()
+  } catch {
     return jsonError("service_unavailable", "Server configuration error.", 503)
   }
-  const readClient = platformAdmin ? admin! : supabase
-  const writeClient = platformAdmin ? admin! : supabase
 
-  const { data: orgBefore, error: loadErr } = await readClient
+  const { data: orgBefore, error: loadErr } = await svc
     .from("organizations")
     .select("*")
     .eq("id", organizationId)
@@ -243,7 +245,7 @@ export async function PATCH(
     return jsonError("org_archived", "This workspace is archived and cannot be edited.", 403)
   }
 
-  const { data: sub } = await readClient
+  const { data: sub } = await svc
     .from("organization_subscriptions")
     .select("plan_id")
     .eq("organization_id", organizationId)
@@ -362,7 +364,7 @@ export async function PATCH(
 
   patch.updated_at = new Date().toISOString()
 
-  const { data: updated, error: upErr } = await writeClient
+  const { data: updated, error: upErr } = await svc
     .from("organizations")
     .update(patch)
     .eq("id", organizationId)
@@ -386,7 +388,7 @@ export async function PATCH(
       (orgBefore as { logo_url?: string | null }).logo_url,
     )
     if (prevPath) {
-      await writeClient.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
+      await svc.storage.from(ORGANIZATION_LOGOS_BUCKET).remove([prevPath])
     }
   }
 

@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
-import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import {
   loadWorkOrderDetailForOrg,
   type WorkOrderDocumentItem,
@@ -824,11 +823,6 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
         postCompletionActions={postCompletionActions}
         onInvoicePlaceholder={() =>
           handleCreateInvoiceAction()
-        }
-        leading={
-          <p className="text-[10px] text-muted-foreground font-mono">
-            {getWorkOrderDisplay(workOrder)}
-          </p>
         }
       />
 

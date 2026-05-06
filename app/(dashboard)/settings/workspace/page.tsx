@@ -132,6 +132,29 @@ export default function WorkspacePage() {
     [dispatch],
   )
 
+  const refetchWorkspace = useCallback(async (): Promise<boolean> => {
+    if (!organizationId) return false
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace`, {
+        cache: "no-store",
+      })
+      const data = (await res.json()) as {
+        organization?: WorkspaceApiOrganization
+        brandingAllowed?: boolean
+        canEdit?: boolean
+        planId?: PlanId
+      }
+      if (!res.ok || !data.organization) return false
+      setBrandingAllowed(Boolean(data.brandingAllowed))
+      setCanEdit(Boolean(data.canEdit))
+      setPlanId(data.planId ?? "solo")
+      applyOrganization(data.organization)
+      return true
+    } catch {
+      return false
+    }
+  }, [organizationId, applyOrganization])
+
   useEffect(() => {
     if (status !== "ready") return
     if (!organizationId) {
@@ -289,8 +312,17 @@ export default function WorkspacePage() {
         })
         return
       }
-      if (data.organization) {
+      const synced = await refetchWorkspace()
+      if (!synced && data.organization) {
         applyOrganization(data.organization)
+      }
+      if (!synced && !data.organization) {
+        toast({
+          variant: "destructive",
+          title: "Saved but could not refresh",
+          description: "Reload the page to confirm your changes.",
+        })
+        return
       }
       toast({ title: "Settings saved", description: "Workspace details were updated." })
     } catch {
@@ -329,6 +361,7 @@ export default function WorkspacePage() {
         setLogoUrl(data.logoUrl)
         dispatch({ type: "SET_LOGO", payload: data.logoUrl })
       }
+      await refetchWorkspace()
       toast({ title: "Logo updated" })
     } catch {
       toast({ variant: "destructive", title: "Upload failed", description: "Network error." })
@@ -355,11 +388,14 @@ export default function WorkspacePage() {
         })
         return
       }
-      if (data.organization) {
-        applyOrganization(data.organization)
-      } else {
-        setLogoUrl("")
-        dispatch({ type: "SET_LOGO", payload: "" })
+      const synced = await refetchWorkspace()
+      if (!synced) {
+        if (data.organization) {
+          applyOrganization(data.organization)
+        } else {
+          setLogoUrl("")
+          dispatch({ type: "SET_LOGO", payload: "" })
+        }
       }
       toast({ title: "Logo removed" })
     } catch {

@@ -83,6 +83,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { tabsListDrawerRowClassName, tabsTriggerDrawerRowClassName } from "@/components/ui/tabs-chrome"
 import {
   Table,
   TableBody,
@@ -617,7 +618,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
           onValueChange={setDetailSheetTab}
           className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden"
         >
-          <TabsList className="h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-0 rounded-none border-0 border-b border-border dark:border-[#25324C] p-0 shrink-0 z-[11] px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className={tabsListDrawerRowClassName}>
             {[
               { value: "services",      label: "Services" },
               { value: "work_orders",   label: "Work Orders" },
@@ -625,16 +626,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               { value: "log",           label: "Notification Log" },
               { value: "settings",      label: "Settings" },
             ].map(({ value, label }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className={cn(
-                  "grow-0 basis-auto rounded-none border-0 border-b-2 border-transparent bg-transparent px-3 py-2.5 shadow-none outline-none",
-                  "text-xs font-medium whitespace-nowrap shrink-0 transition-colors",
-                  "text-muted-foreground hover:text-foreground hover:border-border",
-                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none",
-                )}
-              >
+              <TabsTrigger key={value} value={value} className={tabsTriggerDrawerRowClassName()}>
                 {label}
               </TabsTrigger>
             ))}

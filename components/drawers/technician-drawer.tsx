@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
+import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import type { TechSkill, TechStatus } from "@/lib/mock-data"
 import {
   ALL_REGIONS,
@@ -1417,16 +1418,13 @@ export function TechnicianDrawer({
           </div>
         </div>
 
-        <div className="flex gap-0 border-b border-border shrink-0 px-2 overflow-x-auto">
+        <div className="flex gap-1 border-b border-border shrink-0 px-2 py-2 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={cn(
-                "capitalize text-sm py-3 px-2.5 border-b-2 font-medium transition-colors whitespace-nowrap cursor-pointer",
-                tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
+              className={cnDrawerTabButton(tab === t, "capitalize text-sm py-3 px-2.5 font-medium")}
             >
               {t === "notes" ? (
                 <span className="flex items-center gap-1">

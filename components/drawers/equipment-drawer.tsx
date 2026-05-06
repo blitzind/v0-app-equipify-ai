@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { rowIsArchived } from "@/lib/archive-scope"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -1013,7 +1014,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
           {!editing && (
             <div className="shrink-0 border-b border-border z-[11] dark:border-[#25324C]">
-              <div className="flex min-w-0 gap-0 overflow-x-auto scrollbar-none px-5">
+              <div className="flex min-w-0 gap-1 overflow-x-auto scrollbar-none px-5 py-2">
                 {TABS.map((tab) => {
                   const Icon = tab.icon
                   const isActive = activeTab === tab.id
@@ -1022,12 +1023,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors shrink-0",
-                        isActive
-                          ? "border-primary text-primary"
-                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
-                      )}
+                      className={cnDrawerTabButton(isActive)}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       {tab.label}

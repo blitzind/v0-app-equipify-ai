@@ -4,14 +4,23 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { countActiveOwners, isMembershipRole, type MembershipRole } from "@/lib/team/membership"
 import { insertTeamAuditEvent } from "@/lib/team-audit"
+import { removeAvatarObjectIfInBucket } from "@/lib/profile/avatar-storage"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 type PatchBody = {
   organizationId?: string
   role?: string
   status?: string
+  /** Profile — updated via service role on `profiles` */
+  fullName?: string | null
+  email?: string | null
+  phone?: string | null
+  /** Remove avatar image from storage and clear `profiles.avatar_url` */
+  clearAvatar?: boolean
 }
 
 function jsonError(code: string, message: string, status: number) {
@@ -53,8 +62,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
   const roleRaw = typeof body.role === "string" ? body.role.trim().toLowerCase() : undefined
   const statusRaw = typeof body.status === "string" ? body.status.trim().toLowerCase() : undefined
 
-  if (roleRaw === undefined && statusRaw === undefined) {
-    return jsonError("invalid_body", "Provide role and/or status.", 400)
+  const hasFullName = "fullName" in body
+  const hasEmail = "email" in body
+  const hasPhone = "phone" in body
+  const clearAvatar = body.clearAvatar === true
+
+  const fullNameVal = hasFullName && typeof body.fullName === "string" ? body.fullName.trim() : undefined
+  const emailVal = hasEmail && typeof body.email === "string" ? body.email.trim().toLowerCase() : undefined
+  const phoneVal = hasPhone && typeof body.phone === "string" ? body.phone.trim() : undefined
+
+  const hasProfileFields = hasFullName || hasEmail || hasPhone || clearAvatar
+
+  if (roleRaw === undefined && statusRaw === undefined && !hasProfileFields) {
+    return jsonError("invalid_body", "Provide role, status, profile fields, or clearAvatar.", 400)
   }
 
   if (roleRaw !== undefined && !isMembershipRole(roleRaw)) {
@@ -63,6 +83,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
   if (statusRaw !== undefined && statusRaw !== "active" && statusRaw !== "suspended") {
     return jsonError("invalid_status", "Status must be active or suspended.", 400)
+  }
+
+  if (hasEmail && emailVal !== undefined && emailVal.length > 0 && !EMAIL_RE.test(emailVal)) {
+    return jsonError("invalid_email", "Enter a valid email address.", 400)
+  }
+
+  if (hasFullName && fullNameVal !== undefined && fullNameVal.length > 200) {
+    return jsonError("invalid_full_name", "Full name must be at most 200 characters.", 400)
+  }
+
+  if (hasPhone && phoneVal !== undefined && phoneVal.length > 64) {
+    return jsonError("invalid_phone", "Phone must be at most 64 characters.", 400)
   }
 
   const supabase = await createServerSupabaseClient()
@@ -142,50 +174,92 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     patch.status = newStatus
   }
 
-  if (Object.keys(patch).length === 0) {
+  const membershipChanged = Object.keys(patch).length > 0
+
+  if (membershipChanged) {
+    const client = platformAdmin ? admin : supabase
+    const { error: upErr } = await client
+      .from("organization_members")
+      .update(patch)
+      .eq("organization_id", organizationId)
+      .eq("user_id", targetUserId)
+
+    if (upErr) {
+      return jsonError("update_failed", upErr.message, 400)
+    }
+
+    if (patch.role !== undefined) {
+      await insertTeamAuditEvent({
+        organizationId,
+        action: "member_role_changed",
+        actorUserId: user.id,
+        recordType: "organization_member",
+        recordId: `${organizationId}:${targetUserId}`,
+        metadata: { userId: targetUserId, fromRole: targetRole, toRole: patch.role },
+      })
+    }
+    if (patch.status === "suspended") {
+      await insertTeamAuditEvent({
+        organizationId,
+        action: "member_suspended",
+        actorUserId: user.id,
+        recordType: "organization_member",
+        recordId: `${organizationId}:${targetUserId}`,
+        metadata: { userId: targetUserId },
+      })
+    }
+    if (patch.status === "active" && targetStatus === "suspended") {
+      await insertTeamAuditEvent({
+        organizationId,
+        action: "member_reactivated",
+        actorUserId: user.id,
+        recordType: "organization_member",
+        recordId: `${organizationId}:${targetUserId}`,
+        metadata: { userId: targetUserId },
+      })
+    }
+  }
+
+  let wroteProfile = false
+  if (hasProfileFields) {
+    const svc = createServiceRoleSupabaseClient()
+    const profilePatch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (clearAvatar) {
+      const { data: profBefore } = await svc.from("profiles").select("avatar_url").eq("id", targetUserId).maybeSingle()
+      await removeAvatarObjectIfInBucket(svc, profBefore?.avatar_url as string | null | undefined)
+      profilePatch.avatar_url = null
+    }
+
+    if (hasFullName) profilePatch.full_name = fullNameVal || null
+    if (hasPhone) profilePatch.phone = phoneVal || null
+
+    if (hasEmail && emailVal !== undefined) {
+      if (!emailVal) {
+        return jsonError("invalid_email", "Email cannot be empty.", 400)
+      }
+      const { data: curProf } = await svc.from("profiles").select("email").eq("id", targetUserId).maybeSingle()
+      const curEm = ((curProf?.email as string | null) ?? "").trim().toLowerCase()
+      if (emailVal !== curEm) {
+        const { error: authErr } = await svc.auth.admin.updateUserById(targetUserId, { email: emailVal })
+        if (authErr) {
+          return jsonError("email_update_failed", authErr.message, 400)
+        }
+      }
+      profilePatch.email = emailVal
+    }
+
+    const { error: pErr } = await svc.from("profiles").update(profilePatch).eq("id", targetUserId)
+    if (pErr) {
+      return jsonError("profile_update_failed", pErr.message, 400)
+    }
+    wroteProfile = true
+  }
+
+  if (!membershipChanged && !wroteProfile) {
     return NextResponse.json({ ok: true, unchanged: true })
-  }
-
-  const client = platformAdmin ? admin : supabase
-  const { error: upErr } = await client
-    .from("organization_members")
-    .update(patch)
-    .eq("organization_id", organizationId)
-    .eq("user_id", targetUserId)
-
-  if (upErr) {
-    return jsonError("update_failed", upErr.message, 400)
-  }
-
-  if (patch.role !== undefined) {
-    await insertTeamAuditEvent({
-      organizationId,
-      action: "member_role_changed",
-      actorUserId: user.id,
-      recordType: "organization_member",
-      recordId: `${organizationId}:${targetUserId}`,
-      metadata: { userId: targetUserId, fromRole: targetRole, toRole: patch.role },
-    })
-  }
-  if (patch.status === "suspended") {
-    await insertTeamAuditEvent({
-      organizationId,
-      action: "member_suspended",
-      actorUserId: user.id,
-      recordType: "organization_member",
-      recordId: `${organizationId}:${targetUserId}`,
-      metadata: { userId: targetUserId },
-    })
-  }
-  if (patch.status === "active" && targetStatus === "suspended") {
-    await insertTeamAuditEvent({
-      organizationId,
-      action: "member_reactivated",
-      actorUserId: user.id,
-      recordType: "organization_member",
-      recordId: `${organizationId}:${targetUserId}`,
-      metadata: { userId: targetUserId },
-    })
   }
 
   return NextResponse.json({ ok: true })
