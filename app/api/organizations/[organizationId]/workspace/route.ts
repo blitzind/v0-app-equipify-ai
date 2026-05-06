@@ -9,6 +9,7 @@ import {
   ORGANIZATION_LOGOS_BUCKET,
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
+import { serializeWorkspaceOrganization } from "@/lib/organization/workspace-org-serialize"
 
 export const runtime = "nodejs"
 
@@ -27,41 +28,9 @@ function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ error: code, message }, { status })
 }
 
-/** Built from `organizations.*` so loads succeed even if workspace migrations are behind (missing columns). */
-function serializeOrg(row: Record<string, unknown>) {
-  const wlRaw = row.white_label_settings
-  const whiteLabelSettings =
-    wlRaw && typeof wlRaw === "object" && !Array.isArray(wlRaw)
-      ? (wlRaw as Record<string, unknown>)
-      : {}
-  const createdAt =
-    row.created_at != null ? String(row.created_at as string | number | Date) : null
-  return {
-    id: String(row.id ?? ""),
-    name: String(row.name ?? ""),
-    slug: String(row.slug ?? ""),
-    status: String(row.status ?? ""),
-    createdAt,
-    companyEmail: row.company_email != null ? String(row.company_email) : "",
-    companyPhone: row.company_phone != null ? String(row.company_phone) : "",
-    companyWebsite: row.company_website != null ? String(row.company_website) : "",
-    companyAddress: row.company_address != null ? String(row.company_address) : "",
-    timezone: row.timezone != null ? String(row.timezone) : "America/New_York",
-    dateFormat: row.date_format != null ? String(row.date_format) : "MM/DD/YYYY",
-    currency: row.currency != null ? String(row.currency) : "USD",
-    logoUrl: row.logo_url != null ? String(row.logo_url) : "",
-    documentLogoUrl:
-      row.document_logo_url != null ? String(row.document_logo_url) : "",
-    primaryColor: row.primary_color != null ? String(row.primary_color) : "#2563eb",
-    secondaryBrandColor:
-      row.secondary_brand_color != null ? String(row.secondary_brand_color) : "",
-    whiteLabelSettings,
-  }
-}
-
 function logWorkspaceDev(context: string, payload: Record<string, unknown>) {
   if (process.env.NODE_ENV === "development") {
-    console.error(`[workspace API] ${context}`, payload)
+    console.info(`[workspace API] ${context}`, payload)
   }
 }
 
@@ -155,7 +124,7 @@ export async function GET(
   const canEdit = platformAdmin || memberRole === "owner" || memberRole === "admin"
 
   return NextResponse.json({
-    organization: serializeOrg(org),
+    organization: serializeWorkspaceOrganization(org),
     planId,
     brandingAllowed: planAllowsBranding(planId),
     canEdit,
@@ -397,7 +366,7 @@ export async function PATCH(
     return NextResponse.json({
       ok: true,
       unchanged: true,
-      organization: serializeOrg(orgBefore as Record<string, unknown>),
+      organization: serializeWorkspaceOrganization(orgBefore as Record<string, unknown>),
       planId,
       brandingAllowed: brandingOk,
     })
@@ -424,6 +393,14 @@ export async function PATCH(
     return jsonError("update_failed", upErr.message, 400)
   }
 
+  const serialized = serializeWorkspaceOrganization(updated as Record<string, unknown>)
+  logWorkspaceDev("PATCH db update ok", {
+    organizationId,
+    patchKeys: Object.keys(patch),
+    logoUrl: serialized.logoUrl,
+    documentLogoUrl: serialized.documentLogoUrl,
+  })
+
   if (body.logoUrl === null) {
     const prevPath = pathFromOrganizationLogoPublicUrl(
       (orgBefore as { logo_url?: string | null }).logo_url,
@@ -444,7 +421,7 @@ export async function PATCH(
 
   return NextResponse.json({
     ok: true,
-    organization: serializeOrg(updated as Record<string, unknown>),
+    organization: serialized,
     planId,
     brandingAllowed: brandingOk,
   })

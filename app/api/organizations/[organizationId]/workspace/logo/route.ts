@@ -9,6 +9,7 @@ import {
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
 import { processAppBrandingSquare } from "@/lib/organization/process-logos"
+import { serializeWorkspaceOrganization } from "@/lib/organization/workspace-org-serialize"
 
 export const runtime = "nodejs"
 
@@ -181,7 +182,7 @@ export async function POST(
     .from("organizations")
     .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
     .eq("id", organizationId)
-    .select("id, logo_url")
+    .select("*")
     .single()
 
   if (dbErr || !updatedOrg) {
@@ -202,13 +203,21 @@ export async function POST(
     }
   }
 
+  const serialized = serializeWorkspaceOrganization(updatedOrg as Record<string, unknown>)
+
   devLogo("upload_complete", {
     organizationId,
     userId: user.id,
     storagePath: path,
-    logoUrl: publicUrl,
-    dbRowId: (updatedOrg as { id?: string }).id,
+    logoUrl: serialized.logoUrl,
+    documentLogoUrl: serialized.documentLogoUrl,
+    dbRowId: serialized.id,
   })
 
-  return NextResponse.json({ ok: true, logoUrl: publicUrl })
+  return NextResponse.json({
+    ok: true,
+    logoUrl: publicUrl,
+    documentLogoUrl: serialized.documentLogoUrl,
+    organization: serialized,
+  })
 }

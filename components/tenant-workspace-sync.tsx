@@ -23,19 +23,45 @@ export function TenantWorkspaceSync() {
     let cancelled = false
 
     const run = async () => {
+      const subscriptionUrl = `/api/session/organization-subscription?organizationId=${encodeURIComponent(organizationId)}`
+      const workspaceUrl = `/api/organizations/${encodeURIComponent(organizationId)}/workspace`
+
       let organizationSubscription: {
         planId: PlanId
         status: string
         intendedPlanId: string | null
       } | null = null
 
+      let workspacePayload: {
+        organization?: {
+          name: string
+          slug: string
+          companyEmail: string
+          companyPhone: string
+          companyWebsite: string
+          companyAddress: string
+          timezone: string
+          dateFormat: string
+          currency: string
+          logoUrl: string
+          documentLogoUrl: string
+          primaryColor: string
+          secondaryBrandColor: string
+          whiteLabelSettings: Record<string, unknown>
+        }
+      } | null = null
+
+      let workspaceStatus: number | null = null
+
       try {
-        const res = await fetch(
-          `/api/session/organization-subscription?organizationId=${encodeURIComponent(organizationId)}`,
-          { cache: "no-store" },
-        )
-        if (res.ok) {
-          const body = (await res.json()) as {
+        const [subRes, wRes] = await Promise.all([
+          fetch(subscriptionUrl, { cache: "no-store" }),
+          fetch(workspaceUrl, { cache: "no-store" }),
+        ])
+        workspaceStatus = wRes.status
+
+        if (subRes.ok) {
+          const body = (await subRes.json()) as {
             subscription?: {
               plan_id?: string | null
               status?: string | null
@@ -52,6 +78,10 @@ export function TenantWorkspaceSync() {
           } else {
             organizationSubscription = null
           }
+        }
+
+        if (wRes.ok) {
+          workspacePayload = (await wRes.json()) as typeof workspacePayload
         }
       } catch {
         organizationSubscription = null
@@ -73,71 +103,60 @@ export function TenantWorkspaceSync() {
         },
       })
 
-      try {
-        const wRes = await fetch(
-          `/api/organizations/${encodeURIComponent(organizationId)}/workspace`,
-          { cache: "no-store" },
-        )
-        if (!wRes.ok) return
-        const wBody = (await wRes.json()) as {
-          organization?: {
-            name: string
-            slug: string
-            companyEmail: string
-            companyPhone: string
-            companyWebsite: string
-            companyAddress: string
-            timezone: string
-            dateFormat: string
-            currency: string
-            logoUrl: string
-            documentLogoUrl: string
-            primaryColor: string
-            secondaryBrandColor: string
-            whiteLabelSettings: Record<string, unknown>
-          }
-        }
-        const o = wBody.organization
-        if (!o || cancelled) return
+      const o = workspacePayload?.organization
+      if (!wResOk(workspaceStatus) || !o) {
         if (process.env.NODE_ENV === "development") {
-          console.error("[tenant-workspace-sync] HYDRATE_ORGANIZATION_PROFILE", {
+          console.warn("[tenant-workspace-sync] workspace GET missing or failed", {
             organizationId,
-            logoUrl: o.logoUrl,
-            documentLogoUrl: o.documentLogoUrl,
+            status: workspaceStatus,
           })
         }
-        dispatch({
-          type: "HYDRATE_ORGANIZATION_PROFILE",
-          payload: {
-            name: o.name,
-            slug: o.slug,
-            companyEmail: o.companyEmail,
-            companyPhone: o.companyPhone,
-            companyWebsite: o.companyWebsite,
-            companyAddress: o.companyAddress,
-            timezone: o.timezone,
-            dateFormat: o.dateFormat,
-            currency: o.currency,
-            logoUrl: o.logoUrl,
-            documentLogoUrl: o.documentLogoUrl ?? "",
-            primaryColor: o.primaryColor,
-            secondaryBrandColor: o.secondaryBrandColor ?? "",
-            whiteLabelSettings:
-              o.whiteLabelSettings && typeof o.whiteLabelSettings === "object" && !Array.isArray(o.whiteLabelSettings)
-                ? o.whiteLabelSettings
-                : {},
-          },
-        })
-      } catch {
-        /* profile optional — subscription sync still applied */
+        return
       }
+
+      if (cancelled) return
+      if (process.env.NODE_ENV === "development") {
+        console.info("[tenant-workspace-sync] HYDRATE_ORGANIZATION_PROFILE", {
+          organizationId,
+          logoUrl: o.logoUrl,
+          documentLogoUrl: o.documentLogoUrl,
+        })
+      }
+      dispatch({
+        type: "HYDRATE_ORGANIZATION_PROFILE",
+        payload: {
+          name: o.name,
+          slug: o.slug,
+          companyEmail: o.companyEmail,
+          companyPhone: o.companyPhone,
+          companyWebsite: o.companyWebsite,
+          companyAddress: o.companyAddress,
+          timezone: o.timezone,
+          dateFormat: o.dateFormat,
+          currency: o.currency,
+          logoUrl: o.logoUrl,
+          documentLogoUrl: o.documentLogoUrl ?? "",
+          primaryColor: o.primaryColor,
+          secondaryBrandColor: o.secondaryBrandColor ?? "",
+          whiteLabelSettings:
+            o.whiteLabelSettings && typeof o.whiteLabelSettings === "object" && !Array.isArray(o.whiteLabelSettings)
+              ? o.whiteLabelSettings
+              : {},
+        },
+      })
     }
 
     void run()
     return () => {
       cancelled = true
     }
+    // workspace.name is only a fallback when organizationName is empty; omitting it avoids re-sync loops after HYDRATE.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [status, organizationId, organizationSlug, organizationName, dispatch])
 
   return null
+}
+
+function wResOk(status: number | null): status is number {
+  return typeof status === "number" && status >= 200 && status < 300
 }

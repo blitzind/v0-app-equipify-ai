@@ -9,6 +9,7 @@ import {
   pathFromOrganizationLogoPublicUrl,
 } from "@/lib/organization/logo-storage"
 import { processDocumentLogoRaster } from "@/lib/organization/process-logos"
+import { serializeWorkspaceOrganization } from "@/lib/organization/workspace-org-serialize"
 
 export const runtime = "nodejs"
 
@@ -30,7 +31,7 @@ function logDocLogoRoute(context: string, payload: Record<string, unknown>) {
 
 function devDocLogo(context: string, payload: Record<string, unknown>) {
   if (process.env.NODE_ENV === "development") {
-    console.error(`[workspace/document-logo] ${context}`, payload)
+    console.info(`[workspace/document-logo] ${context}`, payload)
   }
 }
 
@@ -181,7 +182,7 @@ export async function POST(
     .from("organizations")
     .update({ document_logo_url: publicUrl, updated_at: new Date().toISOString() })
     .eq("id", organizationId)
-    .select("id, document_logo_url")
+    .select("*")
     .single()
 
   if (dbErr || !updatedOrg) {
@@ -206,13 +207,21 @@ export async function POST(
     }
   }
 
+  const serialized = serializeWorkspaceOrganization(updatedOrg as Record<string, unknown>)
+
   devDocLogo("upload_complete", {
     organizationId,
     userId: user.id,
     storagePath: path,
-    documentLogoUrl: publicUrl,
-    dbRowId: (updatedOrg as { id?: string }).id,
+    logoUrl: serialized.logoUrl,
+    documentLogoUrl: serialized.documentLogoUrl,
+    dbRowId: serialized.id,
   })
 
-  return NextResponse.json({ ok: true, documentLogoUrl: publicUrl })
+  return NextResponse.json({
+    ok: true,
+    logoUrl: serialized.logoUrl,
+    documentLogoUrl: publicUrl,
+    organization: serialized,
+  })
 }

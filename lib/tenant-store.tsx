@@ -116,6 +116,13 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
       const sub = action.payload.organizationSubscription
       const slug = action.payload.slug
       const sameOrg = slug.length > 0 && state.workspace.slug === slug
+      /** When the active org slug changed, do not keep another org's branding until HYDRATE runs. */
+      const clearedBranding = {
+        logoUrl: "",
+        documentLogoUrl: "",
+        secondaryBrandColor: "",
+        whiteLabelSettings: {} as Record<string, unknown>,
+      }
       return {
         ...state,
         workspace: {
@@ -128,7 +135,7 @@ function reducer(state: TenantState, action: TenantAction): TenantState {
                 secondaryBrandColor: state.workspace.secondaryBrandColor,
                 whiteLabelSettings: state.workspace.whiteLabelSettings,
               }
-            : {}),
+            : clearedBranding),
           name: action.payload.displayName,
           slug,
           organizationSubscription: sub,

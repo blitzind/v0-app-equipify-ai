@@ -51,6 +51,7 @@ function SettingCard({
 }
 
 type WorkspaceApiOrganization = {
+  id?: string
   name: string
   slug: string
   /** ISO timestamp when present on the row */
@@ -165,7 +166,7 @@ export default function WorkspacePage() {
       }
       if (!res.ok || !data.organization) return false
       if (process.env.NODE_ENV === "development") {
-        console.error("[workspace settings] GET workspace (refetch)", {
+        console.info("[workspace settings] GET workspace (refetch)", {
           organizationId,
           logoUrl: data.organization.logoUrl,
           documentLogoUrl: data.organization.documentLogoUrl,
@@ -208,7 +209,7 @@ export default function WorkspacePage() {
         } catch (parseErr) {
           const detail = `Invalid JSON response (${res.status})`
           if (process.env.NODE_ENV === "development") {
-            console.error("[workspace settings] Failed to parse GET response", {
+            console.info("[workspace settings] Failed to parse GET response", {
               organizationId,
               status: res.status,
               parseErr,
@@ -235,7 +236,7 @@ export default function WorkspacePage() {
                 : `Request failed (${res.status})`
           setLoadErrorDetail(detail)
           if (process.env.NODE_ENV === "development") {
-            console.error("[workspace settings] GET /workspace failed", {
+            console.info("[workspace settings] GET /workspace failed", {
               organizationId,
               status: res.status,
               error: data.error,
@@ -254,7 +255,7 @@ export default function WorkspacePage() {
           const detail = "Response missing organization payload."
           setLoadErrorDetail(detail)
           if (process.env.NODE_ENV === "development") {
-            console.error("[workspace settings] Missing organization in response", { organizationId, data })
+            console.info("[workspace settings] Missing organization in response", { organizationId, data })
           }
           setLoadState("error")
           toast({
@@ -274,7 +275,7 @@ export default function WorkspacePage() {
           const detail = e instanceof Error ? e.message : "Network error."
           setLoadErrorDetail(detail)
           if (process.env.NODE_ENV === "development") {
-            console.error("[workspace settings] GET failed", { organizationId, error: e })
+            console.info("[workspace settings] GET failed", { organizationId, error: e })
           }
           setLoadState("error")
           toast({
@@ -321,7 +322,7 @@ export default function WorkspacePage() {
         body.primaryColor = form.primaryColor.trim()
       }
       if (process.env.NODE_ENV === "development") {
-        console.error("[workspace settings] PATCH workspace body", { organizationId, body })
+        console.info("[workspace settings] PATCH workspace body", { organizationId, body })
       }
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/workspace`, {
         method: "PATCH",
@@ -378,9 +379,16 @@ export default function WorkspacePage() {
         body: fd,
         credentials: "same-origin",
       })
-      const data = (await res.json()) as { ok?: boolean; logoUrl?: string; message?: string; error?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        logoUrl?: string
+        documentLogoUrl?: string
+        organization?: WorkspaceApiOrganization
+        message?: string
+        error?: string
+      }
       if (process.env.NODE_ENV === "development") {
-        console.error("[workspace settings] POST /workspace/logo response", {
+        console.info("[workspace settings] POST /workspace/logo response", {
           organizationId,
           ok: res.ok,
           status: res.status,
@@ -395,10 +403,15 @@ export default function WorkspacePage() {
         })
         return
       }
-      if (data.logoUrl) {
+      if (data.organization) {
+        applyOrganization(data.organization)
+      } else if (data.logoUrl) {
         setLogoUrl(data.logoUrl)
         setLogoPreviewNonce((n) => n + 1)
         dispatch({ type: "SET_LOGO", payload: data.logoUrl })
+        if (typeof data.documentLogoUrl === "string") {
+          dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
+        }
       }
       await refetchWorkspace()
       toast({ title: "Logo updated", description: "Your app branding logo was saved." })
@@ -423,12 +436,14 @@ export default function WorkspacePage() {
       )
       const data = (await res.json()) as {
         ok?: boolean
+        logoUrl?: string
         documentLogoUrl?: string
+        organization?: WorkspaceApiOrganization
         message?: string
         error?: string
       }
       if (process.env.NODE_ENV === "development") {
-        console.error("[workspace settings] POST /workspace/document-logo response", {
+        console.info("[workspace settings] POST /workspace/document-logo response", {
           organizationId,
           ok: res.ok,
           status: res.status,
@@ -443,10 +458,15 @@ export default function WorkspacePage() {
         })
         return
       }
-      if (data.documentLogoUrl) {
+      if (data.organization) {
+        applyOrganization(data.organization)
+      } else if (data.documentLogoUrl) {
         setDocumentLogoUrl(data.documentLogoUrl)
         setDocLogoPreviewNonce((n) => n + 1)
         dispatch({ type: "SET_WORKSPACE", payload: { documentLogoUrl: data.documentLogoUrl } })
+        if (typeof data.logoUrl === "string") {
+          dispatch({ type: "SET_LOGO", payload: data.logoUrl })
+        }
       }
       await refetchWorkspace()
       toast({ title: "Document logo updated", description: "Saved for PDFs and documents." })
