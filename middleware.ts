@@ -13,6 +13,7 @@ const PUBLIC_ROUTES = new Set(["/login", "/onboarding"])
 
 const DASHBOARD_PREFIXES = [
   "/customers",
+  "/communications",
   "/equipment",
   "/work-orders",
   "/service-schedule",

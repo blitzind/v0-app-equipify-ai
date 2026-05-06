@@ -6,6 +6,7 @@ import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
 import { quoteStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { QuoteStatus } from "@/lib/mock-data"
+import { logCommunicationEvent } from "@/lib/notifications/log-event"
 
 type Body = {
   organizationId?: string
@@ -139,6 +140,27 @@ export async function POST(request: Request) {
       { status: 500 },
     )
   }
+
+  await logCommunicationEvent(supabase, {
+    organizationId,
+    channel: "email",
+    eventType: "quote_email",
+    title: `Quote emailed: ${quoteLabel}`,
+    summary: `To ${to}`,
+    audience: "both",
+    countsTowardUnread: false,
+    deliveryStatus: "sent",
+    recipientKind: "customer",
+    recipientCustomerId: row.customer_id as string,
+    recipientAddress: to,
+    relatedEntityType: "quote",
+    relatedEntityId: quoteId,
+    provider: "resend",
+    providerMessageId: sendResult.id ?? null,
+    sentAt,
+    createdBy: user.id,
+    metadata: { variant },
+  })
 
   return NextResponse.json({ ok: true, sentAt, emailId: sendResult.id })
 }

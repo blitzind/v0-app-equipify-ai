@@ -1,8 +1,8 @@
 "use client"
 
-import { use, useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
@@ -81,8 +81,11 @@ const nextStatus: Partial<Record<WorkOrderStatus, WorkOrderStatus>> = {
   Completed: "Invoiced",
 }
 
-export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function WorkOrderDetailPage() {
+  const routeParams = useParams<{ id?: string | string[] }>()
+  const rawId = routeParams?.id
+  const id =
+    typeof rawId === "string" ? rawId : Array.isArray(rawId) ? rawId[0] ?? "" : ""
   const router = useRouter()
   const { toast } = useToast()
   const activeOrg = useActiveOrganization()

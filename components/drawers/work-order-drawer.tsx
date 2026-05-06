@@ -907,6 +907,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       updatePayload.total_parts_cents = partsCents
     }
 
+    const prevStatusDb = uiStatusToDb(wo.status as WorkOrderStatus)
+    const nextStatusDb = updatePayload.status as string
+
     const { error } = await supabase
       .from("work_orders")
       .update(updatePayload)
@@ -916,6 +919,43 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (error) {
       toast(`Update failed: ${error.message}`)
       return
+    }
+
+    if (prevStatusDb !== nextStatusDb) {
+      const woCtx = {
+        id: wo.id,
+        status: nextStatusDb,
+        priority: updatePayload.priority,
+        customer_id: wo.customerId,
+        equipment_id: wo.equipmentId,
+        assigned_user_id: assign.assigned_user_id,
+        assigned_technician_id: assign.assigned_technician_id,
+      }
+      void fetch(`/api/organizations/${activeOrgId}/workflows/emit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trigger_type: "work_order_status_changed",
+          source_type: "work_order",
+          source_id: wo.id,
+          context: {
+            work_order: woCtx,
+            previous_work_order: { status: prevStatusDb },
+          },
+        }),
+      }).catch(() => {})
+      if (["completed", "invoiced", "completed_pending_signature"].includes(nextStatusDb)) {
+        void fetch(`/api/organizations/${activeOrgId}/workflows/emit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trigger_type: "work_order_completed",
+            source_type: "work_order",
+            source_id: wo.id,
+            context: { work_order: woCtx },
+          }),
+        }).catch(() => {})
+      }
     }
 
     setEditing(false)
@@ -1459,7 +1499,10 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                 </Button>
               ) : null}
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
-                <Link href={`/work-orders/${wo.id}`} className="flex items-center gap-1.5">
+                <Link
+                  href={`/work-orders/${encodeURIComponent(workOrderId)}`}
+                  className="flex items-center gap-1.5"
+                >
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Full profile
                 </Link>
               </Button>

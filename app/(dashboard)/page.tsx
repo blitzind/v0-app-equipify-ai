@@ -8,6 +8,8 @@ import {
   Shield,
   Repeat2,
   AlertTriangle,
+  FileWarning,
+  ListTodo,
 } from "lucide-react"
 import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 import { StatCard } from "@/components/dashboard/stat-card"
@@ -58,7 +60,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stat cards row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 items-stretch">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
         <StatCard
           title="Equipment Due This Month"
           value={stats.equipmentDueThisMonth}
@@ -119,6 +121,32 @@ export default function DashboardPage() {
           iconBg="bg-destructive/10"
           urgent
           href="/work-orders"
+          loading={loading}
+        />
+        <StatCard
+          title="Overdue Invoices"
+          value={stats.overdueInvoicesCount}
+          subtitle={
+            stats.overdueInvoicesAmountCents > 0
+              ? `${formatUsdFromCents(stats.overdueInvoicesAmountCents)} outstanding`
+              : "Past due date"
+          }
+          icon={FileWarning}
+          iconColor="text-[color:var(--status-warning)]"
+          iconBg="bg-[color:var(--status-warning)]/10"
+          urgent={stats.overdueInvoicesCount > 0}
+          href="/invoices"
+          loading={loading}
+        />
+        <StatCard
+          title="PM Plans Overdue"
+          value={stats.maintenancePlansOverdueCount}
+          subtitle="Active plans past next due"
+          icon={ListTodo}
+          iconColor="text-primary"
+          iconBg="bg-primary/10"
+          urgent={stats.maintenancePlansOverdueCount > 0}
+          href="/maintenance-plans"
           loading={loading}
         />
       </div>

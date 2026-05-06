@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
-  CalendarRange, Store, Package, Upload,
+  CalendarRange, Store, Package, Upload, Bell,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -123,6 +123,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
     icon: Plug,
     cta: { label: "Request Integration" },
   },
+  "/communications": {
+    title: "Communications",
+    subtitle: "Central log of emails, SMS, reminders, and customer-facing notifications with delivery status.",
+    icon: Bell,
+  },
 }
 
 // Routes that render their own full-bleed hero — PageHero is suppressed.
@@ -147,6 +152,7 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/reports": "#6366F1",
   "/portal": "#2563EB",
   "/integrations": "#2563EB",
+  "/communications": "#6366F1",
 }
 
 function getFeatureIconColor(pathname: string): string {

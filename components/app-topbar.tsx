@@ -9,7 +9,6 @@ import {
   Building2, Users,
   CreditCard, Plug, Settings, ShieldCheck,
   LogOut, ChevronRight, Menu, X,
-  AlertCircle, Repeat2, ShieldAlert, CheckCircle2, CalendarClock, UserCog,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -35,195 +34,20 @@ import {
   NAV_PRIMARY_ROW_MOTION,
   NAV_ROW_INACTIVE_HOVER_CARD,
 } from "@/lib/navigation-chrome"
-import type { LucideIcon } from "lucide-react"
+import { formatRelativeTime } from "@/lib/notifications/format-relative"
+import { communicationEventPresentation } from "@/lib/notifications/event-icons"
+import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
 
-// ─── Notification data ────────────────────────────────────────────────────────
-
-interface Notification {
-  id: number
-  icon: LucideIcon
-  iconColor: string
+type FeedPreview = {
+  id: string
   title: string
-  desc: string
-  time: string
-  unread: boolean
-  href: string           // route to navigate to
-  drawerParam?: string   // optional query param to open a specific drawer
-}
-
-const NOTIFICATIONS_BY_WORKSPACE: Record<string, Notification[]> = {
-  "ws-acme": [
-    {
-      id: 1,
-      icon: AlertCircle,
-      iconColor: "text-destructive",
-      title: "Overdue: WO-2038",
-      desc: "Crane #CR-02 repair past due",
-      time: "5m ago",
-      unread: true,
-      href: "/work-orders",
-      drawerParam: "WO-2038",
-    },
-    {
-      id: 2,
-      icon: Repeat2,
-      iconColor: "text-destructive",
-      title: "Repeat Repair Alert",
-      desc: "CNC Machine #CNC-3 flagged (4 repairs)",
-      time: "1h ago",
-      unread: true,
-      href: "/insights",
-    },
-    {
-      id: 3,
-      icon: Shield,
-      iconColor: "text-[oklch(0.50_0.12_70)]",
-      title: "Warranty Expiring",
-      desc: "Excavator #EX-4 expires in 15 days",
-      time: "3h ago",
-      unread: true,
-      href: "/equipment",
-      drawerParam: "EQ-188",
-    },
-    {
-      id: 4,
-      icon: CheckCircle2,
-      iconColor: "text-[oklch(0.42_0.17_145)]",
-      title: "WO-2039 Completed",
-      desc: "Tyler Oakes closed HVAC inspection",
-      time: "5h ago",
-      unread: false,
-      href: "/work-orders",
-      drawerParam: "WO-2039",
-    },
-    {
-      id: 5,
-      icon: CalendarClock,
-      iconColor: "text-primary",
-      title: "PM Due: Forklift #EQ-188",
-      desc: "Toyota 8FGU25 service due Apr 30",
-      time: "8h ago",
-      unread: false,
-      href: "/service-schedule",
-    },
-    {
-      id: 6,
-      icon: UserCog,
-      iconColor: "text-primary",
-      title: "Technician schedule change",
-      desc: "Marcus Webb reassigned to WO-2041",
-      time: "1d ago",
-      unread: false,
-      href: "/technicians",
-    },
-  ],
-  "ws-medology": [
-    {
-      id: 1,
-      icon: AlertCircle,
-      iconColor: "text-destructive",
-      title: "Overdue: MWO-2038",
-      desc: "Sacramento Pediatric — OAE calibration past due",
-      time: "2h ago",
-      unread: true,
-      href: "/work-orders",
-      drawerParam: "MWO-2038",
-    },
-    {
-      id: 2,
-      icon: ShieldAlert,
-      iconColor: "text-[oklch(0.50_0.12_70)]",
-      title: "Invoice Overdue",
-      desc: "MINV-3003 — $390 unpaid (55+ days)",
-      time: "4h ago",
-      unread: true,
-      href: "/invoices",
-    },
-    {
-      id: 3,
-      icon: CalendarClock,
-      iconColor: "text-primary",
-      title: "PM Due: Tympanometer",
-      desc: "San Diego Audiology Clinic due May 3",
-      time: "8h ago",
-      unread: true,
-      href: "/service-schedule",
-    },
-    {
-      id: 4,
-      icon: CheckCircle2,
-      iconColor: "text-[oklch(0.42_0.17_145)]",
-      title: "MWO-2034 Completed",
-      desc: "Megan Brooks closed LA Hearing Center repair",
-      time: "1d ago",
-      unread: false,
-      href: "/work-orders",
-      drawerParam: "MWO-2034",
-    },
-    {
-      id: 5,
-      icon: Repeat2,
-      iconColor: "text-destructive",
-      title: "Repeat Repair Alert",
-      desc: "VNG system at Sierra Balance Center flagged",
-      time: "2d ago",
-      unread: false,
-      href: "/insights",
-    },
-  ],
-  "ws-precision-biomedical": [
-    {
-      id: 1,
-      icon: AlertCircle,
-      iconColor: "text-destructive",
-      title: "Calibration due: infusion pumps",
-      desc: "Maple Street Dialysis — four modules due before May 12",
-      time: "1h ago",
-      unread: true,
-      href: "/service-schedule",
-    },
-    {
-      id: 2,
-      icon: ShieldAlert,
-      iconColor: "text-[oklch(0.50_0.12_70)]",
-      title: "Invoice follow-up",
-      desc: "PBS-INV-5003 anesthesia deposit — materials management",
-      time: "3h ago",
-      unread: true,
-      href: "/invoices",
-    },
-    {
-      id: 3,
-      icon: Repeat2,
-      iconColor: "text-destructive",
-      title: "Repeat imaging QA flags",
-      desc: "Riverstone Imaging Center mobile DR warm-up pattern",
-      time: "5h ago",
-      unread: true,
-      href: "/insights",
-    },
-    {
-      id: 4,
-      icon: CheckCircle2,
-      iconColor: "text-[oklch(0.42_0.17_145)]",
-      title: "PBS-W0004 completed",
-      desc: "Sterilizer temperature variance closed at Valley Regional",
-      time: "1d ago",
-      unread: false,
-      href: "/work-orders",
-      drawerParam: "PBS-W0004",
-    },
-    {
-      id: 5,
-      icon: CalendarClock,
-      iconColor: "text-primary",
-      title: "OR block: anesthesia checkout",
-      desc: "Blue Harbor Rehab — NFPA 99 documentation pack ready",
-      time: "1d ago",
-      unread: false,
-      href: "/technicians",
-    },
-  ],
+  summary: string | null
+  created_at: string
+  event_type: string
+  channel: string
+  is_read?: boolean
+  related_entity_type: string | null
+  related_entity_id: string | null
 }
 
 // ─── Account hub sections ─────────────────────────────────────────────────────
@@ -238,7 +62,8 @@ function formatOrganizationMemberRole(role: string): string {
 
 const LAUNCHER_LINKS = [
   { icon: User,        label: "My Profile",      href: "/settings/general" },
-  { icon: BellRing,    label: "Notifications",   href: "/settings/notifications" },
+  { icon: Bell,        label: "Communications",  href: "/communications" },
+  { icon: BellRing,    label: "Notification preferences",   href: "/settings/notifications" },
   { icon: Shield,      label: "Security",        href: "/settings/security" },
   { icon: Settings,    label: "Settings",        href: "/settings/general" },
   { icon: Users,       label: "Team",            href: "/settings/team" },
@@ -270,13 +95,8 @@ export function AppTopbar() {
             : workspace.subscriptionStatus === "canceled"
               ? "Canceled"
               : "Active"
-  const workspaceNotifs = NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"]
-  const [notifications, setNotifications] = useState<Notification[]>(workspaceNotifs)
-
-  // Reset notifications whenever the workspace changes
-  useEffect(() => {
-    setNotifications(NOTIFICATIONS_BY_WORKSPACE[workspace.id] ?? NOTIFICATIONS_BY_WORKSPACE["ws-acme"])
-  }, [workspace.id])
+  const [notifFeed, setNotifFeed] = useState<FeedPreview[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [notifOpen, setNotifOpen]   = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -284,7 +104,6 @@ export function AppTopbar() {
   const hubRef     = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const { setMobileOpen } = useContext(SidebarContext)
-  const unreadCount = notifications.filter((n) => n.unread).length
 
   const hubRoleLabel =
     orgRoleLabel ??
@@ -334,24 +153,64 @@ export function AppTopbar() {
     }
   }, [supabase, activeOrgOpt?.organizationId])
 
+  useEffect(() => {
+    const orgId = activeOrgOpt?.organizationId
+    if (!orgId) {
+      setNotifFeed([])
+      setUnreadCount(0)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/communications?limit=8`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as { events?: FeedPreview[]; unreadCount?: number; error?: string }
+      if (cancelled) return
+      if (!res.ok) {
+        setNotifFeed([])
+        setUnreadCount(0)
+        return
+      }
+      setNotifFeed(body.events ?? [])
+      setUnreadCount(Number(body.unreadCount ?? 0))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeOrgOpt?.organizationId])
+
   const launcherLinks = useMemo(
     () =>
       LAUNCHER_LINKS.filter((link) => link.href !== "/admin" || platformAdminNavVisible),
     [platformAdminNavVisible],
   )
 
-  // Mark a notification as read and navigate
-  function handleNotifClick(n: Notification) {
-    setNotifications((prev) =>
-      prev.map((item) => item.id === n.id ? { ...item, unread: false } : item)
-    )
+  async function handleNotifClick(n: FeedPreview) {
+    const orgId = activeOrgOpt?.organizationId
+    if (orgId && n.is_read === false) {
+      await fetch(`/api/organizations/${encodeURIComponent(orgId)}/communications/${encodeURIComponent(n.id)}/read`, {
+        method: "POST",
+      })
+      setNotifFeed((prev) => prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item)))
+      setUnreadCount((c) => Math.max(0, c - 1))
+    }
     setNotifOpen(false)
-    router.push(n.href)
+    const href = hrefForRelatedEntity(n.related_entity_type, n.related_entity_id) ?? "/communications"
+    router.push(href)
   }
 
-  // Mark all as read
-  function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  async function markAllRead() {
+    const orgId = activeOrgOpt?.organizationId
+    if (!orgId) return
+    await fetch(`/api/organizations/${encodeURIComponent(orgId)}/communications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAllRead: true }),
+    })
+    setNotifFeed((prev) => prev.map((item) => ({ ...item, is_read: true })))
+    setUnreadCount(0)
   }
 
   async function handleLogout() {
@@ -452,7 +311,11 @@ export function AppTopbar() {
               </div>
               {unreadCount > 0 && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); markAllRead() }}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void markAllRead()
+                  }}
                   className="text-[10px] font-medium text-primary hover:underline cursor-pointer"
                 >
                   Mark all read
@@ -462,54 +325,71 @@ export function AppTopbar() {
 
             {/* Items */}
             <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
-              {notifications.map((n) => {
-                const Icon = n.icon
-                return (
-                  <button
-                    key={n.id}
-                    onClick={() => handleNotifClick(n)}
-                    className={cn(
-                      "w-full flex items-start gap-3 px-4 py-3 text-left cursor-pointer",
-                      "transition-colors duration-100 ds-hover-list-row-menu",
-                      n.unread ? "bg-primary/[0.03]" : "bg-card"
-                    )}
-                    aria-label={`${n.title}: ${n.desc}`}
-                  >
-                    {/* Icon tile */}
-                    <div className={cn(
-                      "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5",
-                      n.unread ? "bg-primary/10" : "bg-muted"
-                    )}>
-                      <Icon className={cn("w-4 h-4", n.unread ? n.iconColor : "text-muted-foreground")} />
-                    </div>
-                    {/* Text */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                        <p className={cn(
-                          "text-xs font-semibold leading-tight truncate",
-                          n.unread ? "text-foreground" : "text-foreground/80 pl-3"
-                        )}>
-                          {n.title}
-                        </p>
+              {notifFeed.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-4 py-6 text-center">No notifications yet.</p>
+              ) : (
+                notifFeed.map((n) => {
+                  const unread = n.is_read === false
+                  const { Icon, iconColor } = communicationEventPresentation(n.event_type, n.channel)
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => void handleNotifClick(n)}
+                      className={cn(
+                        "w-full flex items-start gap-3 px-4 py-3 text-left cursor-pointer",
+                        "transition-colors duration-100 ds-hover-list-row-menu",
+                        unread ? "bg-primary/[0.03]" : "bg-card"
+                      )}
+                      aria-label={`${n.title}: ${n.summary ?? ""}`}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5",
+                          unread ? "bg-primary/10" : "bg-muted",
+                        )}
+                      >
+                        <Icon className={cn("w-4 h-4", unread ? iconColor : "text-muted-foreground")} />
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-1 pl-3.5">{n.desc}</p>
-                    </div>
-                    {/* Time */}
-                    <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5 ds-tabular">{n.time}</span>
-                  </button>
-                )
-              })}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          {unread ? <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" /> : null}
+                          <p
+                            className={cn(
+                              "text-xs font-semibold leading-tight truncate",
+                              unread ? "text-foreground" : "text-foreground/80 pl-3",
+                            )}
+                          >
+                            {n.title}
+                          </p>
+                        </div>
+                        {n.summary ? (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-2 pl-3.5">
+                            {n.summary}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5 ds-tabular">
+                        {formatRelativeTime(n.created_at)}
+                      </span>
+                    </button>
+                  )
+                })
+              )}
             </div>
 
             {/* Footer */}
             <DropdownMenuSeparator className="my-0" />
             <div className="px-4 py-2.5">
               <button
-                onClick={() => { setNotifOpen(false); router.push("/service-schedule") }}
+                type="button"
+                onClick={() => {
+                  setNotifOpen(false)
+                  router.push("/communications")
+                }}
                 className="w-full text-center text-xs font-medium text-primary hover:underline cursor-pointer"
               >
-                View all notifications
+                Open communications center
               </button>
             </div>
           </DropdownMenuContent>

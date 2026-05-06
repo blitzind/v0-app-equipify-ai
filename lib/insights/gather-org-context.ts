@@ -37,6 +37,10 @@ export type OrgInsightsContext = {
     invoicesTotal: number
     purchaseOrdersTotal: number
   }
+  billing: {
+    overdueInvoiceCount: number
+    overdueInvoiceAmountCents: number
+  }
 }
 
 function boundsThisMonth(): { monthStart: string; monthEnd: string; today: string } {
@@ -85,6 +89,7 @@ export async function gatherOrgInsightsContext(
     quotesCountRes,
     invoicesCountRes,
     poCountRes,
+    overdueInvoicesRes,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -180,6 +185,12 @@ export async function gatherOrgInsightsContext(
       .select("*", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .is("archived_at", null),
+    supabase
+      .from("org_invoices")
+      .select("amount_cents, due_date, status")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .in("status", ["sent", "unpaid", "overdue"]),
   ])
 
   const woRows = (woListRes.data ?? []) as Array<{ status: string; priority: string }>
@@ -265,6 +276,20 @@ export async function gatherOrgInsightsContext(
   const invoicesTotal = invoicesCountRes.error ? 0 : invoicesCountRes.count ?? 0
   const purchaseOrdersTotal = poCountRes.error ? 0 : poCountRes.count ?? 0
 
+  const invRows = overdueInvoicesRes.error
+    ? []
+    : ((overdueInvoicesRes.data ?? []) as Array<{
+        amount_cents: number
+        due_date: string | null
+        status: string
+      }>)
+  const overdueInvoiceFiltered = invRows.filter((r) => {
+    if (!r.due_date) return r.status === "overdue"
+    return r.due_date < today
+  })
+  const overdueInvoiceCount = overdueInvoiceFiltered.length
+  const overdueInvoiceAmountCents = overdueInvoiceFiltered.reduce((s, r) => s + (r.amount_cents ?? 0), 0)
+
   return {
     generatedAtIso: new Date().toISOString(),
     customers: { activeCount: customersCountRes.count ?? 0 },
@@ -297,6 +322,10 @@ export async function gatherOrgInsightsContext(
       quotesTotal,
       invoicesTotal,
       purchaseOrdersTotal,
+    },
+    billing: {
+      overdueInvoiceCount,
+      overdueInvoiceAmountCents,
     },
   }
 }

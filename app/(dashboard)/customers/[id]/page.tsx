@@ -27,6 +27,7 @@ import {
   Package,
   CalendarPlus,
   Repeat,
+  MessageSquare,
 } from "lucide-react"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -39,6 +40,7 @@ import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -1307,6 +1309,10 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="maintenance-plans" className="text-xs sm:text-sm">
             Maintenance Plans ({customerPlans.length})
           </TabsTrigger>
+          <TabsTrigger value="communications" className="text-xs sm:text-sm gap-1">
+            <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+            Communications
+          </TabsTrigger>
           <TabsTrigger value="notes" className="text-xs sm:text-sm">
             Notes
           </TabsTrigger>
@@ -1837,6 +1843,25 @@ export default function CustomerDetailPage() {
               </Card>
             </div>
           )}
+        </TabsContent>
+
+        {/* Communications timeline */}
+        <TabsContent value="communications" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-primary shrink-0" />
+                Communication timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {orgStatus === "ready" && activeOrgId ? (
+                <CustomerCommunicationTimeline organizationId={activeOrgId} customerId={customer.id} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Select an organization to load communications.</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Notes tab */}

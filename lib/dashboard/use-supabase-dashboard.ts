@@ -16,6 +16,9 @@ export type DashboardStats = {
   monthlyRevenueCents: number
   expiringWarrantiesCount: number
   repeatRepairAlertsCount: number
+  overdueInvoicesCount: number
+  overdueInvoicesAmountCents: number
+  maintenancePlansOverdueCount: number
 }
 
 export type RecentWorkOrderRow = {
@@ -129,6 +132,9 @@ export function buildOperationalInsights(input: {
   repeatRepairAlertsCount: number
   monthlyRevenueCents: number
   topRepeat?: RepeatRepairRow | null
+  overdueInvoicesCount?: number
+  overdueInvoicesAmountCents?: number
+  maintenancePlansOverdueCount?: number
 }): AiInsight[] {
   const insights: AiInsight[] = []
   let n = 0
@@ -237,6 +243,39 @@ export function buildOperationalInsights(input: {
     })
   }
 
+  const arCount = input.overdueInvoicesCount ?? 0
+  if (arCount > 0) {
+    const arAmt = Math.round((input.overdueInvoicesAmountCents ?? 0) / 100)
+    insights.push({
+      id: id("ar"),
+      category: "revenue_opportunity",
+      severity: arCount >= 5 ? "high" : "medium",
+      title: `${arCount} open invoice${arCount === 1 ? "" : "s"} past due`,
+      description:
+        "Unpaid or sent invoices with a due date before today. Follow up to improve cash flow and reduce write-off risk.",
+      meta: "Accounts receivable",
+      value: arAmt > 0 ? `$${arAmt.toLocaleString()} outstanding` : String(arCount),
+      actionLabel: "View invoices",
+      actionHref: "/invoices",
+    })
+  }
+
+  const pmOver = input.maintenancePlansOverdueCount ?? 0
+  if (pmOver > 0) {
+    insights.push({
+      id: id("pm-plans"),
+      category: "upsell",
+      severity: "medium",
+      title: `${pmOver} active PM plan${pmOver === 1 ? "" : "s"} with a past-due service date`,
+      description:
+        "Scheduled maintenance plans whose next due date is before today. Review automation, schedule work orders, or update plan dates.",
+      meta: "Maintenance plans",
+      value: String(pmOver),
+      actionLabel: "View plans",
+      actionHref: "/maintenance-plans",
+    })
+  }
+
   return insights
 }
 
@@ -251,6 +290,9 @@ export function useSupabaseDashboard() {
     monthlyRevenueCents: 0,
     expiringWarrantiesCount: 0,
     repeatRepairAlertsCount: 0,
+    overdueInvoicesCount: 0,
+    overdueInvoicesAmountCents: 0,
+    maintenancePlansOverdueCount: 0,
   })
   const [recentWorkOrders, setRecentWorkOrders] = useState<RecentWorkOrderRow[]>([])
   const [equipmentDueSoon, setEquipmentDueSoon] = useState<EquipmentDueRow[]>([])
@@ -276,6 +318,9 @@ export function useSupabaseDashboard() {
         monthlyRevenueCents: 0,
         expiringWarrantiesCount: 0,
         repeatRepairAlertsCount: 0,
+        overdueInvoicesCount: 0,
+        overdueInvoicesAmountCents: 0,
+        maintenancePlansOverdueCount: 0,
       })
       setRecentWorkOrders([])
       setEquipmentDueSoon([])
@@ -308,6 +353,9 @@ export function useSupabaseDashboard() {
         monthlyRevenueCents: 0,
         expiringWarrantiesCount: 0,
         repeatRepairAlertsCount: 0,
+        overdueInvoicesCount: 0,
+        overdueInvoicesAmountCents: 0,
+        maintenancePlansOverdueCount: 0,
       })
       setError(
         activeOrg.organizations.length === 0
@@ -352,6 +400,8 @@ export function useSupabaseDashboard() {
         recentWoRes,
         woForRepeatRes,
         woForChartRes,
+        overdueInvoicesRes,
+        plansOverdueRes,
       ] = await Promise.all([
         supabase
           .from("equipment")
@@ -469,6 +519,20 @@ export function useSupabaseDashboard() {
           .is("archived_at", null)
           .in("status", ["completed", "invoiced"])
           .gte("updated_at", chartWindowStartIso),
+        supabase
+          .from("org_invoices")
+          .select("amount_cents, due_date, status")
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", ["sent", "unpaid", "overdue"]),
+        supabase
+          .from("maintenance_plans")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .eq("status", "active")
+          .not("next_due_date", "is", null)
+          .lt("next_due_date", today),
       ])
 
       if (recentWoRes.error && missingWorkOrderNumberColumn(recentWoRes.error)) {
@@ -485,6 +549,22 @@ export function useSupabaseDashboard() {
       const overdueService = overdueCountRes.count ?? 0
       const openWorkOrders = openWoCountRes.count ?? 0
       const expiringWarrantiesCount = warrantyCountRes.count ?? 0
+
+      const invRows = (overdueInvoicesRes.data ?? []) as Array<{
+        amount_cents: number
+        due_date: string | null
+        status: string
+      }>
+      const overdueInvoicesFiltered = invRows.filter((r) => {
+        if (!r.due_date) return r.status === "overdue"
+        return r.due_date < today
+      })
+      const overdueInvoicesCount = overdueInvoicesFiltered.length
+      const overdueInvoicesAmountCents = overdueInvoicesFiltered.reduce(
+        (sum, r) => sum + (r.amount_cents ?? 0),
+        0,
+      )
+      const maintenancePlansOverdueCount = plansOverdueRes.count ?? 0
 
       const woStatusCounts = [
         woCountOpenRes.count ?? 0,
@@ -727,6 +807,9 @@ export function useSupabaseDashboard() {
         monthlyRevenueCents,
         expiringWarrantiesCount,
         repeatRepairAlertsCount,
+        overdueInvoicesCount,
+        overdueInvoicesAmountCents,
+        maintenancePlansOverdueCount,
       })
       setRevenueByMonth(revenuePoints)
       setWorkOrdersByStatus(pie)
@@ -741,6 +824,9 @@ export function useSupabaseDashboard() {
           repeatRepairAlertsCount,
           monthlyRevenueCents,
           topRepeat,
+          overdueInvoicesCount,
+          overdueInvoicesAmountCents,
+          maintenancePlansOverdueCount,
         }),
       )
     } catch (e) {

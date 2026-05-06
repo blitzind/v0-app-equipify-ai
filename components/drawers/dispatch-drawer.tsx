@@ -26,6 +26,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { uiPriorityToDb } from "@/lib/work-orders/db-map"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { DetailDrawer, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
@@ -1218,6 +1219,8 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
       setStatusUpdatingId(id)
       setWoError(null)
       const supabase = createBrowserSupabaseClient()
+      const prevRow = workOrders.find((w) => w.id === id)
+      const prevStatusDb = prevRow ? uiStatusToDb(prevRow.status) : ""
       const dbStatus = uiStatusToDb(next)
 
       const patch: Record<string, unknown> = { status: dbStatus }
@@ -1240,6 +1243,42 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
         return
       }
 
+      if (prevStatusDb !== dbStatus && prevRow) {
+        const woCtx = {
+          id,
+          status: dbStatus,
+          priority: uiPriorityToDb(prevRow.priority),
+          customer_id: prevRow.customerId,
+          equipment_id: prevRow.equipmentId,
+          assigned_user_id: prevRow.technicianId && prevRow.technicianId !== "unassigned" ? prevRow.technicianId : null,
+        }
+        void fetch(`/api/organizations/${organizationId}/workflows/emit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trigger_type: "work_order_status_changed",
+            source_type: "work_order",
+            source_id: id,
+            context: {
+              work_order: woCtx,
+              previous_work_order: { status: prevStatusDb },
+            },
+          }),
+        }).catch(() => {})
+        if (["completed", "invoiced", "completed_pending_signature"].includes(dbStatus)) {
+          void fetch(`/api/organizations/${organizationId}/workflows/emit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trigger_type: "work_order_completed",
+              source_type: "work_order",
+              source_id: id,
+              context: { work_order: woCtx },
+            }),
+          }).catch(() => {})
+        }
+      }
+
       setWorkOrders((prev) =>
         prev.map((w) =>
           w.id === id
@@ -1252,7 +1291,7 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
         )
       )
     },
-    [organizationId]
+    [organizationId, workOrders]
   )
 
   const todayStr = localDateString(today)

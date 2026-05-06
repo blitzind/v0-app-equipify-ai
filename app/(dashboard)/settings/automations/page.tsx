@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Mail, Clock, Send, Eye, Edit3, Check, ChevronDown, ChevronUp, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { WorkflowAutomationsSection } from "@/components/settings/workflow-automations-section"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -325,16 +326,29 @@ export default function AutomationsPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Zap size={16} className="text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Email Automations</h2>
+            <h2 className="text-lg font-semibold text-foreground">Automations</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Configure automated email cadences for reminders, follow-ups, and service notifications.
-            {" "}<span className="font-medium text-foreground">{enabledCount} of {sections.length}</span> automations active.
+            Operational workflows and reminder emails for your organization.
           </p>
         </div>
-        <Button size="sm" onClick={handleSave} className="shrink-0">
-          {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save changes"}
-        </Button>
+      </div>
+
+      <WorkflowAutomationsSection />
+
+      <div className="border-t border-border pt-6 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">Reminder emails</h3>
+            <p className="text-sm text-muted-foreground">
+              Configure automated email cadences for reminders, follow-ups, and service notifications.
+              {" "}<span className="font-medium text-foreground">{enabledCount} of {sections.length}</span> cadences active.
+            </p>
+          </div>
+          <Button size="sm" onClick={handleSave} className="shrink-0">
+            {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save changes"}
+          </Button>
+        </div>
       </div>
 
       {sections.map((section) => (

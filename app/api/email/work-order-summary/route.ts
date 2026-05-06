@@ -6,6 +6,7 @@ import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { logCommunicationEvent } from "@/lib/notifications/log-event"
 
 type Body = {
   organizationId?: string
@@ -158,5 +159,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "send_failed", message: sendResult.error }, { status })
   }
 
-  return NextResponse.json({ ok: true, emailId: sendResult.id })
+  const sentAt = new Date().toISOString()
+
+  await logCommunicationEvent(supabase, {
+    organizationId,
+    channel: "email",
+    eventType: "work_order_summary_email",
+    title: `Work order summary emailed: ${woLabel}`,
+    summary: `To ${to}`,
+    audience: "both",
+    countsTowardUnread: false,
+    deliveryStatus: "sent",
+    recipientKind: "customer",
+    recipientCustomerId: wo.customer_id,
+    recipientAddress: to,
+    relatedEntityType: "work_order",
+    relatedEntityId: workOrderId,
+    provider: "resend",
+    providerMessageId: sendResult.id ?? null,
+    sentAt,
+    createdBy: user.id,
+  })
+
+  return NextResponse.json({ ok: true, emailId: sendResult.id, sentAt })
 }

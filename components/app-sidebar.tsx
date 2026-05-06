@@ -12,6 +12,7 @@ import {
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check,
   Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package,
+  Bell,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -41,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { label: "Dashboard",         href: "/",                  icon: LayoutDashboard },
+      { label: "Communications",    href: "/communications",    icon: Bell },
       { label: "Customers",         href: "/customers",         icon: Users },
       { label: "Equipment",         href: "/equipment",         icon: Wrench },
       { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },

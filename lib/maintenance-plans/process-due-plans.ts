@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireCanCreateRecordForOrganization } from "@/lib/billing/server-guard"
+import { dispatchWorkflowTriggers } from "@/lib/workflows/dispatch"
 import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
 import {
   computeNextDueDate,
@@ -227,6 +228,27 @@ export async function processDuePlansForOrganization(
 
     workOrdersCreated++
     const woId = insertedRows[0]!.id
+
+    const { data: woSnap } = await supabase
+      .from("work_orders")
+      .select(
+        "id, organization_id, customer_id, equipment_id, status, priority, type, assigned_user_id, maintenance_plan_id, title",
+      )
+      .eq("id", woId)
+      .maybeSingle()
+    void dispatchWorkflowTriggers({
+      supabase,
+      organizationId: row.organization_id,
+      triggerType: "maintenance_due",
+      ctx: {
+        organization_id: row.organization_id,
+        trigger_type: "maintenance_due",
+        work_order: (woSnap ?? {}) as Record<string, unknown>,
+        maintenance_plan: row as unknown as Record<string, unknown>,
+      },
+      sourceType: "work_order",
+      sourceId: woId,
+    }).catch(() => {})
 
     void insertMaintenancePlanAutomationEvent(supabase, {
       organizationId: row.organization_id,
