@@ -89,6 +89,17 @@ type Props = {
   onSaved: () => void
   onRequestRunTest?: (automationId: string) => Promise<void> | void
   onRequestRunHistory?: (automationId: string, name: string) => void
+  /**
+   * AI Ops Phase 2 — pre-fill name/description/triggerType when
+   * opening a fresh automation from a recommendation deep-link
+   * (`/settings/automations?aiops=1&trigger=...`). Ignored when
+   * `editing` is set so existing automations are never mutated.
+   */
+  initialSuggestion?: {
+    name?: string
+    description?: string
+    triggerType?: WorkflowTriggerType
+  } | null
 }
 
 type Step = "trigger" | "conditions" | "actions"
@@ -101,6 +112,7 @@ export function AutomationBuilderDialog({
   onSaved,
   onRequestRunTest,
   onRequestRunHistory,
+  initialSuggestion,
 }: Props) {
   const [step, setStep] = useState<Step>("trigger")
   const [name, setName] = useState("")
@@ -162,10 +174,13 @@ export function AutomationBuilderDialog({
         setActionParseError(a.reason)
       }
     } else {
-      setName("")
-      setDescription("")
+      // AI Ops Phase 2 — honor a deep-linked suggestion when no
+      // existing row is being edited. The suggestion is a hint only;
+      // the manager still saves the automation manually.
+      setName(initialSuggestion?.name?.slice(0, 120) ?? "")
+      setDescription(initialSuggestion?.description?.slice(0, 500) ?? "")
       setEnabled(true)
-      setTriggerType("prospect_status_changed")
+      setTriggerType(initialSuggestion?.triggerType ?? "prospect_status_changed")
       setTree(makeEmptyConditionTree())
       setActions([])
       setConditionJson(JSON.stringify({ operator: "and", rules: [] }, null, 2))
@@ -173,7 +188,7 @@ export function AutomationBuilderDialog({
       setConditionParseError(null)
       setActionParseError(null)
     }
-  }, [open, editing])
+  }, [open, editing, initialSuggestion])
 
   // Visual → JSON
   useEffect(() => {

@@ -28,9 +28,18 @@ create table if not exists public.ai_ops_dismissals (
     unique (organization_id, recommendation_key)
 );
 
-create index if not exists idx_ai_ops_dismissals_org_active
+-- Postgres rejects `now()` (mutable) inside partial index predicates,
+-- so we use two complementary indexes instead:
+--   1. (organization_id, snoozed_until) supports time-bounded
+--      "still-snoozed" filters: `where snoozed_until > now()`.
+--   2. A partial index over indefinite dismissals (the common
+--      hot-path lookup, since most dismissals are "snooze=null").
+create index if not exists idx_ai_ops_dismissals_org_snoozed_until
+  on public.ai_ops_dismissals (organization_id, snoozed_until);
+
+create index if not exists idx_ai_ops_dismissals_org_dismissed
   on public.ai_ops_dismissals (organization_id)
-  where snoozed_until is null or snoozed_until > now();
+  where snoozed_until is null;
 
 create index if not exists idx_ai_ops_dismissals_org_category
   on public.ai_ops_dismissals (organization_id, category);

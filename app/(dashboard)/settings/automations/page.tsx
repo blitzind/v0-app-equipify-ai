@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { Mail, Clock, Send, Eye, Edit3, Check, ChevronDown, ChevronUp, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -334,7 +334,9 @@ export default function AutomationsPage() {
         </div>
       </div>
 
-      <WorkflowAutomationsSection />
+      <Suspense fallback={null}>
+        <WorkflowAutomationsSection />
+      </Suspense>
 
       <div className="border-t border-border pt-6 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">

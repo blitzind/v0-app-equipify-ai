@@ -2,7 +2,15 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { ArrowRight, ChevronRight, Loader2, MoreHorizontal, X } from "lucide-react"
+import {
+  ArrowRight,
+  Bot,
+  ChevronRight,
+  Loader2,
+  MoreHorizontal,
+  Workflow,
+  X,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
 import type { Recommendation } from "@/lib/ai-ops/types"
 import {
@@ -22,6 +31,10 @@ import {
   PRIORITY_ICON,
   PRIORITY_LABEL,
 } from "./category-meta"
+import { AiExplainPanel } from "./ai-explain-panel"
+import { DraftFollowupDialog } from "./draft-followup-dialog"
+import { buildAutomationSuggestion, suggestionUrl } from "./automation-suggestion"
+import { logAiOpsOutcome } from "./log-outcome"
 
 const PRIORITY_RIBBON: Record<Recommendation["priority"], string> = {
   high: "before:bg-red-500",
@@ -41,10 +54,20 @@ export function RecommendationCard({
   onDismissed: (key: string) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const [draftOpen, setDraftOpen] = useState(false)
+  const { permissions } = useOrgPermissions()
   const Icon = CATEGORY_ICON[rec.category]
   const PriorityIcon = PRIORITY_ICON[rec.priority]
   const primary = rec.actions[0]
   const extra = rec.actions.slice(1, 3)
+
+  const automationSuggestion = buildAutomationSuggestion(rec)
+  const canSuggestAutomation =
+    Boolean(automationSuggestion) && Boolean(permissions.canManageAutomations)
+  const canDraftFollowup =
+    rec.category === "prospect" &&
+    rec.entity?.type === "prospect" &&
+    Boolean(permissions.canManageProspects)
 
   async function dismiss(snoozeHours: number | null) {
     if (!canDismiss) return
@@ -63,10 +86,23 @@ export function RecommendationCard({
         },
       )
       if (!res.ok) throw new Error("Failed to dismiss recommendation.")
+      logAiOpsOutcome(organizationId, rec, snoozeHours === null ? "dismissed" : "snoozed", {
+        snoozeHours,
+      })
       onDismissed(rec.key)
     } catch {
       setBusy(false)
     }
+  }
+
+  function logOpen() {
+    if (!organizationId || !rec.entity) return
+    logAiOpsOutcome(organizationId, rec, "opened_entity", { entityId: rec.entity.id })
+  }
+
+  function logSuggestion() {
+    if (!organizationId) return
+    logAiOpsOutcome(organizationId, rec, "created_automation_suggestion")
   }
 
   return (
@@ -145,6 +181,7 @@ export function RecommendationCard({
             {rec.entity ? (
               <Link
                 href={rec.entity.href}
+                onClick={logOpen}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-foreground/80 hover:text-foreground hover:border-primary/30"
               >
                 <span className="truncate max-w-[12rem]">{rec.entity.label}</span>
@@ -160,12 +197,38 @@ export function RecommendationCard({
           </div>
         )}
 
+        {organizationId ? <AiExplainPanel rec={rec} organizationId={organizationId} /> : null}
+
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {primary ? (
-            <Button asChild size="sm" className="h-8 gap-1">
+            <Button asChild size="sm" className="h-8 gap-1" onClick={logOpen}>
               <Link href={primary.href ?? "#"}>
                 {primary.label}
                 <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            </Button>
+          ) : null}
+          {canDraftFollowup ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={() => setDraftOpen(true)}
+            >
+              <Bot className="h-3 w-3" aria-hidden /> Draft AI follow-up
+            </Button>
+          ) : null}
+          {canSuggestAutomation && automationSuggestion ? (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={logSuggestion}
+            >
+              <Link href={suggestionUrl(organizationId, automationSuggestion)}>
+                <Workflow className="h-3 w-3" aria-hidden /> Suggest automation
               </Link>
             </Button>
           ) : null}
@@ -176,6 +239,15 @@ export function RecommendationCard({
           ))}
         </div>
       </div>
+
+      {canDraftFollowup ? (
+        <DraftFollowupDialog
+          open={draftOpen}
+          onOpenChange={setDraftOpen}
+          rec={rec}
+          organizationId={organizationId}
+        />
+      ) : null}
     </article>
   )
 }

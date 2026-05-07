@@ -17,7 +17,8 @@
  * stays compatible with Phase 1's enriched response.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle, Filter, Loader2, Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +70,50 @@ export function WorkflowAutomationsSection() {
 
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null)
+
+  // AI Ops Phase 2 — read `?aiops=1&trigger=...&name=...&description=...`
+  // and pop the builder open with a pre-filled suggestion. This is a
+  // one-shot effect (`consumed`) so refreshing the dialog state
+  // doesn't re-trigger.
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const consumedSuggestionRef = useRef(false)
+  const [initialSuggestion, setInitialSuggestion] = useState<{
+    name?: string
+    description?: string
+    triggerType?: WorkflowTriggerType
+  } | null>(null)
+
+  useEffect(() => {
+    if (consumedSuggestionRef.current) return
+    if (searchParams.get("aiops") !== "1") return
+    consumedSuggestionRef.current = true
+    const triggerParam = searchParams.get("trigger") ?? ""
+    const triggerType =
+      triggerParam in TRIGGER_CATALOG ? (triggerParam as WorkflowTriggerType) : undefined
+    const name = (searchParams.get("name") ?? "").slice(0, 120)
+    const description = (searchParams.get("description") ?? "").slice(0, 500)
+    setInitialSuggestion({ name, description, triggerType })
+    setEditing(null)
+    setEditorOpen(true)
+    // Strip the query params so the suggestion isn't re-applied on
+    // navigation (back/forward, refresh).
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete("aiops")
+    next.delete("trigger")
+    next.delete("name")
+    next.delete("description")
+    const search = next.toString()
+    router.replace(search ? `/settings/automations?${search}` : "/settings/automations", {
+      scroll: false,
+    })
+  }, [router, searchParams])
+
+  // Drop the suggestion once the dialog closes so a subsequent
+  // "+ New automation" click starts blank.
+  useEffect(() => {
+    if (!editorOpen) setInitialSuggestion(null)
+  }, [editorOpen])
 
   const load = useCallback(async () => {
     if (!orgId) {
@@ -386,6 +431,7 @@ export function WorkflowAutomationsSection() {
         onOpenChange={setEditorOpen}
         organizationId={orgId}
         editing={editing}
+        initialSuggestion={initialSuggestion}
         onSaved={() => {
           void load()
         }}

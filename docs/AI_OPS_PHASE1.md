@@ -6,6 +6,11 @@ recommendations derived from existing Equipify data. Phase 1 is
 by a transparent rule, no records are mutated, and no customer
 messages are sent automatically.
 
+> Phase 2 — see `docs/AI_OPS_PHASE2.md` — adds AI narration, draft
+> follow-ups, automation deep-links, outcome telemetry, and a
+> dashboard digest card. The deterministic engine described here
+> remains the source of truth.
+
 ## What shipped
 
 ### 1. Recommendation engine (`lib/ai-ops/`)
