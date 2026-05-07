@@ -7,7 +7,7 @@ import {
   Building2, Users, DollarSign, TrendingUp, TrendingDown, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
   ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw, RotateCcw,
-  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket, Brain,
+  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket, Brain, Database,
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import {
@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
 import { AiOperationsContent } from "@/components/admin/ai-operations-content"
+import { ImportOperationsContent } from "@/components/admin/import-operations-content"
 import { MasterContextTabContent } from "@/components/admin/master-context-tab-content"
 import {
   Dialog,
@@ -250,7 +251,7 @@ function severityIcon(sev: string) {
   return <Info size={13} className="ds-icon-info shrink-0" />
 }
 
-type Tab = "accounts" | "analytics" | "flags" | "audit" | "ai_operations" | "master_context"
+type Tab = "accounts" | "analytics" | "flags" | "audit" | "ai_operations" | "import_operations" | "master_context"
 
 // ─── Sub-sections ─────────────────────────────────────────────────────────────
 
@@ -1952,6 +1953,7 @@ export default function PlatformAdminPage() {
     { key: "flags",     label: "Feature Flags", icon: Flag },
     { key: "audit",     label: "Audit Log",  icon: ScrollText },
     { key: "ai_operations", label: "AI Operations", icon: Brain },
+    { key: "import_operations", label: "Import Ops", icon: Database },
     { key: "master_context", label: "Master Context", icon: ScrollText },
   ]
 
@@ -2098,6 +2100,7 @@ export default function PlatformAdminPage() {
           {activeTab === "flags"     && <FlagsTab />}
           {activeTab === "audit"     && <AuditTab />}
           {activeTab === "ai_operations" && <AiOperationsContent />}
+          {activeTab === "import_operations" && <ImportOperationsContent />}
           {activeTab === "master_context" && <MasterContextTabContent />}
         </div>
       </div>

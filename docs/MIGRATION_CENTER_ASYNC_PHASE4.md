@@ -1,0 +1,170 @@
+# Migration Center - Async Phase 4
+
+## Scope
+
+Additive platform/admin import operations tooling on top of the existing async
+runner, cron processor, and run history. No changes to:
+
+- async runner architecture (`lib/migration-imports/async-runner.ts`)
+- cron processing flow (`/api/cron/process-import-runs`)
+- sync import path
+- projection / duplicate handling
+- per-job downloadable CSV exports
+- organization scope, RLS assumptions, portal continuity, QuickBooks export
+
+## Added behavior
+
+### 1. Platform/Admin Import Operations panel
+
+- New admin tab: **Import Ops** (`Tab` value `import_operations`).
+- Component: `components/admin/import-operations-content.tsx`.
+- Lives next to AI Operations / Master Context — same admin layout, KPI strip,
+  and tab pattern. No existing tab is removed or restructured.
+
+### 2. Queue health visibility + dashboard cards
+
+- Six lightweight health cards (queued, processing, retrying, failed,
+  completed-24h, stale-lease-recovered-24h).
+- Stuck-run approximation surfaces in the "Processing" card sub-line and as a
+  "likely stuck" pill on the run.
+
+### 3. Filtering + searching
+
+- Filters: free-text search (run ref / import ref / org name / error /
+  status), status, organization, import kind, "likely stuck only".
+- Search is server-aware where indexed (status / org / kind) and refined
+  client-side (post-join free-text + stuck heuristic).
+
+### 4. Bulk retry actions for failed imports
+
+- New API: `POST /api/platform/import-operations/bulk-retry`.
+- Implementation: `bulkRetryFailedRuns` in
+  `lib/migration-imports/operator-actions.ts`.
+- Re-queues `failed` runs by setting `status = queued`, clearing
+  `next_retry_at`/`lease_*`, and recording metadata in `recovery_json`.
+- Cron picks them back up via the existing `processNextRunnableImportRun` path.
+- Hard cap of 50 runs per request.
+
+### 5. Bulk recovery actions for stale/stuck imports
+
+- New API: `POST /api/platform/import-operations/bulk-recover`.
+- Implementation: `bulkRecoverStaleRuns` in `operator-actions.ts`.
+- Releases stale leases on `processing` runs whose lease has expired or whose
+  heartbeat is older than the existing 120s grace window. Re-queues the run so
+  the existing cron + lease-claim semantics continue to apply.
+- Refuses to override fresh leases (safety guardrail vs `recoverStaleLeases`,
+  which already runs each cron tick).
+
+### 6. Import operational metrics
+
+`GET /api/platform/import-operations` returns counters consistent with the
+cron counters and the run lifecycle:
+
+- `health.queued / processing / retrying / failed / completedRecent /
+  staleLeaseRecoveredRecent / stuckRunsApprox`
+- `totals.runsTotal / runsLast24h`
+- `recentTerminalThroughput.last24h | last7d` for completed / failed /
+  cancelled / completed-with-errors
+
+### 7. Operator/recovery workflows
+
+- Per-run inline **Retry** (failed) and **Recover** (likely stuck) buttons.
+- Bulk action bar with selection-aware buttons (only enables for runs that
+  qualify), preserving existing safety semantics.
+- Notes modal records context against a specific run.
+
+### 8. Operator notes/actions log foundations
+
+- New table: `organization_import_run_operator_events` (Phase 4 migration).
+- Helpers: `lib/migration-imports/operator-events.ts`
+  (`recordOperatorEvent`, `listOperatorEventsForJob`,
+  `listOperatorEventsForRun`, `listOperatorEventsForPlatform`).
+- Surfaces:
+  - `POST /api/platform/import-operations/runs/[runId]/notes`
+  - `GET  /api/platform/import-operations/runs/[runId]/notes`
+  - Recent events list inside the admin Import Ops tab
+- Bulk retry / bulk recover automatically append matching log entries
+  (`event_type = bulk_retry` or `bulk_recover_stale`) per affected run.
+
+## Migrations
+
+- `supabase/migrations/20260507040000_organization_import_async_runs_phase4.sql`
+  - Creates `organization_import_run_operator_events` (RLS: org owner/admin
+    select + insert; service role used for cross-tenant ops writes).
+  - Adds operational indexes on `organization_import_job_runs`:
+    - `(status, updated_at desc)`
+    - `(status, completed_at desc)`
+    - `(status, retry_count, next_retry_at)`
+
+## Files added
+
+- `supabase/migrations/20260507040000_organization_import_async_runs_phase4.sql`
+- `lib/migration-imports/operator-events.ts`
+- `lib/migration-imports/operator-actions.ts`
+- `lib/migration-imports/import-ops-metrics.ts`
+- `app/api/platform/import-operations/route.ts`
+- `app/api/platform/import-operations/bulk-retry/route.ts`
+- `app/api/platform/import-operations/bulk-recover/route.ts`
+- `app/api/platform/import-operations/runs/[runId]/notes/route.ts`
+- `components/admin/import-operations-content.tsx`
+- `docs/MIGRATION_CENTER_ASYNC_PHASE4.md` (this file)
+
+## Files changed
+
+- `app/(admin)/admin/page.tsx`
+  - Added `Database` icon import.
+  - Added `ImportOperationsContent` import.
+  - Extended `Tab` union with `"import_operations"`.
+  - Appended one new tab entry; existing tabs and layout untouched.
+- `lib/admin/master-context.generated.ts` (regenerated by
+  `pnpm update:master-context`).
+
+## Architectural decisions
+
+- **Service role only on the platform path.** All Phase 4 admin endpoints gate
+  by `isPlatformAdminEmail` first, then run via the service-role client. RLS
+  on the new table still enforces per-org access for in-app reads.
+- **No runner mutex changes.** Bulk retry/recover only adjust queue state +
+  recovery metadata; the cron continues to lease, retry, and complete runs
+  exactly as before.
+- **Stuck detection mirrors `STALE_LEASE_GRACE_SECONDS = 120s`.** Same
+  threshold as the existing `recoverStaleLeases` so admin-driven recovery and
+  automatic recovery agree.
+- **Operator events are append-only.** Foundation for future audit/alerting;
+  no admin-side delete path is exposed.
+- **Bulk batch cap of 50** to keep platform-admin actions predictable and
+  avoid long-running endpoints; the dashboard intentionally exposes pagination
+  via filtering rather than infinite scroll.
+- **No raw UUIDs in UI.** Run/import refs are 8-char uppercase derivatives
+  matching the existing `runRef` style.
+
+## TODOs (next phases)
+
+- Per-run drawer with full operator-event timeline + run history graph.
+- Cron-tick metrics persistence (e.g. `import_cron_runs` table) for chart
+  rendering of throughput/lease-recovery over time.
+- Email/Slack alerting hooks driven from `system_observation` events.
+- Operator note severity filter on the events list (already stored, not yet
+  surfaced as filter chip).
+- "Mark known issue" event type with auto-suppression of related alerts.
+- Optional org-scoped Import Ops drawer surface inside the per-org Migration
+  Center page (using the same operator-events table; RLS already supports it).
+
+## Verification / Build status
+
+- `pnpm update:master-context` → OK (125 API routes, 94 migrations).
+- `pnpm build` → Compiled successfully; new platform routes present
+  (`/api/platform/import-operations`, `/bulk-retry`, `/bulk-recover`,
+  `/runs/[runId]/notes`).
+- No new linter errors introduced in the changed files.
+
+## Deploy notes
+
+- Run the new migration:
+  `supabase migration up` (or apply
+  `20260507040000_organization_import_async_runs_phase4.sql` via your normal
+  pipeline).
+- No env changes required; `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and
+  the existing platform-admin email allowlist remain the gates.
+- Existing cron schedule (`/api/cron/process-import-runs`) is unchanged; bulk
+  retry/recover takes effect on the next tick.
