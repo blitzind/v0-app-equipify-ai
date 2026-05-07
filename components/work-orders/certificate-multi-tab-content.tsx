@@ -14,6 +14,11 @@ import {
   type CalibrationTemplate,
 } from "@/lib/calibration-certificates"
 import {
+  allLinkedInvoicesPaid,
+  fetchInvoicesLinkedToWorkOrder,
+} from "@/lib/portal/work-order-invoices"
+import { staffPortalCertificateBullets } from "@/lib/portal/certificate-release-staff"
+import {
   buildCertificatePrefillContextForEquipment,
   certificateFieldMapsEqual,
   seedCertificateValuesForWorkOrder,
@@ -37,6 +42,14 @@ type SlotState = {
   savedAt: string | null
   recordId: string | null
   prefillNotice: boolean
+  portalReleasedAt: string | null
+}
+
+type PortalRulesState = {
+  orgMode: string | null
+  custMode: string | null
+  hasLinked: boolean
+  linkedPaid: boolean
 }
 
 export type CertificateMultiTabContentProps = {
@@ -96,6 +109,8 @@ export function CertificateMultiTabContent({
   const [slotStates, setSlotStates] = useState<Record<string, SlotState>>({})
   const [initBusy, setInitBusy] = useState(true)
   const [savingAssetId, setSavingAssetId] = useState<string | null>(null)
+  const [releasingAssetId, setReleasingAssetId] = useState<string | null>(null)
+  const [portalRules, setPortalRules] = useState<PortalRulesState | null>(null)
   const touchedRef = useRef<Record<string, Set<string>>>({})
 
   const equipmentKey = equipmentAssets.map((a) => a.id).join(",")
@@ -113,6 +128,7 @@ export function CertificateMultiTabContent({
       setInitBusy(false)
       setTemplates([])
       setSlotStates({})
+      setPortalRules(null)
       return
     }
     let cancelled = false
@@ -123,6 +139,28 @@ export function CertificateMultiTabContent({
         const tmplList = await listCalibrationTemplates(supabase, orgId)
         if (cancelled) return
         setTemplates(tmplList)
+
+        const [{ data: orgRow }, { data: custRow }, linkedInvoices] = await Promise.all([
+          supabase.from("organizations").select("portal_certificate_release_mode").eq("id", orgId).maybeSingle(),
+          supabase
+            .from("customers")
+            .select("portal_certificate_release_mode")
+            .eq("id", workOrder.customerId)
+            .eq("organization_id", orgId)
+            .maybeSingle(),
+          fetchInvoicesLinkedToWorkOrder(supabase, orgId, workOrder.id),
+        ])
+        if (cancelled) return
+        setPortalRules({
+          orgMode:
+            (orgRow as { portal_certificate_release_mode?: string | null } | null)?.portal_certificate_release_mode ??
+            null,
+          custMode:
+            (custRow as { portal_certificate_release_mode?: string | null } | null)?.portal_certificate_release_mode ??
+            null,
+          hasLinked: linkedInvoices.length > 0,
+          linkedPaid: allLinkedInvoicesPaid(linkedInvoices),
+        })
 
         const { count: woCalRecordCount, error: woCalCountErr } = await supabase
           .from("calibration_records")
@@ -177,6 +215,7 @@ export function CertificateMultiTabContent({
             savedAt: record?.createdAt ?? null,
             recordId: record?.id ?? null,
             prefillNotice: seeded.hadPrefill,
+            portalReleasedAt: record?.portalReleasedAt ?? null,
           }
         }
         if (cancelled) return
@@ -198,6 +237,7 @@ export function CertificateMultiTabContent({
     workOrder.id,
     workOrder.equipmentId,
     workOrder.calibrationTemplateId,
+    workOrder.customerId,
     equipmentKey,
     equipmentAssets,
   ])
@@ -252,6 +292,7 @@ export function CertificateMultiTabContent({
         savedAt: null,
         recordId: null,
         prefillNotice: seeded.hadPrefill,
+        portalReleasedAt: null,
       },
     }))
   }
@@ -284,10 +325,50 @@ export function CertificateMultiTabContent({
           savedAt: record.createdAt,
           recordId: record.id,
           baseline: snapshot,
+          portalReleasedAt: record.portalReleasedAt ?? null,
         },
       }))
     } finally {
       setSavingAssetId(null)
+    }
+  }
+
+  async function handleReleaseToPortal(assetId: string) {
+    const st = slotStates[assetId]
+    const rid = st?.recordId?.trim()
+    if (!orgId || !rid) return
+    setReleasingAssetId(assetId)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/calibration-records/${encodeURIComponent(rid)}/portal-release`,
+        { method: "POST" },
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string; portal_released_at?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not release certificate",
+          description: data.error ?? "Request failed.",
+        })
+        return
+      }
+      const released =
+        typeof data.portal_released_at === "string" && data.portal_released_at.trim()
+          ? data.portal_released_at
+          : new Date().toISOString()
+      setSlotStates((prev) => ({
+        ...prev,
+        [assetId]: {
+          ...prev[assetId],
+          portalReleasedAt: released,
+        },
+      }))
+      toast({
+        title: "Released to portal",
+        description: "Customers can access this certificate according to your portal rules.",
+      })
+    } finally {
+      setReleasingAssetId(null)
     }
   }
 
@@ -322,6 +403,16 @@ export function CertificateMultiTabContent({
           const label = statusLabel(tmpl, st?.savedAt ?? null, st?.values ?? {})
           const code = (asset.equipmentCode ?? "").trim() || "—"
           const sn = (asset.serialNumber ?? "").trim() || "—"
+          const staffPortalLines = portalRules
+            ? staffPortalCertificateBullets({
+                organizationMode: portalRules.orgMode,
+                customerMode: portalRules.custMode,
+                invoiceOverride: null,
+                portalReleasedAt: st?.portalReleasedAt ?? null,
+                invoicesAllPaid: portalRules.linkedPaid,
+                hasLinkedInvoices: portalRules.hasLinked,
+              })
+            : []
 
           return (
             <div
@@ -422,6 +513,12 @@ export function CertificateMultiTabContent({
                     completedAtLabel={workOrder.completedDate ? fmtShort(workOrder.completedDate) : null}
                     manageTemplatesHref="/calibration-templates"
                     showPrefillHelper={st.prefillNotice}
+                    staffPortalLines={staffPortalLines}
+                    portalReleasedAt={st.portalReleasedAt ?? null}
+                    onReleaseToPortal={
+                      st.recordId?.trim() ? () => void handleReleaseToPortal(asset.id) : undefined
+                    }
+                    releaseToPortalBusy={releasingAssetId === asset.id}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">Loading asset certificate…</p>

@@ -40,6 +40,7 @@ import {
 } from "@/components/detail-drawer"
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
+import { InvoicePortalCertificatePanel } from "@/components/invoices/invoice-portal-certificate-panel"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
@@ -1061,6 +1062,8 @@ function InfoTab({
         )}
         <Row label="Created By" value={invoice.createdBy} />
       </Section>
+
+      {!editing ? <InvoicePortalCertificatePanel invoice={invoice} /> : null}
 
       {/* Total card */}
       <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 flex items-center justify-between">

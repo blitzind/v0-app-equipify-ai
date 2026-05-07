@@ -51,6 +51,7 @@ export type OrgInvoiceRow = {
   terms_custom_days?: number | null
   archived_by?: string | null
   archive_reason?: string | null
+  portal_certificate_release_override?: string | null
 }
 
 export type LineItemJson = {
@@ -233,5 +234,6 @@ export function mapOrgInvoiceToAdmin(
     isArchived: rowIsArchived(row.archived_at),
     termsCode: row.terms_code ?? null,
     termsCustomDays: row.terms_custom_days ?? null,
+    portalCertificateReleaseOverride: row.portal_certificate_release_override ?? null,
   }
 }

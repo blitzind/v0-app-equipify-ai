@@ -1780,6 +1780,8 @@ export interface AdminInvoice {
   termsCode?: string | null
   /** When terms_code is custom */
   termsCustomDays?: number | null
+  /** org_invoices.portal_certificate_release_override — portal certificate policy only. */
+  portalCertificateReleaseOverride?: string | null
 }
 
 export const adminInvoices: AdminInvoice[] = [

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 
@@ -6,6 +6,53 @@ function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   const m = new Map<string, T>()
   for (const r of rows) m.set(r.id, r)
   return [...m.values()]
+}
+
+/** Equipment list on `/equipment` — includes Phase 1 intelligence columns when present in DB. */
+export const EQUIPMENT_PAGE_SELECT_FULL =
+  "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, last_service_at, next_due_at, next_calibration_due_at, warranty_expires_at, location_label, archived_at"
+
+/** Same list without migration `20260720120000_equipment_intelligence_phase1` columns (PostgREST fails whole select if any column is unknown). */
+export const EQUIPMENT_PAGE_SELECT_LEGACY =
+  "id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, warranty_expires_at, location_label, archived_at"
+
+/**
+ * True when the equipment list query likely failed because intelligence columns are missing from the remote schema.
+ */
+export function isEquipmentListSchemaMismatchError(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  if (error.code === "42703") return true
+  const m = (error.message ?? "").toLowerCase()
+  const colHint =
+    m.includes("subcategory") ||
+    m.includes("next_calibration_due_at") ||
+    m.includes("calibration_interval_months")
+  if (!colHint) return false
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("undefined column") ||
+    m.includes("schema cache")
+  )
+}
+
+/**
+ * Structured log for equipment list failures (browser or server caller). Does not log raw row payloads.
+ */
+export function logEquipmentListQueryFailure(
+  phase: "initial" | "legacy_fallback" | "fatal",
+  error: PostgrestError,
+  meta?: { organizationId?: string },
+): void {
+  const payload = {
+    phase,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    ...(meta?.organizationId ? { organizationIdPrefix: meta.organizationId.slice(0, 8) } : {}),
+  }
+  console.error("[equipment list query]", payload)
 }
 
 /**

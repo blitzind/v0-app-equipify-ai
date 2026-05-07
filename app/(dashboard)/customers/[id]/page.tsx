@@ -41,6 +41,7 @@ import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
+import { CUSTOMER_CERT_RELEASE_OPTIONS, modeLabel } from "@/lib/portal/certificate-release-staff"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -94,6 +95,8 @@ type CustomerContract = {
   value: number
 }
 
+type CustomerPortalCertMode = "" | "immediate_release" | "release_on_payment" | "manual_release"
+
 type CustomerDetail = {
   id: string
   organizationId: string
@@ -107,6 +110,8 @@ type CustomerDetail = {
   locations: CustomerLocation[]
   contracts: CustomerContract[]
   isArchived: boolean
+  /** null = use organization default */
+  portalCertificateReleaseMode: string | null
 }
 
 type CustomerPlanRow = {
@@ -358,6 +363,7 @@ export default function CustomerDetailPage() {
     company: "",
     status: "Active" as CustomerStatus,
     notes: "",
+    portalCertificateRelease: "" as CustomerPortalCertMode,
   })
   const [locationModalOpen, setLocationModalOpen] = useState(false)
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
@@ -430,7 +436,7 @@ export default function CustomerDetailPage() {
 
       const { data: customerRow, error: customerError } = await supabase
         .from("customers")
-        .select("id, company_name, status, joined_at, notes, archived_at")
+        .select("id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode")
         .eq("id", id)
         .eq("organization_id", orgId)
         .single()
@@ -501,6 +507,8 @@ export default function CustomerDetailPage() {
       const locationsTyped = (locationsRows ?? []) as LocationRow[]
       const contractsTyped = (contractRows ?? []) as ContractRow[]
 
+      const custPortalMode = (customerRow as { portal_certificate_release_mode?: string | null })
+        .portal_certificate_release_mode
       const mapped: CustomerDetail = {
         id: customerRow.id,
         organizationId: orgId,
@@ -510,6 +518,12 @@ export default function CustomerDetailPage() {
         joinedDate: customerRow.joined_at ?? new Date().toISOString().slice(0, 10),
         openWorkOrders: 0,
         notes: customerRow.notes ?? "",
+        portalCertificateReleaseMode:
+          custPortalMode === "immediate_release" ||
+          custPortalMode === "release_on_payment" ||
+          custPortalMode === "manual_release"
+            ? custPortalMode
+            : null,
         contacts: contactsTyped.map((c) => ({
           id: c.id,
           name: c.full_name ?? "Unknown",
@@ -550,6 +564,12 @@ export default function CustomerDetailPage() {
           company: mapped.company,
           status: mapped.status,
           notes: mapped.notes,
+          portalCertificateRelease:
+            mapped.portalCertificateReleaseMode === "immediate_release" ||
+            mapped.portalCertificateReleaseMode === "release_on_payment" ||
+            mapped.portalCertificateReleaseMode === "manual_release"
+              ? mapped.portalCertificateReleaseMode
+              : "",
         })
         setLoading(false)
       }
@@ -859,6 +879,33 @@ export default function CustomerDetailPage() {
         return
       }
 
+      const pr = await fetch(
+        `/api/organizations/${encodeURIComponent(customer.organizationId)}/customers/${encodeURIComponent(customer.id)}/portal-certificate-release`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            portal_certificate_release_mode:
+              editForm.portalCertificateRelease === "" ? null : editForm.portalCertificateRelease,
+          }),
+        },
+      )
+      const prBody = (await pr.json().catch(() => ({}))) as {
+        error?: string
+        portal_certificate_release_mode?: string | null
+      }
+      if (!pr.ok) {
+        setActionError(prBody.error ?? "Could not update certificate release rule.")
+        return
+      }
+
+      const nextPortal =
+        prBody.portal_certificate_release_mode === "immediate_release" ||
+        prBody.portal_certificate_release_mode === "release_on_payment" ||
+        prBody.portal_certificate_release_mode === "manual_release"
+          ? prBody.portal_certificate_release_mode
+          : null
+
       setCustomer((prev) =>
         prev
           ? {
@@ -866,6 +913,7 @@ export default function CustomerDetailPage() {
               company: editForm.company.trim(),
               status: editForm.status,
               notes: editForm.notes.trim(),
+              portalCertificateReleaseMode: nextPortal,
             }
           : prev,
       )
@@ -1232,6 +1280,12 @@ export default function CustomerDetailPage() {
                       Archived
                     </Badge>
                   ) : null}
+                  <Badge variant="outline" className="text-[10px] font-normal border-border text-muted-foreground">
+                    Portal certs:{" "}
+                    {customer.portalCertificateReleaseMode
+                      ? modeLabel(customer.portalCertificateReleaseMode)
+                      : "Organization default"}
+                  </Badge>
                   {metricsLoading && (
                     <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" /> Syncing metrics…
@@ -1935,6 +1989,35 @@ export default function CustomerDetailPage() {
                   rows={4}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Certificate release rule for this customer
+                </label>
+                <select
+                  value={editForm.portalCertificateRelease}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      portalCertificateRelease: e.target.value as CustomerPortalCertMode,
+                    }))
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  aria-describedby="cust-portal-cert-help"
+                >
+                  {CUSTOMER_CERT_RELEASE_OPTIONS.map((o) => (
+                    <option key={o.value === "" ? "inherit" : o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <p id="cust-portal-cert-help" className="text-[11px] text-muted-foreground mt-1">
+                  {
+                    CUSTOMER_CERT_RELEASE_OPTIONS.find((o) => o.value === editForm.portalCertificateRelease)
+                      ?.helper
+                  }
+                </p>
               </div>
 
               {actionError && <p className="text-xs text-destructive">{actionError}</p>}

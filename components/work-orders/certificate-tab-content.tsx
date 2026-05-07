@@ -6,7 +6,7 @@ import {
   type OrganizationDocumentBranding,
 } from "@/lib/organization/document-branding"
 import Link from "next/link"
-import { CheckCircle2, FileDown, Loader2, Mail, Save } from "lucide-react"
+import { CheckCircle2, FileDown, Loader2, Mail, Save, Shield } from "lucide-react"
 import { DRAWER_FIELD_CLASS } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -63,6 +63,11 @@ type CertificateTabContentProps = {
   equipmentScopeId?: string | null
   /** When true, used inside a parent card (Work Order Certificates tab) to avoid double chrome. */
   embedded?: boolean
+  /** Staff-facing portal visibility summary for this certificate record. */
+  staffPortalLines?: Array<{ tone: "neutral" | "info" | "warning" | "success"; text: string }>
+  portalReleasedAt?: string | null
+  onReleaseToPortal?: () => void | Promise<void>
+  releaseToPortalBusy?: boolean
 }
 
 function fmtDateTime(iso: string) {
@@ -112,6 +117,10 @@ export function CertificateTabContent({
   workOrderId,
   equipmentScopeId = undefined,
   embedded = false,
+  staffPortalLines,
+  portalReleasedAt,
+  onReleaseToPortal,
+  releaseToPortalBusy = false,
 }: CertificateTabContentProps) {
   const { toast } = useToast()
   const resolvedLogoUrl = logoUrl?.trim() ? logoUrl.trim() : undefined
@@ -349,6 +358,68 @@ export function CertificateTabContent({
               Email certificate
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {(staffPortalLines?.length ||
+        onReleaseToPortal ||
+        (portalReleasedAt && portalReleasedAt.trim())) ? (
+        <div className="rounded-xl border border-border bg-muted/15 p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <Shield className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+            <div className="min-w-0 space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Customer portal (internal)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                How this certificate appears in the customer portal. Shown to staff only.
+              </p>
+            </div>
+          </div>
+          {staffPortalLines?.length ? (
+            <ul className="space-y-1.5 border-t border-border pt-3">
+              {staffPortalLines.map((b, i) => (
+                <li
+                  key={i}
+                  className={cn(
+                    "text-xs leading-snug",
+                    b.tone === "warning" && "text-[color:var(--status-warning)]",
+                    b.tone === "success" && "text-[color:var(--status-success)]",
+                    b.tone === "info" && "text-[color:var(--status-info)]",
+                    b.tone === "neutral" && "text-muted-foreground",
+                  )}
+                >
+                  {b.text}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {calibrationRecordId && onReleaseToPortal ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="text-xs"
+                disabled={
+                  Boolean(portalReleasedAt?.trim()) ||
+                  releaseToPortalBusy ||
+                  !calibrationRecordId
+                }
+                onClick={() => void onReleaseToPortal()}
+              >
+                {releaseToPortalBusy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                ) : null}
+                Release to portal
+              </Button>
+              {portalReleasedAt?.trim() ? (
+                <span className="text-[11px] text-[color:var(--status-success)]">
+                  Released to portal for customer access (manual rule satisfied).
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

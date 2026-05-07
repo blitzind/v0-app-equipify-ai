@@ -55,6 +55,8 @@ export type CalibrationRecord = {
   templateId: string
   values: Record<string, unknown>
   createdAt: string
+  /** When staff releases certificate under manual-release policy (portal). */
+  portalReleasedAt?: string | null
 }
 
 type CalibrationTemplateRow = {
@@ -80,6 +82,7 @@ type CalibrationRecordRow = {
   template_id: string
   values: unknown
   created_at: string
+  portal_released_at?: string | null
 }
 
 export function defaultValueForField(type: CalibrationFieldType): string | number | boolean {
@@ -195,6 +198,7 @@ function mapRecordRow(row: CalibrationRecordRow): CalibrationRecord {
     templateId: row.template_id,
     values: row.values && typeof row.values === "object" ? (row.values as Record<string, unknown>) : {},
     createdAt: row.created_at,
+    portalReleasedAt: row.portal_released_at ?? null,
   }
 }
 
@@ -316,7 +320,7 @@ export async function loadLatestCalibrationRecordForEquipment(
 ): Promise<CalibrationRecord | null> {
   const { data, error } = await supabase
     .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
     .eq("organization_id", organizationId)
     .eq("work_order_id", workOrderId)
     .eq("equipment_id", equipmentId)
@@ -458,7 +462,7 @@ export async function listCompletedCertificatesForOrg(
 
   const { data: records, error: recErr } = await supabase
     .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit)
@@ -634,7 +638,7 @@ export async function loadCompletedCertificateItemByRecordId(
 ): Promise<CompletedCertificateListItem | null> {
   const { data: rec, error } = await supabase
     .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
     .eq("organization_id", organizationId)
     .eq("id", recordId)
     .maybeSingle()
@@ -823,7 +827,7 @@ export async function createCalibrationRecord(
       values,
       created_by: user?.id ?? null,
     })
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
     .single()
   if (error) throw new Error(error.message)
   return mapRecordRow(data as CalibrationRecordRow)

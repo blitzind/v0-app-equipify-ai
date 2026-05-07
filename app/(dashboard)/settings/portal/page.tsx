@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   Globe, Paintbrush, LayoutGrid, LogIn, Mail, Link2,
   Save, Eye, Upload, Check,
+  Shield,
 } from "lucide-react"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { CERTIFICATE_RELEASE_OPTIONS } from "@/lib/portal/certificate-release-staff"
+import { useToast } from "@/hooks/use-toast"
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -99,6 +103,8 @@ const EMAIL_TEMPLATES = [
 ]
 
 export default function PortalSettingsPage() {
+  const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { toast } = useToast()
   const [saved, setSaved] = useState(false)
 
   // Branding
@@ -126,8 +132,78 @@ export default function PortalSettingsPage() {
   const [customDomain, setCustomDomain] = useState("")
   const [domainVerified] = useState(false)
 
-  function handleSave() {
+  const [certificateReleaseMode, setCertificateReleaseMode] = useState<
+    "immediate_release" | "release_on_payment" | "manual_release"
+  >("immediate_release")
+  const [certificateReleaseLoading, setCertificateReleaseLoading] = useState(true)
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !organizationId?.trim()) {
+      setCertificateReleaseLoading(false)
+      return
+    }
+    let cancelled = false
+    setCertificateReleaseLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/certificate-release-default`,
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          portal_certificate_release_mode?: string
+        }
+        if (cancelled) return
+        const m = data.portal_certificate_release_mode
+        if (m === "immediate_release" || m === "release_on_payment" || m === "manual_release") {
+          setCertificateReleaseMode(m)
+        }
+      } finally {
+        if (!cancelled) setCertificateReleaseLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgStatus, organizationId])
+
+  async function handleSave() {
+    if (orgStatus === "ready" && organizationId?.trim()) {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/certificate-release-default`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ portal_certificate_release_mode: certificateReleaseMode }),
+          },
+        )
+        const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+        if (!res.ok) {
+          toast({
+            variant: "destructive",
+            title: "Could not save certificate release default",
+            description: errBody.error ?? res.statusText,
+          })
+          return
+        }
+      } catch (e) {
+        toast({
+          variant: "destructive",
+          title: "Could not save certificate release default",
+          description: e instanceof Error ? e.message : String(e),
+        })
+        return
+      }
+    }
+
     setSaved(true)
+    toast({
+      title: "Settings saved",
+      description:
+        organizationId?.trim() && orgStatus === "ready"
+          ? "Portal certificate release default was updated."
+          : "Display preferences updated locally.",
+    })
     setTimeout(() => setSaved(false), 2500)
   }
 
@@ -195,6 +271,43 @@ export default function PortalSettingsPage() {
           >
             {faviconUploaded ? <><Check size={12} className="text-[color:var(--status-success)]" /> Favicon uploaded</> : <><Upload size={12} /> Upload Favicon</>}
           </Button>
+        </FieldRow>
+      </SectionCard>
+
+      {/* Certificate portal release (persisted) */}
+      <SectionCard
+        title="Certificates & compliance"
+        description="Default rule for when calibration certificates appear in the customer portal. Owners and admins can change this; managers use customer or invoice overrides for day-to-day operations."
+        icon={Shield}
+      >
+        <FieldRow
+          label="Default certificate release mode"
+          description="Applies when a customer has no override and an invoice does not override the rule."
+        >
+          <div className="space-y-1.5">
+            <select
+              value={certificateReleaseMode}
+              onChange={(e) =>
+                setCertificateReleaseMode(
+                  e.target.value as "immediate_release" | "release_on_payment" | "manual_release",
+                )
+              }
+              disabled={certificateReleaseLoading || orgStatus !== "ready" || !organizationId?.trim()}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground"
+              aria-label="Default certificate release mode"
+            >
+              {CERTIFICATE_RELEASE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              {
+                CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === certificateReleaseMode)?.helper
+              }
+            </p>
+          </div>
         </FieldRow>
       </SectionCard>
 

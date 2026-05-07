@@ -507,6 +507,7 @@ export async function updateOrgInvoice(
     lineItems: LineItemJson[]
     amountCents: number
     title: string
+    portalCertificateReleaseOverride: string | null
   }>,
 ): Promise<{ error?: string }> {
   const row: Record<string, unknown> = {}
@@ -518,6 +519,9 @@ export async function updateOrgInvoice(
   if (patch.lineItems !== undefined) row.line_items = patch.lineItems
   if (patch.amountCents !== undefined) row.amount_cents = patch.amountCents
   if (patch.title !== undefined) row.title = patch.title.trim()
+  if (patch.portalCertificateReleaseOverride !== undefined) {
+    row.portal_certificate_release_override = patch.portalCertificateReleaseOverride
+  }
 
   if (Object.keys(row).length === 0) return {}
 

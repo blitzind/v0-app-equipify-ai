@@ -56,6 +56,12 @@ import {
 } from "lucide-react"
 import { EquipmentDrawer } from "@/components/drawers/equipment-drawer"
 import { equipmentMatchesSearch, getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import {
+  EQUIPMENT_PAGE_SELECT_FULL,
+  EQUIPMENT_PAGE_SELECT_LEGACY,
+  isEquipmentListSchemaMismatchError,
+  logEquipmentListQueryFailure,
+} from "@/lib/equipment/equipment-detail-queries"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
@@ -91,15 +97,29 @@ type DbEquipmentRow = {
   name: string
   manufacturer: string | null
   category: string | null
-  subcategory: string | null
+  /** Absent when DB predates equipment intelligence migration. */
+  subcategory?: string | null
   serial_number: string | null
   status: "active" | "needs_service" | "out_of_service" | "in_repair"
   last_service_at: string | null
   next_due_at: string | null
-  next_calibration_due_at: string | null
+  next_calibration_due_at?: string | null
   warranty_expires_at: string | null
   location_label: string | null
   archived_at: string | null
+}
+
+function userVisibleEquipmentQueryError(err: { message?: string } | null): string {
+  if (process.env.NODE_ENV !== "production") {
+    return err?.message?.trim() || "Equipment query failed."
+  }
+  return "Could not load equipment. Try refreshing the page. If the problem continues, contact support."
+}
+
+function warnNonProduction(message: string): void {
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(message)
+  }
 }
 
 const statusColors: Record<Equipment["status"], string> = {
@@ -247,6 +267,7 @@ function EquipmentPageInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
+  const [queryError, setQueryError] = useState<string | null>(null)
 
   // Auto-open drawer from ?open= query param
   useEffect(() => {
@@ -300,31 +321,77 @@ function EquipmentPageInner() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        if (active) setEquipment([])
+        if (active) {
+          setEquipment([])
+          setQueryError(null)
+        }
         return
       }
 
       if (orgStatus !== "ready" || !activeOrgId) {
-        if (active) setEquipment([])
+        if (active) {
+          setEquipment([])
+          setQueryError(null)
+        }
         return
       }
 
       const orgId = activeOrgId
+      if (active) setQueryError(null)
 
       let eqQuery = supabase
         .from("equipment")
-        .select(
-          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, last_service_at, next_due_at, next_calibration_due_at, warranty_expires_at, location_label, archived_at",
-        )
+        .select(EQUIPMENT_PAGE_SELECT_FULL)
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
       eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
 
-      const { data: equipmentRows, error: equipmentError } = await eqQuery
+      const firstRes = await eqQuery
+      let equipmentError = firstRes.error
+      let equipmentRows = (firstRes.data as DbEquipmentRow[] | null) ?? null
+      let schemaFallback = false
 
-      if (equipmentError || !equipmentRows) {
-        if (active) setEquipment([])
+      if (equipmentError && isEquipmentListSchemaMismatchError(equipmentError)) {
+        logEquipmentListQueryFailure("initial", equipmentError, { organizationId: orgId })
+        warnNonProduction(
+          "[equipment] Full equipment select failed (missing intelligence columns?). Retrying with legacy select.",
+        )
+
+        let legacyQ = supabase
+          .from("equipment")
+          .select(EQUIPMENT_PAGE_SELECT_LEGACY)
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false })
+        legacyQ = applyArchivedAtScope(legacyQ, archiveScope)
+        const legacyRes = await legacyQ
+        equipmentError = legacyRes.error
+        equipmentRows = (legacyRes.data as DbEquipmentRow[] | null) ?? null
+        schemaFallback = true
+        if (!equipmentError && schemaFallback) {
+          warnNonProduction(
+            "[equipment] Loaded with LEGACY column set. Apply migration 20260720120000_equipment_intelligence_phase1 for full fields.",
+          )
+        }
+      }
+
+      if (equipmentError) {
+        logEquipmentListQueryFailure(schemaFallback ? "legacy_fallback" : "fatal", equipmentError, {
+          organizationId: orgId,
+        })
+        warnNonProduction(`[equipment] Query failed: ${equipmentError.message}`)
+        if (active) {
+          setEquipment([])
+          setQueryError(userVisibleEquipmentQueryError(equipmentError))
+        }
+        return
+      }
+
+      if (!equipmentRows) {
+        if (active) {
+          setEquipment([])
+          setQueryError(userVisibleEquipmentQueryError({ message: "No data returned." }))
+        }
         return
       }
 
@@ -350,7 +417,7 @@ function EquipmentPageInner() {
         in_repair: "In Repair",
       }
 
-      const mapped = (equipmentRows as DbEquipmentRow[]).map((row) => ({
+      const mapped = equipmentRows.map((row) => ({
         id: row.id,
         customerId: row.customer_id,
         customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
@@ -358,7 +425,7 @@ function EquipmentPageInner() {
         model: row.name,
         manufacturer: row.manufacturer ?? "",
         category: row.category ?? "General",
-        subcategory: row.subcategory ?? "",
+        subcategory: row.subcategory?.trim() ? row.subcategory : "",
         serialNumber: row.serial_number ?? "",
         lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
         nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
@@ -369,7 +436,10 @@ function EquipmentPageInner() {
         isArchived: Boolean(row.archived_at),
       }))
 
-      if (active) setEquipment(mapped)
+      if (active) {
+        setEquipment(mapped)
+        setQueryError(null)
+      }
     }
 
     void loadEquipment()
@@ -465,6 +535,20 @@ function EquipmentPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
+      {queryError ? (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {queryError}
+          {process.env.NODE_ENV !== "production" ? (
+            <span className="block text-xs mt-1 text-destructive/80 font-mono">
+              Check the browser console for <code className="font-mono">[equipment list query]</code> details.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">

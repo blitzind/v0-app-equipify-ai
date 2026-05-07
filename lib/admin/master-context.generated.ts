@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 109,
+  apiRouteHandlers: 113,
   sqlMigrations: 89,
   dashboardPages: 46,
-  componentsTsx: 136,
-  libTsFiles: 237,
+  componentsTsx: 137,
+  libTsFiles: 239,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **109** |
+| API route handlers (\`app/api/**/route.ts\`) | **113** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **89** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **46** |
-| \`components/**/*.tsx\` | **136** |
-| \`lib/**/*.ts\` | **237** |
+| \`components/**/*.tsx\` | **137** |
+| \`lib/**/*.ts\` | **239** |
 
 ### Vercel crons
 
@@ -60,6 +60,7 @@ organizations/[organizationId]/ai-assistants/[assistantId]/run/route.ts
 organizations/[organizationId]/ai-assistants/route.ts
 organizations/[organizationId]/ai-jobs/[jobId]/route.ts
 organizations/[organizationId]/ai-usage/route.ts
+organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
 organizations/[organizationId]/calibration-templates/import-commit/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/attachments/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/route.ts
@@ -76,6 +77,7 @@ organizations/[organizationId]/communications/templates/[templateId]/route.ts
 organizations/[organizationId]/communications/templates/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/[locationId]/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
+organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts
 organizations/[organizationId]/integrations/quickbooks/invoice-auto-sync/route.ts
 organizations/[organizationId]/integrations/quickbooks/route.ts
 organizations/[organizationId]/inventory/adjust/route.ts
@@ -92,8 +94,10 @@ organizations/[organizationId]/inventory/transactions/route.ts
 organizations/[organizationId]/inventory/transfer/route.ts
 organizations/[organizationId]/inventory/vehicle-stock/route.ts
 organizations/[organizationId]/invite-member/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
 organizations/[organizationId]/portal-invites/route.ts
+organizations/[organizationId]/portal/certificate-release-default/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/cancel/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/commit/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/duplicate-preview/route.ts
