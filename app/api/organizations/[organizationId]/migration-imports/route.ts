@@ -44,7 +44,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("organization_import_jobs")
     .select(
-      "id, kind, source_system, status, file_name, row_count, success_count, error_count, skipped_count, updated_count, strategy, created_at, completed_at, user_message",
+      "id, kind, source_system, status, file_name, row_count, processed_count, success_count, error_count, skipped_count, updated_count, strategy, active_run_id, cancel_requested_at, created_at, completed_at, user_message",
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
@@ -73,11 +73,14 @@ export async function GET(
       status: row.status,
       file_name: row.file_name,
       row_count: row.row_count,
+      processed_count: row.processed_count,
       success_count: row.success_count,
       error_count: row.error_count,
       skipped_count: row.skipped_count,
       updated_count: row.updated_count,
       strategy: row.strategy,
+      active_run_id: row.active_run_id,
+      cancel_requested_at: row.cancel_requested_at,
       created_at: row.created_at,
       completed_at: row.completed_at,
       user_message: row.user_message,

@@ -95,6 +95,9 @@ export async function POST(
     user_message: null,
     strategy,
     committed_by: userId,
+    active_run_id: null,
+    cancel_requested_at: null,
+    processed_count: 0,
   }
 
   await supabase.from("organization_import_jobs").update(jobUpdate).eq("id", jobId)
@@ -167,6 +170,8 @@ export async function POST(
     completed_at: completed,
     user_message: summaryMsg,
     strategy,
+    active_run_id: null,
+    processed_count: result.createdCount + result.updatedCount + result.skippedCount + result.errorCount,
   }
 
   await supabase.from("organization_import_jobs").update(countsUpdate).eq("id", jobId)

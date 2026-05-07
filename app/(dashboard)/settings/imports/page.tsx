@@ -30,11 +30,14 @@ type ImportJobListItem = {
   status: string
   file_name: string | null
   row_count: number | null
+  processed_count?: number | null
   success_count: number | null
   error_count: number | null
   skipped_count?: number | null
   updated_count?: number | null
   strategy?: string | null
+  active_run_id?: string | null
+  cancel_requested_at?: string | null
   created_at: string | null
   completed_at: string | null
   user_message: string | null
@@ -296,7 +299,9 @@ export default function MigrationCenterPage() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground text-xs max-w-[200px] truncate">
-                      {j.user_message ?? "—"}
+                      {j.status === "processing" || j.status === "queued"
+                        ? `progress ${(j.processed_count ?? 0).toLocaleString()} / ${(j.row_count ?? 0).toLocaleString()}${j.cancel_requested_at ? " · cancel requested" : ""}`
+                        : j.user_message ?? "—"}
                     </td>
                   </tr>
                 ))}

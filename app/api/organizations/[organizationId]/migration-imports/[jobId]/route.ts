@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { shortImportRef } from "@/lib/migration-imports/parse-csv"
+import { getActiveImportRun } from "@/lib/migration-imports/async-runner"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
 
 export const runtime = "nodejs"
@@ -30,7 +31,7 @@ export async function GET(
   const { data: job, error } = await supabase
     .from("organization_import_jobs")
     .select(
-      "kind, source_system, status, file_name, storage_path, column_mapping, options, preview_json, validation_summary, row_count, success_count, error_count, skipped_count, updated_count, strategy, user_message, created_at, started_at, completed_at",
+      "kind, source_system, status, file_name, storage_path, column_mapping, options, preview_json, validation_summary, row_count, processed_count, success_count, error_count, skipped_count, updated_count, strategy, user_message, cancel_requested_at, created_at, started_at, completed_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", jobId)
@@ -90,6 +91,7 @@ export async function GET(
   }
 
   const partialImport = j.status === "completed_with_errors"
+  const activeRun = await getActiveImportRun(gate, organizationId, jobId)
 
   return NextResponse.json({
     job: {
@@ -104,6 +106,7 @@ export async function GET(
       preview_json: j.preview_json,
       validation_summary: j.validation_summary,
       row_count: j.row_count,
+      processed_count: j.processed_count,
       success_count: j.success_count,
       updated_count: j.updated_count,
       skipped_count: j.skipped_count,
@@ -115,7 +118,9 @@ export async function GET(
       completed_at: j.completed_at,
       partialImport,
       canExport,
+      cancel_requested_at: j.cancel_requested_at,
     },
+    activeRun,
     rows,
     rowSampleLimit: rowLimit,
   })

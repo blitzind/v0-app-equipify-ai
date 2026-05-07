@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useState } from "react"
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Loader2, Upload } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Loader2, PauseCircle, PlayCircle, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -48,6 +48,21 @@ type CommitJson = {
   }[]
 }
 
+type AsyncRun = {
+  runId: string
+  status: string
+  chunkSize: number
+  totalRows: number
+  totalChunks: number
+  currentChunkIndex: number
+  processedCount: number
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+  errorCount: number
+  cancelRequestedAt: string | null
+}
+
 export function CsvImportFlow({
   kind,
   title,
@@ -73,6 +88,9 @@ export function CsvImportFlow({
   const [commitResult, setCommitResult] = useState<CommitJson | null>(null)
   const [strategy, setStrategy] = useState<MigrationImportStrategy>("skip_duplicates")
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [asyncMode, setAsyncMode] = useState(false)
+  const [asyncRun, setAsyncRun] = useState<AsyncRun | null>(null)
+  const [asyncBusy, setAsyncBusy] = useState(false)
 
   const runUpload = useCallback(async () => {
     if (!organizationId || !file) return
@@ -108,6 +126,7 @@ export function CsvImportFlow({
       })
       setColumnMappingText(JSON.stringify(json.columnMapping ?? {}, null, 2))
       setImportRef(null)
+      setAsyncRun(null)
       toast({ title: "Preview ready", description: "Review validation and outcome estimates, then adjust mapping if needed." })
     } catch {
       toast({ title: "Upload failed", description: "Network error.", variant: "destructive" })
@@ -189,6 +208,84 @@ export function CsvImportFlow({
       setConfirmOpen(false)
     }
   }, [organizationId, jobId, columnMappingText, strategy, toast])
+
+  const runAsyncAction = useCallback(
+    async (action: "start" | "tick" | "cancel") => {
+      if (!organizationId || !jobId) return null
+      let mapping: Record<string, string> = {}
+      try {
+        mapping = JSON.parse(columnMappingText) as Record<string, string>
+      } catch {
+        if (action === "start") {
+          toast({ title: "Invalid mapping", description: "Column mapping must be valid JSON.", variant: "destructive" })
+        }
+      }
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/async`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            columnMapping: mapping,
+            options: { strategy },
+          }),
+        },
+      )
+      const json = (await res.json()) as { run?: AsyncRun | null; message?: string; accepted?: boolean }
+      if (!res.ok) {
+        toast({ title: "Background import", description: json.message ?? "Action failed.", variant: "destructive" })
+        return null
+      }
+      return json
+    },
+    [organizationId, jobId, columnMappingText, strategy, toast],
+  )
+
+  const startAsyncRun = useCallback(async () => {
+    setAsyncBusy(true)
+    try {
+      const json = await runAsyncAction("start")
+      if (!json) return
+      setAsyncMode(true)
+      setAsyncRun(json.run ?? null)
+      toast({
+        title: "Background import started",
+        description: "Processing chunks in the background. Keep this tab open for best progress.",
+      })
+    } finally {
+      setAsyncBusy(false)
+      setConfirmOpen(false)
+    }
+  }, [runAsyncAction, toast])
+
+  const cancelAsyncRun = useCallback(async () => {
+    setAsyncBusy(true)
+    try {
+      const json = await runAsyncAction("cancel")
+      setAsyncRun(json?.run ?? null)
+      toast({ title: "Cancellation requested", description: "Current chunk will stop at the next checkpoint." })
+    } finally {
+      setAsyncBusy(false)
+    }
+  }, [runAsyncAction, toast])
+
+  useEffect(() => {
+    if (!asyncMode) return
+    const id = setInterval(() => {
+      void (async () => {
+        const json = await runAsyncAction("tick")
+        if (!json) return
+        const run = json.run ?? null
+        setAsyncRun(run)
+        if (!run) {
+          setAsyncMode(false)
+          toast({ title: "Background import completed", description: "Open job detail to review full outcomes." })
+        }
+      })()
+    }, 2500)
+    return () => clearInterval(id)
+  }, [asyncMode, runAsyncAction, toast])
 
   if (orgStatus !== "ready" || !organizationId) {
     return (
@@ -391,15 +488,56 @@ export function CsvImportFlow({
             </p>
           </div>
 
-          <Button
-            type="button"
-            onClick={() => setConfirmOpen(true)}
-            disabled={busy || !jobId}
-            className="gap-2"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Commit import…
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={busy || !jobId || asyncMode}
+              className="gap-2"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Commit import…
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void startAsyncRun()}
+              disabled={busy || asyncBusy || !jobId || asyncMode}
+              className="gap-2"
+            >
+              {asyncBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+              Start background import (beta)
+            </Button>
+            {asyncMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void cancelAsyncRun()}
+                disabled={asyncBusy}
+                className="gap-2"
+              >
+                <PauseCircle className="h-4 w-4" />
+                Request cancel
+              </Button>
+            ) : null}
+          </div>
+
+          {asyncRun ? (
+            <div className="rounded-md border border-border bg-muted/20 p-3 text-sm space-y-2">
+              <p className="font-medium text-foreground">Background import status: {asyncRun.status.replace(/_/g, " ")}</p>
+              <p className="text-muted-foreground">
+                Processed {asyncRun.processedCount.toLocaleString()} / {asyncRun.totalRows.toLocaleString()} rows · chunk{" "}
+                {asyncRun.currentChunkIndex}/{Math.max(asyncRun.totalChunks, 1)}
+              </p>
+              <p className="text-muted-foreground">
+                Created {asyncRun.createdCount} · Updated {asyncRun.updatedCount} · Skipped {asyncRun.skippedCount} · Errors{" "}
+                {asyncRun.errorCount}
+              </p>
+              {asyncRun.cancelRequestedAt ? (
+                <p className="text-amber-700 dark:text-amber-300">Cancellation requested; waiting for chunk checkpoint.</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
             <AlertDialogContent>

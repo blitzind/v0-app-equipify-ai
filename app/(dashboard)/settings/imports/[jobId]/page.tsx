@@ -18,6 +18,7 @@ type JobDetail = {
   status: string
   file_name: string | null
   row_count: number | null
+  processed_count?: number | null
   success_count: number | null
   updated_count: number | null
   skipped_count: number | null
@@ -31,6 +32,21 @@ type JobDetail = {
   preview_json: { headers?: string[]; truncated?: boolean; sample?: unknown[] } | null
   partialImport?: boolean
   canExport: boolean
+  cancel_requested_at?: string | null
+}
+
+type ActiveRun = {
+  runId: string
+  status: string
+  totalRows: number
+  totalChunks: number
+  currentChunkIndex: number
+  processedCount: number
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+  errorCount: number
+  cancelRequestedAt: string | null
 }
 
 type RowSample = {
@@ -60,6 +76,7 @@ export default function ImportJobDetailPage() {
   const [rowSampleLimit, setRowSampleLimit] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeRun, setActiveRun] = useState<ActiveRun | null>(null)
 
   const load = useCallback(async () => {
     if (!organizationId || !jobId || !allowed) {
@@ -74,6 +91,7 @@ export default function ImportJobDetailPage() {
       )
       const json = (await res.json()) as {
         job?: JobDetail
+        activeRun?: ActiveRun | null
         rows?: RowSample[]
         rowSampleLimit?: number
         message?: string
@@ -85,11 +103,13 @@ export default function ImportJobDetailPage() {
         return
       }
       setJob(json.job ?? null)
+      setActiveRun(json.activeRun ?? null)
       setRows(json.rows ?? [])
       setRowSampleLimit(json.rowSampleLimit ?? 0)
     } catch {
       setError("Could not load import job.")
       setJob(null)
+      setActiveRun(null)
       setRows([])
     } finally {
       setLoading(false)
@@ -99,6 +119,14 @@ export default function ImportJobDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!job || (job.status !== "processing" && job.status !== "queued")) return
+    const id = setInterval(() => {
+      void load()
+    }, 3000)
+    return () => clearInterval(id)
+  }, [job, load])
 
   if (permStatus === "loading" || orgStatus !== "ready") {
     return (
@@ -193,13 +221,29 @@ export default function ImportJobDetailPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm pt-2 border-t border-border">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm pt-2 border-t border-border">
               <Count label="Total rows" value={job.row_count} />
+              <Count label="Processed" value={job.processed_count ?? null} />
               <Count label="Created" value={job.success_count} />
               <Count label="Updated" value={job.updated_count} />
               <Count label="Skipped" value={job.skipped_count} />
               <Count label="Failed" value={job.error_count} tone="destructive" />
             </div>
+
+            {activeRun ? (
+              <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                <p className="font-medium text-foreground">
+                  Active background run: {activeRun.status.replace(/_/g, " ")}
+                </p>
+                <p className="text-muted-foreground">
+                  Processed {activeRun.processedCount}/{activeRun.totalRows} rows · chunk {activeRun.currentChunkIndex}/
+                  {Math.max(1, activeRun.totalChunks)}
+                </p>
+                {activeRun.cancelRequestedAt ? (
+                  <p className="text-amber-700 dark:text-amber-300">Cancellation requested.</p>
+                ) : null}
+              </div>
+            ) : null}
 
             {job.user_message ? (
               <p className="text-sm text-muted-foreground border-t border-border pt-3">{job.user_message}</p>
