@@ -44,10 +44,12 @@ import {
 import { CustomerDrawer } from "@/components/drawers/customer-drawer"
 import { ContactActions, type ContactActionsProps } from "@/components/contact-actions"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
+import { loadHierarchySummariesForList } from "@/lib/customers/hierarchy"
 
 type SortKey = "company" | "equipmentCount" | "openWorkOrders" | "joinedDate"
 type SortDir = "asc" | "desc"
 type ViewMode = "table" | "card"
+type HierarchyScope = "all" | "parents" | "children" | "standalone"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -74,6 +76,10 @@ type Customer = {
   openWorkOrders: number
   joinedDate: string
   isArchived?: boolean
+  /** Phase 1 hierarchy: number of direct active sub-accounts. */
+  childCount: number
+  /** Phase 1 hierarchy: parent customer (when this row is itself a sub-account). */
+  parent?: { id: string; companyName: string } | null
 }
 
 type DbCustomerRow = {
@@ -151,19 +157,33 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
     <Card onClick={onOpen} className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary font-semibold text-sm shrink-0">
                 {customer.company.slice(0, 2).toUpperCase()}
               </div>
-              <div>
-                <p className="font-semibold text-foreground leading-tight group-hover:text-primary transition-colors">
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground leading-tight group-hover:text-primary transition-colors truncate">
                   {customer.company}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{customer.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{customer.name}</p>
+                {customer.parent ? (
+                  <p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-[color:var(--status-info)]">
+                    Sub-account of <span className="font-semibold">{customer.parent.companyName}</span>
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1 justify-end">
               <StatusBadge status={customer.status} />
+              {customer.childCount > 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] border border-primary/30 bg-primary/10 text-primary font-semibold"
+                  title={`${customer.childCount} sub-account${customer.childCount === 1 ? "" : "s"}`}
+                >
+                  Parent · {customer.childCount}
+                </Badge>
+              ) : null}
               {customer.isArchived ? (
                 <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
                   Archived
@@ -272,6 +292,38 @@ function CustomersPageInner() {
 
       const contactsByCustomer = new Map<string, DbContactRow[]>()
       const locationsByCustomer = new Map<string, DbLocationRow[]>()
+      const hierarchyByCustomer = await loadHierarchySummariesForList(supabase, {
+        organizationId: orgId,
+        customerIds,
+      })
+
+      // Build a name lookup so we can render "Child of <Parent>" without a
+      // raw UUID. Parent ids may reference customers that are not in the
+      // current page (e.g. when filtering by status).
+      const parentCompanyById = new Map<string, string>()
+      const parentIdsToFetch = new Set<string>()
+      for (const summary of hierarchyByCustomer.values()) {
+        if (summary.parent_customer_id && !parentCompanyById.has(summary.parent_customer_id)) {
+          parentIdsToFetch.add(summary.parent_customer_id)
+        }
+      }
+      // Pre-fill from already-loaded rows.
+      for (const row of customerRows) {
+        if (parentIdsToFetch.has(row.id)) {
+          parentCompanyById.set(row.id, row.company_name)
+          parentIdsToFetch.delete(row.id)
+        }
+      }
+      if (parentIdsToFetch.size > 0) {
+        const { data: parentRows } = await supabase
+          .from("customers")
+          .select("id, company_name")
+          .eq("organization_id", orgId)
+          .in("id", Array.from(parentIdsToFetch))
+        for (const r of (parentRows ?? []) as Array<{ id: string; company_name: string }>) {
+          parentCompanyById.set(r.id, r.company_name)
+        }
+      }
 
       if (customerIds.length > 0) {
         const [{ data: contactRows }, { data: locationRows }] = await Promise.all([
@@ -331,6 +383,11 @@ function CustomersPageInner() {
           name: (c.full_name ?? "").trim() || displayName,
         }))
 
+        const hierarchy = hierarchyByCustomer.get(row.id) ?? null
+        const parentCompany = hierarchy?.parent_customer_id
+          ? parentCompanyById.get(hierarchy.parent_customer_id) ?? null
+          : null
+
         return {
           id: row.id,
           company: row.company_name,
@@ -343,6 +400,10 @@ function CustomersPageInner() {
           openWorkOrders: 0,
           joinedDate: row.joined_at ?? new Date().toISOString().slice(0, 10),
           isArchived: Boolean(row.archived_at),
+          childCount: hierarchy?.child_count ?? 0,
+          parent: parentCompany && hierarchy?.parent_customer_id
+            ? { id: hierarchy.parent_customer_id, companyName: parentCompany }
+            : null,
         }
       })
 
@@ -356,6 +417,13 @@ function CustomersPageInner() {
     }
   }, [refreshToken, orgStatus, activeOrgId, archiveScope])
 
+  // Phase 1: optional ?parent=<id> filter to scope the list to a parent's
+  // sub-accounts (deep-linked from the customer hierarchy card). The id is a
+  // valid customer id known to the user via RLS — never displayed raw.
+  const [parentFilterId, setParentFilterId] = useState<string | null>(null)
+  // Phase 2: hierarchy-scope filter (all/parents/children/standalone).
+  const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>("all")
+
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
@@ -363,7 +431,17 @@ function CustomersPageInner() {
       setArchiveScope("all")
       router.replace("/customers", { scroll: false })
     }
+    const parentId = searchParams.get("parent")
+    if (parentId) {
+      setParentFilterId(parentId)
+    }
   }, [searchParams, router])
+
+  const parentFilterCompany = useMemo(() => {
+    if (!parentFilterId) return null
+    const match = customers.find((c) => c.id === parentFilterId)
+    return match?.company ?? null
+  }, [customers, parentFilterId])
 
   const filtered = useMemo(() => {
     let list = [...customers]
@@ -382,6 +460,21 @@ function CustomersPageInner() {
       list = list.filter((c) => c.status === statusFilter)
     }
 
+    if (parentFilterId) {
+      list = list.filter((c) => c.parent?.id === parentFilterId)
+    }
+
+    if (hierarchyScope !== "all") {
+      list = list.filter((c) => {
+        const isParent = c.childCount > 0
+        const isChild = Boolean(c.parent)
+        if (hierarchyScope === "parents") return isParent
+        if (hierarchyScope === "children") return isChild
+        if (hierarchyScope === "standalone") return !isParent && !isChild
+        return true
+      })
+    }
+
     list.sort((a, b) => {
       let av: string | number = a[sortKey] as string | number
       let bv: string | number = b[sortKey] as string | number
@@ -395,7 +488,7 @@ function CustomersPageInner() {
     })
 
     return list
-  }, [customers, search, statusFilter, sortKey, sortDir])
+  }, [customers, search, statusFilter, sortKey, sortDir, parentFilterId, hierarchyScope])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -493,6 +586,22 @@ function CustomersPageInner() {
           </SelectContent>
         </Select>
 
+        {/* Phase 2: hierarchy scope filter. */}
+        <Select
+          value={hierarchyScope}
+          onValueChange={(v) => setHierarchyScope(v as HierarchyScope)}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Hierarchy" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All accounts</SelectItem>
+            <SelectItem value="parents">Parent accounts</SelectItem>
+            <SelectItem value="children">Sub-accounts</SelectItem>
+            <SelectItem value="standalone">Stand-alone</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
           <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewCustomerModal()}>
@@ -508,6 +617,29 @@ function CustomersPageInner() {
         Showing <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
         <span className="font-medium text-foreground">{customers.length}</span> customers
       </p>
+
+      {/* Parent-filter chip (Phase 1 hierarchy deep-link) */}
+      {parentFilterId ? (
+        <div className="-mt-2 flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+          <Building2 className="w-3.5 h-3.5 text-primary" aria-hidden />
+          <span className="text-foreground">
+            Showing sub-accounts of{" "}
+            <span className="font-semibold">
+              {parentFilterCompany ?? "selected parent account"}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setParentFilterId(null)
+              router.replace("/customers", { scroll: false })
+            }}
+            className="ml-auto text-[11px] font-medium text-primary hover:underline"
+          >
+            Clear filter
+          </button>
+        </div>
+      ) : null}
 
       {/* Table view */}
       {viewMode === "table" && (
@@ -569,17 +701,34 @@ function CustomersPageInner() {
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary font-semibold text-xs shrink-0">
                           {c.company.slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground text-sm group-hover:text-primary transition-colors">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground text-sm group-hover:text-primary transition-colors truncate">
                             {c.company}
                           </p>
-                          <p className="text-xs text-muted-foreground">{c.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{c.name}</p>
+                          {c.parent ? (
+                            <p
+                              className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-[color:var(--status-info)]"
+                              title={`Sub-account of ${c.parent.companyName}`}
+                            >
+                              Sub-account of {c.parent.companyName}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
                         <StatusBadge status={c.status} />
+                        {c.childCount > 0 ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] border border-primary/30 bg-primary/10 text-primary font-semibold"
+                            title={`${c.childCount} sub-account${c.childCount === 1 ? "" : "s"}`}
+                          >
+                            Parent · {c.childCount}
+                          </Badge>
+                        ) : null}
                         {c.isArchived ? (
                           <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
                             Archived

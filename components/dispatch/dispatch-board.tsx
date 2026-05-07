@@ -5,6 +5,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   closestCorners,
   useDroppable,
   useDraggable,
@@ -169,7 +170,16 @@ function DraggableWo({
     : undefined
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "touch-none select-none",
+        isDragging ? "cursor-grabbing" : "cursor-grab",
+      )}
+    >
       <WoCard wo={wo} dragging={isDragging} onOpen={onOpen} slotOverlap={slotOverlap} />
     </div>
   )
@@ -284,9 +294,15 @@ export function DispatchBoard({
 }) {
   const [activeWo, setActiveWo] = useState<DispatchWo | null>(null)
 
+  // Phase 4: separate Pointer + Touch sensors. Pointer uses a small distance
+  // threshold so mouse drag still feels snappy; Touch uses a short long-press
+  // delay so list scrolling on mobile is not hijacked into a drag.
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 180, tolerance: 6 },
     }),
   )
 

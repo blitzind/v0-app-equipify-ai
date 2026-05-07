@@ -91,6 +91,13 @@ import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { fetchInvoicesForWorkOrder } from "@/lib/org-quotes-invoices/repository"
 import type { AdminInvoice } from "@/lib/mock-data"
+import { SchedulingEventsCard } from "@/components/dispatch/scheduling-events-card"
+import {
+  composeReassignMessage,
+  composeRescheduleMessage,
+  composeUnassignMessage,
+  emitSchedulingEvent,
+} from "@/lib/dispatch/scheduling-events-client"
 
 let toastCounter = 0
 
@@ -339,6 +346,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [addEquipmentOpen, setAddEquipmentOpen] = useState(false)
   const [completionCertSlots, setCompletionCertSlots] = useState<CompletionCertificateSlot[]>([])
   const [linkedInvoices, setLinkedInvoices] = useState<AdminInvoice[]>([])
+  /** Phase 4: bumping this triggers the SchedulingEventsCard to re-fetch — used after we emit an event from this drawer. */
+  const [schedulingEventsRefresh, setSchedulingEventsRefresh] = useState(0)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -640,12 +649,34 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         return
       }
 
+      // Phase 4: non-blocking scheduling event. Failure is intentionally ignored.
+      const fromTechLabel = wo.technicianId === "unassigned" ? null : wo.technicianName
+      const toTechLabel =
+        userId
+          ? technicianAssignOptions.find((o) => o.id === userId)?.label ?? null
+          : null
+      void emitSchedulingEvent({
+        organizationId: activeOrgId,
+        workOrderId: wo.id,
+        eventType: userId ? "reassign" : "unassign",
+        severity: "info",
+        message: userId
+          ? composeReassignMessage({ fromTechLabel, toTechLabel })
+          : composeUnassignMessage({ fromTechLabel }),
+        metadata: {
+          source: "work_order_drawer.assign_dialog",
+          previousTechnicianId: wo.technicianId === "unassigned" ? null : wo.technicianId,
+          nextTechnicianId: userId ?? null,
+        },
+      })
+
       pushToast({
         title: userId ? "Technician assigned" : "Technician unassigned",
         description: getWorkOrderDisplay(wo),
       })
       setAssignDialogOpen(false)
       await loadWorkOrder()
+      setSchedulingEventsRefresh((n) => n + 1)
       onUpdated?.()
     } finally {
       setAssignSavingKey(null)
@@ -962,6 +993,63 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (error) {
       toast(`Update failed: ${error.message}`)
       return
+    }
+
+    // Phase 4: emit scheduling events when scheduled date/time or technician changed.
+    // Non-blocking — fired after the work_orders update succeeded.
+    const prevTechnicianId = wo.technicianId === "unassigned" ? null : wo.technicianId
+    const nextTechnicianIdRaw =
+      (draft.technicianId ?? wo.technicianId) === "unassigned"
+        ? null
+        : (draft.technicianId ?? wo.technicianId)
+    const techChanged = prevTechnicianId !== nextTechnicianIdRaw
+    const prevDate = wo.scheduledDate ?? null
+    const nextDate = (draft.scheduledDate ?? wo.scheduledDate) || null
+    const prevTime = wo.scheduledTime ?? null
+    const nextTime = (draft.scheduledTime ?? wo.scheduledTime) || null
+    const scheduleChanged = prevDate !== nextDate || prevTime !== nextTime
+
+    if (techChanged) {
+      const fromLabel = wo.technicianId === "unassigned" ? null : wo.technicianName
+      const toLabel = nextTechnicianIdRaw
+        ? draft.technicianName ?? technicianAssignOptions.find((o) => o.id === nextTechnicianIdRaw)?.label ?? null
+        : null
+      void emitSchedulingEvent({
+        organizationId: activeOrgId,
+        workOrderId: wo.id,
+        eventType: nextTechnicianIdRaw ? "reassign" : "unassign",
+        severity: "info",
+        message: nextTechnicianIdRaw
+          ? composeReassignMessage({ fromTechLabel: fromLabel, toTechLabel: toLabel })
+          : composeUnassignMessage({ fromTechLabel: fromLabel }),
+        metadata: {
+          source: "work_order_drawer.edit_save",
+          previousTechnicianId: prevTechnicianId,
+          nextTechnicianId: nextTechnicianIdRaw,
+        },
+      })
+    }
+    if (scheduleChanged) {
+      void emitSchedulingEvent({
+        organizationId: activeOrgId,
+        workOrderId: wo.id,
+        eventType: "reschedule",
+        severity: "info",
+        message: composeRescheduleMessage({
+          scheduledOn: nextDate,
+          scheduledTimeHhMm: nextTime,
+        }),
+        metadata: {
+          source: "work_order_drawer.edit_save",
+          previousScheduledOn: prevDate,
+          previousScheduledTime: prevTime,
+          nextScheduledOn: nextDate,
+          nextScheduledTime: nextTime,
+        },
+      })
+    }
+    if (techChanged || scheduleChanged) {
+      setSchedulingEventsRefresh((n) => n + 1)
     }
 
     if (prevStatusDb !== nextStatusDb) {
@@ -1757,6 +1845,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                 Operational signals
               </p>
               <OperationalBadgeRow badges={operationalDrawerBadges} cap={8} />
+            </div>
+          ) : null}
+
+          {!editing && wo ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <SchedulingEventsCard workOrderId={wo.id} refreshKey={schedulingEventsRefresh} />
             </div>
           ) : null}
 

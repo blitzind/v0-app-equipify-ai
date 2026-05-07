@@ -56,9 +56,19 @@ import {
 import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
 import {
   describeConflicts,
+  describeNeighborConflicts,
+  findNeighborSlotConflicts,
   findSlotConflicts,
 } from "@/lib/dispatch/scheduling-conflicts"
 import { useToast } from "@/hooks/use-toast"
+import {
+  composeConflictAcknowledgedMessage,
+  composeReassignMessage,
+  composeRescheduleMessage,
+  composeUnassignMessage,
+  emitSchedulingEvent,
+  severityForConflictAck,
+} from "@/lib/dispatch/scheduling-events-client"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
 const DISPATCH_STATUSES_BASE = ["open", "scheduled", "in_progress", "completed"] as const
@@ -87,6 +97,10 @@ function isBoolean(v: unknown): v is boolean {
   return typeof v === "boolean"
 }
 
+function isDispatchSort(v: unknown): v is "schedule" | "priority" {
+  return v === "schedule" || v === "priority"
+}
+
 function DispatchPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { toast } = useToast()
@@ -102,7 +116,13 @@ function DispatchPageInner() {
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
   const [dispatchFilter, setDispatchFilter] = useState<DispatchFilterId>("all")
-  const [dispatchSort, setDispatchSort] = useState<"schedule" | "priority">("schedule")
+  const [dispatchSort, setDispatchSort] = usePersistedDispatchPref<"schedule" | "priority">({
+    scope: "dispatch",
+    key: "sort",
+    organizationId: activeOrgId,
+    defaultValue: "schedule",
+    isValid: isDispatchSort,
+  })
   const [statusFilter, setStatusFilter] = usePersistedDispatchPref<DispatchStatusKey[]>({
     scope: "dispatch",
     key: "status-filter",
@@ -471,9 +491,21 @@ function DispatchPageInner() {
       },
       { excludeWoId: args.woId },
     )
+    const neighborConflicts = findNeighborSlotConflicts(
+      workOrders,
+      {
+        technicianId: args.assignedUserId,
+        scheduledOn: args.scheduledOn,
+        scheduledTimeHhMm: args.scheduledTimeHhMm,
+      },
+      { excludeWoId: args.woId },
+    )
     const techLabel = args.assignedUserId
       ? technicians.find((t) => t.id === args.assignedUserId)?.label ?? null
       : null
+    const previousTechLabel = wo.assigned_user_id
+      ? technicians.find((t) => t.id === wo.assigned_user_id)?.label ?? wo.technicianLabel ?? null
+      : wo.technicianLabel ?? null
 
     setPersistBusy(true)
     const supabase = createBrowserSupabaseClient()
@@ -500,6 +532,49 @@ function DispatchPageInner() {
     setLoadError(null)
     setRefresh((n) => n + 1)
 
+    // Phase 4: emit scheduling events. Always non-blocking — silently dropped on failure.
+    const orgId = activeOrgId
+    const techChanged = wo.assigned_user_id !== args.assignedUserId
+    const scheduleChanged =
+      wo.scheduled_on !== args.scheduledOn || (wo.scheduled_time ?? null) !== (args.scheduledTimeHhMm ?? null)
+
+    if (techChanged) {
+      void emitSchedulingEvent({
+        organizationId: orgId,
+        workOrderId: args.woId,
+        eventType: args.assignedUserId ? "reassign" : "unassign",
+        severity: "info",
+        message: args.assignedUserId
+          ? composeReassignMessage({ fromTechLabel: previousTechLabel, toTechLabel: techLabel })
+          : composeUnassignMessage({ fromTechLabel: previousTechLabel }),
+        metadata: {
+          source: "dispatch_board.drag_drop",
+          previousTechnicianId: wo.assigned_user_id ?? null,
+          nextTechnicianId: args.assignedUserId,
+        },
+      })
+    }
+    if (scheduleChanged && args.assignedUserId) {
+      void emitSchedulingEvent({
+        organizationId: orgId,
+        workOrderId: args.woId,
+        eventType: "reschedule",
+        severity: "info",
+        message: composeRescheduleMessage({
+          scheduledOn: args.scheduledOn,
+          scheduledTimeHhMm: args.scheduledTimeHhMm,
+        }),
+        metadata: {
+          source: "dispatch_board.drag_drop",
+          previousScheduledOn: wo.scheduled_on,
+          previousScheduledTime: wo.scheduled_time,
+          nextScheduledOn: args.scheduledOn,
+          nextScheduledTime: args.scheduledTimeHhMm,
+          technicianId: args.assignedUserId,
+        },
+      })
+    }
+
     const conflictMsg = describeConflicts(conflicts, techLabel)
     if (conflictMsg) {
       toast({
@@ -507,6 +582,50 @@ function DispatchPageInner() {
         title: "Scheduling conflict",
         description: `${conflictMsg} The move was saved — review the slot before dispatching.`,
       })
+      void emitSchedulingEvent({
+        organizationId: orgId,
+        workOrderId: args.woId,
+        eventType: "conflict_acknowledged",
+        severity: severityForConflictAck("exact"),
+        message: composeConflictAcknowledgedMessage({
+          conflictCount: conflicts.length,
+          techLabel,
+          proximity: "exact",
+        }),
+        metadata: {
+          source: "dispatch_board.drag_drop",
+          proximity: "exact",
+          conflictCount: conflicts.length,
+          // Keep DB-only IDs in metadata; never rendered in the timeline message.
+          conflictWorkOrderIds: conflicts.map((c) => c.id),
+        },
+      })
+    } else {
+      const neighborMsg = describeNeighborConflicts(neighborConflicts, techLabel)
+      if (neighborMsg) {
+        toast({
+          variant: "default",
+          title: "Tight schedule",
+          description: `${neighborMsg} The move was saved.`,
+        })
+        void emitSchedulingEvent({
+          organizationId: orgId,
+          workOrderId: args.woId,
+          eventType: "conflict_acknowledged",
+          severity: severityForConflictAck("neighbor"),
+          message: composeConflictAcknowledgedMessage({
+            conflictCount: neighborConflicts.length,
+            techLabel,
+            proximity: "neighbor",
+          }),
+          metadata: {
+            source: "dispatch_board.drag_drop",
+            proximity: "neighbor",
+            conflictCount: neighborConflicts.length,
+            conflictWorkOrderIds: neighborConflicts.map((c) => c.id),
+          },
+        })
+      }
     }
   }
 

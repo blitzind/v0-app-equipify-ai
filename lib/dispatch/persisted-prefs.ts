@@ -22,6 +22,7 @@ export type DispatchPrefKey =
   | "week-overview-visible" // boolean — Phase 3: collapsed by default
   | "more-filters-expanded" // boolean — Phase 3: advanced focus filters
   | "all-signals-expanded" // boolean — Phase 3: KPI overflow
+  | "sort" // "schedule" | "priority" — Phase 4: dispatch row sort
 
 export function dispatchPrefStorageKey(
   scope: DispatchPrefScope,

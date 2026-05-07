@@ -27,8 +27,16 @@ import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import type { DispatchWo } from "@/components/dispatch/dispatch-board"
 import {
   describeConflicts,
+  describeNeighborConflicts,
+  findNeighborSlotConflicts,
   findSlotConflicts,
 } from "@/lib/dispatch/scheduling-conflicts"
+import {
+  composeConflictAcknowledgedMessage,
+  composeQuickAddMessage,
+  emitSchedulingEvent,
+  severityForConflictAck,
+} from "@/lib/dispatch/scheduling-events-client"
 
 /**
  * Phase 1 quick-create scheduling flow.
@@ -205,6 +213,18 @@ export function QuickAppointmentDialog({
     })
   }, [existingWorkOrders, technicianId, date, timeHhMm])
 
+  // Phase 4: ±1 slot warning. Only renders when no exact-slot conflict already
+  // dominates the alert (we keep the inline UI to one row at a time).
+  const neighborConflicts = useMemo(() => {
+    if (!existingWorkOrders || existingWorkOrders.length === 0) return []
+    if (!technicianId || !date || !timeHhMm) return []
+    return findNeighborSlotConflicts(existingWorkOrders, {
+      technicianId,
+      scheduledOn: date,
+      scheduledTimeHhMm: timeHhMm,
+    })
+  }, [existingWorkOrders, technicianId, date, timeHhMm])
+
   const conflictTechLabel = useMemo(
     () => technicians.find((t) => t.id === technicianId)?.label ?? null,
     [technicians, technicianId],
@@ -212,6 +232,13 @@ export function QuickAppointmentDialog({
   const conflictMessage = useMemo(
     () => describeConflicts(conflicts, conflictTechLabel),
     [conflicts, conflictTechLabel],
+  )
+  const neighborConflictMessage = useMemo(
+    () =>
+      conflicts.length > 0
+        ? null
+        : describeNeighborConflicts(neighborConflicts, conflictTechLabel),
+    [conflicts.length, neighborConflicts, conflictTechLabel],
   )
 
   const handleSubmit = useCallback(async () => {
@@ -249,27 +276,96 @@ export function QuickAppointmentDialog({
       signedAt: "",
     }
 
-    const { error } = await supabase.from("work_orders").insert({
-      organization_id: organizationId,
-      customer_id: customerId,
-      equipment_id: equipmentId,
-      title,
-      status,
-      priority: uiPriorityToDb(priority),
-      type: uiTypeToDb(serviceType),
-      scheduled_on: date,
-      scheduled_time: normalizeTimeForDb(timeHhMm),
-      ...assign,
-      notes: trimmedNotes || null,
-      problem_reported: trimmedNotes || title,
-      repair_log: repairLog,
-    })
+    const { data: insertedRow, error } = await supabase
+      .from("work_orders")
+      .insert({
+        organization_id: organizationId,
+        customer_id: customerId,
+        equipment_id: equipmentId,
+        title,
+        status,
+        priority: uiPriorityToDb(priority),
+        type: uiTypeToDb(serviceType),
+        scheduled_on: date,
+        scheduled_time: normalizeTimeForDb(timeHhMm),
+        ...assign,
+        notes: trimmedNotes || null,
+        problem_reported: trimmedNotes || title,
+        repair_log: repairLog,
+      })
+      .select("id")
+      .single()
 
     setSubmitting(false)
     if (error) {
       setSubmitError(error.message)
       return
     }
+
+    // Phase 4: emit scheduling events (non-blocking — never gate the user).
+    const newWoId = (insertedRow as { id?: string } | null)?.id ?? null
+    const techLabel = technicianId
+      ? technicians.find((t) => t.id === technicianId)?.label ?? null
+      : null
+    if (newWoId) {
+      void emitSchedulingEvent({
+        organizationId,
+        workOrderId: newWoId,
+        eventType: "quick_add",
+        severity: "info",
+        message: composeQuickAddMessage({
+          scheduledOn: date,
+          scheduledTimeHhMm: timeHhMm || null,
+          techLabel,
+        }),
+        metadata: {
+          source: "dispatch_quick_add_dialog",
+          // ID stays in metadata only (RLS-protected); never rendered.
+          technicianId: technicianId || null,
+          serviceType,
+          priority,
+        },
+      })
+
+      if (conflicts.length > 0) {
+        void emitSchedulingEvent({
+          organizationId,
+          workOrderId: newWoId,
+          eventType: "conflict_acknowledged",
+          severity: severityForConflictAck("exact"),
+          message: composeConflictAcknowledgedMessage({
+            conflictCount: conflicts.length,
+            techLabel,
+            proximity: "exact",
+          }),
+          metadata: {
+            source: "dispatch_quick_add_dialog",
+            proximity: "exact",
+            conflictCount: conflicts.length,
+            conflictWorkOrderIds: conflicts.map((c) => c.id),
+          },
+        })
+      } else if (neighborConflicts.length > 0) {
+        void emitSchedulingEvent({
+          organizationId,
+          workOrderId: newWoId,
+          eventType: "conflict_acknowledged",
+          severity: severityForConflictAck("neighbor"),
+          message: composeConflictAcknowledgedMessage({
+            conflictCount: neighborConflicts.length,
+            techLabel,
+            proximity: "neighbor",
+          }),
+          metadata: {
+            source: "dispatch_quick_add_dialog",
+            proximity: "neighbor",
+            conflictCount: neighborConflicts.length,
+            conflictWorkOrderIds: neighborConflicts.map((c) => c.id),
+          },
+        })
+      }
+    }
+
     onCreated?.()
     onClose()
   }, [
@@ -288,6 +384,9 @@ export function QuickAppointmentDialog({
     timeHhMm,
     onCreated,
     onClose,
+    conflicts,
+    neighborConflicts,
+    technicians,
   ])
 
   if (!open) return null
@@ -514,6 +613,34 @@ export function QuickAppointmentDialog({
                 <p className="mt-1 text-muted-foreground/70">
                   You can still continue — this is informational only.
                 </p>
+              </div>
+            </div>
+          ) : neighborConflictMessage ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-foreground"
+            >
+              <AlertTriangle
+                className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground"
+                aria-hidden
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-foreground">Tight schedule</p>
+                <p className="mt-0.5 text-muted-foreground">{neighborConflictMessage}</p>
+                {neighborConflicts.length > 0 ? (
+                  <ul className="mt-1 space-y-0.5 text-muted-foreground/90">
+                    {neighborConflicts.slice(0, 3).map((c) => (
+                      <li key={c.id} className="truncate">
+                        ·{" "}
+                        {c.workOrderNumber ? (
+                          <span className="font-mono">#{c.workOrderNumber}</span>
+                        ) : null}{" "}
+                        {c.title} — {c.customerName}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             </div>
           ) : null}

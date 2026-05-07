@@ -36,6 +36,11 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import {
+  loadCustomerHierarchy,
+  type CustomerHierarchySummary,
+} from "@/lib/customers/hierarchy"
+import { CustomerHierarchyCard } from "@/components/customers/customer-hierarchy-card"
 
 let toastCounter = 0
 
@@ -474,6 +479,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
   >([])
   const [drawerContacts, setDrawerContacts] = useState<DrawerContact[]>([])
   const [drawerLocations, setDrawerLocations] = useState<Location[]>([])
+  const [hierarchySummary, setHierarchySummary] = useState<CustomerHierarchySummary | null>(null)
+  const [hierarchyLoading, setHierarchyLoading] = useState(false)
   const [contactModalOpen, setContactModalOpen] = useState(false)
   const [editingContactId, setEditingContactId] = useState<string | null>(null)
   const [contactForm, setContactForm] = useState({
@@ -708,6 +715,31 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
     void loadOrgAndRelated()
   }, [customerId, drawerRefresh, activeOrgId, orgStatus])
 
+  // Hierarchy summary loads independently so the rest of the drawer never
+  // waits on it. Always non-blocking; missing-migration cases degrade in-card.
+  useEffect(() => {
+    let cancelled = false
+    if (!customerId || orgStatus !== "ready" || !activeOrgId) {
+      setHierarchySummary(null)
+      setHierarchyLoading(false)
+      return
+    }
+    setHierarchyLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const summary = await loadCustomerHierarchy(supabase, {
+        organizationId: activeOrgId,
+        customerId,
+      }).catch(() => null)
+      if (cancelled) return
+      setHierarchySummary(summary)
+      setHierarchyLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customerId, drawerRefresh, activeOrgId, orgStatus])
+
   useEffect(() => {
     return () => {
       if (closeTimerRef.current) {
@@ -900,6 +932,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
           />
           <DrawerRow label="Locations" value={drawerLocations.map((l) => l.city).join(", ") || "—"} />
         </CustomerDrawerCard>
+
+        {/* Hierarchy + billing/service address summary (Phase 1) */}
+        <CustomerHierarchyCard
+          summary={hierarchySummary}
+          loading={hierarchyLoading}
+          companyName={header.company}
+          variant="drawer"
+        />
 
         {/* Active maintenance plans */}
         <CustomerDrawerCard title={`Maintenance Plans (${activeCustPlans.length} active)`}>

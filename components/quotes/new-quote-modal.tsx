@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { X, Plus, Trash2, Send, FilePen, PackageSearch } from "lucide-react"
+import { X, Plus, Trash2, Send, FilePen, PackageSearch, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useQuotes } from "@/lib/quote-invoice-store"
 import type { QuoteStatus } from "@/lib/mock-data"
@@ -11,6 +11,10 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import {
+  loadCustomerHierarchy,
+  type CustomerHierarchySummary,
+} from "@/lib/customers/hierarchy"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
@@ -158,6 +162,7 @@ export function NewQuoteModal({
   const [catalogOpen, setCatalogOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState("")
+  const [customerHierarchy, setCustomerHierarchy] = useState<CustomerHierarchySummary | null>(null)
   const [equipmentId, setEquipmentId] = useState("")
   const [workOrderId, setWorkOrderId] = useState("")
   const [title, setTitle] = useState("")
@@ -371,6 +376,28 @@ export function NewQuoteModal({
     }
   }, [open, organizationId, customerId, prefilledEquipmentId])
 
+  // Phase 1: load customer hierarchy summary so we can warn about a missing
+  // billing address before the user finalizes a quote.
+  useEffect(() => {
+    if (!open || !organizationId || !customerId) {
+      setCustomerHierarchy(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const summary = await loadCustomerHierarchy(supabase, {
+        organizationId,
+        customerId,
+      }).catch(() => null)
+      if (cancelled) return
+      setCustomerHierarchy(summary)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, customerId])
+
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -565,6 +592,15 @@ export function NewQuoteModal({
                     ))}
                   </FieldSelect>
                   <FieldError msg={errors.customerId} />
+                  {customerHierarchy?.billingAddressMissing ? (
+                    <div className="mt-2 flex items-start gap-1.5 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                      <span>
+                        No billing address on file. The quote will fall back to the
+                        default service location until a billing address is added.
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <Label>Equipment</Label>

@@ -42,6 +42,19 @@ import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
 import { CUSTOMER_CERT_RELEASE_OPTIONS, modeLabel } from "@/lib/portal/certificate-release-staff"
+import {
+  loadCustomerHierarchy,
+  type CustomerHierarchySummary,
+} from "@/lib/customers/hierarchy"
+import { CustomerHierarchyCard } from "@/components/customers/customer-hierarchy-card"
+import { ManageHierarchyDialog } from "@/components/customers/manage-hierarchy-dialog"
+import {
+  loadCustomerRollupMetrics,
+  type CustomerRollupMetrics,
+} from "@/lib/customers/rollup-metrics"
+import { CustomerRollupCard } from "@/components/customers/customer-rollup-card"
+import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
+import { ParentAccountCard } from "@/components/customers/parent-account-card"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -406,6 +419,11 @@ export default function CustomerDetailPage() {
   const [lifetimeRevenueCents, setLifetimeRevenueCents] = useState(0)
   const [equipmentCreatedAt, setEquipmentCreatedAt] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState("overview")
+  const [hierarchySummary, setHierarchySummary] = useState<CustomerHierarchySummary | null>(null)
+  const [hierarchyLoading, setHierarchyLoading] = useState(false)
+  const [hierarchyDialogOpen, setHierarchyDialogOpen] = useState(false)
+  const [rollupMetrics, setRollupMetrics] = useState<CustomerRollupMetrics | null>(null)
+  const [rollupLoading, setRollupLoading] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -581,6 +599,56 @@ export default function CustomerDetailPage() {
       active = false
     }
   }, [id, refreshToken, orgStatus, activeOrgId])
+
+  // Hierarchy + billing/service summary (Phase 1) — non-blocking.
+  useEffect(() => {
+    let cancelled = false
+    if (!id || orgStatus !== "ready" || !activeOrgId) {
+      setHierarchySummary(null)
+      setHierarchyLoading(false)
+      return
+    }
+    setHierarchyLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const summary = await loadCustomerHierarchy(supabase, {
+        organizationId: activeOrgId,
+        customerId: id,
+      }).catch(() => null)
+      if (cancelled) return
+      setHierarchySummary(summary)
+      setHierarchyLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [id, refreshToken, activeOrgId, orgStatus])
+
+  // Phase 2 rollup metrics — only computed for parent accounts (childCount > 0).
+  // Loads in parallel with the hierarchy summary so the rollup card can
+  // appear alongside the existing overview without blocking the page.
+  useEffect(() => {
+    let cancelled = false
+    if (!hierarchySummary || hierarchySummary.childCount === 0) {
+      setRollupMetrics(null)
+      setRollupLoading(false)
+      return
+    }
+    setRollupLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const metrics = await loadCustomerRollupMetrics(supabase, {
+        organizationId: hierarchySummary.organizationId,
+        rootCustomerId: hierarchySummary.customerId,
+      }).catch(() => null)
+      if (cancelled) return
+      setRollupMetrics(metrics)
+      setRollupLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [hierarchySummary, refreshToken])
 
   useEffect(() => {
     if (!customer) {
@@ -1280,6 +1348,25 @@ export default function CustomerDetailPage() {
                       Archived
                     </Badge>
                   ) : null}
+                  {/* Phase 2 hierarchy chip — sits in the existing header badge row. */}
+                  {hierarchySummary?.childCount && hierarchySummary.childCount > 0 ? (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] font-semibold border border-primary/30 bg-primary/10 text-primary"
+                      title={`${hierarchySummary.childCount} sub-account${hierarchySummary.childCount === 1 ? "" : "s"}`}
+                    >
+                      Parent · {hierarchySummary.childCount}
+                    </Badge>
+                  ) : null}
+                  {hierarchySummary?.parent ? (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] font-semibold border border-[color:var(--status-info)]/30 bg-[color:var(--status-info)]/10 text-[color:var(--status-info)]"
+                      title={`Sub-account of ${hierarchySummary.parent.companyName}`}
+                    >
+                      Sub-account
+                    </Badge>
+                  ) : null}
                   <Badge variant="outline" className="text-[10px] font-normal border-border text-muted-foreground">
                     Portal certs:{" "}
                     {customer.portalCertificateReleaseMode
@@ -1362,6 +1449,15 @@ export default function CustomerDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Phase 2: Parent account context (sub-account view only). */}
+      {hierarchySummary?.parent ? (
+        <ParentAccountCard
+          organizationId={hierarchySummary.organizationId}
+          customerId={hierarchySummary.customerId}
+          parentId={hierarchySummary.parent.id}
+        />
+      ) : null}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-card border border-border h-auto flex-wrap justify-start gap-1 p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">
@@ -1390,6 +1486,15 @@ export default function CustomerDetailPage() {
 
         {/* Overview */}
         <TabsContent value="overview" className="mt-4 space-y-6">
+          {/* Phase 2 parent rollup — only renders when this account has sub-accounts. */}
+          {hierarchySummary?.childCount && hierarchySummary.childCount > 0 ? (
+            <CustomerRollupCard
+              metrics={rollupMetrics}
+              loading={rollupLoading}
+              rootCompanyName={customer.company}
+            />
+          ) : null}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {(
               [
@@ -1548,14 +1653,34 @@ export default function CustomerDetailPage() {
                 </CardContent>
               </Card>
 
+              <CustomerHierarchyCard
+                summary={hierarchySummary}
+                loading={hierarchyLoading}
+                companyName={customer.company}
+                onManage={canArchiveRestore ? () => setHierarchyDialogOpen(true) : undefined}
+              />
+
+              {/* Phase 2: child-accounts table — only on parent accounts. */}
+              {hierarchySummary?.childCount && hierarchySummary.childCount > 0 ? (
+                <ChildAccountsCard
+                  organizationId={hierarchySummary.organizationId}
+                  parentCustomerId={hierarchySummary.customerId}
+                  parentCompanyName={customer.company}
+                />
+              ) : null}
+
               <Card className="border-border">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base">Locations</CardTitle>
+                    <CardTitle className="text-base">Service locations</CardTitle>
                     <Button type="button" variant="outline" size="sm" onClick={openCreateLocationModal}>
                       Add Location
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Sites where work happens. The default site is used as the bill-to
+                    fallback when no explicit billing address is set.
+                  </p>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   {customer.locations.map((loc) => (
@@ -1952,6 +2077,33 @@ export default function CustomerDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {hierarchySummary ? (
+        <ManageHierarchyDialog
+          open={hierarchyDialogOpen}
+          onClose={() => setHierarchyDialogOpen(false)}
+          onSaved={() => setRefreshToken((n) => n + 1)}
+          organizationId={hierarchySummary.organizationId}
+          customerId={hierarchySummary.customerId}
+          customerCompany={customer?.company ?? ""}
+          initialParent={
+            hierarchySummary.parent
+              ? { id: hierarchySummary.parent.id, companyName: hierarchySummary.parent.companyName }
+              : null
+          }
+          initialBilling={{
+            sameAsService: hierarchySummary.billingAddress.inheritsFromDefaultLocation,
+            attention: hierarchySummary.billingAddress.attention,
+            email: hierarchySummary.billingAddress.email,
+            line1: hierarchySummary.billingAddress.line1,
+            line2: hierarchySummary.billingAddress.line2,
+            city: hierarchySummary.billingAddress.city,
+            state: hierarchySummary.billingAddress.state,
+            postalCode: hierarchySummary.billingAddress.postalCode,
+            notes: hierarchySummary.billingAddress.notes,
+          }}
+        />
+      ) : null}
 
       {editOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
