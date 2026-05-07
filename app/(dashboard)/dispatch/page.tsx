@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
@@ -27,6 +27,9 @@ import {
   type DispatchWo,
 } from "@/components/dispatch/dispatch-board"
 import { DispatchMobileList } from "@/components/dispatch/dispatch-mobile-list"
+import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filter"
+import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overview"
+import { QuickAppointmentDialog } from "@/components/dispatch/quick-appointment-dialog"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,9 +38,22 @@ import {
   sortDispatchRows,
 } from "@/lib/dispatch/build-dispatch-wos"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
+import {
+  DEFAULT_DISPATCH_STATUSES,
+  countByStatus,
+  filterByStatuses,
+  type DispatchStatusKey,
+} from "@/lib/dispatch/status-filter"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
-const DISPATCH_STATUSES = ["open", "scheduled", "in_progress", "completed"] as const
+const DISPATCH_STATUSES_BASE = ["open", "scheduled", "in_progress", "completed"] as const
+const DISPATCH_STATUSES_WITH_INVOICED = [
+  "open",
+  "scheduled",
+  "in_progress",
+  "completed",
+  "invoiced",
+] as const
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -61,6 +77,13 @@ function DispatchPageInner() {
   const [refresh, setRefresh] = useState(0)
   const [dispatchFilter, setDispatchFilter] = useState<DispatchFilterId>("all")
   const [dispatchSort, setDispatchSort] = useState<"schedule" | "priority">("schedule")
+  const [statusFilter, setStatusFilter] = useState<DispatchStatusKey[]>(DEFAULT_DISPATCH_STATUSES)
+  const [includeInvoiced, setIncludeInvoiced] = useState(false)
+  const [quickAddSeed, setQuickAddSeed] = useState<{
+    technicianId: string | null
+    scheduledOn: string
+    scheduledTimeHhMm: string | null
+  } | null>(null)
 
   const weekStart = useMemo(() => startOfWeekMonday(weekAnchor), [weekAnchor])
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
@@ -68,12 +91,45 @@ function DispatchPageInner() {
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
 
   const displayWorkOrders = useMemo(() => {
-    const filtered = filterDispatchRows(workOrders, dispatchFilter)
-    return sortDispatchRows(filtered, dispatchSort)
-  }, [workOrders, dispatchFilter, dispatchSort])
+    const opsFiltered = filterDispatchRows(workOrders, dispatchFilter)
+    const statusFiltered = filterByStatuses(opsFiltered, statusFilter)
+    return sortDispatchRows(statusFiltered, dispatchSort)
+  }, [workOrders, dispatchFilter, statusFilter, dispatchSort])
+
+  const statusCounts = useMemo(
+    () => countByStatus(filterDispatchRows(workOrders, dispatchFilter)),
+    [workOrders, dispatchFilter],
+  )
+
+  const technicianOptionsForQuickAdd = useMemo(
+    () => technicians.map((t) => ({ id: t.id, label: t.label })),
+    [technicians],
+  )
+
+  const handleQuickAdd = useCallback(
+    (args: {
+      technicianId: string | null
+      scheduledOn: string
+      scheduledTimeHhMm: string | null
+    }) => {
+      setQuickAddSeed(args)
+    },
+    [],
+  )
+
+  const handleStatusToggle = useCallback((key: DispatchStatusKey) => {
+    setStatusFilter((prev) => {
+      const set = new Set(prev)
+      if (set.has(key)) set.delete(key)
+      else set.add(key)
+      return [...set]
+    })
+  }, [])
 
   const dispatchKpi = useMemo(() => {
     const k = {
+      dueToday: 0,
+      overdue: 0,
       unbilled: 0,
       overdueInv: 0,
       pmOd: 0,
@@ -85,6 +141,8 @@ function DispatchPageInner() {
     for (const w of workOrders) {
       const f = w.opsFlags
       if (!f) continue
+      if (f.due_today) k.dueToday++
+      if (f.sched_past_due) k.overdue++
       if (f.not_invoiced || f.completed_not_invoiced_aging) k.unbilled++
       if (f.overdue_invoice) k.overdueInv++
       if (f.pm_overdue) k.pmOd++
@@ -156,6 +214,10 @@ function DispatchPageInner() {
     const selMini =
       "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, created_at"
 
+    const dispatchStatuses = includeInvoiced
+      ? [...DISPATCH_STATUSES_WITH_INVOICED]
+      : [...DISPATCH_STATUSES_BASE]
+
     async function fetchRange(): Promise<{ data: unknown; error: { message: string } | null; mini: boolean }> {
       let mini = false
       let q = supabase
@@ -163,7 +225,7 @@ function DispatchPageInner() {
         .select(selFull)
         .eq("organization_id", orgId)
         .is("archived_at", null)
-        .in("status", [...DISPATCH_STATUSES])
+        .in("status", dispatchStatuses)
         .gte("scheduled_on", ws)
         .lte("scheduled_on", we)
 
@@ -174,7 +236,7 @@ function DispatchPageInner() {
           .select(selNoBilling)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", [...DISPATCH_STATUSES])
+          .in("status", dispatchStatuses)
           .gte("scheduled_on", ws)
           .lte("scheduled_on", we)
       }
@@ -185,7 +247,7 @@ function DispatchPageInner() {
           .select(selMini)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", [...DISPATCH_STATUSES])
+          .in("status", dispatchStatuses)
           .gte("scheduled_on", ws)
           .lte("scheduled_on", we)
       }
@@ -313,7 +375,7 @@ function DispatchPageInner() {
 
     setWorkOrders(enriched)
     setLoading(false)
-  }, [activeOrgId, orgStatus, weekStart, weekEnd, refresh])
+  }, [activeOrgId, orgStatus, weekStart, weekEnd, refresh, includeInvoiced])
 
   useEffect(() => {
     void loadData()
@@ -416,25 +478,46 @@ function DispatchPageInner() {
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Operational snapshot
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2 text-center">
           {(
             [
-              ["Unbilled / CNI", dispatchKpi.unbilled],
-              ["Overdue invoice", dispatchKpi.overdueInv],
-              ["PM overdue", dispatchKpi.pmOd],
-              ["Cal overdue", dispatchKpi.calOd],
-              ["Unassigned 48h+", dispatchKpi.unassigned],
-              ["Cert pending", dispatchKpi.certPend],
-              ["Priority / urgent", dispatchKpi.priorityJobs],
+              ["Due today", dispatchKpi.dueToday, "due_today"],
+              ["Overdue", dispatchKpi.overdue, "sched_past_due"],
+              ["Unbilled / CNI", dispatchKpi.unbilled, "invoice_pending"],
+              ["Overdue invoice", dispatchKpi.overdueInv, "overdue_invoice"],
+              ["PM overdue", dispatchKpi.pmOd, "pm_overdue"],
+              ["Cal overdue", dispatchKpi.calOd, "cal_overdue"],
+              ["Unassigned 48h+", dispatchKpi.unassigned, "unassigned_aging"],
+              ["Cert pending", dispatchKpi.certPend, "cert_pending"],
+              ["Priority / urgent", dispatchKpi.priorityJobs, "high_priority"],
             ] as const
-          ).map(([label, n]) => (
-            <div key={label} className="rounded-md border border-border bg-background px-2 py-1.5">
-              <p className="text-lg font-semibold tabular-nums text-foreground">{n}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
-            </div>
+          ).map(([label, n, focus]) => (
+            <button
+              type="button"
+              key={label}
+              onClick={() => setDispatchFilter(focus as DispatchFilterId)}
+              className={cn(
+                "rounded-md border px-2 py-1.5 text-left transition-colors",
+                dispatchFilter === focus
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-background hover:border-primary/40",
+              )}
+              aria-pressed={dispatchFilter === focus}
+            >
+              <p className="text-lg font-semibold tabular-nums text-foreground text-center">{n}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight text-center">{label}</p>
+            </button>
           ))}
         </div>
       </div>
+
+      <DispatchStatusFilter
+        selected={statusFilter}
+        onToggle={handleStatusToggle}
+        counts={statusCounts}
+        includeInvoiced={includeInvoiced}
+        onIncludeInvoicedChange={setIncludeInvoiced}
+      />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
@@ -458,18 +541,46 @@ function DispatchPageInner() {
             )
           })}
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="shrink-0">Sort</span>
-          <select
-            value={dispatchSort}
-            onChange={(e) => setDispatchSort(e.target.value as "schedule" | "priority")}
-            className="rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() =>
+              handleQuickAdd({
+                technicianId: null,
+                scheduledOn: selectedYmd,
+                scheduledTimeHhMm: null,
+              })
+            }
           >
-            <option value="schedule">By time</option>
-            <option value="priority">By priority</option>
-          </select>
-        </label>
+            <Plus className="h-3.5 w-3.5" />
+            Quick add
+          </Button>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="shrink-0">Sort</span>
+            <select
+              value={dispatchSort}
+              onChange={(e) => setDispatchSort(e.target.value as "schedule" | "priority")}
+              className="rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+            >
+              <option value="schedule">By time</option>
+              <option value="priority">By priority</option>
+            </select>
+          </label>
+        </div>
       </div>
+
+      {!loading && technicians.length > 0 ? (
+        <DispatchWeekOverview
+          technicians={technicians}
+          workOrders={displayWorkOrders}
+          weekAnchor={weekAnchor}
+          selectedYmd={selectedYmd}
+          onSelectYmd={setSelectedYmd}
+        />
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading dispatch…</p>
@@ -483,6 +594,7 @@ function DispatchPageInner() {
               onOpenWo={setSelectedWoId}
               onMoveWo={handleMoveWo}
               busy={persistBusy}
+              onQuickAdd={handleQuickAdd}
             />
           </div>
           <div className="md:hidden">
@@ -491,6 +603,7 @@ function DispatchPageInner() {
               workOrders={displayWorkOrders}
               selectedYmd={selectedYmd}
               onOpenWo={setSelectedWoId}
+              onQuickAdd={handleQuickAdd}
             />
           </div>
         </>
@@ -500,6 +613,19 @@ function DispatchPageInner() {
         workOrderId={selectedWoId}
         onClose={() => setSelectedWoId(null)}
         onUpdated={() => setRefresh((n) => n + 1)}
+      />
+
+      <QuickAppointmentDialog
+        open={quickAddSeed !== null}
+        onClose={() => setQuickAddSeed(null)}
+        defaultDate={quickAddSeed?.scheduledOn ?? selectedYmd}
+        defaultTimeHhMm={quickAddSeed?.scheduledTimeHhMm ?? null}
+        defaultTechnicianId={quickAddSeed?.technicianId ?? null}
+        technicians={technicianOptionsForQuickAdd}
+        onCreated={() => {
+          setQuickAddSeed(null)
+          setRefresh((n) => n + 1)
+        }}
       />
     </div>
   )

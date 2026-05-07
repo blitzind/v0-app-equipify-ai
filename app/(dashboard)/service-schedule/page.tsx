@@ -15,6 +15,13 @@ import { WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM } from "@/lib/work-orde
 import { enrichDispatchWorkOrders, filterDispatchRows } from "@/lib/dispatch/build-dispatch-wos"
 import type { DispatchWoRow } from "@/lib/dispatch/build-dispatch-wos"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
+import {
+  DEFAULT_DISPATCH_STATUSES,
+  filterByStatuses,
+  countByStatus,
+  type DispatchStatusKey,
+} from "@/lib/dispatch/status-filter"
+import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filter"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -1483,6 +1490,19 @@ function ServiceSchedulePageInner() {
   const [statusFilter, setStatusFilter]   = useState("All")
   const [techFilter, setTechFilter]       = useState("All")
   const [scheduleOpsFilter, setScheduleOpsFilter] = useState<DispatchFilterId>("all")
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<DispatchStatusKey[]>(
+    DEFAULT_DISPATCH_STATUSES,
+  )
+  const [includeInvoicedSchedule, setIncludeInvoicedSchedule] = useState(false)
+
+  function handleScheduleStatusToggle(key: DispatchStatusKey) {
+    setScheduleStatusFilter((prev) => {
+      const set = new Set(prev)
+      if (set.has(key)) set.delete(key)
+      else set.add(key)
+      return [...set]
+    })
+  }
 
   // Drawer / modal state
   const [createdIds, setCreatedIds]       = useState<Set<string>>(new Set())
@@ -1525,9 +1545,15 @@ function ServiceSchedulePageInner() {
   )
 
   const filteredScheduledWoRows = useMemo(() => {
-    let rows = scheduledWoRows.filter(
+    const opsFiltered = scheduledWoRows.filter(
       (row) => filterDispatchRows([row.wo], scheduleOpsFilter).length > 0,
     )
+    const statusBucketed = filterByStatuses(
+      opsFiltered.map((r) => r.wo),
+      scheduleStatusFilter,
+    )
+    const allowedIds = new Set(statusBucketed.map((w) => w.id))
+    let rows = opsFiltered.filter((row) => allowedIds.has(row.wo.id))
     if (customerFilter !== "All") {
       rows = rows.filter((row) => row.wo.customerName === customerFilter)
     }
@@ -1535,7 +1561,14 @@ function ServiceSchedulePageInner() {
       rows = rows.filter((row) => row.wo.technicianLabel === techFilter)
     }
     return rows
-  }, [scheduledWoRows, scheduleOpsFilter, customerFilter, techFilter])
+  }, [scheduledWoRows, scheduleOpsFilter, scheduleStatusFilter, customerFilter, techFilter])
+
+  const scheduleStatusCounts = useMemo(() => {
+    const opsFiltered = scheduledWoRows
+      .filter((row) => filterDispatchRows([row.wo], scheduleOpsFilter).length > 0)
+      .map((r) => r.wo)
+    return countByStatus(opsFiltered)
+  }, [scheduledWoRows, scheduleOpsFilter])
 
   const scheduleOverlapKeys = useMemo(() => {
     const counts = new Map<string, number>()
@@ -1765,6 +1798,14 @@ function ServiceSchedulePageInner() {
 
         {/* Main content area */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-6">
+          <DispatchStatusFilter
+            selected={scheduleStatusFilter}
+            onToggle={handleScheduleStatusToggle}
+            counts={scheduleStatusCounts}
+            includeInvoiced={includeInvoicedSchedule}
+            onIncludeInvoicedChange={setIncludeInvoicedSchedule}
+            className="px-1"
+          />
           <ScheduledWorkOrdersSection
             rows={filteredScheduledWoRows}
             loading={scheduledWoLoading}

@@ -26,7 +26,7 @@ import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import type { OperationalBadge, OpsFlags } from "@/lib/dispatch/operational-badges"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Boxes, Clock, Plus } from "lucide-react"
 
 export type DispatchTech = {
   id: string
@@ -51,6 +51,8 @@ export type DispatchWo = {
   opsFlags?: OpsFlags
   technicianLabel?: string | null
   serviceLocationLabel?: string | null
+  /** Phase 1: explicit chip on dispatch card; falls back to 1 if join missing. */
+  equipmentCount?: number
 }
 
 function cardTone(status: string): string {
@@ -70,6 +72,13 @@ function cardTone(status: string): string {
   }
 }
 
+function formatCardTimeLabel(scheduledTime: string | null): string | null {
+  if (!scheduledTime) return null
+  const head = scheduledTime.trim().slice(0, 5)
+  if (head.length < 5) return null
+  return formatSlotLabel(timeToSlotIndex(head))
+}
+
 function WoCard({
   wo,
   dragging,
@@ -87,10 +96,12 @@ function WoCard({
     id: wo.id,
     workOrderNumber: wo.work_order_number ?? null,
   })
-  const metaLine =
-    wo.assigned_user_id && wo.technicianLabel
-      ? `${wo.technicianLabel}${wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}`
-      : wo.serviceLocationLabel ?? ""
+  const techMeta =
+    wo.assigned_user_id && wo.technicianLabel ? wo.technicianLabel : null
+  const locationMeta = wo.serviceLocationLabel?.trim() ?? null
+  const equipmentChip =
+    wo.equipmentCount && wo.equipmentCount > 0 ? wo.equipmentCount : null
+  const timeLabel = formatCardTimeLabel(wo.scheduled_time)
 
   return (
     <button
@@ -106,6 +117,21 @@ function WoCard({
     >
       <div className="flex items-start gap-1">
         <p className="min-w-0 flex-1 font-mono text-[10px] text-primary">{num}</p>
+        {timeLabel ? (
+          <span className="inline-flex items-center gap-0.5 shrink-0 rounded bg-background/60 px-1 text-[10px] font-medium text-foreground">
+            <Clock className="h-2.5 w-2.5" />
+            {timeLabel}
+          </span>
+        ) : null}
+        {equipmentChip ? (
+          <span
+            className="inline-flex items-center gap-0.5 shrink-0 rounded bg-background/60 px-1 text-[10px] font-medium text-foreground"
+            title={`${equipmentChip} equipment asset${equipmentChip > 1 ? "s" : ""}`}
+          >
+            <Boxes className="h-2.5 w-2.5" />
+            {equipmentChip}
+          </span>
+        ) : null}
         {slotOverlap ? (
           <AlertTriangle
             className="h-3 w-3 shrink-0 text-[color:var(--status-warning)]"
@@ -115,7 +141,11 @@ function WoCard({
       </div>
       <p className="line-clamp-2 font-medium leading-snug">{wo.title}</p>
       <p className="truncate text-[10px] text-muted-foreground">{wo.customerName}</p>
-      {metaLine ? <p className="truncate text-[10px] text-muted-foreground">{metaLine}</p> : null}
+      {techMeta || locationMeta ? (
+        <p className="truncate text-[10px] text-muted-foreground">
+          {[techMeta, locationMeta].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
       <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1" />
     </button>
   )
@@ -149,10 +179,14 @@ function DroppableSlot({
   techId,
   slotIdx,
   children,
+  onQuickAdd,
+  isEmpty,
 }: {
   techId: string
   slotIdx: number
   children: React.ReactNode
+  onQuickAdd?: () => void
+  isEmpty?: boolean
 }) {
   const id = DND.cell(techId, slotIdx)
   const { setNodeRef, isOver } = useDroppable({ id })
@@ -160,11 +194,27 @@ function DroppableSlot({
     <div
       ref={setNodeRef}
       className={cn(
-        "min-h-[52px] border-b border-border/50 p-1 transition-colors",
-        isOver && "bg-primary/10 ring-1 ring-inset ring-primary/25",
+        "group min-h-[52px] border-b border-border/50 p-1 transition-colors relative",
+        isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
     >
       <div className="flex flex-col gap-1">{children}</div>
+      {onQuickAdd && isEmpty ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onQuickAdd()
+          }}
+          className={cn(
+            "absolute inset-0 m-1 hidden items-center justify-center rounded border border-dashed border-primary/30 bg-primary/5 text-[10px] font-medium text-primary/70",
+            "group-hover:flex",
+          )}
+          aria-label="Quick add at this slot"
+        >
+          <Plus className="h-3 w-3 mr-0.5" /> Add
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -208,6 +258,7 @@ export function DispatchBoard({
   onOpenWo,
   onMoveWo,
   busy,
+  onQuickAdd,
 }: {
   technicians: DispatchTech[]
   workOrders: DispatchWo[]
@@ -220,6 +271,16 @@ export function DispatchBoard({
     scheduledTimeHhMm: string | null
   }) => Promise<void>
   busy?: boolean
+  /**
+   * Phase 1: optional quick-create entry point. When provided, the board
+   * renders an "+ Quick add" button on the Unassigned section and on each
+   * technician column header, prefilling date/time/tech.
+   */
+  onQuickAdd?: (args: {
+    technicianId: string | null
+    scheduledOn: string
+    scheduledTimeHhMm: string | null
+  }) => void
 }) {
   const [activeWo, setActiveWo] = useState<DispatchWo | null>(null)
 
@@ -295,10 +356,30 @@ export function DispatchBoard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* Unassigned */}
         <section className="w-full shrink-0 space-y-2 lg:w-72">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Unassigned</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Unassigned
+              <span className="ml-1.5 text-muted-foreground/60">({unassigned.length})</span>
+            </h3>
+            {onQuickAdd ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onQuickAdd({ technicianId: null, scheduledOn: selectedYmd, scheduledTimeHhMm: null })
+                }
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                aria-label="Quick add unassigned work order"
+                disabled={busy}
+              >
+                <Plus className="h-3 w-3" /> Quick add
+              </button>
+            ) : null}
+          </div>
           <DroppablePool>
             {unassigned.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">No unassigned jobs.</p>
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                No unassigned jobs. Drag here from a tech to release, or use "Quick add" to queue work.
+              </p>
             ) : (
               <div className="flex flex-col gap-2">
                 {unassigned.map((wo) => (
@@ -342,6 +423,23 @@ export function DispatchBoard({
                     <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
                       ({workloadByTech.get(t.id) ?? 0})
                     </span>
+                    {onQuickAdd ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onQuickAdd({
+                            technicianId: t.id,
+                            scheduledOn: selectedYmd,
+                            scheduledTimeHhMm: null,
+                          })
+                        }
+                        className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                        aria-label={`Quick add for ${t.label}`}
+                        disabled={busy}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -355,7 +453,22 @@ export function DispatchBoard({
                     const cellKey = `${tech.id}@@${slotIdx}`
                     const list = assignedMap.get(cellKey) ?? []
                     return (
-                      <DroppableSlot key={`${tech.id}-${slotIdx}`} techId={tech.id} slotIdx={slotIdx}>
+                      <DroppableSlot
+                        key={`${tech.id}-${slotIdx}`}
+                        techId={tech.id}
+                        slotIdx={slotIdx}
+                        isEmpty={list.length === 0}
+                        onQuickAdd={
+                          onQuickAdd
+                            ? () =>
+                                onQuickAdd({
+                                  technicianId: tech.id,
+                                  scheduledOn: selectedYmd,
+                                  scheduledTimeHhMm: slotIndexToTimeHhMm(slotIdx),
+                                })
+                            : undefined
+                        }
+                      >
                         {list.map((wo) => (
                           <DraggableWo
                             key={wo.id}

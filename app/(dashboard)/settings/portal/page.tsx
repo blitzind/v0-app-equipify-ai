@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -166,6 +166,26 @@ export default function PortalSettingsPage() {
     }
   }, [orgStatus, organizationId])
 
+  const handlePreviewPortal = useCallback(() => {
+    if (orgStatus !== "ready" || !organizationId?.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Organization not ready",
+        description: "Select a workspace and wait for it to finish loading before previewing the portal.",
+      })
+      return
+    }
+    const url = `/api/portal/preview/start?organizationId=${encodeURIComponent(organizationId.trim())}`
+    const win = window.open(url, "_blank", "noopener,noreferrer")
+    if (!win) {
+      toast({
+        variant: "destructive",
+        title: "Popup blocked",
+        description: "Allow popups for this site to open the portal preview, or copy the preview URL from your browser's address bar after clicking again.",
+      })
+    }
+  }, [orgStatus, organizationId, toast])
+
   async function handleSave() {
     if (orgStatus === "ready" && organizationId?.trim()) {
       try {
@@ -218,7 +238,13 @@ export default function PortalSettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={handlePreviewPortal}
+          >
             <Eye size={13} /> Preview Portal
           </Button>
           <Button size="sm" className="gap-1.5 text-xs" onClick={handleSave}>

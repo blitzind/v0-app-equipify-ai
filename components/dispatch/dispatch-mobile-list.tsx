@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { Boxes, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
@@ -29,11 +30,17 @@ export function DispatchMobileList({
   workOrders,
   selectedYmd,
   onOpenWo,
+  onQuickAdd,
 }: {
   technicians: DispatchTech[]
   workOrders: DispatchWo[]
   selectedYmd: string
   onOpenWo: (id: string) => void
+  onQuickAdd?: (args: {
+    technicianId: string | null
+    scheduledOn: string
+    scheduledTimeHhMm: string | null
+  }) => void
 }) {
   const unassigned = useMemo(
     () => workOrders.filter((w) => !w.assigned_user_id && ["open", "scheduled", "in_progress"].includes(w.status)),
@@ -58,7 +65,23 @@ export function DispatchMobileList({
   return (
     <div className="flex flex-col gap-6 md:hidden">
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Unassigned</h3>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Unassigned <span className="text-muted-foreground/60">({unassigned.length})</span>
+          </h3>
+          {onQuickAdd ? (
+            <button
+              type="button"
+              onClick={() =>
+                onQuickAdd({ technicianId: null, scheduledOn: selectedYmd, scheduledTimeHhMm: null })
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              aria-label="Quick add unassigned"
+            >
+              <Plus className="h-3 w-3" /> Quick add
+            </button>
+          ) : null}
+        </div>
         <div className="flex flex-col gap-2">
           {unassigned.length === 0 ? (
             <p className="text-xs text-muted-foreground">None.</p>
@@ -70,9 +93,17 @@ export function DispatchMobileList({
                 onClick={() => onOpenWo(wo.id)}
                 className={cn("rounded-lg border px-3 py-2 text-left text-sm", cardTone(wo.status))}
               >
-                <p className="font-mono text-[10px] text-primary">
-                  {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] text-primary">
+                    {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
+                  </p>
+                  {wo.equipmentCount && wo.equipmentCount > 0 ? (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                      <Boxes className="h-3 w-3" />
+                      {wo.equipmentCount}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="font-medium">{wo.title}</p>
                 <p className="text-xs text-muted-foreground">{wo.customerName}</p>
                 {wo.assigned_user_id && wo.technicianLabel ? (
@@ -94,7 +125,23 @@ export function DispatchMobileList({
         const list = byTech.get(t.id) ?? []
         return (
           <section key={t.id}>
-            <h3 className="mb-2 truncate text-sm font-semibold text-foreground">{t.label}</h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="truncate text-sm font-semibold text-foreground">
+                {t.label} <span className="text-muted-foreground/60 text-xs font-normal">({list.length})</span>
+              </h3>
+              {onQuickAdd ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onQuickAdd({ technicianId: t.id, scheduledOn: selectedYmd, scheduledTimeHhMm: null })
+                  }
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
+                  aria-label={`Quick add for ${t.label}`}
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </button>
+              ) : null}
+            </div>
             {list.length === 0 ? (
               <p className="text-xs text-muted-foreground">Nothing scheduled this day.</p>
             ) : (
@@ -106,12 +153,20 @@ export function DispatchMobileList({
                     onClick={() => onOpenWo(wo.id)}
                     className={cn("rounded-lg border px-3 py-2 text-left text-sm", cardTone(wo.status))}
                   >
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatSlotLabel(timeToSlotIndex(wo.scheduled_time))}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatSlotLabel(timeToSlotIndex(wo.scheduled_time))}
+                      </p>
+                      {wo.equipmentCount && wo.equipmentCount > 0 ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                          <Boxes className="h-3 w-3" />
+                          {wo.equipmentCount}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="font-mono text-[10px] text-primary">
-                  {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
-                </p>
+                      {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
+                    </p>
                     <p className="font-medium">{wo.title}</p>
                     <p className="text-xs text-muted-foreground">{wo.customerName}</p>
                     {wo.technicianLabel ? (

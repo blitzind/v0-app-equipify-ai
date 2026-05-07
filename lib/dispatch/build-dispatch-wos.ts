@@ -248,6 +248,7 @@ export async function enrichDispatchWorkOrders(
       opsFlags: flags,
       technicianLabel: tech?.label ?? null,
       serviceLocationLabel: loc,
+      equipmentCount: ctx.equipmentCount,
     })
   }
 
@@ -292,6 +293,12 @@ export function filterDispatchRows(rows: DispatchWo[], filterId: DispatchFilterI
         return f.revenue_at_risk
       case "sched_past_due":
         return f.sched_past_due
+      case "due_today":
+        return f.due_today
+      case "waiting_on_parts":
+        return f.waiting_on_parts
+      case "invoice_pending":
+        return f.invoice_pending
       default:
         return true
     }

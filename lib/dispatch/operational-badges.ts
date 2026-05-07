@@ -65,6 +65,11 @@ function ymdBeforeToday(ymd: string | null | undefined): boolean {
   return ymd < todayYmdUtc()
 }
 
+function ymdEqualsToday(ymd: string | null | undefined): boolean {
+  if (!ymd?.trim()) return false
+  return ymd.trim().slice(0, 10) === todayYmdUtc()
+}
+
 /** Due date falls within the next `days` calendar days from today (inclusive). */
 function ymdWithinDaysForward(ymd: string | null, days: number): boolean {
   if (!ymd?.trim()) return false
@@ -180,7 +185,7 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
     wo.billingState !== "paid" &&
     ctx.linkedInvoiceCount === 0
   ) {
-    out.push({ key: "cni", label: "Not invoiced", tone: "warning" })
+    out.push({ key: "cni", label: "Invoice pending", tone: "warning" })
     const age = daysSinceYmdOrIso(wo.completedAt)
     if (age !== null && age >= 14) {
       out.push({ key: "cni-14", label: "Unbilled 14d+", tone: "danger" })
@@ -201,14 +206,19 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
   }
 
   if ((wo.totalPartsCents ?? 0) > 0 && ["open", "scheduled", "in_progress"].includes(wo.status)) {
-    out.push({ key: "parts", label: "Parts", tone: "info" })
+    out.push({ key: "parts", label: "Waiting on parts", tone: "info" })
   }
 
   if (
     ["open", "scheduled", "in_progress"].includes(wo.status) &&
     schedBeforeToday(wo.scheduledOnYmd)
   ) {
-    out.push({ key: "sched-past", label: "Past schedule", tone: "warning" })
+    out.push({ key: "sched-past", label: "Overdue", tone: "danger" })
+  } else if (
+    ["open", "scheduled", "in_progress"].includes(wo.status) &&
+    ymdEqualsToday(wo.scheduledOnYmd)
+  ) {
+    out.push({ key: "due-today", label: "Due today", tone: "info" })
   }
 
   // Unassigned aging
@@ -277,18 +287,24 @@ export type DispatchFilterId =
   | "high_priority"
   | "revenue_at_risk"
   | "sched_past_due"
+  | "due_today"
+  | "waiting_on_parts"
+  | "invoice_pending"
 
 /** Toolbar / dropdown options for dispatch + service schedule parity. */
 export const DISPATCH_FOCUS_OPTIONS: { id: DispatchFilterId; label: string }[] = [
   { id: "all", label: "All jobs" },
+  { id: "due_today", label: "Due today" },
+  { id: "sched_past_due", label: "Overdue" },
   { id: "revenue_at_risk", label: "Revenue at risk" },
   { id: "billing_ready", label: "Ready to bill" },
-  { id: "not_invoiced", label: "Not invoiced" },
+  { id: "invoice_pending", label: "Invoice pending" },
   { id: "completed_not_invoiced_aging", label: "Unbilled 14d+" },
   { id: "overdue_invoice", label: "Overdue invoice" },
   { id: "invoice_due_soon", label: "Invoice due soon" },
   { id: "cert_pending", label: "Certificate pending" },
   { id: "cert_payment_hold", label: "Cert until paid" },
+  { id: "waiting_on_parts", label: "Waiting on parts" },
   { id: "pm_risk", label: "PM & calibration risk" },
   { id: "pm_overdue", label: "PM overdue" },
   { id: "cal_overdue", label: "Calibration overdue" },
@@ -296,7 +312,6 @@ export const DISPATCH_FOCUS_OPTIONS: { id: DispatchFilterId; label: string }[] =
   { id: "warranty_review", label: "Warranty review" },
   { id: "emergency", label: "Emergency / urgent" },
   { id: "high_priority", label: "High priority" },
-  { id: "sched_past_due", label: "Past schedule" },
 ]
 
 /** Precomputed on the batch pass for toolbar filters (no re-derive). */
@@ -317,6 +332,9 @@ export type OpsFlags = {
   high_priority: boolean
   revenue_at_risk: boolean
   sched_past_due: boolean
+  due_today: boolean
+  waiting_on_parts: boolean
+  invoice_pending: boolean
 }
 
 export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): OpsFlags {
@@ -338,6 +356,9 @@ export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): 
   const high_priority = wo.priority === "high"
   const sched_past_due = keys.has("sched-past")
   const warranty_review = wo.warrantyReviewRequired
+  const due_today = keys.has("due-today")
+  const waiting_on_parts = keys.has("parts")
+  const invoice_pending = not_invoiced
 
   const revenue_at_risk =
     overdue_invoice || cert_payment_hold || completed_not_invoiced_aging || not_invoiced
@@ -359,6 +380,9 @@ export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): 
     high_priority,
     revenue_at_risk,
     sched_past_due,
+    due_today,
+    waiting_on_parts,
+    invoice_pending,
   }
 }
 
@@ -386,6 +410,9 @@ export function dispatchBadgeSummary(
       if (f === "high_priority") return flags.high_priority
       if (f === "revenue_at_risk") return flags.revenue_at_risk
       if (f === "sched_past_due") return flags.sched_past_due
+      if (f === "due_today") return flags.due_today
+      if (f === "waiting_on_parts") return flags.waiting_on_parts
+      if (f === "invoice_pending") return flags.invoice_pending
       return true
     },
   }

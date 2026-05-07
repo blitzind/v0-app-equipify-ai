@@ -7,16 +7,35 @@ import { BrandLogoOnLight } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+const NOTICE_COPY: Record<string, string> = {
+  no_staff_portal:
+    "There is no customer portal login linked to your staff email for this workspace yet. Invite yourself from Customers (portal invite) or paste an invite token below.",
+  portal_revoked: "Portal access for this email has been revoked.",
+  org_archived: "This workspace is no longer available.",
+  invalid_preview: "Preview could not be started. Return to Settings → Customer Portal and try again.",
+}
+
 function PortalLoginInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [err, setErr] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [manualToken, setManualToken] = useState("")
 
   useEffect(() => {
     const e = searchParams.get("error")
-    if (e === "misconfigured") setErr("Portal sign-in is not configured for this environment.")
+    const n = searchParams.get("notice")
+    setErr(null)
+    setInfo(null)
+    if (e === "misconfigured") {
+      setErr("Portal sign-in is not configured for this environment.")
+    } else if (e === "preview_forbidden") {
+      setErr("You don't have permission to preview the portal for this organization.")
+    }
+    if (n && NOTICE_COPY[n]) {
+      setInfo(NOTICE_COPY[n]!)
+    }
   }, [searchParams])
 
   useEffect(() => {
@@ -92,6 +111,19 @@ function PortalLoginInner() {
           <p className="text-sm text-center" style={{ color: "var(--portal-nav-text)" }}>
             Signing you in…
           </p>
+        )}
+
+        {info && (
+          <div
+            className="text-sm rounded-lg px-3 py-2 border"
+            style={{
+              background: "color-mix(in srgb, var(--portal-accent) 12%, transparent)",
+              borderColor: "color-mix(in srgb, var(--portal-accent) 35%, transparent)",
+              color: "var(--portal-foreground)",
+            }}
+          >
+            {info}
+          </div>
         )}
 
         {err && (
