@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { DEMO_INDUSTRY_PROFILES, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
+import { getStarterTemplatesForIndustry } from "@/lib/demo-seeding/industry-templates"
 
 export type DemoSeedCounts = {
   customers: number
@@ -107,19 +108,11 @@ const BIOMED_VENDOR_NAMES: { name: string; email: string; phone: string; contact
   { name: "Thermo Fisher Scientific Lab Supply", email: "clinical.orders@thermo-demo.example.com", phone: "(781) 555-0160", contact: "West Clinical Accounts" },
 ]
 
-const CAL_TEMPLATE_FIELDS_A = [
-  { id: "sh_sep", type: "section_heading", label: "Electrical safety (IEC 60601-1)" },
-  { id: "pf_g", type: "pass_fail", label: "Ground continuity / resistance", required: true },
-  { id: "pf_l", type: "pass_fail", label: "Leakage current — patient connections", required: true },
-  { id: "n_doc", type: "notes", label: "As-found / as-left notes" },
-] as const
-
-const CAL_TEMPLATE_FIELDS_B = [
-  { id: "sh_pm", type: "section_heading", label: "Preventive maintenance checks" },
-  { id: "pf_alarm", type: "pass_fail", label: "Alarm function & limits", required: true },
-  { id: "pf_flow", type: "pass_fail", label: "Delivery accuracy / flow verification", required: true },
-  { id: "cb_cal", type: "checkbox", label: "NIST-traceable reference used" },
-] as const
+// Legacy CAL_TEMPLATE_FIELDS_A/B inlined here have moved into
+// `lib/demo-seeding/industry-templates.ts` as part of the industry-aware
+// templates foundation. Calibration record values for the rich biomedical
+// path still reference these field IDs (`pf_g`, `pf_l`, `pf_alarm`, etc.)
+// since the medical industry templates use the same shape.
 
 async function seedTechnicianAuthMembers(params: {
   supabase: SupabaseClient
@@ -565,30 +558,29 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   let calibrationRecords = 0
   const templateIds: string[] = []
 
-  if (rich && insertedWOs && insertedWOs.length > 0) {
-    const tRows = [
-      {
-        organization_id: args.organizationId,
-        name: "Electrical Safety & Leakage (IEC 60601-1)",
-        equipment_category_id: "Patient Monitoring",
-        fields: CAL_TEMPLATE_FIELDS_A,
-        is_archived: false,
-        is_sample: true,
-      },
-      {
-        organization_id: args.organizationId,
-        name: "Infusion / Pump PM & Alarm Verification",
-        equipment_category_id: "Infusion",
-        fields: CAL_TEMPLATE_FIELDS_B,
-        is_archived: false,
-        is_sample: true,
-      },
-    ]
+  // Industry-aware starter templates: every industry gets at least a small,
+  // representative checklist library so the workspace doesn't look empty.
+  // Backed by `lib/demo-seeding/industry-templates.ts` mapping foundation.
+  const industryTemplates = getStarterTemplatesForIndustry(args.industry)
+  if (industryTemplates.length > 0) {
+    const tRows = industryTemplates.map((t) => ({
+      organization_id: args.organizationId,
+      name: t.name,
+      equipment_category_id: t.equipmentCategoryId,
+      fields: t.fields,
+      is_archived: false,
+      is_sample: true,
+    }))
     const { data: tIns, error: tErr } = await args.supabase.from("calibration_templates").insert(tRows).select("id")
     if (tErr) throw new Error(tErr.message)
     for (const t of tIns ?? []) templateIds.push((t as { id: string }).id)
     calibrationTemplates = templateIds.length
+  }
 
+  // Calibration records are only seeded for the rich (medical) demo where the
+  // values payloads carry meaningful biomedical data. Other industries still
+  // get the templates above so admins can author records themselves.
+  if (rich && insertedWOs && insertedWOs.length > 0 && templateIds.length > 0) {
     const certCandidates = (insertedWOs as { id: string; equipment_id: string; status: string }[]).filter((w) =>
       ["completed", "completed_pending_signature", "invoiced"].includes(w.status),
     )

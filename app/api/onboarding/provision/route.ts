@@ -9,6 +9,12 @@ import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 import { seedDemoForIndustry } from "@/lib/demo-seeding/seed-engine"
+import { normalizeIndustryKey } from "@/lib/demo-seeding/profiles"
+import {
+  describeProvisioningPhaseFailure,
+  sanitizeProvisioningError,
+  type ProvisioningErrorCode,
+} from "@/lib/onboarding/error-mapping"
 
 type Body = {
   organizationId?: string | null
@@ -24,6 +30,34 @@ type Body = {
 }
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
+
+function logProvision(event: string, payload: Record<string, unknown>) {
+  try {
+    console.info(`[onboarding/provision] ${event}`, payload)
+  } catch {
+    /* logging is best-effort */
+  }
+}
+
+function logProvisionError(event: string, payload: Record<string, unknown>) {
+  try {
+    console.error(`[onboarding/provision] ${event}`, payload)
+  } catch {
+    /* logging is best-effort */
+  }
+}
+
+function failure(
+  code: ProvisioningErrorCode,
+  rawMessage: string | null | undefined,
+  status: number,
+  extra: Record<string, unknown> = {},
+) {
+  const fallback = describeProvisioningPhaseFailure(code)
+  const message = sanitizeProvisioningError(rawMessage, fallback)
+  logProvisionError(code, { rawMessage, ...extra })
+  return NextResponse.json({ error: code, message, ...extra }, { status })
+}
 
 /**
  * New self-serve org: one subscription row with Scale trial + intended paid tier for later checkout.
@@ -86,6 +120,27 @@ function slugify(value: string) {
     .slice(0, 48)
 }
 
+async function persistIndustryOnOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+  industry: ReturnType<typeof normalizeIndustryKey>,
+) {
+  // Only updates a small set of metadata columns added in
+  // `20260507130000_signup_provisioning_repair.sql`. Errors here are non-fatal
+  // because the canonical industry can also be resolved via demo_seed_industry.
+  const { error } = await admin
+    .from("organizations")
+    .update({ industry, updated_at: new Date().toISOString() })
+    .eq("id", organizationId)
+  if (error) {
+    logProvisionError("industry_persist_failed", {
+      organizationId,
+      industry,
+      error: error.message,
+    })
+  }
+}
+
 export async function POST(request: Request) {
   let body: Body
   try {
@@ -115,12 +170,26 @@ export async function POST(request: Request) {
   }
 
   if (!user) {
-    return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
+    // We deliberately keep this generic — we cannot do anything until a session
+    // exists. Returning a polished message keeps onboarding from leaking the
+    // shape of our auth flow to end users.
+    return NextResponse.json(
+      { error: "unauthorized", message: "Please finish creating your account before we set up your workspace." },
+      { status: 401 },
+    )
   }
 
   const seedDemo = body.seedDemo !== false
+  const industry = normalizeIndustryKey(body.industry)
   let organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
   let createdNewOrganization = false
+
+  logProvision("start", {
+    userId: user.id,
+    hasOrganizationIdParam: Boolean(organizationId),
+    seedDemo,
+    industry,
+  })
 
   if (organizationId) {
     const { data: membership } = await supabase
@@ -155,6 +224,8 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < 3; i += 1) {
         const candidateSlug = i === 0 ? baseSlug : `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`
+        // RPC runs server-side under the user's JWT, so auth.uid() is the new
+        // user. The RPC sets organizations.created_by to v_uid explicitly.
         const { data, error } = await supabase.rpc("create_organization_with_owner", {
           org_name: baseName,
           org_slug: candidateSlug,
@@ -167,15 +238,25 @@ export async function POST(request: Request) {
       }
 
       if (!created?.id) {
-        return NextResponse.json(
-          { error: "organization_create_failed", message: lastError },
-          { status: 400 },
-        )
+        return failure("organization_create_failed", lastError, 400)
       }
       organizationId = created.id
       createdNewOrganization = true
     }
   }
+
+  let svc
+  try {
+    svc = createServiceRoleSupabaseClient()
+  } catch (e) {
+    const message = e instanceof Error ? e.message : null
+    return failure("service_unavailable", message, 503)
+  }
+
+  // Persist canonical industry as soon as the org exists, regardless of seed
+  // outcome. This guarantees industry-aware defaults even if seeding is skipped
+  // or fails.
+  await persistIndustryOnOrganization(svc, organizationId, industry)
 
   if (createdNewOrganization) {
     try {
@@ -184,19 +265,9 @@ export async function POST(request: Request) {
         billingCycle: body.billingCycle,
       })
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Could not activate trial subscription."
-      return NextResponse.json(
-        { error: "trial_bootstrap_failed", message, organizationId },
-        { status: 500 },
-      )
+      const message = e instanceof Error ? e.message : null
+      return failure("trial_bootstrap_failed", message, 500, { organizationId })
     }
-  }
-
-  let svc
-  try {
-    svc = createServiceRoleSupabaseClient()
-  } catch {
-    return NextResponse.json({ error: "service_unavailable", message: "Server configuration error." }, { status: 503 })
   }
 
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>
@@ -225,10 +296,7 @@ export async function POST(request: Request) {
 
   const { error: profUpsertErr } = await svc.from("profiles").upsert(profileUpsert, { onConflict: "id" })
   if (profUpsertErr) {
-    return NextResponse.json(
-      { error: "profile_failed", message: profUpsertErr.message, organizationId },
-      { status: 400 },
-    )
+    return failure("profile_failed", profUpsertErr.message, 400, { organizationId })
   }
 
   await svc.auth.admin.updateUserById(user.id, {
@@ -245,6 +313,7 @@ export async function POST(request: Request) {
   let techniciansSeeded = false
   let seededIndustry: string | null = null
   let seedCounts: Record<string, number> | null = null
+  let resumedFromPartial = false
 
   if (seedDemo) {
     try {
@@ -252,34 +321,32 @@ export async function POST(request: Request) {
         supabase: svc,
         organizationId,
         ownerUserId: user.id,
-        industry: body.industry,
+        industry,
       })
       seededIndustry = seedResult.industry
       seeded = seedResult.seeded
       seedSkipped = seedResult.skipped
       techniciansSeeded = Boolean(seedResult.techniciansSeeded)
       seedCounts = (seedResult.counts ?? null) as Record<string, number> | null
-      if (process.env.NODE_ENV === "development") {
-        console.info("[onboarding/provision] demo seed", {
-          organizationId,
-          industry: body.industry,
-          seedDemo,
-          seeded,
-          seedSkipped,
-          seededIndustry,
-          seedCounts,
-          techniciansSeeded,
-        })
-      }
+      resumedFromPartial = Boolean(seedResult.resumedFromPartial)
+      logProvision("demo_seed", {
+        organizationId,
+        industry,
+        seeded,
+        seedSkipped,
+        seededIndustry,
+        seedCounts,
+        techniciansSeeded,
+        resumedFromPartial,
+      })
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to seed demo data."
-      return NextResponse.json(
-        { error: "seed_failed", message, organizationId },
-        { status: 400 },
-      )
+      const message = err instanceof Error ? err.message : null
+      // Account is already provisioned. Surface a friendly message but keep
+      // the workspace usable — admins can re-run sample import from settings.
+      return failure("seed_failed", message, 400, { organizationId })
     }
-  } else if (process.env.NODE_ENV === "development") {
-    console.info("[onboarding/provision] demo seed skipped", { organizationId, seedDemo })
+  } else {
+    logProvision("demo_seed_skipped", { organizationId, seedDemo })
   }
 
   return NextResponse.json({
@@ -290,5 +357,6 @@ export async function POST(request: Request) {
     seededIndustry,
     seedCounts,
     techniciansSeeded,
+    resumedFromPartial,
   })
 }
