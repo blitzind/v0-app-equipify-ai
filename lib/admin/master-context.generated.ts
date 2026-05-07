@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 143,
+  apiRouteHandlers: 145,
   sqlMigrations: 101,
   dashboardPages: 55,
-  componentsTsx: 182,
-  libTsFiles: 299,
+  componentsTsx: 188,
+  libTsFiles: 301,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **143** |
+| API route handlers (\`app/api/**/route.ts\`) | **145** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **101** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **55** |
-| \`components/**/*.tsx\` | **182** |
-| \`lib/**/*.ts\` | **299** |
+| \`components/**/*.tsx\` | **188** |
+| \`lib/**/*.ts\` | **301** |
 
 ### Vercel crons
 
@@ -71,9 +71,11 @@ organizations/[organizationId]/catalog-items/[itemId]/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/usage/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/verification/route.ts
 organizations/[organizationId]/catalog-items/route.ts
+organizations/[organizationId]/communications/[communicationId]/route.ts
 organizations/[organizationId]/communications/[eventId]/read/route.ts
 organizations/[organizationId]/communications/[eventId]/retry/route.ts
 organizations/[organizationId]/communications/automations/route.ts
+organizations/[organizationId]/communications/feed/route.ts
 organizations/[organizationId]/communications/metrics/route.ts
 organizations/[organizationId]/communications/route.ts
 organizations/[organizationId]/communications/suggestions/route.ts

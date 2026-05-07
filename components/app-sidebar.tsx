@@ -112,9 +112,8 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: "growth",
-    label: "Growth",
+    label: "Automation & Intelligence",
     items: [
-      { label: "Communications", href: "/communications", icon: Bell, anyOf: ["canViewBilling"] },
       {
         label: "Insights",
         href: "/insights",
@@ -122,6 +121,12 @@ const NAV_GROUPS: NavGroup[] = [
         highlight: true,
         anyOf: ["canViewInsights"],
         requireAiPlan: true,
+      },
+      {
+        label: "Communications",
+        href: "/communications",
+        icon: Bell,
+        anyOf: ["canViewCommunications"],
       },
       {
         label: "AI Assistants",

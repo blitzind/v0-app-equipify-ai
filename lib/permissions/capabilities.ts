@@ -35,6 +35,7 @@ export type CapabilityMetadata = {
     | "reports"
     | "automations"
     | "prospects"
+    | "communications"
     | "general"
 }
 
@@ -199,6 +200,18 @@ export const CAPABILITY_METADATA: Partial<Record<OrgPermissionKey, CapabilityMet
     description:
       "Create and edit prospects, log follow-ups, and convert prospects into customers.",
     surface: "prospects",
+  },
+  canViewCommunications: {
+    label: "View communications",
+    description:
+      "Open the Communications Center and embedded recent-communications sections.",
+    surface: "communications",
+  },
+  canManageCommunications: {
+    label: "Manage communications",
+    description:
+      "Resend, retry, or compose customer communications (Phase 2 mutations land here).",
+    surface: "communications",
   },
 }
 

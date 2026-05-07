@@ -75,6 +75,22 @@ export type OrgPermissions = {
    * org membership but cannot mutate.
    */
   canManageProspects: boolean
+
+  /**
+   * Communications Center Phase 1: open the unified Communications page
+   * and embedded "Recent communications" sections. Granted to all
+   * non-tech roles plus techs (who only see operational/customer-facing
+   * messages on jobs they're assigned to — financial messages stay
+   * gated by `canViewBilling` at the API level).
+   */
+  canViewCommunications: boolean
+  /**
+   * Communications Center Phase 1: future-facing manage flag for
+   * resend/retry/compose actions. Phase 1 ships read-only mutations so
+   * this is granted to owner/admin/manager only and is currently a
+   * passthrough for the Phase 2 "Resend / retry" controls.
+   */
+  canManageCommunications: boolean
 }
 
 export type OrgPermissionKey = keyof OrgPermissions
@@ -111,6 +127,8 @@ const NONE: OrgPermissions = {
   canViewTechnicians: false,
   canArchiveRecords: false,
   canManageProspects: false,
+  canViewCommunications: false,
+  canManageCommunications: false,
 }
 
 export function normalizeOrgMemberRole(raw: string | null | undefined): OrgMemberRole | null {
@@ -160,6 +178,8 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewTechnicians: true,
         canArchiveRecords: true,
         canManageProspects: true,
+        canViewCommunications: true,
+        canManageCommunications: true,
       }
     case "manager":
       return {
@@ -195,6 +215,8 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewTechnicians: true,
         canArchiveRecords: true,
         canManageProspects: true,
+        canViewCommunications: true,
+        canManageCommunications: true,
       }
     case "tech":
       return {
@@ -229,6 +251,8 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewTechnicians: true,
         canArchiveRecords: false,
         canManageProspects: false,
+        canViewCommunications: true,
+        canManageCommunications: false,
       }
     case "viewer":
       return {
@@ -263,6 +287,8 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewTechnicians: true,
         canArchiveRecords: false,
         canManageProspects: false,
+        canViewCommunications: true,
+        canManageCommunications: false,
       }
     default:
       return NONE
