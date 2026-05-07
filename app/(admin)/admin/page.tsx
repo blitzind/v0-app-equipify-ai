@@ -1968,6 +1968,12 @@ export default function PlatformAdminPage() {
         >
           AI Operations
         </Link>
+        <Link
+          href="/admin/master-context"
+          className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors mr-2"
+        >
+          Master Context Doc
+        </Link>
         {/* Admin identity */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#7c3aed] flex items-center justify-center text-white text-[11px] font-bold shrink-0">

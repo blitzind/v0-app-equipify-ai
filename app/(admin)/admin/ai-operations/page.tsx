@@ -270,6 +270,12 @@ export default function AiOperationsPage() {
           <ArrowLeft size={14} />
           Platform Admin
         </Link>
+        <Link
+          href="/admin/master-context"
+          className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          Master Context Doc
+        </Link>
         <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
           App <ChevronRight size={12} />
         </Link>

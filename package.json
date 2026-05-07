@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "ai:evals": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ai-evals.ts",
-    "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs"
+    "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs",
+    "update:master-context": "tsx scripts/update-master-context.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

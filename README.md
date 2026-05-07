@@ -8,6 +8,16 @@ This repository is linked to a [v0](https://v0.app) project. You can continue de
 
 [Continue working on v0 →](https://v0.app/chat/projects/prj_OlHisG2ZgM3eQmHHAyB0X8J0ZnYV)
 
+## Master Context Doc (internal / platform admin)
+
+After meaningful changes to routes, APIs, or migrations, refresh the auto-generated scan that feeds **Admin → Master Context Doc**:
+
+```bash
+pnpm update:master-context
+```
+
+This updates `lib/admin/master-context.generated.ts` and the `MASTER_CONTEXT_LAST_UPDATED_ISO` timestamp in `lib/admin/master-context.ts`. Commit the results so the admin page and GPT context stay in sync.
+
 ## Getting Started
 
 First, run the development server:
