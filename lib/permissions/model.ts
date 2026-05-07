@@ -13,6 +13,35 @@ export type OrgPermissions = {
   canViewOperationalReports: boolean
   canApproveInvoices: boolean
 
+  /**
+   * Phase 1 (Permissions): explicit "view financials" rollup. Currently
+   * mirrors `canViewBilling` but exists as a separate key so we can split
+   * subscription/Stripe billing from operational invoice totals later.
+   */
+  canViewFinancials: boolean
+  /** Phase 1: create / edit / void / archive operational invoices. */
+  canEditInvoices: boolean
+  /** Phase 1: read quote drafts (separate so techs can be hidden from pricing). */
+  canViewQuotes: boolean
+  /** Phase 1: create / edit / send / convert quotes. */
+  canEditQuotes: boolean
+  /**
+   * Phase 1: full edit access to work orders (status, schedule, line items,
+   * notes). Conservative read-only access still requires only membership.
+   */
+  canEditWorkOrders: boolean
+  /** Phase 1: upload external certificate attachments to a calibration record. */
+  canUploadCertificateAttachments: boolean
+  /** Phase 1: adjust on-hand inventory stock (counts, write-offs, manual edits). */
+  canAdjustInventoryStock: boolean
+  /**
+   * Phase 1: aggregate "manage settings" capability used by API guards that
+   * gate workspace-wide configuration (workspace profile, billing defaults,
+   * portal defaults, integrations). Mirrors `canManageWorkspaceSettings ||
+   * canEditOrgBilling || canManagePortalSettings`.
+   */
+  canManageSettings: boolean
+
   canManageDispatch: boolean
   canViewDispatch: boolean
 
@@ -48,6 +77,14 @@ const NONE: OrgPermissions = {
   canViewFinancialReports: false,
   canViewOperationalReports: false,
   canApproveInvoices: false,
+  canViewFinancials: false,
+  canEditInvoices: false,
+  canViewQuotes: false,
+  canEditQuotes: false,
+  canEditWorkOrders: false,
+  canUploadCertificateAttachments: false,
+  canAdjustInventoryStock: false,
+  canManageSettings: false,
   canManageDispatch: false,
   canViewDispatch: false,
   canManageInventory: false,
@@ -88,6 +125,14 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewFinancialReports: true,
         canViewOperationalReports: true,
         canApproveInvoices: true,
+        canViewFinancials: true,
+        canEditInvoices: true,
+        canViewQuotes: true,
+        canEditQuotes: true,
+        canEditWorkOrders: true,
+        canUploadCertificateAttachments: true,
+        canAdjustInventoryStock: true,
+        canManageSettings: true,
         canManageDispatch: true,
         canViewDispatch: true,
         canManageInventory: true,
@@ -114,6 +159,14 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewFinancialReports: true,
         canViewOperationalReports: true,
         canApproveInvoices: true,
+        canViewFinancials: true,
+        canEditInvoices: true,
+        canViewQuotes: true,
+        canEditQuotes: true,
+        canEditWorkOrders: true,
+        canUploadCertificateAttachments: true,
+        canAdjustInventoryStock: true,
+        canManageSettings: true,
         canManageDispatch: true,
         canViewDispatch: true,
         canManageInventory: true,
@@ -140,6 +193,14 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewFinancialReports: false,
         canViewOperationalReports: false,
         canApproveInvoices: false,
+        canViewFinancials: false,
+        canEditInvoices: false,
+        canViewQuotes: false,
+        canEditQuotes: false,
+        canEditWorkOrders: true,
+        canUploadCertificateAttachments: true,
+        canAdjustInventoryStock: false,
+        canManageSettings: false,
         canManageDispatch: false,
         canViewDispatch: true,
         canManageInventory: false,
@@ -165,6 +226,14 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canViewFinancialReports: false,
         canViewOperationalReports: true,
         canApproveInvoices: false,
+        canViewFinancials: true,
+        canEditInvoices: false,
+        canViewQuotes: true,
+        canEditQuotes: false,
+        canEditWorkOrders: false,
+        canUploadCertificateAttachments: false,
+        canAdjustInventoryStock: false,
+        canManageSettings: false,
         canManageDispatch: false,
         canViewDispatch: true,
         canManageInventory: false,

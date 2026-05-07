@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type TouchEvent } from "react"
+import { useState, type ReactNode } from "react"
 import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -18,7 +18,6 @@ import {
   MoreHorizontal,
   CheckCircle2,
   AlertTriangle,
-  Save,
   X,
   ExternalLink,
   Download,
@@ -51,14 +50,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { tabsListDrawerRowClassName, tabsTriggerDrawerRowClassName } from "@/components/ui/tabs-chrome"
 import {
@@ -70,6 +61,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DrawerTimeline, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
+import { SignaturePadDialog } from "@/components/signatures/signature-pad-dialog"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import {
@@ -590,142 +582,7 @@ function Section({
   )
 }
 
-// ─── Customer signature (preview + modal canvas) ─────────────────────────────
-
-function signatureCanvasGetPos(e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) {
-  const rect = canvas.getBoundingClientRect()
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
-  if ("touches" in e) {
-    return {
-      x: (e.touches[0].clientX - rect.left) * scaleX,
-      y: (e.touches[0].clientY - rect.top) * scaleY,
-    }
-  }
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
-  }
-}
-
-function SignatureCaptureDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
-  open: boolean
-  onOpenChange: (next: boolean) => void
-  onConfirm: (blob: Blob, name: string) => Promise<void>
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [drawing, setDrawing] = useState(false)
-  const [hasStrokes, setHasStrokes] = useState(false)
-  const [signerName, setSignerName] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-
-  const resetCanvas = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height)
-    setHasStrokes(false)
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    setSignerName("")
-    resetCanvas()
-  }, [open, resetCanvas])
-
-  function startDraw(e: MouseEvent | TouchEvent) {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")!
-    const pos = signatureCanvasGetPos(e, canvas)
-    ctx.beginPath()
-    ctx.moveTo(pos.x, pos.y)
-    setDrawing(true)
-  }
-
-  function draw(e: MouseEvent | TouchEvent) {
-    if (!drawing) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")!
-    const pos = signatureCanvasGetPos(e, canvas)
-    ctx.lineWidth = 2.5
-    ctx.lineCap = "round"
-    ctx.strokeStyle = "#1a1a2e"
-    ctx.lineTo(pos.x, pos.y)
-    ctx.stroke()
-    setHasStrokes(true)
-  }
-
-  function endDraw() {
-    setDrawing(false)
-  }
-
-  async function handleSave() {
-    const canvas = canvasRef.current
-    if (!canvas || !hasStrokes || !signerName.trim()) return
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not create PNG"))), "image/png")
-    })
-    setSubmitting(true)
-    try {
-      await onConfirm(blob, signerName.trim())
-      onOpenChange(false)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90vh,560px)] overflow-y-auto sm:max-w-xl" showCloseButton={!submitting}>
-        <DialogHeader>
-          <DialogTitle>Customer signature</DialogTitle>
-          <DialogDescription>
-            Sign with mouse or touch, enter the signer&apos;s name, then save.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Input
-            placeholder="Signer&apos;s full name"
-            value={signerName}
-            onChange={(e) => setSignerName(e.target.value)}
-            className="max-w-full sm:max-w-md"
-            disabled={submitting}
-          />
-          <div className="border-2 border-dashed border-border rounded-lg overflow-hidden touch-none select-none dark:bg-[#0B111E] dark:border-[#25324C]">
-            <canvas
-              ref={canvasRef}
-              width={600}
-              height={220}
-              className="w-full min-h-[140px] cursor-crosshair max-h-56 touch-none sm:max-h-44"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={endDraw}
-              onMouseLeave={endDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={endDraw}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">Draw signature using mouse or touch</p>
-        </div>
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button type="button" variant="outline" onClick={() => resetCanvas()} disabled={submitting}>
-            Clear
-          </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={submitting || !hasStrokes || !signerName.trim()}>
-            <Save className="w-3.5 h-3.5 mr-1.5" />
-            {submitting ? "Saving…" : "Save"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
+// ─── Customer signature (preview + shared modal canvas) ──────────────────────
 
 function CustomerSignatureSection({
   legacySigData,
@@ -794,10 +651,15 @@ function CustomerSignatureSection({
             <PenLine className="w-3.5 h-3.5 mr-1.5" />
             {imageSrc || showCheckOnly ? "Replace signature" : "Capture signature"}
           </Button>
-          <SignatureCaptureDialog
+          <SignaturePadDialog
             open={modalOpen}
             onOpenChange={setModalOpen}
-            onConfirm={onCustomerSignatureSave}
+            requireSignerName
+            title="Customer signature"
+            description="Sign with mouse or touch, enter the signer's name, then save."
+            onConfirm={async (blob, name) => {
+              await onCustomerSignatureSave(blob, (name ?? "").trim())
+            }}
           />
         </>
       ) : null}

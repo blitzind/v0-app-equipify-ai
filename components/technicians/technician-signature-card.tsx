@@ -2,10 +2,20 @@
 
 /**
  * Certificates + Portal Release Workflow — Phase 2
+ * Technician Signature Capture — Phase 3 (draw + upload)
  *
  * Self-contained card for managing a technician's stored signature image.
  * When a signature is on file, the certificate output uses it as a fallback
  * whenever no fresh visit signature was captured for the work order.
+ *
+ * Two save paths share the same storage:
+ *   - Upload signature: choose a transparent PNG / JPEG / WEBP file.
+ *   - Draw signature: open the shared `<SignaturePadDialog>`, draw on the
+ *     canvas (mouse or touch), and save the resulting PNG.
+ *
+ * Both flows call `uploadTechnicianSignature`, so the certificate auto-
+ * fallback, RLS, and tenant scoping behave identically regardless of how
+ * the signature was produced.
  */
 
 import * as React from "react"
@@ -21,6 +31,7 @@ import {
   uploadTechnicianSignature,
   validateSignatureFile,
 } from "@/lib/technicians/signature-storage"
+import { SignaturePadDialog } from "@/components/signatures/signature-pad-dialog"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 export type TechnicianSignatureCardProps = {
@@ -55,6 +66,7 @@ export function TechnicianSignatureCard({
   const [storagePath, setStoragePath] = React.useState<string | null>(null)
   const [signedUrl, setSignedUrl] = React.useState<string | null>(null)
   const [updatedAt, setUpdatedAt] = React.useState<string | null>(null)
+  const [drawDialogOpen, setDrawDialogOpen] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const refresh = React.useCallback(async () => {
@@ -83,14 +95,18 @@ export function TechnicianSignatureCard({
     void refresh()
   }, [refresh])
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ""
-    if (!file) return
-    const validation = validateSignatureFile(file)
+  /**
+   * Persist a blob as the technician's stored signature. Used by both the
+   * upload-from-file flow and the draw-on-canvas flow so storage path,
+   * cleanup, and certificate fallback behavior stay identical.
+   */
+  async function persistSignatureBlob(
+    blob: Blob | File,
+    successTitle = "Signature saved",
+  ): Promise<void> {
+    const validation = validateSignatureFile(blob as File)
     if (validation) {
-      toast({ variant: "destructive", title: "Cannot upload signature", description: validation })
-      return
+      throw new Error(validation)
     }
     setBusy(true)
     const supabase = createBrowserSupabaseClient()
@@ -98,22 +114,39 @@ export function TechnicianSignatureCard({
       await uploadTechnicianSignature(supabase, {
         organizationId,
         technicianId,
-        file,
+        file: blob,
       })
       toast({
-        title: "Signature saved",
+        title: successTitle,
         description: "Future certificates will use this signature as a fallback.",
       })
       await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    try {
+      await persistSignatureBlob(file)
     } catch (err) {
       toast({
         variant: "destructive",
         title: "Upload failed",
         description: err instanceof Error ? err.message : "Please retry.",
       })
-    } finally {
-      setBusy(false)
     }
+  }
+
+  async function handleDrawnSignature(blob: Blob) {
+    // Convert the shared canvas blob into a File so the signature-storage
+    // validator can attach the expected `image/png` MIME type and produce a
+    // friendly extension. The dialog throws back to itself if this rejects.
+    const file = new File([blob], "drawn-signature.png", { type: "image/png" })
+    await persistSignatureBlob(file, "Signature saved")
   }
 
   async function handleDelete() {
@@ -139,6 +172,10 @@ export function TechnicianSignatureCard({
     }
   }
 
+  const hasSignature = Boolean(signedUrl)
+  const uploadLabel = hasSignature ? "Replace upload" : "Upload signature"
+  const drawLabel = hasSignature ? "Replace by drawing" : "Draw signature"
+
   return (
     <div
       className={cn(
@@ -152,42 +189,21 @@ export function TechnicianSignatureCard({
             <PenLine className="w-3 h-3" /> Stored signature
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
+            Upload an existing signature image or draw a signature to save for certificates.
             Auto-applied to calibration certificates when no fresh signature was captured on the visit.
           </p>
         </div>
-        {canManage ? (
-          <>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              hidden
-              onChange={(e) => void handleFile(e)}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="gap-1.5 text-xs shrink-0"
-              disabled={busy}
-              onClick={() => inputRef.current?.click()}
-            >
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-              {storagePath ? "Replace" : "Upload"}
-            </Button>
-          </>
-        ) : null}
       </div>
 
       {loading ? (
         <p className="text-xs text-muted-foreground py-2">Loading signature…</p>
-      ) : signedUrl ? (
+      ) : hasSignature ? (
         <div className="flex flex-col sm:flex-row gap-3 items-start">
           <div className="rounded-lg border border-border bg-background px-3 py-2 max-w-[260px]">
             {/* Storage signed URLs are external; using <img> avoids a Next.js domain whitelist. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={signedUrl}
+              src={signedUrl ?? ""}
               alt={`${technicianName} signature`}
               className="max-h-20 object-contain"
             />
@@ -210,9 +226,61 @@ export function TechnicianSignatureCard({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground py-2">
-          No signature on file yet. Upload a transparent PNG, JPEG, or WEBP.
+          No signature on file yet.
         </p>
       )}
+
+      {canManage ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(e) => void handleFile(e)}
+          />
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="gap-1.5 text-xs"
+              disabled={busy}
+              onClick={() => inputRef.current?.click()}
+            >
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {uploadLabel}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs"
+              disabled={busy}
+              onClick={() => setDrawDialogOpen(true)}
+            >
+              <PenLine className="w-3.5 h-3.5" />
+              {drawLabel}
+            </Button>
+            {!hasSignature ? (
+              <span className="text-[11px] text-muted-foreground">
+                Accepts transparent PNG, JPEG, or WEBP up to 2 MB.
+              </span>
+            ) : null}
+          </div>
+          <SignaturePadDialog
+            open={drawDialogOpen}
+            onOpenChange={setDrawDialogOpen}
+            title={`Draw ${technicianName}'s signature`}
+            description="Sign with mouse or touch — saved as a PNG and used as a fallback on calibration certificates."
+            saveLabel="Save signature"
+            helperText="Draw signature using mouse or touch. Tap Clear to start over."
+            onConfirm={async (blob) => {
+              await handleDrawnSignature(blob)
+            }}
+          />
+        </>
+      ) : null}
     </div>
   )
 }

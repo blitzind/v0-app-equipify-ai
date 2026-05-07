@@ -28,6 +28,9 @@ import { NewInvoiceModal } from "@/components/invoices/new-invoice-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { PermissionGate } from "@/components/permissions/permission-gate"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -133,6 +136,8 @@ function InvoicesPageInner() {
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
   const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
+  const { permissions: orgPermissions } = useOrgPermissions()
+  const canViewFinancials = orgPermissions.canViewFinancials
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [invoicePrefillWo, setInvoicePrefillWo] = useState<string | undefined>(undefined)
   const [invoicePrefillCal, setInvoicePrefillCal] = useState<string | undefined>(undefined)
@@ -297,6 +302,18 @@ function InvoicesPageInner() {
 
   const overdue = filtered.filter(i => i.status === "Overdue")
 
+  if (!canViewFinancials) {
+    return (
+      <div className="flex flex-col gap-5">
+        <RestrictedNotice
+          capability="canViewFinancials"
+          title="Invoices are restricted for your role"
+          body="Your role doesn't include access to invoice totals or billing history. Ask an owner, admin, or manager if you need to view or work on invoices."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {error && (
@@ -378,11 +395,13 @@ function InvoicesPageInner() {
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewInvoiceModal(undefined, undefined)}>
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Invoice</span>
-            <span className="sm:hidden">New</span>
-          </Button>
+          <PermissionGate capability="canEditInvoices">
+            <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewInvoiceModal(undefined, undefined)}>
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">New Invoice</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </PermissionGate>
         </div>
       </div>
 

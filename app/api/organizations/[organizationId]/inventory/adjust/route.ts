@@ -5,6 +5,7 @@ import {
   insertLedger,
 } from "@/lib/inventory/inventory-mutations"
 import { requireOrgInventoryWrite } from "@/lib/inventory/require-org-inventory-access"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
 
@@ -19,6 +20,11 @@ export async function POST(
   if (!UUID_RE.test(organizationId)) {
     return NextResponse.json({ message: "Invalid organization." }, { status: 400 })
   }
+
+  // Phase 1 capability check (in addition to the existing membership-level
+  // gate) — only roles with `canAdjustInventoryStock` can hit this endpoint.
+  const capabilityGate = await requireOrgPermission(organizationId, "canAdjustInventoryStock")
+  if ("error" in capabilityGate) return capabilityGate.error
 
   const gate = await requireOrgInventoryWrite(organizationId)
   if ("error" in gate) return gate.error

@@ -28,6 +28,9 @@ import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { PermissionGate } from "@/components/permissions/permission-gate"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -129,6 +132,8 @@ function QuotesPageInner() {
   } = useQuotes()
   const { toast } = useToast()
   const { standardCreateEligibility } = useBillingAccess()
+  const { permissions: orgPermissions } = useOrgPermissions()
+  const canViewQuotes = orgPermissions.canViewQuotes
   const { organizationId: activeOrgId, status: activeOrgStatus } = useActiveOrganization()
   const [newModalOpen, setNewModalOpen] = useState(false)
   const [newQuotePrefillCustomerId, setNewQuotePrefillCustomerId] = useState<string | null>(null)
@@ -287,6 +292,18 @@ function QuotesPageInner() {
   const pendingApproval = filtered.filter(q => q.status === "Pending Approval")
   const others          = filtered.filter(q => q.status !== "Pending Approval")
 
+  if (!canViewQuotes) {
+    return (
+      <div className="flex flex-col gap-5">
+        <RestrictedNotice
+          capability="canViewQuotes"
+          title="Quotes are restricted for your role"
+          body="Your role doesn't include access to quote pricing or status. Ask an owner, admin, or manager if you need to review quotes."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {error && (
@@ -347,17 +364,19 @@ function QuotesPageInner() {
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button
-            size="sm"
-            className="gap-2 cursor-pointer"
-            onClick={() => {
-              openNewQuoteModal(null, null)
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Quote</span>
-            <span className="sm:hidden">New</span>
-          </Button>
+          <PermissionGate capability="canEditQuotes">
+            <Button
+              size="sm"
+              className="gap-2 cursor-pointer"
+              onClick={() => {
+                openNewQuoteModal(null, null)
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">New Quote</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </PermissionGate>
         </div>
       </div>
 
