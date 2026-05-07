@@ -34,6 +34,9 @@ export type AsyncRunPublic = {
   leaseExpiresAt: string | null
   updatedAt: string | null
   createdAt: string | null
+  recovery: Record<string, unknown> | null
+  staleLeaseRecoveredAt: string | null
+  isLikelyStuck: boolean
 }
 
 type StartRunInput = {
@@ -50,8 +53,17 @@ type ProcessRunOptions = {
   allowRetryWindowBypass?: boolean
 }
 
+export type CronImportRunCounters = {
+  processed: number
+  skipped: number
+  retried: number
+  failed: number
+  leaseSkipped: number
+}
+
 const DEFAULT_MAX_RETRIES = 5
 const LEASE_SECONDS = 45
+const STALE_LEASE_GRACE_SECONDS = 120
 const TRANSIENT_ERROR_CODES = new Set([
   "ETIMEDOUT",
   "ECONNRESET",
@@ -86,7 +98,7 @@ function jobStatusMessage(status: string, args: { processed?: number; total?: nu
   }
   if (status === "cancel_requested") return "Cancellation requested. Current chunk will stop at the next checkpoint."
   if (status === "cancelled") return "Background import cancelled by request."
-  if (status === "failed") return "Background import failed. You can review run history and retry with adjusted mapping."
+  if (status === "failed") return "Background import failed permanently after retry policy. Review run diagnostics before resuming."
   if (status === "completed") return "Background import completed."
   if (status === "completed_with_errors") return "Background import completed with some row errors."
   return "Import status updated."
@@ -106,6 +118,19 @@ function retryDelaySeconds(retryCount: number): number {
 
 function isoAfterSeconds(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString()
+}
+
+function isLikelyStuckRow(row: Record<string, unknown>): boolean {
+  const status = String(row.status ?? "")
+  if (status !== "processing") return false
+  const lease = (row.lease_expires_at as string | null) ?? null
+  const hb = (row.last_heartbeat_at as string | null) ?? null
+  const nowMs = Date.now()
+  const leaseMs = lease ? new Date(lease).getTime() : 0
+  const hbMs = hb ? new Date(hb).getTime() : 0
+  if (leaseMs && Number.isFinite(leaseMs) && leaseMs < nowMs) return true
+  if (hbMs && Number.isFinite(hbMs) && nowMs - hbMs > STALE_LEASE_GRACE_SECONDS * 1000) return true
+  return false
 }
 
 function mapRun(row: Record<string, unknown>): AsyncRunPublic {
@@ -135,6 +160,10 @@ function mapRun(row: Record<string, unknown>): AsyncRunPublic {
     leaseExpiresAt: (row.lease_expires_at as string | null) ?? null,
     updatedAt: (row.updated_at as string | null) ?? null,
     createdAt: (row.created_at as string | null) ?? null,
+    recovery: (row.recovery_json as Record<string, unknown> | null) ?? null,
+    staleLeaseRecoveredAt:
+      (row.recovery_json as Record<string, unknown> | null)?.stale_lease_recovered_at as string | null,
+    isLikelyStuck: isLikelyStuckRow(row),
   }
 }
 
@@ -143,7 +172,7 @@ export async function getActiveImportRun(gate: Gate, organizationId: string, job
   const { data, error } = await supabase
     .from("organization_import_job_runs")
     .select(
-      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message",
+      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message, retry_count, max_retries, next_retry_at, lease_expires_at, recovery_json, created_at, updated_at",
     )
     .eq("organization_id", organizationId)
     .eq("import_job_id", jobId)
@@ -166,7 +195,7 @@ export async function listImportRunsHistory(
   const { data } = await supabase
     .from("organization_import_job_runs")
     .select(
-      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message, retry_count, max_retries, next_retry_at, lease_expires_at, created_at, updated_at",
+      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message, retry_count, max_retries, next_retry_at, lease_expires_at, recovery_json, created_at, updated_at",
     )
     .eq("organization_id", organizationId)
     .eq("import_job_id", jobId)
@@ -530,7 +559,7 @@ async function processRunById(
         .from("organization_import_jobs")
         .update({
           status: "queued",
-          user_message: `Retry ${retryCount}/${maxRetries} scheduled for background import.`,
+          user_message: `Retrying background import (${retryCount}/${maxRetries}). Next attempt scheduled automatically.`,
         })
         .eq("id", jobId)
         .eq("organization_id", organizationId)
@@ -589,7 +618,14 @@ export async function processAsyncImportRunTick(gate: Gate, organizationId: stri
 export async function processNextRunnableImportRun(
   gate: Gate,
   opts?: ProcessRunOptions,
-): Promise<{ processed: boolean; run: AsyncRunPublic | null }> {
+): Promise<{ processed: boolean; run: AsyncRunPublic | null; counters: CronImportRunCounters }> {
+  const counters: CronImportRunCounters = {
+    processed: 0,
+    skipped: 0,
+    retried: 0,
+    failed: 0,
+    leaseSkipped: 0,
+  }
   const { supabase } = gate
   const now = new Date().toISOString()
   const { data: runData } = await supabase
@@ -600,10 +636,132 @@ export async function processNextRunnableImportRun(
     .order("updated_at", { ascending: true })
     .limit(1)
     .maybeSingle()
-  if (!runData) return { processed: false, run: null }
+  if (!runData) return { processed: false, run: null, counters }
   const runId = String((runData as { id: string }).id)
+  const { data: beforeData } = await supabase
+    .from("organization_import_job_runs")
+    .select("status, retry_count")
+    .eq("id", runId)
+    .maybeSingle()
+  const before = beforeData as { status?: string; retry_count?: number } | null
   const result = await processRunById(gate, runId, opts)
-  return { processed: !result.leaseDenied, run: result.run }
+  if (result.leaseDenied) {
+    counters.leaseSkipped += 1
+    return { processed: false, run: result.run, counters }
+  }
+  counters.processed += 1
+  const { data: afterData } = await supabase
+    .from("organization_import_job_runs")
+    .select("status, retry_count")
+    .eq("id", runId)
+    .maybeSingle()
+  const after = afterData as { status?: string; retry_count?: number } | null
+  if (after?.status === "queued" && typeof after.retry_count === "number" && typeof before?.retry_count === "number" && after.retry_count > before.retry_count) {
+    counters.retried += 1
+  }
+  if (after?.status === "failed") counters.failed += 1
+  if (after?.status === "cancelled") counters.skipped += 1
+  return { processed: true, run: result.run, counters }
+}
+
+export async function recoverStaleLeases(gate: Gate): Promise<number> {
+  const { supabase } = gate
+  const nowIso = new Date().toISOString()
+  const staleBefore = isoAfterSeconds(-STALE_LEASE_GRACE_SECONDS)
+  const { data: staleRows } = await supabase
+    .from("organization_import_job_runs")
+    .select("id, import_job_id, organization_id, status, recovery_json")
+    .eq("status", "processing")
+    .or(`lease_expires_at.lt.${nowIso},last_heartbeat_at.lt.${staleBefore}`)
+    .limit(50)
+  if (!staleRows || staleRows.length === 0) return 0
+
+  for (const r of staleRows as Array<Record<string, unknown>>) {
+    const runId = String(r.id)
+    const orgId = String(r.organization_id)
+    const jobId = String(r.import_job_id)
+    const oldRecovery = (r.recovery_json as Record<string, unknown> | null) ?? {}
+    await supabase
+      .from("organization_import_job_runs")
+      .update({
+        status: "queued",
+        lease_owner: null,
+        lease_expires_at: null,
+        last_heartbeat_at: nowIso,
+        recovery_json: {
+          ...oldRecovery,
+          stale_lease_recovered_at: nowIso,
+          stale_lease_recovered: true,
+        },
+      })
+      .eq("id", runId)
+    await supabase
+      .from("organization_import_jobs")
+      .update({
+        status: "queued",
+        user_message: "Stale lease recovered. Run safely returned to queue for retry.",
+      })
+      .eq("organization_id", orgId)
+      .eq("id", jobId)
+  }
+  return staleRows.length
+}
+
+export async function resumeFailedImportRun(gate: Gate, organizationId: string, jobId: string): Promise<AsyncRunPublic> {
+  const { supabase } = gate
+  const active = await getActiveImportRun(gate, organizationId, jobId)
+  if (active) throw new Error("An active run already exists.")
+
+  const { data: failedRun, error } = await supabase
+    .from("organization_import_job_runs")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("import_job_id", jobId)
+    .eq("status", "failed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error || !failedRun) throw new Error("No failed run available to resume.")
+
+  const prev = failedRun as Record<string, unknown>
+  const now = new Date().toISOString()
+  const prevRecovery = (prev.recovery_json as Record<string, unknown> | null) ?? {}
+  await supabase
+    .from("organization_import_job_runs")
+    .update({
+      status: "queued",
+      completed_at: null,
+      error_message: null,
+      next_retry_at: null,
+      lease_owner: null,
+      lease_expires_at: null,
+      last_heartbeat_at: now,
+      recovery_json: {
+        ...prevRecovery,
+        resumed_at: now,
+        resumed_from_status: "failed",
+        resume_cursor: prev.resume_cursor ?? 0,
+      },
+    })
+    .eq("id", String(prev.id))
+
+  await supabase
+    .from("organization_import_jobs")
+    .update({
+      status: "queued",
+      active_run_id: String(prev.id),
+      completed_at: null,
+      user_message: "Run resumed from recovery cursor metadata.",
+    })
+    .eq("organization_id", organizationId)
+    .eq("id", jobId)
+
+  const { data: resumed } = await supabase
+    .from("organization_import_job_runs")
+    .select("*")
+    .eq("id", String(prev.id))
+    .single()
+  return mapRun((resumed ?? prev) as Record<string, unknown>)
 }
 
 export async function requestCancelAsyncRun(gate: Gate, organizationId: string, jobId: string): Promise<AsyncRunPublic | null> {

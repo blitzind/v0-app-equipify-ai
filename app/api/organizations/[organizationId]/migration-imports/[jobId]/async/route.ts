@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import {
   getActiveImportRun,
   processAsyncImportRunTick,
+  resumeFailedImportRun,
   requestCancelAsyncRun,
   startAsyncImportRun,
 } from "@/lib/migration-imports/async-runner"
@@ -43,7 +44,7 @@ export async function POST(
   if ("error" in gate) return gate.error
 
   let body: {
-    action?: "start" | "tick" | "cancel"
+    action?: "start" | "tick" | "cancel" | "resume"
     columnMapping?: Record<string, string>
     options?: MigrationCommitOptions
     chunkSize?: number
@@ -69,6 +70,10 @@ export async function POST(
     }
     if (action === "cancel") {
       const run = await requestCancelAsyncRun(gate, organizationId, jobId)
+      return NextResponse.json({ ok: true, action, run })
+    }
+    if (action === "resume") {
+      const run = await resumeFailedImportRun(gate, organizationId, jobId)
       return NextResponse.json({ ok: true, action, run })
     }
 

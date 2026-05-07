@@ -54,6 +54,9 @@ type ActiveRun = {
   errorMessage?: string | null
   completedAt?: string | null
   createdAt?: string | null
+  isLikelyStuck?: boolean
+  staleLeaseRecoveredAt?: string | null
+  recovery?: Record<string, unknown> | null
 }
 
 type RowSample = {
@@ -85,6 +88,8 @@ export default function ImportJobDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [activeRun, setActiveRun] = useState<ActiveRun | null>(null)
   const [runHistory, setRunHistory] = useState<ActiveRun[]>([])
+  const [runActionBusy, setRunActionBusy] = useState(false)
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!organizationId || !jobId || !allowed) {
@@ -138,6 +143,31 @@ export default function ImportJobDetailPage() {
     }, 3000)
     return () => clearInterval(id)
   }, [job, load])
+
+  const resumeFailedRun = useCallback(async () => {
+    if (!organizationId || !jobId) return
+    setRunActionBusy(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/async`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "resume" }),
+        },
+      )
+      const json = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        setError(json.message ?? "Could not resume failed run.")
+        return
+      }
+      await load()
+    } catch {
+      setError("Could not resume failed run.")
+    } finally {
+      setRunActionBusy(false)
+    }
+  }, [organizationId, jobId, load])
 
   if (permStatus === "loading" || orgStatus !== "ready") {
     return (
@@ -200,6 +230,14 @@ export default function ImportJobDetailPage() {
         <p className="text-sm text-muted-foreground">Job not found.</p>
       ) : (
         <>
+          {activeRun?.isLikelyStuck ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+              <p className="font-medium">Stuck run detected</p>
+              <p className="text-muted-foreground mt-1">
+                This run appears stuck (stale lease or heartbeat). Cron will recover stale leases automatically.
+              </p>
+            </div>
+          ) : null}
           {job.partialImport ? (
             <div
               className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100 flex gap-2 items-start"
@@ -255,6 +293,11 @@ export default function ImportJobDetailPage() {
                 ) : null}
                 {activeRun.nextRetryAt ? (
                   <p className="text-muted-foreground">Next retry: {new Date(activeRun.nextRetryAt).toLocaleString()}</p>
+                ) : null}
+                {activeRun.staleLeaseRecoveredAt ? (
+                  <p className="text-muted-foreground">
+                    Stale lease recovered at {new Date(activeRun.staleLeaseRecoveredAt).toLocaleString()}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -348,8 +391,20 @@ export default function ImportJobDetailPage() {
 
           {runHistory.length > 0 ? (
             <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-3 py-2 bg-muted/40 border-b border-border">
+              <div className="px-3 py-2 bg-muted/40 border-b border-border flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Run history</h2>
+                {!activeRun && runHistory.some((r) => r.status === "failed") ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={runActionBusy}
+                    onClick={() => void resumeFailedRun()}
+                  >
+                    {runActionBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    Resume failed run
+                  </Button>
+                ) : null}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -360,11 +415,12 @@ export default function ImportJobDetailPage() {
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">Progress</th>
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">Retry</th>
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">Completed</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {runHistory.map((r) => (
-                      <tr key={r.runId} className="border-t border-border/80">
+                      <tr key={r.runId} className="border-t border-border/80 align-top">
                         <td className="px-3 py-1.5 font-mono text-xs">{r.runRef}</td>
                         <td className="px-3 py-1.5 capitalize">{r.status.replace(/_/g, " ")}</td>
                         <td className="px-3 py-1.5 text-xs text-muted-foreground">
@@ -376,6 +432,29 @@ export default function ImportJobDetailPage() {
                         </td>
                         <td className="px-3 py-1.5 text-xs text-muted-foreground">
                           {r.completedAt ? new Date(r.completedAt).toLocaleString() : "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          <button
+                            type="button"
+                            className="text-primary hover:underline"
+                            onClick={() => setExpandedRunId((prev) => (prev === r.runId ? null : r.runId))}
+                          >
+                            {expandedRunId === r.runId ? "Hide" : "Show"}
+                          </button>
+                          {expandedRunId === r.runId ? (
+                            <div className="mt-2 rounded border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground space-y-1 max-w-[320px]">
+                              {r.errorMessage ? <p>Error: {r.errorMessage}</p> : null}
+                              {r.isLikelyStuck ? <p>Likely stuck: yes</p> : null}
+                              {r.staleLeaseRecoveredAt ? (
+                                <p>Stale lease recovered: {new Date(r.staleLeaseRecoveredAt).toLocaleString()}</p>
+                              ) : null}
+                              {r.recovery ? (
+                                <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(r.recovery, null, 2)}</pre>
+                              ) : (
+                                <p>No recovery metadata.</p>
+                              )}
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ))}

@@ -7,7 +7,7 @@ import {
   Building2, Users, DollarSign, TrendingUp, TrendingDown, MoreHorizontal,
   LogIn, ShieldAlert, CheckCircle2, XCircle, Clock, Zap, AlertTriangle,
   ChevronRight, ArrowUpRight, Filter, Info, Eye, RefreshCw, RotateCcw,
-  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket,
+  ScrollText, Gauge, Flag, Activity, Archive, Trash2, Loader2, CreditCard, Ticket, Brain,
 } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import {
@@ -23,9 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
 import { AiOperationsContent } from "@/components/admin/ai-operations-content"
-import { MasterContextDocClient } from "./master-context/master-context-doc-client"
-import { getEquipifyMasterContext, MASTER_CONTEXT_LAST_UPDATED_ISO } from "@/lib/admin/master-context"
-import { MCG_SCAN_COUNTS } from "@/lib/admin/master-context.generated"
+import { MasterContextTabContent } from "@/components/admin/master-context-tab-content"
 import {
   Dialog,
   DialogContent,
@@ -2100,14 +2098,7 @@ export default function PlatformAdminPage() {
           {activeTab === "flags"     && <FlagsTab />}
           {activeTab === "audit"     && <AuditTab />}
           {activeTab === "ai_operations" && <AiOperationsContent />}
-          {activeTab === "master_context" && (
-            <MasterContextDocClient
-              embedded
-              initialMarkdown={getEquipifyMasterContext()}
-              generatedAtIso={MASTER_CONTEXT_LAST_UPDATED_ISO}
-              scanCounts={MCG_SCAN_COUNTS}
-            />
-          )}
+          {activeTab === "master_context" && <MasterContextTabContent />}
         </div>
       </div>
     </div>

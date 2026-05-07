@@ -56,6 +56,15 @@ type InvRow = {
   portal_certificate_release_override: string | null
 }
 
+function isMissingDbObject(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find") ||
+    m.includes("schema cache")
+  )
+}
+
 /**
  * Single batch pass: linked invoices per work order + operational aging aggregates.
  * Merges legacy `work_order_id` with `invoice_work_order_links` (deduped per WO).
@@ -91,8 +100,30 @@ export async function fetchWorkOrderInvoiceOpsBatch(
       .in("work_order_id", workOrderIds),
   ])
 
-  if (directRes.error) throw new Error(directRes.error.message)
-  if (linkRes.error) throw new Error(linkRes.error.message)
+  let directData = directRes.data as InvRow[] | null
+  if (directRes.error) {
+    if (isMissingDbObject(directRes.error.message)) {
+      const fallback = await supabase
+        .from("org_invoices")
+        .select("id, status, due_date, issued_at, work_order_id")
+        .eq("organization_id", organizationId)
+        .in("work_order_id", workOrderIds)
+      if (fallback.error) throw new Error(fallback.error.message)
+      directData = ((fallback.data ?? []) as Array<Omit<InvRow, "portal_certificate_release_override">>).map(
+        (r) => ({ ...r, portal_certificate_release_override: null }),
+      )
+    } else {
+      throw new Error(directRes.error.message)
+    }
+  }
+
+  const canUseLinkTable = !linkRes.error
+    ? true
+    : !isMissingDbObject(linkRes.error.message)
+
+  if (linkRes.error && canUseLinkTable) {
+    throw new Error(linkRes.error.message)
+  }
 
   const byWo = new Map<string, Map<string, InvRow>>()
 
@@ -105,12 +136,15 @@ export async function fetchWorkOrderInvoiceOpsBatch(
     m.set(row.id, row)
   }
 
-  for (const row of (directRes.data ?? []) as InvRow[]) {
+  for (const row of (directData ?? []) as InvRow[]) {
     if (row.work_order_id) addInv(row.work_order_id, row)
   }
 
   const extraIds = new Set<string>()
-  for (const r of (linkRes.data ?? []) as { invoice_id: string; work_order_id: string }[]) {
+  const linkRows = canUseLinkTable
+    ? ((linkRes.data ?? []) as { invoice_id: string; work_order_id: string }[])
+    : []
+  for (const r of linkRows) {
     extraIds.add(r.invoice_id)
   }
 
@@ -122,7 +156,7 @@ export async function fetchWorkOrderInvoiceOpsBatch(
       .in("id", [...extraIds])
     if (error) throw new Error(error.message)
     const invMap = new Map((extraRows ?? []).map((r) => [(r as InvRow).id, r as InvRow]))
-    for (const r of (linkRes.data ?? []) as { invoice_id: string; work_order_id: string }[]) {
+    for (const r of linkRows) {
       const inv = invMap.get(r.invoice_id)
       if (inv) addInv(r.work_order_id, inv)
     }
