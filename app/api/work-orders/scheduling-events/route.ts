@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import {
   listSchedulingEventsForWorkOrder,
   recordSchedulingEvent,
@@ -81,6 +82,15 @@ export async function POST(request: NextRequest) {
   if (!UUID_RE.test(workOrderId)) {
     return NextResponse.json({ error: "Invalid workOrderId" }, { status: 400 })
   }
+
+  // Phase 2 (Permissions): scheduling notes / actions are mutations against
+  // the work order timeline. Allow techs to add their own notes (canEditWorkOrders)
+  // and dispatch managers (canManageDispatch) — viewers stay read-only.
+  const capGate = await requireAnyOrgPermission(organizationId, [
+    "canEditWorkOrders",
+    "canManageDispatch",
+  ])
+  if ("error" in capGate) return capGate.error
   const eventType = (body.eventType ?? "note") as SchedulingEventType
   if (!ALLOWED_TYPES.has(eventType)) {
     return NextResponse.json({ error: "Invalid eventType" }, { status: 400 })

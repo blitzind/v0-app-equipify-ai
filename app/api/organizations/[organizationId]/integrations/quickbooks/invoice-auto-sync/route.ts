@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireOrganizationMember } from "@/lib/email/route-auth"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { triggerQuickBooksInvoiceAutoSyncIfEnabled } from "@/lib/integrations/quickbooks/invoice-auto-sync"
 
 export const runtime = "nodejs"
@@ -36,6 +37,12 @@ export async function POST(
   if (!allowed) {
     return NextResponse.json({ error: "forbidden", message: "No access to this organization." }, { status: 403 })
   }
+
+  // Phase 2 (Permissions): triggering auto-sync touches invoice state and
+  // QuickBooks side effects, so gate it on canEditInvoices to keep techs and
+  // viewers out without affecting QB sync configuration itself.
+  const capGate = await requireOrgPermission(organizationId, "canEditInvoices")
+  if ("error" in capGate) return capGate.error
 
   const { data: inv } = await supabase
     .from("org_invoices")

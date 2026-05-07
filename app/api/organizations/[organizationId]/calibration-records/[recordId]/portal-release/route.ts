@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import {
-  getOrganizationMemberRole,
-  roleCanManageOperationalCertificateRules,
-} from "@/lib/api/org-role"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
 
@@ -14,6 +10,12 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
 }
 
+/**
+ * Phase 2 (Permissions): manual portal release is now gated by the central
+ * `canReleaseCertificatesToPortal` capability. RLS still enforces the
+ * organization scope; this guard returns a consistent 403 shape before
+ * touching the row.
+ */
 export async function POST(
   _request: Request,
   context: { params: Promise<{ organizationId: string; recordId: string }> },
@@ -23,16 +25,12 @@ export async function POST(
     return jsonError("Invalid id.", 400)
   }
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.id) return jsonError("Unauthorized.", 401)
-
-  const role = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!roleCanManageOperationalCertificateRules(role)) {
-    return jsonError("Insufficient permissions.", 403)
-  }
+  const gate = await requireOrgPermission(
+    organizationId,
+    "canReleaseCertificatesToPortal",
+  )
+  if ("error" in gate) return gate.error
+  const { supabase } = gate
 
   const now = new Date().toISOString()
 

@@ -2,10 +2,25 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import {
+  getOrgPermissionsForRole,
+  hasOrgPermission,
+  normalizeOrgMemberRole,
+  type OrgPermissionKey,
+} from "@/lib/permissions/model"
 
-const MANAGER_ROLES = ["owner", "admin", "manager"] as const
-
-export async function requireOrgCatalogWrite(organizationId: string): Promise<
+/**
+ * Phase 2 (Permissions): the catalog/inventory write gate is now driven by
+ * the central `OrgPermissions` capability map instead of a hardcoded role
+ * array. The default capability is `canManageInventory` (true for owner /
+ * admin / manager — identical to the previous behaviour); callers may pass
+ * a different key (e.g. `canManageCertificateTemplates`) to gate alternate
+ * surfaces while still benefiting from the shared service-role wiring.
+ */
+export async function requireOrgCatalogWrite(
+  organizationId: string,
+  options: { capability?: OrgPermissionKey; forbiddenMessage?: string } = {},
+): Promise<
   | {
       userId: string
       supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
@@ -13,6 +28,11 @@ export async function requireOrgCatalogWrite(organizationId: string): Promise<
     }
   | { error: NextResponse }
 > {
+  const capability: OrgPermissionKey = options.capability ?? "canManageInventory"
+  const forbiddenMessage =
+    options.forbiddenMessage ??
+    "Only owners, admins, and managers can manage catalog and inventory."
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -41,11 +61,21 @@ export async function requireOrgCatalogWrite(organizationId: string): Promise<
       }
     }
 
-    const role = mem?.role as string | undefined
-    if (!role || !MANAGER_ROLES.includes(role as (typeof MANAGER_ROLES)[number])) {
+    const rawRole = (mem as { role?: string } | null)?.role ?? null
+    const role = normalizeOrgMemberRole(rawRole)
+    if (!role) {
       return {
         error: NextResponse.json(
-          { error: "forbidden", message: "Only owners, admins, and managers can manage catalog imports." },
+          { error: "forbidden", message: "You are not a member of this organization." },
+          { status: 403 },
+        ),
+      }
+    }
+    const perms = getOrgPermissionsForRole(role)
+    if (!hasOrgPermission(perms, capability)) {
+      return {
+        error: NextResponse.json(
+          { error: "insufficient_permissions", message: forbiddenMessage },
           { status: 403 },
         ),
       }

@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/resend"
 import { buildInvoiceEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { invoiceStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { InvoiceStatus } from "@/lib/mock-data"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
@@ -51,6 +52,10 @@ export async function POST(request: Request) {
   if (!allowed) {
     return NextResponse.json({ error: "forbidden", message: "You do not have access to this organization." }, { status: 403 })
   }
+
+  // Phase 2 (Permissions): only roles that can edit invoices may email them.
+  const capGate = await requireOrgPermission(organizationId, "canEditInvoices")
+  if ("error" in capGate) return capGate.error
 
   const { data: inv, error: invErr } = await supabase
     .from("org_invoices")

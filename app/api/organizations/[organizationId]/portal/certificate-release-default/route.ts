@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import {
-  getOrganizationMemberRole,
-  roleCanEditOrgPortalCertificateDefault,
-} from "@/lib/api/org-role"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { getOrganizationMemberRole } from "@/lib/api/org-role"
 
 export const runtime = "nodejs"
 
@@ -40,20 +38,18 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
   return NextResponse.json({ portal_certificate_release_mode: mode ?? "immediate_release" })
 }
 
+/**
+ * Phase 2 (Permissions): editing the workspace default release mode is gated
+ * by `canManagePortalSettings` (owner / admin only). Manager+ certificate
+ * release operations remain on `canReleaseCertificatesToPortal` elsewhere.
+ */
 export async function PATCH(request: Request, context: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.id) return jsonError("Unauthorized.", 401)
-
-  const role = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!roleCanEditOrgPortalCertificateDefault(role)) {
-    return jsonError("Only owners and admins can change the organization default.", 403)
-  }
+  const gate = await requireOrgPermission(organizationId, "canManagePortalSettings")
+  if ("error" in gate) return gate.error
+  const { supabase } = gate
 
   let body: { portal_certificate_release_mode?: unknown }
   try {

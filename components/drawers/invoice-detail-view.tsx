@@ -14,6 +14,7 @@ import {
 import { OrganizationDocumentHeader } from "@/components/documents/organization-document-header"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
@@ -1525,6 +1526,9 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const { canArchiveRestore } = useOrgArchivePermissions()
   const { permissions } = useOrgPermissions()
   const showFinancials = permissions.canViewBilling
+  // Phase 2 (Permissions): gate invoice mutations through the central capability
+  // map. UI hides write actions and the back-end re-enforces via requireOrgPermission.
+  const canEditInvoices = permissions.canEditInvoices
   const canEditInvoiceFinancials =
     showFinancials && (permissions.canApproveInvoices || permissions.canEditOrgBilling)
   const { updateInvoice, archiveInvoice, restoreInvoice, refreshInvoices } = useInvoices()
@@ -1736,8 +1740,14 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           <>
             {showFinancials ? (
               <>
-                {/* Primary: Email / already sent + resend */}
-                {alreadyEmailed ? (
+                {/* Primary: Email / already sent + resend (Phase 2: gated by canEditInvoices) */}
+                {!canEditInvoices ? (
+                  <RestrictedNotice
+                    inline
+                    capability="canEditInvoices"
+                    title="Invoice actions restricted to other roles."
+                  />
+                ) : alreadyEmailed ? (
                   <>
                     <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed" disabled>
                       <Mail className="w-3.5 h-3.5" /> Already Sent
@@ -1757,8 +1767,8 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   </Button>
                 )}
 
-                {/* Dropdown: send actions */}
-                <div className="relative">
+                {/* Dropdown: send actions (Phase 2: gated by canEditInvoices) */}
+                <div className="relative" hidden={!canEditInvoices}>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer px-2" onClick={() => setActionsOpen((p) => !p)}>
                 <ChevronDown className="w-3.5 h-3.5" />
               </Button>
@@ -1842,8 +1852,8 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
               )}
                 </div>
 
-                {/* Record Payment */}
-                {canRecordPayment && (
+                {/* Record Payment (Phase 2: gated by canEditInvoices) */}
+                {canRecordPayment && canEditInvoices && (
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("payment")}>
                     <CreditCard className="w-3.5 h-3.5" /> Record Payment
                   </Button>

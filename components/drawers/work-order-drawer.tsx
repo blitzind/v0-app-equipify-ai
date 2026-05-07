@@ -42,6 +42,7 @@ import {
 import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-order-equipment-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import type { Part, RepairLog, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -291,6 +292,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const { toast: pushToast } = useToast()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { canArchiveRestore } = useOrgArchivePermissions()
+  // Phase 2 (Permissions): hide work-order mutation buttons for read-only roles.
+  const { permissions: woOrgPermissions } = useOrgPermissions()
+  const woCanEdit = woOrgPermissions.canEditWorkOrders
   const [wo, setWo] = useState<WorkOrder | null>(null)
   const [dbNotes, setDbNotes] = useState("")
   const [photoGallery, setPhotoGallery] = useState<WorkOrderPhotoGalleryItem[]>([])
@@ -1556,34 +1560,42 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             Collect Customer Signature
           </Button>
         ) : null}
-        <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleCreateInvoiceAction()}>
-          <Receipt className="w-3.5 h-3.5" />
-          Create Invoice
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-8 gap-1.5 text-xs"
-          onClick={() => setPostEmailDraftOpen(true)}
-        >
-          <Mail className="w-3.5 h-3.5" />
-          Draft Email
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-8 gap-1.5 text-xs"
-          onClick={() => {
-            setWoSummaryEmailTo("")
-            setWoSummaryEmailNote("")
-            setWoSummaryEmailOpen(true)
-          }}
-        >
-          <Mail className="w-3.5 h-3.5" />
-          Email work summary
-        </Button>
+        {woCanEdit ? (
+          <>
+            <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleCreateInvoiceAction()}>
+              <Receipt className="w-3.5 h-3.5" />
+              Create Invoice
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setPostEmailDraftOpen(true)}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Draft Email
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => {
+                setWoSummaryEmailTo("")
+                setWoSummaryEmailNote("")
+                setWoSummaryEmailOpen(true)
+              }}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Email work summary
+            </Button>
+          </>
+        ) : (
+          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+            Post-completion actions (invoicing, customer email) are restricted to other roles.
+          </p>
+        )}
       </div>
     </div>
   ) : null

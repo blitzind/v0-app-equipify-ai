@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/resend"
 import { buildWorkOrderSummaryEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
@@ -67,6 +68,14 @@ export async function POST(request: Request) {
   if (!allowed) {
     return NextResponse.json({ error: "forbidden", message: "You do not have access to this organization." }, { status: 403 })
   }
+
+  // Phase 2 (Permissions): allow staff that can edit work orders OR manage
+  // dispatch to send the summary email. Viewers stay read-only.
+  const capGate = await requireAnyOrgPermission(organizationId, [
+    "canEditWorkOrders",
+    "canManageDispatch",
+  ])
+  if ("error" in capGate) return capGate.error
 
   let woSel = await supabase
     .from("work_orders")

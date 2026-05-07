@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email/resend"
 import { buildQuoteEmailContent } from "@/lib/email/templates"
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { quoteStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { QuoteStatus } from "@/lib/mock-data"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
@@ -51,6 +52,10 @@ export async function POST(request: Request) {
   if (!allowed) {
     return NextResponse.json({ error: "forbidden", message: "You do not have access to this organization." }, { status: 403 })
   }
+
+  // Phase 2 (Permissions): sending a quote bumps status / sent_at — gate on canEditQuotes.
+  const capGate = await requireOrgPermission(organizationId, "canEditQuotes")
+  if ("error" in capGate) return capGate.error
 
   const { data: row, error: qErr } = await supabase
     .from("org_quotes")

@@ -17,7 +17,11 @@ export async function POST(
     return NextResponse.json({ error: "invalid_organization", message: "Invalid organization." }, { status: 400 })
   }
 
-  const gate = await requireOrgCatalogWrite(organizationId)
+  const gate = await requireOrgCatalogWrite(organizationId, {
+    capability: "canManageCertificateTemplates",
+    forbiddenMessage:
+      "Only owners, admins, and managers can manage calibration templates.",
+  })
   if ("error" in gate) return gate.error
 
   const bill = await enforceCanCreateRecord(organizationId, "calibration_template")

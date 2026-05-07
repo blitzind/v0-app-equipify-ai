@@ -10,6 +10,8 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { computeDueDateYmd } from "@/lib/billing/invoice-terms"
@@ -537,6 +539,9 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { canArchiveRestore } = useOrgArchivePermissions()
   const { quotes, updateQuote, archiveQuote, restoreQuote, refreshQuotes } = useQuotes()
   const { addInvoiceFromPayload } = useInvoices()
+  // Phase 2 (Permissions): hide quote mutation actions for non-edit roles.
+  const { permissions: quoteOrgPermissions } = useOrgPermissions()
+  const canEditQuotes = quoteOrgPermissions.canEditQuotes
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<AdminQuote>>({})
@@ -984,6 +989,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                 Restore
               </Button>
             ) : null
+          ) : !canEditQuotes ? (
+            <RestrictedNotice
+              inline
+              capability="canEditQuotes"
+              title="Quote actions are restricted to other roles."
+            />
           ) : (
             <>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
