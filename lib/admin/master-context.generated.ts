@@ -3,6 +3,14 @@
  * TODO: Wire deeper automation (optional AST/OpenAPI) without embedding secrets.
  */
 
+export const MCG_SCAN_COUNTS = {
+  apiRouteHandlers: 107,
+  sqlMigrations: 86,
+  dashboardPages: 46,
+  componentsTsx: 134,
+  libTsFiles: 227,
+} as const
+
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
 
 _Regenerate with \`pnpm update:master-context\` after meaningful changes._

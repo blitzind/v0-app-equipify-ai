@@ -274,7 +274,7 @@ export default function AiOperationsPage() {
           href="/admin/master-context"
           className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors"
         >
-          Master Context Doc
+          Master Context
         </Link>
         <Link href="/" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
           App <ChevronRight size={12} />

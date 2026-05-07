@@ -20,6 +20,7 @@ import {
 import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
 import {
@@ -1972,7 +1973,7 @@ export default function PlatformAdminPage() {
           href="/admin/master-context"
           className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors mr-2"
         >
-          Master Context Doc
+          Master Context
         </Link>
         {/* Admin identity */}
         <div className="flex items-center gap-2">
@@ -2073,15 +2074,36 @@ export default function PlatformAdminPage() {
           />
         </div>
 
+        <Card className="border-border bg-card shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-foreground">Equipify Master Context</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground max-w-2xl">
+              Generate and copy GPT-ready project context for implementation planning.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button
+              asChild
+              className="bg-[#f59f1c] text-[#1a150a] hover:bg-[#e08e0e] border-0 font-medium"
+            >
+              <Link href="/admin/master-context" className="inline-flex items-center gap-2">
+                Open Master Context
+                <ChevronRight size={14} className="opacity-80" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Tabs */}
         <div className="flex flex-col gap-6">
-          <nav className="flex items-center gap-1 border-b border-border">
+          <nav className="flex items-center gap-1 border-b border-border overflow-x-auto pb-px [scrollbar-width:thin]">
             {TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
+                type="button"
                 onClick={() => setActiveTab(key)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
+                  "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0",
                   activeTab === key
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -2090,6 +2112,15 @@ export default function PlatformAdminPage() {
                 <Icon size={14} /> {label}
               </button>
             ))}
+            <Link
+              href="/admin/master-context"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0",
+                "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ScrollText size={14} /> Master Context
+            </Link>
           </nav>
 
           {activeTab === "accounts" && (

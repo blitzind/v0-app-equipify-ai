@@ -127,7 +127,16 @@ function main() {
     " * TODO: Wire deeper automation (optional AST/OpenAPI) without embedding secrets.\n" +
     " */\n\n"
 
-  fs.writeFileSync(genPath, `${banner}export const MCG_SCAN_SECTION = \`${escaped}\`\n`, "utf8")
+  const countsBlock =
+    "export const MCG_SCAN_COUNTS = {\n" +
+    `  apiRouteHandlers: ${apiRoutes.length},\n` +
+    `  sqlMigrations: ${migrationCount},\n` +
+    `  dashboardPages: ${dashboardPages},\n` +
+    `  componentsTsx: ${componentsCount},\n` +
+    `  libTsFiles: ${libTsCount},\n` +
+    "} as const\n"
+
+  fs.writeFileSync(genPath, `${banner}${countsBlock}\nexport const MCG_SCAN_SECTION = \`${escaped}\`\n`, "utf8")
 
   const iso = new Date().toISOString()
   const mcPath = path.join(ROOT, "lib", "admin", "master-context.ts")
