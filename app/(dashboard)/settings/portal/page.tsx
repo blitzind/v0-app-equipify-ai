@@ -8,10 +8,22 @@ import {
   Globe, Paintbrush, LayoutGrid, LogIn, Mail, Link2,
   Save, Eye, Upload, Check,
   Shield,
+  Layers,
 } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { CERTIFICATE_RELEASE_OPTIONS } from "@/lib/portal/certificate-release-staff"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -53,17 +65,29 @@ function FieldRow({ label, description, children }: {
   )
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onChange(!checked)
+      }}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors",
+        "relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        checked ? "bg-primary" : "bg-muted-foreground/25"
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+        checked ? "bg-primary" : "bg-muted-foreground/25",
       )}
     >
       <span
@@ -104,8 +128,12 @@ const EMAIL_TEMPLATES = [
 
 export default function PortalSettingsPage() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { has, status: permStatus } = useOrgPermissions()
   const { toast } = useToast()
   const [saved, setSaved] = useState(false)
+
+  const canEditPortalSettings = has("canManagePortalSettings")
+  const canViewDocActivity = has("canManagePortalSettings") || has("canReleaseCertificatesToPortal")
 
   // Branding
   const [portalName, setPortalName] = useState("Equipify Customer Portal")
@@ -137,6 +165,22 @@ export default function PortalSettingsPage() {
   >("immediate_release")
   const [certificateReleaseLoading, setCertificateReleaseLoading] = useState(true)
 
+  const [consolidatedDocumentsDefault, setConsolidatedDocumentsDefault] = useState(false)
+  const [consolidatedLoading, setConsolidatedLoading] = useState(true)
+  const [consolidatedSchemaPending, setConsolidatedSchemaPending] = useState(false)
+  const [confirmConsolidatedOpen, setConfirmConsolidatedOpen] = useState(false)
+
+  type ActivityRow = {
+    at: string
+    action: string
+    label: string
+    path: string | null
+    metadata: Record<string, unknown>
+  }
+  const [activityRows, setActivityRows] = useState<ActivityRow[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activitySchemaPending, setActivitySchemaPending] = useState(false)
+
   useEffect(() => {
     if (orgStatus !== "ready" || !organizationId?.trim()) {
       setCertificateReleaseLoading(false)
@@ -165,6 +209,68 @@ export default function PortalSettingsPage() {
       cancelled = true
     }
   }, [orgStatus, organizationId])
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !organizationId?.trim()) {
+      setConsolidatedLoading(false)
+      return
+    }
+    let cancelled = false
+    setConsolidatedLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/consolidated-documents-default`,
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          portal_consolidated_documents_default?: boolean
+          schema_migration_pending?: boolean
+        }
+        if (cancelled) return
+        setConsolidatedSchemaPending(data.schema_migration_pending === true)
+        setConsolidatedDocumentsDefault(data.portal_consolidated_documents_default === true)
+      } finally {
+        if (!cancelled) setConsolidatedLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgStatus, organizationId])
+
+  useEffect(() => {
+    if (
+      orgStatus !== "ready" ||
+      !organizationId?.trim() ||
+      permStatus !== "ready" ||
+      !canViewDocActivity
+    ) {
+      setActivityRows([])
+      setActivityLoading(false)
+      return
+    }
+    let cancelled = false
+    setActivityLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/document-access-activity`,
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          items?: ActivityRow[]
+          schema_migration_pending?: boolean
+        }
+        if (cancelled) return
+        setActivitySchemaPending(data.schema_migration_pending === true)
+        setActivityRows(Array.isArray(data.items) ? data.items : [])
+      } finally {
+        if (!cancelled) setActivityLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgStatus, organizationId, permStatus, canViewDocActivity])
 
   const handlePreviewPortal = useCallback(() => {
     if (orgStatus !== "ready" || !organizationId?.trim()) {
@@ -206,10 +312,32 @@ export default function PortalSettingsPage() {
           })
           return
         }
+
+        if (canEditPortalSettings && !consolidatedSchemaPending) {
+          const res2 = await fetch(
+            `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/consolidated-documents-default`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                portal_consolidated_documents_default: consolidatedDocumentsDefault,
+              }),
+            },
+          )
+          const err2 = (await res2.json().catch(() => ({}))) as { error?: string }
+          if (!res2.ok) {
+            toast({
+              variant: "destructive",
+              title: "Could not save consolidated document setting",
+              description: err2.error ?? res2.statusText,
+            })
+            return
+          }
+        }
       } catch (e) {
         toast({
           variant: "destructive",
-          title: "Could not save certificate release default",
+          title: "Could not save portal settings",
           description: e instanceof Error ? e.message : String(e),
         })
         return
@@ -221,7 +349,7 @@ export default function PortalSettingsPage() {
       title: "Settings saved",
       description:
         organizationId?.trim() && orgStatus === "ready"
-          ? "Portal certificate release default was updated."
+          ? "Portal defaults were updated."
           : "Display preferences updated locally.",
     })
     setTimeout(() => setSaved(false), 2500)
@@ -336,6 +464,149 @@ export default function PortalSettingsPage() {
           </div>
         </FieldRow>
       </SectionCard>
+
+      {/* Consolidated portal documents (workspace default) */}
+      <SectionCard
+        title="Portal document library"
+        description="Control whether parent-account portal users can include child-account documents in the unified library. Certificate and payment rules are unchanged."
+        icon={Layers}
+      >
+        {consolidatedSchemaPending ? (
+          <p className="text-xs text-muted-foreground">
+            Consolidated document settings are not available until the latest database migration is applied.
+          </p>
+        ) : (
+          <>
+            <FieldRow
+              label="Consolidated documents (workspace default)"
+              description="Off by default. When on, customers without a per-account override may include sub-accounts in the portal document library, if the account is a parent in your hierarchy."
+            >
+              <div className="space-y-1.5">
+                <Toggle
+                  checked={consolidatedDocumentsDefault}
+                  disabled={
+                    !canEditPortalSettings ||
+                    consolidatedLoading ||
+                    consolidatedSchemaPending
+                  }
+                  onChange={(v) => {
+                    if (!canEditPortalSettings) return
+                    if (v && !consolidatedDocumentsDefault) {
+                      setConfirmConsolidatedOpen(true)
+                      return
+                    }
+                    setConsolidatedDocumentsDefault(v)
+                  }}
+                />
+                <div
+                  className={cn(
+                    "rounded-md border px-2.5 py-2 text-[10px] leading-snug",
+                    consolidatedDocumentsDefault
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                      : "border-border bg-muted/30 text-muted-foreground",
+                  )}
+                >
+                  {consolidatedDocumentsDefault ? (
+                    <strong className="font-medium text-foreground">
+                      Warning:{" "}
+                    </strong>
+                  ) : null}
+                  Eligible parent portal logins may view documents belonging to linked child accounts. Invoice and
+                  certificate release rules still apply. Save changes to apply this workspace default.
+                </div>
+                {!canEditPortalSettings ? (
+                  <p className="text-[10px] text-muted-foreground">
+                    Only workspace owners and admins can change this setting.
+                  </p>
+                ) : null}
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Default is <span className="font-medium text-foreground">Off</span>. Per-customer overrides are
+                  available when editing a customer.
+                </p>
+              </div>
+            </FieldRow>
+
+            {canViewDocActivity ? (
+              <div className="border-t border-border pt-4 space-y-2">
+                <p className="text-xs font-medium text-foreground">Recent portal document activity</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Opens and downloads from the customer portal document library (no file URLs stored here).
+                </p>
+                {activitySchemaPending ? (
+                  <p className="text-xs text-muted-foreground">Activity history is not available on this database yet.</p>
+                ) : activityLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading…</p>
+                ) : activityRows.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No document views or downloads recorded yet.</p>
+                ) : (
+                  <div className="rounded-lg border border-border overflow-x-auto">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+                        <tr>
+                          <th className="px-3 py-2 font-medium">When</th>
+                          <th className="px-3 py-2 font-medium">What</th>
+                          <th className="px-3 py-2 font-medium hidden sm:table-cell">Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {activityRows.map((row, i) => (
+                          <tr key={`${row.at}-${row.action}-${i}`} className="bg-card">
+                            <td className="px-3 py-2 whitespace-nowrap text-muted-foreground align-top">
+                              {new Date(row.at).toLocaleString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td className="px-3 py-2 text-foreground align-top">{row.label}</td>
+                            <td className="px-3 py-2 text-muted-foreground align-top hidden sm:table-cell">
+                              {(() => {
+                                const k = row.metadata?.kind
+                                const sb = row.metadata?.source_category
+                                const parts: string[] = []
+                                if (typeof k === "string") parts.push(k.replace(/_/g, " "))
+                                if (typeof sb === "string") parts.push(sb.replace(/_/g, " "))
+                                if (row.metadata?.cross_account === true) parts.push("cross-account")
+                                return parts.length ? parts.join(" · ") : "—"
+                              })()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </>
+        )}
+      </SectionCard>
+
+      <AlertDialog open={confirmConsolidatedOpen} onOpenChange={setConfirmConsolidatedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Turn on consolidated portal documents?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              When enabled for this workspace (and not overridden per customer), eligible parent portal users may see
+              invoices, certificates, service summaries, and related documents for linked child accounts. Certificate
+              release and invoice payment rules still apply. Continue only if your customers expect this behavior.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="text-xs"
+              onClick={() => {
+                setConsolidatedDocumentsDefault(true)
+                setConfirmConsolidatedOpen(false)
+              }}
+            >
+              Enable consolidated access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Portal Modules */}
       <SectionCard

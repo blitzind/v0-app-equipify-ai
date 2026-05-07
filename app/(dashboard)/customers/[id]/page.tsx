@@ -62,6 +62,7 @@ import { CustomerRollupCard } from "@/components/customers/customer-rollup-card"
 import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
+import { CustomerPortalConsolidatedDocsCard } from "@/components/customers/customer-portal-consolidated-docs-card"
 import { CustomerBillingTermsCard } from "@/components/customers/customer-billing-terms-card"
 import { CustomerInvoiceAgingCard } from "@/components/customers/customer-invoice-aging-card"
 import {
@@ -132,6 +133,31 @@ type CustomerContract = {
 
 type CustomerPortalCertMode = "" | "immediate_release" | "release_on_payment" | "manual_release"
 
+type CustomerPortalConsolidatedMode = "" | "true" | "false"
+
+const CUSTOMER_CONSOLIDATED_DOCS_OPTIONS: Array<{
+  value: CustomerPortalConsolidatedMode
+  label: string
+  helper: string
+}> = [
+  {
+    value: "",
+    label: "Use workspace default",
+    helper: "Inherits the consolidated documents toggle under Settings → Customer portal.",
+  },
+  {
+    value: "true",
+    label: "Force consolidated view on",
+    helper:
+      "Eligible parent portal users can include child-account documents in the library when hierarchy allows.",
+  },
+  {
+    value: "false",
+    label: "Force consolidated view off",
+    helper: "Portal users for this account only see documents for this account.",
+  },
+]
+
 type CustomerDetail = {
   id: string
   organizationId: string
@@ -147,6 +173,8 @@ type CustomerDetail = {
   isArchived: boolean
   /** null = use organization default */
   portalCertificateReleaseMode: string | null
+  /** null = inherit workspace default for consolidated portal document rollup (Phase 2). */
+  portalConsolidatedDocumentsEnabled: boolean | null
   /** null = use organization default for invoice terms (Phase 2). */
   defaultInvoiceTermsCode: string | null
 }
@@ -401,6 +429,7 @@ export default function CustomerDetailPage() {
     status: "Active" as CustomerStatus,
     notes: "",
     portalCertificateRelease: "" as CustomerPortalCertMode,
+    portalConsolidatedDocuments: "" as CustomerPortalConsolidatedMode,
     /** Empty string = use organization default (Phase 2). */
     defaultInvoiceTermsCode: "",
   })
@@ -488,6 +517,8 @@ export default function CustomerDetailPage() {
       const orgId = activeOrgId
 
       const customerSelectAttempts = [
+        // Includes Phase 2 consolidated docs column when migration applied.
+        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, default_invoice_terms_code, portal_consolidated_documents_enabled",
         // Phase 2 includes default_invoice_terms_code (added in service_lifecycle_phase1).
         "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, default_invoice_terms_code",
         // Schema-drift fallback for environments missing the Phase 1 column.
@@ -584,9 +615,14 @@ export default function CustomerDetailPage() {
         archived_at: string | null
         portal_certificate_release_mode?: string | null
         default_invoice_terms_code?: string | null
+        portal_consolidated_documents_enabled?: boolean | null
       }
       const custPortalMode = customerRowTyped.portal_certificate_release_mode
       const custTermsCode = (customerRowTyped.default_invoice_terms_code ?? "").trim()
+      const custConsolidated =
+        typeof customerRowTyped.portal_consolidated_documents_enabled === "boolean"
+          ? customerRowTyped.portal_consolidated_documents_enabled
+          : null
       const mapped: CustomerDetail = {
         id: customerRowTyped.id,
         organizationId: orgId,
@@ -602,6 +638,7 @@ export default function CustomerDetailPage() {
           custPortalMode === "manual_release"
             ? custPortalMode
             : null,
+        portalConsolidatedDocumentsEnabled: custConsolidated,
         defaultInvoiceTermsCode: custTermsCode || null,
         contacts: contactsTyped.map((c) => ({
           id: c.id,
@@ -649,6 +686,12 @@ export default function CustomerDetailPage() {
             mapped.portalCertificateReleaseMode === "manual_release"
               ? mapped.portalCertificateReleaseMode
               : "",
+          portalConsolidatedDocuments:
+            mapped.portalConsolidatedDocumentsEnabled === true
+              ? "true"
+              : mapped.portalConsolidatedDocumentsEnabled === false
+                ? "false"
+                : "",
           defaultInvoiceTermsCode: mapped.defaultInvoiceTermsCode ?? "",
         })
         setLoading(false)
@@ -1142,11 +1185,38 @@ export default function CustomerDetailPage() {
         return
       }
 
+      const cd = await fetch(
+        `/api/organizations/${encodeURIComponent(customer.organizationId)}/customers/${encodeURIComponent(customer.id)}/portal-consolidated-documents`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            portal_consolidated_documents_enabled:
+              editForm.portalConsolidatedDocuments === ""
+                ? null
+                : editForm.portalConsolidatedDocuments === "true",
+          }),
+        },
+      )
+      const cdBody = (await cd.json().catch(() => ({}))) as {
+        error?: string
+        portal_consolidated_documents_enabled?: boolean | null
+      }
+      if (!cd.ok) {
+        setActionError(cdBody.error ?? "Could not update consolidated document access.")
+        return
+      }
+
       const nextPortal =
         prBody.portal_certificate_release_mode === "immediate_release" ||
         prBody.portal_certificate_release_mode === "release_on_payment" ||
         prBody.portal_certificate_release_mode === "manual_release"
           ? prBody.portal_certificate_release_mode
+          : null
+
+      const nextConsolidated =
+        typeof cdBody.portal_consolidated_documents_enabled === "boolean"
+          ? cdBody.portal_consolidated_documents_enabled
           : null
 
       setCustomer((prev) =>
@@ -1157,6 +1227,7 @@ export default function CustomerDetailPage() {
               status: editForm.status,
               notes: editForm.notes.trim(),
               portalCertificateReleaseMode: nextPortal,
+              portalConsolidatedDocumentsEnabled: nextConsolidated,
               defaultInvoiceTermsCode: validTermsCode,
             }
           : prev,
@@ -1559,7 +1630,32 @@ export default function CustomerDetailPage() {
             </div>
             <div className="flex gap-2 flex-wrap items-center">
               {!customer.isArchived ? (
-                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (!customer) return
+                    setEditForm({
+                      company: customer.company,
+                      status: customer.status,
+                      notes: customer.notes,
+                      portalCertificateRelease:
+                        customer.portalCertificateReleaseMode === "immediate_release" ||
+                        customer.portalCertificateReleaseMode === "release_on_payment" ||
+                        customer.portalCertificateReleaseMode === "manual_release"
+                          ? customer.portalCertificateReleaseMode
+                          : "",
+                      portalConsolidatedDocuments:
+                        customer.portalConsolidatedDocumentsEnabled === true
+                          ? "true"
+                          : customer.portalConsolidatedDocumentsEnabled === false
+                            ? "false"
+                            : "",
+                      defaultInvoiceTermsCode: customer.defaultInvoiceTermsCode ?? "",
+                    })
+                    setEditOpen(true)
+                  }}
+                >
                   Edit
                 </Button>
               ) : null}
@@ -1684,6 +1780,13 @@ export default function CustomerDetailPage() {
             <CustomerPortalCertificateRuleCard
               organizationId={activeOrgId}
               customerMode={customer.portalCertificateReleaseMode}
+            />
+          ) : null}
+
+          {activeOrgId ? (
+            <CustomerPortalConsolidatedDocsCard
+              organizationId={activeOrgId}
+              customerOverride={customer.portalConsolidatedDocumentsEnabled}
             />
           ) : null}
 
@@ -2444,6 +2547,35 @@ export default function CustomerDetailPage() {
                 <p id="cust-portal-cert-help" className="text-[11px] text-muted-foreground mt-1">
                   {
                     CUSTOMER_CERT_RELEASE_OPTIONS.find((o) => o.value === editForm.portalCertificateRelease)
+                      ?.helper
+                  }
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Consolidated portal documents
+                </label>
+                <select
+                  value={editForm.portalConsolidatedDocuments}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      portalConsolidatedDocuments: e.target.value as CustomerPortalConsolidatedMode,
+                    }))
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  aria-describedby="cust-portal-consolidated-help"
+                >
+                  {CUSTOMER_CONSOLIDATED_DOCS_OPTIONS.map((o) => (
+                    <option key={o.value === "" ? "inherit" : o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <p id="cust-portal-consolidated-help" className="text-[11px] text-muted-foreground mt-1">
+                  {
+                    CUSTOMER_CONSOLIDATED_DOCS_OPTIONS.find((o) => o.value === editForm.portalConsolidatedDocuments)
                       ?.helper
                   }
                 </p>

@@ -4,10 +4,10 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 130,
+  apiRouteHandlers: 133,
   sqlMigrations: 99,
   dashboardPages: 54,
-  componentsTsx: 164,
+  componentsTsx: 165,
   libTsFiles: 288,
 } as const
 
@@ -17,10 +17,10 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **130** |
+| API route handlers (\`app/api/**/route.ts\`) | **133** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **99** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **54** |
-| \`components/**/*.tsx\` | **164** |
+| \`components/**/*.tsx\` | **165** |
 | \`lib/**/*.ts\` | **288** |
 
 ### Vercel crons
@@ -82,6 +82,7 @@ organizations/[organizationId]/communications/templates/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/[locationId]/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts
+organizations/[organizationId]/customers/[customerId]/portal-consolidated-documents/route.ts
 organizations/[organizationId]/integrations/quickbooks/invoice-auto-sync/route.ts
 organizations/[organizationId]/integrations/quickbooks/route.ts
 organizations/[organizationId]/inventory/adjust/route.ts
@@ -108,6 +109,8 @@ organizations/[organizationId]/migration-imports/[jobId]/route.ts
 organizations/[organizationId]/migration-imports/route.ts
 organizations/[organizationId]/portal-invites/route.ts
 organizations/[organizationId]/portal/certificate-release-default/route.ts
+organizations/[organizationId]/portal/consolidated-documents-default/route.ts
+organizations/[organizationId]/portal/document-access-activity/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/cancel/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/commit/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/duplicate-preview/route.ts
