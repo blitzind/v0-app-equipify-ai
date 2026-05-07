@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useMemo, useCallback, type ReactNode } from "react"
+import { useState, useRef, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
@@ -13,6 +13,7 @@ import {
 } from "@/lib/organization/document-branding"
 import { OrganizationDocumentHeader } from "@/components/documents/organization-document-header"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
@@ -965,6 +966,7 @@ function InfoTab({
   organizationName,
   onApplyReminder,
   catalogLineActions,
+  showFinancials,
 }: {
   invoice: AdminInvoice
   editing: boolean
@@ -975,6 +977,7 @@ function InfoTab({
   organizationName: string
   onApplyReminder: (t: string) => void
   catalogLineActions?: ReactNode
+  showFinancials: boolean
 }) {
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
   const displayTotal  = editing
@@ -984,15 +987,15 @@ function InfoTab({
   return (
     <div className="space-y-5">
       {/* Overdue banner */}
-      {currentStatus === "Overdue" && !editing && (
+      {showFinancials && currentStatus === "Overdue" && !editing && (
         <div className="flex items-center gap-2.5 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           Payment overdue since {fmtDate(invoice.dueDate)} — {daysOverdue(invoice.dueDate)} days
         </div>
       )}
 
-      {/* AI Tools */}
-      {!editing && (
+      {/* AI Tools — invoice reminders assume billing visibility */}
+      {!editing && showFinancials && (
         <AIToolsPanel
           invoice={invoice}
           organizationName={organizationName}
@@ -1057,7 +1060,7 @@ function InfoTab({
         {!editing && invoice.sentAt && (
           <Row label="Sent" value={`Sent on ${fmtDate(invoice.sentAt)}`} />
         )}
-        {invoice.paidDate && (
+        {showFinancials && invoice.paidDate && (
           <Row label="Paid On" value={<span className="text-[color:var(--status-success)] font-semibold">{fmtDate(invoice.paidDate)}</span>} />
         )}
         <Row label="Created By" value={invoice.createdBy} />
@@ -1066,13 +1069,20 @@ function InfoTab({
       {!editing ? <InvoicePortalCertificatePanel invoice={invoice} /> : null}
 
       {/* Total card */}
-      <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Invoice Total</p>
-          <p className="text-2xl font-bold text-foreground mt-0.5 tabular-nums">{fmtCurrency(displayTotal)}</p>
+      {showFinancials ? (
+        <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Invoice Total</p>
+            <p className="text-2xl font-bold text-foreground mt-0.5 tabular-nums">{fmtCurrency(displayTotal)}</p>
+          </div>
+          <DollarSign className="w-8 h-8 text-primary/30" />
         </div>
-        <DollarSign className="w-8 h-8 text-primary/30" />
-      </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-muted/20 p-4 text-xs text-muted-foreground">
+          Invoice totals and payment status are hidden for your role. Operational details (customer, work order, certificate
+          links) remain visible.
+        </div>
+      )}
 
       {/* Line items */}
       <Section title="Line Items">
@@ -1083,7 +1093,7 @@ function InfoTab({
             extraActions={catalogLineActions}
           />
         ) : (
-          <ReadOnlyLineItems items={invoice.lineItems} total={invoice.amount} />
+          <ReadOnlyLineItems items={invoice.lineItems} total={invoice.amount} maskMoney={!showFinancials} />
         )}
       </Section>
 
@@ -1429,7 +1439,15 @@ function EditableLineItems({
   )
 }
 
-function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number }) {
+function ReadOnlyLineItems({
+  items,
+  total,
+  maskMoney,
+}: {
+  items: LineItem[]
+  total: number
+  maskMoney?: boolean
+}) {
   return (
     <table className="w-full text-xs">
       <thead className="ds-thead-bg">
@@ -1445,15 +1463,21 @@ function ReadOnlyLineItems({ items, total }: { items: LineItem[]; total: number 
           <tr key={i}>
             <td className="px-3 py-2 text-foreground">{item.description}</td>
             <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
-            <td className="px-3 py-2 text-right text-muted-foreground">{fmtCurrency(item.unit)}</td>
-            <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">{fmtCurrency(item.qty * item.unit)}</td>
+            <td className="px-3 py-2 text-right text-muted-foreground">
+              {maskMoney ? "—" : fmtCurrency(item.unit)}
+            </td>
+            <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
+              {maskMoney ? "—" : fmtCurrency(item.qty * item.unit)}
+            </td>
           </tr>
         ))}
       </tbody>
       <tfoot className="ds-tfoot-bg border-t border-border">
         <tr>
           <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
-          <td className="px-3 py-2 text-right font-bold text-foreground tabular-nums">{fmtCurrency(total)}</td>
+          <td className="px-3 py-2 text-right font-bold text-foreground tabular-nums">
+            {maskMoney ? "—" : fmtCurrency(total)}
+          </td>
         </tr>
       </tfoot>
     </table>
@@ -1471,6 +1495,10 @@ let toastCounter = 0
 
 export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) {
   const { canArchiveRestore } = useOrgArchivePermissions()
+  const { permissions } = useOrgPermissions()
+  const showFinancials = permissions.canViewBilling
+  const canEditInvoiceFinancials =
+    showFinancials && (permissions.canApproveInvoices || permissions.canEditOrgBilling)
   const { updateInvoice, archiveInvoice, restoreInvoice, refreshInvoices } = useInvoices()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { workspace } = useTenant()
@@ -1530,7 +1558,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   }
 
   function startEdit() {
-    if (invoice.isArchived) return
+    if (invoice.isArchived || !canEditInvoiceFinancials) return
     setDraft({ status: invoice.status, dueDate: invoice.dueDate, notes: invoice.notes })
     setDraftItems(invoice.lineItems.map((li) => ({ ...li })))
     setEditing(true)
@@ -1608,22 +1636,34 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   }
 
   function handleApplyReminder(text: string) {
+    if (!canEditInvoiceFinancials) return
     setDraft((prev) => ({ ...prev, notes: text }))
     if (!editing) startEdit()
     toast("Reminder draft applied to notes — review and save")
   }
 
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
-  const canRecordPayment = ["Unpaid", "Overdue", "Sent"].includes(currentStatus)
+  const canRecordPayment =
+    showFinancials &&
+    permissions.canApproveInvoices &&
+    ["Unpaid", "Overdue", "Sent"].includes(currentStatus)
 
-  const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
-    { id: "info",        label: "Info",         icon: <FileText className="w-3.5 h-3.5 shrink-0" /> },
-    { id: "payments",    label: "Payments",    icon: <CreditCard className="w-3.5 h-3.5 shrink-0" /> },
-    { id: "files",       label: "Files",       icon: <Paperclip className="w-3.5 h-3.5 shrink-0" /> },
-    { id: "comments",    label: "Comments",    icon: <MessageSquare className="w-3.5 h-3.5 shrink-0" /> },
-    { id: "work-orders", label: "Work Orders", icon: <ClipboardList className="w-3.5 h-3.5 shrink-0" /> },
-    { id: "activity",    label: "Activity",    icon: <History className="w-3.5 h-3.5 shrink-0" /> },
-  ]
+  const TABS: { id: Tab; label: string; icon: ReactNode }[] = useMemo(() => {
+    const base: { id: Tab; label: string; icon: ReactNode }[] = [
+      { id: "info", label: "Info", icon: <FileText className="w-3.5 h-3.5 shrink-0" /> },
+      { id: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5 shrink-0" /> },
+      { id: "files", label: "Files", icon: <Paperclip className="w-3.5 h-3.5 shrink-0" /> },
+      { id: "comments", label: "Comments", icon: <MessageSquare className="w-3.5 h-3.5 shrink-0" /> },
+      { id: "work-orders", label: "Work Orders", icon: <ClipboardList className="w-3.5 h-3.5 shrink-0" /> },
+      { id: "activity", label: "Activity", icon: <History className="w-3.5 h-3.5 shrink-0" /> },
+    ]
+    if (!showFinancials) return base.filter((t) => t.id !== "payments")
+    return base
+  }, [showFinancials])
+
+  useEffect(() => {
+    if (!showFinancials && activeTab === "payments") setActiveTab("info")
+  }, [showFinancials, activeTab])
 
   const DEVICES: { id: PreviewDevice; icon: React.ReactNode; label: string }[] = [
     { id: "mobile",  icon: <Smartphone className="w-3.5 h-3.5" />,  label: "Mobile" },
@@ -1666,29 +1706,31 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           )
         ) : (
           <>
-            {/* Primary: Email / already sent + resend */}
-            {alreadyEmailed ? (
+            {showFinancials ? (
               <>
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed" disabled>
-                  <Mail className="w-3.5 h-3.5" /> Already Sent
-                </Button>
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="gap-1.5 text-xs cursor-pointer"
-                  onClick={() => openEmailModal("resend")}
-                >
-                  <Mail className="w-3.5 h-3.5" /> Resend Invoice
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => openEmailModal("send")}>
-                <Mail className="w-3.5 h-3.5" /> Email to Customer
-              </Button>
-            )}
+                {/* Primary: Email / already sent + resend */}
+                {alreadyEmailed ? (
+                  <>
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-not-allowed" disabled>
+                      <Mail className="w-3.5 h-3.5" /> Already Sent
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="gap-1.5 text-xs cursor-pointer"
+                      onClick={() => openEmailModal("resend")}
+                    >
+                      <Mail className="w-3.5 h-3.5" /> Resend Invoice
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => openEmailModal("send")}>
+                    <Mail className="w-3.5 h-3.5" /> Email to Customer
+                  </Button>
+                )}
 
-            {/* Dropdown: send actions */}
-            <div className="relative">
+                {/* Dropdown: send actions */}
+                <div className="relative">
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer px-2" onClick={() => setActionsOpen((p) => !p)}>
                 <ChevronDown className="w-3.5 h-3.5" />
               </Button>
@@ -1770,19 +1812,23 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   </div>
                 </>
               )}
-            </div>
+                </div>
 
-            {/* Record Payment */}
-            {canRecordPayment && (
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("payment")}>
-                <CreditCard className="w-3.5 h-3.5" /> Record Payment
-              </Button>
-            )}
+                {/* Record Payment */}
+                {canRecordPayment && (
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("payment")}>
+                    <CreditCard className="w-3.5 h-3.5" /> Record Payment
+                  </Button>
+                )}
+              </>
+            ) : null}
 
             {/* Edit */}
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
-              <Pencil className="w-3.5 h-3.5" /> Edit
-            </Button>
+            {canEditInvoiceFinancials ? (
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </Button>
+            ) : null}
 
             {/* More Actions */}
             <div className="relative ml-auto">
@@ -1877,7 +1923,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       </div>
 
       {/* ── Preview + Settings toggle bar ──────────────────────────────────── */}
-      {!editing && !invoice.isArchived && (
+      {!editing && !invoice.isArchived && showFinancials && (
         <div className="flex items-center gap-2 px-5 py-2 border-b border-border dark:border-[#25324C] shrink-0">
           <button
             type="button"
@@ -1965,6 +2011,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   setDraftItems={setDraftItems}
                   setField={setField}
                   organizationName={documentBranding.organizationName}
+                  showFinancials={showFinancials}
                   onApplyReminder={handleApplyReminder}
                   catalogLineActions={
                     editing && orgStatus === "ready" && organizationId ? (
@@ -2011,7 +2058,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       </div>
 
       {/* ── Preview overlay ────────────────────────────────────────────────── */}
-      {showPreview && !editing && (
+      {showPreview && !editing && showFinancials && (
         <div className="border-t border-border bg-muted/20 shrink-0 overflow-y-auto" style={{ maxHeight: "55vh" }}>
           <div className="px-5 py-5">
             <InvoicePreview

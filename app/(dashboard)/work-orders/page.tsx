@@ -28,6 +28,7 @@ import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
 import {
   missingAssignedTechnicianColumn,
+  missingOperationalBillingColumns,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
 
@@ -717,10 +718,16 @@ function WorkOrdersPageInner() {
 
       const orgId = activeOrgId
 
-      async function runWorkOrdersQuery(includeNum: boolean, includeTech: boolean) {
+      async function runWorkOrdersQuery(includeNum: boolean, includeTech: boolean, includeBilling: boolean) {
         let q = supabase
           .from("work_orders")
-          .select(buildWorkOrderListSelect({ includeWorkOrderNumber: includeNum, includeAssignedTechnician: includeTech }))
+          .select(
+            buildWorkOrderListSelect({
+              includeWorkOrderNumber: includeNum,
+              includeAssignedTechnician: includeTech,
+              includeOperationalBillingColumns: includeBilling,
+            }),
+          )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
         q = applyArchivedAtScope(q, archiveScope)
@@ -729,19 +736,25 @@ function WorkOrdersPageInner() {
 
       let includeNum = true
       let includeTech = true
-      let woRes = await runWorkOrdersQuery(includeNum, includeTech)
+      let includeBilling = true
+      let woRes = await runWorkOrdersQuery(includeNum, includeTech, includeBilling)
 
       for (;;) {
         const err = woRes.error
         if (!err) break
         if (missingWorkOrderNumberColumn(err) && includeNum) {
           includeNum = false
-          woRes = await runWorkOrdersQuery(includeNum, includeTech)
+          woRes = await runWorkOrdersQuery(includeNum, includeTech, includeBilling)
           continue
         }
         if (missingAssignedTechnicianColumn(err) && includeTech) {
           includeTech = false
-          woRes = await runWorkOrdersQuery(includeNum, includeTech)
+          woRes = await runWorkOrdersQuery(includeNum, includeTech, includeBilling)
+          continue
+        }
+        if (missingOperationalBillingColumns(err) && includeBilling) {
+          includeBilling = false
+          woRes = await runWorkOrdersQuery(includeNum, includeTech, includeBilling)
           continue
         }
         break
@@ -750,15 +763,28 @@ function WorkOrdersPageInner() {
       const { data: rows, error: woError } = woRes
 
       if (woError || !rows) {
-        if (process.env.NODE_ENV === "development" && woError) {
-          console.error("[work-orders] load failed", { orgId, message: woError.message, code: woError.code })
+        const payload = {
+          phase: "work_orders_list",
+          code: woError?.code,
+          message: woError?.message,
+          retryPath: "work_order_number → assigned_technician_id → operational billing columns",
+        }
+        console.error("[work-orders] load failed", payload)
+        if (process.env.NODE_ENV === "development") {
+          void fetch("/api/dev/work-order-query-log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).catch(() => {})
         }
         if (active) {
           setWorkOrders([])
           setWorkOrdersLoadError(
-            process.env.NODE_ENV === "development" && woError
-              ? woError.message || "Failed to load work orders"
-              : null,
+            woError
+              ? process.env.NODE_ENV === "development"
+                ? `[${woError.code ?? "error"}] ${woError.message}`
+                : "Could not load work orders. Refresh the page, or apply pending Supabase migrations on local databases."
+              : "Could not load work orders (empty response). Try refreshing.",
           )
         }
         return
@@ -1113,13 +1139,19 @@ function WorkOrdersPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
-      {process.env.NODE_ENV === "development" && workOrdersLoadError ? (
+      {workOrdersLoadError ? (
         <div
           role="alert"
           className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-          <span className="font-medium">Work orders failed to load (dev)</span>
-          <span className="mt-1 block font-mono text-xs opacity-90">{workOrdersLoadError}</span>
+          <span className="font-medium">Work orders could not be loaded</span>
+          <span className="mt-1 block leading-snug">{workOrdersLoadError}</span>
+          {process.env.NODE_ENV === "development" ? (
+            <span className="mt-2 block text-[11px] text-muted-foreground">
+              Check the browser console and <code className="rounded bg-muted px-1">/api/dev/work-order-query-log</code>{" "}
+              output when errors persist after refresh.
+            </span>
+          ) : null}
         </div>
       ) : null}
 

@@ -7,7 +7,11 @@ import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import {
+  missingOperationalBillingColumns,
+  missingWorkOrderNumberColumn,
+} from "@/lib/work-orders/postgrest-fallback"
+import { WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { enrichDispatchWorkOrders, filterDispatchRows } from "@/lib/dispatch/build-dispatch-wos"
 import type { DispatchWoRow } from "@/lib/dispatch/build-dispatch-wos"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
@@ -1300,6 +1304,7 @@ function ServiceSchedulePageInner() {
 
       const selFull =
         "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+      const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
       const selMini =
         "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
 
@@ -1313,6 +1318,16 @@ function ServiceSchedulePageInner() {
         .order("scheduled_on", { ascending: true })
         .order("scheduled_time", { ascending: true, nullsFirst: false })
 
+      if (woRes.error && missingOperationalBillingColumns(woRes.error)) {
+        woRes = await supabase
+          .from("work_orders")
+          .select(selNoBilling)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .not("scheduled_on", "is", null)
+          .order("scheduled_on", { ascending: true })
+          .order("scheduled_time", { ascending: true, nullsFirst: false })
+      }
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
         mini = true
         woRes = await supabase

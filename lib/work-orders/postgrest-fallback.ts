@@ -17,3 +17,19 @@ export function missingAssignedTechnicianColumn(error: PostgrestError | null | u
   if (error.code === "42703") return true
   return m.includes("does not exist") || m.includes("could not find")
 }
+
+const OPERATIONAL_BILLING_KEYS = [
+  "billing_state",
+  "billable_to_customer",
+  "warranty_review_required",
+  "warranty_vendor_id",
+] as const
+
+/** Service lifecycle / warranty columns not present until migrations are applied. */
+export function missingOperationalBillingColumns(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  const m = (error.message ?? "").toLowerCase()
+  if (!OPERATIONAL_BILLING_KEYS.some((k) => m.includes(k))) return false
+  if (error.code === "42703") return true
+  return m.includes("does not exist") || m.includes("could not find")
+}

@@ -18,6 +18,7 @@ import {
   fetchInvoicesLinkedToWorkOrder,
 } from "@/lib/portal/work-order-invoices"
 import { staffPortalCertificateBullets } from "@/lib/portal/certificate-release-staff"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import {
   buildCertificatePrefillContextForEquipment,
   certificateFieldMapsEqual,
@@ -97,6 +98,7 @@ export function CertificateMultiTabContent({
   onFocusEquipmentApplied,
 }: CertificateMultiTabContentProps) {
   const { workspace } = useTenant()
+  const { permissions: orgPermissions } = useOrgPermissions()
   const workspaceCompanyName = workspace.name?.trim() || "Organization"
   const workspaceLogoUrl = pickPreferredDocumentLogoUrl(workspace.documentLogoUrl, workspace.logoUrl)
   const workspaceDocumentBranding = useMemo(
@@ -516,7 +518,9 @@ export function CertificateMultiTabContent({
                     staffPortalLines={staffPortalLines}
                     portalReleasedAt={st.portalReleasedAt ?? null}
                     onReleaseToPortal={
-                      st.recordId?.trim() ? () => void handleReleaseToPortal(asset.id) : undefined
+                      orgPermissions.canReleaseCertificatesToPortal && st.recordId?.trim()
+                        ? () => void handleReleaseToPortal(asset.id)
+                        : undefined
                     }
                     releaseToPortalBusy={releasingAssetId === asset.id}
                   />

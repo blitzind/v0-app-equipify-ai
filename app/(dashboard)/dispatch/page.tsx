@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState, Suspense } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import {
+  missingOperationalBillingColumns,
+  missingWorkOrderNumberColumn,
+} from "@/lib/work-orders/postgrest-fallback"
+import { WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
   queryOrganizationMembersForRoster,
@@ -148,6 +152,7 @@ function DispatchPageInner() {
 
     const selFull =
       "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+    const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
     const selMini =
       "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, created_at"
 
@@ -163,6 +168,16 @@ function DispatchPageInner() {
         .lte("scheduled_on", we)
 
       let res = await q
+      if (res.error && missingOperationalBillingColumns(res.error)) {
+        res = await supabase
+          .from("work_orders")
+          .select(selNoBilling)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", [...DISPATCH_STATUSES])
+          .gte("scheduled_on", ws)
+          .lte("scheduled_on", we)
+      }
       if (res.error && missingWorkOrderNumberColumn(res.error)) {
         mini = true
         res = await supabase
@@ -188,6 +203,15 @@ function DispatchPageInner() {
         .in("status", ["open", "scheduled", "in_progress"])
 
       let res = await q
+      if (res.error && missingOperationalBillingColumns(res.error)) {
+        res = await supabase
+          .from("work_orders")
+          .select(selNoBilling)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .is("assigned_user_id", null)
+          .in("status", ["open", "scheduled", "in_progress"])
+      }
       if (res.error && missingWorkOrderNumberColumn(res.error)) {
         mini = true
         res = await supabase

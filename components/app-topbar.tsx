@@ -22,6 +22,7 @@ import {
 import { SidebarContext } from "@/components/app-sidebar"
 import { BrandLogo } from "@/components/brand-logo"
 import { useTenant } from "@/lib/tenant-store"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useAdmin } from "@/lib/admin-store"
 import { useActiveOrganizationOptional } from "@/lib/active-organization-context"
@@ -82,6 +83,7 @@ export function AppTopbar() {
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
+  const { permissions } = useOrgPermissions()
   const planBadge = planBadgeFromWorkspace(workspace)
   const subscriptionChrome =
     workspace.organizationSubscription === undefined
@@ -181,11 +183,18 @@ export function AppTopbar() {
     }
   }, [activeOrgOpt?.organizationId])
 
-  const launcherLinks = useMemo(
-    () =>
-      LAUNCHER_LINKS.filter((link) => link.href !== "/admin" || platformAdminNavVisible),
-    [platformAdminNavVisible],
-  )
+  const launcherLinks = useMemo(() => {
+    return LAUNCHER_LINKS.filter((link) => {
+      if (link.href === "/admin") return platformAdminNavVisible
+      if (link.href === "/communications") return permissions.canViewBilling
+      if (link.href === "/settings/billing") return permissions.canViewBilling
+      if (link.href === "/settings/integrations") return permissions.canManageIntegrations
+      if (link.href === "/settings/security") return permissions.canManageSecuritySettings
+      if (link.href === "/settings/team") return permissions.canManageWorkspaceSettings
+      if (link.href === "/settings/notifications") return permissions.canManageWorkspaceSettings
+      return true
+    })
+  }, [platformAdminNavVisible, permissions])
 
   async function handleNotifClick(n: FeedPreview) {
     const orgId = activeOrgOpt?.organizationId

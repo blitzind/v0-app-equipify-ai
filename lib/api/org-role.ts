@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  getOrgPermissionsForRole,
+  normalizeOrgMemberRole,
+} from "@/lib/permissions/model"
 
 /** Active membership role for the user in the organization, or null. */
 export async function getOrganizationMemberRole(
@@ -19,10 +23,10 @@ export async function getOrganizationMemberRole(
 
 /** Org default certificate release mode (settings page). */
 export function roleCanEditOrgPortalCertificateDefault(role: string | null): boolean {
-  return role === "owner" || role === "admin"
+  return getOrgPermissionsForRole(normalizeOrgMemberRole(role)).canManagePortalSettings
 }
 
 /** Customer override, invoice override, manual certificate release. */
 export function roleCanManageOperationalCertificateRules(role: string | null): boolean {
-  return role === "owner" || role === "admin" || role === "manager"
+  return getOrgPermissionsForRole(normalizeOrgMemberRole(role)).canReleaseCertificatesToPortal
 }

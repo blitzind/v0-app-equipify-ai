@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { computeReportAnalytics } from "@/lib/reporting/compute-analytics"
+import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 
 export const runtime = "nodejs"
 
@@ -40,6 +41,12 @@ export async function GET(
       .maybeSingle()
     if (!mem) {
       return jsonError("Forbidden.", 403)
+    }
+    const reportPerms = getOrgPermissionsForRole(
+      normalizeOrgMemberRole((mem as { role?: string }).role),
+    )
+    if (!reportPerms.canViewOperationalReports && !reportPerms.canViewFinancialReports) {
+      return jsonError("Insufficient permissions.", 403)
     }
   }
 

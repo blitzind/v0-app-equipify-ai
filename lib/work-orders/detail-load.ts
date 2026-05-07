@@ -8,6 +8,7 @@ import type {
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import {
   missingAssignedTechnicianColumn,
+  missingOperationalBillingColumns,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
@@ -344,13 +345,14 @@ export async function loadWorkOrderDetailForOrg(
     by: "id" | "work_order_number"
     value: string | number
   }) {
-    async function runQuery(includeNum: boolean, includeTech: boolean) {
+    async function runQuery(includeNum: boolean, includeTech: boolean, includeBilling: boolean) {
       let q = supabase
         .from("work_orders")
         .select(
           buildWorkOrderDetailSelect({
             includeWorkOrderNumber: includeNum,
             includeAssignedTechnician: includeTech,
+            includeOperationalBillingColumns: includeBilling,
           }),
         )
         .eq("organization_id", organizationId)
@@ -363,19 +365,25 @@ export async function loadWorkOrderDetailForOrg(
 
     let includeNum = true
     let includeTech = true
-    let woRes = await runQuery(includeNum, includeTech)
+    let includeBilling = true
+    let woRes = await runQuery(includeNum, includeTech, includeBilling)
 
     for (;;) {
       const err = woRes.error
       if (!err) break
       if (missingWorkOrderNumberColumn(err) && includeNum) {
         includeNum = false
-        woRes = await runQuery(includeNum, includeTech)
+        woRes = await runQuery(includeNum, includeTech, includeBilling)
         continue
       }
       if (missingAssignedTechnicianColumn(err) && includeTech) {
         includeTech = false
-        woRes = await runQuery(includeNum, includeTech)
+        woRes = await runQuery(includeNum, includeTech, includeBilling)
+        continue
+      }
+      if (missingOperationalBillingColumns(err) && includeBilling) {
+        includeBilling = false
+        woRes = await runQuery(includeNum, includeTech, includeBilling)
         continue
       }
       break

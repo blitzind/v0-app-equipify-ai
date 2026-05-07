@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils"
 import { useTenant } from "@/lib/tenant-store"
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useBillingAccessOptional } from "@/lib/billing-access-context"
+import type { OrgPermissions } from "@/lib/permissions/model"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
@@ -30,7 +33,10 @@ type NavItem = {
   href: string
   icon: React.ElementType
   highlight?: boolean
-  requirePerm?: "canViewInsights" | "canAccessPortal" | "canViewBilling"
+  /** User needs at least one of these permissions (OR). Omit for routes available to all members. */
+  anyOf?: (keyof OrgPermissions)[]
+  /** AI routes also require plan/billing feature access when applicable. */
+  requireAiPlan?: boolean
 }
 
 type NavGroup = {
@@ -42,38 +48,77 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Dashboard",         href: "/",                  icon: LayoutDashboard },
-      { label: "Customers",         href: "/customers",         icon: Users },
-      { label: "Equipment",         href: "/equipment",         icon: Wrench },
-      { label: "Inventory",         href: "/inventory",         icon: Warehouse },
-      { label: "Work Orders",       href: "/work-orders",       icon: ClipboardList },
-      { label: "Dispatch Board",    href: "/dispatch",          icon: CalendarRange },
-      { label: "Service Schedule",  href: "/service-schedule",  icon: CalendarClock },
+      { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "Customers", href: "/customers", icon: Users },
+      { label: "Equipment", href: "/equipment", icon: Wrench },
+      {
+        label: "Inventory",
+        href: "/inventory",
+        icon: Warehouse,
+        anyOf: ["canManageInventory", "canConsumePartsOnWorkOrders"],
+      },
+      { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
+      { label: "Dispatch Board", href: "/dispatch", icon: CalendarRange, anyOf: ["canViewDispatch"] },
+      { label: "Service Schedule", href: "/service-schedule", icon: CalendarClock, anyOf: ["canViewDispatch"] },
       { label: "Maintenance Plans", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
-      { label: "Certificates", href: "/calibration-templates", icon: FileBadge2 },
-      { label: "Technicians",       href: "/technicians",       icon: HardHat },
+      {
+        label: "Certificates",
+        href: "/calibration-templates",
+        icon: FileBadge2,
+        anyOf: ["canManageCertificateTemplates"],
+      },
+      { label: "Technicians", href: "/technicians", icon: HardHat, anyOf: ["canViewTechnicians"] },
     ],
   },
   {
     label: "Sales & Finance",
     items: [
-      { label: "Quotes",           href: "/quotes",           icon: FileText },
-      { label: "Invoices",         href: "/invoices",         icon: Receipt },
-      { label: "Communications",   href: "/communications",   icon: Bell },
-      { label: "Purchase Orders",  href: "/purchase-orders",  icon: ShoppingCart },
-      { label: "Vendors",          href: "/vendors",          icon: Store },
-      { label: "Catalog",          href: "/catalog",          icon: Package },
+      { label: "Quotes", href: "/quotes", icon: FileText, anyOf: ["canViewBilling"] },
+      { label: "Invoices", href: "/invoices", icon: Receipt, anyOf: ["canViewBilling"] },
+      { label: "Communications", href: "/communications", icon: Bell, anyOf: ["canViewBilling"] },
+      { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, anyOf: ["canViewBilling"] },
+      { label: "Vendors", href: "/vendors", icon: Store, anyOf: ["canViewBilling"] },
+      { label: "Catalog", href: "/catalog", icon: Package, anyOf: ["canViewBilling"] },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { label: "AI Insights", href: "/insights", icon: Sparkles, highlight: true, requirePerm: "canViewInsights" },
-      { label: "AI Assistants", href: "/ai-assistants", icon: Bot, highlight: true, requirePerm: "canViewInsights" },
-      { label: "Reports",     href: "/reports",  icon: BarChart3 },
+      {
+        label: "AI Insights",
+        href: "/insights",
+        icon: Sparkles,
+        highlight: true,
+        anyOf: ["canViewInsights"],
+        requireAiPlan: true,
+      },
+      {
+        label: "AI Assistants",
+        href: "/ai-assistants",
+        icon: Bot,
+        highlight: true,
+        anyOf: ["canViewInsights"],
+        requireAiPlan: true,
+      },
+      {
+        label: "Reports",
+        href: "/reports",
+        icon: BarChart3,
+        anyOf: ["canViewOperationalReports", "canViewFinancialReports"],
+      },
     ],
   },
 ]
+
+function navItemAllowed(
+  item: NavItem,
+  perms: OrgPermissions,
+  insightsAllowed: boolean,
+): boolean {
+  if (item.requireAiPlan && !insightsAllowed) return false
+  if (!item.anyOf?.length) return true
+  return item.anyOf.some((k) => perms[k])
+}
 
 // Mobile drawer open state — consumed by AppTopbar hamburger button
 export const SidebarContext = React.createContext<{
@@ -92,7 +137,10 @@ function SidebarBody({
   isMobile?: boolean
 }) {
   const pathname = usePathname()
-  const { workspace, can } = useTenant()
+  const { workspace } = useTenant()
+  const { permissions } = useOrgPermissions()
+  const billingAccess = useBillingAccessOptional()
+  const insightsAllowed = billingAccess?.insightsAllowed ?? false
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
     useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
@@ -107,7 +155,7 @@ function SidebarBody({
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.requirePerm || can(item.requirePerm)),
+    items: group.items.filter((item) => navItemAllowed(item, permissions, insightsAllowed)),
   })).filter((group) => group.items.length > 0)
 
   // In mobile mode always show expanded; desktop respects collapsed state

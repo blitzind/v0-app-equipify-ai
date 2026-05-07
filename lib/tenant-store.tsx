@@ -5,6 +5,8 @@ import {
   MOCK_WORKSPACES, MOCK_USERS,
   type TenantWorkspace, type TenantUser, type UserRole,
 } from "./tenant-data"
+import { useOrgPermissionsOptional } from "@/lib/org-permissions-context"
+import { orgPermissionsToLegacyCan } from "@/lib/permissions/legacy-tenant-bridge"
 import { getPlan, type PlanId } from "./plans"
 import { getWorkspaceData, type WorkspaceDataBundle } from "./workspace-data"
 
@@ -171,6 +173,7 @@ const DEFAULT_USERS = MOCK_USERS.filter((u) =>
 )
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
+  const orgPermCtx = useOrgPermissionsOptional()
   const [state, dispatch] = useReducer(reducer, {
     workspace: DEFAULT_WS,
     currentUser: DEFAULT_USER,
@@ -180,7 +183,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const plan = getPlan(state.workspace.planId)
   const workspaceData = getWorkspaceData(state.workspace.id)
 
-  // Permissions map — mirrors ROLE_PERMISSIONS in tenant-data.ts
+  // Fallback demo matrix when org permissions are unavailable (e.g. outside dashboard shell).
   const PERMS = {
     Owner:       { canManageWorkspace:true,  canManageBilling:true,  canManageTeam:true,  canCreateWorkOrders:true,  canEditWorkOrders:true,  canDeleteWorkOrders:true,  canCreateEquipment:true,  canEditEquipment:true,  canViewInsights:true,  canManagePlans:true,  canViewBilling:true,  canAccessPortal:true },
     Admin:       { canManageWorkspace:true,  canManageBilling:false, canManageTeam:true,  canCreateWorkOrders:true,  canEditWorkOrders:true,  canDeleteWorkOrders:true,  canCreateEquipment:true,  canEditEquipment:true,  canViewInsights:true,  canManagePlans:true,  canViewBilling:true,  canAccessPortal:true },
@@ -192,9 +195,16 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   } as const
 
   const can = useCallback(
-    (permission: keyof typeof PERMS["Owner"]) =>
-      PERMS[state.currentUser.role]?.[permission] ?? false,
-    [state.currentUser.role]
+    (permission: keyof typeof PERMS["Owner"]) => {
+      if (orgPermCtx) {
+        if (orgPermCtx.status === "ready") {
+          return orgPermissionsToLegacyCan(orgPermCtx.permissions, permission)
+        }
+        return false
+      }
+      return PERMS[state.currentUser.role]?.[permission] ?? false
+    },
+    [orgPermCtx, state.currentUser.role],
   )
 
   return (

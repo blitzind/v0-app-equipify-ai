@@ -8,6 +8,7 @@ import { WorkOrderProvider } from "@/lib/work-order-store"
 import { MaintenanceProvider } from "@/lib/maintenance-store"
 import { TenantProvider } from "@/lib/tenant-store"
 import { ActiveOrganizationProvider } from "@/lib/active-organization-context"
+import { OrgPermissionsProvider } from "@/lib/org-permissions-context"
 import { BillingAccessProvider } from "@/lib/billing-access-context"
 import { BillingWarningBanner } from "@/components/billing-warning-banner"
 import { TenantWorkspaceSync } from "@/components/tenant-workspace-sync"
@@ -58,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AdminProvider>
       <ActiveOrganizationProvider>
         <BillingAccessProvider>
+        <OrgPermissionsProvider>
         <TenantProvider>
           <ArchivedDashboardGate />
           <TenantWorkspaceSync />
@@ -89,6 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </MaintenanceProvider>
           </WorkOrderProvider>
         </TenantProvider>
+        </OrgPermissionsProvider>
         </BillingAccessProvider>
       </ActiveOrganizationProvider>
     </AdminProvider>

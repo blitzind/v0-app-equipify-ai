@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import type { OrgPermissions } from "@/lib/permissions/model"
 import {
   User, Building2, Users, CreditCard, Bell,
   Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload, Sparkles,
@@ -13,28 +15,53 @@ import {
   NAV_ROW_INACTIVE_HOVER_CARD,
 } from "@/lib/navigation-chrome"
 
-const NAV_ITEMS = [
-  { label: "General",         href: "/settings/general",         icon: User },
-  { label: "Workspace",       href: "/settings/workspace",       icon: Building2 },
-  { label: "Sample data",     href: "/settings/sample-data",    icon: Database },
-  { label: "Data imports",    href: "/settings/imports",        icon: Upload },
-  { label: "Team",            href: "/settings/team",            icon: Users },
-  { label: "Permissions",     href: "/settings/permissions",     icon: Lock },
-  { label: "Billing",         href: "/settings/billing",         icon: CreditCard },
-  { label: "AI Usage",        href: "/settings/ai-usage",        icon: Sparkles },
-  { label: "Notifications",   href: "/settings/notifications",   icon: Bell },
-  { label: "Automations",     href: "/settings/automations",     icon: Zap },
-  { label: "Customer Portal", href: "/settings/portal",          icon: Globe },
-  { label: "Integrations",    href: "/settings/integrations",    icon: Plug },
-  { label: "Security",        href: "/settings/security",        icon: Shield },
-  { label: "API / Developers",href: "/settings/api",             icon: Code2 },
-  { label: "Audit Log",       href: "/settings/audit-log",       icon: ScrollText },
-  { label: "Archived",        href: "/settings/archived",        icon: Archive },
-  { label: "Equipment Types", href: "/settings/equipment-types", icon: Wrench },
+type SettingsNavItem = {
+  label: string
+  href: string
+  icon: React.ElementType
+  /** Omit or return true to show for every signed-in member. */
+  visible?: (p: OrgPermissions) => boolean
+}
+
+const NAV_ITEMS: SettingsNavItem[] = [
+  { label: "General", href: "/settings/general", icon: User, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Workspace", href: "/settings/workspace", icon: Building2, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Sample data", href: "/settings/sample-data", icon: Database, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Data imports", href: "/settings/imports", icon: Upload, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Team", href: "/settings/team", icon: Users, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Permissions", href: "/settings/permissions", icon: Lock },
+  { label: "Billing", href: "/settings/billing", icon: CreditCard, visible: (p) => p.canViewBilling },
+  { label: "AI Usage", href: "/settings/ai-usage", icon: Sparkles, visible: (p) => p.canViewInsights },
+  {
+    label: "Notifications",
+    href: "/settings/notifications",
+    icon: Bell,
+    visible: (p) => p.canManageWorkspaceSettings,
+  },
+  { label: "Automations", href: "/settings/automations", icon: Zap, visible: (p) => p.canManageAutomations },
+  { label: "Customer Portal", href: "/settings/portal", icon: Globe, visible: (p) => p.canManagePortalSettings },
+  { label: "Integrations", href: "/settings/integrations", icon: Plug, visible: (p) => p.canManageIntegrations },
+  { label: "Security", href: "/settings/security", icon: Shield, visible: (p) => p.canManageSecuritySettings },
+  { label: "API / Developers", href: "/settings/api", icon: Code2, visible: (p) => p.canManageApiKeys },
+  {
+    label: "Audit Log",
+    href: "/settings/audit-log",
+    icon: ScrollText,
+    visible: (p) => p.canViewOperationalReports || p.canManageSecuritySettings,
+  },
+  { label: "Archived", href: "/settings/archived", icon: Archive, visible: (p) => p.canArchiveRecords },
+  {
+    label: "Equipment Types",
+    href: "/settings/equipment-types",
+    icon: Wrench,
+    visible: (p) => p.canManageWorkspaceSettings,
+  },
 ]
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { permissions } = useOrgPermissions()
+  const visibleNav = NAV_ITEMS.filter((item) => !item.visible || item.visible(permissions))
 
   return (
     <div className="flex flex-col gap-0 md:gap-5">
@@ -43,7 +70,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         className="md:hidden flex items-center gap-1 overflow-x-auto scrollbar-none border-b border-border bg-card px-3 py-2 -mx-4 sticky top-0 z-20"
         aria-label="Settings navigation"
       >
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {visibleNav.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/")
           return (
             <Link
@@ -67,7 +94,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="flex gap-8 items-start mt-3 md:mt-0">
         {/* Desktop: left sidebar nav */}
         <nav className="hidden md:flex w-48 shrink-0 flex-col gap-0.5 sticky top-4" aria-label="Settings navigation">
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+          {visibleNav.map(({ label, href, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/")
             return (
               <Link
