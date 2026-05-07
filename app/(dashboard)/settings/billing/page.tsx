@@ -42,6 +42,8 @@ import {
   ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
   parseOnboardingPlan,
 } from "@/lib/onboarding-intent"
+import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
@@ -250,6 +252,7 @@ function BillingPageContent() {
   const searchParams = useSearchParams()
   const { workspace, dispatch, workspaceUsers } = useTenant()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const orgPermissions = useOrgPermissions()
 
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(workspace.billingCycle)
   const [checkoutBusy, setCheckoutBusy] = useState(false)
@@ -540,6 +543,12 @@ function BillingPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
+
+      {/* ── Invoicing Phase 3 — Workspace invoice defaults ─────────────────── */}
+      <WorkspaceInvoiceDefaultsCard
+        organizationId={orgStatus === "ready" ? organizationId : null}
+        canEdit={orgPermissions.canEditOrgBilling}
+      />
 
       {/* ── Current subscription ─────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">

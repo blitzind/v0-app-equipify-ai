@@ -240,10 +240,20 @@ function InvoicesPageInner() {
     }
   }, [searchParams])
 
+  /** Invoicing Phase 3 — optional customer scoping (deep links from customer billing tab). */
+  const customerIdFilter = useMemo(() => {
+    const raw = searchParams.get("customerId") ?? ""
+    return UUID_PARAM.test(raw) ? raw : ""
+  }, [searchParams])
+
   const invoicesForStats = useMemo(() => invoices.filter((i) => !i.isArchived), [invoices])
 
   const filtered = useMemo(() => {
     let list = [...invoices]
+
+    if (customerIdFilter) {
+      list = list.filter((inv) => inv.customerId === customerIdFilter)
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -278,7 +288,7 @@ function InvoicesPageInner() {
     })
 
     return list
-  }, [invoices, search, statusFilter, sortKey, sortDir])
+  }, [invoices, search, statusFilter, sortKey, sortDir, customerIdFilter])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -297,6 +307,27 @@ function InvoicesPageInner() {
           </Button>
         </div>
       )}
+
+      {customerIdFilter ? (
+        <div className="rounded-lg border border-border bg-card px-4 py-2.5 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+          <span>
+            Showing invoices for{" "}
+            <span className="text-foreground font-medium">
+              {filtered[0]?.customerName ?? "selected customer"}
+            </span>
+            {" "}only.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => router.push("/invoices")}
+          >
+            Clear filter
+          </Button>
+        </div>
+      ) : null}
 
       <InvoiceStatCards invoices={invoicesForStats} />
 
@@ -508,7 +539,12 @@ function InvoicesPageInner() {
                     <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">{inv.equipmentName}</TableCell>
                     <TableCell>
                       {inv.workOrderId ? (
-                        <span className="font-mono text-xs text-muted-foreground ds-tabular">{getWorkOrderDisplay({ id: inv.workOrderId })}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-xs text-muted-foreground ds-tabular">{getWorkOrderDisplay({ id: inv.workOrderId })}</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                            <Wrench className="w-2.5 h-2.5 shrink-0" /> Service-linked
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>
                       )}

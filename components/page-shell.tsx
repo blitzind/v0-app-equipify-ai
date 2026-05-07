@@ -57,13 +57,13 @@ const ROUTE_META: Record<string, RouteMeta> = {
     icon: CalendarRange,
   },
   "/service-schedule": {
-    title: "Service Schedule",
+    title: "Schedule",
     subtitle: "Upcoming maintenance services grouped by month, with notification and work order previews.",
     icon: CalendarClock,
   },
   "/maintenance-plans": {
-    title: "Maintenance Plans",
-    subtitle: "Recurring service schedules with automated notifications and work order creation.",
+    title: "Maintenance",
+    subtitle: "Recurring service plans with automated notifications and work order creation.",
     icon: MaintenancePlansLucideIcon,
     cta: { label: "+ New Plan" },
   },
@@ -118,7 +118,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     icon: Upload,
   },
   "/reports": {
-    title: "Reports",
+    title: "Operations",
     subtitle: "Track revenue, service performance, asset activity, and technician productivity.",
     icon: BarChart3,
     cta: { label: "Export Report" },

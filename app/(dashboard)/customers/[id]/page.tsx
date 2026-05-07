@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Loader2,
   Activity,
+  AlertTriangle,
   CheckCircle2,
   DollarSign,
   ClipboardList,
@@ -62,6 +63,14 @@ import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
 import { CustomerBillingTermsCard } from "@/components/customers/customer-billing-terms-card"
+import { CustomerInvoiceAgingCard } from "@/components/customers/customer-invoice-aging-card"
+import {
+  combineInvoiceAgingSummaries,
+  invoicesForCustomerIds,
+  summarizeInvoiceAging,
+  type InvoiceAgingSummary,
+} from "@/lib/billing/invoice-aging"
+import { fetchInvoicesForOrganization } from "@/lib/org-quotes-invoices/repository"
 import {
   loadEquipmentCategoryBreakdown,
   type EquipmentCategoryBreakdownRow,
@@ -444,6 +453,12 @@ export default function CustomerDetailPage() {
   const [equipmentBreakdownLoading, setEquipmentBreakdownLoading] = useState(false)
   const [equipmentBreakdownIncludesChildren, setEquipmentBreakdownIncludesChildren] = useState(false)
   const [rollupLoading, setRollupLoading] = useState(false)
+  /** Invoicing Phase 3 — invoice aging summary (single + consolidated). */
+  const [invoiceAgingSelf, setInvoiceAgingSelf] = useState<InvoiceAgingSummary | null>(null)
+  const [invoiceAgingConsolidated, setInvoiceAgingConsolidated] =
+    useState<InvoiceAgingSummary | null>(null)
+  const [invoiceAgingLoading, setInvoiceAgingLoading] = useState(false)
+  const [invoiceAgingChildCount, setInvoiceAgingChildCount] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -696,6 +711,57 @@ export default function CustomerDetailPage() {
       cancelled = true
     }
   }, [hierarchySummary, refreshToken])
+
+  // Invoicing Phase 3 — invoice aging for this customer (and consolidated
+  // rollup when this account has sub-accounts).
+  useEffect(() => {
+    let cancelled = false
+    if (!customer) {
+      setInvoiceAgingSelf(null)
+      setInvoiceAgingConsolidated(null)
+      setInvoiceAgingChildCount(0)
+      setInvoiceAgingLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+    setInvoiceAgingLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const isParent = Boolean(hierarchySummary && hierarchySummary.childCount > 0)
+
+      let consolidatedIds: string[] = [customer.id]
+      if (isParent) {
+        const tree = await loadCustomerRollupTree(supabase, {
+          organizationId: customer.organizationId,
+          rootCustomerId: customer.id,
+        }).catch(() => [])
+        if (tree.length > 0) consolidatedIds = tree.map((n) => n.id)
+      }
+
+      const { invoices } = await fetchInvoicesForOrganization(supabase, customer.organizationId, {
+        visibility: "active",
+      })
+      if (cancelled) return
+
+      const selfRows = invoicesForCustomerIds(invoices, [customer.id])
+      const selfSummary = summarizeInvoiceAging(selfRows)
+
+      let consolidatedSummary: InvoiceAgingSummary | null = null
+      if (isParent && consolidatedIds.length > 1) {
+        const consolidatedRows = invoicesForCustomerIds(invoices, consolidatedIds)
+        consolidatedSummary = combineInvoiceAgingSummaries([summarizeInvoiceAging(consolidatedRows)])
+      }
+
+      setInvoiceAgingSelf(selfSummary)
+      setInvoiceAgingConsolidated(consolidatedSummary)
+      setInvoiceAgingChildCount(isParent ? Math.max(consolidatedIds.length - 1, 0) : 0)
+      setInvoiceAgingLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customer, hierarchySummary, refreshToken])
 
   // Equipment Intelligence Phase 2 — category breakdown for this customer.
   // For parent accounts we expand to the full rollup tree (self + descendants);
@@ -1582,6 +1648,14 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="quotes" className="text-xs sm:text-sm">
             Quotes
           </TabsTrigger>
+          <TabsTrigger value="billing" className="text-xs sm:text-sm">
+            Billing
+            {invoiceAgingSelf && invoiceAgingSelf.overdueCount > 0 ? (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 px-1.5 text-[10px] font-semibold text-destructive">
+                {invoiceAgingSelf.overdueCount}
+              </span>
+            ) : null}
+          </TabsTrigger>
           <TabsTrigger value="maintenance-plans" className="text-xs sm:text-sm">
             Maintenance Plans ({customerPlans.length})
           </TabsTrigger>
@@ -2040,6 +2114,69 @@ export default function CustomerDetailPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Invoicing Phase 3 — Billing aging tab */}
+        <TabsContent value="billing" className="mt-4 space-y-6">
+          {activeOrgId ? (
+            <CustomerBillingTermsCard
+              organizationId={activeOrgId}
+              customerTermsCode={customer.defaultInvoiceTermsCode}
+            />
+          ) : null}
+
+          {invoiceAgingConsolidated ? (
+            <CustomerInvoiceAgingCard
+              summary={invoiceAgingConsolidated}
+              loading={invoiceAgingLoading}
+              consolidated
+              childCount={invoiceAgingChildCount}
+              invoicesHref={`/invoices?customerId=${encodeURIComponent(customer.id)}`}
+            />
+          ) : null}
+          <CustomerInvoiceAgingCard
+            summary={
+              invoiceAgingSelf ?? {
+                unpaidCount: 0,
+                overdueCount: 0,
+                draftPendingCount: 0,
+                paidLast12moCount: 0,
+                totalCount: 0,
+                openBalanceCents: 0,
+                overdueBalanceCents: 0,
+                draftPendingBalanceCents: 0,
+                paidLast12moBalanceCents: 0,
+                buckets: {
+                  current: 0,
+                  bucket0_30: 0,
+                  bucket31_60: 0,
+                  bucket61_90: 0,
+                  bucket90Plus: 0,
+                },
+                oldestOpenIssueDate: null,
+                newestPaidDate: null,
+              }
+            }
+            loading={invoiceAgingLoading}
+            invoicesHref={`/invoices?customerId=${encodeURIComponent(customer.id)}`}
+          />
+
+          {hierarchySummary?.billingAddressMissing ? (
+            <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 p-3 text-xs text-[color:var(--status-warning)] flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
+              <span>
+                No billing address on file. New invoices fall back to the default service location.
+                Add a billing address in <span className="font-medium">Edit customer → Billing address</span>.
+              </span>
+            </div>
+          ) : null}
+          {!customer.defaultInvoiceTermsCode ? (
+            <div className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
+              This customer is using the workspace default for payment terms. Configure terms in
+              <span className="text-foreground font-medium"> Edit customer → Default invoice payment terms</span>{" "}
+              or update the workspace default in <span className="text-foreground font-medium">Settings → Billing</span>.
+            </div>
+          ) : null}
         </TabsContent>
 
         {/* Maintenance Plans tab */}

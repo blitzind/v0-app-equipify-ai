@@ -139,12 +139,12 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const items: { icon: React.ElementType; label: string; href: string }[] = [
     { icon: Wrench, label: "Equipment", href: "/equipment" },
     { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
-    { icon: MaintenancePlansLucideIcon, label: "Maintenance Plans", href: "/maintenance-plans" },
+    { icon: MaintenancePlansLucideIcon, label: "Maintenance", href: "/maintenance-plans" },
     { icon: FileText, label: "Quotes", href: "/quotes" },
     { icon: Receipt, label: "Invoices", href: "/invoices" },
     { icon: ShoppingCart, label: "Purchase Orders", href: "/purchase-orders" },
     { icon: BarChart3, label: "Reports", href: "/reports" },
-    { icon: Sparkles, label: "AI Insights", href: "/insights" },
+    { icon: Sparkles, label: "Insights", href: "/insights" },
     { icon: Settings, label: "Settings", href: "/settings/workspace" },
   ]
 

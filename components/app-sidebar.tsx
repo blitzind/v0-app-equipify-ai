@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -17,6 +17,7 @@ import {
   Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package,
   Bell,
   Warehouse,
+  UserPlus,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -30,6 +31,7 @@ import {
 
 type NavItem = {
   label: string
+  /** href is empty string for placeholder/coming-soon items (renders disabled). */
   href: string
   icon: React.ElementType
   highlight?: boolean
@@ -37,19 +39,39 @@ type NavItem = {
   anyOf?: (keyof OrgPermissions)[]
   /** AI routes also require plan/billing feature access when applicable. */
   requireAiPlan?: boolean
+  /** Renders the row in a disabled "coming soon" style. */
+  comingSoon?: boolean
 }
 
 type NavGroup = {
   label: string
+  /** Stable id for collapse persistence (independent from the user-facing label). */
+  id: string
   items: NavItem[]
 }
 
+/**
+ * Final left navigation grouping (Operations / Assets / Contacts / Financial /
+ * Growth / Reports). Routes are unchanged — only labels and grouping. See
+ * docs/LEFT_NAV_REFACTOR.md for the canonical mapping.
+ */
 const NAV_GROUPS: NavGroup[] = [
   {
+    id: "operations",
     label: "Operations",
     items: [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
-      { label: "Customers", href: "/customers", icon: Users },
+      { label: "Dispatch", href: "/dispatch", icon: CalendarRange, anyOf: ["canViewDispatch"] },
+      { label: "Schedule", href: "/service-schedule", icon: CalendarClock, anyOf: ["canViewDispatch"] },
+      { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
+      { label: "Maintenance", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
+      { label: "Technicians", href: "/technicians", icon: HardHat, anyOf: ["canViewTechnicians"] },
+    ],
+  },
+  {
+    id: "assets",
+    label: "Assets",
+    items: [
       { label: "Equipment", href: "/equipment", icon: Wrench },
       {
         label: "Inventory",
@@ -57,35 +79,41 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Warehouse,
         anyOf: ["canManageInventory", "canConsumePartsOnWorkOrders"],
       },
-      { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
-      { label: "Dispatch Board", href: "/dispatch", icon: CalendarRange, anyOf: ["canViewDispatch"] },
-      { label: "Service Schedule", href: "/service-schedule", icon: CalendarClock, anyOf: ["canViewDispatch"] },
-      { label: "Maintenance Plans", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
+      { label: "Catalog", href: "/catalog", icon: Package, anyOf: ["canViewBilling"] },
       {
         label: "Certificates",
         href: "/calibration-templates",
         icon: FileBadge2,
         anyOf: ["canManageCertificateTemplates"],
       },
-      { label: "Technicians", href: "/technicians", icon: HardHat, anyOf: ["canViewTechnicians"] },
     ],
   },
   {
-    label: "Sales & Finance",
+    id: "contacts",
+    label: "Contacts",
+    items: [
+      { label: "Customers", href: "/customers", icon: Users },
+      // Placeholder — no route yet; rendered in disabled state.
+      { label: "Prospects", href: "", icon: UserPlus, comingSoon: true },
+    ],
+  },
+  {
+    id: "financial",
+    label: "Financial",
     items: [
       { label: "Quotes", href: "/quotes", icon: FileText, anyOf: ["canViewBilling"] },
       { label: "Invoices", href: "/invoices", icon: Receipt, anyOf: ["canViewBilling"] },
-      { label: "Communications", href: "/communications", icon: Bell, anyOf: ["canViewBilling"] },
       { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, anyOf: ["canViewBilling"] },
       { label: "Vendors", href: "/vendors", icon: Store, anyOf: ["canViewBilling"] },
-      { label: "Catalog", href: "/catalog", icon: Package, anyOf: ["canViewBilling"] },
     ],
   },
   {
-    label: "Intelligence",
+    id: "growth",
+    label: "Growth",
     items: [
+      { label: "Communications", href: "/communications", icon: Bell, anyOf: ["canViewBilling"] },
       {
-        label: "AI Insights",
+        label: "Insights",
         href: "/insights",
         icon: Sparkles,
         highlight: true,
@@ -100,8 +128,14 @@ const NAV_GROUPS: NavGroup[] = [
         anyOf: ["canViewInsights"],
         requireAiPlan: true,
       },
+    ],
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    items: [
       {
-        label: "Reports",
+        label: "Operations",
         href: "/reports",
         icon: BarChart3,
         anyOf: ["canViewOperationalReports", "canViewFinancialReports"],
@@ -115,9 +149,44 @@ function navItemAllowed(
   perms: OrgPermissions,
   insightsAllowed: boolean,
 ): boolean {
+  // Coming-soon placeholders always render so the user can see roadmap items.
+  if (item.comingSoon) return true
   if (item.requireAiPlan && !insightsAllowed) return false
   if (!item.anyOf?.length) return true
   return item.anyOf.some((k) => perms[k])
+}
+
+// ─── Collapse persistence ────────────────────────────────────────────────────
+
+const NAV_GROUP_STORAGE_KEY = "equipify:nav:groups:collapsed/v1"
+
+function readCollapsedGroups(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(NAV_GROUP_STORAGE_KEY)
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) return new Set(parsed.filter((x): x is string => typeof x === "string"))
+    return new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writeCollapsedGroups(set: Set<string>) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(NAV_GROUP_STORAGE_KEY, JSON.stringify(Array.from(set)))
+  } catch {
+    // localStorage may be unavailable (private mode); collapse state stays in memory.
+  }
+}
+
+/** Active match — copies the rule used for individual rows so headers and rows agree. */
+function isItemActive(pathname: string, href: string): boolean {
+  if (!href) return false
+  if (href === "/") return pathname === "/"
+  return pathname === href || pathname.startsWith(href + "/") || pathname.startsWith(href + "?")
 }
 
 // Mobile drawer open state — consumed by AppTopbar hamburger button
@@ -153,13 +222,52 @@ function SidebarBody({
     setWsMenuOpen((v) => !v)
   }
 
-  const visibleGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => navItemAllowed(item, permissions, insightsAllowed)),
-  })).filter((group) => group.items.length > 0)
+  const visibleGroups = useMemo(
+    () =>
+      NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => navItemAllowed(item, permissions, insightsAllowed)),
+      })).filter((group) => group.items.length > 0),
+    [permissions, insightsAllowed],
+  )
 
   // In mobile mode always show expanded; desktop respects collapsed state
   const isCollapsed = isMobile ? false : collapsed
+
+  // ── Collapsible category groups ─────────────────────────────────────────
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    setCollapsedGroups(readCollapsedGroups())
+  }, [])
+
+  // Auto-expand the group that owns the active route so the active row is
+  // never hidden behind a collapsed header.
+  useEffect(() => {
+    setCollapsedGroups((prev) => {
+      let mutated = false
+      const next = new Set(prev)
+      for (const group of visibleGroups) {
+        if (!next.has(group.id)) continue
+        const owns = group.items.some((item) => isItemActive(pathname, item.href))
+        if (owns) {
+          next.delete(group.id)
+          mutated = true
+        }
+      }
+      if (mutated) writeCollapsedGroups(next)
+      return mutated ? next : prev
+    })
+  }, [pathname, visibleGroups])
+
+  function toggleGroup(id: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      writeCollapsedGroups(next)
+      return next
+    })
+  }
 
   return (
     <>
@@ -295,59 +403,121 @@ function SidebarBody({
 
       {/* ── Navigation ────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 px-3">
-        {visibleGroups.map((group, gi) => (
-          <div key={group.label} className={cn(gi > 0 && "mt-4")}>
-            {/* Group label — hidden when collapsed */}
-            {!isCollapsed && (
-              <p className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/35 select-none">
-                {group.label}
-              </p>
-            )}
-            {/* Collapsed: thin divider between groups instead of label */}
-            {isCollapsed && gi > 0 && (
-              <div className="my-2 mx-auto w-5 border-t border-sidebar-border" />
-            )}
-            <div className="space-y-0.5">
-              {group.items.map(({ label, href, icon: Icon, highlight }) => {
-                const active = pathname === href || (href !== "/" && pathname.startsWith(href))
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    title={isCollapsed ? label : undefined}
+        {visibleGroups.map((group, gi) => {
+          const groupCollapsed = collapsedGroups.has(group.id)
+          const groupHasActive = group.items.some((item) => isItemActive(pathname, item.href))
+          return (
+            <div key={group.id} className={cn(gi > 0 && (isCollapsed ? "mt-3" : "mt-3"))}>
+              {/* Collapsible category header — desktop only when sidebar is open */}
+              {!isCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.id)}
+                  aria-expanded={!groupCollapsed}
+                  aria-controls={`nav-group-${group.id}`}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-2 px-3 pb-1 pt-0.5",
+                    "text-[10px] font-semibold uppercase tracking-widest select-none",
+                    "rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground/70 transition-colors",
+                  )}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {group.label}
+                    {groupCollapsed && groupHasActive && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                        aria-label="Active route inside collapsed group"
+                      />
+                    )}
+                  </span>
+                  <ChevronDown
+                    size={11}
                     className={cn(
-                      "flex items-center gap-3 group relative",
-                      NAV_PRIMARY_ROW_MOTION,
-                      isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
-                      active ? NAV_ROW_ACTIVE_SIDEBAR : NAV_ROW_INACTIVE_HOVER_SIDEBAR,
+                      "shrink-0 transition-transform duration-150",
+                      groupCollapsed && "-rotate-90",
                     )}
-                  >
-                    {/* Left accent bar — active only, desktop only */}
-                    {active && !isCollapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-400" />
-                    )}
-                    {/* Collapsed active: dot indicator at bottom */}
-                    {active && isCollapsed && (
-                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
-                    )}
-                    <Icon className={cn(
-                      "w-[17px] h-[17px] shrink-0 transition-all duration-150",
-                      active ? NAV_ICON_ACTIVE_SIDEBAR : NAV_ICON_INACTIVE_SIDEBAR,
-                    )} />
-                    {!isCollapsed && (
-                      <>
-                        <span className="truncate flex-1 font-medium">{label}</span>
-                        {highlight && !active && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">AI</span>
+                  />
+                </button>
+              )}
+              {/* Collapsed: thin divider between groups instead of header */}
+              {isCollapsed && gi > 0 && (
+                <div className="my-2 mx-auto w-5 border-t border-sidebar-border" />
+              )}
+              <div
+                id={`nav-group-${group.id}`}
+                hidden={!isCollapsed && groupCollapsed}
+                className="space-y-0.5"
+              >
+                {group.items.map(({ label, href, icon: Icon, highlight, comingSoon }) => {
+                  const active = isItemActive(pathname, href)
+                  if (comingSoon) {
+                    return (
+                      <div
+                        key={`${group.id}:${label}`}
+                        title={isCollapsed ? `${label} — coming soon` : undefined}
+                        aria-disabled
+                        className={cn(
+                          "flex items-center gap-3 group relative cursor-not-allowed select-none",
+                          isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
+                          NAV_ROW_INACTIVE_HOVER_SIDEBAR,
+                          "opacity-55 hover:opacity-65",
                         )}
-                      </>
-                    )}
-                  </Link>
-                )
-              })}
+                      >
+                        <Icon className={cn("w-[17px] h-[17px] shrink-0", NAV_ICON_INACTIVE_SIDEBAR)} />
+                        {!isCollapsed && (
+                          <>
+                            <span className="truncate flex-1 font-medium">{label}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-sidebar-border text-sidebar-foreground/55">
+                              Soon
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )
+                  }
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      title={isCollapsed ? label : undefined}
+                      className={cn(
+                        "flex items-center gap-3 group relative",
+                        NAV_PRIMARY_ROW_MOTION,
+                        isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
+                        active ? NAV_ROW_ACTIVE_SIDEBAR : NAV_ROW_INACTIVE_HOVER_SIDEBAR,
+                      )}
+                    >
+                      {/* Left accent bar — active only, desktop only */}
+                      {active && !isCollapsed && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-400" />
+                      )}
+                      {/* Collapsed active: dot indicator at bottom */}
+                      {active && isCollapsed && (
+                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
+                      )}
+                      <Icon
+                        className={cn(
+                          "w-[17px] h-[17px] shrink-0 transition-all duration-150",
+                          active ? NAV_ICON_ACTIVE_SIDEBAR : NAV_ICON_INACTIVE_SIDEBAR,
+                        )}
+                      />
+                      {!isCollapsed && (
+                        <>
+                          <span className="truncate flex-1 font-medium">{label}</span>
+                          {highlight && !active && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                              AI
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* ── Footer ────────────────────────────────────────────── */}
@@ -381,10 +551,33 @@ function SidebarBody({
   )
 }
 
+const SIDEBAR_COLLAPSED_KEY = "equipify:nav:sidebar-collapsed/v1"
+
 export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsedState] = useState(false)
   const { mobileOpen, setMobileOpen } = React.useContext(SidebarContext)
   const pathname = usePathname()
+
+  // Restore desktop sidebar collapsed state (icon rail vs full sidebar).
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+      if (raw === "1") setCollapsedState(true)
+    } catch {
+      // ignore — fall back to default expanded.
+    }
+  }, [])
+
+  const setCollapsed = React.useCallback((v: boolean) => {
+    setCollapsedState(v)
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, v ? "1" : "0")
+    } catch {
+      // ignore
+    }
+  }, [])
 
   // Close mobile drawer on route change
   React.useEffect(() => { setMobileOpen(false) }, [pathname, setMobileOpen])

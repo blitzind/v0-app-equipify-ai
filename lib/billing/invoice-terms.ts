@@ -154,3 +154,40 @@ export function netDaysForTermsCode(
   }
   return map[c] ?? 30
 }
+
+/**
+ * Invoicing Phase 3 — QuickBooks Terms preset hint.
+ *
+ * Provides a *display-only* preset name commonly used in QuickBooks Online's
+ * Terms picker (e.g. "Net 30"). This is intentionally not wired into the
+ * existing QuickBooks invoice sync — adding `TermsRef` to the export payload
+ * would require fetching the QB org's actual Terms catalog at sync time and
+ * mapping by name. We surface the hint so admins can pick the matching QB
+ * preset manually until a future sync phase wires this end-to-end.
+ *
+ * Returns null when no preset is appropriate (e.g. `custom` terms — QB has no
+ * generic "Custom" preset).
+ */
+export function quickbooksTermsHintForCode(
+  code: InvoiceTermsCode | string | null | undefined,
+): string | null {
+  const c = (code ?? "").trim()
+  switch (c) {
+    case "due_on_receipt":
+      return "Due on receipt"
+    case "net_7":
+      return "Net 7"
+    case "net_14":
+      return "Net 14"
+    case "net_15":
+      return "Net 15"
+    case "net_30":
+      return "Net 30"
+    case "net_45":
+      return "Net 45"
+    case "net_60":
+      return "Net 60"
+    default:
+      return null
+  }
+}
