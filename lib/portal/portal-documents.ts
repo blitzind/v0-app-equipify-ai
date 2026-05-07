@@ -25,6 +25,7 @@ import {
   buildPortalCertificateItems,
   type PortalCertificateItem,
 } from "@/lib/portal/portal-certificate-items"
+import { fetchInvoicesLinkedToWorkOrdersBatch } from "@/lib/portal/work-order-invoices"
 import { mapInvoiceStatus, mapWorkOrderStatus } from "@/lib/portal/display-mappers"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
@@ -60,6 +61,12 @@ export type PortalDocumentItem = {
   availability: PortalDocumentAvailability
   /** Customer-facing reason / next-step hint. */
   availabilityReason: string
+  /**
+   * Optional secondary hint that names the blocking invoice when the
+   * document is locked due to payment. Customer-facing copy only — never
+   * a UUID. `null` in any other state.
+   */
+  blockedByInvoice: { number: string | null; statusLabel: string | null } | null
   /** Click target inside the portal (page route, never an API route). */
   viewPath: string | null
   /**
@@ -70,6 +77,14 @@ export type PortalDocumentItem = {
   downloadPath: string | null
   /** Status pill text (e.g. "Paid", "Awaiting payment"). */
   statusLabel: string
+  /**
+   * Phase 2: rollup-only label naming the customer/account the document
+   * belongs to. Populated only when consolidated visibility is in effect
+   * AND the document originates from a non-root customer. `null` in
+   * single-customer mode and for the root account itself, so the UI can
+   * skip the chip when it would just repeat the user's own account name.
+   */
+  accountLabel: string | null
   /** Lightweight metadata for filtering. Never includes raw UUIDs. */
   meta: {
     invoiceNumber: string | null
@@ -82,10 +97,21 @@ export type PortalDocumentsResult = {
   items: PortalDocumentItem[]
   /** Distinct equipment options for the filter dropdown. */
   equipmentOptions: Array<{ value: string; label: string }>
+  /**
+   * Phase 2: distinct account/location options for the filter dropdown.
+   * Populated only when consolidated rollup is in effect; otherwise empty.
+   */
+  accountOptions: Array<{ value: string; label: string }>
   /** Counts by kind, computed once on the server. */
   countsByKind: Record<PortalDocumentKind, number>
   /** Counts by availability state, used to drive the UI banners. */
   countsByAvailability: Record<PortalDocumentAvailability, number>
+  /** Phase 2: scope summary for the UI to render banners and filters. */
+  scope: {
+    rollupEnabled: boolean
+    /** Customer-facing label of the portal user's own account. */
+    rootAccountLabel: string | null
+  }
 }
 
 const EMPTY_KIND_COUNTS: Record<PortalDocumentKind, number> = {
@@ -140,12 +166,30 @@ function reasonForAvailability(a: PortalDocumentAvailability): string {
 }
 
 /** Map a `PortalCertificateItem` into the unified document shape. */
-function certificateToDocument(c: PortalCertificateItem): PortalDocumentItem {
+function certificateToDocument(
+  c: PortalCertificateItem,
+  context: {
+    accountLabel: string | null
+    blockedByInvoice: PortalDocumentItem["blockedByInvoice"]
+  },
+): PortalDocumentItem {
   let availability: PortalDocumentAvailability
   if (c.unlocked) availability = "available"
   else if (c.reasonCode === "locked_payment") availability = "awaiting_payment"
   else if (c.reasonCode === "locked_manual") availability = "awaiting_release"
   else availability = "not_yet_available"
+
+  // Phase 2: when a payment-locked cert can be tied to an unpaid invoice,
+  // surface that hint in the customer-facing reason text. Falls back to
+  // the existing `reasonLabel` when the invoice number is unknown.
+  let reason = c.reasonLabel || reasonForAvailability(availability)
+  if (availability === "awaiting_payment" && context.blockedByInvoice?.number) {
+    reason = `Available once Invoice ${context.blockedByInvoice.number} is paid.`
+  } else if (availability === "awaiting_release") {
+    reason =
+      c.reasonLabel ||
+      "Your service provider will release this certificate to the portal once it's ready."
+  }
 
   return {
     key: `certificate:${c.id}`,
@@ -156,7 +200,8 @@ function certificateToDocument(c: PortalCertificateItem): PortalDocumentItem {
     equipmentLabel: c.equipmentName,
     locationLabel: c.equipmentLocationLabel,
     availability,
-    availabilityReason: c.reasonLabel || reasonForAvailability(availability),
+    availabilityReason: reason,
+    blockedByInvoice: context.blockedByInvoice,
     // Certificates don't have a portal detail page yet; the certificates
     // index already shows full state. Link there for context.
     viewPath: "/portal/certificates",
@@ -169,8 +214,9 @@ function certificateToDocument(c: PortalCertificateItem): PortalDocumentItem {
           : availability === "awaiting_release"
             ? "Awaiting release"
             : "Not yet available",
+    accountLabel: context.accountLabel,
     meta: {
-      invoiceNumber: null,
+      invoiceNumber: context.blockedByInvoice?.number ?? null,
       workOrderNumber: null,
       workOrderDisplay: c.workOrderId
         ? getWorkOrderDisplay({ id: c.workOrderId, workOrderNumber: null })
@@ -182,19 +228,51 @@ function certificateToDocument(c: PortalCertificateItem): PortalDocumentItem {
 /**
  * Build the unified document list for one (or, in the future, several)
  * portal customers within a single workspace.
+ *
+ * Phase 2: when the caller resolves a parent-rollup scope, pass the
+ * `accountLabels` map and the `rootCustomerId` so the aggregator can
+ * label cross-account documents without leaking raw UUIDs to the UI.
  */
 export async function buildPortalDocuments(
   svc: SupabaseClient,
-  args: { organizationId: string; customerIds: string[] },
+  args: {
+    organizationId: string
+    customerIds: string[]
+    /** Optional customer_id → display name map. Required for rollup labels. */
+    accountLabels?: Record<string, string>
+    /** Root portal customer; descendants get an account chip in the UI. */
+    rootCustomerId?: string
+    /** When true, the aggregator emits accountLabel chips for non-root rows. */
+    rollupEnabled?: boolean
+  },
 ): Promise<PortalDocumentsResult> {
-  const { organizationId, customerIds } = args
+  const {
+    organizationId,
+    customerIds,
+    accountLabels: accountLabelsArg,
+    rootCustomerId,
+    rollupEnabled = false,
+  } = args
+  const accountLabels = accountLabelsArg ?? {}
+  const rootAccountLabel = rootCustomerId
+    ? accountLabels[rootCustomerId]?.trim() || null
+    : null
   const empty: PortalDocumentsResult = {
     items: [],
     equipmentOptions: [],
+    accountOptions: [],
     countsByKind: { ...EMPTY_KIND_COUNTS },
     countsByAvailability: { ...EMPTY_AVAIL_COUNTS },
+    scope: { rollupEnabled, rootAccountLabel },
   }
   if (customerIds.length === 0) return empty
+
+  /** Helper: only return a chip when the doc belongs to a non-root account. */
+  function chipFor(customerId: string | null | undefined): string | null {
+    if (!rollupEnabled || !customerId) return null
+    if (rootCustomerId && customerId === rootCustomerId) return null
+    return accountLabels[customerId]?.trim() || null
+  }
 
   const equipmentLabelById = new Map<string, string>()
   const locationLabelById = new Map<string, string | null>()
@@ -203,7 +281,7 @@ export async function buildPortalDocuments(
   const { data: invRows, error: invErr } = await svc
     .from("org_invoices")
     .select(
-      "id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id",
+      "id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id, customer_id",
     )
     .eq("organization_id", organizationId)
     .in("customer_id", customerIds)
@@ -256,6 +334,12 @@ export async function buildPortalDocuments(
 
   const items: PortalDocumentItem[] = []
 
+  /** Map of invoice id → { number, statusLabel } used to attach blocking-invoice context to certs. */
+  const invoiceCtxById = new Map<
+    string,
+    { number: string | null; statusLabel: string; status: string }
+  >()
+
   for (const r of (invRows ?? []) as Array<{
     id: string
     invoice_number: string | null
@@ -265,12 +349,14 @@ export async function buildPortalDocuments(
     paid_at: string | null
     due_date: string | null
     equipment_id: string | null
+    customer_id: string | null
   }>) {
     const eid = r.equipment_id ?? null
     const eqLabel = eid ? equipmentLabelById.get(eid) ?? null : null
     const availability = invoiceAvailability(r.status)
     const statusLabel = mapInvoiceStatus(r.status)
     const number = r.invoice_number?.trim() || null
+    invoiceCtxById.set(r.id, { number, statusLabel, status: r.status })
     items.push({
       key: `invoice:${r.id}`,
       kind: "invoice",
@@ -286,10 +372,12 @@ export async function buildPortalDocuments(
           : r.status === "overdue"
             ? "Overdue — payment still owed."
             : "Open — payment outstanding.",
+      blockedByInvoice: null,
       viewPath: `/portal/invoices/${r.id}`,
       // Phase 1: no PDF download yet. The detail page is the document.
       downloadPath: null,
       statusLabel,
+      accountLabel: chipFor(r.customer_id),
       meta: {
         invoiceNumber: number,
         workOrderNumber: null,
@@ -299,6 +387,8 @@ export async function buildPortalDocuments(
   }
 
   // ─── Work order summaries ───────────────────────────────────────────────
+  /** work_order_id → customer_id, used to label cross-account certs/attachments. */
+  const woCustomerById = new Map<string, string>()
   for (const w of (woRows ?? []) as Array<{
     id: string
     work_order_number: number | null
@@ -307,7 +397,9 @@ export async function buildPortalDocuments(
     scheduled_on: string | null
     completed_at: string | null
     equipment_id: string | null
+    customer_id: string | null
   }>) {
+    if (w.customer_id) woCustomerById.set(w.id, w.customer_id)
     const availability = woSummaryAvailability(w.status)
     if (availability === "not_yet_available") continue // Don't surface in-flight WOs as documents.
     const eid = w.equipment_id ?? null
@@ -332,9 +424,11 @@ export async function buildPortalDocuments(
             : w.status === "invoiced"
               ? "Service complete and invoiced."
               : reasonForAvailability(availability),
+      blockedByInvoice: null,
       viewPath: "/portal/work-orders",
       downloadPath: null,
       statusLabel: mapWorkOrderStatus(w.status),
+      accountLabel: chipFor(w.customer_id),
       meta: {
         invoiceNumber: null,
         workOrderNumber: w.work_order_number ?? null,
@@ -344,19 +438,122 @@ export async function buildPortalDocuments(
   }
 
   // ─── Certificates (reuses existing release rules verbatim) ──────────────
-  // For the parent-rollup foundation we iterate per-customer-id; in practice
-  // Phase 1 always passes a single id so this is just one call.
+  // For the parent-rollup we iterate per-customer-id; the existing release
+  // evaluator runs unchanged. We additionally track each cert's owning
+  // customer so we can paint an account chip in rollup mode and resolve
+  // the blocking invoice (when known) for clearer locked-state messaging.
   const certIndexByRecordId = new Map<string, PortalCertificateItem>()
+  const certCustomerByRecordId = new Map<string, string>()
+  const lockedPaymentRecordIds: string[] = []
+
   for (const customerId of customerIds) {
     try {
       const pack = await buildPortalCertificateItems(svc, organizationId, customerId)
       for (const c of pack.items) {
-        items.push(certificateToDocument(c))
         certIndexByRecordId.set(c.id, c)
+        certCustomerByRecordId.set(c.id, customerId)
+        if (!c.unlocked && c.reasonCode === "locked_payment") {
+          lockedPaymentRecordIds.push(c.id)
+        }
       }
     } catch {
       // Schema-drift safe: skip rather than 500.
     }
+  }
+
+  // Phase 2: for every payment-locked cert, surface the *first unpaid*
+  // linked invoice as the blocking document. We never expose the invoice
+  // UUID — only the customer-facing invoice number/status label.
+  const blockedInvoiceByRecordId = new Map<
+    string,
+    PortalDocumentItem["blockedByInvoice"]
+  >()
+  if (lockedPaymentRecordIds.length > 0) {
+    const lockedWoIds = [
+      ...new Set(
+        lockedPaymentRecordIds
+          .map((rid) => certIndexByRecordId.get(rid)?.workOrderId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ]
+    let invoiceMapByWo = new Map<string, Awaited<ReturnType<typeof fetchInvoicesLinkedToWorkOrdersBatch>>[string]>()
+    try {
+      const m = await fetchInvoicesLinkedToWorkOrdersBatch(
+        svc,
+        organizationId,
+        lockedWoIds,
+      )
+      invoiceMapByWo = m as unknown as typeof invoiceMapByWo
+    } catch {
+      // Non-fatal — fall back to generic locked messaging.
+    }
+
+    // Pull invoice_numbers for any blocking invoice we don't already have
+    // in `invoiceCtxById` (e.g. cross-account links the customer can't see
+    // directly). Schema-drift safe: errors fall back to generic copy.
+    const missingInvoiceIds: string[] = []
+    for (const rid of lockedPaymentRecordIds) {
+      const cert = certIndexByRecordId.get(rid)
+      if (!cert) continue
+      const linked = (invoiceMapByWo as unknown as Map<string, Array<{ id: string; status: string }>>).get(
+        cert.workOrderId,
+      )
+      if (!linked) continue
+      for (const inv of linked) {
+        if (inv.status !== "paid" && !invoiceCtxById.has(inv.id)) {
+          missingInvoiceIds.push(inv.id)
+        }
+      }
+    }
+    if (missingInvoiceIds.length > 0) {
+      try {
+        const { data: extraInvRows } = await svc
+          .from("org_invoices")
+          .select("id, invoice_number, status")
+          .eq("organization_id", organizationId)
+          .in("id", [...new Set(missingInvoiceIds)])
+        for (const row of (extraInvRows ?? []) as Array<{
+          id: string
+          invoice_number: string | null
+          status: string
+        }>) {
+          invoiceCtxById.set(row.id, {
+            number: row.invoice_number?.trim() || null,
+            statusLabel: mapInvoiceStatus(row.status),
+            status: row.status,
+          })
+        }
+      } catch {
+        // Ignore — fall back to generic copy.
+      }
+    }
+
+    for (const rid of lockedPaymentRecordIds) {
+      const cert = certIndexByRecordId.get(rid)
+      if (!cert) continue
+      const linked = (invoiceMapByWo as unknown as Map<string, Array<{ id: string; status: string }>>).get(
+        cert.workOrderId,
+      )
+      if (!linked) continue
+      const blocker = linked.find((i) => i.status !== "paid")
+      if (!blocker) continue
+      const ctx = invoiceCtxById.get(blocker.id)
+      if (!ctx) continue
+      blockedInvoiceByRecordId.set(rid, {
+        number: ctx.number,
+        statusLabel: ctx.statusLabel,
+      })
+    }
+  }
+
+  for (const c of certIndexByRecordId.values()) {
+    const customerId = certCustomerByRecordId.get(c.id) ?? null
+    items.push(
+      certificateToDocument(c, {
+        accountLabel: chipFor(customerId),
+        blockedByInvoice: blockedInvoiceByRecordId.get(c.id) ?? null,
+      }),
+    )
   }
 
   // ─── Certificate attachments tied to released records ───────────────────
@@ -404,6 +601,28 @@ export async function buildPortalDocuments(
         const locationLabel =
           eid ? locationLabelById.get(eid) ?? parent.equipmentLocationLabel ?? null : parent.equipmentLocationLabel ?? null
 
+        // Phase 2: gating remains the parent calibration record's release
+        // rule. The attachment never enables looser visibility than its
+        // parent — this is the same rule enforced by the download route.
+        const parentBlockedByInvoice =
+          blockedInvoiceByRecordId.get(parent.id) ?? null
+        const attachmentCustomerId =
+          certCustomerByRecordId.get(parent.id) ??
+          (row.work_order_id ? woCustomerById.get(row.work_order_id) ?? null : null)
+
+        let attachmentReason: string
+        if (availability === "available") {
+          attachmentReason = "Available alongside the released certificate."
+        } else if (availability === "awaiting_payment" && parentBlockedByInvoice?.number) {
+          attachmentReason = `Available once Invoice ${parentBlockedByInvoice.number} is paid.`
+        } else if (availability === "awaiting_release") {
+          attachmentReason =
+            parent.reasonLabel ||
+            "Your service provider will release this attachment with the parent certificate."
+        } else {
+          attachmentReason = parent.reasonLabel || reasonForAvailability(availability)
+        }
+
         items.push({
           key: `certificate_attachment:${row.id}`,
           kind: "certificate_attachment",
@@ -416,10 +635,8 @@ export async function buildPortalDocuments(
           equipmentLabel: eqLabel,
           locationLabel,
           availability,
-          availabilityReason:
-            availability === "available"
-              ? "Available alongside the released certificate."
-              : parent.reasonLabel || reasonForAvailability(availability),
+          availabilityReason: attachmentReason,
+          blockedByInvoice: parentBlockedByInvoice,
           viewPath: "/portal/certificates",
           downloadPath:
             availability === "available"
@@ -433,8 +650,9 @@ export async function buildPortalDocuments(
                 : availability === "awaiting_release"
                   ? "Awaiting release"
                   : "Not yet available",
+          accountLabel: chipFor(attachmentCustomerId),
           meta: {
-            invoiceNumber: null,
+            invoiceNumber: parentBlockedByInvoice?.number ?? null,
             workOrderNumber: null,
             workOrderDisplay: row.work_order_id
               ? getWorkOrderDisplay({ id: row.work_order_id, workOrderNumber: null })
@@ -465,10 +683,22 @@ export async function buildPortalDocuments(
     .sort((a, b) => a.localeCompare(b))
     .map((label) => ({ value: label, label }))
 
+  const accountOptionSet = new Map<string, string>()
+  if (rollupEnabled) {
+    for (const it of items) {
+      if (it.accountLabel) accountOptionSet.set(it.accountLabel, it.accountLabel)
+    }
+  }
+  const accountOptions = [...accountOptionSet.keys()]
+    .sort((a, b) => a.localeCompare(b))
+    .map((label) => ({ value: label, label }))
+
   return {
     items,
     equipmentOptions,
+    accountOptions,
     countsByKind,
     countsByAvailability,
+    scope: { rollupEnabled, rootAccountLabel },
   }
 }

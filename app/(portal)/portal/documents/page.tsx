@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import {
+  Building2,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -12,6 +13,7 @@ import {
   Filter,
   Folder,
   Info,
+  Layers,
   Lock,
   Receipt,
   Search,
@@ -42,9 +44,12 @@ type DocItem = {
   locationLabel: string | null
   availability: Availability
   availabilityReason: string
+  blockedByInvoice: { number: string | null; statusLabel: string | null } | null
   viewPath: string | null
   downloadPath: string | null
   statusLabel: string
+  /** Phase 2 chip — populated only for non-root accounts under rollup. */
+  accountLabel: string | null
   meta: {
     invoiceNumber: string | null
     workOrderNumber: number | null
@@ -55,8 +60,13 @@ type DocItem = {
 type Payload = {
   items: DocItem[]
   equipmentOptions: Array<{ value: string; label: string }>
+  accountOptions: Array<{ value: string; label: string }>
   countsByKind: Record<DocumentKind, number>
   countsByAvailability: Record<Availability, number>
+  scope: {
+    rollupEnabled: boolean
+    rootAccountLabel: string | null
+  }
 }
 
 type KindFilter = "all" | DocumentKind
@@ -164,6 +174,20 @@ function DocRow({ doc }: { doc: DocItem }) {
               {doc.title}
             </p>
             <StatusPill avail={doc.availability} label={doc.statusLabel} />
+            {doc.accountLabel ? (
+              <span
+                className="inline-flex max-w-[200px] items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                title={`Account: ${doc.accountLabel}`}
+                style={{
+                  borderColor: "var(--portal-border-light)",
+                  background: "var(--portal-surface)",
+                  color: "var(--portal-nav-text)",
+                }}
+              >
+                <Building2 size={10} />
+                <span className="truncate">{doc.accountLabel}</span>
+              </span>
+            ) : null}
           </div>
           {doc.subtitle ? (
             <p className="mt-0.5 truncate text-xs" style={{ color: "var(--portal-nav-text)" }}>
@@ -182,10 +206,15 @@ function DocRow({ doc }: { doc: DocItem }) {
           </p>
           {doc.availability !== "available" ? (
             <p
-              className="mt-1 text-[11px] leading-snug"
+              className="mt-1 flex items-start gap-1 text-[11px] leading-snug"
               style={{ color: "var(--portal-secondary)" }}
             >
-              {doc.availabilityReason}
+              {doc.availability === "awaiting_payment" ? (
+                <Receipt size={10} className="mt-0.5 shrink-0" />
+              ) : doc.availability === "awaiting_release" ? (
+                <Lock size={10} className="mt-0.5 shrink-0" />
+              ) : null}
+              <span>{doc.availabilityReason}</span>
             </p>
           ) : null}
         </div>
@@ -240,6 +269,7 @@ export default function PortalDocumentsPage() {
   const [query, setQuery] = useState("")
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
   const [equipmentFilter, setEquipmentFilter] = useState<string>("all")
+  const [accountFilter, setAccountFilter] = useState<string>("all")
   const [availableOnly, setAvailableOnly] = useState(false)
   const [dateFrom, setDateFrom] = useState<string>("")
   const [dateTo, setDateTo] = useState<string>("")
@@ -265,6 +295,9 @@ export default function PortalDocumentsPage() {
       if (kindFilter !== "all" && d.kind !== kindFilter) return false
       if (availableOnly && d.availability !== "available") return false
       if (equipmentFilter !== "all" && d.equipmentLabel !== equipmentFilter) return false
+      if (accountFilter !== "all" && (d.accountLabel ?? "__root__") !== accountFilter) {
+        return false
+      }
       const ts = new Date(d.occurredAt).getTime()
       if (fromTs && ts < fromTs) return false
       if (toTs && ts > toTs) return false
@@ -274,6 +307,7 @@ export default function PortalDocumentsPage() {
           d.subtitle ?? "",
           d.equipmentLabel ?? "",
           d.locationLabel ?? "",
+          d.accountLabel ?? "",
           d.meta.invoiceNumber ?? "",
           d.meta.workOrderDisplay ?? "",
         ]
@@ -283,7 +317,16 @@ export default function PortalDocumentsPage() {
       }
       return true
     })
-  }, [data, query, kindFilter, availableOnly, equipmentFilter, dateFrom, dateTo])
+  }, [
+    data,
+    query,
+    kindFilter,
+    availableOnly,
+    equipmentFilter,
+    accountFilter,
+    dateFrom,
+    dateTo,
+  ])
 
   const grouped = useMemo(() => {
     const map: Partial<Record<DocumentKind, DocItem[]>> = {}
@@ -301,16 +344,24 @@ export default function PortalDocumentsPage() {
     (data?.countsByAvailability.not_yet_available ?? 0)
 
   const anyAdvancedActive =
-    equipmentFilter !== "all" || dateFrom !== "" || dateTo !== "" || availableOnly
+    equipmentFilter !== "all" ||
+    accountFilter !== "all" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    availableOnly
 
   function clearFilters() {
     setKindFilter("all")
     setEquipmentFilter("all")
+    setAccountFilter("all")
     setAvailableOnly(false)
     setDateFrom("")
     setDateTo("")
     setQuery("")
   }
+
+  const rollupEnabled = data?.scope.rollupEnabled ?? false
+  const rollupAccountCount = (data?.accountOptions.length ?? 0) + (rollupEnabled ? 1 : 0)
 
   const renderEmptyHint =
     totalCount === 0
@@ -378,6 +429,40 @@ export default function PortalDocumentsPage() {
               </div>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {/* Phase 2: parent-account rollup banner — only when explicitly enabled. */}
+      {rollupEnabled ? (
+        <div
+          className="portal-card flex items-start gap-3 px-4 py-3"
+          style={{
+            borderColor: "var(--portal-accent)",
+            background: "var(--portal-accent-muted)",
+          }}
+        >
+          <Layers
+            size={14}
+            className="mt-0.5 shrink-0"
+            style={{ color: "var(--portal-accent)" }}
+          />
+          <div
+            className="text-xs leading-snug"
+            style={{ color: "var(--portal-foreground)" }}
+          >
+            <p className="font-semibold">Consolidated view enabled</p>
+            <p className="mt-0.5">
+              You&apos;re viewing documents across{" "}
+              {rollupAccountCount > 1
+                ? `${rollupAccountCount} accounts`
+                : "your account"}{" "}
+              under{" "}
+              <span className="font-medium">
+                {data?.scope.rootAccountLabel ?? "your organization"}
+              </span>
+              . Each item shows the account it belongs to.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -485,6 +570,34 @@ export default function PortalDocumentsPage() {
 
         {advancedOpen ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {rollupEnabled ? (
+              <label
+                className="flex flex-col gap-1 text-xs"
+                style={{ color: "var(--portal-nav-text)" }}
+              >
+                <span className="font-medium">Account</span>
+                <select
+                  value={accountFilter}
+                  onChange={(e) => setAccountFilter(e.target.value)}
+                  className="rounded-md border px-2 py-1.5 text-xs"
+                  style={{
+                    borderColor: "var(--portal-border-light)",
+                    background: "var(--portal-surface)",
+                    color: "var(--portal-foreground)",
+                  }}
+                >
+                  <option value="all">All accounts</option>
+                  <option value="__root__">
+                    {data?.scope.rootAccountLabel ?? "Your account"}
+                  </option>
+                  {data?.accountOptions.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--portal-nav-text)" }}>
               <span className="font-medium">Equipment</span>
               <select

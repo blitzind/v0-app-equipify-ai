@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { canPortalDownloadCertificate } from "@/lib/portal/portal-certificate-items"
-import { requirePortalSession } from "@/lib/portal/require-portal-session"
+import { logPortalActivity } from "@/lib/portal/activity-log"
+import { resolvePortalDocumentScope } from "@/lib/portal/portal-document-scope"
+import { getRequestMeta, requirePortalSession } from "@/lib/portal/require-portal-session"
 import { signedUrlForAttachmentPath } from "@/lib/work-orders/work-order-tab-data"
 
 export const runtime = "nodejs"
@@ -9,22 +11,24 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
- * Customer Portal Document Library — Phase 1
+ * Customer Portal Document Library — uploaded certificate attachments.
  *
- * Streams a short-lived signed URL for an uploaded certificate
- * attachment. Strict release gate:
+ * Strict release gate (unchanged from Phase 1 in single-customer mode):
  *   1. Portal session is required.
  *   2. The attachment must belong to a calibration record (parent cert).
- *   3. The parent calibration record must be unlocked under the existing
- *      `canPortalDownloadCertificate` policy. We never invent a new
- *      release rule here — the same payment / manual / immediate logic
- *      that gates the certificate's own download gates this attachment.
- *   4. The owning work order must belong to the portal user's customer.
+ *   3. The owning work order must belong to a customer the portal session
+ *      is allowed to see — by default just the portal user's own customer
+ *      (`scope.customerIds = [self]`), or, when consolidated visibility
+ *      is explicitly enabled (Phase 2), any descendant customer.
+ *   4. The parent calibration record must be unlocked under the existing
+ *      `canPortalDownloadCertificate` policy *for the actual owning
+ *      customer*. We never invent a new release rule here.
  *
- * We intentionally redirect to a short-lived signed Supabase Storage URL
- * rather than streaming the file through the Node runtime, mirroring
- * how the existing portal certificate download already works
- * (server-vetted gate + client-fetched payload).
+ * We redirect to a short-lived signed Supabase Storage URL rather than
+ * streaming the file through Node, mirroring the existing portal
+ * certificate download flow (server-vetted gate + client-fetched
+ * payload). Telemetry is emitted server-side and never includes the
+ * signed URL or the underlying storage path.
  */
 export async function GET(
   _request: Request,
@@ -40,7 +44,12 @@ export async function GET(
 
   const { svc, portalUser } = ctx
   const orgId = portalUser.organization_id
-  const custId = portalUser.customer_id
+
+  const scope = await resolvePortalDocumentScope(svc, {
+    organizationId: orgId,
+    rootCustomerId: portalUser.customer_id,
+  })
+  const allowedCustomerIds = new Set(scope.customerIds)
 
   const { data: attRow, error: attErr } = await svc
     .from("certificate_attachments")
@@ -69,8 +78,6 @@ export async function GET(
     return NextResponse.json({ error: "Attachment not found." }, { status: 404 })
   }
 
-  // Phase 1: portal can only see attachments tied to a parent calibration
-  // record. Anything else is outside the established release model.
   if (!att.calibration_record_id) {
     return NextResponse.json(
       {
@@ -81,8 +88,7 @@ export async function GET(
     )
   }
 
-  // Verify the work order belongs to this customer (mirrors the existing
-  // portal certificate download flow).
+  // Verify the work order belongs to a customer in the portal session's scope.
   const { data: wo } = await svc
     .from("work_orders")
     .select("customer_id")
@@ -90,15 +96,18 @@ export async function GET(
     .eq("id", att.work_order_id)
     .maybeSingle()
 
-  if (!wo || (wo as { customer_id: string }).customer_id !== custId) {
+  const woCustomerId = (wo as { customer_id?: string | null } | null)?.customer_id ?? null
+  if (!woCustomerId || !allowedCustomerIds.has(woCustomerId)) {
     return NextResponse.json({ error: "Attachment not found." }, { status: 404 })
   }
 
-  // Reuse the existing parent-certificate release evaluation — no new gate.
+  // Existing parent-certificate release evaluation, run against the
+  // *actual owning customer* — not the portal session customer — so the
+  // release rule keeps applying correctly under rollup.
   const allowed = await canPortalDownloadCertificate(
     svc,
     orgId,
-    custId,
+    woCustomerId,
     att.calibration_record_id,
   )
   if (!allowed) {
@@ -118,6 +127,26 @@ export async function GET(
       { status: 502 },
     )
   }
+
+  // Telemetry — log AFTER the gate has been cleared, never include the
+  // signed URL or the storage path.
+  const meta = await getRequestMeta()
+  void logPortalActivity(svc, {
+    organizationId: orgId,
+    portalUserId: portalUser.id,
+    action: "portal_document_download",
+    path: "/api/portal/certificate-attachments/:id/download",
+    resourceType: "certificate_attachment",
+    metadata: {
+      kind: "certificate_attachment",
+      source_category: "calibration",
+      file_type: att.file_type ?? null,
+      cross_account: woCustomerId !== portalUser.customer_id,
+      rollup_enabled: scope.rollupEnabled,
+    },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  })
 
   return NextResponse.redirect(signed, { status: 302 })
 }

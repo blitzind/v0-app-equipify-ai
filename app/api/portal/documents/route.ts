@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server"
 import { buildPortalDocuments } from "@/lib/portal/portal-documents"
-import { requirePortalSession } from "@/lib/portal/require-portal-session"
+import { resolvePortalDocumentScope } from "@/lib/portal/portal-document-scope"
+import { logPortalActivity } from "@/lib/portal/activity-log"
+import { getRequestMeta, requirePortalSession } from "@/lib/portal/require-portal-session"
 
 export const runtime = "nodejs"
 
 /**
- * Customer Portal Document Library — Phase 1
+ * Customer Portal Document Library
  *
- * Aggregator endpoint backing `/portal/documents`. Reuses the existing
- * portal session/cookie auth and the existing per-domain release rules
- * (invoices, certificates, work orders, certificate attachments).
+ * Phase 2: this route now resolves the consolidated visibility scope
+ * (parent-account rollup), but the *single-customer* scope remains the
+ * default. Cross-account access is only ever in effect when both the
+ * org default and/or per-customer override explicitly enable it.
  *
- * Phase 1 always scopes to the current portal user's customer. The
- * underlying `buildPortalDocuments` helper accepts an array of customer
- * ids so a future parent/child rollup phase can wire the parent
- * customer's children in without changing the contract here. We
- * deliberately do not enable that today.
+ * - Reuses existing portal session/cookie auth.
+ * - Reuses every per-domain release rule (invoices, certificates, work
+ *   orders, certificate attachments) untouched.
+ * - Logs an aggregate index-view event for telemetry without leaking
+ *   any UUIDs or storage paths.
  */
 export async function GET() {
   const ctx = await requirePortalSession()
@@ -24,10 +27,39 @@ export async function GET() {
   const { svc, portalUser } = ctx
 
   try {
+    const scope = await resolvePortalDocumentScope(svc, {
+      organizationId: portalUser.organization_id,
+      rootCustomerId: portalUser.customer_id,
+    })
+
     const result = await buildPortalDocuments(svc, {
       organizationId: portalUser.organization_id,
-      customerIds: [portalUser.customer_id],
+      customerIds: scope.customerIds,
+      accountLabels: scope.accountLabels,
+      rootCustomerId: scope.rootCustomerId,
+      rollupEnabled: scope.rollupEnabled,
     })
+
+    // Telemetry: index view. Only counts/scope flags — no UUIDs, no labels
+    // that aren't already user-visible, no signed URLs.
+    const meta = await getRequestMeta()
+    void logPortalActivity(svc, {
+      organizationId: portalUser.organization_id,
+      portalUserId: portalUser.id,
+      action: "portal_document_index_view",
+      path: "/portal/documents",
+      resourceType: "document_index",
+      metadata: {
+        rollup_enabled: scope.rollupEnabled,
+        account_count: scope.customerIds.length,
+        total_items: result.items.length,
+        counts_by_kind: result.countsByKind,
+        counts_by_availability: result.countsByAvailability,
+      },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    })
+
     return NextResponse.json(result)
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not load documents."
