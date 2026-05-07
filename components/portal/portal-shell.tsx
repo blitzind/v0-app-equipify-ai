@@ -12,6 +12,7 @@ import {
   Receipt,
   FilePen,
   FileText,
+  Folder,
   UserCog,
   Bell,
   LogOut,
@@ -36,6 +37,9 @@ const NAV_ITEMS = [
   { href: "/portal/maintenance", label: "Maintenance", icon: Calendar },
   { href: "/portal/invoices", label: "Invoices", icon: Receipt },
   { href: "/portal/quotes", label: "Quotes", icon: FilePen },
+  // Phase: Customer Portal Document Access — single landing page for
+  // invoices, certificates, service summaries, and uploaded documents.
+  { href: "/portal/documents", label: "Documents", icon: Folder },
   { href: "/portal/reports", label: "Reports", icon: FileText },
   { href: "/portal/certificates", label: "Certificates", icon: ShieldCheck },
 ]

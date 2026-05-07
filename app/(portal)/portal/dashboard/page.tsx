@@ -9,6 +9,7 @@ import {
   Receipt,
   FilePen,
   FileText,
+  Folder,
   AlertTriangle,
   Clock,
   ArrowRight,
@@ -300,12 +301,23 @@ export default function PortalDashboardPage() {
               {data.certificateSummary.unlocked} available · {data.certificateSummary.locked} pending release
             </p>
           </div>
-          <Link
-            href="/portal/certificates"
-            className="portal-btn-secondary text-xs inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium"
-          >
-            View certificates
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Phase: Customer Portal Document Access — direct entry to the
+                unified library alongside the existing certificates page. */}
+            <Link
+              href="/portal/documents"
+              className="portal-btn-secondary text-xs inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium"
+            >
+              All documents
+            </Link>
+            <Link
+              href="/portal/certificates"
+              className="text-xs font-medium inline-flex items-center gap-1"
+              style={{ color: "var(--portal-accent)" }}
+            >
+              Certificates <ArrowRight size={11} />
+            </Link>
+          </div>
         </div>
       )}
 
@@ -489,7 +501,12 @@ export default function PortalDashboardPage() {
           <QuickAction href="/portal/request-repair" icon={Wrench} label="Request a Repair" description="Submit a service request" />
           <QuickAction href="/portal/book-maintenance" icon={Calendar} label="Book Maintenance" description="Schedule a visit" />
           <QuickAction href="/portal/invoices" icon={Receipt} label="Invoices" description="View balances (payments coming soon)" />
-          <QuickAction href="/portal/reports" icon={FileText} label="Reports" description="Service summaries" />
+          <QuickAction
+            href="/portal/documents"
+            icon={Folder}
+            label="Documents"
+            description="Invoices, certificates, summaries"
+          />
         </div>
       </div>
 

@@ -314,27 +314,54 @@ function SidebarBody({
         </Link>
       </div>
 
-      {/* ── Workspace selector ────────────────────────────────── */}
-      <div className="relative px-3 py-3 border-b border-sidebar-border shrink-0">
+      {/* ── Workspace selector ──────────────────────────────────
+          Collapsed rail (`w-14`) demands a square avatar slot, so we
+          drop the default `w-full` button and switch to an explicit
+          `h-10 w-10` square that centers cleanly. The avatar itself is
+          locked to a square via `aspect-square` plus explicit min/max
+          sizes so neither flex-shrink nor intrinsic-image sizing can
+          deform the logo into a pill. */}
+      <div
+        className={cn(
+          "relative border-b border-sidebar-border shrink-0",
+          isCollapsed ? "px-2 py-2" : "px-3 py-3",
+        )}
+      >
         <button
           type="button"
           onClick={toggleWorkspaceMenu}
           aria-expanded={showOrgSwitcher ? wsMenuOpen : undefined}
           aria-haspopup={showOrgSwitcher ? "menu" : undefined}
           className={cn(
-            "w-full flex items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/30 transition-all duration-150",
+            "flex items-center gap-3 rounded-xl border transition-all duration-150",
             showOrgSwitcher && "hover:border-primary/40 hover:bg-sidebar-accent/50",
             !showOrgSwitcher && "cursor-default",
             isCollapsed
-              ? "justify-center p-2 border-transparent bg-transparent hover:bg-sidebar-accent/50"
-              : "px-3.5 py-3"
+              ? // 40x40 square button, fully centered in the rail.
+                "mx-auto h-10 w-10 aspect-square shrink-0 grow-0 justify-center p-1 border-transparent bg-transparent hover:bg-sidebar-accent/50"
+              : "w-full px-3.5 py-3 border-sidebar-border bg-sidebar-accent/30",
           )}
         >
           {workspace.logoUrl ? (
-            <img src={workspace.logoUrl} alt="" className="w-8 h-8 rounded-lg object-contain bg-white border border-sidebar-border shrink-0" />
+            <img
+              src={workspace.logoUrl}
+              alt=""
+              className={cn(
+                // Iron-clad square sizing — explicit width AND height,
+                // aspect-ratio guard, and a hard min/max that overrides
+                // any flex shrink behavior even at narrow rail widths.
+                "block h-8 w-8 min-h-8 min-w-8 max-h-8 max-w-8 aspect-square",
+                "shrink-0 grow-0 basis-8 select-none",
+                "rounded-lg border border-sidebar-border bg-white object-contain",
+              )}
+            />
           ) : (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0 uppercase"
+              className={cn(
+                "flex h-8 w-8 min-h-8 min-w-8 max-h-8 max-w-8 aspect-square",
+                "shrink-0 grow-0 basis-8 select-none items-center justify-center",
+                "rounded-lg uppercase text-white text-sm font-bold",
+              )}
               style={{ background: workspace.primaryColor }}
               suppressHydrationWarning
             >
@@ -351,7 +378,7 @@ function SidebarBody({
                 <ChevronDown
                   size={14}
                   className={cn(
-                    "text-sidebar-foreground/40 shrink-0 transition-transform duration-150",
+                    "shrink-0 text-sidebar-foreground/40 transition-transform duration-150",
                     wsMenuOpen && "rotate-180",
                   )}
                 />
@@ -380,7 +407,14 @@ function SidebarBody({
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
                 >
                   <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 uppercase"
+                    className={cn(
+                      // Square org avatar in the switcher menu — same
+                      // ironclad sizing as the sidebar header avatar so a
+                      // long org name in a tight row never compresses it.
+                      "flex h-7 w-7 min-h-7 min-w-7 max-h-7 max-w-7 aspect-square",
+                      "shrink-0 grow-0 basis-7 items-center justify-center",
+                      "rounded-lg uppercase text-white text-[11px] font-bold",
+                    )}
                     style={{ background: workspace.primaryColor }}
                   >
                     {org.name[0]}
