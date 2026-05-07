@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Calendar, ChevronDown, Clock, Loader2, MapPin, User, Wrench, X, Zap } from "lucide-react"
+import { AlertTriangle, Calendar, ChevronDown, Clock, Loader2, MapPin, User, Wrench, X, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +24,11 @@ import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-order
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
+import type { DispatchWo } from "@/components/dispatch/dispatch-board"
+import {
+  describeConflicts,
+  findSlotConflicts,
+} from "@/lib/dispatch/scheduling-conflicts"
 
 /**
  * Phase 1 quick-create scheduling flow.
@@ -58,6 +63,12 @@ type Props = {
   defaultTechnicianId: string | null
   technicians: TechnicianOption[]
   onCreated?: () => void
+  /**
+   * Phase 2: existing dispatch rows used to surface lightweight conflict
+   * warnings when the chosen technician + date + time slot already has a job.
+   * Optional — when omitted, the dialog behaves like Phase 1 (no warning).
+   */
+  existingWorkOrders?: DispatchWo[]
 }
 
 const SERVICE_TYPES: WorkOrderType[] = ["Repair", "PM", "Inspection", "Install", "Emergency"]
@@ -79,6 +90,7 @@ export function QuickAppointmentDialog({
   defaultTechnicianId,
   technicians,
   onCreated,
+  existingWorkOrders,
 }: Props) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
@@ -182,6 +194,25 @@ export function QuickAppointmentDialog({
     !!timeHhMm &&
     !submitting &&
     orgStatus === "ready"
+
+  const conflicts = useMemo(() => {
+    if (!existingWorkOrders || existingWorkOrders.length === 0) return []
+    if (!technicianId || !date) return []
+    return findSlotConflicts(existingWorkOrders, {
+      technicianId,
+      scheduledOn: date,
+      scheduledTimeHhMm: timeHhMm || null,
+    })
+  }, [existingWorkOrders, technicianId, date, timeHhMm])
+
+  const conflictTechLabel = useMemo(
+    () => technicians.find((t) => t.id === technicianId)?.label ?? null,
+    [technicians, technicianId],
+  )
+  const conflictMessage = useMemo(
+    () => describeConflicts(conflicts, conflictTechLabel),
+    [conflicts, conflictTechLabel],
+  )
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !organizationId) return
@@ -445,6 +476,46 @@ export function QuickAppointmentDialog({
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Wrench className="h-3 w-3" /> Customer: {selectedCustomerName}
             </p>
+          ) : null}
+
+          {conflictMessage ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-md border border-[color:var(--status-warning)]/35 bg-[color:var(--status-warning)]/10 px-3 py-2 text-[11px] text-foreground"
+            >
+              <AlertTriangle
+                className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[color:var(--status-warning)]"
+                aria-hidden
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-[color:var(--status-warning)]">
+                  Possible scheduling conflict
+                </p>
+                <p className="mt-0.5 text-muted-foreground">{conflictMessage}</p>
+                {conflicts.length > 0 ? (
+                  <ul className="mt-1 space-y-0.5 text-muted-foreground/90">
+                    {conflicts.slice(0, 3).map((c) => (
+                      <li key={c.id} className="truncate">
+                        ·{" "}
+                        {c.workOrderNumber ? (
+                          <span className="font-mono">#{c.workOrderNumber}</span>
+                        ) : null}{" "}
+                        {c.title} — {c.customerName}
+                      </li>
+                    ))}
+                    {conflicts.length > 3 ? (
+                      <li className="text-muted-foreground/70">
+                        + {conflicts.length - 3} more
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+                <p className="mt-1 text-muted-foreground/70">
+                  You can still continue — this is informational only.
+                </p>
+              </div>
+            </div>
           ) : null}
         </div>
 

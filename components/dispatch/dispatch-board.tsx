@@ -377,9 +377,14 @@ export function DispatchBoard({
           </div>
           <DroppablePool>
             {unassigned.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">
-                No unassigned jobs. Drag here from a tech to release, or use "Quick add" to queue work.
-              </p>
+              <div className="py-6 px-3 text-center flex flex-col gap-2 items-center">
+                <p className="text-xs font-medium text-foreground">Inbox is clear.</p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Drag any tech card here to release a job back to the queue, or use{" "}
+                  <span className="font-medium text-foreground">Quick add</span> to drop a new
+                  appointment in.
+                </p>
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {unassigned.map((wo) => (

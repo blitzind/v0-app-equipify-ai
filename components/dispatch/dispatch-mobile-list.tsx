@@ -84,7 +84,10 @@ export function DispatchMobileList({
         </div>
         <div className="flex flex-col gap-2">
           {unassigned.length === 0 ? (
-            <p className="text-xs text-muted-foreground">None.</p>
+            <p className="text-xs text-muted-foreground">
+              Inbox is clear. Tap{" "}
+              <span className="font-medium text-foreground">Quick add</span> to queue a new job.
+            </p>
           ) : (
             unassigned.map((wo) => (
               <button
@@ -143,7 +146,11 @@ export function DispatchMobileList({
               ) : null}
             </div>
             {list.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Nothing scheduled this day.</p>
+              <p className="text-xs text-muted-foreground">
+                Nothing scheduled this day. Tap{" "}
+                <span className="font-medium text-foreground">Add</span> to drop a job on
+                {` ${t.label.split(" ")[0]}'s`} day.
+              </p>
             ) : (
               <div className="flex flex-col gap-2">
                 {list.map((wo) => (

@@ -40,10 +40,17 @@ import {
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
 import {
   DEFAULT_DISPATCH_STATUSES,
+  DISPATCH_STATUS_ORDER,
   countByStatus,
   filterByStatuses,
   type DispatchStatusKey,
 } from "@/lib/dispatch/status-filter"
+import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
+import {
+  describeConflicts,
+  findSlotConflicts,
+} from "@/lib/dispatch/scheduling-conflicts"
+import { useToast } from "@/hooks/use-toast"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
 const DISPATCH_STATUSES_BASE = ["open", "scheduled", "in_progress", "completed"] as const
@@ -62,8 +69,19 @@ function initialsFromName(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+function isStatusKeyArray(v: unknown): v is DispatchStatusKey[] {
+  if (!Array.isArray(v)) return false
+  const known = new Set<string>(DISPATCH_STATUS_ORDER)
+  return v.every((x) => typeof x === "string" && known.has(x))
+}
+
+function isBoolean(v: unknown): v is boolean {
+  return typeof v === "boolean"
+}
+
 function DispatchPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { toast } = useToast()
 
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeekMonday(new Date()))
   const [selectedYmd, setSelectedYmd] = useState(() => toYmd(new Date()))
@@ -77,8 +95,20 @@ function DispatchPageInner() {
   const [refresh, setRefresh] = useState(0)
   const [dispatchFilter, setDispatchFilter] = useState<DispatchFilterId>("all")
   const [dispatchSort, setDispatchSort] = useState<"schedule" | "priority">("schedule")
-  const [statusFilter, setStatusFilter] = useState<DispatchStatusKey[]>(DEFAULT_DISPATCH_STATUSES)
-  const [includeInvoiced, setIncludeInvoiced] = useState(false)
+  const [statusFilter, setStatusFilter] = usePersistedDispatchPref<DispatchStatusKey[]>({
+    scope: "dispatch",
+    key: "status-filter",
+    organizationId: activeOrgId,
+    defaultValue: DEFAULT_DISPATCH_STATUSES,
+    isValid: isStatusKeyArray,
+  })
+  const [includeInvoiced, setIncludeInvoiced] = usePersistedDispatchPref<boolean>({
+    scope: "dispatch",
+    key: "include-invoiced",
+    organizationId: activeOrgId,
+    defaultValue: false,
+    isValid: isBoolean,
+  })
   const [quickAddSeed, setQuickAddSeed] = useState<{
     technicianId: string | null
     scheduledOn: string
@@ -129,6 +159,8 @@ function DispatchPageInner() {
   const dispatchKpi = useMemo(() => {
     const k = {
       dueToday: 0,
+      dueTomorrow: 0,
+      dueNext7: 0,
       overdue: 0,
       unbilled: 0,
       overdueInv: 0,
@@ -142,6 +174,8 @@ function DispatchPageInner() {
       const f = w.opsFlags
       if (!f) continue
       if (f.due_today) k.dueToday++
+      if (f.due_tomorrow) k.dueTomorrow++
+      if (f.due_next_7) k.dueNext7++
       if (f.sched_past_due) k.overdue++
       if (f.not_invoiced || f.completed_not_invoiced_aging) k.unbilled++
       if (f.overdue_invoice) k.overdueInv++
@@ -391,6 +425,19 @@ function DispatchPageInner() {
     const wo = workOrders.find((w) => w.id === args.woId)
     if (!wo) return
 
+    const conflicts = findSlotConflicts(
+      workOrders,
+      {
+        technicianId: args.assignedUserId,
+        scheduledOn: args.scheduledOn,
+        scheduledTimeHhMm: args.scheduledTimeHhMm,
+      },
+      { excludeWoId: args.woId },
+    )
+    const techLabel = args.assignedUserId
+      ? technicians.find((t) => t.id === args.assignedUserId)?.label ?? null
+      : null
+
     setPersistBusy(true)
     const supabase = createBrowserSupabaseClient()
     const assign = await workOrderAssignmentColumns(supabase, activeOrgId, args.assignedUserId)
@@ -415,6 +462,15 @@ function DispatchPageInner() {
     }
     setLoadError(null)
     setRefresh((n) => n + 1)
+
+    const conflictMsg = describeConflicts(conflicts, techLabel)
+    if (conflictMsg) {
+      toast({
+        variant: "destructive",
+        title: "Scheduling conflict",
+        description: `${conflictMsg} The move was saved — review the slot before dispatching.`,
+      })
+    }
   }
 
   return (
@@ -478,10 +534,12 @@ function DispatchPageInner() {
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Operational snapshot
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2 text-center">
           {(
             [
               ["Due today", dispatchKpi.dueToday, "due_today"],
+              ["Tomorrow", dispatchKpi.dueTomorrow, "due_tomorrow"],
+              ["Next 7 days", dispatchKpi.dueNext7, "due_next_7"],
               ["Overdue", dispatchKpi.overdue, "sched_past_due"],
               ["Unbilled / CNI", dispatchKpi.unbilled, "invoice_pending"],
               ["Overdue invoice", dispatchKpi.overdueInv, "overdue_invoice"],
@@ -622,6 +680,7 @@ function DispatchPageInner() {
         defaultTimeHhMm={quickAddSeed?.scheduledTimeHhMm ?? null}
         defaultTechnicianId={quickAddSeed?.technicianId ?? null}
         technicians={technicianOptionsForQuickAdd}
+        existingWorkOrders={workOrders}
         onCreated={() => {
           setQuickAddSeed(null)
           setRefresh((n) => n + 1)

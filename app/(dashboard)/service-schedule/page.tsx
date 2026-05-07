@@ -17,12 +17,16 @@ import type { DispatchWoRow } from "@/lib/dispatch/build-dispatch-wos"
 import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
 import {
   DEFAULT_DISPATCH_STATUSES,
+  DISPATCH_STATUS_ORDER,
   filterByStatuses,
   countByStatus,
   type DispatchStatusKey,
 } from "@/lib/dispatch/status-filter"
 import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filter"
+import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overview"
+import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
+import { startOfWeekMonday, toYmd } from "@/lib/dispatch/board-utils"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
@@ -1109,7 +1113,15 @@ function ScheduledWorkOrdersSection({
           <p className="text-sm text-muted-foreground py-6 text-center">Loading scheduled work orders…</p>
         )}
         {!loading && rows.length === 0 && (
-          <p className="text-sm text-muted-foreground py-4 text-center">No scheduled work orders match your filters.</p>
+          <div className="flex flex-col items-center gap-1.5 py-8 text-center">
+            <ClipboardList className="w-8 h-8 text-muted-foreground/30" aria-hidden />
+            <p className="text-sm font-medium text-foreground">No scheduled work orders match your filters.</p>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              Try adjusting status chips above, switching the operational focus, or toggle{" "}
+              <span className="font-medium text-foreground">Include invoiced</span> to widen the
+              window.
+            </p>
+          </div>
         )}
         {!loading &&
           rows.map((row) => {
@@ -1490,10 +1502,24 @@ function ServiceSchedulePageInner() {
   const [statusFilter, setStatusFilter]   = useState("All")
   const [techFilter, setTechFilter]       = useState("All")
   const [scheduleOpsFilter, setScheduleOpsFilter] = useState<DispatchFilterId>("all")
-  const [scheduleStatusFilter, setScheduleStatusFilter] = useState<DispatchStatusKey[]>(
-    DEFAULT_DISPATCH_STATUSES,
-  )
-  const [includeInvoicedSchedule, setIncludeInvoicedSchedule] = useState(false)
+  const [scheduleStatusFilter, setScheduleStatusFilter] = usePersistedDispatchPref<DispatchStatusKey[]>({
+    scope: "schedule",
+    key: "status-filter",
+    organizationId,
+    defaultValue: DEFAULT_DISPATCH_STATUSES,
+    isValid: (v): v is DispatchStatusKey[] => {
+      if (!Array.isArray(v)) return false
+      const known = new Set<string>(DISPATCH_STATUS_ORDER)
+      return v.every((x) => typeof x === "string" && known.has(x))
+    },
+  })
+  const [includeInvoicedSchedule, setIncludeInvoicedSchedule] = usePersistedDispatchPref<boolean>({
+    scope: "schedule",
+    key: "include-invoiced",
+    organizationId,
+    defaultValue: false,
+    isValid: (v): v is boolean => typeof v === "boolean",
+  })
 
   function handleScheduleStatusToggle(key: DispatchStatusKey) {
     setScheduleStatusFilter((prev) => {
@@ -1581,6 +1607,58 @@ function ServiceSchedulePageInner() {
     }
     return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
   }, [filteredScheduledWoRows])
+
+  /**
+   * Phase 2: lightweight scheduling KPIs derived from the same operational
+   * flag set the dispatch board uses. Click-to-filter via `scheduleOpsFilter`
+   * keeps the schedule view in sync with dispatch parity.
+   */
+  const scheduleKpi = useMemo(() => {
+    const k = { dueToday: 0, dueTomorrow: 0, dueNext7: 0, overdue: 0, unassigned: 0 }
+    for (const row of scheduledWoRows) {
+      const f = row.wo.opsFlags
+      if (!f) continue
+      if (f.due_today) k.dueToday++
+      if (f.due_tomorrow) k.dueTomorrow++
+      if (f.due_next_7) k.dueNext7++
+      if (f.sched_past_due) k.overdue++
+      if (f.unassigned_aging) k.unassigned++
+    }
+    return k
+  }, [scheduledWoRows])
+
+  /**
+   * Phase 2: technician roster derived from already-loaded scheduled WO rows
+   * for the inline week overview (no extra fetch). Falls back to empty when
+   * nothing is scheduled this period — overview hides itself in that case.
+   */
+  const scheduleTechnicians = useMemo<DispatchTech[]>(() => {
+    const map = new Map<string, DispatchTech>()
+    for (const row of scheduledWoRows) {
+      const id = row.wo.assigned_user_id
+      if (!id) continue
+      const label = row.wo.technicianLabel?.trim() || "Technician"
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          label,
+          initials: scheduleInitialsFromName(label),
+          avatarUrl: null,
+        })
+      }
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label))
+  }, [scheduledWoRows])
+
+  const scheduleWeekDispatchRows = useMemo<DispatchWo[]>(
+    () => filteredScheduledWoRows.map((r) => r.wo),
+    [filteredScheduledWoRows],
+  )
+
+  const [scheduleWeekAnchor, setScheduleWeekAnchor] = useState<Date>(() =>
+    startOfWeekMonday(new Date()),
+  )
+  const [scheduleSelectedYmd, setScheduleSelectedYmd] = useState<string>(() => toYmd(new Date()))
 
   // Filtered plans
   const filteredPlans = useMemo(() => {
@@ -1798,6 +1876,38 @@ function ServiceSchedulePageInner() {
 
         {/* Main content area */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-6">
+          <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Scheduling snapshot
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+              {(
+                [
+                  ["Due today", scheduleKpi.dueToday, "due_today"],
+                  ["Tomorrow", scheduleKpi.dueTomorrow, "due_tomorrow"],
+                  ["Next 7 days", scheduleKpi.dueNext7, "due_next_7"],
+                  ["Overdue", scheduleKpi.overdue, "sched_past_due"],
+                  ["Unassigned 48h+", scheduleKpi.unassigned, "unassigned_aging"],
+                ] as const
+              ).map(([label, n, focus]) => (
+                <button
+                  type="button"
+                  key={label}
+                  onClick={() => setScheduleOpsFilter(focus as DispatchFilterId)}
+                  className={cn(
+                    "rounded-md border px-2 py-1.5 text-left transition-colors",
+                    scheduleOpsFilter === focus
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-background hover:border-primary/40",
+                  )}
+                  aria-pressed={scheduleOpsFilter === focus}
+                >
+                  <p className="text-lg font-semibold tabular-nums text-foreground text-center">{n}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight text-center">{label}</p>
+                </button>
+              ))}
+            </div>
+          </div>
           <DispatchStatusFilter
             selected={scheduleStatusFilter}
             onToggle={handleScheduleStatusToggle}
@@ -1806,6 +1916,22 @@ function ServiceSchedulePageInner() {
             onIncludeInvoicedChange={setIncludeInvoicedSchedule}
             className="px-1"
           />
+          {scheduleTechnicians.length > 0 && scheduleWeekDispatchRows.length > 0 ? (
+            <DispatchWeekOverview
+              technicians={scheduleTechnicians}
+              workOrders={scheduleWeekDispatchRows}
+              weekAnchor={scheduleWeekAnchor}
+              selectedYmd={scheduleSelectedYmd}
+              onSelectYmd={(ymd) => {
+                setScheduleSelectedYmd(ymd)
+                const next = new Date(ymd + "T12:00:00")
+                setScheduleWeekAnchor(startOfWeekMonday(next))
+                setCalDate(next)
+                setCalSub("day")
+                setViewTab("calendar")
+              }}
+            />
+          ) : null}
           <ScheduledWorkOrdersSection
             rows={filteredScheduledWoRows}
             loading={scheduledWoLoading}

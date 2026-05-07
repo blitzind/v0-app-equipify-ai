@@ -70,6 +70,28 @@ function ymdEqualsToday(ymd: string | null | undefined): boolean {
   return ymd.trim().slice(0, 10) === todayYmdUtc()
 }
 
+function tomorrowYmdUtc(): string {
+  const t = new Date()
+  t.setUTCDate(t.getUTCDate() + 1)
+  return t.toISOString().slice(0, 10)
+}
+
+function ymdEqualsTomorrow(ymd: string | null | undefined): boolean {
+  if (!ymd?.trim()) return false
+  return ymd.trim().slice(0, 10) === tomorrowYmdUtc()
+}
+
+/** Strict next-N-day forward window (excludes today; includes day N). */
+function ymdWithinNextDaysExclusive(ymd: string | null, days: number): boolean {
+  if (!ymd?.trim()) return false
+  const head = ymd.trim().slice(0, 10)
+  const today = todayYmdUtc()
+  if (head <= today) return false
+  const cap = new Date()
+  cap.setUTCDate(cap.getUTCDate() + days)
+  return head <= cap.toISOString().slice(0, 10)
+}
+
 /** Due date falls within the next `days` calendar days from today (inclusive). */
 function ymdWithinDaysForward(ymd: string | null, days: number): boolean {
   if (!ymd?.trim()) return false
@@ -219,6 +241,11 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
     ymdEqualsToday(wo.scheduledOnYmd)
   ) {
     out.push({ key: "due-today", label: "Due today", tone: "info" })
+  } else if (
+    ["open", "scheduled", "in_progress"].includes(wo.status) &&
+    ymdEqualsTomorrow(wo.scheduledOnYmd)
+  ) {
+    out.push({ key: "due-tomorrow", label: "Due tomorrow", tone: "info" })
   }
 
   // Unassigned aging
@@ -288,6 +315,8 @@ export type DispatchFilterId =
   | "revenue_at_risk"
   | "sched_past_due"
   | "due_today"
+  | "due_tomorrow"
+  | "due_next_7"
   | "waiting_on_parts"
   | "invoice_pending"
 
@@ -295,6 +324,8 @@ export type DispatchFilterId =
 export const DISPATCH_FOCUS_OPTIONS: { id: DispatchFilterId; label: string }[] = [
   { id: "all", label: "All jobs" },
   { id: "due_today", label: "Due today" },
+  { id: "due_tomorrow", label: "Due tomorrow" },
+  { id: "due_next_7", label: "Next 7 days" },
   { id: "sched_past_due", label: "Overdue" },
   { id: "revenue_at_risk", label: "Revenue at risk" },
   { id: "billing_ready", label: "Ready to bill" },
@@ -333,6 +364,8 @@ export type OpsFlags = {
   revenue_at_risk: boolean
   sched_past_due: boolean
   due_today: boolean
+  due_tomorrow: boolean
+  due_next_7: boolean
   waiting_on_parts: boolean
   invoice_pending: boolean
 }
@@ -357,8 +390,13 @@ export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): 
   const sched_past_due = keys.has("sched-past")
   const warranty_review = wo.warrantyReviewRequired
   const due_today = keys.has("due-today")
+  const due_tomorrow = keys.has("due-tomorrow")
   const waiting_on_parts = keys.has("parts")
   const invoice_pending = not_invoiced
+
+  const due_next_7 =
+    ["open", "scheduled", "in_progress"].includes(wo.status) &&
+    ymdWithinNextDaysExclusive(wo.scheduledOnYmd, 7)
 
   const revenue_at_risk =
     overdue_invoice || cert_payment_hold || completed_not_invoiced_aging || not_invoiced
@@ -381,6 +419,8 @@ export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): 
     revenue_at_risk,
     sched_past_due,
     due_today,
+    due_tomorrow,
+    due_next_7,
     waiting_on_parts,
     invoice_pending,
   }
@@ -411,6 +451,8 @@ export function dispatchBadgeSummary(
       if (f === "revenue_at_risk") return flags.revenue_at_risk
       if (f === "sched_past_due") return flags.sched_past_due
       if (f === "due_today") return flags.due_today
+      if (f === "due_tomorrow") return flags.due_tomorrow
+      if (f === "due_next_7") return flags.due_next_7
       if (f === "waiting_on_parts") return flags.waiting_on_parts
       if (f === "invoice_pending") return flags.invoice_pending
       return true

@@ -295,6 +295,10 @@ export function filterDispatchRows(rows: DispatchWo[], filterId: DispatchFilterI
         return f.sched_past_due
       case "due_today":
         return f.due_today
+      case "due_tomorrow":
+        return f.due_tomorrow
+      case "due_next_7":
+        return f.due_next_7
       case "waiting_on_parts":
         return f.waiting_on_parts
       case "invoice_pending":
