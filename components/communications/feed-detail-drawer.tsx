@@ -19,6 +19,7 @@ import {
   FlaskConical,
   Loader2,
   Mail,
+  RefreshCw,
   Send,
   Sparkles,
   Workflow,
@@ -35,6 +36,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { eventTypeMeta } from "@/lib/communications/event-catalog"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
@@ -52,14 +55,23 @@ export function FeedDetailDrawer({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { toast } = useToast()
+  const { permissions } = useOrgPermissions()
+  const canManageCommunications = Boolean(permissions.canManageCommunications)
+
   const [detail, setDetail] = useState<FeedDetailClient | null>(null)
   const [showRawMetadata, setShowRawMetadata] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [retryDoneAt, setRetryDoneAt] = useState<string | null>(null)
+  const [showMeta, setShowMeta] = useState(false)
 
   useEffect(() => {
     setDetail(null)
     setError(null)
+    setRetryDoneAt(null)
+    setShowMeta(false)
     if (!open || !initial) return
     let cancelled = false
     setLoading(true)
@@ -89,6 +101,32 @@ export function FeedDetailDrawer({
       cancelled = true
     }
   }, [open, initial, organizationId])
+
+  async function requeueFailedDelivery() {
+    if (!detail || !canManageCommunications) return
+    setRetrying(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/communications/${encodeURIComponent(detail.id)}/retry`,
+        { method: "POST" },
+      )
+      const body = (await res.json()) as { ok?: boolean; message?: string; error?: string }
+      if (!res.ok) throw new Error(body.message ?? body.error ?? "Retry failed.")
+      toast({ title: "Retry queued", description: body.message })
+      setRetryDoneAt(new Date().toISOString())
+      // Reflect the new status locally so the pill updates without
+      // needing to refetch.
+      setDetail({ ...detail, delivery_status: "queued", error_message: null })
+    } catch (e) {
+      toast({
+        title: "Retry failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   const item = detail ?? initial
   const meta = item ? eventTypeMeta(item.event_type) : null
@@ -276,9 +314,22 @@ export function FeedDetailDrawer({
 
               {showRawMetadata && item.metadata ? (
                 <Section label="Raw metadata (admin)">
-                  <pre className="text-[11px] leading-relaxed whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-3 py-2 font-mono overflow-x-auto">
-                    {JSON.stringify(item.metadata, null, 2)}
-                  </pre>
+                  <details
+                    open={showMeta}
+                    onToggle={(e) => setShowMeta((e.target as HTMLDetailsElement).open)}
+                    className="rounded-md border border-border bg-muted/30"
+                  >
+                    <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+                      {showMeta ? "Hide JSON" : "Show JSON"}
+                    </summary>
+                    <pre className="text-[11px] leading-relaxed whitespace-pre-wrap rounded-b-md border-t border-border bg-muted/30 px-3 py-2 font-mono overflow-x-auto">
+                      {JSON.stringify(item.metadata, null, 2)}
+                    </pre>
+                  </details>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">
+                    Raw metadata is restricted to admins / managers. Provider IDs and signed
+                    URLs are intentionally redacted from this view.
+                  </p>
                 </Section>
               ) : null}
 
@@ -300,7 +351,27 @@ export function FeedDetailDrawer({
         </div>
 
         <Separator />
-        <SheetFooter className="gap-2 pt-3">
+        <SheetFooter className="gap-2 pt-3 flex-col sm:flex-row sm:items-center">
+          {item && canManageCommunications && isRetriable(item) ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void requeueFailedDelivery()}
+              disabled={retrying || Boolean(retryDoneAt)}
+              className="gap-1.5"
+            >
+              {retrying ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" aria-hidden />
+              )}
+              {retryDoneAt ? "Retry queued" : "Retry / resend"}
+            </Button>
+          ) : item && isRetriable(item) ? (
+            <p className="text-[11px] text-muted-foreground sm:mr-auto">
+              Retry is restricted to managers and above.
+            </p>
+          ) : null}
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
@@ -397,8 +468,12 @@ function prettyEntityLabel(type: string | null): string {
 }
 
 function effectiveStatus(item: FeedItemClient | FeedDetailClient): string {
-  const md = (item.metadata ?? {}) as Record<string, unknown>
-  if (md.simulated === true || md.test === true) return "simulated"
-  if (item.event_type.includes("draft") || md.is_draft === true) return "draft"
+  const md = (item.metadata ?? {}) as Record<string, unknown> | null
+  if (md && (md.simulated === true || md.test === true)) return "simulated"
+  if (item.event_type.includes("draft") || (md && md.is_draft === true)) return "draft"
   return item.delivery_status
+}
+
+function isRetriable(item: FeedItemClient | FeedDetailClient): boolean {
+  return item.delivery_status === "failed" || item.delivery_status === "bounced"
 }

@@ -12,6 +12,7 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { computeDueDateYmd } from "@/lib/billing/invoice-terms"
@@ -1190,6 +1191,16 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
             <div className={cn(DRAWER_NESTED_CARD, "p-4")}>
               <DrawerTimeline items={timelineItems} />
             </div>
+          </DrawerSection>
+
+          <DrawerSection title="Recent communications">
+            <RecentCommunicationsCard
+              entityType="quote"
+              entityId={quote.id}
+              limit={4}
+              title="Recent communications"
+              description="Quote emails, follow-ups, and automation activity for this quote."
+            />
           </DrawerSection>
         </div>
       </DetailDrawer>

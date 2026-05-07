@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
+import { parseUuid } from "@/lib/email/route-auth"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { getOrganizationMemberRole } from "@/lib/api/org-role"
+import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 
 export const runtime = "nodejs"
 
 /**
- * Marks a failed delivery for retry (queue). Actual provider resend hooks (Resend/Twilio) land later.
+ * Marks a failed/bounced delivery for retry (queue).
+ *
+ * Communications Phase 2 — gated behind `canManageCommunications`
+ * (owner/admin/manager) so techs and viewers can read the feed but
+ * can't requeue customer-facing sends. The retry semantics stay
+ * unchanged: we flip `delivery_status` back to `queued`, clear the
+ * stored error, and stamp `metadata.retry_requested_at` /
+ * `metadata.retry_requested_by`. Actual provider resend hooks
+ * (Resend / Twilio) land in a later phase via webhook ingestion.
  */
 export async function POST(
   _request: Request,
@@ -23,13 +34,27 @@ export async function POST(
     data: { user },
     error: authErr,
   } = await supabase.auth.getUser()
-  if (authErr || !user) {
+  if (authErr || !user?.email) {
     return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
   }
 
-  const allowed = await requireOrganizationMember(supabase, user.id, organizationId)
-  if (!allowed) {
-    return NextResponse.json({ error: "forbidden", message: "No access to this organization." }, { status: 403 })
+  const isPlatformAdmin = isPlatformAdminEmail(user.email)
+  const rawRole = isPlatformAdmin
+    ? "owner"
+    : await getOrganizationMemberRole(supabase, user.id, organizationId)
+  const role = normalizeOrgMemberRole(rawRole)
+  if (!role && !isPlatformAdmin) {
+    return NextResponse.json(
+      { error: "forbidden", message: "No access to this organization." },
+      { status: 403 },
+    )
+  }
+  const permissions = getOrgPermissionsForRole(role)
+  if (!permissions.canManageCommunications && !isPlatformAdmin) {
+    return NextResponse.json(
+      { error: "forbidden", message: "Retrying communications requires manager access." },
+      { status: 403 },
+    )
   }
 
   const { data: ev, error: loadErr } = await supabase
@@ -40,6 +65,17 @@ export async function POST(
 
   if (loadErr || !ev || (ev as { organization_id: string }).organization_id !== organizationId) {
     return NextResponse.json({ error: "not_found", message: "Event not found." }, { status: 404 })
+  }
+
+  const status = (ev as { delivery_status: string }).delivery_status
+  if (status !== "failed" && status !== "bounced") {
+    return NextResponse.json(
+      {
+        error: "not_retriable",
+        message: "Only failed or bounced deliveries can be queued for retry.",
+      },
+      { status: 409 },
+    )
   }
 
   const meta = ((ev as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>
@@ -65,6 +101,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    message: "Retry queued. Provider webhooks will confirm delivery when integrated.",
+    message:
+      "Retry queued. Provider webhooks will confirm delivery once Resend / Twilio sync is integrated.",
   })
 }

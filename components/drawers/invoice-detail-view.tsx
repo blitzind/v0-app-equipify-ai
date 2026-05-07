@@ -23,6 +23,7 @@ import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dial
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { buildInvoiceServiceTimeline } from "@/lib/lifecycle/service-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -2040,6 +2041,16 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
               <div className="space-y-5">
                 {!editing ? (
                   <ServiceLifecycleTimeline title="Service timeline" events={invoiceLifecycleEvents} />
+                ) : null}
+                {!editing ? (
+                  <RecentCommunicationsCard
+                    entityType="invoice"
+                    entityId={invoice.id}
+                    customerId={invoice.customerId}
+                    limit={4}
+                    title="Recent communications"
+                    description="Invoice emails, payment reminders, and automation runs tied to this invoice."
+                  />
                 ) : null}
                 <InfoTab
                   invoice={invoice}

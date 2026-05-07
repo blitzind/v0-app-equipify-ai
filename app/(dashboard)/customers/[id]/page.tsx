@@ -42,6 +42,7 @@ import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import { CUSTOMER_CERT_RELEASE_OPTIONS, modeLabel } from "@/lib/portal/certificate-release-staff"
 import {
   CUSTOMER_TERMS_OPTIONS,
@@ -2426,12 +2427,20 @@ export default function CustomerDetailPage() {
         </TabsContent>
 
         {/* Communications timeline */}
-        <TabsContent value="communications" className="mt-4">
+        <TabsContent value="communications" className="mt-4 space-y-4">
+          {orgStatus === "ready" && activeOrgId ? (
+            <RecentCommunicationsCard
+              customerId={customer.id}
+              limit={10}
+              title="Recent communications"
+              description="Cross-channel feed of automation runs, AI drafts, and customer-facing emails. Click any item for the full delivery details."
+            />
+          ) : null}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-primary shrink-0" />
-                Communication timeline
+                Notification timeline (legacy view)
               </CardTitle>
             </CardHeader>
             <CardContent>

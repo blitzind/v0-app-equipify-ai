@@ -30,6 +30,7 @@ import {
 } from "@/lib/work-orders/work-order-completion"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderInventoryUsageCard } from "@/components/inventory/work-order-inventory-usage-card"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import {
   WorkOrderCloseOutDialog,
   WorkOrderCustomerEmailDraftDialog,
@@ -1872,6 +1873,18 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           {!editing && wo ? (
             <div className="shrink-0 border-b border-border px-5 py-3">
               <SchedulingEventsCard workOrderId={wo.id} refreshKey={schedulingEventsRefresh} />
+            </div>
+          ) : null}
+
+          {!editing && wo ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <RecentCommunicationsCard
+                entityType="work_order"
+                entityId={wo.id}
+                limit={4}
+                title="Recent communications"
+                description="Confirmations, summary emails, automation runs, and reminders for this work order."
+              />
             </div>
           ) : null}
 

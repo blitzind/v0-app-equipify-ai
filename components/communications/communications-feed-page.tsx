@@ -27,17 +27,17 @@ import Link from "next/link"
 import {
   ArrowDownToLine,
   Bell,
-  Bot,
   Inbox,
   Loader2,
   MessageSquare,
+  NotebookPen,
   Search,
   Send,
   Settings2,
-  Sparkles,
   XCircle,
   Zap,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -49,8 +49,7 @@ import {
 } from "@/components/ui/select"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import { cn } from "@/lib/utils"
-import { listEventTypeMetas } from "@/lib/communications/event-catalog"
+import { ComposeDraftDialog } from "./compose-draft-dialog"
 import { FeedRow } from "./feed-row"
 import { FeedDetailDrawer } from "./feed-detail-drawer"
 import type {
@@ -95,6 +94,7 @@ export function CommunicationsFeedPage() {
   const { permissions } = useOrgPermissions()
 
   const canView = Boolean(permissions.canViewCommunications)
+  const canManage = Boolean(permissions.canManageCommunications)
 
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
@@ -111,6 +111,7 @@ export function CommunicationsFeedPage() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<FeedItemClient | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [composeOpen, setComposeOpen] = useState(false)
 
   // Debounce the search input to avoid spamming the API on each
   // keystroke. 350ms is the same value used elsewhere in the app.
@@ -216,36 +217,13 @@ export function CommunicationsFeedPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 min-w-0">
-      {/* Hero — title card matching dashboard rhythm; no decorative right-side graphic */}
-      <section
-        className={cn(
-          "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6",
-          "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
-          "dark:shadow-[0_1px_3px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.12)]",
-        )}
-      >
-        <div className="flex gap-4 min-w-0">
-          <div
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0"
-            style={{
-              backgroundColor: "color-mix(in srgb, var(--primary) 14%, var(--card))",
-              borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
-            }}
-          >
-            <Bell className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
-          </div>
-          <div className="min-w-0 pt-0.5">
-            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
-              Communications
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl text-pretty leading-relaxed">
-              Track customer communication history, automation activity, confirmations, and
-              operational messaging across your organization.
-            </p>
-          </div>
-        </div>
-      </section>
+    <div className="flex flex-col gap-6 min-w-0">
+      {/*
+        The shared dashboard PageHero (see lib/page-shell ROUTE_META) already
+        renders the Communications title card above this page. We intentionally
+        do NOT add a second in-page hero here so the spacing rhythm matches
+        Customers / Equipment / Work Orders.
+      */}
 
       {/* KPI strip per Phase 1 spec */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -368,6 +346,16 @@ export function CommunicationsFeedPage() {
             <ArrowDownToLine className="w-4 h-4" aria-hidden />
             Export CSV
           </Button>
+          {canManage ? (
+            <Button
+              type="button"
+              onClick={() => setComposeOpen(true)}
+              className="min-h-11 lg:min-h-10 gap-1.5 w-full sm:w-auto"
+            >
+              <NotebookPen className="w-4 h-4" aria-hidden />
+              Compose draft
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -440,6 +428,13 @@ export function CommunicationsFeedPage() {
           setDrawerOpen(o)
           if (!o) setSelected(null)
         }}
+      />
+
+      <ComposeDraftDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        organizationId={organizationId}
+        onSaved={() => void reload()}
       />
     </div>
   )

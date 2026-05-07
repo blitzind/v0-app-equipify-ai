@@ -53,6 +53,7 @@ import { ConvertProspectDialog } from "@/components/prospects/convert-prospect-d
 import { AiDraftFollowUpDialog } from "@/components/prospects/ai-draft-followup-dialog"
 import { useBillingAccessOptional } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 
 type TimelineEvent = {
   id: string
@@ -350,6 +351,16 @@ export function ProspectDrawer({
               ))}
             </ul>
           )}
+        </DrawerSection>
+
+        <DrawerSection title="All communications">
+          <RecentCommunicationsCard
+            entityType="prospect"
+            entityId={prospect.id}
+            limit={4}
+            title="Recent communications"
+            description="Cross-channel timeline including AI drafts and workflow automation runs."
+          />
         </DrawerSection>
 
         <DrawerSection title="Growth roadmap">
