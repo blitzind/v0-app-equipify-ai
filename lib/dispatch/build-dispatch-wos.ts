@@ -1,16 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  computeOpsFlags,
   deriveOperationalBadges,
-  dispatchBadgeSummary,
   type DispatchFilterId,
   type DispatchOpsContext,
   type DispatchOpsInput,
   type OpsFlags,
 } from "@/lib/dispatch/operational-badges"
+import { fetchWorkOrderInvoiceOpsBatch } from "@/lib/dispatch/work-order-invoice-agg"
+import { resolveEffectiveCertificateReleaseMode } from "@/lib/portal/certificate-release"
+import { allLinkedInvoicesPaid } from "@/lib/portal/work-order-invoices"
 import { timeToSlotIndex } from "@/lib/dispatch/board-utils"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
 
-type WoRow = {
+export type DispatchWoRow = {
   id: string
   work_order_number?: number | null
   title: string
@@ -29,6 +32,7 @@ type WoRow = {
   warranty_review_required: boolean | null
   total_parts_cents: number | null
   created_at: string
+  completed_at: string | null
 }
 
 function ymdFromDateCol(raw: string | null | undefined): string | null {
@@ -46,14 +50,16 @@ function minYmd(a: string | null, b: string | null): string | null {
 export async function enrichDispatchWorkOrders(
   supabase: SupabaseClient,
   organizationId: string,
-  rows: WoRow[],
+  rows: DispatchWoRow[],
   techByUserId: Map<string, DispatchTech>,
   customerNameById: Map<string, string>,
 ): Promise<DispatchWo[]> {
   const woIds = rows.map((r) => r.id)
   if (woIds.length === 0) return []
 
-  const [{ data: woeRows }, { data: calRows }] = await Promise.all([
+  const custIds = [...new Set(rows.map((r) => r.customer_id).filter(Boolean))]
+
+  const [{ data: woeRows }, { data: calRows }, invOps, orgRes, custRes] = await Promise.all([
     woIds.length
       ? supabase
           .from("work_order_equipment")
@@ -64,7 +70,23 @@ export async function enrichDispatchWorkOrders(
     woIds.length
       ? supabase.from("calibration_records").select("work_order_id").eq("organization_id", organizationId).in("work_order_id", woIds)
       : Promise.resolve({ data: [] as { work_order_id: string }[] }),
+    fetchWorkOrderInvoiceOpsBatch(supabase, organizationId, woIds),
+    supabase.from("organizations").select("portal_certificate_release_mode").eq("id", organizationId).maybeSingle(),
+    custIds.length
+      ? supabase
+          .from("customers")
+          .select("id, portal_certificate_release_mode")
+          .eq("organization_id", organizationId)
+          .in("id", custIds)
+      : Promise.resolve({ data: [] as { id: string; portal_certificate_release_mode: string | null }[] }),
   ])
+
+  const orgCertMode =
+    (orgRes.data as { portal_certificate_release_mode?: string | null } | null)?.portal_certificate_release_mode ?? null
+  const customerCertMap = new Map<string, string | null>()
+  for (const c of (custRes.data ?? []) as { id: string; portal_certificate_release_mode: string | null }[]) {
+    customerCertMap.set(c.id, c.portal_certificate_release_mode)
+  }
 
   const equipmentIdsByWo = new Map<string, string[]>()
   const rowList = (woeRows ?? []) as { work_order_id: string; equipment_id: string }[]
@@ -117,7 +139,7 @@ export async function enrichDispatchWorkOrders(
     )
   }
 
-  function ctxForWo(wo: WoRow): DispatchOpsContext {
+  function ctxForWo(wo: DispatchWoRow): DispatchOpsContext {
     const eqIds =
       equipmentIdsByWo.get(wo.id)?.length ? equipmentIdsByWo.get(wo.id)! : wo.equipment_id ? [wo.equipment_id] : []
 
@@ -139,16 +161,36 @@ export async function enrichDispatchWorkOrders(
 
     const equipmentCount = uniq.length > 0 ? uniq.length : wo.equipment_id ? 1 : 0
 
+    const linked = invOps.linkedByWo.get(wo.id) ?? []
+    const overrides = linked.map((i) => i.portal_certificate_release_override)
+    const eff = resolveEffectiveCertificateReleaseMode({
+      organizationMode: orgCertMode,
+      customerMode: customerCertMap.get(wo.customer_id) ?? null,
+      invoiceOverrides: overrides,
+    })
+    const certPaymentBlocked =
+      Boolean(wo.calibration_template_id) &&
+      eff === "release_on_payment" &&
+      linked.length > 0 &&
+      !allLinkedInvoicesPaid(linked)
+
     return {
       equipmentNextServiceDueYmd,
       equipmentNextCalibrationYmd,
       hasCalibrationRecord: calWoIds.has(wo.id),
       equipmentCount,
       equipmentCategory,
+      invoiceAgg: invOps.aggregates.get(wo.id) ?? null,
+      linkedInvoiceCount: linked.length,
+      organizationCertificateReleaseMode: orgCertMode,
+      customerCertificateReleaseMode: customerCertMap.get(wo.customer_id) ?? null,
+      certPaymentBlocked,
     }
   }
 
-  function inputForWo(wo: WoRow): DispatchOpsInput {
+  function inputForWo(wo: DispatchWoRow): DispatchOpsInput {
+    const sched = wo.scheduled_on?.trim() ? wo.scheduled_on.trim().slice(0, 10) : null
+    const completed = wo.completed_at?.trim() ? wo.completed_at.trim().slice(0, 10) : null
     return {
       id: wo.id,
       status: wo.status,
@@ -162,6 +204,8 @@ export async function enrichDispatchWorkOrders(
       assignedUserId: wo.assigned_user_id,
       createdAt: wo.created_at ?? "",
       totalPartsCents: wo.total_parts_cents ?? 0,
+      completedAt: completed,
+      scheduledOnYmd: sched,
     }
   }
 
@@ -171,15 +215,7 @@ export async function enrichDispatchWorkOrders(
     const ctx = ctxForWo(wo)
     const input = inputForWo(wo)
     const opsBadges = deriveOperationalBadges(input, ctx)
-    const summary = dispatchBadgeSummary(input, ctx)
-
-    const flags: OpsFlags = {
-      billing_ready: summary.matches("billing_ready"),
-      cert_pending: summary.matches("cert_pending"),
-      pm_risk: summary.matches("pm_risk"),
-      unassigned_aging: summary.matches("unassigned_aging"),
-      warranty_review: summary.matches("warranty_review"),
-    }
+    const flags: OpsFlags = computeOpsFlags(input, ctx)
 
     const tech = wo.assigned_user_id ? techByUserId.get(wo.assigned_user_id) : null
     const eqIdsForLoc =
@@ -228,12 +264,34 @@ export function filterDispatchRows(rows: DispatchWo[], filterId: DispatchFilterI
         return f.billing_ready
       case "cert_pending":
         return f.cert_pending
+      case "cert_payment_hold":
+        return f.cert_payment_hold
       case "pm_risk":
         return f.pm_risk
+      case "pm_overdue":
+        return f.pm_overdue
+      case "cal_overdue":
+        return f.cal_overdue
       case "unassigned_aging":
         return f.unassigned_aging
       case "warranty_review":
         return f.warranty_review
+      case "not_invoiced":
+        return f.not_invoiced
+      case "overdue_invoice":
+        return f.overdue_invoice
+      case "invoice_due_soon":
+        return f.invoice_due_soon
+      case "completed_not_invoiced_aging":
+        return f.completed_not_invoiced_aging
+      case "emergency":
+        return f.emergency
+      case "high_priority":
+        return f.high_priority
+      case "revenue_at_risk":
+        return f.revenue_at_risk
+      case "sched_past_due":
+        return f.sched_past_due
       default:
         return true
     }

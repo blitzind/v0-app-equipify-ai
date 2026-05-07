@@ -9,6 +9,7 @@ import type {
   WorkOrderStatus,
   WorkOrderType,
 } from "@/lib/mock-data"
+import type { WoInvoiceAggregate } from "@/lib/dispatch/work-order-invoice-agg"
 
 export type OperationalBadge = {
   key: string
@@ -31,6 +32,10 @@ export type DispatchOpsInput = {
   assignedUserId: string | null
   createdAt: string
   totalPartsCents: number
+  /** YYYY-MM-DD or ISO; drives completed-but-not-invoiced aging */
+  completedAt: string | null
+  /** Scheduled date YYYY-MM-DD for past-schedule cue */
+  scheduledOnYmd: string | null
 }
 
 export type DispatchOpsContext = {
@@ -44,6 +49,13 @@ export type DispatchOpsContext = {
   equipmentCount: number
   /** Primary equipment category for risk hint */
   equipmentCategory: string | null
+  /** Linked invoice aging (batch); null treated as no unpaid signals */
+  invoiceAgg: WoInvoiceAggregate | null
+  linkedInvoiceCount: number
+  organizationCertificateReleaseMode: string | null
+  customerCertificateReleaseMode: string | null
+  /** Precomputed in enrichment: calibration template + release_on_payment + unpaid linked invoices */
+  certPaymentBlocked: boolean
 }
 
 export const todayYmdUtc = () => new Date().toISOString().slice(0, 10)
@@ -65,12 +77,35 @@ function ymdWithinDaysForward(ymd: string | null, days: number): boolean {
   return due >= start.getTime() && due <= end.getTime()
 }
 
+function daysSinceYmdOrIso(raw: string | null): number | null {
+  if (!raw?.trim()) return null
+  const ymd = raw.trim().slice(0, 10)
+  if (ymd.length < 10) return null
+  const today = todayYmdUtc()
+  if (ymd > today) return 0
+  const a = new Date(ymd + "T12:00:00Z").getTime()
+  const b = new Date(today + "T12:00:00Z").getTime()
+  return Math.round((b - a) / 86400000)
+}
+
+function billingBlocksInvoiceCue(wo: DispatchOpsInput): boolean {
+  return wo.warrantyReviewRequired || wo.billingState === "not_billable" || wo.billableToCustomer === false
+}
+
+function isCompletedLike(status: string): boolean {
+  return ["completed", "completed_pending_signature", "invoiced"].includes(status)
+}
+
+function schedBeforeToday(ymd: string | null): boolean {
+  if (!ymd?.trim()) return false
+  return ymd.trim().slice(0, 10) < todayYmdUtc()
+}
+
 /**
- * Produces 0–5 badges; caller may truncate for card density.
+ * Produces compact badges; caller may truncate for card density.
  */
 export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsContext): OperationalBadge[] {
   const out: OperationalBadge[] = []
-  const t = todayYmd()
 
   // Priority / job type (compact)
   if (wo.type === "emergency" || wo.priority === "critical") {
@@ -109,15 +144,50 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
     ["completed", "completed_pending_signature", "invoiced"].includes(wo.status)
   ) {
     out.push({ key: "rtb", label: "Ready to bill", tone: "warning" })
-  } else if (
-    wo.status === "completed" &&
-    wo.billableToCustomer !== false &&
-    wo.billingState == null
-  ) {
+  } else if (wo.status === "completed" && wo.billableToCustomer !== false && wo.billingState == null) {
     out.push({ key: "rtb", label: "Ready to bill", tone: "warning" })
   }
 
-  // Certificate
+  // Invoice aging (linked org_invoices)
+  const agg = ctx.invoiceAgg
+  if (agg?.hasOverdue) {
+    switch (agg.worstBucket) {
+      case "od_1_15":
+        out.push({ key: "inv-od-1", label: "Invoice 1–15d overdue", tone: "danger" })
+        break
+      case "od_16_30":
+        out.push({ key: "inv-od-2", label: "Invoice 16–30d overdue", tone: "danger" })
+        break
+      case "od_31_60":
+        out.push({ key: "inv-od-3", label: "Invoice 31–60d overdue", tone: "danger" })
+        break
+      case "od_60_plus":
+        out.push({ key: "inv-od-4", label: "Invoice 60d+ overdue", tone: "danger" })
+        break
+      default:
+        out.push({ key: "inv-od", label: "Invoice overdue", tone: "danger" })
+    }
+  } else if (agg?.hasDueSoon && wo.billingState !== "paid") {
+    out.push({ key: "inv-due-soon", label: "Invoice due soon", tone: "warning" })
+  }
+
+  // Completed work — no invoice linked yet (operational recovery)
+  if (
+    isCompletedLike(wo.status) &&
+    wo.billableToCustomer !== false &&
+    !billingBlocksInvoiceCue(wo) &&
+    wo.billingState !== "invoiced" &&
+    wo.billingState !== "paid" &&
+    ctx.linkedInvoiceCount === 0
+  ) {
+    out.push({ key: "cni", label: "Not invoiced", tone: "warning" })
+    const age = daysSinceYmdOrIso(wo.completedAt)
+    if (age !== null && age >= 14) {
+      out.push({ key: "cni-14", label: "Unbilled 14d+", tone: "danger" })
+    }
+  }
+
+  // Certificate upload (calibration template selected, job finished, no record yet)
   if (
     wo.calibrationTemplateId &&
     ["completed", "invoiced", "completed_pending_signature"].includes(wo.status) &&
@@ -126,8 +196,19 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
     out.push({ key: "cert", label: "Cert pending", tone: "warning" })
   }
 
+  if (ctx.certPaymentBlocked) {
+    out.push({ key: "cert-pay-hold", label: "Cert until paid", tone: "warning" })
+  }
+
   if ((wo.totalPartsCents ?? 0) > 0 && ["open", "scheduled", "in_progress"].includes(wo.status)) {
     out.push({ key: "parts", label: "Parts", tone: "info" })
+  }
+
+  if (
+    ["open", "scheduled", "in_progress"].includes(wo.status) &&
+    schedBeforeToday(wo.scheduledOnYmd)
+  ) {
+    out.push({ key: "sched-past", label: "Past schedule", tone: "warning" })
   }
 
   // Unassigned aging
@@ -142,13 +223,17 @@ export function deriveOperationalBadges(wo: DispatchOpsInput, ctx: DispatchOpsCo
     out.push({ key: "multi", label: `${ctx.equipmentCount} assets`, tone: "neutral" })
   }
 
-  // Compliance-sensitive category (lightweight)
   const cat = (ctx.equipmentCategory ?? "").toLowerCase()
-  if (cat && (cat.includes("medical") || cat.includes("calibration") || cat.includes("gas") || cat.includes("life safety"))) {
+  if (
+    cat &&
+    (cat.includes("medical") ||
+      cat.includes("calibration") ||
+      cat.includes("gas") ||
+      cat.includes("life safety"))
+  ) {
     out.push({ key: "sens", label: "Compliance", tone: "info" })
   }
 
-  // Dedup by key, preserve order
   const seen = new Set<string>()
   return out.filter((b) => {
     if (seen.has(b.key)) return false
@@ -178,34 +263,129 @@ export type DispatchFilterId =
   | "all"
   | "billing_ready"
   | "cert_pending"
+  | "cert_payment_hold"
   | "pm_risk"
+  | "pm_overdue"
+  | "cal_overdue"
   | "unassigned_aging"
   | "warranty_review"
+  | "not_invoiced"
+  | "overdue_invoice"
+  | "invoice_due_soon"
+  | "completed_not_invoiced_aging"
+  | "emergency"
+  | "high_priority"
+  | "revenue_at_risk"
+  | "sched_past_due"
 
-/** Precomputed on the server/client batch pass for toolbar filters (no re-derive). */
+/** Toolbar / dropdown options for dispatch + service schedule parity. */
+export const DISPATCH_FOCUS_OPTIONS: { id: DispatchFilterId; label: string }[] = [
+  { id: "all", label: "All jobs" },
+  { id: "revenue_at_risk", label: "Revenue at risk" },
+  { id: "billing_ready", label: "Ready to bill" },
+  { id: "not_invoiced", label: "Not invoiced" },
+  { id: "completed_not_invoiced_aging", label: "Unbilled 14d+" },
+  { id: "overdue_invoice", label: "Overdue invoice" },
+  { id: "invoice_due_soon", label: "Invoice due soon" },
+  { id: "cert_pending", label: "Certificate pending" },
+  { id: "cert_payment_hold", label: "Cert until paid" },
+  { id: "pm_risk", label: "PM & calibration risk" },
+  { id: "pm_overdue", label: "PM overdue" },
+  { id: "cal_overdue", label: "Calibration overdue" },
+  { id: "unassigned_aging", label: "Unassigned aging" },
+  { id: "warranty_review", label: "Warranty review" },
+  { id: "emergency", label: "Emergency / urgent" },
+  { id: "high_priority", label: "High priority" },
+  { id: "sched_past_due", label: "Past schedule" },
+]
+
+/** Precomputed on the batch pass for toolbar filters (no re-derive). */
 export type OpsFlags = {
   billing_ready: boolean
   cert_pending: boolean
+  cert_payment_hold: boolean
   pm_risk: boolean
+  pm_overdue: boolean
+  cal_overdue: boolean
   unassigned_aging: boolean
   warranty_review: boolean
+  not_invoiced: boolean
+  overdue_invoice: boolean
+  invoice_due_soon: boolean
+  completed_not_invoiced_aging: boolean
+  emergency: boolean
+  high_priority: boolean
+  revenue_at_risk: boolean
+  sched_past_due: boolean
+}
+
+export function computeOpsFlags(wo: DispatchOpsInput, ctx: DispatchOpsContext): OpsFlags {
+  const badges = deriveOperationalBadges(wo, ctx)
+  const keys = new Set(badges.map((b) => b.key))
+
+  const billing_ready = keys.has("rtb")
+  const cert_pending = keys.has("cert")
+  const cert_payment_hold = keys.has("cert-pay-hold")
+  const pm_overdue = keys.has("pm-overdue")
+  const cal_overdue = keys.has("cal-overdue")
+  const pm_risk = pm_overdue || keys.has("pm-soon") || cal_overdue
+  const unassigned_aging = keys.has("aging")
+  const overdue_invoice = Boolean(ctx.invoiceAgg?.hasOverdue)
+  const invoice_due_soon = Boolean(ctx.invoiceAgg?.hasDueSoon && wo.billingState !== "paid")
+  const not_invoiced = keys.has("cni")
+  const completed_not_invoiced_aging = keys.has("cni-14")
+  const emergency = wo.type === "emergency" || wo.priority === "critical"
+  const high_priority = wo.priority === "high"
+  const sched_past_due = keys.has("sched-past")
+  const warranty_review = wo.warrantyReviewRequired
+
+  const revenue_at_risk =
+    overdue_invoice || cert_payment_hold || completed_not_invoiced_aging || not_invoiced
+
+  return {
+    billing_ready,
+    cert_pending,
+    cert_payment_hold,
+    pm_risk,
+    pm_overdue,
+    cal_overdue,
+    unassigned_aging,
+    warranty_review,
+    not_invoiced,
+    overdue_invoice,
+    invoice_due_soon,
+    completed_not_invoiced_aging,
+    emergency,
+    high_priority,
+    revenue_at_risk,
+    sched_past_due,
+  }
 }
 
 export function dispatchBadgeSummary(
   wo: DispatchOpsInput,
   ctx: DispatchOpsContext,
 ): { matches: (f: DispatchFilterId) => boolean } {
-  const badges = deriveOperationalBadges(wo, ctx)
-  const keys = new Set(badges.map((b) => b.key))
-
+  const flags = computeOpsFlags(wo, ctx)
   return {
     matches: (f: DispatchFilterId) => {
       if (f === "all") return true
-      if (f === "billing_ready") return keys.has("rtb")
-      if (f === "cert_pending") return keys.has("cert")
-      if (f === "pm_risk") return keys.has("pm-overdue") || keys.has("pm-soon") || keys.has("cal-overdue")
-      if (f === "unassigned_aging") return keys.has("aging")
-      if (f === "warranty_review") return wo.warrantyReviewRequired
+      if (f === "billing_ready") return flags.billing_ready
+      if (f === "cert_pending") return flags.cert_pending
+      if (f === "cert_payment_hold") return flags.cert_payment_hold
+      if (f === "pm_risk") return flags.pm_risk
+      if (f === "pm_overdue") return flags.pm_overdue
+      if (f === "cal_overdue") return flags.cal_overdue
+      if (f === "unassigned_aging") return flags.unassigned_aging
+      if (f === "warranty_review") return flags.warranty_review
+      if (f === "not_invoiced") return flags.not_invoiced
+      if (f === "overdue_invoice") return flags.overdue_invoice
+      if (f === "invoice_due_soon") return flags.invoice_due_soon
+      if (f === "completed_not_invoiced_aging") return flags.completed_not_invoiced_aging
+      if (f === "emergency") return flags.emergency
+      if (f === "high_priority") return flags.high_priority
+      if (f === "revenue_at_risk") return flags.revenue_at_risk
+      if (f === "sched_past_due") return flags.sched_past_due
       return true
     },
   }
@@ -240,6 +420,8 @@ export function workOrderToDispatchOpsInput(wo: WorkOrder): DispatchOpsInput {
   const unassigned =
     wo.technicianId === "unassigned" || wo.technicianName.trim().toLowerCase() === "unassigned"
   const techRaw = unassigned ? null : wo.technicianId
+  const sched = wo.scheduledDate?.trim() ? wo.scheduledDate.trim().slice(0, 10) : null
+  const completed = wo.completedDate?.trim() ? wo.completedDate.trim().slice(0, 10) : null
   return {
     id: wo.id,
     status: STATUS_UI_TO_DB[wo.status] ?? "open",
@@ -253,6 +435,8 @@ export function workOrderToDispatchOpsInput(wo: WorkOrder): DispatchOpsInput {
     assignedUserId: techRaw,
     createdAt: wo.createdAt ?? "",
     totalPartsCents: Math.round((wo.totalPartsCost ?? 0) * 100),
+    completedAt: completed,
+    scheduledOnYmd: sched,
   }
 }
 
@@ -290,6 +474,11 @@ export function buildDispatchOpsContextFromEquipmentAssets(
     hasCalibrationRecord,
     equipmentCount: Math.max(assets.length, 1),
     equipmentCategory: category,
+    invoiceAgg: null,
+    linkedInvoiceCount: 0,
+    organizationCertificateReleaseMode: null,
+    customerCertificateReleaseMode: null,
+    certPaymentBlocked: false,
   }
 }
 

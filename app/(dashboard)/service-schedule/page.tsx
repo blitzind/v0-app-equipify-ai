@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
+import { enrichDispatchWorkOrders, filterDispatchRows } from "@/lib/dispatch/build-dispatch-wos"
+import type { DispatchWoRow } from "@/lib/dispatch/build-dispatch-wos"
+import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
+import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
+import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
@@ -1008,19 +1013,53 @@ type DbScheduledWoRow = {
   scheduled_on: string
   scheduled_time: string | null
   assigned_user_id: string | null
+  priority?: string | null
+  type?: string | null
+  billing_state?: string | null
+  maintenance_plan_id?: string | null
+  calibration_template_id?: string | null
+  billable_to_customer?: boolean | null
+  warranty_review_required?: boolean | null
+  total_parts_cents?: number | null
+  created_at?: string | null
+  completed_at?: string | null
 }
 
-type ScheduledWorkOrderDisplay = {
-  id: string
-  workOrderNumber?: number
-  title: string
-  status: string
-  scheduled_on: string
-  scheduled_time: string | null
-  customerName: string
+type ScheduledWoRowView = {
+  wo: DispatchWo
   equipmentName: string
   location: string
-  assigneeName: string | null
+}
+
+function scheduleInitialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function mapDbRowToDispatchWoRow(r: DbScheduledWoRow, mini: boolean): DispatchWoRow {
+  return {
+    id: r.id,
+    work_order_number: r.work_order_number ?? null,
+    title: r.title,
+    status: r.status,
+    scheduled_on: r.scheduled_on,
+    scheduled_time: r.scheduled_time,
+    assigned_user_id: r.assigned_user_id,
+    customer_id: r.customer_id,
+    equipment_id: r.equipment_id,
+    priority: r.priority ?? "normal",
+    type: r.type ?? "repair",
+    billing_state: mini ? null : (r.billing_state ?? null),
+    maintenance_plan_id: mini ? null : (r.maintenance_plan_id ?? null),
+    calibration_template_id: mini ? null : (r.calibration_template_id ?? null),
+    billable_to_customer: mini ? true : (r.billable_to_customer ?? true),
+    warranty_review_required: mini ? false : Boolean(r.warranty_review_required),
+    total_parts_cents: mini ? 0 : (r.total_parts_cents ?? 0),
+    created_at: r.created_at ?? new Date(0).toISOString(),
+    completed_at: mini ? null : (r.completed_at ?? null),
+  }
 }
 
 function formatScheduleTimeHm(t: string | null): string {
@@ -1036,9 +1075,11 @@ function formatWoStatusLabel(status: string): string {
 function ScheduledWorkOrdersSection({
   rows,
   loading,
+  overlapKeys,
 }: {
-  rows: ScheduledWorkOrderDisplay[]
+  rows: ScheduledWoRowView[]
   loading: boolean
+  overlapKeys: Set<string>
 }) {
   return (
     <Card className="border border-border">
@@ -1048,7 +1089,8 @@ function ScheduledWorkOrdersSection({
           Scheduled Work Orders
         </CardTitle>
         <p className="text-xs text-muted-foreground font-normal pt-0.5">
-          Active work orders with a scheduled date for your organization.
+          Active work orders with a scheduled date — same operational signals as dispatch (billing, PM/cal, invoices,
+          certificates).
         </p>
       </CardHeader>
       <CardContent className="pt-0 flex flex-col gap-3">
@@ -1056,12 +1098,18 @@ function ScheduledWorkOrdersSection({
           <p className="text-sm text-muted-foreground py-6 text-center">Loading scheduled work orders…</p>
         )}
         {!loading && rows.length === 0 && (
-          <p className="text-sm text-muted-foreground py-4 text-center">No scheduled work orders yet.</p>
+          <p className="text-sm text-muted-foreground py-4 text-center">No scheduled work orders match your filters.</p>
         )}
         {!loading &&
-          rows.map((wo) => {
-            const days = daysUntil(wo.scheduled_on)
+          rows.map((row) => {
+            const wo = row.wo
+            const days = daysUntil(wo.scheduled_on ?? "")
             const timeStr = formatScheduleTimeHm(wo.scheduled_time)
+            const slotKey =
+              wo.assigned_user_id && wo.scheduled_on
+                ? `${wo.assigned_user_id}|${wo.scheduled_on}|${(wo.scheduled_time ?? "").trim()}`
+                : ""
+            const slotOverlap = Boolean(slotKey && overlapKeys.has(slotKey))
             return (
               <div
                 key={wo.id}
@@ -1072,10 +1120,10 @@ function ScheduledWorkOrdersSection({
               >
                 <div className="flex flex-col items-center justify-center px-4 py-3 border-r border-border bg-muted/30 min-w-[72px] shrink-0">
                   <span className="text-xs text-muted-foreground uppercase tracking-wide leading-none">
-                    {new Date(wo.scheduled_on + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
+                    {new Date((wo.scheduled_on ?? "") + "T12:00:00").toLocaleDateString("en-US", { month: "short" })}
                   </span>
                   <span className="text-2xl font-bold text-foreground leading-tight">
-                    {new Date(wo.scheduled_on + "T12:00:00").getDate()}
+                    {new Date((wo.scheduled_on ?? "") + "T12:00:00").getDate()}
                   </span>
                   {timeStr && (
                     <span className="text-xs mt-1 text-muted-foreground tabular-nums">{timeStr}</span>
@@ -1084,7 +1132,17 @@ function ScheduledWorkOrdersSection({
                 <div className="flex flex-1 flex-col gap-1 px-4 py-3 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-mono text-muted-foreground">{formatWorkOrderDisplay(wo.workOrderNumber, wo.id)}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] font-mono text-muted-foreground">
+                          {formatWorkOrderDisplay(wo.work_order_number ?? undefined, wo.id)}
+                        </p>
+                        {slotOverlap ? (
+                          <AlertTriangle
+                            className="h-3.5 w-3.5 shrink-0 text-[color:var(--status-warning)]"
+                            aria-label="Technician overlap"
+                          />
+                        ) : null}
+                      </div>
                       <Link
                         href={`/work-orders?open=${wo.id}`}
                         className="text-sm font-semibold text-foreground hover:text-primary truncate min-w-0 block"
@@ -1101,24 +1159,25 @@ function ScheduledWorkOrdersSection({
                       {formatWoStatusLabel(wo.status)}
                     </span>
                   </div>
+                  <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-0.5" cap={5} />
                   <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
                     <span className="truncate">{wo.customerName}</span>
                     <span className="flex items-center gap-1 min-w-0">
                       <Wrench className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{wo.equipmentName}</span>
+                      <span className="truncate">{row.equipmentName}</span>
                     </span>
-                    {wo.location && (
+                    {row.location ? (
                       <span className="flex items-center gap-1 min-w-0">
                         <MapPin className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{wo.location}</span>
+                        <span className="truncate">{row.location}</span>
                       </span>
-                    )}
-                    {wo.assigneeName && (
+                    ) : null}
+                    {wo.technicianLabel ? (
                       <span className="flex items-center gap-1">
                         <User className="w-3 h-3 shrink-0" />
-                        {wo.assigneeName}
+                        {wo.technicianLabel}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -1207,7 +1266,7 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
 function ServiceSchedulePageInner() {
   const { plans, organizationId } = useMaintenancePlans()
 
-  const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWorkOrderDisplay[]>([])
+  const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWoRowView[]>([])
   const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
   const [scheduledWoRefresh, setScheduledWoRefresh] = useState(0)
 
@@ -1239,13 +1298,15 @@ function ServiceSchedulePageInner() {
 
       const orgId = organizationId
 
-      const schedWoSelWithNum =
+      const selFull =
+        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+      const selMini =
         "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
-      const schedWoSel = schedWoSelWithNum.replace("work_order_number, ", "")
 
+      let mini = false
       let woRes = await supabase
         .from("work_orders")
-        .select(schedWoSelWithNum)
+        .select(selFull)
         .eq("organization_id", orgId)
         .is("archived_at", null)
         .not("scheduled_on", "is", null)
@@ -1253,9 +1314,10 @@ function ServiceSchedulePageInner() {
         .order("scheduled_time", { ascending: true, nullsFirst: false })
 
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
+        mini = true
         woRes = await supabase
           .from("work_orders")
-          .select(schedWoSel)
+          .select(selMini)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .not("scheduled_on", "is", null)
@@ -1348,7 +1410,22 @@ function ServiceSchedulePageInner() {
 
       if (!active) return
 
-      const mapped: ScheduledWorkOrderDisplay[] = list.map((row) => {
+      const dispatchRows = list.map((row) => mapDbRowToDispatchWoRow(row, mini))
+
+      const techByUserId = new Map<string, DispatchTech>()
+      for (const id of assigneeIds) {
+        const label = profileMap.get(id) ?? "Technician"
+        techByUserId.set(id, {
+          id,
+          label,
+          initials: scheduleInitialsFromName(label),
+          avatarUrl: null,
+        })
+      }
+
+      const enriched = await enrichDispatchWorkOrders(supabase, orgId, dispatchRows, techByUserId, customerMap)
+
+      const mapped: ScheduledWoRowView[] = list.map((row, i) => {
         const eq = equipmentMap.get(row.equipment_id)
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
@@ -1360,16 +1437,9 @@ function ServiceSchedulePageInner() {
             })
           : "Equipment"
         return {
-          id: row.id,
-          workOrderNumber: row.work_order_number ?? undefined,
-          title: row.title,
-          status: row.status,
-          scheduled_on: row.scheduled_on,
-          scheduled_time: row.scheduled_time,
-          customerName: customerMap.get(row.customer_id) ?? "Unknown customer",
+          wo: enriched[i]!,
           equipmentName,
           location: eq?.location ?? "",
-          assigneeName: row.assigned_user_id ? profileMap.get(row.assigned_user_id) ?? null : null,
         }
       })
 
@@ -1397,6 +1467,7 @@ function ServiceSchedulePageInner() {
   const [customerFilter, setCustomerFilter] = useState("All")
   const [statusFilter, setStatusFilter]   = useState("All")
   const [techFilter, setTechFilter]       = useState("All")
+  const [scheduleOpsFilter, setScheduleOpsFilter] = useState<DispatchFilterId>("all")
 
   // Drawer / modal state
   const [createdIds, setCreatedIds]       = useState<Set<string>>(new Set())
@@ -1437,6 +1508,31 @@ function ServiceSchedulePageInner() {
     ["All", ...Array.from(new Set(plans.map((p) => p.technicianName))).sort()],
     [plans]
   )
+
+  const filteredScheduledWoRows = useMemo(() => {
+    let rows = scheduledWoRows.filter(
+      (row) => filterDispatchRows([row.wo], scheduleOpsFilter).length > 0,
+    )
+    if (customerFilter !== "All") {
+      rows = rows.filter((row) => row.wo.customerName === customerFilter)
+    }
+    if (techFilter !== "All") {
+      rows = rows.filter((row) => row.wo.technicianLabel === techFilter)
+    }
+    return rows
+  }, [scheduledWoRows, scheduleOpsFilter, customerFilter, techFilter])
+
+  const scheduleOverlapKeys = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of filteredScheduledWoRows) {
+      const w = row.wo
+      if (!w.assigned_user_id || !w.scheduled_on) continue
+      const slot = (w.scheduled_time ?? "").trim()
+      const k = `${w.assigned_user_id}|${w.scheduled_on}|${slot}`
+      counts.set(k, (counts.get(k) ?? 0) + 1)
+    }
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
+  }, [filteredScheduledWoRows])
 
   // Filtered plans
   const filteredPlans = useMemo(() => {
@@ -1601,6 +1697,19 @@ function ServiceSchedulePageInner() {
           </Select>
         )}
 
+        <Select value={scheduleOpsFilter} onValueChange={(v) => setScheduleOpsFilter(v as DispatchFilterId)}>
+          <SelectTrigger className="h-9 min-w-[200px] max-w-[min(100vw-2rem,280px)] text-sm shrink-0">
+            <SelectValue placeholder="Operational focus" />
+          </SelectTrigger>
+          <SelectContent>
+            {DISPATCH_FOCUS_OPTIONS.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {/* List-only: view mode + date nav */}
         {viewTab === "list" && (
           <>
@@ -1641,7 +1750,11 @@ function ServiceSchedulePageInner() {
 
         {/* Main content area */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-6">
-          <ScheduledWorkOrdersSection rows={scheduledWoRows} loading={scheduledWoLoading} />
+          <ScheduledWorkOrdersSection
+            rows={filteredScheduledWoRows}
+            loading={scheduledWoLoading}
+            overlapKeys={scheduleOverlapKeys}
+          />
 
           {viewTab === "list" && (
             <>

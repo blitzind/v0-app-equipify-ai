@@ -30,7 +30,7 @@ import {
   filterDispatchRows,
   sortDispatchRows,
 } from "@/lib/dispatch/build-dispatch-wos"
-import type { DispatchFilterId } from "@/lib/dispatch/operational-badges"
+import { DISPATCH_FOCUS_OPTIONS, type DispatchFilterId } from "@/lib/dispatch/operational-badges"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
 const DISPATCH_STATUSES = ["open", "scheduled", "in_progress", "completed"] as const
@@ -67,6 +67,30 @@ function DispatchPageInner() {
     const filtered = filterDispatchRows(workOrders, dispatchFilter)
     return sortDispatchRows(filtered, dispatchSort)
   }, [workOrders, dispatchFilter, dispatchSort])
+
+  const dispatchKpi = useMemo(() => {
+    const k = {
+      unbilled: 0,
+      overdueInv: 0,
+      pmOd: 0,
+      calOd: 0,
+      unassigned: 0,
+      certPend: 0,
+      priorityJobs: 0,
+    }
+    for (const w of workOrders) {
+      const f = w.opsFlags
+      if (!f) continue
+      if (f.not_invoiced || f.completed_not_invoiced_aging) k.unbilled++
+      if (f.overdue_invoice) k.overdueInv++
+      if (f.pm_overdue) k.pmOd++
+      if (f.cal_overdue) k.calOd++
+      if (f.unassigned_aging) k.unassigned++
+      if (f.cert_pending) k.certPend++
+      if (f.emergency || f.high_priority) k.priorityJobs++
+    }
+    return k
+  }, [workOrders])
 
   useEffect(() => {
     const days = weekDays.map((d) => toYmd(d))
@@ -123,7 +147,7 @@ function DispatchPageInner() {
     setTechnicians(techList)
 
     const selFull =
-      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at"
+      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
     const selMini =
       "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, created_at"
 
@@ -211,6 +235,7 @@ function DispatchPageInner() {
       warranty_review_required?: boolean | null
       total_parts_cents?: number | null
       created_at?: string | null
+      completed_at?: string | null
     }
 
     const rowMap = new Map<string, RawWo>()
@@ -236,6 +261,7 @@ function DispatchPageInner() {
           warranty_review_required: mini ? false : Boolean(r.warranty_review_required),
           total_parts_cents: mini ? 0 : (r.total_parts_cents ?? 0),
           created_at: r.created_at ?? new Date(0).toISOString(),
+          completed_at: mini ? null : (r.completed_at ?? null),
         })
       }
     }
@@ -362,18 +388,37 @@ function DispatchPageInner() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Operational focus">
+      <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Operational snapshot
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center">
           {(
             [
-              ["all", "All"],
-              ["billing_ready", "Ready to bill"],
-              ["cert_pending", "Cert / compliance"],
-              ["pm_risk", "PM & calibration"],
-              ["unassigned_aging", "Unassigned aging"],
-              ["warranty_review", "Warranty review"],
+              ["Unbilled / CNI", dispatchKpi.unbilled],
+              ["Overdue invoice", dispatchKpi.overdueInv],
+              ["PM overdue", dispatchKpi.pmOd],
+              ["Cal overdue", dispatchKpi.calOd],
+              ["Unassigned 48h+", dispatchKpi.unassigned],
+              ["Cert pending", dispatchKpi.certPend],
+              ["Priority / urgent", dispatchKpi.priorityJobs],
             ] as const
-          ).map(([id, label]) => {
+          ).map(([label, n]) => (
+            <div key={label} className="rounded-md border border-border bg-background px-2 py-1.5">
+              <p className="text-lg font-semibold tabular-nums text-foreground">{n}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto sm:max-h-none sm:overflow-visible"
+          role="group"
+          aria-label="Operational focus"
+        >
+          {DISPATCH_FOCUS_OPTIONS.map(({ id, label }) => {
             const active = dispatchFilter === id
             return (
               <Button
@@ -381,7 +426,7 @@ function DispatchPageInner() {
                 type="button"
                 size="sm"
                 variant={active ? "default" : "outline"}
-                className="h-8 text-xs"
+                className="h-8 text-xs shrink-0"
                 onClick={() => setDispatchFilter(id)}
               >
                 {label}
