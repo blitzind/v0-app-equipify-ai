@@ -21,6 +21,8 @@ import type { AdminQuote, InvoiceStatus } from "@/lib/mock-data"
 import {
   PAYMENT_TERMS_OPTIONS,
   computeDueDateYmd,
+  invoiceTermsCodeLabel,
+  resolveEffectiveTermsCode,
   type InvoiceTermsCode,
 } from "@/lib/billing/invoice-terms"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
@@ -190,6 +192,14 @@ export function NewInvoiceModal({
   const [dueDate, setDueDate] = useState("")
   const [termsCode, setTermsCode] = useState<InvoiceTermsCode>("net_30")
   const [termsCustomDays, setTermsCustomDays] = useState(30)
+  /** Whether the user manually edited the terms (so we don't override on customer change). */
+  const [termsManuallySet, setTermsManuallySet] = useState(false)
+  /** Resolved customer / org defaults — drives the inline helper text. */
+  const [customerTermsDefault, setCustomerTermsDefault] = useState<string | null>(null)
+  const [orgTermsDefault, setOrgTermsDefault] = useState<string | null>(null)
+  /** Cert count tied to the selected work order (Phase 2 visibility). */
+  const [linkedCertCount, setLinkedCertCount] = useState<number | null>(null)
+  const [linkedCertReleasedCount, setLinkedCertReleasedCount] = useState<number | null>(null)
   const [notes, setNotes] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
   const [calibrationRecordId, setCalibrationRecordId] = useState("")
@@ -234,6 +244,11 @@ export function NewInvoiceModal({
       setIssuedAt(today)
       setTermsCode("net_30")
       setTermsCustomDays(30)
+      setTermsManuallySet(false)
+      setLinkedCertCount(null)
+      setLinkedCertReleasedCount(null)
+      setCustomerTermsDefault(null)
+      setOrgTermsDefault(null)
       if (!hasPrefill) {
         setCustomerId("")
         setWorkOrderId("")
@@ -446,6 +461,90 @@ export function NewInvoiceModal({
       cancelled = true
     }
   }, [open, organizationId, customerId])
+
+  // Invoicing Phase 2: resolve effective payment terms.
+  // Reads the org default + customer override (schema-drift safe) and, when
+  // the user hasn't manually edited the terms select, preselects the most
+  // specific value: customer override → org default → built-in fallback.
+  useEffect(() => {
+    if (!open || !organizationId) return
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      let custCode: string | null = null
+      let orgCode: string | null = null
+
+      if (customerId) {
+        const cRes = await supabase
+          .from("customers")
+          .select("default_invoice_terms_code")
+          .eq("organization_id", organizationId)
+          .eq("id", customerId)
+          .maybeSingle()
+        if (!cRes.error) {
+          custCode = (cRes.data as { default_invoice_terms_code?: string | null } | null)
+            ?.default_invoice_terms_code ?? null
+        }
+      }
+
+      const oRes = await supabase
+        .from("organizations")
+        .select("default_invoice_terms_code")
+        .eq("id", organizationId)
+        .maybeSingle()
+      if (!oRes.error) {
+        orgCode = (oRes.data as { default_invoice_terms_code?: string | null } | null)
+          ?.default_invoice_terms_code ?? null
+      }
+
+      if (cancelled) return
+      setCustomerTermsDefault(custCode)
+      setOrgTermsDefault(orgCode)
+
+      if (!termsManuallySet) {
+        const next = resolveEffectiveTermsCode({ customerCode: custCode, organizationCode: orgCode })
+        if (next !== "custom") setTermsCode(next)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, customerId, termsManuallySet])
+
+  // Invoicing Phase 2: surface certificate availability for the selected work
+  // order so staff know how many certificates are on the linked job and how
+  // many have already been released to the customer portal.
+  useEffect(() => {
+    if (!open || !organizationId || !workOrderId) {
+      setLinkedCertCount(null)
+      setLinkedCertReleasedCount(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const total = await supabase
+        .from("calibration_records")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("work_order_id", workOrderId)
+      if (cancelled) return
+      setLinkedCertCount(total.error ? null : total.count ?? 0)
+
+      const released = await supabase
+        .from("calibration_records")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("work_order_id", workOrderId)
+        .not("portal_released_at", "is", null)
+      if (cancelled) return
+      // Phase 1 column may be missing on legacy DBs.
+      setLinkedCertReleasedCount(released.error ? null : released.count ?? 0)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, workOrderId])
 
   // ── Auto-fill from quote ──
   useEffect(() => {
@@ -738,6 +837,15 @@ export function NewInvoiceModal({
                       </option>
                     ))}
                   </FieldSelect>
+                  {workOrderId && linkedCertCount !== null && linkedCertCount > 0 ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {linkedCertCount} certificate{linkedCertCount === 1 ? "" : "s"} on linked job
+                      {linkedCertReleasedCount !== null && linkedCertReleasedCount > 0
+                        ? ` · ${linkedCertReleasedCount} released`
+                        : ""}
+                      .
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <Label>Related Quote</Label>
@@ -925,7 +1033,10 @@ export function NewInvoiceModal({
                   <Label>Payment Terms</Label>
                   <FieldSelect
                     value={termsCode}
-                    onChange={(e) => setTermsCode(e.target.value as InvoiceTermsCode)}
+                    onChange={(e) => {
+                      setTermsCode(e.target.value as InvoiceTermsCode)
+                      setTermsManuallySet(true)
+                    }}
                   >
                     {PAYMENT_TERMS_OPTIONS.map((t) => (
                       <option key={t.code} value={t.code}>
@@ -933,6 +1044,15 @@ export function NewInvoiceModal({
                       </option>
                     ))}
                   </FieldSelect>
+                  {customerId ? (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {customerTermsDefault
+                        ? `Default for this customer: ${invoiceTermsCodeLabel(customerTermsDefault)}.`
+                        : orgTermsDefault
+                          ? `Workspace default: ${invoiceTermsCodeLabel(orgTermsDefault)}.`
+                          : "Workspace default not set — using Net 30 fallback."}
+                    </p>
+                  ) : null}
                 </div>
                 {termsCode === "custom" ? (
                   <div>
@@ -942,7 +1062,10 @@ export function NewInvoiceModal({
                       min={1}
                       max={365}
                       value={termsCustomDays}
-                      onChange={(e) => setTermsCustomDays(parseInt(e.target.value, 10) || 1)}
+                      onChange={(e) => {
+                        setTermsCustomDays(parseInt(e.target.value, 10) || 1)
+                        setTermsManuallySet(true)
+                      }}
                     />
                   </div>
                 ) : (

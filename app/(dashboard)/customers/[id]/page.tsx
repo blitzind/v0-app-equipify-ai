@@ -43,6 +43,11 @@ import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
 import { CUSTOMER_CERT_RELEASE_OPTIONS, modeLabel } from "@/lib/portal/certificate-release-staff"
 import {
+  CUSTOMER_TERMS_OPTIONS,
+  INVOICE_TERMS_CODES,
+  type InvoiceTermsCode,
+} from "@/lib/billing/invoice-terms"
+import {
   loadCustomerHierarchy,
   type CustomerHierarchySummary,
 } from "@/lib/customers/hierarchy"
@@ -56,6 +61,7 @@ import { CustomerRollupCard } from "@/components/customers/customer-rollup-card"
 import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
+import { CustomerBillingTermsCard } from "@/components/customers/customer-billing-terms-card"
 import {
   loadEquipmentCategoryBreakdown,
   type EquipmentCategoryBreakdownRow,
@@ -132,6 +138,8 @@ type CustomerDetail = {
   isArchived: boolean
   /** null = use organization default */
   portalCertificateReleaseMode: string | null
+  /** null = use organization default for invoice terms (Phase 2). */
+  defaultInvoiceTermsCode: string | null
 }
 
 type CustomerPlanRow = {
@@ -384,6 +392,8 @@ export default function CustomerDetailPage() {
     status: "Active" as CustomerStatus,
     notes: "",
     portalCertificateRelease: "" as CustomerPortalCertMode,
+    /** Empty string = use organization default (Phase 2). */
+    defaultInvoiceTermsCode: "",
   })
   const [locationModalOpen, setLocationModalOpen] = useState(false)
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
@@ -462,13 +472,28 @@ export default function CustomerDetailPage() {
 
       const orgId = activeOrgId
 
-      const { data: customerRow, error: customerError } = await supabase
-        .from("customers")
-        .select("id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode")
-        .eq("id", id)
-        .eq("organization_id", orgId)
-        .single()
-
+      const customerSelectAttempts = [
+        // Phase 2 includes default_invoice_terms_code (added in service_lifecycle_phase1).
+        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, default_invoice_terms_code",
+        // Schema-drift fallback for environments missing the Phase 1 column.
+        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode",
+      ]
+      let customerRow: Record<string, unknown> | null = null
+      let customerError: { message: string } | null = null
+      for (const sel of customerSelectAttempts) {
+        const res = await supabase
+          .from("customers")
+          .select(sel)
+          .eq("id", id)
+          .eq("organization_id", orgId)
+          .single()
+        if (!res.error) {
+          customerRow = res.data as Record<string, unknown>
+          customerError = null
+          break
+        }
+        customerError = res.error
+      }
       if (customerError || !customerRow) {
         if (active) {
           setCustomer(null)
@@ -535,23 +560,34 @@ export default function CustomerDetailPage() {
       const locationsTyped = (locationsRows ?? []) as LocationRow[]
       const contractsTyped = (contractRows ?? []) as ContractRow[]
 
-      const custPortalMode = (customerRow as { portal_certificate_release_mode?: string | null })
-        .portal_certificate_release_mode
+      const customerRowTyped = customerRow as {
+        id: string
+        company_name: string
+        status: string
+        joined_at: string | null
+        notes: string | null
+        archived_at: string | null
+        portal_certificate_release_mode?: string | null
+        default_invoice_terms_code?: string | null
+      }
+      const custPortalMode = customerRowTyped.portal_certificate_release_mode
+      const custTermsCode = (customerRowTyped.default_invoice_terms_code ?? "").trim()
       const mapped: CustomerDetail = {
-        id: customerRow.id,
+        id: customerRowTyped.id,
         organizationId: orgId,
-        company: customerRow.company_name,
-        name: contactsRows?.[0]?.full_name ?? customerRow.company_name,
-        status: customerRow.status === "inactive" ? "Inactive" : "Active",
-        joinedDate: customerRow.joined_at ?? new Date().toISOString().slice(0, 10),
+        company: customerRowTyped.company_name,
+        name: contactsRows?.[0]?.full_name ?? customerRowTyped.company_name,
+        status: customerRowTyped.status === "inactive" ? "Inactive" : "Active",
+        joinedDate: customerRowTyped.joined_at ?? new Date().toISOString().slice(0, 10),
         openWorkOrders: 0,
-        notes: customerRow.notes ?? "",
+        notes: customerRowTyped.notes ?? "",
         portalCertificateReleaseMode:
           custPortalMode === "immediate_release" ||
           custPortalMode === "release_on_payment" ||
           custPortalMode === "manual_release"
             ? custPortalMode
             : null,
+        defaultInvoiceTermsCode: custTermsCode || null,
         contacts: contactsTyped.map((c) => ({
           id: c.id,
           name: c.full_name ?? "Unknown",
@@ -583,7 +619,7 @@ export default function CustomerDetailPage() {
           endDate: contract.end_date ?? new Date().toISOString().slice(0, 10),
           value: Math.floor((contract.value_cents ?? 0) / 100),
         })),
-        isArchived: Boolean((customerRow as { archived_at?: string | null }).archived_at),
+        isArchived: Boolean(customerRowTyped.archived_at),
       }
 
       if (active) {
@@ -598,6 +634,7 @@ export default function CustomerDetailPage() {
             mapped.portalCertificateReleaseMode === "manual_release"
               ? mapped.portalCertificateReleaseMode
               : "",
+          defaultInvoiceTermsCode: mapped.defaultInvoiceTermsCode ?? "",
         })
         setLoading(false)
       }
@@ -982,15 +1019,37 @@ export default function CustomerDetailPage() {
     setSavingEdit(true)
     try {
       const supabase = createBrowserSupabaseClient()
-      const { error } = await supabase
+      const desiredTerms = editForm.defaultInvoiceTermsCode.trim()
+      const validTermsCode =
+        desiredTerms === ""
+          ? null
+          : (INVOICE_TERMS_CODES as readonly string[]).includes(desiredTerms)
+            ? desiredTerms
+            : null
+
+      // Schema-drift safe write: drop the new column when the DB hasn't
+      // applied the Phase 1 migration yet (very rare in deployed envs).
+      const updateRowFull: Record<string, unknown> = {
+        company_name: editForm.company.trim(),
+        status: editForm.status.toLowerCase(),
+        notes: editForm.notes.trim(),
+        default_invoice_terms_code: validTermsCode,
+      }
+      let { error } = await supabase
         .from("customers")
-        .update({
-          company_name: editForm.company.trim(),
-          status: editForm.status.toLowerCase(),
-          notes: editForm.notes.trim(),
-        })
+        .update(updateRowFull)
         .eq("id", customer.id)
         .eq("organization_id", customer.organizationId)
+      if (error && /default_invoice_terms_code/i.test(error.message)) {
+        const fallback: Record<string, unknown> = { ...updateRowFull }
+        delete fallback.default_invoice_terms_code
+        const retry = await supabase
+          .from("customers")
+          .update(fallback)
+          .eq("id", customer.id)
+          .eq("organization_id", customer.organizationId)
+        error = retry.error
+      }
 
       if (error) {
         setActionError(error.message)
@@ -1032,6 +1091,7 @@ export default function CustomerDetailPage() {
               status: editForm.status,
               notes: editForm.notes.trim(),
               portalCertificateReleaseMode: nextPortal,
+              defaultInvoiceTermsCode: validTermsCode,
             }
           : prev,
       )
@@ -1550,6 +1610,14 @@ export default function CustomerDetailPage() {
             <CustomerPortalCertificateRuleCard
               organizationId={activeOrgId}
               customerMode={customer.portalCertificateReleaseMode}
+            />
+          ) : null}
+
+          {/* Invoicing Phase 2: Customer billing terms clarity */}
+          {activeOrgId ? (
+            <CustomerBillingTermsCard
+              organizationId={activeOrgId}
+              customerTermsCode={customer.defaultInvoiceTermsCode}
             />
           ) : null}
 
@@ -2239,6 +2307,35 @@ export default function CustomerDetailPage() {
                 <p id="cust-portal-cert-help" className="text-[11px] text-muted-foreground mt-1">
                   {
                     CUSTOMER_CERT_RELEASE_OPTIONS.find((o) => o.value === editForm.portalCertificateRelease)
+                      ?.helper
+                  }
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Default invoice payment terms
+                </label>
+                <select
+                  value={editForm.defaultInvoiceTermsCode}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      defaultInvoiceTermsCode: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  aria-describedby="cust-invoice-terms-help"
+                >
+                  {CUSTOMER_TERMS_OPTIONS.map((o) => (
+                    <option key={o.code === "" ? "inherit" : o.code} value={o.code}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <p id="cust-invoice-terms-help" className="text-[11px] text-muted-foreground mt-1">
+                  {
+                    CUSTOMER_TERMS_OPTIONS.find((o) => o.code === editForm.defaultInvoiceTermsCode)
                       ?.helper
                   }
                 </p>

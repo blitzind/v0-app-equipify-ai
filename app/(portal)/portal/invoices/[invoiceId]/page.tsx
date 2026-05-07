@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
-import { ChevronLeft, Download, Receipt, ShieldCheck } from "lucide-react"
+import { ChevronLeft, Clock, Download, Lock, Receipt, ShieldCheck } from "lucide-react"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
+import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
@@ -20,6 +21,7 @@ type CertItem = {
   templateName: string
   unlocked: boolean
   reasonLabel: string
+  reasonCode?: string
   downloadPath: string | null
 }
 
@@ -49,6 +51,8 @@ type DetailPayload = {
     equipmentId: string | null
     equipmentName: string | null
     portalCertificateReleaseOverride: string | null
+    termsCode: string | null
+    termsCustomDays: number | null
   }
   workOrders: WoRow[]
   certificates: CertItem[]
@@ -123,6 +127,7 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
                 Issued {fmtDate(inv.issuedAt)}
                 {inv.dueDate ? ` · Due ${fmtDate(inv.dueDate)}` : ""}
                 {inv.paidAt ? ` · Paid ${fmtDate(inv.paidAt)}` : ""}
+                {inv.termsCode ? ` · ${invoiceTermsCodeLabel(inv.termsCode)}` : ""}
               </p>
               {inv.equipmentName ? (
                 <p className="text-xs mt-1" style={{ color: "var(--portal-secondary)" }}>
@@ -197,9 +202,18 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
 
       <div className="portal-card">
         <div className="px-5 py-4 border-b flex items-center justify-between gap-2" style={{ borderColor: "var(--portal-border-light)" }}>
-          <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
-            Certificates & compliance
-          </h2>
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Certificates & compliance
+            </h2>
+            {data.certificates.length > 0 ? (
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+                {data.certificates.length} certificate{data.certificates.length === 1 ? "" : "s"} on
+                related visits ·{" "}
+                {data.certificates.filter((c) => c.unlocked).length} available to download
+              </p>
+            ) : null}
+          </div>
           <Link href="/portal/certificates" className="text-xs font-medium" style={{ color: "var(--portal-accent)" }}>
             Archive
           </Link>
@@ -210,34 +224,68 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
           </p>
         ) : (
           <div className="divide-y" style={{ borderColor: "var(--portal-border-light)" }}>
-            {data.certificates.map((c) => (
-              <div key={c.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <div className="flex items-start gap-2 min-w-0">
-                  <ShieldCheck size={16} className="shrink-0 mt-0.5" style={{ color: "var(--portal-accent)" }} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--portal-foreground)" }}>
-                      {c.templateName}
-                    </p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
-                      {c.reasonLabel}
-                    </p>
+            {data.certificates.map((c) => {
+              const lockedByPayment = c.reasonCode === "locked_payment"
+              const lockedByManual = c.reasonCode === "locked_manual"
+              const pillLabel = c.unlocked
+                ? "Available"
+                : lockedByPayment
+                  ? "Awaiting payment"
+                  : lockedByManual
+                    ? "Awaiting release"
+                    : "Locked"
+              return (
+                <div key={c.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="flex items-start gap-2 min-w-0">
+                    {c.unlocked ? (
+                      <ShieldCheck size={16} className="shrink-0 mt-0.5" style={{ color: "var(--portal-accent)" }} />
+                    ) : lockedByPayment ? (
+                      <Clock size={16} className="shrink-0 mt-0.5" style={{ color: "var(--portal-nav-icon)" }} />
+                    ) : (
+                      <Lock size={16} className="shrink-0 mt-0.5" style={{ color: "var(--portal-nav-icon)" }} />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium truncate" style={{ color: "var(--portal-foreground)" }}>
+                          {c.templateName}
+                        </p>
+                        <span
+                          className="inline-flex items-center text-[10px] font-medium rounded-full border px-2 py-px"
+                          style={{
+                            borderColor: c.unlocked
+                              ? "var(--portal-accent)"
+                              : "var(--portal-border-light)",
+                            color: c.unlocked ? "var(--portal-accent-text)" : "var(--portal-nav-text)",
+                            background: c.unlocked ? "var(--portal-accent-muted)" : "transparent",
+                          }}
+                        >
+                          {pillLabel}
+                        </span>
+                      </div>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+                        {c.reasonLabel}
+                      </p>
+                    </div>
                   </div>
+                  {c.downloadPath ? (
+                    <a
+                      href={c.downloadPath}
+                      className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium shrink-0"
+                      style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-accent)" }}
+                    >
+                      <Download size={12} /> Download
+                    </a>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium shrink-0"
+                      style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-nav-text)" }}
+                    >
+                      <Lock size={12} /> Not yet available
+                    </span>
+                  )}
                 </div>
-                {c.downloadPath ? (
-                  <a
-                    href={c.downloadPath}
-                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium shrink-0"
-                    style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-accent)" }}
-                  >
-                    <Download size={12} /> Download
-                  </a>
-                ) : (
-                  <span className="text-[11px] shrink-0" style={{ color: "var(--portal-nav-text)" }}>
-                    Locked
-                  </span>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

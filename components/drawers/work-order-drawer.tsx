@@ -91,6 +91,7 @@ import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { fetchInvoicesForWorkOrder } from "@/lib/org-quotes-invoices/repository"
 import type { AdminInvoice } from "@/lib/mock-data"
+import { LinkedInvoicesSummary } from "@/components/work-orders/linked-invoices-summary"
 import { SchedulingEventsCard } from "@/components/dispatch/scheduling-events-card"
 import {
   composeReassignMessage,
@@ -1845,6 +1846,13 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                 Operational signals
               </p>
               <OperationalBadgeRow badges={operationalDrawerBadges} cap={8} />
+            </div>
+          ) : null}
+
+          {/* Invoicing Phase 2 — Linked invoices status */}
+          {!editing && wo ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <LinkedInvoicesSummary invoices={linkedInvoices} />
             </div>
           ) : null}
 

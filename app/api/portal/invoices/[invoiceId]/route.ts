@@ -32,7 +32,7 @@ export async function GET(
   const custId = portalUser.customer_id
 
   const selFull =
-    "id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, created_at"
+    "id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, terms_code, terms_custom_days, created_at"
 
   let invRes = await svc
     .from("org_invoices")
@@ -237,6 +237,8 @@ export async function GET(
       equipmentId: (inv.equipment_id as string | null) ?? null,
       equipmentName,
       portalCertificateReleaseOverride: releaseOverride ?? null,
+      termsCode: (inv.terms_code as string | null) ?? null,
+      termsCustomDays: (inv.terms_custom_days as number | null) ?? null,
     },
     workOrders: workOrdersOut,
     certificates,

@@ -42,6 +42,8 @@ import {
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { InvoicePortalCertificatePanel } from "@/components/invoices/invoice-portal-certificate-panel"
+import { InvoiceSourcePanel } from "@/components/invoices/invoice-source-panel"
+import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
@@ -967,6 +969,7 @@ function InfoTab({
   onApplyReminder,
   catalogLineActions,
   showFinancials,
+  organizationId,
 }: {
   invoice: AdminInvoice
   editing: boolean
@@ -978,6 +981,7 @@ function InfoTab({
   onApplyReminder: (t: string) => void
   catalogLineActions?: ReactNode
   showFinancials: boolean
+  organizationId?: string | null
 }) {
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
   const displayTotal  = editing
@@ -1002,6 +1006,15 @@ function InfoTab({
           onApplyReminder={onApplyReminder}
         />
       )}
+
+      {/* Invoicing Phase 2 — Service source (linked work orders, technicians, certs) */}
+      {!editing && organizationId ? (
+        <InvoiceSourcePanel
+          organizationId={organizationId}
+          invoiceId={invoice.id}
+          legacyWorkOrderId={invoice.workOrderId || null}
+        />
+      ) : null}
 
       {/* Invoice Details */}
       <Section title="Invoice Details">
@@ -1045,6 +1058,21 @@ function InfoTab({
             <span className={invoice.status === "Overdue" ? "text-destructive font-semibold" : ""}>{fmtDate(invoice.dueDate)}</span>
           } />
         )}
+        {!editing && invoice.termsCode ? (
+          <Row
+            label="Payment Terms"
+            value={
+              <span className="inline-flex items-center gap-1 text-xs">
+                <Badge variant="outline" className="text-[10px] font-semibold">
+                  {invoiceTermsCodeLabel(invoice.termsCode)}
+                </Badge>
+                {invoice.termsCode === "custom" && invoice.termsCustomDays
+                  ? `${invoice.termsCustomDays} days`
+                  : null}
+              </span>
+            }
+          />
+        ) : null}
         {editing ? (
           <EditRow label="Status">
             <select value={draft.status ?? invoice.status} onChange={(e) => setField("status", e.target.value as InvoiceStatus)}
@@ -2013,6 +2041,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                   organizationName={documentBranding.organizationName}
                   showFinancials={showFinancials}
                   onApplyReminder={handleApplyReminder}
+                  organizationId={orgStatus === "ready" ? organizationId : null}
                   catalogLineActions={
                     editing && orgStatus === "ready" && organizationId ? (
                       <Button
