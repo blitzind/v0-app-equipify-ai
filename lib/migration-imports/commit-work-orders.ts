@@ -4,6 +4,7 @@ import {
   csvWorkOrderStatusToDb,
   csvWorkOrderTypeToDb,
 } from "./work-order-csv"
+import { resolveImportStrategy } from "./strategy"
 import type { CommitResult, ImportEngineContext, RowOutcome } from "./types"
 
 function normName(s: string) {
@@ -24,6 +25,14 @@ function parseTs(raw: string): string | null {
   const d = new Date(s)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()
+}
+
+function parseWoNumber(raw: string): number | null {
+  const t = raw.trim()
+  if (!t) return null
+  const n = parseInt(t, 10)
+  if (Number.isNaN(n) || n < 1) return null
+  return n
 }
 
 async function resolveCustomerAndEquipment(
@@ -60,8 +69,45 @@ async function resolveCustomerAndEquipment(
   return { customerId, equipmentId }
 }
 
+async function findExistingWorkOrderId(
+  supabase: ImportEngineContext["supabase"],
+  organizationId: string,
+  customerId: string,
+  equipmentId: string,
+  scheduledOn: string | null,
+  woNum: number | null,
+): Promise<string | null> {
+  if (woNum != null) {
+    const { data } = await supabase
+      .from("work_orders")
+      .select("id, customer_id, equipment_id")
+      .eq("organization_id", organizationId)
+      .eq("work_order_number", woNum)
+      .maybeSingle()
+    const row = data as { id: string; customer_id: string; equipment_id: string } | null
+    if (row && row.customer_id === customerId && row.equipment_id === equipmentId) {
+      return row.id
+    }
+    if (row) return row.id
+  }
+  if (scheduledOn) {
+    const { data } = await supabase
+      .from("work_orders")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("customer_id", customerId)
+      .eq("equipment_id", equipmentId)
+      .eq("scheduled_on", scheduledOn)
+      .limit(1)
+      .maybeSingle()
+    return (data as { id: string } | null)?.id ?? null
+  }
+  return null
+}
+
 export async function commitWorkOrders(ctx: ImportEngineContext): Promise<CommitResult> {
   const { supabase, organizationId, userId, columnMapping, rows } = ctx
+  const strategy = resolveImportStrategy(ctx.options)
 
   const { data: customers } = await supabase
     .from("customers")
@@ -82,9 +128,10 @@ export async function commitWorkOrders(ctx: ImportEngineContext): Promise<Commit
 
   const caches = { idByExt, idsByCompany }
   const outcomes: RowOutcome[] = []
-  let successCount = 0
-  let errorCount = 0
+  let createdCount = 0
+  let updatedCount = 0
   let skippedCount = 0
+  let errorCount = 0
 
   const defaultRepairLog = {
     problemReported: "",
@@ -148,6 +195,153 @@ export async function commitWorkOrders(ctx: ImportEngineContext): Promise<Commit
       notes?.slice(0, 500) ||
       `Historical service import — ${title.slice(0, 200)}`
 
+    const woNum = parseWoNumber(resolveMapped(row, columnMapping, "work_order_number"))
+
+    const existingId = await findExistingWorkOrderId(
+      supabase,
+      organizationId,
+      resolved.customerId,
+      resolved.equipmentId,
+      scheduledOn,
+      woNum,
+    )
+
+    if (existingId) {
+      const { data: exRow } = await supabase
+        .from("work_orders")
+        .select("id, customer_id, equipment_id, status, priority, type, scheduled_on, completed_at, notes, invoice_number, title")
+        .eq("id", existingId)
+        .eq("organization_id", organizationId)
+        .maybeSingle()
+
+      const ex = exRow as {
+        id: string
+        customer_id: string
+        equipment_id: string
+        status: string
+        priority: string
+        type: string
+        scheduled_on: string | null
+        completed_at: string | null
+        notes: string | null
+        invoice_number: string | null
+        title: string
+      } | null
+
+      if (!ex) {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["load_failed"],
+          message: "Could not load existing work order.",
+        })
+        continue
+      }
+
+      if (ex.customer_id !== resolved.customerId || ex.equipment_id !== resolved.equipmentId) {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["wo_number_conflict"],
+          message: "Work order number exists for another job.",
+          matchedLabel: woNum != null ? `WO #${woNum}` : "Existing row",
+        })
+        continue
+      }
+
+      const label = woNum != null ? `WO #${woNum}` : ex.title?.slice(0, 40) || "Work order"
+
+      if (strategy === "skip_duplicates") {
+        skippedCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "skipped",
+          codes: ["duplicate_work_order"],
+          message: "Skipped — matches existing work order.",
+          entityKind: "work_order",
+          entityId: ex.id,
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      if (strategy === "create_new_only") {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["duplicate_blocked"],
+          message: "Matches existing work order — not allowed for “only create new”.",
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      const patch: Record<string, unknown> = {}
+      if (strategy === "update_existing") {
+        patch.title = title.slice(0, 500)
+        patch.status = status
+        patch.priority = priority
+        patch.type = type
+        patch.scheduled_on = scheduledOn
+        patch.completed_at = completedAt
+        patch.notes = notes
+        patch.problem_reported = problemReported
+        if (legacyInv) patch.invoice_number = legacyInv.trim().slice(0, 120)
+      } else {
+        if (!(ex.notes?.trim()) && notes) patch.notes = notes
+        if (!ex.completed_at && completedAt) patch.completed_at = completedAt
+        if (!(ex.invoice_number?.trim()) && legacyInv) {
+          patch.invoice_number = legacyInv.trim().slice(0, 120)
+        }
+        if (ex.status === "open" && status === "completed") patch.status = status
+      }
+
+      if (Object.keys(patch).length === 0) {
+        skippedCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "skipped",
+          codes: ["no_fields_to_update"],
+          message: "No updates applied.",
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      const { error: uErr } = await supabase
+        .from("work_orders")
+        .update(patch as never)
+        .eq("id", ex.id)
+        .eq("organization_id", organizationId)
+
+      if (uErr) {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["update_failed"],
+          message: uErr.message,
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      updatedCount += 1
+      outcomes.push({
+        rowIndex,
+        status: "updated",
+        codes: [],
+        message: null,
+        entityKind: "work_order",
+        entityId: ex.id,
+        matchedLabel: label,
+      })
+      continue
+    }
+
     const payload: Record<string, unknown> = {
       organization_id: organizationId,
       customer_id: resolved.customerId,
@@ -167,10 +361,14 @@ export async function commitWorkOrders(ctx: ImportEngineContext): Promise<Commit
       created_by: userId,
     }
 
+    if (woNum != null) {
+      payload.work_order_number = woNum
+    }
+
     const { data: ins, error } = await supabase
       .from("work_orders")
       .insert(payload as never)
-      .select("id")
+      .select("id, work_order_number")
       .maybeSingle()
 
     if (error || !ins) {
@@ -184,16 +382,18 @@ export async function commitWorkOrders(ctx: ImportEngineContext): Promise<Commit
       continue
     }
 
-    successCount += 1
+    const insRow = ins as { id: string; work_order_number: number }
+    createdCount += 1
     outcomes.push({
       rowIndex,
       status: "imported",
       codes: [],
       message: null,
       entityKind: "work_order",
-      entityId: (ins as { id: string }).id,
+      entityId: insRow.id,
+      matchedLabel: `WO #${insRow.work_order_number}`,
     })
   }
 
-  return { successCount, errorCount, skippedCount, outcomes }
+  return { createdCount, updatedCount, skippedCount, errorCount, outcomes }
 }

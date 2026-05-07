@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
+  AlertTriangle,
   ArrowRight,
   Briefcase,
   ClipboardList,
@@ -19,19 +20,30 @@ import { Button } from "@/components/ui/button"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
+import { IMPORT_STRATEGIES } from "@/lib/migration-imports/strategy"
 
 type ImportJobListItem = {
   jobId: string
   importRef: string
   kind: string
+  source_system?: string | null
   status: string
   file_name: string | null
   row_count: number | null
   success_count: number | null
   error_count: number | null
+  skipped_count?: number | null
+  updated_count?: number | null
+  strategy?: string | null
   created_at: string | null
   completed_at: string | null
   user_message: string | null
+}
+
+function listStrategyLabel(value: string | null | undefined): string {
+  if (!value) return "—"
+  const hit = IMPORT_STRATEGIES.find((s) => s.value === value)
+  return hit?.label ?? value.replace(/_/g, " ")
 }
 
 function HubCard({
@@ -240,26 +252,50 @@ export default function MigrationCenterPage() {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Ref</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Kind</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">Strategy</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">Rows</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">Counts</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Summary</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map((j) => (
                   <tr key={j.jobId} className="border-b border-border/80 last:border-0">
-                    <td className="px-3 py-2 font-mono text-primary">{j.importRef}</td>
-                    <td className="px-3 py-2 capitalize">{j.kind.replace(/_/g, " ")}</td>
-                    <td className="px-3 py-2 capitalize">{j.status.replace(/_/g, " ")}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {j.row_count ?? "—"}
-                      {j.success_count != null ? (
-                        <span className="text-muted-foreground text-xs block">
-                          ok {j.success_count}
-                          {j.error_count != null && j.error_count > 0 ? ` · err ${j.error_count}` : ""}
-                        </span>
-                      ) : null}
+                    <td className="px-3 py-2 font-mono text-primary">
+                      <Link href={`/settings/imports/${j.jobId}`} className="hover:underline">
+                        {j.importRef}
+                      </Link>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs max-w-[220px] truncate">
+                    <td className="px-3 py-2 capitalize">{j.kind.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2">
+                      <span className="capitalize inline-flex items-center gap-1">
+                        {j.status === "completed_with_errors" ? (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" aria-label="Completed with errors" />
+                        ) : null}
+                        {j.status.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{listStrategyLabel(j.strategy)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{j.row_count ?? "—"}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">
+                      {j.success_count != null || j.updated_count != null || j.skipped_count != null ? (
+                        <>
+                          {j.success_count != null ? <span>cr {j.success_count}</span> : null}
+                          {j.updated_count != null && j.updated_count > 0 ? (
+                            <span className="ml-1">· up {j.updated_count}</span>
+                          ) : null}
+                          {j.skipped_count != null && j.skipped_count > 0 ? (
+                            <span className="ml-1">· sk {j.skipped_count}</span>
+                          ) : null}
+                          {j.error_count != null && j.error_count > 0 ? (
+                            <span className="ml-1 text-destructive">· err {j.error_count}</span>
+                          ) : null}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs max-w-[200px] truncate">
                       {j.user_message ?? "—"}
                     </td>
                   </tr>

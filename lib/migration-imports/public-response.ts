@@ -8,6 +8,7 @@ export function outcomesForClient(outcomes: RowOutcome[]): {
   codes: string[]
   message: string | null
   ref?: string
+  matchedLabel?: string
 }[] {
   return outcomes.map((o) => ({
     rowIndex: o.rowIndex,
@@ -15,5 +16,6 @@ export function outcomesForClient(outcomes: RowOutcome[]): {
     codes: o.codes,
     message: o.message,
     ...(o.entityId ? { ref: shortImportRef(o.entityId) } : {}),
+    ...(o.matchedLabel?.trim() ? { matchedLabel: o.matchedLabel.trim() } : {}),
   }))
 }

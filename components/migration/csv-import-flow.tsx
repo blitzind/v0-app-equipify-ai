@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useState } from "react"
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Upload } from "lucide-react"
+import { AlertTriangle, ArrowLeft, CheckCircle2, Download, Loader2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,19 +13,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { IMPORT_STRATEGIES } from "@/lib/migration-imports/strategy"
+import type { MigrationImportStrategy } from "@/lib/migration-imports/types"
 import type { PreviewResult } from "@/lib/migration-imports/public-types"
 
 type CommitJson = {
   ok?: boolean
   successCount?: number
+  updatedCount?: number
   errorCount?: number
   skippedCount?: number
   importRef?: string
   message?: string
-  outcomes?: { rowIndex: number; status: string; message: string | null; codes: string[]; ref?: string }[]
+  strategy?: MigrationImportStrategy
+  outcomes?: {
+    rowIndex: number
+    status: string
+    message: string | null
+    codes: string[]
+    ref?: string
+    matchedLabel?: string
+  }[]
 }
 
 export function CsvImportFlow({
@@ -51,9 +71,8 @@ export function CsvImportFlow({
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [previewMeta, setPreviewMeta] = useState<{ rowCount: number; truncated: boolean } | null>(null)
   const [commitResult, setCommitResult] = useState<CommitJson | null>(null)
-  const [duplicateStrategy, setDuplicateStrategy] = useState<"skip_duplicates" | "fail_on_duplicate">(
-    "skip_duplicates",
-  )
+  const [strategy, setStrategy] = useState<MigrationImportStrategy>("skip_duplicates")
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const runUpload = useCallback(async () => {
     if (!organizationId || !file) return
@@ -89,7 +108,7 @@ export function CsvImportFlow({
       })
       setColumnMappingText(JSON.stringify(json.columnMapping ?? {}, null, 2))
       setImportRef(null)
-      toast({ title: "Preview ready", description: "Review validation, then adjust column mapping if needed." })
+      toast({ title: "Preview ready", description: "Review validation and outcome estimates, then adjust mapping if needed." })
     } catch {
       toast({ title: "Upload failed", description: "Network error.", variant: "destructive" })
     } finally {
@@ -113,7 +132,7 @@ export function CsvImportFlow({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnMapping: mapping }),
+          body: JSON.stringify({ columnMapping: mapping, options: { strategy } }),
         },
       )
       const json = (await res.json()) as { preview?: PreviewResult; message?: string }
@@ -128,7 +147,7 @@ export function CsvImportFlow({
     } finally {
       setBusy(false)
     }
-  }, [organizationId, jobId, columnMappingText, toast])
+  }, [organizationId, jobId, columnMappingText, strategy, toast])
 
   const runCommit = useCallback(async () => {
     if (!organizationId || !jobId) return
@@ -148,7 +167,7 @@ export function CsvImportFlow({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             columnMapping: mapping,
-            options: { duplicateStrategy },
+            options: { strategy },
           }),
         },
       )
@@ -161,14 +180,15 @@ export function CsvImportFlow({
       setImportRef(json.importRef ?? null)
       toast({
         title: json.ok ? "Import finished" : "Import completed with issues",
-        description: `${json.successCount ?? 0} rows imported`,
+        description: `${json.successCount ?? 0} created${json.updatedCount ? ` · ${json.updatedCount} updated` : ""}`,
       })
     } catch {
       toast({ title: "Import failed", variant: "destructive" })
     } finally {
       setBusy(false)
+      setConfirmOpen(false)
     }
-  }, [organizationId, jobId, columnMappingText, duplicateStrategy, toast])
+  }, [organizationId, jobId, columnMappingText, strategy, toast])
 
   if (orgStatus !== "ready" || !organizationId) {
     return (
@@ -178,6 +198,15 @@ export function CsvImportFlow({
       </div>
     )
   }
+
+  const totalRows = previewMeta?.rowCount ?? preview?.rowCount ?? 0
+  const proj = preview?.projection
+  const validationErrors = preview?.summary.errorRows ?? 0
+
+  const confirmSummary =
+    proj != null
+      ? `You are about to import ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}. About ${proj.willCreate.toLocaleString()} will be created, ${proj.willUpdate.toLocaleString()} may update existing records, ${proj.willSkip.toLocaleString()} will be skipped, and ${Math.max(validationErrors, proj.willFail).toLocaleString()} rows have validation or merge issues in this estimate.`
+      : `You are about to import ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}. Refresh preview for a detailed estimate. ${validationErrors} row${validationErrors === 1 ? "" : "s"} show validation errors in the sample.`
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -229,12 +258,55 @@ export function CsvImportFlow({
               </span>
             ) : null}
           </div>
+
+          <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground space-y-2">
+            <p className="font-medium text-foreground">Import safety</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Every batch is logged with per-row outcomes. Duplicates are not overwritten when you use the default strategy.</li>
+              <li>Reverting a large import may require support — contact your workspace admin before running very wide updates.</li>
+            </ul>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <Stat label="Rows" value={String(previewMeta?.rowCount ?? preview.rowCount)} />
             <Stat label="OK" value={String(preview.summary.okRows)} />
             <Stat label="Warnings" value={String(preview.summary.warningRows)} tone="amber" />
             <Stat label="Errors" value={String(preview.summary.errorRows)} tone="destructive" />
           </div>
+
+          {proj ? (
+            <div>
+              <h3 className="text-sm font-medium text-foreground mb-2">Outcome estimate (current strategy)</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <Stat label="Ready to create" value={String(proj.willCreate)} tone="positive" />
+                <Stat label="Will update" value={String(proj.willUpdate)} tone="amber" />
+                <Stat label="Will skip" value={String(proj.willSkip)} />
+                <Stat label="Will fail" value={String(proj.willFail)} tone="destructive" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Estimates use your mapping and existing workspace data. Refresh preview after changing strategy or mapping.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Refresh preview to compute outcome estimates for the selected strategy.</p>
+          )}
+
+          {(preview.duplicateHints.length > 0 || preview.unresolvedRefs.length > 0) && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm space-y-2">
+              {preview.duplicateHints.length > 0 ? (
+                <p className="text-amber-800 dark:text-amber-200">
+                  <span className="font-medium">Possible duplicates in file:</span> {preview.duplicateHints.length} row
+                  {preview.duplicateHints.length === 1 ? "" : "s"} flagged — review before commit.
+                </p>
+              ) : null}
+              {preview.unresolvedRefs.length > 0 ? (
+                <p className="text-amber-800 dark:text-amber-200">
+                  <span className="font-medium">Unresolved references:</span> {preview.unresolvedRefs.length} row
+                  {preview.unresolvedRefs.length === 1 ? "" : "s"} may fail without matching customer, location, or equipment.
+                </p>
+              ) : null}
+            </div>
+          )}
 
           {preview.sampleRows.length > 0 ? (
             <div className="overflow-x-auto rounded-md border border-border">
@@ -300,31 +372,62 @@ export function CsvImportFlow({
             </div>
           </div>
 
-          <div className="grid gap-2 max-w-xs">
-            <Label>Duplicates</Label>
-            <Select
-              value={duplicateStrategy}
-              onValueChange={(v) => setDuplicateStrategy(v as "skip_duplicates" | "fail_on_duplicate")}
-            >
-              <SelectTrigger>
+          <div className="grid gap-2 max-w-md">
+            <Label htmlFor="import-strategy">Merge strategy</Label>
+            <Select value={strategy} onValueChange={(v) => setStrategy(v as MigrationImportStrategy)}>
+              <SelectTrigger id="import-strategy">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="skip_duplicates">Skip duplicate rows</SelectItem>
-                <SelectItem value="fail_on_duplicate">Fail entire batch on first duplicate</SelectItem>
+                {IMPORT_STRATEGIES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {IMPORT_STRATEGIES.find((s) => s.value === strategy)?.description ?? ""}
+            </p>
           </div>
 
-          <Button type="button" onClick={() => void runCommit()} disabled={busy || !jobId} className="gap-2">
+          <Button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            disabled={busy || !jobId}
+            className="gap-2"
+          >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Commit import
+            Commit import…
           </Button>
+
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm import</AlertDialogTitle>
+                <AlertDialogDescription className="text-left space-y-3">
+                  <span className="block">{confirmSummary}</span>
+                  {strategy === "update_existing" ? (
+                    <span className="block text-amber-700 dark:text-amber-300 font-medium">
+                      You chose to update existing records. Mapped columns can overwrite current field values. Confirm only
+                      if you intend to merge legacy data into live records.
+                    </span>
+                  ) : null}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+                <Button type="button" disabled={busy} onClick={() => void runCommit()}>
+                  {busy ? "Working…" : "Run import"}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       ) : null}
 
       {commitResult ? (
-        <div className="rounded-lg border border-border bg-muted/20 p-5 space-y-2">
+        <div className="rounded-lg border border-border bg-muted/20 p-5 space-y-3">
           <h3 className="font-semibold text-foreground flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-primary" />
             Result
@@ -333,9 +436,41 @@ export function CsvImportFlow({
             ) : null}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Imported {commitResult.successCount ?? 0} · Skipped {commitResult.skippedCount ?? 0} · Errors{" "}
-            {commitResult.errorCount ?? 0}
+            Created {commitResult.successCount ?? 0}
+            {commitResult.updatedCount ? ` · Updated ${commitResult.updatedCount}` : ""}
+            {` · Skipped ${commitResult.skippedCount ?? 0} · Errors ${commitResult.errorCount ?? 0}`}
           </p>
+          {jobId ? (
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" asChild className="gap-2">
+                <Link href={`/settings/imports/${jobId}`}>Open job detail</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild className="gap-2">
+                <a
+                  href={`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/export?filter=all`}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Full outcome CSV
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" asChild className="gap-2">
+                <a
+                  href={`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/export?filter=failed`}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Errors only
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" asChild className="gap-2">
+                <a
+                  href={`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/export?filter=skipped`}
+                >
+                  <Download className="h-4 w-4" aria-hidden />
+                  Skipped only
+                </a>
+              </Button>
+            </div>
+          ) : null}
           {commitResult.outcomes && commitResult.outcomes.length > 0 ? (
             <details className="text-sm">
               <summary className="cursor-pointer text-primary font-medium">Row details</summary>
@@ -343,7 +478,7 @@ export function CsvImportFlow({
                 {commitResult.outcomes.slice(0, 80).map((o) => (
                   <li key={o.rowIndex}>
                     Row {o.rowIndex}: {o.status}
-                    {o.ref ? ` · ${o.ref}` : ""}
+                    {o.matchedLabel ? ` · ${o.matchedLabel}` : o.ref ? ` · ${o.ref}` : ""}
                     {o.message ? ` — ${o.message}` : ""}
                   </li>
                 ))}
@@ -363,7 +498,7 @@ function Stat({
 }: {
   label: string
   value: string
-  tone?: "amber" | "destructive"
+  tone?: "amber" | "destructive" | "positive"
 }) {
   return (
     <div
@@ -371,6 +506,7 @@ function Stat({
         "rounded-md border border-border px-3 py-2",
         tone === "amber" && "border-amber-500/30 bg-amber-500/5",
         tone === "destructive" && "border-destructive/30 bg-destructive/5",
+        tone === "positive" && "border-emerald-500/30 bg-emerald-500/5",
       )}
     >
       <p className="text-xs text-muted-foreground">{label}</p>

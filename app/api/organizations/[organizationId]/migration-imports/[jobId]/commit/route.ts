@@ -3,6 +3,7 @@ import { loadJobCsvFromStorage } from "@/lib/migration-imports/load-job-csv"
 import { runCommit } from "@/lib/migration-imports/types"
 import type { MigrationCommitOptions, MigrationImportKind } from "@/lib/migration-imports/types"
 import { outcomesForClient } from "@/lib/migration-imports/public-response"
+import { resolveImportStrategy } from "@/lib/migration-imports/strategy"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
 
 export const runtime = "nodejs"
@@ -77,22 +78,26 @@ export async function POST(
   const baseMap = (job as { column_mapping: Record<string, string> }).column_mapping ?? {}
   const columnMapping = { ...baseMap, ...(body.columnMapping ?? {}) }
   const options: MigrationCommitOptions = {
-    duplicateStrategy: body.options?.duplicateStrategy ?? "skip_duplicates",
+    strategy: body.options?.strategy,
+    duplicateStrategy: body.options?.duplicateStrategy,
     skipQuickBooksInvoiceSync: true,
   }
+  const strategy = resolveImportStrategy(options)
 
   const started = new Date().toISOString()
-  await supabase
-    .from("organization_import_jobs")
-    .update({
-      status: "processing",
-      started_at: started,
-      options: options as unknown as Record<string, unknown>,
-      column_mapping: columnMapping,
-      completed_at: null,
-      user_message: null,
-    })
-    .eq("id", jobId)
+
+  const jobUpdate: Record<string, unknown> = {
+    status: "processing",
+    started_at: started,
+    options: { ...options, strategy } as Record<string, unknown>,
+    column_mapping: columnMapping,
+    completed_at: null,
+    user_message: null,
+    strategy,
+    committed_by: userId,
+  }
+
+  await supabase.from("organization_import_jobs").update(jobUpdate).eq("id", jobId)
 
   const result = await runCommit({
     supabase,
@@ -110,12 +115,12 @@ export async function POST(
   const rowPayload = result.outcomes.map((o) => ({
     import_job_id: jobId,
     row_index: o.rowIndex,
-    status: o.status,
+    status: o.status === "imported" ? "imported" : o.status,
     codes: o.codes,
     message: o.message,
     entity_kind: o.entityKind ?? null,
     entity_id: o.entityId ?? null,
-    snapshot: {},
+    snapshot: { cells: parsed.rows[o.rowIndex - 1] ?? {} } as Record<string, unknown>,
   }))
 
   if (rowPayload.length > 0) {
@@ -136,40 +141,46 @@ export async function POST(
   const completed = new Date().toISOString()
 
   let finalStatus: "completed" | "completed_with_errors" | "failed"
-  if (result.successCount === 0 && result.errorCount > 0) {
+  if (result.errorCount > 0 && result.createdCount === 0 && result.updatedCount === 0) {
     finalStatus = "failed"
-  } else if (result.errorCount > 0 || result.skippedCount > 0) {
+  } else if (result.errorCount > 0) {
     finalStatus = "completed_with_errors"
   } else {
     finalStatus = "completed"
   }
 
   const summaryMsg = [
-    `${result.successCount} imported`,
+    `${result.createdCount} created`,
+    result.updatedCount ? `${result.updatedCount} updated` : null,
     result.skippedCount ? `${result.skippedCount} skipped` : null,
     result.errorCount ? `${result.errorCount} errors` : null,
   ]
     .filter(Boolean)
     .join(" · ")
 
-  await supabase
-    .from("organization_import_jobs")
-    .update({
-      status: finalStatus,
-      success_count: result.successCount,
-      error_count: result.errorCount,
-      completed_at: completed,
-      user_message: summaryMsg,
-    })
-    .eq("id", jobId)
+  const countsUpdate: Record<string, unknown> = {
+    status: finalStatus,
+    success_count: result.createdCount,
+    updated_count: result.updatedCount,
+    skipped_count: result.skippedCount,
+    error_count: result.errorCount,
+    completed_at: completed,
+    user_message: summaryMsg,
+    strategy,
+  }
+
+  await supabase.from("organization_import_jobs").update(countsUpdate).eq("id", jobId)
 
   return NextResponse.json({
     ok: finalStatus !== "failed",
     status: finalStatus,
-    successCount: result.successCount,
-    errorCount: result.errorCount,
+    createdCount: result.createdCount,
+    updatedCount: result.updatedCount,
+    successCount: result.createdCount,
     skippedCount: result.skippedCount,
+    errorCount: result.errorCount,
     outcomes: outcomesForClient(result.outcomes),
     importRef: jobId.replace(/-/g, "").slice(0, 8).toUpperCase(),
+    strategy,
   })
 }

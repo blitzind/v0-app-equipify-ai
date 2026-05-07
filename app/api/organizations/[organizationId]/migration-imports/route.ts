@@ -6,6 +6,7 @@ import {
 } from "@/lib/migration-imports/constants"
 import { parseCsvText } from "@/lib/migration-imports/parse-csv"
 import { suggestColumnMapping } from "@/lib/migration-imports/map-columns"
+import { computeImportProjection } from "@/lib/migration-imports/import-projection"
 import { buildPreview } from "@/lib/migration-imports/types"
 import type { MigrationImportKind } from "@/lib/migration-imports/types"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
@@ -43,7 +44,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("organization_import_jobs")
     .select(
-      "id, kind, source_system, status, file_name, row_count, success_count, error_count, created_at, completed_at, user_message",
+      "id, kind, source_system, status, file_name, row_count, success_count, error_count, skipped_count, updated_count, strategy, created_at, completed_at, user_message",
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
@@ -74,6 +75,9 @@ export async function GET(
       row_count: row.row_count,
       success_count: row.success_count,
       error_count: row.error_count,
+      skipped_count: row.skipped_count,
+      updated_count: row.updated_count,
+      strategy: row.strategy,
       created_at: row.created_at,
       completed_at: row.completed_at,
       user_message: row.user_message,
@@ -231,6 +235,17 @@ export async function POST(
     kind,
   })
 
+  const projection = await computeImportProjection({
+    supabase,
+    organizationId,
+    userId,
+    columnMapping: column_mapping,
+    rows,
+    options: {},
+    kind,
+  })
+  const previewForClient = { ...previewResult, projection }
+
   const { data: jobIns, error: jobErr } = await supabase
     .from("organization_import_jobs")
     .insert({
@@ -253,6 +268,7 @@ export async function POST(
         duplicateHints: previewResult.duplicateHints.length,
         unresolvedRefs: previewResult.unresolvedRefs.length,
         truncated,
+        projection,
       },
       row_count: rows.length,
       success_count: 0,
@@ -286,7 +302,7 @@ export async function POST(
     kind,
     status: "draft",
     columnMapping: column_mapping,
-    preview: previewResult,
+    preview: previewForClient,
     rowCount: rows.length,
     truncated,
   })

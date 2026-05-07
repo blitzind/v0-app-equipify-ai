@@ -45,6 +45,7 @@ export function suggestColumnMapping(kind: MigrationImportKind, headers: string[
 
   if (kind === "equipment") {
     set("name", ["equipment_name", "name", "asset_name"])
+    set("equipment_code", ["equipment_code", "asset_code", "asset_id", "external_equipment_id"])
     set("serial_number", ["serial_number", "serial", "s_n"])
     set("customer_external_code", ["customer_external_code", "customer_id", "account_number"])
     set("customer_company", ["customer_company", "company_name", "customer"])
@@ -75,6 +76,7 @@ export function suggestColumnMapping(kind: MigrationImportKind, headers: string[
   }
 
   if (kind === "work_order") {
+    set("work_order_number", ["work_order_number", "wo_number", "job_number"])
     set("title", ["title", "job_title", "description"])
     set("customer_external_code", ["customer_external_code", "account_number"])
     set("customer_company", ["customer_company"])

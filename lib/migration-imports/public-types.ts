@@ -13,6 +13,14 @@ export type PreviewSampleRow = {
   issues: PreviewIssue[]
 }
 
+/** Estimated outcomes for the selected merge strategy (deterministic preview). */
+export type ImportProjection = {
+  willCreate: number
+  willUpdate: number
+  willSkip: number
+  willFail: number
+}
+
 export type PreviewResult = {
   rowCount: number
   truncated: boolean
@@ -24,4 +32,6 @@ export type PreviewResult = {
     warningRows: number
     okRows: number
   }
+  /** Present when strategy was supplied to preview/commit prep. */
+  projection?: ImportProjection
 }

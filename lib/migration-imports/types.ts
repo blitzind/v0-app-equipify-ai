@@ -16,9 +16,17 @@ export type MigrationImportKind =
   | "quickbooks_snapshot"
   | "generic"
 
+export type MigrationImportStrategy =
+  | "skip_duplicates"
+  | "update_empty_fields"
+  | "update_existing"
+  | "create_new_only"
+
+/** @deprecated Prefer {@link MigrationImportStrategy} via `strategy`. */
 export type DuplicateStrategy = "skip_duplicates" | "fail_on_duplicate"
 
 export type MigrationCommitOptions = {
+  strategy?: MigrationImportStrategy
   duplicateStrategy?: DuplicateStrategy
   /** When true, invoice inserts skip QuickBooks auto-sync side effects (historical rows). */
   skipQuickBooksInvoiceSync?: boolean
@@ -26,17 +34,20 @@ export type MigrationCommitOptions = {
 
 export type RowOutcome = {
   rowIndex: number
-  status: "imported" | "skipped" | "error" | "duplicate"
+  status: "imported" | "updated" | "skipped" | "error" | "duplicate"
   codes: string[]
   message: string | null
   entityKind?: string
   entityId?: string
+  /** Short label for exports (e.g. company name, invoice #) — no raw UUID in CSV. */
+  matchedLabel?: string | null
 }
 
 export type CommitResult = {
-  successCount: number
-  errorCount: number
+  createdCount: number
+  updatedCount: number
   skippedCount: number
+  errorCount: number
   outcomes: RowOutcome[]
 }
 
@@ -106,7 +117,8 @@ export async function runCommit(ctx: ImportEngineContext & { kind: MigrationImpo
       return commitWorkOrders(ctx)
     case "certificate":
       return {
-        successCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
         errorCount: 0,
         skippedCount: ctx.rows.length,
         outcomes: ctx.rows.map((_, i) => ({
@@ -118,14 +130,16 @@ export async function runCommit(ctx: ImportEngineContext & { kind: MigrationImpo
       }
     case "quickbooks_snapshot":
       return {
-        successCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
         errorCount: 0,
         skippedCount: ctx.rows.length,
         outcomes: [],
       }
     default:
       return {
-        successCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
         errorCount: ctx.rows.length,
         skippedCount: 0,
         outcomes: [{ rowIndex: 0, status: "error", codes: ["unknown_kind"], message: "Unsupported import kind." }],

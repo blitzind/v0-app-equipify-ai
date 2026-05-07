@@ -1,6 +1,10 @@
 import { resolveMapped } from "./map-columns"
 import { csvInvoiceStatusToDb } from "./invoice-status"
+import { resolveImportStrategy } from "./strategy"
 import type { CommitResult, ImportEngineContext, RowOutcome } from "./types"
+
+const HIST_INTERNAL =
+  "Historical import — operational record. QuickBooks auto-sync skipped."
 
 function normName(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ")
@@ -43,9 +47,24 @@ async function resolveCustomerId(
   return null
 }
 
+type InvoiceRow = {
+  id: string
+  customer_id: string
+  invoice_number: string
+  title: string
+  amount_cents: number
+  status: string
+  issued_at: string
+  due_date: string | null
+  paid_at: string | null
+  notes: string | null
+  internal_notes: string | null
+  equipment_id: string | null
+}
+
 export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitResult> {
-  const { supabase, organizationId, columnMapping, rows, options } = ctx
-  const strategy = options.duplicateStrategy ?? "skip_duplicates"
+  const { supabase, organizationId, columnMapping, rows } = ctx
+  const strategy = resolveImportStrategy(ctx.options)
   const seedPrefix = ctx.importSeedPrefix ?? `migration-${organizationId.slice(0, 8)}`
 
   const { data: customers } = await supabase
@@ -67,9 +86,10 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
 
   const caches = { idByExt, idsByCompany }
   const outcomes: RowOutcome[] = []
-  let successCount = 0
-  let errorCount = 0
+  let createdCount = 0
+  let updatedCount = 0
   let skippedCount = 0
+  let errorCount = 0
 
   const seenNumbers = new Set<string>()
 
@@ -100,35 +120,6 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
       })
       continue
     }
-
-    const { data: exists } = await supabase
-      .from("org_invoices")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("invoice_number", invoiceNumber)
-      .maybeSingle()
-
-    if (exists) {
-      if (strategy === "fail_on_duplicate") {
-        errorCount += 1
-        outcomes.push({
-          rowIndex,
-          status: "error",
-          codes: ["duplicate_invoice_number"],
-          message: "Invoice number already exists.",
-        })
-      } else {
-        skippedCount += 1
-        outcomes.push({
-          rowIndex,
-          status: "skipped",
-          codes: ["duplicate_invoice_number"],
-          message: "Skipped — invoice number already exists.",
-        })
-      }
-      continue
-    }
-
     seenNumbers.add(numKey)
 
     const customerId = await resolveCustomerId(ctx, caches, row)
@@ -188,6 +179,114 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
     const notes = resolveMapped(row, columnMapping, "notes") || null
     const seedKey = `${seedPrefix}-inv-${rowIndex}`
 
+    const { data: exists } = await supabase
+      .from("org_invoices")
+      .select(
+        "id, customer_id, invoice_number, title, amount_cents, status, issued_at, due_date, paid_at, notes, internal_notes, equipment_id",
+      )
+      .eq("organization_id", organizationId)
+      .eq("invoice_number", invoiceNumber)
+      .maybeSingle()
+
+    if (exists) {
+      const ex = exists as InvoiceRow
+      const label = ex.invoice_number
+
+      if (ex.customer_id !== customerId) {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["invoice_customer_mismatch"],
+          message: "Invoice number exists for a different customer.",
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      if (strategy === "skip_duplicates") {
+        skippedCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "skipped",
+          codes: ["duplicate_invoice"],
+          message: "Skipped — invoice number already exists.",
+          entityKind: "invoice",
+          entityId: ex.id,
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      if (strategy === "create_new_only") {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["duplicate_blocked"],
+          message: "Invoice already exists — not allowed for “only create new”.",
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      const internal_notes =
+        ex.internal_notes?.includes("Historical import") || ex.internal_notes?.includes("QuickBooks auto-sync skipped")
+          ? ex.internal_notes
+          : [ex.internal_notes?.trim() || null, HIST_INTERNAL].filter(Boolean).join("\n\n")
+
+      const patch: Record<string, unknown> = { internal_notes }
+
+      if (strategy === "update_existing") {
+        patch.title = title
+        patch.amount_cents = amountCents
+        patch.status = statusDb
+        patch.issued_at = issuedAt
+        patch.due_date = dueDate
+        patch.paid_at = paidAt
+        patch.notes = notes
+        if (equipmentId) patch.equipment_id = equipmentId
+      } else {
+        if (!(ex.title?.trim()) || ex.title === "Invoice") patch.title = title
+        if (!ex.amount_cents || ex.amount_cents === 0) patch.amount_cents = amountCents
+        if (!(ex.notes?.trim()) && notes) patch.notes = notes
+        if (!ex.due_date) patch.due_date = dueDate
+        if (!ex.paid_at && paidAt) patch.paid_at = paidAt
+        patch.status = statusDb
+        if (!ex.equipment_id && equipmentId) patch.equipment_id = equipmentId
+      }
+
+      const { error: uErr } = await supabase
+        .from("org_invoices")
+        .update(patch)
+        .eq("id", ex.id)
+        .eq("organization_id", organizationId)
+
+      if (uErr) {
+        errorCount += 1
+        outcomes.push({
+          rowIndex,
+          status: "error",
+          codes: ["update_failed"],
+          message: uErr.message,
+          matchedLabel: label,
+        })
+        continue
+      }
+
+      updatedCount += 1
+      outcomes.push({
+        rowIndex,
+        status: "updated",
+        codes: [],
+        message: null,
+        entityKind: "invoice",
+        entityId: ex.id,
+        matchedLabel: label,
+      })
+      continue
+    }
+
     const insertRow: Record<string, unknown> = {
       organization_id: organizationId,
       customer_id: customerId,
@@ -205,7 +304,7 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
       paid_at: paidAt,
       line_items: [],
       notes,
-      internal_notes: "Historical import — operational record. QuickBooks auto-sync skipped.",
+      internal_notes: HIST_INTERNAL,
     }
 
     const { data: ins, error } = await supabase
@@ -225,7 +324,7 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
       continue
     }
 
-    successCount += 1
+    createdCount += 1
     outcomes.push({
       rowIndex,
       status: "imported",
@@ -233,8 +332,9 @@ export async function commitInvoices(ctx: ImportEngineContext): Promise<CommitRe
       message: null,
       entityKind: "invoice",
       entityId: (ins as { id: string }).id,
+      matchedLabel: invoiceNumber,
     })
   }
 
-  return { successCount, errorCount, skippedCount, outcomes }
+  return { createdCount, updatedCount, skippedCount, errorCount, outcomes }
 }

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { MIGRATION_IMPORT_MAX_ROWS } from "@/lib/migration-imports/constants"
 import { loadJobCsvFromStorage } from "@/lib/migration-imports/load-job-csv"
+import { computeImportProjection } from "@/lib/migration-imports/import-projection"
+import { resolveImportStrategy } from "@/lib/migration-imports/strategy"
 import { buildPreview } from "@/lib/migration-imports/types"
-import type { MigrationImportKind } from "@/lib/migration-imports/types"
+import type { MigrationCommitOptions, MigrationImportKind } from "@/lib/migration-imports/types"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
 
 export const runtime = "nodejs"
@@ -25,9 +27,9 @@ export async function POST(
 
   const { userId, supabase, svc } = gate
 
-  let body: { columnMapping?: Record<string, string> }
+  let body: { columnMapping?: Record<string, string>; options?: MigrationCommitOptions }
   try {
-    body = (await request.json()) as { columnMapping?: Record<string, string> }
+    body = (await request.json()) as { columnMapping?: Record<string, string>; options?: MigrationCommitOptions }
   } catch {
     return NextResponse.json({ error: "invalid_body", message: "Expected JSON." }, { status: 400 })
   }
@@ -61,6 +63,11 @@ export async function POST(
   const kind = (job as { kind: MigrationImportKind }).kind
   const baseMap = (job as { column_mapping: Record<string, string> }).column_mapping ?? {}
   const columnMapping = { ...baseMap, ...(body.columnMapping ?? {}) }
+  const options: MigrationCommitOptions = {
+    strategy: body.options?.strategy,
+    duplicateStrategy: body.options?.duplicateStrategy,
+  }
+  const strategy = resolveImportStrategy(options)
 
   const preview = await buildPreview({
     supabase,
@@ -68,9 +75,20 @@ export async function POST(
     userId,
     columnMapping,
     rows: parsed.rows,
-    options: {},
+    options,
     kind,
   })
+
+  const projection = await computeImportProjection({
+    supabase,
+    organizationId,
+    userId,
+    columnMapping,
+    rows: parsed.rows,
+    options,
+    kind,
+  })
+  const previewWithProjection = { ...preview, projection }
 
   await supabase
     .from("organization_import_jobs")
@@ -85,6 +103,8 @@ export async function POST(
         ...preview.summary,
         duplicateHints: preview.duplicateHints.length,
         unresolvedRefs: preview.unresolvedRefs.length,
+        strategy,
+        projection,
       },
       row_count: parsed.rows.length,
       updated_at: new Date().toISOString(),
@@ -92,5 +112,5 @@ export async function POST(
     .eq("id", jobId)
     .eq("organization_id", organizationId)
 
-  return NextResponse.json({ ok: true, preview, columnMapping })
+  return NextResponse.json({ ok: true, preview: previewWithProjection, columnMapping, strategy })
 }

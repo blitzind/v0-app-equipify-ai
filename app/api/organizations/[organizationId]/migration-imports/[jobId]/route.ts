@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { shortImportRef } from "@/lib/migration-imports/parse-csv"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
 
 export const runtime = "nodejs"
@@ -6,8 +7,10 @@ export const runtime = "nodejs"
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const MAX_ROW_SAMPLE = 500
+
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; jobId: string }> },
 ) {
   const { organizationId, jobId } = await context.params
@@ -20,10 +23,14 @@ export async function GET(
 
   const { supabase } = gate
 
+  const { searchParams } = new URL(request.url)
+  const rowLimitRaw = parseInt(searchParams.get("rowLimit") ?? String(MAX_ROW_SAMPLE), 10)
+  const rowLimit = Number.isFinite(rowLimitRaw) ? Math.min(Math.max(rowLimitRaw, 0), MAX_ROW_SAMPLE) : MAX_ROW_SAMPLE
+
   const { data: job, error } = await supabase
     .from("organization_import_jobs")
     .select(
-      "kind, source_system, status, file_name, storage_path, column_mapping, options, preview_json, validation_summary, row_count, success_count, error_count, user_message, created_at, started_at, completed_at",
+      "kind, source_system, status, file_name, storage_path, column_mapping, options, preview_json, validation_summary, row_count, success_count, error_count, skipped_count, updated_count, strategy, user_message, created_at, started_at, completed_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", jobId)
@@ -36,11 +43,80 @@ export async function GET(
     return NextResponse.json({ error: "not_found", message: "Import job not found." }, { status: 404 })
   }
 
+  const j = job as Record<string, unknown>
+  const canExport = typeof j.storage_path === "string" && j.storage_path.length > 0
+
+  let rows: {
+    rowIndex: number
+    status: string
+    codes: string[]
+    message: string | null
+    recordRef: string | null
+    cells: Record<string, string> | null
+  }[] = []
+
+  if (rowLimit > 0) {
+    const { data: jobRows, error: rowErr } = await supabase
+      .from("organization_import_job_rows")
+      .select("row_index, status, codes, message, entity_id, snapshot")
+      .eq("import_job_id", jobId)
+      .order("row_index", { ascending: true })
+      .limit(rowLimit)
+
+    if (rowErr) {
+      return NextResponse.json({ error: "query_failed", message: rowErr.message }, { status: 500 })
+    }
+
+    rows =
+      jobRows?.map((r) => {
+        const row = r as {
+          row_index: number
+          status: string
+          codes: string[] | null
+          message: string | null
+          entity_id: string | null
+          snapshot: { cells?: Record<string, string> } | null
+        }
+        const entityId = row.entity_id
+        return {
+          rowIndex: row.row_index,
+          status: row.status,
+          codes: row.codes ?? [],
+          message: row.message,
+          recordRef: entityId ? shortImportRef(entityId) : null,
+          cells: row.snapshot?.cells ?? null,
+        }
+      }) ?? []
+  }
+
+  const partialImport = j.status === "completed_with_errors"
+
   return NextResponse.json({
     job: {
       jobId,
       importRef: jobId.replace(/-/g, "").slice(0, 8).toUpperCase(),
-      ...(job as Record<string, unknown>),
+      kind: j.kind,
+      source_system: j.source_system,
+      status: j.status,
+      file_name: j.file_name,
+      column_mapping: j.column_mapping,
+      options: j.options,
+      preview_json: j.preview_json,
+      validation_summary: j.validation_summary,
+      row_count: j.row_count,
+      success_count: j.success_count,
+      updated_count: j.updated_count,
+      skipped_count: j.skipped_count,
+      error_count: j.error_count,
+      strategy: j.strategy,
+      user_message: j.user_message,
+      created_at: j.created_at,
+      started_at: j.started_at,
+      completed_at: j.completed_at,
+      partialImport,
+      canExport,
     },
+    rows,
+    rowSampleLimit: rowLimit,
   })
 }
