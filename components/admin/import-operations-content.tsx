@@ -466,18 +466,25 @@ export function ImportOperationsContent() {
       </div>
 
       {/*
-        Filters — compact toolbar layout.
-        - Single flex-wrap row on desktop; stacks on mobile.
-        - Search grows; selects sit at deterministic widths (no ultra-wide gaps).
-        - "Likely stuck only" + Apply/Clear share the row, no second action strip.
-        - "Filters" header collapsed to an inline label on the leading edge.
+        Filters — two-row layout.
+        - Row 1: Filters label/header (icon + title + small helper text).
+        - Row 2: All filter controls + Apply/Clear actions, wrapping cleanly on tablet/mobile.
+        - Selects sit at deterministic widths so the row doesn't stretch unevenly on wide displays.
       */}
-      <div className="rounded-xl border border-border bg-card p-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
-          <span className="hidden lg:inline-flex items-center gap-1.5 self-center pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Filter className="h-3.5 w-3.5" aria-hidden /> Filters
+      <div className="rounded-xl border border-border bg-card p-4">
+        {/* Header row */}
+        <div className="flex items-center justify-between gap-2 pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <h2 className="text-sm font-semibold text-foreground">Filters</h2>
+          </div>
+          <span className="hidden sm:inline text-[11px] text-muted-foreground">
+            Narrow the import runs list. Press Enter in search to apply.
           </span>
+        </div>
 
+        {/* Control row */}
+        <div className="flex flex-col gap-3 pt-3 lg:flex-row lg:flex-wrap lg:items-end">
           <div className="flex flex-col gap-1 min-w-0 lg:flex-1 lg:basis-[18rem] lg:max-w-[28rem]">
             <label htmlFor="import-ops-search" className="text-[11px] text-muted-foreground">
               Search
@@ -558,12 +565,13 @@ export function ImportOperationsContent() {
             Likely stuck only
           </label>
 
-          {/* Actions — pushed right on desktop, wrap under the inputs on tablet/mobile. */}
+          {/* Actions — pushed right on desktop, wrap under the inputs on tablet/mobile.
+              `Apply filters` uses the default (primary) variant so it reads as the main
+              action of this card; `Clear` stays ghost as a quieter reset. */}
           <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:self-end">
             <Button
               type="button"
               size="sm"
-              variant="secondary"
               onClick={() => void load()}
               disabled={loading || busy}
             >
