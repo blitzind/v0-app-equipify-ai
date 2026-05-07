@@ -33,6 +33,7 @@ import {
   DRAWER_NESTED_CARD,
   type ToastItem,
 } from "@/components/detail-drawer"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import {
   Play,
   Pause,
@@ -474,6 +475,17 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
             </p>
           </DrawerSection>
         )}
+
+        <DrawerSection title="Recent communications">
+          <RecentCommunicationsCard
+            entityType="maintenance_plan"
+            entityId={activePlan.id}
+            customerId={activePlan.customerId || undefined}
+            limit={4}
+            title="Recent communications"
+            description="Reminder runs, work-order summaries, and automation activity tied to this maintenance plan."
+          />
+        </DrawerSection>
 
       </DetailDrawer>
 

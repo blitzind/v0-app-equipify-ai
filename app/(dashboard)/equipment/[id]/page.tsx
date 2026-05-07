@@ -23,6 +23,7 @@ import {
 } from "@/lib/equipment/equipment-detail-queries"
 import { buildEquipmentLifecycleTimeline, sumInvoiceAmountCents } from "@/lib/lifecycle/equipment-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
+import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import {
@@ -784,6 +785,14 @@ export default function EquipmentDetailPage() {
               )}
             </CardContent>
           </Card>
+          <RecentCommunicationsCard
+            entityType="equipment"
+            entityId={eq.id}
+            customerId={eq.customerId}
+            limit={4}
+            title="Recent communications"
+            description="Service confirmations, certificate releases, and automation runs tied to this asset."
+          />
         </TabsContent>
 
         <TabsContent value="plans" className="mt-4 space-y-4">

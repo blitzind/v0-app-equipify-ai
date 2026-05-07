@@ -68,6 +68,16 @@ export async function POST(
   }
 
   const status = (ev as { delivery_status: string }).delivery_status
+  if (status === "queued" || status === "pending") {
+    return NextResponse.json(
+      {
+        error: "already_queued",
+        message:
+          "This delivery is already queued. Wait for it to settle before requesting another retry.",
+      },
+      { status: 409 },
+    )
+  }
   if (status !== "failed" && status !== "bounced") {
     return NextResponse.json(
       {
@@ -81,6 +91,34 @@ export async function POST(
   const meta = ((ev as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>
   const now = new Date().toISOString()
 
+  // Phase 3 — cooldown: refuse to re-queue if a retry was requested
+  // in the last RETRY_COOLDOWN_MS milliseconds. Prevents accidental
+  // double-clicks from spamming the future provider sync once it
+  // lands. The window is intentionally short — managers can always
+  // retry again after the cooldown expires.
+  const RETRY_COOLDOWN_MS = 30_000
+  const lastRetryIso =
+    typeof meta.retry_requested_at === "string" ? (meta.retry_requested_at as string) : null
+  if (lastRetryIso) {
+    const last = new Date(lastRetryIso).getTime()
+    if (Number.isFinite(last) && Date.now() - last < RETRY_COOLDOWN_MS) {
+      const secondsLeft = Math.max(
+        1,
+        Math.ceil((RETRY_COOLDOWN_MS - (Date.now() - last)) / 1000),
+      )
+      return NextResponse.json(
+        {
+          error: "retry_cooldown",
+          message: `Retry is cooling down. Try again in ${secondsLeft}s.`,
+          cooldownSecondsRemaining: secondsLeft,
+        },
+        { status: 429 },
+      )
+    }
+  }
+
+  const retryCount = typeof meta.retry_count === "number" ? (meta.retry_count as number) : 0
+
   const { error: upErr } = await supabase
     .from("communication_events")
     .update({
@@ -90,6 +128,7 @@ export async function POST(
         ...meta,
         retry_requested_at: now,
         retry_requested_by: user.id,
+        retry_count: retryCount + 1,
       },
     })
     .eq("id", eventId)
@@ -103,5 +142,6 @@ export async function POST(
     ok: true,
     message:
       "Retry queued. Provider webhooks will confirm delivery once Resend / Twilio sync is integrated.",
+    retryCount: retryCount + 1,
   })
 }

@@ -10,9 +10,10 @@
  * coming later without rendering live actions.
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
+  AlertTriangle,
   Bot,
   ChevronRight,
   ExternalLink,
@@ -39,9 +40,11 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { eventTypeMeta } from "@/lib/communications/event-catalog"
+import { buildLifecycle, explainFailure } from "@/lib/communications/lifecycle"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
 import { FeedStatusPill } from "./feed-status-pill"
+import { LifecycleTimeline } from "./lifecycle-timeline"
 import type { FeedDetailClient, FeedItemClient } from "./types-client"
 
 export function FeedDetailDrawer({
@@ -66,12 +69,15 @@ export function FeedDetailDrawer({
   const [retrying, setRetrying] = useState(false)
   const [retryDoneAt, setRetryDoneAt] = useState<string | null>(null)
   const [showMeta, setShowMeta] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendDoneAt, setSendDoneAt] = useState<string | null>(null)
 
   useEffect(() => {
     setDetail(null)
     setError(null)
     setRetryDoneAt(null)
     setShowMeta(false)
+    setSendDoneAt(null)
     if (!open || !initial) return
     let cancelled = false
     setLoading(true)
@@ -128,6 +134,42 @@ export function FeedDetailDrawer({
     }
   }
 
+  async function sendDraftNow() {
+    if (!detail || !canManageCommunications) return
+    setSending(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/communications/${encodeURIComponent(detail.id)}/send`,
+        { method: "POST" },
+      )
+      const body = (await res.json()) as { ok?: boolean; message?: string; error?: string }
+      if (!res.ok || body.ok === false) {
+        throw new Error(body.message ?? body.error ?? "Send failed.")
+      }
+      toast({ title: "Draft sent", description: body.message })
+      setSendDoneAt(new Date().toISOString())
+      const sentAt = new Date().toISOString()
+      setDetail({
+        ...detail,
+        delivery_status: "sent",
+        sent_at: sentAt,
+        metadata: {
+          ...((detail.metadata ?? {}) as Record<string, unknown>),
+          is_draft: false,
+          handoff_completed_at: sentAt,
+        } as Record<string, unknown>,
+      })
+    } catch (e) {
+      toast({
+        title: "Could not send draft",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setSending(false)
+    }
+  }
+
   const item = detail ?? initial
   const meta = item ? eventTypeMeta(item.event_type) : null
   const md = (item?.metadata ?? {}) as Record<string, unknown>
@@ -138,6 +180,28 @@ export function FeedDetailDrawer({
   const aiAssistantName =
     typeof md.assistant_name === "string" ? (md.assistant_name as string) : null
   const status = item ? effectiveStatus(item) : "—"
+  const lifecycle = useMemo(
+    () =>
+      item
+        ? buildLifecycle({
+            delivery_status: item.delivery_status,
+            event_type: item.event_type,
+            created_at: item.created_at,
+            scheduled_at: item.scheduled_at ?? null,
+            sent_at: item.sent_at ?? null,
+            delivered_at: item.delivered_at ?? null,
+            failed_at: item.failed_at ?? null,
+            error_message: item.error_message ?? null,
+            metadata: (item.metadata ?? null) as Record<string, unknown> | null,
+          })
+        : [],
+    [item],
+  )
+  const failureHint = explainFailure(item?.error_message)
+  const draftReady = item ? isDraft(item) && canSendDraft(item) : false
+  const draftBlocker = item && isDraft(item) ? draftBlockerReason(item) : null
+  const handoffRouteLabel =
+    typeof md.handoff_route_label === "string" ? (md.handoff_route_label as string) : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -231,14 +295,58 @@ export function FeedDetailDrawer({
                       ? ["Delivered", formatRelativeTime(item.delivered_at)]
                       : null,
                     item.failed_at ? ["Failed", formatRelativeTime(item.failed_at)] : null,
+                    handoffRouteLabel
+                      ? ["Hand-off", `Sent via ${handoffRouteLabel}`]
+                      : null,
                   ].filter(Boolean) as [string, React.ReactNode][]}
                 />
                 {item.error_message ? (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-2 leading-relaxed">
-                    {item.error_message}
-                  </p>
+                  <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/[0.05] px-3 py-2 text-xs space-y-1">
+                    <p className="flex items-center gap-1.5 font-medium text-red-700 dark:text-red-300">
+                      <AlertTriangle className="w-3.5 h-3.5" aria-hidden />
+                      Last failure
+                    </p>
+                    <p className="text-red-700/90 dark:text-red-300/90 leading-relaxed">
+                      {item.error_message}
+                    </p>
+                    {failureHint ? (
+                      <p className="text-[11px] text-red-700/80 dark:text-red-300/80 leading-snug">
+                        {failureHint}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </Section>
+
+              {lifecycle.length > 0 ? (
+                <Section label="Lifecycle">
+                  <LifecycleTimeline steps={lifecycle} />
+                </Section>
+              ) : null}
+
+              {isDraft(item) ? (
+                <Section label="Draft hand-off">
+                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
+                    <p className="text-foreground/90">
+                      Drafts hand off to the existing live send route based on the
+                      related entity. Sending is permission-gated and never auto-fires.
+                    </p>
+                    {draftBlocker ? (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+                        {draftBlocker}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Ready to dispatch via{" "}
+                        <span className="font-medium">
+                          {prettyEntityLabel(item.related_entity_type).toLowerCase()}
+                        </span>
+                        .
+                      </p>
+                    )}
+                  </div>
+                </Section>
+              ) : null}
 
               {(item.entity_label ||
                 item.customer_label ||
@@ -333,16 +441,16 @@ export function FeedDetailDrawer({
                 </Section>
               ) : null}
 
-              <Section label="Coming in Phase 2">
+              <Section label="Roadmap">
                 <ul className="text-xs text-muted-foreground space-y-1.5">
                   <li className="flex items-center gap-1.5">
-                    <Send className="w-3 h-3" aria-hidden /> Resend / retry
+                    <Mail className="w-3 h-3" aria-hidden /> Threaded conversations + inbound replies
                   </li>
                   <li className="flex items-center gap-1.5">
-                    <Mail className="w-3 h-3" aria-hidden /> Threaded conversations
+                    <Send className="w-3 h-3" aria-hidden /> Provider webhook sync (Resend)
                   </li>
                   <li className="flex items-center gap-1.5">
-                    <Zap className="w-3 h-3" aria-hidden /> SMS, voicemail, call logs
+                    <Zap className="w-3 h-3" aria-hidden /> SMS, voicemail, call logs (Twilio)
                   </li>
                 </ul>
               </Section>
@@ -352,6 +460,29 @@ export function FeedDetailDrawer({
 
         <Separator />
         <SheetFooter className="gap-2 pt-3 flex-col sm:flex-row sm:items-center">
+          {item && isDraft(item) ? (
+            canManageCommunications ? (
+              <Button
+                type="button"
+                onClick={() => void sendDraftNow()}
+                disabled={sending || Boolean(sendDoneAt) || !draftReady}
+                className="gap-1.5"
+                title={draftBlocker ?? undefined}
+              >
+                {sending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" aria-hidden />
+                )}
+                {sendDoneAt ? "Draft sent" : "Send draft now"}
+              </Button>
+            ) : (
+              <p className="text-[11px] text-muted-foreground sm:mr-auto">
+                Sending drafts is restricted to managers and above.
+              </p>
+            )
+          ) : null}
+
           {item && canManageCommunications && isRetriable(item) ? (
             <Button
               type="button"
@@ -367,6 +498,12 @@ export function FeedDetailDrawer({
               )}
               {retryDoneAt ? "Retry queued" : "Retry / resend"}
             </Button>
+          ) : item &&
+            (item.delivery_status === "queued" || item.delivery_status === "pending") &&
+            !isDraft(item) ? (
+            <p className="text-[11px] text-muted-foreground sm:mr-auto">
+              Already in flight — wait for delivery to settle before retrying.
+            </p>
           ) : item && isRetriable(item) ? (
             <p className="text-[11px] text-muted-foreground sm:mr-auto">
               Retry is restricted to managers and above.
@@ -476,4 +613,40 @@ function effectiveStatus(item: FeedItemClient | FeedDetailClient): string {
 
 function isRetriable(item: FeedItemClient | FeedDetailClient): boolean {
   return item.delivery_status === "failed" || item.delivery_status === "bounced"
+}
+
+/**
+ * Phase 3 — recognize draft rows produced by the Phase 2 compose
+ * dialog. Drafts use `event_type='communication_draft'` and/or
+ * `metadata.is_draft=true` and stay in `delivery_status='pending'`
+ * until they are dispatched.
+ */
+function isDraft(item: FeedItemClient | FeedDetailClient): boolean {
+  if (item.event_type === "communication_draft") return true
+  const md = item.metadata as Record<string, unknown> | null
+  return Boolean(md && md.is_draft === true)
+}
+
+/** Whether the draft has the minimum context required to dispatch. */
+function canSendDraft(item: FeedItemClient | FeedDetailClient): boolean {
+  if (!item.related_entity_type || !item.related_entity_id) return false
+  if (item.related_entity_type === "prospect") return true
+  return Boolean(item.recipient_address?.trim())
+}
+
+/** Manager-friendly explanation for why a draft can't be sent yet. */
+function draftBlockerReason(
+  item: FeedItemClient | FeedDetailClient,
+): string | null {
+  if (!item.related_entity_type || !item.related_entity_id) {
+    return "Link this draft to an invoice, quote, work order, or prospect before sending."
+  }
+  if (item.related_entity_type !== "prospect" && !item.recipient_address?.trim()) {
+    return "Add a recipient email before sending."
+  }
+  const supported = new Set(["invoice", "quote", "work_order", "prospect"])
+  if (!supported.has(item.related_entity_type)) {
+    return `No live send route is wired for ${item.related_entity_type} drafts yet.`
+  }
+  return null
 }
