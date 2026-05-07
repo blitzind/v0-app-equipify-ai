@@ -20,9 +20,12 @@ import {
 import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
+import { AiOperationsContent } from "@/components/admin/ai-operations-content"
+import { MasterContextDocClient } from "./master-context/master-context-doc-client"
+import { getEquipifyMasterContext, MASTER_CONTEXT_LAST_UPDATED_ISO } from "@/lib/admin/master-context"
+import { MCG_SCAN_COUNTS } from "@/lib/admin/master-context.generated"
 import {
   Dialog,
   DialogContent,
@@ -249,7 +252,7 @@ function severityIcon(sev: string) {
   return <Info size={13} className="ds-icon-info shrink-0" />
 }
 
-type Tab = "accounts" | "analytics" | "flags" | "audit"
+type Tab = "accounts" | "analytics" | "flags" | "audit" | "ai_operations" | "master_context"
 
 // ─── Sub-sections ─────────────────────────────────────────────────────────────
 
@@ -1950,6 +1953,8 @@ export default function PlatformAdminPage() {
     { key: "analytics", label: "Analytics",  icon: TrendingUp },
     { key: "flags",     label: "Feature Flags", icon: Flag },
     { key: "audit",     label: "Audit Log",  icon: ScrollText },
+    { key: "ai_operations", label: "AI Operations", icon: Brain },
+    { key: "master_context", label: "Master Context", icon: ScrollText },
   ]
 
   return (
@@ -1963,18 +1968,6 @@ export default function PlatformAdminPage() {
           </span>
         </div>
         <div className="flex-1" />
-        <Link
-          href="/admin/ai-operations"
-          className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors mr-2"
-        >
-          AI Operations
-        </Link>
-        <Link
-          href="/admin/master-context"
-          className="hidden sm:inline-flex text-xs text-slate-400 hover:text-white transition-colors mr-2"
-        >
-          Master Context
-        </Link>
         {/* Admin identity */}
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#7c3aed] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
@@ -2074,26 +2067,6 @@ export default function PlatformAdminPage() {
           />
         </div>
 
-        <Card className="border-border bg-card shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-foreground">Equipify Master Context</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground max-w-2xl">
-              Generate and copy GPT-ready project context for implementation planning.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <Button
-              asChild
-              className="bg-[#f59f1c] text-[#1a150a] hover:bg-[#e08e0e] border-0 font-medium"
-            >
-              <Link href="/admin/master-context" className="inline-flex items-center gap-2">
-                Open Master Context
-                <ChevronRight size={14} className="opacity-80" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* Tabs */}
         <div className="flex flex-col gap-6">
           <nav className="flex items-center gap-1 border-b border-border overflow-x-auto pb-px [scrollbar-width:thin]">
@@ -2112,15 +2085,6 @@ export default function PlatformAdminPage() {
                 <Icon size={14} /> {label}
               </button>
             ))}
-            <Link
-              href="/admin/master-context"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0",
-                "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <ScrollText size={14} /> Master Context
-            </Link>
           </nav>
 
           {activeTab === "accounts" && (
@@ -2135,6 +2099,15 @@ export default function PlatformAdminPage() {
           {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "flags"     && <FlagsTab />}
           {activeTab === "audit"     && <AuditTab />}
+          {activeTab === "ai_operations" && <AiOperationsContent />}
+          {activeTab === "master_context" && (
+            <MasterContextDocClient
+              embedded
+              initialMarkdown={getEquipifyMasterContext()}
+              generatedAtIso={MASTER_CONTEXT_LAST_UPDATED_ISO}
+              scanCounts={MCG_SCAN_COUNTS}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -33,10 +33,12 @@ export function MasterContextDocClient({
   initialMarkdown,
   generatedAtIso,
   scanCounts,
+  embedded = false,
 }: {
   initialMarkdown: string
   generatedAtIso: string
   scanCounts: MasterContextScanCounts
+  embedded?: boolean
 }) {
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
@@ -106,8 +108,9 @@ export function MasterContextDocClient({
   )
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="flex items-center min-h-14 px-4 sm:px-6 py-2 bg-[#0F172A] border-b border-white/10 gap-4 shrink-0 flex-wrap">
+    <div className={cn("bg-background flex flex-col", embedded ? "min-h-0" : "min-h-screen")}>
+      {!embedded ? (
+        <header className="flex items-center min-h-14 px-4 sm:px-6 py-2 bg-[#0F172A] border-b border-white/10 gap-4 shrink-0 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
           <BrandLogo className="h-7 w-auto max-h-7 shrink-0" priority />
           <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-200 border border-violet-400/25 truncate">
@@ -134,12 +137,13 @@ export function MasterContextDocClient({
         >
           App <ChevronRight size={12} />
         </Link>
-      </header>
+        </header>
+      ) : null}
 
       {/* Sticky action bar */}
       <div
         className={cn(
-          "sticky top-0 z-20 border-b border-border",
+          embedded ? "border-b border-border" : "sticky top-0 z-20 border-b border-border",
           "bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85",
           "dark:bg-background/90 dark:supports-[backdrop-filter]:dark:bg-background/75",
           "shadow-[0_1px_0_0_oklch(var(--border)_/_0.6)]",
@@ -174,7 +178,7 @@ export function MasterContextDocClient({
         </div>
       </div>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 flex flex-col gap-10">
+      <main className={cn("flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 flex flex-col gap-10", embedded && "max-w-none px-0 sm:px-0 py-0")}>
         <section className="space-y-4">
           <div className="flex flex-col gap-2">
             <div className="flex items-start gap-3">
@@ -285,7 +289,7 @@ export function MasterContextDocClient({
         </section>
       </main>
 
-      <Toaster richColors position="top-center" closeButton className="z-[100]" />
+      {!embedded ? <Toaster richColors position="top-center" closeButton className="z-[100]" /> : null}
     </div>
   )
 }
