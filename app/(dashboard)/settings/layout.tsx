@@ -27,7 +27,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { label: "General", href: "/settings/general", icon: User, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Workspace", href: "/settings/workspace", icon: Building2, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Sample data", href: "/settings/sample-data", icon: Database, visible: (p) => p.canManageWorkspaceSettings },
-  { label: "Data imports", href: "/settings/imports", icon: Upload, visible: (p) => p.canManageWorkspaceSettings },
+  { label: "Migration center", href: "/settings/imports", icon: Upload, visible: (p) => p.canManageHistoricalImports },
   { label: "Team", href: "/settings/team", icon: Users, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Permissions", href: "/settings/permissions", icon: Lock },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, visible: (p) => p.canViewBilling },

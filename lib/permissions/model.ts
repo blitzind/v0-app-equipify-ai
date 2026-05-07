@@ -30,6 +30,8 @@ export type OrgPermissions = {
 
   /** General, workspace profile fields, team invites, notifications, imports, sample data, equipment types */
   canManageWorkspaceSettings: boolean
+  /** Historical CSV / migration center — owner & admin only (see RLS on organization_import_jobs). */
+  canManageHistoricalImports: boolean
   canManageSecuritySettings: boolean
 
   canManageTechnicians: boolean
@@ -58,6 +60,7 @@ const NONE: OrgPermissions = {
   canManageApiKeys: false,
   canManageAutomations: false,
   canManageWorkspaceSettings: false,
+  canManageHistoricalImports: false,
   canManageSecuritySettings: false,
   canManageTechnicians: false,
   canViewTechnicians: false,
@@ -97,6 +100,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageApiKeys: true,
         canManageAutomations: true,
         canManageWorkspaceSettings: true,
+        canManageHistoricalImports: true,
         canManageSecuritySettings: true,
         canManageTechnicians: true,
         canViewTechnicians: true,
@@ -122,6 +126,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageApiKeys: false,
         canManageAutomations: false,
         canManageWorkspaceSettings: true,
+        canManageHistoricalImports: false,
         canManageSecuritySettings: false,
         canManageTechnicians: true,
         canViewTechnicians: true,

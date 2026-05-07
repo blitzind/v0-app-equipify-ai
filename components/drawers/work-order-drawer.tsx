@@ -74,6 +74,7 @@ import {
   Receipt,
   Loader2,
   PackageSearch,
+  History,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { useTenant } from "@/lib/tenant-store"
@@ -296,6 +297,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [tabTasks, setTabTasks] = useState<TaskDraft[]>([])
   const [savedTasks, setSavedTasks] = useState<TaskDraft[]>([])
   const [drawerTab, setDrawerTab] = useState("overview")
+  /** Service lifecycle timeline (WO + linked invoices); collapsed by default so tabs keep vertical space. */
+  const [drawerServiceTimelineOpen, setDrawerServiceTimelineOpen] = useState(false)
   const [certificateFocusEquipmentId, setCertificateFocusEquipmentId] = useState<string | null>(null)
   const [partsSaving, setPartsSaving] = useState(false)
   const [tasksSaving, setTasksSaving] = useState(false)
@@ -451,9 +454,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setDraft({})
     setDraftLaborDollars("")
     setDraftPartsDollars("")
+    setDrawerServiceTimelineOpen(false)
     setDrawerTab(initialTab === "certificate" ? "certificates" : (initialTab ?? "overview"))
     void loadWorkOrder()
   }, [workOrderId, loadWorkOrder, initialTab])
+
+  useEffect(() => {
+    if (editing) setDrawerServiceTimelineOpen(false)
+  }, [editing])
 
   useEffect(() => {
     if (!workOrderId || orgStatus !== "ready" || !activeOrgId) {
@@ -1533,6 +1541,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   <Pencil className="w-3.5 h-3.5 shrink-0" /> Edit
                 </Button>
               ) : null}
+              {serviceTimelineEvents.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={drawerServiceTimelineOpen ? "secondary" : "outline"}
+                  className="gap-1.5 text-xs cursor-pointer"
+                  aria-expanded={drawerServiceTimelineOpen}
+                  onClick={() => setDrawerServiceTimelineOpen((o) => !o)}
+                >
+                  <History className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  {drawerServiceTimelineOpen ? "Hide timeline" : "Timeline"}
+                </Button>
+              ) : null}
               <Button size="sm" variant="outline" asChild className="text-xs cursor-pointer">
                 <Link
                   href={`/work-orders?workOrderId=${encodeURIComponent(workOrderId)}`}
@@ -1739,13 +1760,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </div>
           ) : null}
 
-          {!editing && serviceTimelineEvents.length > 0 ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
+          {!editing && drawerServiceTimelineOpen && serviceTimelineEvents.length > 0 ? (
+            <div className="shrink-0 border-b border-border px-5 py-3 max-h-[min(42vh,26rem)] overflow-y-auto overscroll-contain">
               <ServiceLifecycleTimeline title="Service timeline" events={serviceTimelineEvents} />
             </div>
           ) : null}
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
           <WorkOrderDetailExperience
             layout="drawer"
             workOrder={displayWo ?? wo}

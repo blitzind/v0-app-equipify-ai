@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 114,
-  sqlMigrations: 89,
-  dashboardPages: 46,
-  componentsTsx: 137,
-  libTsFiles: 242,
+  apiRouteHandlers: 118,
+  sqlMigrations: 90,
+  dashboardPages: 53,
+  componentsTsx: 138,
+  libTsFiles: 260,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **114** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **89** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **46** |
-| \`components/**/*.tsx\` | **137** |
-| \`lib/**/*.ts\` | **242** |
+| API route handlers (\`app/api/**/route.ts\`) | **118** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **90** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **53** |
+| \`components/**/*.tsx\` | **138** |
+| \`lib/**/*.ts\` | **260** |
 
 ### Vercel crons
 
@@ -97,6 +97,10 @@ organizations/[organizationId]/inventory/vehicle-stock/route.ts
 organizations/[organizationId]/invite-member/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
+organizations/[organizationId]/migration-imports/[jobId]/commit/route.ts
+organizations/[organizationId]/migration-imports/[jobId]/preview/route.ts
+organizations/[organizationId]/migration-imports/[jobId]/route.ts
+organizations/[organizationId]/migration-imports/route.ts
 organizations/[organizationId]/portal-invites/route.ts
 organizations/[organizationId]/portal/certificate-release-default/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/cancel/route.ts
