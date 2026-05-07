@@ -67,6 +67,14 @@ export type OrgPermissions = {
   canViewTechnicians: boolean
 
   canArchiveRecords: boolean
+
+  /**
+   * Phase 1 (Leads): manage the prospects pipeline — create, edit, log
+   * follow-ups, and convert prospects to customers. Granted to
+   * owner/admin/manager only; techs and viewers see read-only access via
+   * org membership but cannot mutate.
+   */
+  canManageProspects: boolean
 }
 
 export type OrgPermissionKey = keyof OrgPermissions
@@ -102,6 +110,7 @@ const NONE: OrgPermissions = {
   canManageTechnicians: false,
   canViewTechnicians: false,
   canArchiveRecords: false,
+  canManageProspects: false,
 }
 
 export function normalizeOrgMemberRole(raw: string | null | undefined): OrgMemberRole | null {
@@ -150,6 +159,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageTechnicians: true,
         canViewTechnicians: true,
         canArchiveRecords: true,
+        canManageProspects: true,
       }
     case "manager":
       return {
@@ -184,6 +194,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageTechnicians: true,
         canViewTechnicians: true,
         canArchiveRecords: true,
+        canManageProspects: true,
       }
     case "tech":
       return {
@@ -217,6 +228,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageTechnicians: false,
         canViewTechnicians: true,
         canArchiveRecords: false,
+        canManageProspects: false,
       }
     case "viewer":
       return {
@@ -250,6 +262,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageTechnicians: false,
         canViewTechnicians: true,
         canArchiveRecords: false,
+        canManageProspects: false,
       }
     default:
       return NONE

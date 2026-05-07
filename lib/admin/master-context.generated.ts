@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 134,
-  sqlMigrations: 99,
-  dashboardPages: 54,
-  componentsTsx: 170,
-  libTsFiles: 289,
+  apiRouteHandlers: 139,
+  sqlMigrations: 100,
+  dashboardPages: 55,
+  componentsTsx: 174,
+  libTsFiles: 292,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **134** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **99** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **54** |
-| \`components/**/*.tsx\` | **170** |
-| \`lib/**/*.ts\` | **289** |
+| API route handlers (\`app/api/**/route.ts\`) | **139** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **100** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **55** |
+| \`components/**/*.tsx\` | **174** |
+| \`lib/**/*.ts\` | **292** |
 
 ### Vercel crons
 
@@ -118,6 +118,11 @@ organizations/[organizationId]/price-list-imports/[importId]/duplicate-preview/r
 organizations/[organizationId]/price-list-imports/[importId]/extract/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/route.ts
 organizations/[organizationId]/price-list-imports/route.ts
+organizations/[organizationId]/prospects/[prospectId]/convert/route.ts
+organizations/[organizationId]/prospects/[prospectId]/follow-up/route.ts
+organizations/[organizationId]/prospects/[prospectId]/route.ts
+organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts
+organizations/[organizationId]/prospects/route.ts
 organizations/[organizationId]/reports/analytics/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/route.ts
 organizations/[organizationId]/workflow-automations/route.ts

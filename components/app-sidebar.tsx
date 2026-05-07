@@ -93,8 +93,11 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Contacts",
     items: [
       { label: "Customers", href: "/customers", icon: Users },
-      // Placeholder — no route yet; rendered in disabled state.
-      { label: "Prospects", href: "", icon: UserPlus, comingSoon: true },
+      // Leads + Follow-Up Phase 1: pipeline lives at /prospects. Read access
+      // matches RLS (org membership); editing/converting requires
+      // `canManageProspects`, but we surface the link to all members so
+      // viewers/techs can see the pipeline read-only.
+      { label: "Prospects", href: "/prospects", icon: UserPlus },
     ],
   },
   {

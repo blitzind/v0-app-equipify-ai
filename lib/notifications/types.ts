@@ -34,6 +34,7 @@ export type RelatedEntityType =
   | "customer"
   | "equipment"
   | "organization"
+  | "prospect"
 
 export type CommunicationEventType =
   | "work_order_reminder"

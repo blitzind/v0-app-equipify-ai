@@ -34,6 +34,7 @@ export type CapabilityMetadata = {
     | "technicians"
     | "reports"
     | "automations"
+    | "prospects"
     | "general"
 }
 
@@ -192,6 +193,12 @@ export const CAPABILITY_METADATA: Partial<Record<OrgPermissionKey, CapabilityMet
     label: "Archive records",
     description: "Archive customers, equipment, work orders, and invoices.",
     surface: "general",
+  },
+  canManageProspects: {
+    label: "Manage prospects",
+    description:
+      "Create and edit prospects, log follow-ups, and convert prospects into customers.",
+    surface: "prospects",
   },
 }
 
