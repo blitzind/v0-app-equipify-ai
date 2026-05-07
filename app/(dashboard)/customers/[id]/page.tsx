@@ -191,9 +191,11 @@ function equipmentRowToUi(row: {
   name: string
   manufacturer: string | null
   category: string | null
+  subcategory: string | null
   serial_number: string | null
   status: string
   next_due_at: string | null
+  next_calibration_due_at: string | null
   location_label: string | null
   install_date: string | null
   warranty_expires_at: string | null
@@ -214,11 +216,13 @@ function equipmentRowToUi(row: {
     model: row.name,
     manufacturer: row.manufacturer ?? "",
     category: row.category ?? "",
+    subcategory: row.subcategory ?? undefined,
     serialNumber: row.serial_number ?? "",
     installDate: row.install_date ?? "",
     warrantyExpiration: row.warranty_expires_at ?? "",
     lastServiceDate: row.last_service_at ?? "",
-    nextDueDate: row.next_due_at ?? "",
+    nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "",
+    nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : undefined,
     status: statusMap[row.status] ?? "Active",
     notes: row.notes ?? "",
     location: row.location_label ?? "",
@@ -575,7 +579,7 @@ export default function CustomerDetailPage() {
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
         .select(
-          "id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, next_due_at, location_label, install_date, warranty_expires_at, last_service_at, notes, created_at",
+          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, install_date, warranty_expires_at, last_service_at, notes, created_at",
         )
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
@@ -736,6 +740,18 @@ export default function CustomerDetailPage() {
       customerWorkOrders.filter((w) => w.status !== "completed" && w.status !== "invoiced").length,
     [customerWorkOrders],
   )
+
+  const equipmentComplianceSummary = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    let overduePm = 0
+    let overdueCal = 0
+    for (const e of customerEquipment) {
+      if (e.nextDueDate?.trim() && e.nextDueDate < today) overduePm++
+      const nc = e.nextCalibrationDue?.trim()
+      if (nc && nc < today) overdueCal++
+    }
+    return { overduePm, overdueCal }
+  }, [customerEquipment])
 
   const activityItems = useMemo((): ActivityEntry[] => {
     if (!customer) return []
@@ -1326,7 +1342,12 @@ export default function CustomerDetailPage() {
                 {
                   label: "Total Equipment",
                   value: String(customerEquipment.length),
-                  sub: "assets on file",
+                  sub:
+                    equipmentComplianceSummary.overduePm > 0 || equipmentComplianceSummary.overdueCal > 0
+                      ? `${equipmentComplianceSummary.overduePm > 0 ? `${equipmentComplianceSummary.overduePm} PM overdue` : ""}${
+                          equipmentComplianceSummary.overduePm > 0 && equipmentComplianceSummary.overdueCal > 0 ? " · " : ""
+                        }${equipmentComplianceSummary.overdueCal > 0 ? `${equipmentComplianceSummary.overdueCal} calibration overdue` : ""}`
+                      : "assets on file",
                   icon: Wrench,
                   accent: "text-primary",
                   bg: "bg-primary/10",

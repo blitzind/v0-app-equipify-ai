@@ -73,9 +73,12 @@ type Equipment = {
   model: string
   manufacturer: string
   category: string
+  subcategory: string
   serialNumber: string
   lastServiceDate: string
   nextDueDate: string
+  nextCalibrationDue: string
+  warrantyExpiresAt: string
   status: EquipmentStatus
   location: string
   isArchived?: boolean
@@ -88,10 +91,13 @@ type DbEquipmentRow = {
   name: string
   manufacturer: string | null
   category: string | null
+  subcategory: string | null
   serial_number: string | null
   status: "active" | "needs_service" | "out_of_service" | "in_repair"
   last_service_at: string | null
   next_due_at: string | null
+  next_calibration_due_at: string | null
+  warranty_expires_at: string | null
   location_label: string | null
   archived_at: string | null
 }
@@ -154,7 +160,7 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
                   name: eq.model,
                   equipment_code: eq.equipmentCode,
                   serial_number: eq.serialNumber,
-                  category: eq.category,
+                  category: [eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ") || eq.category,
                 })}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -164,7 +170,8 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
                     name: eq.model,
                     equipment_code: eq.equipmentCode,
                     serial_number: eq.serialNumber,
-                    category: eq.category,
+                    category: [eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ") || eq.category,
+                    manufacturer: eq.manufacturer,
                   },
                   eq.customerName,
                 )}
@@ -192,7 +199,9 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
             </div>
             <div className="flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{eq.category}</span>
+              <span className="truncate">
+                {[eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ")}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 shrink-0" />
@@ -231,6 +240,7 @@ function EquipmentPageInner() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [complianceFilter, setComplianceFilter] = useState<string>("all")
   const [sortKey, setSortKey] = useState<SortKey>("nextDueDate")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
@@ -303,7 +313,9 @@ function EquipmentPageInner() {
 
       let eqQuery = supabase
         .from("equipment")
-        .select("id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, last_service_at, next_due_at, location_label, archived_at")
+        .select(
+          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, last_service_at, next_due_at, next_calibration_due_at, warranty_expires_at, location_label, archived_at",
+        )
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
@@ -346,9 +358,12 @@ function EquipmentPageInner() {
         model: row.name,
         manufacturer: row.manufacturer ?? "",
         category: row.category ?? "General",
+        subcategory: row.subcategory ?? "",
         serialNumber: row.serial_number ?? "",
         lastServiceDate: row.last_service_at ? row.last_service_at.slice(0, 10) : "1970-01-01",
         nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "2099-12-31",
+        nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : "",
+        warrantyExpiresAt: row.warranty_expires_at ? row.warranty_expires_at.slice(0, 10) : "",
         status: statusMap[row.status] ?? "Active",
         location: row.location_label ?? "—",
         isArchived: Boolean(row.archived_at),
@@ -377,6 +392,8 @@ function EquipmentPageInner() {
             equipment_code: e.equipmentCode,
             serial_number: e.serialNumber,
             category: e.category,
+            subcategory: e.subcategory,
+            manufacturer: e.manufacturer,
           },
           e.customerName,
         ),
@@ -391,6 +408,21 @@ function EquipmentPageInner() {
       list = list.filter((e) => e.category === categoryFilter)
     }
 
+    const today = new Date().toISOString().slice(0, 10)
+    if (complianceFilter === "maintenance_overdue") {
+      list = list.filter(
+        (e) => e.nextDueDate !== "2099-12-31" && e.nextDueDate < today,
+      )
+    } else if (complianceFilter === "calibration_overdue") {
+      list = list.filter((e) => e.nextCalibrationDue.trim() && e.nextCalibrationDue < today)
+    } else if (complianceFilter === "warranty_expiring") {
+      list = list.filter((e) => {
+        if (!e.warrantyExpiresAt.trim()) return false
+        const d = daysToDue(e.warrantyExpiresAt)
+        return d >= 0 && d <= 90
+      })
+    }
+
     list.sort((a, b) => {
       const av = a[sortKey] as string
       const bv = b[sortKey] as string
@@ -398,7 +430,7 @@ function EquipmentPageInner() {
     })
 
     return list
-  }, [equipment, search, statusFilter, categoryFilter, sortKey, sortDir])
+  }, [equipment, search, statusFilter, categoryFilter, complianceFilter, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -468,6 +500,18 @@ function EquipmentPageInner() {
               {allCategories.map((c) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={complianceFilter} onValueChange={setComplianceFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Compliance" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All compliance</SelectItem>
+              <SelectItem value="maintenance_overdue">Maintenance overdue</SelectItem>
+              <SelectItem value="calibration_overdue">Calibration overdue</SelectItem>
+              <SelectItem value="warranty_expiring">Warranty expiring (90d)</SelectItem>
             </SelectContent>
           </Select>
 
@@ -633,7 +677,7 @@ function EquipmentPageInner() {
                             name: eq.model,
                             equipment_code: eq.equipmentCode,
                             serial_number: eq.serialNumber,
-                            category: eq.category,
+                            category: [eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ") || eq.category,
                           })}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -643,7 +687,8 @@ function EquipmentPageInner() {
                               name: eq.model,
                               equipment_code: eq.equipmentCode,
                               serial_number: eq.serialNumber,
-                              category: eq.category,
+                              category: [eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ") || eq.category,
+                              manufacturer: eq.manufacturer,
                             },
                             eq.customerName,
                           )}
@@ -655,7 +700,9 @@ function EquipmentPageInner() {
                         {eq.customerName}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{eq.category}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {[eq.category, eq.subcategory].filter((x) => x?.trim()).join(" › ") || "—"}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
                         <Badge variant="secondary" className={cn("text-xs", statusColors[eq.status])}>

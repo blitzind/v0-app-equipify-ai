@@ -88,12 +88,17 @@ export interface Equipment {
   model: string
   manufacturer: string
   category: string
+  /** Optional refinement under category for taxonomy / reporting */
+  subcategory?: string
   serialNumber: string
   installDate: string
   warrantyStartDate?: string
   warrantyExpiration: string
   lastServiceDate: string
   nextDueDate: string
+  /** Planned calibration/compliance due (equipment.next_calibration_due_at) */
+  nextCalibrationDue?: string
+  calibrationIntervalMonths?: number | null
   status: EquipmentStatus
   notes: string
   location: string

@@ -8,6 +8,9 @@ export type EquipmentDisplayFields = {
   equipment_code?: string | null
   serial_number?: string | null
   category?: string | null
+  /** Refinement under category (search + labels); optional. */
+  subcategory?: string | null
+  manufacturer?: string | null
 }
 
 function trim(s: string | null | undefined): string {
@@ -73,6 +76,8 @@ export function equipmentMatchesSearch(
     eq.equipment_code,
     eq.serial_number,
     eq.category,
+    eq.subcategory,
+    eq.manufacturer,
     customerName,
     getEquipmentDisplayPrimary(eq),
     getEquipmentReference(eq),

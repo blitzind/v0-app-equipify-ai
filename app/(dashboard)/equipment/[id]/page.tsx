@@ -11,11 +11,18 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DrawerSection, DrawerRow, DrawerTimeline } from "@/components/detail-drawer"
+import { DrawerSection, DrawerRow } from "@/components/detail-drawer"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
-import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
-import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
+import {
+  fetchCalibrationRecordsForEquipment,
+  fetchInvoicesForEquipmentAsset,
+  fetchWorkOrdersLinkedToEquipment,
+  type EquipmentCertRow,
+  type EquipmentInvoiceRow,
+} from "@/lib/equipment/equipment-detail-queries"
+import { buildEquipmentLifecycleTimeline, sumInvoiceAmountCents } from "@/lib/lifecycle/equipment-timeline"
+import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import {
@@ -29,6 +36,8 @@ import {
   Calendar,
   Cpu,
   ExternalLink,
+  Users,
+  Receipt,
 } from "lucide-react"
 
 type DbEquipmentRow = {
@@ -39,12 +48,16 @@ type DbEquipmentRow = {
   name: string
   manufacturer: string | null
   category: string | null
+  subcategory: string | null
   serial_number: string | null
   status: "active" | "needs_service" | "out_of_service" | "in_repair"
   install_date: string | null
   warranty_expires_at: string | null
+  warranty_expiration_date: string | null
   last_service_at: string | null
   next_due_at: string | null
+  next_calibration_due_at: string | null
+  calibration_interval_months: number | null
   location_label: string | null
   notes: string | null
 }
@@ -61,6 +74,7 @@ type AssetWo = {
   total_labor_cents: number
   total_parts_cents: number
   maintenance_plan_id: string | null
+  assigned_technician_id: string | null
 }
 
 type PlanRow = {
@@ -141,6 +155,10 @@ function warrantyKpiLabel(days: number, hasDate: boolean): string {
 }
 
 function rowToEquipment(row: DbEquipmentRow, customerName: string): Equipment {
+  const warranty =
+    row.warranty_expiration_date?.trim() ||
+    row.warranty_expires_at?.trim() ||
+    ""
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -149,11 +167,14 @@ function rowToEquipment(row: DbEquipmentRow, customerName: string): Equipment {
     model: row.name,
     manufacturer: row.manufacturer ?? "",
     category: row.category ?? "",
+    subcategory: row.subcategory ?? undefined,
     serialNumber: row.serial_number ?? "",
     installDate: row.install_date ?? "",
-    warrantyExpiration: row.warranty_expires_at ?? "",
+    warrantyExpiration: warranty,
     lastServiceDate: row.last_service_at ?? "",
     nextDueDate: row.next_due_at ?? "",
+    nextCalibrationDue: row.next_calibration_due_at ?? undefined,
+    calibrationIntervalMonths: row.calibration_interval_months ?? undefined,
     status: mapDbStatusToUi(row.status),
     notes: row.notes ?? "",
     location: row.location_label ?? "",
@@ -172,6 +193,11 @@ export default function EquipmentDetailPage() {
   const [eq, setEq] = useState<Equipment | null>(null)
   const [workOrders, setWorkOrders] = useState<AssetWo[]>([])
   const [plans, setPlans] = useState<PlanRow[]>([])
+  const [invoiceRows, setInvoiceRows] = useState<EquipmentInvoiceRow[]>([])
+  const [certificateLines, setCertificateLines] = useState<
+    { id: string; created_at: string; templateName: string | null; workOrderLabel: string | null }[]
+  >([])
+  const [techProfiles, setTechProfiles] = useState<Record<string, string>>({})
   const [tab, setTab] = useState("overview")
 
   const load = useCallback(async () => {
@@ -179,6 +205,9 @@ export default function EquipmentDetailPage() {
       setEq(null)
       setWorkOrders([])
       setPlans([])
+      setInvoiceRows([])
+      setCertificateLines([])
+      setTechProfiles({})
       setLoading(false)
       return
     }
@@ -192,6 +221,9 @@ export default function EquipmentDetailPage() {
         setEq(null)
         setWorkOrders([])
         setPlans([])
+        setInvoiceRows([])
+        setCertificateLines([])
+        setTechProfiles({})
         return
       }
       if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
@@ -203,7 +235,7 @@ export default function EquipmentDetailPage() {
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes",
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, install_date, warranty_expires_at, warranty_expiration_date, last_service_at, next_due_at, next_calibration_due_at, calibration_interval_months, location_label, notes",
         )
         .eq("id", id)
         .eq("organization_id", oid)
@@ -214,6 +246,9 @@ export default function EquipmentDetailPage() {
         setEq(null)
         setWorkOrders([])
         setPlans([])
+        setInvoiceRows([])
+        setCertificateLines([])
+        setTechProfiles({})
         return
       }
 
@@ -228,26 +263,66 @@ export default function EquipmentDetailPage() {
       const customerName = (customerRow as { company_name: string } | null)?.company_name ?? "Customer"
       setEq(rowToEquipment(er, customerName))
 
-      let woRes = await supabase
-        .from("work_orders")
-        .select(WO_LIST_SELECT_WITH_NUM)
-        .eq("organization_id", oid)
-        .eq("equipment_id", er.id)
-        .is("archived_at", null)
-        .order("created_at", { ascending: false })
-        .limit(150)
+      const { rows: woMerged, error: woErr } = await fetchWorkOrdersLinkedToEquipment(supabase, oid, er.id)
+      const woList = (woErr ? [] : woMerged) as AssetWo[]
+      setWorkOrders(woList)
 
-      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-        woRes = await supabase
-          .from("work_orders")
-          .select(WO_LIST_SELECT)
-          .eq("organization_id", oid)
-          .eq("equipment_id", er.id)
-          .is("archived_at", null)
-          .order("created_at", { ascending: false })
-          .limit(150)
+      const techIds = [...new Set(woList.map((w) => w.assigned_technician_id).filter(Boolean))] as string[]
+      if (techIds.length > 0) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", techIds)
+        const map: Record<string, string> = {}
+        for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+          map[p.id] = p.full_name?.trim() || "Technician"
+        }
+        setTechProfiles(map)
+      } else {
+        setTechProfiles({})
       }
-      setWorkOrders(woRes.error ? [] : ((woRes.data ?? []) as AssetWo[]))
+
+      const [{ rows: invs }, { rows: certs }] = await Promise.all([
+        fetchInvoicesForEquipmentAsset(supabase, oid, er.id),
+        fetchCalibrationRecordsForEquipment(supabase, oid, er.id),
+      ])
+      setInvoiceRows(invs)
+
+      const templateIds = [...new Set(certs.map((c) => c.template_id))]
+      const tplMap: Record<string, string> = {}
+      if (templateIds.length > 0) {
+        const { data: tplRows } = await supabase
+          .from("calibration_templates")
+          .select("id, name")
+          .eq("organization_id", oid)
+          .in("id", templateIds)
+        for (const t of (tplRows ?? []) as Array<{ id: string; name: string }>) tplMap[t.id] = t.name
+      }
+
+      const woIdsCert = [...new Set(certs.map((c) => c.work_order_id))]
+      const woMap: Record<string, { work_order_number?: number | null; title: string }> = {}
+      if (woIdsCert.length > 0) {
+        const { data: wcert } = await supabase
+          .from("work_orders")
+          .select("id, work_order_number, title")
+          .eq("organization_id", oid)
+          .in("id", woIdsCert)
+        for (const w of (wcert ?? []) as AssetWo[]) {
+          woMap[w.id] = { work_order_number: w.work_order_number, title: w.title }
+        }
+      }
+
+      setCertificateLines(
+        certs.map((c: EquipmentCertRow) => {
+          const wo = woMap[c.work_order_id]
+          const woLbl = wo
+            ? `${formatWorkOrderDisplay(wo.work_order_number, c.work_order_id)} · ${wo.title}`
+            : null
+          return {
+            id: c.id,
+            created_at: c.created_at,
+            templateName: tplMap[c.template_id] ?? null,
+            workOrderLabel: woLbl,
+          }
+        }),
+      )
 
       const { data: planData } = await supabase
         .from("maintenance_plans")
@@ -290,38 +365,77 @@ export default function EquipmentDetailPage() {
         ? `Expired ${fmtDate(eq.warrantyExpiration)}`
         : `Ends ${fmtDate(eq.warrantyExpiration)}`
 
-  const overviewTimeline = useMemo(() => {
-    type Ev = { at: string; label: string; desc: string; accent: "success" | "warning" | "muted" }
-    const ev: Ev[] = []
-    for (const wo of workOrders) {
-      ev.push({
-        at: wo.created_at,
-        label: `Work order opened · ${formatWorkOrderDisplay(wo.work_order_number, wo.id)}`,
-        desc: `${wo.title} · ${woDbStatusLabel(wo.status)}`,
-        accent: "muted",
-      })
-      if (wo.completed_at) {
-        ev.push({
-          at: wo.completed_at,
-          label: `Work order completed · ${formatWorkOrderDisplay(wo.work_order_number, wo.id)}`,
-          desc: wo.title,
-          accent: "success",
-        })
-      }
+  const equipmentLifecycleEvents = useMemo(() => {
+    if (!eq) return []
+    return buildEquipmentLifecycleTimeline(
+      {
+        installDate: eq.installDate,
+        warrantyExpires: eq.warrantyExpiration,
+        nextDueAt: eq.nextDueDate,
+        nextCalibrationDueAt: eq.nextCalibrationDue,
+      },
+      workOrders.map((w) => ({
+        id: w.id,
+        created_at: w.created_at,
+        completed_at: w.completed_at,
+        title: w.title,
+        type: w.type,
+        status: w.status,
+        work_order_number: w.work_order_number,
+        maintenance_plan_id: w.maintenance_plan_id,
+        total_parts_cents: w.total_parts_cents,
+        total_labor_cents: w.total_labor_cents,
+        technicianLabel: w.assigned_technician_id ? techProfiles[w.assigned_technician_id] ?? null : null,
+      })),
+      invoiceRows.map((inv) => ({
+        id: inv.id,
+        issued_at: inv.issued_at,
+        title: inv.title ?? "",
+        status: inv.status,
+        amount_cents: inv.amount_cents,
+        invoice_number: inv.invoice_number,
+      })),
+      certificateLines.map((c) => ({
+        id: c.id,
+        created_at: c.created_at,
+        templateName: c.templateName,
+        workOrderLabel: c.workOrderLabel,
+      })),
+      plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        next_due_date: p.next_due_date,
+      })),
+    )
+  }, [eq, workOrders, techProfiles, invoiceRows, certificateLines, plans])
+
+  const invoicedRevenueCents = useMemo(() => sumInvoiceAmountCents(invoiceRows), [invoiceRows])
+
+  const technicianRollup = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const w of workOrders) {
+      const tid = w.assigned_technician_id
+      if (!tid) continue
+      const label = techProfiles[tid] ?? "Technician"
+      m.set(label, (m.get(label) ?? 0) + 1)
     }
-    ev.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-    return ev.slice(0, 14).map((e) => ({
-      date: new Date(e.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-      label: e.label,
-      description: e.desc,
-      accent: e.accent,
-    }))
-  }, [workOrders])
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [workOrders, techProfiles])
 
   const totalServiceCost = useMemo(
     () => workOrders.reduce((s, w) => s + ((w.total_labor_cents ?? 0) + (w.total_parts_cents ?? 0)) / 100, 0),
     [workOrders],
   )
+
+  function invoiceUiStatus(db: string | null): string {
+    if (!db) return "—"
+    const x = db.toLowerCase()
+    if (x === "paid" || x === "sent" || x === "draft" || x === "void" || x === "overdue") {
+      return db.charAt(0).toUpperCase() + db.slice(1).toLowerCase()
+    }
+    return db.replace(/_/g, " ")
+  }
 
   if (!id) {
     return (
@@ -498,21 +612,106 @@ export default function EquipmentDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
-          {overviewTimeline.length > 0 && (
-            <Card className="border-border">
-              <CardContent className="p-5">
-                <DrawerSection title="Recent service activity">
-                  <DrawerTimeline items={overviewTimeline} />
-                </DrawerSection>
+          <ServiceLifecycleTimeline title="Equipment timeline" events={equipmentLifecycleEvents} />
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-[color:var(--status-info)]" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Revenue (invoiced)</p>
+                </div>
+                <p className="text-2xl font-bold text-foreground tabular-nums">{fmtCurrency(invoicedRevenueCents / 100)}</p>
+                <p className="text-xs text-muted-foreground leading-snug">
+                  Sum of invoice totals linked to this asset. Repair vs PM breakdown uses work order type on the Service tab.
+                </p>
               </CardContent>
             </Card>
-          )}
+            <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Technician familiarity</p>
+                </div>
+                {technicianRollup.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No assigned technician history on work orders yet.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {technicianRollup.slice(0, 6).map(([name, count]) => (
+                      <li key={name} className="flex justify-between text-sm gap-2">
+                        <span className="text-foreground truncate">{name}</span>
+                        <span className="text-muted-foreground tabular-nums shrink-0">{count} WO{count === 1 ? "" : "s"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border-border">
+            <CardContent className="p-5 space-y-0">
+              <DrawerSection title="Compliance & maintenance">
+                <DrawerRow
+                  label="Calibration due"
+                  value={
+                    eq.nextCalibrationDue?.trim()
+                      ? `${fmtDate(eq.nextCalibrationDue)}${daysToDue(eq.nextCalibrationDue) < 0 ? " · Overdue" : ""}`
+                      : "—"
+                  }
+                />
+                <DrawerRow
+                  label="Calibration interval"
+                  value={
+                    eq.calibrationIntervalMonths != null && eq.calibrationIntervalMonths > 0
+                      ? `${eq.calibrationIntervalMonths} months`
+                      : "—"
+                  }
+                />
+                <DrawerRow label="Certificates on file" value={String(certificateLines.length)} />
+              </DrawerSection>
+            </CardContent>
+          </Card>
+
+          {invoiceRows.length > 0 ? (
+            <Card className="border-border">
+              <CardContent className="p-5 space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Invoices</p>
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                  {invoiceRows.slice(0, 8).map((inv) => (
+                    <Link
+                      key={inv.id}
+                      href={`/invoices?open=${encodeURIComponent(inv.id)}`}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-muted/40 transition-colors"
+                    >
+                      <span className="font-medium text-foreground truncate">
+                        {inv.invoice_number?.trim() || inv.title?.trim() || "Invoice"}
+                      </span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {inv.amount_cents != null ? fmtCurrency(inv.amount_cents / 100) : "—"} · {invoiceUiStatus(inv.status)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+                {invoiceRows.length > 8 ? (
+                  <p className="text-[10px] text-muted-foreground">Showing 8 of {invoiceRows.length} invoices.</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card className="border-border">
             <CardContent className="p-5 space-y-0">
               <DrawerSection title="Equipment">
                 <DrawerRow label="Customer" value={<Link href={`/customers/${eq.customerId}`} className="text-primary hover:underline">{eq.customerName}</Link>} />
                 <DrawerRow label="Serial" value={eq.serialNumber || "—"} />
-                <DrawerRow label="Category" value={eq.category || "—"} />
+                <DrawerRow
+                  label="Category"
+                  value={
+                    [eq.category?.trim(), eq.subcategory?.trim()].filter(Boolean).join(" › ") || "—"
+                  }
+                />
+                <DrawerRow label="Manufacturer" value={eq.manufacturer?.trim() || "—"} />
                 <DrawerRow label="Location" value={eq.location || "—"} />
               </DrawerSection>
             </CardContent>

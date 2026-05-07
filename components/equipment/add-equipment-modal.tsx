@@ -96,6 +96,7 @@ function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLText
 const INITIAL_FORM = {
   name: "",
   equipmentType: "",
+  subcategory: "",
   manufacturer: "",
   model: "",
   serialNumber: "",
@@ -105,6 +106,8 @@ const INITIAL_FORM = {
   warrantyExpiration: "",
   lastServiceDate: "",
   nextServiceDue: "",
+  nextCalibrationDue: "",
+  calibrationIntervalMonths: "",
   serviceInterval: "",
   status: "Active" as EquipmentStatus,
   notes: "",
@@ -247,12 +250,18 @@ export function AddEquipmentModal({
         name: (form.model || form.name).trim(),
         manufacturer: form.manufacturer.trim() || null,
         category: form.equipmentType.trim(),
+        subcategory: form.subcategory.trim() || null,
         serial_number: form.serialNumber.trim() || null,
         status: statusMap[form.status],
         install_date: form.installDate || null,
         warranty_expires_at: form.warrantyExpiration || null,
         last_service_at: form.lastServiceDate || null,
         next_due_at: form.nextServiceDue || null,
+        next_calibration_due_at: form.nextCalibrationDue.trim() ? form.nextCalibrationDue.trim() : null,
+        calibration_interval_months: (() => {
+          const n = parseInt(form.calibrationIntervalMonths.trim(), 10)
+          return Number.isFinite(n) && n > 0 ? n : null
+        })(),
         location_label: form.location.trim() || null,
         notes: form.notes.trim() || null,
       })
@@ -384,6 +393,16 @@ export function AddEquipmentModal({
               </Field>
             </div>
 
+            <Field>
+              <Label>Subcategory (optional)</Label>
+              <Input
+                placeholder="e.g. Rooftop · Medical Gas · Audiometer"
+                value={form.subcategory}
+                onChange={(e) => set("subcategory", e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Refines the primary type for reporting and filters.</p>
+            </Field>
+
             {/* Row 3 */}
             <div className="grid grid-cols-2 gap-4">
               <Field>
@@ -423,6 +442,23 @@ export function AddEquipmentModal({
               <Field>
                 <Label>Next Service Due</Label>
                 <Input type="date" value={form.nextServiceDue} onChange={(e) => set("nextServiceDue", e.target.value)} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <Label>Next calibration / compliance due</Label>
+                <Input type="date" value={form.nextCalibrationDue} onChange={(e) => set("nextCalibrationDue", e.target.value)} />
+              </Field>
+              <Field>
+                <Label>Calibration interval (months)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 12"
+                  value={form.calibrationIntervalMonths}
+                  onChange={(e) => set("calibrationIntervalMonths", e.target.value)}
+                />
               </Field>
             </div>
 
