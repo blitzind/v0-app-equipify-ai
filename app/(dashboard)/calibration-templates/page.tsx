@@ -711,10 +711,14 @@ export default function CertificatesPage() {
         </div>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex flex-nowrap items-end justify-between gap-3 border-b border-border bg-background px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* gap-2 only — avoid stacking space-y-* with Root gap (was pushing content too far down) */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-2">
+        <div className="flex flex-nowrap items-center justify-between gap-3 bg-background px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsList
-            className={cn(tabsListDrawerRowClassName, "min-w-0 flex-1 bg-background py-2")}
+            className={cn(
+              tabsListDrawerRowClassName,
+              "min-w-0 flex-1 border-b-0 px-1 py-1.5 sm:px-2 bg-background",
+            )}
           >
             <TabsTrigger
               value="templates"
@@ -731,7 +735,7 @@ export default function CertificatesPage() {
               Completed Certificates
             </TabsTrigger>
           </TabsList>
-          <div className="flex shrink-0 items-center gap-2 mb-px flex-wrap justify-end">
+          <div className="flex shrink-0 items-center gap-2 flex-wrap justify-end py-1">
             {!certificateAiImportAllowed ? (
               <p className="text-[11px] text-muted-foreground max-w-[220px] text-right leading-snug">
                 AI certificate import is available on Growth and Scale plans.{" "}
@@ -764,7 +768,7 @@ export default function CertificatesPage() {
           </div>
         </div>
         {activeTab === "completed" ? (
-          <div className="border-b border-border bg-background px-1 py-2">
+          <div className="border-b border-border bg-background px-1 py-1.5">
             <div className="relative max-w-md">
               <Search
                 className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground"

@@ -37,21 +37,112 @@ export function isEquipmentListSchemaMismatchError(error: PostgrestError | null 
 }
 
 /**
- * Structured log for equipment list failures (browser or server caller). Does not log raw row payloads.
+ * Phases:
+ * - `initial_schema_fallback` — full select failed because new intelligence columns are missing
+ *   from the remote schema. We are about to retry with a backward-safe legacy select. This is
+ *   expected behavior in dev/preview environments where the migration has not been applied yet,
+ *   so we surface it as a `console.warn` (dev only) instead of a scary `console.error`.
+ * - `legacy_fallback_failed` — both the full select AND the legacy fallback failed. Real failure.
+ * - `fatal`                  — the initial select failed for a non-schema reason (RLS, network,
+ *                              connection, etc.) so no fallback retry is possible.
+ */
+export type EquipmentListQueryPhase = "initial_schema_fallback" | "legacy_fallback_failed" | "fatal"
+
+type NormalizedEquipmentError = {
+  /** True when no recognizable diagnostic fields were present on the error object. */
+  empty: boolean
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+  /** Comma-joined enumerable keys when fallback fields are absent — helps identify unknown error shapes. */
+  rawKeys?: string
+}
+
+/**
+ * Coerce arbitrary throwables / Supabase errors into a stable diagnostic shape so the console
+ * never receives an opaque `{}`. Supabase usually returns `PostgrestError` (code/message/details/hint),
+ * but RLS rejections, edge fetch failures, and aborted requests can surface non-standard shapes.
+ */
+function normalizeEquipmentListError(error: unknown): NormalizedEquipmentError {
+  if (error == null) return { empty: true }
+  if (typeof error === "string") return { empty: false, message: error }
+  if (typeof error !== "object") return { empty: false, message: String(error) }
+
+  const e = error as Record<string, unknown>
+  const code = typeof e.code === "string" && e.code.trim() ? e.code : undefined
+  const message =
+    typeof e.message === "string" && e.message.trim()
+      ? e.message
+      : error instanceof Error && error.message
+        ? error.message
+        : undefined
+  const details = typeof e.details === "string" && e.details.trim() ? e.details : undefined
+  const hint = typeof e.hint === "string" && e.hint.trim() ? e.hint : undefined
+
+  if (code || message || details || hint) {
+    return { empty: false, code, message, details, hint }
+  }
+
+  let rawKeys: string | undefined
+  try {
+    const keys = Object.keys(e)
+    if (keys.length > 0) rawKeys = keys.join(",")
+  } catch {
+    /* defensive: some proxies throw on Object.keys */
+  }
+
+  return { empty: !rawKeys, rawKeys }
+}
+
+/**
+ * Structured log for equipment list query failures.
+ *
+ * Behavior:
+ * - Never emits an empty `{}` payload. If the underlying error has no recognizable diagnostic
+ *   fields, a soft dev-only warning is emitted with explicit context.
+ * - Uses `console.warn` (dev only) for `initial_schema_fallback`, since that is an expected
+ *   recoverable code path; the page proceeds to retry with a legacy select.
+ * - Uses `console.error` only for true unrecovered failures (`legacy_fallback_failed`, `fatal`).
+ * - Never logs raw row payloads or full organization UUIDs.
  */
 export function logEquipmentListQueryFailure(
-  phase: "initial" | "legacy_fallback" | "fatal",
-  error: PostgrestError,
+  phase: EquipmentListQueryPhase,
+  error: unknown,
   meta?: { organizationId?: string },
 ): void {
-  const payload = {
-    phase,
-    code: error.code,
-    message: error.message,
-    details: error.details,
-    hint: error.hint,
-    ...(meta?.organizationId ? { organizationIdPrefix: meta.organizationId.slice(0, 8) } : {}),
+  const normalized = normalizeEquipmentListError(error)
+  const isDev = process.env.NODE_ENV !== "production"
+  const orgPrefix = meta?.organizationId ? meta.organizationId.slice(0, 8) : undefined
+
+  if (normalized.empty) {
+    if (!isDev) return
+    console.warn("[equipment list query] received empty/unknown error object", {
+      phase,
+      note: "Supabase returned no diagnostic fields (code/message/details/hint). Check network tab and RLS policies.",
+      ...(orgPrefix ? { organizationIdPrefix: orgPrefix } : {}),
+    })
+    return
   }
+
+  const payload: Record<string, unknown> = { phase }
+  if (normalized.code) payload.code = normalized.code
+  if (normalized.message) payload.message = normalized.message
+  if (normalized.details) payload.details = normalized.details
+  if (normalized.hint) payload.hint = normalized.hint
+  if (normalized.rawKeys) payload.rawKeys = normalized.rawKeys
+  if (orgPrefix) payload.organizationIdPrefix = orgPrefix
+
+  if (phase === "initial_schema_fallback") {
+    if (isDev) {
+      console.warn(
+        "[equipment list query] schema mismatch on full select — retrying with legacy column set",
+        payload,
+      )
+    }
+    return
+  }
+
   console.error("[equipment list query]", payload)
 }
 

@@ -33,3 +33,17 @@ export function missingOperationalBillingColumns(error: PostgrestError | null | 
   if (error.code === "42703") return true
   return m.includes("does not exist") || m.includes("could not find")
 }
+
+/**
+ * True when the portal certificate release column is missing on
+ * `calibration_records` (i.e. migration `20260506120000_portal_certificate_release_phase1.sql`
+ * has not been applied yet on this database). Used to soft-fall back the
+ * Completed Certificates query on local/dev DBs that haven't been migrated.
+ */
+export function missingPortalReleasedAtColumn(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  const m = (error.message ?? "").toLowerCase()
+  if (!m.includes("portal_released_at")) return false
+  if (error.code === "42703") return true
+  return m.includes("does not exist") || m.includes("could not find")
+}

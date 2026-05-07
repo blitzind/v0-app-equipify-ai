@@ -353,10 +353,7 @@ function EquipmentPageInner() {
       let schemaFallback = false
 
       if (equipmentError && isEquipmentListSchemaMismatchError(equipmentError)) {
-        logEquipmentListQueryFailure("initial", equipmentError, { organizationId: orgId })
-        warnNonProduction(
-          "[equipment] Full equipment select failed (missing intelligence columns?). Retrying with legacy select.",
-        )
+        logEquipmentListQueryFailure("initial_schema_fallback", equipmentError, { organizationId: orgId })
 
         let legacyQ = supabase
           .from("equipment")
@@ -376,10 +373,9 @@ function EquipmentPageInner() {
       }
 
       if (equipmentError) {
-        logEquipmentListQueryFailure(schemaFallback ? "legacy_fallback" : "fatal", equipmentError, {
+        logEquipmentListQueryFailure(schemaFallback ? "legacy_fallback_failed" : "fatal", equipmentError, {
           organizationId: orgId,
         })
-        warnNonProduction(`[equipment] Query failed: ${equipmentError.message}`)
         if (active) {
           setEquipment([])
           setQueryError(userVisibleEquipmentQueryError(equipmentError))

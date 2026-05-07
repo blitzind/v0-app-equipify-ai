@@ -53,8 +53,13 @@ export function DispatchStatusFilter({
             key={k}
             type="button"
             size="sm"
-            variant={active ? "default" : "outline"}
-            className={cn("h-8 px-2.5 text-xs shrink-0", active && "shadow-sm")}
+            variant="outline"
+            className={cn(
+              "h-8 px-2.5 text-xs shrink-0",
+              // Selected = primary (blue) tinted state; reserves CTA orange for "+ Quick add" only.
+              active &&
+                "border-primary bg-primary/10 text-primary shadow-sm hover:bg-primary/15 hover:text-primary",
+            )}
             onClick={() => onToggle(k)}
             aria-pressed={active}
           >
@@ -64,7 +69,7 @@ export function DispatchStatusFilter({
                 className={cn(
                   "ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
                   active
-                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    ? "bg-primary/15 text-primary"
                     : "bg-muted text-muted-foreground",
                 )}
               >

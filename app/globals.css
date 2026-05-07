@@ -436,6 +436,25 @@
     @apply transition-colors hover:bg-muted/50 dark:hover:bg-accent;
   }
 
+  /* ── Table / list surface ────────────────────────────────────────────────
+     Drop-in container for any standalone <Table>/list that is NOT already
+     inside a <Card>. Gives the data surface the same elevation language as
+     <Card> (matches `rounded-xl`, border-border, shadow tokens), so tables
+     no longer blend into the page background.
+     - Light: solid `--card` with subtle 1px+blur shadow.
+     - Dark : solid elevated `--card` (#121B2C) over the page canvas.
+     Use `overflow-hidden` so child header strips clip cleanly with the
+     rounded corners — horizontal scroll is handled by the inner Table
+     primitive's own `overflow-x-auto` wrapper. */
+  .ds-table-surface {
+    @apply bg-card text-card-foreground border border-border rounded-xl overflow-hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 200ms ease;
+  }
+  .dark .ds-table-surface {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
   /* ── Interactive card lift ────────────────────────────────────────────────
      Apply to any card that should lift on hover (opt-in, not global).      */
   .ds-card-interactive {

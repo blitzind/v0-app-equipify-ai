@@ -248,7 +248,7 @@ export default function MigrationCenterPage() {
         ) : jobs.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">No import jobs yet.</p>
         ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="ds-table-surface">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b border-border">
                 <tr>

@@ -240,7 +240,7 @@ function PartsTable({
   const total = parts.reduce((sum, p) => sum + p.quantity * p.unitCost, 0)
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-border overflow-x-auto">
+      <div className="ds-table-surface">
         <Table>
           <TableHeader>
             <TableRow className="ds-table-header-row-subtle">

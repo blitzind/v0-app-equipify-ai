@@ -272,7 +272,7 @@ export function AiOperationsContent() {
             <StatCard icon={Sparkles} label="Cache hits (logged)" value={String(data.summary.cacheHitsLogged)} sub={data.summary.cacheHitsNote} tone="violet" />
           </div>
 
-          <div className="rounded-lg border border-border overflow-x-auto">
+          <div className="ds-table-surface">
             <div className="px-4 py-2 border-b border-border bg-muted/30"><p className="text-sm font-semibold">Open AI alerts</p></div>
             <Table>
               <TableHeader><TableRow><TableHead>Severity</TableHead><TableHead>Organization</TableHead><TableHead>Type</TableHead><TableHead>Title</TableHead><TableHead className="whitespace-nowrap">Created (UTC)</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -295,7 +295,7 @@ export function AiOperationsContent() {
             </Table>
           </div>
 
-          <div className="rounded-lg border border-border overflow-x-auto">
+          <div className="ds-table-surface">
             <div className="px-4 py-2 border-b border-border bg-muted/30"><p className="text-sm font-semibold">Recent AI usage log</p></div>
             <Table>
               <TableHeader><TableRow><TableHead className="whitespace-nowrap">Time (UTC)</TableHead><TableHead>Organization</TableHead><TableHead>Task</TableHead><TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead className="text-right">Prompt tok</TableHead><TableHead className="text-right">Completion tok</TableHead><TableHead className="text-right">Est. cost</TableHead><TableHead>OK</TableHead><TableHead>Failure</TableHead></TableRow></TableHeader>
@@ -323,7 +323,7 @@ export function AiOperationsContent() {
           </div>
 
           {data.recentAiJobs && data.recentAiJobs.length > 0 ? (
-            <div className="rounded-lg border border-border overflow-x-auto">
+            <div className="ds-table-surface">
               <div className="px-4 py-2 border-b border-border bg-muted/30"><p className="text-sm font-semibold">Recent AI jobs</p></div>
               <Table>
                 <TableHeader><TableRow><TableHead className="whitespace-nowrap">Created (UTC)</TableHead><TableHead>Organization</TableHead><TableHead>Task</TableHead><TableHead>Status</TableHead><TableHead className="text-right tabular-nums">%</TableHead><TableHead className="text-right">Duration</TableHead></TableRow></TableHeader>

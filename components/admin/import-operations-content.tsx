@@ -18,6 +18,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -464,16 +465,25 @@ export function ImportOperationsContent() {
         />
       </div>
 
-      {/* Filters */}
-      <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-muted-foreground">Search</label>
+      {/*
+        Filters — compact toolbar layout.
+        - Single flex-wrap row on desktop; stacks on mobile.
+        - Search grows; selects sit at deterministic widths (no ultra-wide gaps).
+        - "Likely stuck only" + Apply/Clear share the row, no second action strip.
+        - "Filters" header collapsed to an inline label on the leading edge.
+      */}
+      <div className="rounded-xl border border-border bg-card p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+          <span className="hidden lg:inline-flex items-center gap-1.5 self-center pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Filter className="h-3.5 w-3.5" aria-hidden /> Filters
+          </span>
+
+          <div className="flex flex-col gap-1 min-w-0 lg:flex-1 lg:basis-[18rem] lg:max-w-[28rem]">
+            <label htmlFor="import-ops-search" className="text-[11px] text-muted-foreground">
+              Search
+            </label>
             <Input
+              id="import-ops-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -483,10 +493,11 @@ export function ImportOperationsContent() {
               className="h-9"
             />
           </div>
-          <div className="flex flex-col gap-1">
+
+          <div className="flex flex-col gap-1 lg:basis-[10rem]">
             <label className="text-[11px] text-muted-foreground">Status</label>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -498,13 +509,14 @@ export function ImportOperationsContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
+
+          <div className="flex flex-col gap-1 lg:basis-[12rem]">
             <label className="text-[11px] text-muted-foreground">Organization</label>
             <Select
               value={organizationId || "__all__"}
               onValueChange={(v) => setOrganizationId(v === "__all__" ? "" : v)}
             >
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="All organizations" />
               </SelectTrigger>
               <SelectContent>
@@ -517,10 +529,11 @@ export function ImportOperationsContent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
+
+          <div className="flex flex-col gap-1 lg:basis-[10rem]">
             <label className="text-[11px] text-muted-foreground">Import kind</label>
             <Select value={importKind || "__all__"} onValueChange={(v) => setImportKind(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="All kinds" />
               </SelectTrigger>
               <SelectContent>
@@ -533,7 +546,9 @@ export function ImportOperationsContent() {
               </SelectContent>
             </Select>
           </div>
-          <label className="flex items-end gap-2 text-xs text-muted-foreground pb-1.5">
+
+          {/* Inline checkbox — bottom padding aligns with the inputs above on desktop. */}
+          <label className="flex items-center gap-2 text-xs text-muted-foreground select-none lg:pb-2.5 lg:self-end">
             <input
               type="checkbox"
               className="h-4 w-4"
@@ -542,27 +557,35 @@ export function ImportOperationsContent() {
             />
             Likely stuck only
           </label>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="secondary" onClick={() => void load()} disabled={loading || busy}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Apply filters
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setSearch("")
-              setStatusFilter("all")
-              setOrganizationId("")
-              setImportKind("")
-              setStuckOnly(false)
-            }}
-            disabled={loading || busy}
-          >
-            Clear
-          </Button>
+
+          {/* Actions — pushed right on desktop, wrap under the inputs on tablet/mobile. */}
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:self-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void load()}
+              disabled={loading || busy}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Apply filters
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSearch("")
+                setStatusFilter("all")
+                setOrganizationId("")
+                setImportKind("")
+                setStuckOnly(false)
+              }}
+              disabled={loading || busy}
+            >
+              Clear
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -598,9 +621,9 @@ export function ImportOperationsContent() {
         </div>
       </div>
 
-      {/* Runs table */}
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center gap-2">
+      {/* Runs table — Card matches Filters / Bulk actions (solid bg-card surface). */}
+      <Card className="gap-0 overflow-hidden border-border py-0">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
           <p className="text-sm font-semibold">Import runs</p>
           <span className="text-[11px] text-muted-foreground">
             ({data?.runs.length ?? 0} shown · max 200)
@@ -714,13 +737,13 @@ export function ImportOperationsContent() {
             )}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       {/* Inline error preview for failures */}
       {data?.runs.some((r) => r.status === "failed" && r.errorMessage) ? (
-        <div className="rounded-lg border border-border overflow-x-auto">
-          <div className="px-4 py-2 border-b border-border bg-muted/30">
-            <p className="text-sm font-semibold flex items-center gap-2">
+        <Card className="gap-0 overflow-hidden border-border py-0">
+          <div className="border-b border-border bg-muted/30 px-4 py-2.5">
+            <p className="flex items-center gap-2 text-sm font-semibold">
               <AlertTriangle className="h-4 w-4 text-amber-500" /> Recent failure messages
             </p>
           </div>
@@ -741,13 +764,13 @@ export function ImportOperationsContent() {
                 </li>
               ))}
           </ul>
-        </div>
+        </Card>
       ) : null}
 
       {/* Operator events log */}
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center gap-2">
-          <StickyNote className="h-4 w-4 text-muted-foreground" />
+      <Card className="gap-0 overflow-hidden border-border py-0">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
+          <StickyNote className="h-4 w-4 shrink-0 text-muted-foreground" />
           <p className="text-sm font-semibold">Operator events log</p>
           <span className="text-[11px] text-muted-foreground">(last {data?.recentEvents.length ?? 0})</span>
         </div>
@@ -783,7 +806,7 @@ export function ImportOperationsContent() {
             )}
           </TableBody>
         </Table>
-      </div>
+      </Card>
 
       {/* Note modal */}
       {noteRunId ? (

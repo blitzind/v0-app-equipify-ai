@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Bell, Search, ChevronDown,
   User, BellRing, Shield,
-  Building2, Users,
+  Users,
   CreditCard, Plug, Settings, ShieldCheck,
   LogOut, ChevronRight, Menu, X,
 } from "lucide-react"
@@ -61,16 +61,17 @@ function formatOrganizationMemberRole(role: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+/** Order matches Equipify account hub hierarchy (see app-topbar launcher grid). */
 const LAUNCHER_LINKS = [
-  { icon: User,        label: "My Profile",      href: "/settings/general" },
-  { icon: Bell,        label: "Communications",  href: "/communications" },
-  { icon: BellRing,    label: "Notification preferences",   href: "/settings/notifications" },
-  { icon: Shield,      label: "Security",        href: "/settings/security" },
-  { icon: Settings,    label: "Settings",        href: "/settings/general" },
-  { icon: Users,       label: "Team",            href: "/settings/team" },
-  { icon: CreditCard,  label: "Billing",         href: "/settings/billing" },
-  { icon: Plug,        label: "Integrations",    href: "/settings/integrations" },
-  { icon: ShieldCheck, label: "Platform Admin",  href: "/admin" },
+  { icon: User, label: "My Profile", href: "/settings/general" },
+  { icon: BellRing, label: "Notifications", href: "/settings/notifications" },
+  { icon: Bell, label: "Communications", href: "/communications" },
+  { icon: Users, label: "Team", href: "/settings/team" },
+  { icon: CreditCard, label: "Billing", href: "/settings/billing" },
+  { icon: Plug, label: "Integrations", href: "/settings/integrations" },
+  { icon: Shield, label: "Security", href: "/settings/security" },
+  { icon: Settings, label: "Settings", href: "/settings/general" },
+  { icon: ShieldCheck, label: "Platform Admin", href: "/admin" },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export function AppTopbar() {
   const pathname  = usePathname()
   const router    = useRouter()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { sessionIdentity, sessionIdentityLoading, platformAdminNavVisible } = useAdmin()
+  const { sessionIdentity, sessionIdentityLoading, isPlatformAdmin } = useAdmin()
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
@@ -185,7 +186,9 @@ export function AppTopbar() {
 
   const launcherLinks = useMemo(() => {
     return LAUNCHER_LINKS.filter((link) => {
-      if (link.href === "/admin") return platformAdminNavVisible
+      // Platform admin is determined server-side in /api/session/account-summary
+      // (isPlatformAdminEmail); never show /admin to org-only users.
+      if (link.href === "/admin") return isPlatformAdmin
       if (link.href === "/communications") return permissions.canViewBilling
       if (link.href === "/settings/billing") return permissions.canViewBilling
       if (link.href === "/settings/integrations") return permissions.canManageIntegrations
@@ -194,7 +197,7 @@ export function AppTopbar() {
       if (link.href === "/settings/notifications") return permissions.canManageWorkspaceSettings
       return true
     })
-  }, [platformAdminNavVisible, permissions])
+  }, [isPlatformAdmin, permissions])
 
   async function handleNotifClick(n: FeedPreview) {
     const orgId = activeOrgOpt?.organizationId
@@ -466,10 +469,10 @@ export function AppTopbar() {
           </div>
 
           {/* Launcher grid */}
-          <div className="grid grid-cols-2 gap-1 p-3">
+          <div className="grid grid-cols-2 gap-0.5 p-2.5">
             {launcherLinks.map(({ icon: Icon, label, href }) => (
               <Link
-                key={label}
+                key={`${href}::${label}`}
                 href={href}
                 onClick={() => setHubOpen(false)}
                 className={cn(NAV_LAUNCHER_ROW_LAYOUT, NAV_PRIMARY_ROW_MOTION, NAV_ROW_INACTIVE_HOVER_CARD)}

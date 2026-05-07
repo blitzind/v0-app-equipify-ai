@@ -1397,9 +1397,12 @@ function TechniciansPageInner() {
           </div>
         )}
 
-        {/* ── Table view ── */}
+        {/* ── Table view ──
+              Uses the shared `ds-table-surface` (solid bg-card + border + rounded-xl + shadow-sm)
+              instead of <Card>, which adds `py-6` and would create a blank strip above the
+              <TableHeader>. Matches the Customers / Equipment / Work Orders list pattern. */}
         {view === "table" && (
-          <Card>
+          <div className="ds-table-surface">
             <Table>
               <TableHeader>
                 <TableRow className="ds-table-header-row">
@@ -1485,7 +1488,7 @@ function TechniciansPageInner() {
                 )}
               </TableBody>
             </Table>
-          </Card>
+          </div>
         )}
       </div>
 

@@ -33,7 +33,7 @@ export const NAV_ICON_INACTIVE_CARD =
 
 /** Account hub grid rows (spacing tuned for 2-col launcher). */
 export const NAV_LAUNCHER_ROW_LAYOUT =
-  "group flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
+  "group flex items-center gap-2 px-3 py-2 rounded-lg"
 
 /** Account menu trigger when open — subtle blue wash (matches nav “active” family). */
 export const NAV_HUB_TRIGGER_OPEN = "bg-blue-500/[0.15]"

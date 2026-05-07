@@ -107,6 +107,11 @@ const ROUTE_META: Record<string, RouteMeta> = {
       "Manage reusable items imported from manufacturer price lists for quotes, invoices, work orders, and purchase orders.",
     icon: Package,
   },
+  "/inventory": {
+    title: "Inventory",
+    subtitle: "Track parts by location, transfers, work order consumption, and van stock.",
+    icon: Warehouse,
+  },
   "/catalog/import": {
     title: "Import price list",
     subtitle: "Upload a manufacturer or vendor price list to extract catalog lines with AI review.",

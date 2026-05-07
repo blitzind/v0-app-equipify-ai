@@ -1,7 +1,15 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import {
+  CalendarRange,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  SlidersHorizontal,
+  X,
+} from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
@@ -109,6 +117,27 @@ function DispatchPageInner() {
     defaultValue: false,
     isValid: isBoolean,
   })
+  const [weekOverviewVisible, setWeekOverviewVisible] = usePersistedDispatchPref<boolean>({
+    scope: "dispatch",
+    key: "week-overview-visible",
+    organizationId: activeOrgId,
+    defaultValue: false,
+    isValid: isBoolean,
+  })
+  const [moreFiltersOpen, setMoreFiltersOpen] = usePersistedDispatchPref<boolean>({
+    scope: "dispatch",
+    key: "more-filters-expanded",
+    organizationId: activeOrgId,
+    defaultValue: false,
+    isValid: isBoolean,
+  })
+  const [allSignalsOpen, setAllSignalsOpen] = usePersistedDispatchPref<boolean>({
+    scope: "dispatch",
+    key: "all-signals-expanded",
+    organizationId: activeOrgId,
+    defaultValue: false,
+    isValid: isBoolean,
+  })
   const [quickAddSeed, setQuickAddSeed] = useState<{
     technicianId: string | null
     scheduledOn: string
@@ -135,6 +164,12 @@ function DispatchPageInner() {
     () => technicians.map((t) => ({ id: t.id, label: t.label })),
     [technicians],
   )
+
+  // Active focus filter label for the "More filters" trigger and clear chip.
+  const activeFocusLabel = useMemo(() => {
+    if (dispatchFilter === "all") return null
+    return DISPATCH_FOCUS_OPTIONS.find((o) => o.id === dispatchFilter)?.label ?? null
+  }, [dispatchFilter])
 
   const handleQuickAdd = useCallback(
     (args: {
@@ -169,6 +204,7 @@ function DispatchPageInner() {
       unassigned: 0,
       certPend: 0,
       priorityJobs: 0,
+      billingReady: 0,
     }
     for (const w of workOrders) {
       const f = w.opsFlags
@@ -184,6 +220,7 @@ function DispatchPageInner() {
       if (f.unassigned_aging) k.unassigned++
       if (f.cert_pending) k.certPend++
       if (f.emergency || f.high_priority) k.priorityJobs++
+      if (f.billing_ready) k.billingReady++
     }
     return k
   }, [workOrders])
@@ -530,80 +567,138 @@ function DispatchPageInner() {
         </div>
       </div>
 
+      {/* Compact operational snapshot — 5 primary signals + collapsible advanced */}
       <div className="rounded-lg border border-border bg-card/40 px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-          Operational snapshot
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2 text-center">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Operational signals
+          </p>
+          <button
+            type="button"
+            onClick={() => setAllSignalsOpen((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            aria-expanded={allSignalsOpen}
+          >
+            {allSignalsOpen ? "Hide signals" : "View all signals"}
+            <ChevronDown
+              className={cn("h-3 w-3 transition-transform", allSignalsOpen && "rotate-180")}
+            />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
           {(
             [
               ["Due today", dispatchKpi.dueToday, "due_today"],
-              ["Tomorrow", dispatchKpi.dueTomorrow, "due_tomorrow"],
-              ["Next 7 days", dispatchKpi.dueNext7, "due_next_7"],
               ["Overdue", dispatchKpi.overdue, "sched_past_due"],
-              ["Unbilled / CNI", dispatchKpi.unbilled, "invoice_pending"],
-              ["Overdue invoice", dispatchKpi.overdueInv, "overdue_invoice"],
-              ["PM overdue", dispatchKpi.pmOd, "pm_overdue"],
-              ["Cal overdue", dispatchKpi.calOd, "cal_overdue"],
               ["Unassigned 48h+", dispatchKpi.unassigned, "unassigned_aging"],
+              ["Ready to bill", dispatchKpi.billingReady, "billing_ready"],
               ["Cert pending", dispatchKpi.certPend, "cert_pending"],
-              ["Priority / urgent", dispatchKpi.priorityJobs, "high_priority"],
             ] as const
           ).map(([label, n, focus]) => (
             <button
               type="button"
               key={label}
-              onClick={() => setDispatchFilter(focus as DispatchFilterId)}
+              onClick={() =>
+                setDispatchFilter((cur) => (cur === focus ? "all" : (focus as DispatchFilterId)))
+              }
               className={cn(
-                "rounded-md border px-2 py-1.5 text-left transition-colors",
+                "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors",
                 dispatchFilter === focus
                   ? "border-primary bg-primary/10"
                   : "border-border bg-background hover:border-primary/40",
               )}
               aria-pressed={dispatchFilter === focus}
             >
-              <p className="text-lg font-semibold tabular-nums text-foreground text-center">{n}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight text-center">{label}</p>
+              <span className="text-[11px] text-muted-foreground">{label}</span>
+              <span className="text-base font-semibold tabular-nums text-foreground">{n}</span>
             </button>
           ))}
         </div>
+        {allSignalsOpen ? (
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+            {(
+              [
+                ["Tomorrow", dispatchKpi.dueTomorrow, "due_tomorrow"],
+                ["Next 7 days", dispatchKpi.dueNext7, "due_next_7"],
+                ["Unbilled / CNI", dispatchKpi.unbilled, "invoice_pending"],
+                ["Overdue invoice", dispatchKpi.overdueInv, "overdue_invoice"],
+                ["PM overdue", dispatchKpi.pmOd, "pm_overdue"],
+                ["Cal overdue", dispatchKpi.calOd, "cal_overdue"],
+                ["Priority / urgent", dispatchKpi.priorityJobs, "high_priority"],
+              ] as const
+            ).map(([label, n, focus]) => (
+              <button
+                type="button"
+                key={label}
+                onClick={() =>
+                  setDispatchFilter((cur) => (cur === focus ? "all" : (focus as DispatchFilterId)))
+                }
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                  dispatchFilter === focus
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background hover:border-primary/40",
+                )}
+                aria-pressed={dispatchFilter === focus}
+              >
+                <span className="text-[11px] text-muted-foreground">{label}</span>
+                <span className="text-base font-semibold tabular-nums text-foreground">{n}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <DispatchStatusFilter
-        selected={statusFilter}
-        onToggle={handleStatusToggle}
-        counts={statusCounts}
-        includeInvoiced={includeInvoiced}
-        onIncludeInvoicedChange={setIncludeInvoiced}
-      />
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto sm:max-h-none sm:overflow-visible"
-          role="group"
-          aria-label="Operational focus"
-        >
-          {DISPATCH_FOCUS_OPTIONS.map(({ id, label }) => {
-            const active = dispatchFilter === id
-            return (
-              <Button
-                key={id}
-                type="button"
-                size="sm"
-                variant={active ? "default" : "outline"}
-                className="h-8 text-xs shrink-0"
-                onClick={() => setDispatchFilter(id)}
-              >
-                {label}
-              </Button>
-            )
-          })}
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Primary filter row: status chips + sort + quick add + more-filters trigger */}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <DispatchStatusFilter
+          selected={statusFilter}
+          onToggle={handleStatusToggle}
+          counts={statusCounts}
+          includeInvoiced={includeInvoiced}
+          onIncludeInvoicedChange={setIncludeInvoiced}
+        />
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className={cn(
+              "h-8 gap-1.5 text-xs",
+              // Active = blue tint, not CTA orange.
+              (moreFiltersOpen || activeFocusLabel) &&
+                "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
+            )}
+            onClick={() => setMoreFiltersOpen((v) => !v)}
+            aria-expanded={moreFiltersOpen}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            More filters
+            {activeFocusLabel ? (
+              <span className="ml-0.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium text-primary">
+                1
+              </span>
+            ) : null}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className={cn(
+              "h-8 gap-1.5 text-xs",
+              weekOverviewVisible &&
+                "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
+            )}
+            onClick={() => setWeekOverviewVisible((v) => !v)}
+            aria-expanded={weekOverviewVisible}
+          >
+            <CalendarRange className="h-3.5 w-3.5" />
+            {weekOverviewVisible ? "Hide week overview" : "Show week overview"}
+          </Button>
+          {/* Quick add — primary CTA (orange). Same variant as Add Customer / New Work Order. */}
+          <Button
+            type="button"
+            size="sm"
             className="h-8 gap-1.5 text-xs"
             onClick={() =>
               handleQuickAdd({
@@ -616,12 +711,13 @@ function DispatchPageInner() {
             <Plus className="h-3.5 w-3.5" />
             Quick add
           </Button>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="shrink-0">Sort</span>
             <select
               value={dispatchSort}
               onChange={(e) => setDispatchSort(e.target.value as "schedule" | "priority")}
-              className="rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+              className="h-8 rounded-md border border-border bg-card px-2 text-xs text-foreground"
+              aria-label="Sort dispatch list"
             >
               <option value="schedule">By time</option>
               <option value="priority">By priority</option>
@@ -630,7 +726,72 @@ function DispatchPageInner() {
         </div>
       </div>
 
-      {!loading && technicians.length > 0 ? (
+      {/* Active focus chip — shows current advanced filter outside the panel */}
+      {activeFocusLabel ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Focus
+          </span>
+          <button
+            type="button"
+            onClick={() => setDispatchFilter("all")}
+            className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+            aria-label={`Clear focus filter: ${activeFocusLabel}`}
+          >
+            {activeFocusLabel}
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      ) : null}
+
+      {/* Advanced focus filters (collapsed) */}
+      {moreFiltersOpen ? (
+        <div className="rounded-lg border border-border bg-card/40 px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Advanced filters
+            </p>
+            {activeFocusLabel ? (
+              <button
+                type="button"
+                onClick={() => setDispatchFilter("all")}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Operational focus"
+          >
+            {DISPATCH_FOCUS_OPTIONS.map(({ id, label }) => {
+              const active = dispatchFilter === id
+              return (
+                <Button
+                  key={id}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "h-7 shrink-0 text-[11px]",
+                    active &&
+                      "border-primary bg-primary/10 text-primary shadow-sm hover:bg-primary/15 hover:text-primary",
+                  )}
+                  onClick={() => setDispatchFilter(id)}
+                  aria-pressed={active}
+                >
+                  {label}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Week overview (collapsed by default; persisted) */}
+      {weekOverviewVisible && !loading && technicians.length > 0 ? (
         <DispatchWeekOverview
           technicians={technicians}
           workOrders={displayWorkOrders}

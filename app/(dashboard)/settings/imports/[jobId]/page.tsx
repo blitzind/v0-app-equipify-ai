@@ -350,7 +350,7 @@ export default function ImportJobDetailPage() {
           </div>
 
           {rows.length > 0 ? (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="ds-table-surface">
               <div className="px-3 py-2 bg-muted/40 border-b border-border flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Row outcomes</h2>
                 <span className="text-xs text-muted-foreground">
@@ -390,7 +390,7 @@ export default function ImportJobDetailPage() {
           ) : null}
 
           {runHistory.length > 0 ? (
-            <div className="rounded-lg border border-border overflow-hidden">
+            <div className="ds-table-surface">
               <div className="px-3 py-2 bg-muted/40 border-b border-border flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Run history</h2>
                 {!activeRun && runHistory.some((r) => r.status === "failed") ? (

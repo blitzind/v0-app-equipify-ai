@@ -66,8 +66,11 @@ export function DispatchMobileList({
     <div className="flex flex-col gap-6 md:hidden">
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Unassigned <span className="text-muted-foreground/60">({unassigned.length})</span>
+          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+            Unassigned work
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              {unassigned.length}
+            </span>
           </h3>
           {onQuickAdd ? (
             <button
@@ -129,8 +132,11 @@ export function DispatchMobileList({
         return (
           <section key={t.id}>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="truncate text-sm font-semibold text-foreground">
-                {t.label} <span className="text-muted-foreground/60 text-xs font-normal">({list.length})</span>
+              <h3 className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold text-foreground">
+                <span className="truncate" title={t.label}>{t.label}</span>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                  {list.length}
+                </span>
               </h3>
               {onQuickAdd ? (
                 <button

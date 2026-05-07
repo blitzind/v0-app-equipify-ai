@@ -472,7 +472,7 @@ function TableView({
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-x-auto">
+    <div className="ds-table-surface">
       <Table>
         <TableHeader>
           <TableRow className="ds-table-header-row-subtle">

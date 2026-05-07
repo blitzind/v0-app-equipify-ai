@@ -19,6 +19,9 @@ export type DispatchPrefScope = "dispatch" | "schedule"
 export type DispatchPrefKey =
   | "status-filter" // string[] of DispatchStatusKey
   | "include-invoiced" // boolean
+  | "week-overview-visible" // boolean — Phase 3: collapsed by default
+  | "more-filters-expanded" // boolean — Phase 3: advanced focus filters
+  | "all-signals-expanded" // boolean — Phase 3: KPI overflow
 
 export function dispatchPrefStorageKey(
   scope: DispatchPrefScope,

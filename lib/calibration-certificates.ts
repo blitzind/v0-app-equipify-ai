@@ -1,15 +1,49 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 import { applyArchivedAtScope, rowIsArchived, type ArchivedAtScope } from "@/lib/archive-scope"
 import type { RepairLog } from "@/lib/mock-data"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { buildCertificatePdfHtml } from "@/lib/certificates/certificate-pdf-html"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
+import { missingPortalReleasedAtColumn } from "@/lib/work-orders/postgrest-fallback"
 import { signedUrlForAttachmentPath } from "@/lib/work-orders/work-order-tab-data"
 import {
   documentBrandingFromFields,
   getOrganizationDocumentBranding,
 } from "@/lib/organization/document-branding"
+
+/**
+ * Selects for `calibration_records`. The "full" select includes
+ * `portal_released_at`, which only exists once
+ * `20260506120000_portal_certificate_release_phase1.sql` has been applied.
+ *
+ * Local/dev databases may not have that migration applied yet. When the
+ * column is missing, PostgREST returns `42703` ("column does not exist")
+ * and we transparently retry the same query without `portal_released_at`.
+ * The retried row gets `portal_released_at: null` injected at the row layer
+ * so downstream mappers (`mapRecordRow`) see a uniform shape.
+ *
+ * Behaviour matrix:
+ *  - column present → identical to the previous query (portal release works)
+ *  - column missing → list still loads, portal release UI treats every row
+ *    as "not released yet" (existing default behaviour)
+ *  - other DB error → propagated, list does not silently empty out
+ */
+const CAL_RECORD_SELECT_FULL =
+  "id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at"
+const CAL_RECORD_SELECT_LEGACY =
+  "id, organization_id, work_order_id, equipment_id, template_id, values, created_at"
+
+function logPortalReleasedAtFallback(callsite: string, err: PostgrestError): void {
+  // Dev-only diagnostic — surfaces schema drift loudly without breaking prod.
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(
+      `[calibration-certificates:${callsite}] calibration_records.portal_released_at missing — falling back to legacy select. ` +
+        `Apply supabase/migrations/20260506120000_portal_certificate_release_phase1.sql to enable portal certificate release. ` +
+        `(${err.code ?? "no-code"}: ${err.message})`,
+    )
+  }
+}
 
 export type CalibrationFieldType =
   | "text"
@@ -318,15 +352,28 @@ export async function loadLatestCalibrationRecordForEquipment(
   workOrderId: string,
   equipmentId: string,
 ): Promise<CalibrationRecord | null> {
-  const { data, error } = await supabase
-    .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
-    .eq("organization_id", organizationId)
-    .eq("work_order_id", workOrderId)
-    .eq("equipment_id", equipmentId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const runSelect = (select: string) =>
+    supabase
+      .from("calibration_records")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .eq("work_order_id", workOrderId)
+      .eq("equipment_id", equipmentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+  let { data, error } = await runSelect(CAL_RECORD_SELECT_FULL)
+
+  if (error && missingPortalReleasedAtColumn(error)) {
+    logPortalReleasedAtFallback("loadLatestCalibrationRecordForEquipment", error)
+    const retry = await runSelect(CAL_RECORD_SELECT_LEGACY)
+    error = retry.error
+    data = retry.data
+      ? ({ ...(retry.data as Record<string, unknown>), portal_released_at: null } as typeof data)
+      : retry.data
+  }
+
   if (error) throw new Error(error.message)
   if (!data) return null
   return mapRecordRow(data as CalibrationRecordRow)
@@ -460,15 +507,33 @@ export async function listCompletedCertificatesForOrg(
 ): Promise<CompletedCertificateListItem[]> {
   const limit = Math.min(Math.max(options?.limit ?? 500, 1), 1000)
 
-  const { data: records, error: recErr } = await supabase
-    .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false })
-    .limit(limit)
+  const runListSelect = (select: string) =>
+    supabase
+      .from("calibration_records")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(limit)
 
+  let firstAttempt = await runListSelect(CAL_RECORD_SELECT_FULL)
+  let recErr = firstAttempt.error
+  let recordsRaw: Array<Record<string, unknown>> = (firstAttempt.data ?? []) as Array<Record<string, unknown>>
+
+  if (recErr && missingPortalReleasedAtColumn(recErr)) {
+    logPortalReleasedAtFallback("listCompletedCertificatesForOrg", recErr)
+    const retry = await runListSelect(CAL_RECORD_SELECT_LEGACY)
+    recErr = retry.error
+    recordsRaw = ((retry.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+      ...row,
+      portal_released_at: null,
+    }))
+  }
+
+  // Important: do NOT silently return `[]` on a real error — bubble it up so
+  // the page surfaces an actionable message instead of an empty list.
   if (recErr) throw new Error(recErr.message)
-  if (!records?.length) return []
+  if (!recordsRaw.length) return []
+  const records = recordsRaw as unknown as CalibrationRecordRow[]
 
   const woIds = [...new Set(records.map((r) => (r as CalibrationRecordRow).work_order_id))]
   const templateIds = [...new Set(records.map((r) => (r as CalibrationRecordRow).template_id))]
@@ -636,12 +701,24 @@ export async function loadCompletedCertificateItemByRecordId(
   organizationId: string,
   recordId: string,
 ): Promise<CompletedCertificateListItem | null> {
-  const { data: rec, error } = await supabase
-    .from("calibration_records")
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
-    .eq("organization_id", organizationId)
-    .eq("id", recordId)
-    .maybeSingle()
+  const runByIdSelect = (select: string) =>
+    supabase
+      .from("calibration_records")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .eq("id", recordId)
+      .maybeSingle()
+
+  let { data: rec, error } = await runByIdSelect(CAL_RECORD_SELECT_FULL)
+
+  if (error && missingPortalReleasedAtColumn(error)) {
+    logPortalReleasedAtFallback("loadCompletedCertificateItemByRecordId", error)
+    const retry = await runByIdSelect(CAL_RECORD_SELECT_LEGACY)
+    error = retry.error
+    rec = retry.data
+      ? ({ ...(retry.data as Record<string, unknown>), portal_released_at: null } as typeof rec)
+      : retry.data
+  }
 
   if (error) throw new Error(error.message)
   if (!rec) return null
@@ -817,18 +894,29 @@ export async function createCalibrationRecord(
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const { data, error } = await supabase
-    .from("calibration_records")
-    .insert({
-      organization_id: organizationId,
-      work_order_id: workOrderId,
-      equipment_id: equipmentId,
-      template_id: templateId,
-      values,
-      created_by: user?.id ?? null,
-    })
-    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at")
-    .single()
+  const insertPayload = {
+    organization_id: organizationId,
+    work_order_id: workOrderId,
+    equipment_id: equipmentId,
+    template_id: templateId,
+    values,
+    created_by: user?.id ?? null,
+  }
+
+  const runInsertSelect = (select: string) =>
+    supabase.from("calibration_records").insert(insertPayload).select(select).single()
+
+  let { data, error } = await runInsertSelect(CAL_RECORD_SELECT_FULL)
+
+  if (error && missingPortalReleasedAtColumn(error)) {
+    logPortalReleasedAtFallback("createCalibrationRecord", error)
+    const retry = await runInsertSelect(CAL_RECORD_SELECT_LEGACY)
+    error = retry.error
+    data = retry.data
+      ? ({ ...(retry.data as Record<string, unknown>), portal_released_at: null } as typeof data)
+      : retry.data
+  }
+
   if (error) throw new Error(error.message)
   return mapRecordRow(data as CalibrationRecordRow)
 }

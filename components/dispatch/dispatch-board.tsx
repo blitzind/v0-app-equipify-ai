@@ -354,12 +354,14 @@ export function DispatchBoard({
       onDragEnd={(ev) => void handleDragEnd(ev)}
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* Unassigned */}
-        <section className="w-full shrink-0 space-y-2 lg:w-72">
+        {/* Unassigned work — sticky on tall viewports so it stays in reach */}
+        <section className="w-full shrink-0 space-y-2 lg:sticky lg:top-2 lg:w-72 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Unassigned
-              <span className="ml-1.5 text-muted-foreground/60">({unassigned.length})</span>
+            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+              Unassigned work
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                {unassigned.length}
+              </span>
             </h3>
             {onQuickAdd ? (
               <button
@@ -377,9 +379,9 @@ export function DispatchBoard({
           </div>
           <DroppablePool>
             {unassigned.length === 0 ? (
-              <div className="py-6 px-3 text-center flex flex-col gap-2 items-center">
+              <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
                 <p className="text-xs font-medium text-foreground">Inbox is clear.</p>
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   Drag any tech card here to release a job back to the queue, or use{" "}
                   <span className="font-medium text-foreground">Quick add</span> to drop a new
                   appointment in.
@@ -395,8 +397,15 @@ export function DispatchBoard({
           </DroppablePool>
         </section>
 
-        {/* Grid */}
-        <div className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        {/* Technician schedule */}
+        <section className="min-w-0 flex-1 space-y-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+            Technician schedule
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              {technicians.length} {technicians.length === 1 ? "tech" : "techs"}
+            </span>
+          </h3>
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           {technicians.length === 0 ? (
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
               No technicians in roster. Invite team members with the technician role to build the dispatch grid.
@@ -405,49 +414,74 @@ export function DispatchBoard({
             <div
               className="grid min-w-[720px]"
               style={{
-                gridTemplateColumns: `72px repeat(${technicians.length}, minmax(140px, 1fr))`,
+                gridTemplateColumns: `72px repeat(${technicians.length}, minmax(160px, 1fr))`,
               }}
             >
               <div className="sticky top-0 z-10 border-b border-border ds-thead-bg px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Time
               </div>
-              {technicians.map((t) => (
-                <div
-                  key={t.id}
-                  className="sticky top-0 z-10 border-b border-l border-border ds-thead-bg px-2 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <TechnicianAvatar
-                      userId={t.id}
-                      name={t.label}
-                      initials={t.initials}
-                      avatarUrl={t.avatarUrl}
-                      size="xs"
-                    />
-                    <span className="truncate text-xs font-semibold text-foreground">{t.label}</span>
-                    <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
-                      ({workloadByTech.get(t.id) ?? 0})
-                    </span>
-                    {onQuickAdd ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onQuickAdd({
-                            technicianId: t.id,
-                            scheduledOn: selectedYmd,
-                            scheduledTimeHhMm: null,
-                          })
-                        }
-                        className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-                        aria-label={`Quick add for ${t.label}`}
-                        disabled={busy}
+              {technicians.map((t) => {
+                const load = workloadByTech.get(t.id) ?? 0
+                return (
+                  <div
+                    key={t.id}
+                    className="sticky top-0 z-10 border-b border-l border-border ds-thead-bg px-2 py-2"
+                  >
+                    {/* Row 1: name + load chip + add — easier to scan than the
+                        old single-line cramming of avatar/name/(count)/+. */}
+                    <div className="flex items-center gap-2">
+                      <TechnicianAvatar
+                        userId={t.id}
+                        name={t.label}
+                        initials={t.initials}
+                        avatarUrl={t.avatarUrl}
+                        size="xs"
+                      />
+                      <span
+                        className="truncate text-xs font-semibold text-foreground"
+                        title={t.label}
                       >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    ) : null}
+                        {t.label}
+                      </span>
+                      {onQuickAdd ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onQuickAdd({
+                              technicianId: t.id,
+                              scheduledOn: selectedYmd,
+                              scheduledTimeHhMm: null,
+                            })
+                          }
+                          className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                          aria-label={`Quick add for ${t.label}`}
+                          disabled={busy}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      ) : null}
+                    </div>
+                    {/* Row 2: lightweight workload indicator. */}
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                          load === 0
+                            ? "bg-muted text-muted-foreground"
+                            : load >= 6
+                              ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                              : load >= 3
+                                ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                                : "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+                        )}
+                        title={`${load} job${load === 1 ? "" : "s"} on selected day`}
+                      >
+                        {load} {load === 1 ? "job" : "jobs"}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               {Array.from({ length: DISPATCH_SLOT_COUNT }, (_, slotIdx) => (
                 <Fragment key={slotIdx}>
@@ -489,7 +523,8 @@ export function DispatchBoard({
               ))}
             </div>
           )}
-        </div>
+          </div>
+        </section>
       </div>
 
       <DragOverlay dropAnimation={null}>

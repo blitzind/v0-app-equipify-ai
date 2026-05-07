@@ -35,6 +35,7 @@ import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mo
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Zap,
   Calendar,
   AlertTriangle,
@@ -1284,6 +1285,232 @@ function NotificationTimeline({ plans }: { plans: MaintenancePlan[] }) {
   )
 }
 
+// ─── Compact alert banners ────────────────────────────────────────────────────
+//
+// Replaces the previous full-paragraph red/amber strip that listed every plan
+// inline. Shows an actionable summary by default; expands into a scrollable list
+// of plan rows with per-row "View plan" / "Create work order" affordances.
+
+const PREVIEW_PLAN_ROWS = 5
+
+function PlanAlertRow({
+  plan,
+  tone,
+  onOpenPlan,
+  onCreateWo,
+  alreadyCreated,
+}: {
+  plan: MaintenancePlan
+  tone: "danger" | "warning"
+  onOpenPlan: (id: string) => void
+  onCreateWo: (plan: MaintenancePlan) => void | Promise<void>
+  alreadyCreated: boolean
+}) {
+  const days = daysUntil(plan.nextDueDate)
+  const ageLabel = formatDaysLabel(days)
+  const ageClass =
+    tone === "danger"
+      ? "text-red-700 dark:text-red-300"
+      : "text-amber-700 dark:text-amber-300"
+
+  return (
+    <li
+      className={cn(
+        "flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:gap-3",
+        "ds-hover-list-row-sm",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">{plan.name}</p>
+          <span className={cn("shrink-0 text-xs font-semibold tabular-nums", ageClass)}>
+            {ageLabel}
+          </span>
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {plan.customerName}
+          {plan.equipmentName ? ` · ${plan.equipmentName}` : ""}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs"
+          onClick={() => onOpenPlan(plan.id)}
+        >
+          View plan
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          disabled={alreadyCreated}
+          onClick={() => void onCreateWo(plan)}
+        >
+          {alreadyCreated ? "WO created" : "Create work order"}
+        </Button>
+      </div>
+    </li>
+  )
+}
+
+function CompactPlanAlert({
+  tone,
+  plans,
+  onOpenPlan,
+  onCreateWo,
+  createdIds,
+}: {
+  tone: "danger" | "warning"
+  plans: MaintenancePlan[]
+  onOpenPlan: (id: string) => void
+  onCreateWo: (plan: MaintenancePlan) => void | Promise<void>
+  createdIds: Set<string>
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+
+  // Most-overdue first; for "warning" tone, soonest-due first (same comparator).
+  const sorted = useMemo(
+    () =>
+      [...plans].sort(
+        (a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime(),
+      ),
+    [plans],
+  )
+
+  if (plans.length === 0) return null
+
+  const isDanger = tone === "danger"
+  const Icon = isDanger ? AlertTriangle : Clock
+  const count = plans.length
+
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_PLAN_ROWS)
+  const hiddenCount = Math.max(0, sorted.length - visible.length)
+
+  const headline = isDanger
+    ? `${count} plan${count !== 1 ? "s" : ""} overdue`
+    : `${count} plan${count !== 1 ? "s" : ""} due within 7 days`
+  const helper = isDanger
+    ? "Review overdue maintenance plans that may need scheduling."
+    : "These plans are coming up soon — schedule before they slip."
+
+  return (
+    <div
+      role="region"
+      aria-label={isDanger ? "Overdue maintenance plans" : "Upcoming maintenance plans"}
+      className={cn(
+        "rounded-lg border shadow-sm",
+        isDanger
+          ? "border-red-200/70 bg-red-50/70 dark:border-red-900/50 dark:bg-red-950/30"
+          : "border-amber-200/70 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/30",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          isDanger
+            ? "hover:bg-red-100/60 dark:hover:bg-red-950/50"
+            : "hover:bg-amber-100/60 dark:hover:bg-amber-950/50",
+        )}
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0",
+            isDanger ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400",
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-sm font-semibold",
+              isDanger ? "text-red-800 dark:text-red-200" : "text-amber-900 dark:text-amber-200",
+            )}
+          >
+            {headline}
+          </p>
+          <p
+            className={cn(
+              "text-xs",
+              isDanger ? "text-red-700/80 dark:text-red-300/80" : "text-amber-800/80 dark:text-amber-300/80",
+            )}
+          >
+            {helper}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "ml-2 hidden shrink-0 items-center gap-1 text-xs font-medium sm:inline-flex",
+            isDanger ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300",
+          )}
+        >
+          {expanded ? "Hide details" : "Show details"}
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 transition-transform",
+              expanded && "rotate-180",
+            )}
+          />
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform sm:hidden",
+            expanded && "rotate-180",
+            isDanger ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300",
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div
+          className={cn(
+            "border-t",
+            isDanger ? "border-red-200/70 dark:border-red-900/50" : "border-amber-200/70 dark:border-amber-900/50",
+          )}
+        >
+          <ul
+            className={cn(
+              "max-h-[19rem] divide-y overflow-y-auto bg-card/60",
+              isDanger ? "divide-red-100 dark:divide-red-900/40" : "divide-amber-100 dark:divide-amber-900/40",
+            )}
+          >
+            {visible.map((plan) => (
+              <PlanAlertRow
+                key={plan.id}
+                plan={plan}
+                tone={tone}
+                onOpenPlan={onOpenPlan}
+                onCreateWo={onCreateWo}
+                alreadyCreated={createdIds.has(plan.id)}
+              />
+            ))}
+          </ul>
+          {hiddenCount > 0 && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">
+                Showing {visible.length} of {sorted.length}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setShowAll(true)}
+              >
+                View all {sorted.length}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function ServiceSchedulePageInner() {
@@ -1701,23 +1928,21 @@ function ServiceSchedulePageInner() {
   return (
     <div className="flex flex-col gap-5">
 
-      {/* Alert banners */}
-      {overduePlans.length > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <p className="text-sm font-medium">
-            {overduePlans.length} plan{overduePlans.length !== 1 ? "s are" : " is"} overdue: {overduePlans.map((p) => p.name).join(", ")}
-          </p>
-        </div>
-      )}
-      {criticalSoon.length > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800">
-          <Clock className="w-4 h-4 shrink-0" />
-          <p className="text-sm font-medium">
-            {criticalSoon.length} plan{criticalSoon.length !== 1 ? "s are" : " is"} due within 7 days: {criticalSoon.map((p) => p.name).join(", ")}
-          </p>
-        </div>
-      )}
+      {/* Alert banners — compact, expandable summaries (replaces inline plan-name paragraphs). */}
+      <CompactPlanAlert
+        tone="danger"
+        plans={overduePlans}
+        onOpenPlan={setSelectedPlanId}
+        onCreateWo={handleCreateWo}
+        createdIds={createdIds}
+      />
+      <CompactPlanAlert
+        tone="warning"
+        plans={criticalSoon}
+        onOpenPlan={setSelectedPlanId}
+        onCreateWo={handleCreateWo}
+        createdIds={createdIds}
+      />
 
       {/* ── View Tabs + My/Team Toggle ─────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
