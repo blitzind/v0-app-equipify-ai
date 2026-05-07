@@ -11,6 +11,7 @@ type Gate = {
 
 export type AsyncRunPublic = {
   runId: string
+  runRef: string
   status: string
   runMode: string
   chunkSize: number
@@ -27,6 +28,12 @@ export type AsyncRunPublic = {
   lastHeartbeatAt: string | null
   cancelRequestedAt: string | null
   errorMessage: string | null
+  retryCount: number
+  maxRetries: number
+  nextRetryAt: string | null
+  leaseExpiresAt: string | null
+  updatedAt: string | null
+  createdAt: string | null
 }
 
 type StartRunInput = {
@@ -37,6 +44,21 @@ type StartRunInput = {
   options?: MigrationCommitOptions
   chunkSize?: number
 }
+
+type ProcessRunOptions = {
+  workerId?: string
+  allowRetryWindowBypass?: boolean
+}
+
+const DEFAULT_MAX_RETRIES = 5
+const LEASE_SECONDS = 45
+const TRANSIENT_ERROR_CODES = new Set([
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "PGRST",
+])
 
 function clampChunkSize(size?: number): number {
   const n = Number.isFinite(size) ? Math.trunc(size as number) : MIGRATION_IMPORT_ASYNC_DEFAULT_CHUNK_SIZE
@@ -49,9 +71,48 @@ function statusFromCounts(createdCount: number, updatedCount: number, errorCount
   return "completed"
 }
 
+function runRef(runId: string) {
+  return runId.replace(/-/g, "").slice(0, 8).toUpperCase()
+}
+
+function jobStatusMessage(status: string, args: { processed?: number; total?: number; chunk?: number; totalChunks?: number }) {
+  if (status === "queued") return "Queued for background processing."
+  if (status === "processing") {
+    const processed = args.processed ?? 0
+    const total = args.total ?? 0
+    const chunk = args.chunk ?? 0
+    const totalChunks = args.totalChunks ?? 0
+    return `Background import processing: ${processed}/${total} rows · chunk ${chunk}/${totalChunks}`
+  }
+  if (status === "cancel_requested") return "Cancellation requested. Current chunk will stop at the next checkpoint."
+  if (status === "cancelled") return "Background import cancelled by request."
+  if (status === "failed") return "Background import failed. You can review run history and retry with adjusted mapping."
+  if (status === "completed") return "Background import completed."
+  if (status === "completed_with_errors") return "Background import completed with some row errors."
+  return "Import status updated."
+}
+
+function isTransientError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false
+  const err = e as { code?: string; message?: string }
+  if (err.code && TRANSIENT_ERROR_CODES.has(err.code)) return true
+  const msg = (err.message ?? "").toLowerCase()
+  return msg.includes("timeout") || msg.includes("temporar") || msg.includes("connection reset") || msg.includes("deadlock")
+}
+
+function retryDelaySeconds(retryCount: number): number {
+  return Math.min(300, 5 * 2 ** Math.max(0, retryCount - 1))
+}
+
+function isoAfterSeconds(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString()
+}
+
 function mapRun(row: Record<string, unknown>): AsyncRunPublic {
+  const runId = String(row.id ?? "")
   return {
-    runId: String(row.id ?? ""),
+    runId,
+    runRef: runRef(runId),
     status: String(row.status ?? "queued"),
     runMode: String(row.run_mode ?? "async"),
     chunkSize: Number(row.chunk_size ?? 0),
@@ -68,6 +129,12 @@ function mapRun(row: Record<string, unknown>): AsyncRunPublic {
     lastHeartbeatAt: (row.last_heartbeat_at as string | null) ?? null,
     cancelRequestedAt: (row.cancel_requested_at as string | null) ?? null,
     errorMessage: (row.error_message as string | null) ?? null,
+    retryCount: Number(row.retry_count ?? 0),
+    maxRetries: Number(row.max_retries ?? DEFAULT_MAX_RETRIES),
+    nextRetryAt: (row.next_retry_at as string | null) ?? null,
+    leaseExpiresAt: (row.lease_expires_at as string | null) ?? null,
+    updatedAt: (row.updated_at as string | null) ?? null,
+    createdAt: (row.created_at as string | null) ?? null,
   }
 }
 
@@ -87,6 +154,25 @@ export async function getActiveImportRun(gate: Gate, organizationId: string, job
 
   if (error || !data) return null
   return mapRun(data as Record<string, unknown>)
+}
+
+export async function listImportRunsHistory(
+  gate: Gate,
+  organizationId: string,
+  jobId: string,
+  limit = 8,
+): Promise<AsyncRunPublic[]> {
+  const { supabase } = gate
+  const { data } = await supabase
+    .from("organization_import_job_runs")
+    .select(
+      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message, retry_count, max_retries, next_retry_at, lease_expires_at, created_at, updated_at",
+    )
+    .eq("organization_id", organizationId)
+    .eq("import_job_id", jobId)
+    .order("created_at", { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 25)))
+  return (data ?? []).map((d: Record<string, unknown>) => mapRun(d))
 }
 
 export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: AsyncRunPublic; accepted: boolean }> {
@@ -152,6 +238,12 @@ export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: 
       committed_by: userId,
       started_at: now,
       last_heartbeat_at: now,
+      retry_count: 0,
+      max_retries: DEFAULT_MAX_RETRIES,
+      next_retry_at: null,
+      last_error_at: null,
+      error_message: null,
+      recovery_json: {},
     })
     .select(
       "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message",
@@ -188,11 +280,299 @@ function offsetOutcomes(outcomes: RowOutcome[], offset: number): RowOutcome[] {
   return outcomes.map((o) => ({ ...o, rowIndex: o.rowIndex + offset }))
 }
 
-export async function processAsyncImportRunTick(gate: Gate, organizationId: string, jobId: string): Promise<AsyncRunPublic | null> {
+async function processRunById(
+  gate: Gate,
+  runId: string,
+  opts?: ProcessRunOptions,
+): Promise<{ run: AsyncRunPublic | null; leaseDenied?: boolean }> {
   const { supabase, svc, userId } = gate
+  const workerId = (opts?.workerId?.trim() || `worker-${Math.random().toString(36).slice(2, 10)}`).slice(0, 64)
+  const now = new Date().toISOString()
+  const leaseExpires = isoAfterSeconds(LEASE_SECONDS)
+
+  const { data: leased, error: leaseErr } = await supabase
+    .from("organization_import_job_runs")
+    .update({
+      lease_owner: workerId,
+      lease_expires_at: leaseExpires,
+      last_heartbeat_at: now,
+      status: "processing",
+    })
+    .eq("id", runId)
+    .in("status", ["queued", "processing"])
+    .or(`lease_expires_at.is.null,lease_expires_at.lt.${now}`)
+    .select("*")
+    .maybeSingle()
+
+  if (leaseErr || !leased) return { run: null, leaseDenied: true }
+
+  const run = leased as Record<string, unknown>
+  const organizationId = String(run.organization_id ?? "")
+  const jobId = String(run.import_job_id ?? "")
+  const nextRetryAt = (run.next_retry_at as string | null) ?? null
+  if (!opts?.allowRetryWindowBypass && nextRetryAt && nextRetryAt > now) {
+    return { run: mapRun(run), leaseDenied: true }
+  }
+
+  const meta = (run.metadata as Record<string, unknown> | null) ?? {}
+  const columnMapping = (meta.columnMapping as Record<string, string> | undefined) ?? {}
+  const options = (meta.options as MigrationCommitOptions | undefined) ?? {}
+  const strategy = resolveImportStrategy(options)
+
+  try {
+    const { data: job, error: jobErr } = await supabase
+      .from("organization_import_jobs")
+      .select("kind, storage_path, cancel_requested_at")
+      .eq("organization_id", organizationId)
+      .eq("id", jobId)
+      .single()
+    if (jobErr || !job) throw new Error(jobErr?.message ?? "Import job not found.")
+
+    const j = job as { kind: MigrationImportKind; storage_path: string | null; cancel_requested_at: string | null }
+    if (!j.storage_path) throw new Error("No uploaded file for this job.")
+
+    const cancelRequested = Boolean(run.cancel_requested_at) || Boolean(j.cancel_requested_at)
+    if (cancelRequested) {
+      await supabase
+        .from("organization_import_job_runs")
+        .update({
+          status: "cancelled",
+          completed_at: now,
+          last_heartbeat_at: now,
+          recovery_json: {
+            reason: "cancel_requested",
+            resume_cursor: run.resume_cursor ?? 0,
+            current_chunk_index: run.current_chunk_index ?? 0,
+          },
+          lease_owner: null,
+          lease_expires_at: null,
+        })
+        .eq("id", runId)
+      await supabase
+        .from("organization_import_jobs")
+        .update({
+          status: "cancelled",
+          completed_at: now,
+          user_message: jobStatusMessage("cancelled", {}),
+          active_run_id: null,
+        })
+        .eq("organization_id", organizationId)
+        .eq("id", jobId)
+      return { run: null }
+    }
+
+    const parsed = await loadJobCsvFromStorageForAsync(svc, j.storage_path)
+    const chunkSize = Number(run.chunk_size ?? MIGRATION_IMPORT_ASYNC_DEFAULT_CHUNK_SIZE)
+    const totalRows = parsed.rows.length
+    const cursor = Number(run.resume_cursor ?? 0)
+    const nextRows = parsed.rows.slice(cursor, cursor + chunkSize)
+
+    await supabase
+      .from("organization_import_jobs")
+      .update({
+        status: "processing",
+        started_at: (run.started_at as string | null) ?? now,
+        user_message: jobStatusMessage("processing", {
+          processed: Number(run.processed_count ?? 0),
+          total: totalRows,
+          chunk: Math.floor(cursor / chunkSize) + 1,
+          totalChunks: Math.max(1, Math.ceil(totalRows / chunkSize)),
+        }),
+      })
+      .eq("id", jobId)
+      .eq("organization_id", organizationId)
+
+    if (nextRows.length === 0) {
+      const createdCount = Number(run.created_count ?? 0)
+      const updatedCount = Number(run.updated_count ?? 0)
+      const skippedCount = Number(run.skipped_count ?? 0)
+      const errorCount = Number(run.error_count ?? 0)
+      const finalStatus = statusFromCounts(createdCount, updatedCount, errorCount)
+      await supabase
+        .from("organization_import_job_runs")
+        .update({
+          status: finalStatus,
+          completed_at: now,
+          last_heartbeat_at: now,
+          lease_owner: null,
+          lease_expires_at: null,
+        })
+        .eq("id", runId)
+      await supabase
+        .from("organization_import_jobs")
+        .update({
+          status: finalStatus,
+          completed_at: now,
+          user_message: `${createdCount} created · ${updatedCount} updated · ${skippedCount} skipped · ${errorCount} errors`,
+          active_run_id: null,
+          strategy,
+        })
+        .eq("id", jobId)
+        .eq("organization_id", organizationId)
+      return { run: null }
+    }
+
+    const result = await runCommit({
+      supabase,
+      organizationId,
+      userId,
+      columnMapping,
+      rows: nextRows,
+      options,
+      kind: j.kind,
+      importSeedPrefix: `${jobId}-r-${runId}-c-${Math.floor(cursor / chunkSize)}`,
+    })
+
+    const offset = cursor
+    const shifted = offsetOutcomes(result.outcomes, offset)
+    const rowPayload = shifted.map((o, idx) => ({
+      import_job_id: jobId,
+      row_index: o.rowIndex,
+      status: o.status === "imported" ? "imported" : o.status,
+      codes: o.codes,
+      message: o.message,
+      entity_kind: o.entityKind ?? null,
+      entity_id: o.entityId ?? null,
+      snapshot: { cells: nextRows[idx] ?? {} } as Record<string, unknown>,
+    }))
+    if (rowPayload.length > 0) {
+      await supabase.from("organization_import_job_rows").upsert(rowPayload, { onConflict: "import_job_id,row_index" })
+    }
+
+    const processedCount = Number(run.processed_count ?? 0) + nextRows.length
+    const createdCount = Number(run.created_count ?? 0) + result.createdCount
+    const updatedCount = Number(run.updated_count ?? 0) + result.updatedCount
+    const skippedCount = Number(run.skipped_count ?? 0) + result.skippedCount
+    const errorCount = Number(run.error_count ?? 0) + result.errorCount
+    const nextCursor = cursor + nextRows.length
+    const totalChunks = Math.max(1, Math.ceil(totalRows / chunkSize))
+    const currentChunkIndex = Math.min(totalChunks, Math.ceil(nextCursor / chunkSize))
+    const done = nextCursor >= totalRows
+    const finalStatus = done ? statusFromCounts(createdCount, updatedCount, errorCount) : "processing"
+
+    await supabase
+      .from("organization_import_job_runs")
+      .update({
+        status: finalStatus,
+        total_rows: totalRows,
+        total_chunks: totalChunks,
+        current_chunk_index: currentChunkIndex,
+        resume_cursor: nextCursor,
+        processed_count: processedCount,
+        created_count: createdCount,
+        updated_count: updatedCount,
+        skipped_count: skippedCount,
+        error_count: errorCount,
+        last_heartbeat_at: now,
+        completed_at: done ? now : null,
+        retry_count: done ? Number(run.retry_count ?? 0) : Number(run.retry_count ?? 0),
+        next_retry_at: null,
+        error_message: null,
+        lease_owner: null,
+        lease_expires_at: null,
+      })
+      .eq("id", runId)
+
+    await supabase
+      .from("organization_import_jobs")
+      .update({
+        status: finalStatus,
+        processed_count: processedCount,
+        success_count: createdCount,
+        updated_count: updatedCount,
+        skipped_count: skippedCount,
+        error_count: errorCount,
+        strategy,
+        completed_at: done ? now : null,
+        user_message: done
+          ? `${createdCount} created · ${updatedCount} updated · ${skippedCount} skipped · ${errorCount} errors`
+          : jobStatusMessage("processing", {
+              processed: processedCount,
+              total: totalRows,
+              chunk: currentChunkIndex,
+              totalChunks,
+            }),
+        active_run_id: done ? null : runId,
+      })
+      .eq("id", jobId)
+      .eq("organization_id", organizationId)
+
+    const fresh = await getActiveImportRun(gate, organizationId, jobId)
+    if (fresh) return { run: fresh }
+    return { run: null }
+  } catch (e) {
+    const retryCount = Number(run.retry_count ?? 0) + 1
+    const maxRetries = Number(run.max_retries ?? DEFAULT_MAX_RETRIES)
+    const transient = isTransientError(e)
+    const nowErr = new Date().toISOString()
+    if (transient && retryCount <= maxRetries) {
+      const nextRetryAt = isoAfterSeconds(retryDelaySeconds(retryCount))
+      await supabase
+        .from("organization_import_job_runs")
+        .update({
+          status: "queued",
+          retry_count: retryCount,
+          next_retry_at: nextRetryAt,
+          last_error_at: nowErr,
+          error_message: e instanceof Error ? e.message : "Transient processing failure.",
+          last_heartbeat_at: nowErr,
+          recovery_json: {
+            reason: "transient_failure",
+            retry_count: retryCount,
+            resume_cursor: run.resume_cursor ?? 0,
+            current_chunk_index: run.current_chunk_index ?? 0,
+          },
+          lease_owner: null,
+          lease_expires_at: null,
+        })
+        .eq("id", runId)
+      await supabase
+        .from("organization_import_jobs")
+        .update({
+          status: "queued",
+          user_message: `Retry ${retryCount}/${maxRetries} scheduled for background import.`,
+        })
+        .eq("id", jobId)
+        .eq("organization_id", organizationId)
+      return { run: await getActiveImportRun(gate, organizationId, jobId) }
+    }
+
+    await supabase
+      .from("organization_import_job_runs")
+      .update({
+        status: "failed",
+        completed_at: nowErr,
+        last_error_at: nowErr,
+        error_message: e instanceof Error ? e.message : "Background import failed.",
+        recovery_json: {
+          reason: transient ? "retry_exhausted" : "non_transient_failure",
+          retry_count: retryCount,
+          resume_cursor: run.resume_cursor ?? 0,
+          current_chunk_index: run.current_chunk_index ?? 0,
+        },
+        lease_owner: null,
+        lease_expires_at: null,
+      })
+      .eq("id", runId)
+    await supabase
+      .from("organization_import_jobs")
+      .update({
+        status: "failed",
+        completed_at: nowErr,
+        user_message: jobStatusMessage("failed", {}),
+        active_run_id: null,
+      })
+      .eq("id", jobId)
+      .eq("organization_id", organizationId)
+    throw e
+  }
+}
+
+export async function processAsyncImportRunTick(gate: Gate, organizationId: string, jobId: string): Promise<AsyncRunPublic | null> {
+  const { supabase } = gate
   const { data: runData, error: runErr } = await supabase
     .from("organization_import_job_runs")
-    .select("*")
+    .select("id")
     .eq("organization_id", organizationId)
     .eq("import_job_id", jobId)
     .in("status", ["queued", "processing"])
@@ -201,189 +581,29 @@ export async function processAsyncImportRunTick(gate: Gate, organizationId: stri
     .maybeSingle()
 
   if (runErr || !runData) return null
+  const runId = String((runData as { id: string }).id)
+  const result = await processRunById(gate, runId)
+  return result.run
+}
 
-  const run = runData as Record<string, unknown>
-  const runId = String(run.id)
-  const meta = (run.metadata as Record<string, unknown> | null) ?? {}
-  const columnMapping = (meta.columnMapping as Record<string, string> | undefined) ?? {}
-  const options = (meta.options as MigrationCommitOptions | undefined) ?? {}
-  const strategy = resolveImportStrategy(options)
-
-  const { data: job, error: jobErr } = await supabase
-    .from("organization_import_jobs")
-    .select("kind, storage_path, cancel_requested_at")
-    .eq("organization_id", organizationId)
-    .eq("id", jobId)
-    .single()
-  if (jobErr || !job) throw new Error(jobErr?.message ?? "Import job not found.")
-
-  const j = job as { kind: MigrationImportKind; storage_path: string | null; cancel_requested_at: string | null }
-  if (!j.storage_path) throw new Error("No uploaded file for this job.")
-
-  const cancelRequested = Boolean(run.cancel_requested_at) || Boolean(j.cancel_requested_at)
-  if (cancelRequested) {
-    const now = new Date().toISOString()
-    await supabase
-      .from("organization_import_job_runs")
-      .update({
-        status: "cancelled",
-        completed_at: now,
-        last_heartbeat_at: now,
-      })
-      .eq("id", runId)
-    await supabase
-      .from("organization_import_jobs")
-      .update({
-        status: "cancelled",
-        completed_at: now,
-        user_message: "Background import cancelled by user request.",
-        active_run_id: null,
-      })
-      .eq("organization_id", organizationId)
-      .eq("id", jobId)
-    return getActiveImportRun(gate, organizationId, jobId)
-  }
-
-  const parsed = await loadJobCsvFromStorageForAsync(svc, j.storage_path)
-  const chunkSize = Number(run.chunk_size ?? MIGRATION_IMPORT_ASYNC_DEFAULT_CHUNK_SIZE)
-  const totalRows = parsed.rows.length
-  const cursor = Number(run.resume_cursor ?? 0)
-  const nextRows = parsed.rows.slice(cursor, cursor + chunkSize)
-
+export async function processNextRunnableImportRun(
+  gate: Gate,
+  opts?: ProcessRunOptions,
+): Promise<{ processed: boolean; run: AsyncRunPublic | null }> {
+  const { supabase } = gate
   const now = new Date().toISOString()
-  await supabase
+  const { data: runData } = await supabase
     .from("organization_import_job_runs")
-    .update({
-      status: "processing",
-      started_at: (run.started_at as string | null) ?? now,
-      last_heartbeat_at: now,
-    })
-    .eq("id", runId)
-  await supabase
-    .from("organization_import_jobs")
-    .update({
-      status: "processing",
-      started_at: (run.started_at as string | null) ?? now,
-      user_message: `Processing chunk ${Math.floor(cursor / chunkSize) + 1} of ${Math.max(1, Math.ceil(totalRows / chunkSize))}...`,
-    })
-    .eq("id", jobId)
-    .eq("organization_id", organizationId)
-
-  if (nextRows.length === 0) {
-    const createdCount = Number(run.created_count ?? 0)
-    const updatedCount = Number(run.updated_count ?? 0)
-    const skippedCount = Number(run.skipped_count ?? 0)
-    const errorCount = Number(run.error_count ?? 0)
-    const finalStatus = statusFromCounts(createdCount, updatedCount, errorCount)
-    await supabase
-      .from("organization_import_job_runs")
-      .update({
-        status: finalStatus,
-        completed_at: now,
-        last_heartbeat_at: now,
-      })
-      .eq("id", runId)
-    await supabase
-      .from("organization_import_jobs")
-      .update({
-        status: finalStatus,
-        completed_at: now,
-        user_message: `${createdCount} created · ${updatedCount} updated · ${skippedCount} skipped · ${errorCount} errors`,
-        active_run_id: null,
-        strategy,
-      })
-      .eq("id", jobId)
-      .eq("organization_id", organizationId)
-    return null
-  }
-
-  const result = await runCommit({
-    supabase,
-    organizationId,
-    userId,
-    columnMapping,
-    rows: nextRows,
-    options,
-    kind: j.kind,
-    importSeedPrefix: `${jobId}-r-${runId}-c-${Math.floor(cursor / chunkSize)}`,
-  })
-
-  const offset = cursor
-  const shifted = offsetOutcomes(result.outcomes, offset)
-  const rowPayload = shifted.map((o, idx) => ({
-    import_job_id: jobId,
-    row_index: o.rowIndex,
-    status: o.status === "imported" ? "imported" : o.status,
-    codes: o.codes,
-    message: o.message,
-    entity_kind: o.entityKind ?? null,
-    entity_id: o.entityId ?? null,
-    snapshot: { cells: nextRows[idx] ?? {} } as Record<string, unknown>,
-  }))
-
-  if (rowPayload.length > 0) {
-    await supabase.from("organization_import_job_rows").upsert(rowPayload, { onConflict: "import_job_id,row_index" })
-  }
-
-  const processedCount = Number(run.processed_count ?? 0) + nextRows.length
-  const createdCount = Number(run.created_count ?? 0) + result.createdCount
-  const updatedCount = Number(run.updated_count ?? 0) + result.updatedCount
-  const skippedCount = Number(run.skipped_count ?? 0) + result.skippedCount
-  const errorCount = Number(run.error_count ?? 0) + result.errorCount
-  const nextCursor = cursor + nextRows.length
-  const totalChunks = Math.max(1, Math.ceil(totalRows / chunkSize))
-  const currentChunkIndex = Math.min(totalChunks, Math.ceil(nextCursor / chunkSize))
-  const done = nextCursor >= totalRows
-  const finalStatus = done ? statusFromCounts(createdCount, updatedCount, errorCount) : "processing"
-
-  await supabase
-    .from("organization_import_job_runs")
-    .update({
-      status: finalStatus,
-      total_rows: totalRows,
-      total_chunks: totalChunks,
-      current_chunk_index: currentChunkIndex,
-      resume_cursor: nextCursor,
-      processed_count: processedCount,
-      created_count: createdCount,
-      updated_count: updatedCount,
-      skipped_count: skippedCount,
-      error_count: errorCount,
-      last_heartbeat_at: now,
-      completed_at: done ? now : null,
-    })
-    .eq("id", runId)
-
-  await supabase
-    .from("organization_import_jobs")
-    .update({
-      status: finalStatus,
-      processed_count: processedCount,
-      success_count: createdCount,
-      updated_count: updatedCount,
-      skipped_count: skippedCount,
-      error_count: errorCount,
-      strategy,
-      completed_at: done ? now : null,
-      user_message: done
-        ? `${createdCount} created · ${updatedCount} updated · ${skippedCount} skipped · ${errorCount} errors`
-        : `Processed ${processedCount}/${totalRows} rows · chunk ${currentChunkIndex}/${totalChunks}`,
-      active_run_id: done ? null : runId,
-    })
-    .eq("id", jobId)
-    .eq("organization_id", organizationId)
-
-  const fresh = await getActiveImportRun(gate, organizationId, jobId)
-  if (fresh) return fresh
-
-  const { data: doneRun } = await supabase
-    .from("organization_import_job_runs")
-    .select(
-      "id, status, run_mode, chunk_size, total_rows, total_chunks, current_chunk_index, processed_count, created_count, updated_count, skipped_count, error_count, started_at, completed_at, last_heartbeat_at, cancel_requested_at, error_message",
-    )
-    .eq("id", runId)
+    .select("id")
+    .in("status", ["queued", "processing"])
+    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
+    .order("updated_at", { ascending: true })
+    .limit(1)
     .maybeSingle()
-  return doneRun ? mapRun(doneRun as Record<string, unknown>) : null
+  if (!runData) return { processed: false, run: null }
+  const runId = String((runData as { id: string }).id)
+  const result = await processRunById(gate, runId, opts)
+  return { processed: !result.leaseDenied, run: result.run }
 }
 
 export async function requestCancelAsyncRun(gate: Gate, organizationId: string, jobId: string): Promise<AsyncRunPublic | null> {
@@ -393,7 +613,7 @@ export async function requestCancelAsyncRun(gate: Gate, organizationId: string, 
     .from("organization_import_jobs")
     .update({
       cancel_requested_at: now,
-      user_message: "Cancellation requested. Current chunk will stop at next checkpoint.",
+      user_message: jobStatusMessage("cancel_requested", {}),
     })
     .eq("organization_id", organizationId)
     .eq("id", jobId)

@@ -37,6 +37,7 @@ type JobDetail = {
 
 type ActiveRun = {
   runId: string
+  runRef: string
   status: string
   totalRows: number
   totalChunks: number
@@ -47,6 +48,12 @@ type ActiveRun = {
   skippedCount: number
   errorCount: number
   cancelRequestedAt: string | null
+  retryCount: number
+  maxRetries: number
+  nextRetryAt: string | null
+  errorMessage?: string | null
+  completedAt?: string | null
+  createdAt?: string | null
 }
 
 type RowSample = {
@@ -77,6 +84,7 @@ export default function ImportJobDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeRun, setActiveRun] = useState<ActiveRun | null>(null)
+  const [runHistory, setRunHistory] = useState<ActiveRun[]>([])
 
   const load = useCallback(async () => {
     if (!organizationId || !jobId || !allowed) {
@@ -92,6 +100,7 @@ export default function ImportJobDetailPage() {
       const json = (await res.json()) as {
         job?: JobDetail
         activeRun?: ActiveRun | null
+        runHistory?: ActiveRun[]
         rows?: RowSample[]
         rowSampleLimit?: number
         message?: string
@@ -105,12 +114,14 @@ export default function ImportJobDetailPage() {
       setJob(json.job ?? null)
       setActiveRun(json.activeRun ?? null)
       setRows(json.rows ?? [])
+      setRunHistory(json.runHistory ?? [])
       setRowSampleLimit(json.rowSampleLimit ?? 0)
     } catch {
       setError("Could not load import job.")
       setJob(null)
       setActiveRun(null)
       setRows([])
+      setRunHistory([])
     } finally {
       setLoading(false)
     }
@@ -242,6 +253,9 @@ export default function ImportJobDetailPage() {
                 {activeRun.cancelRequestedAt ? (
                   <p className="text-amber-700 dark:text-amber-300">Cancellation requested.</p>
                 ) : null}
+                {activeRun.nextRetryAt ? (
+                  <p className="text-muted-foreground">Next retry: {new Date(activeRun.nextRetryAt).toLocaleString()}</p>
+                ) : null}
               </div>
             ) : null}
 
@@ -330,6 +344,45 @@ export default function ImportJobDetailPage() {
             </div>
           ) : job.status !== "draft" ? (
             <p className="text-sm text-muted-foreground">No row outcomes recorded for this job yet.</p>
+          ) : null}
+
+          {runHistory.length > 0 ? (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="px-3 py-2 bg-muted/40 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Run history</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Run</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Progress</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Retry</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runHistory.map((r) => (
+                      <tr key={r.runId} className="border-t border-border/80">
+                        <td className="px-3 py-1.5 font-mono text-xs">{r.runRef}</td>
+                        <td className="px-3 py-1.5 capitalize">{r.status.replace(/_/g, " ")}</td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                          {r.processedCount}/{r.totalRows} · chunk {r.currentChunkIndex}/{Math.max(1, r.totalChunks)}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                          {r.retryCount}/{r.maxRetries}
+                          {r.nextRetryAt ? ` · next ${new Date(r.nextRetryAt).toLocaleTimeString()}` : ""}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                          {r.completedAt ? new Date(r.completedAt).toLocaleString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : null}
 
           <p className="text-xs text-muted-foreground border-t border-border pt-4">

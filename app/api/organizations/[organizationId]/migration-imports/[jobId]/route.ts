@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { shortImportRef } from "@/lib/migration-imports/parse-csv"
-import { getActiveImportRun } from "@/lib/migration-imports/async-runner"
+import { getActiveImportRun, listImportRunsHistory } from "@/lib/migration-imports/async-runner"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
 
 export const runtime = "nodejs"
@@ -92,6 +92,7 @@ export async function GET(
 
   const partialImport = j.status === "completed_with_errors"
   const activeRun = await getActiveImportRun(gate, organizationId, jobId)
+  const runHistory = await listImportRunsHistory(gate, organizationId, jobId, 8)
 
   return NextResponse.json({
     job: {
@@ -121,6 +122,7 @@ export async function GET(
       cancel_requested_at: j.cancel_requested_at,
     },
     activeRun,
+    runHistory,
     rows,
     rowSampleLimit: rowLimit,
   })
