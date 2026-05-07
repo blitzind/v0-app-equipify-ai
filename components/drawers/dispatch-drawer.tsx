@@ -1327,6 +1327,10 @@ function DailyDispatchInner({ initialTechnicianId }: { initialTechnicianId?: str
               setAssignExistingWoId(woId)
               setScheduleJobOpen(true)
             }}
+            onQuickAdd={() => {
+              setAssignExistingWoId(null)
+              setScheduleJobOpen(true)
+            }}
           />
         </section>
 

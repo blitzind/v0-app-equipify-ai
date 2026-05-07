@@ -59,6 +59,12 @@ interface FormState {
   notes: string
   createWorkOrder: boolean
   sendConfirmation: boolean
+  /**
+   * Phase: Scheduling Field-Speed Polish — recipient address for the
+   * "Send confirmation" toggle. Pre-filled from the customer's billing_email
+   * when available; the dispatcher can override before submitting.
+   */
+  confirmationEmail: string
   sendReminder: boolean
   repeatSchedule: boolean
 }
@@ -115,6 +121,7 @@ const BLANK: FormState = {
   notes: "",
   createWorkOrder: true,
   sendConfirmation: false,
+  confirmationEmail: "",
   sendReminder: false,
   repeatSchedule: false,
 }
@@ -351,12 +358,43 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       equipmentId: "",
       locationId: "",
       locationText: "",
+      // Phase: Scheduling Field-Speed Polish — clear stale email; the
+      // billing_email lookup below repopulates it asynchronously.
+      confirmationEmail: prev.customerId === v ? prev.confirmationEmail : "",
     }))
     setShowAddLoc(false)
     setNewLoc(BLANK_LOC)
     setLocSaved(false)
     setLocSaveError(null)
   }
+
+  // Phase: Scheduling Field-Speed Polish — prefill confirmation recipient
+  // from the customer's billing email when available. Schema-drift safe:
+  // if the column ever disappears we silently fall back to the manual entry.
+  useEffect(() => {
+    if (!open || !activeOrgId || !form.customerId) return
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("customers")
+        .select("billing_email")
+        .eq("organization_id", activeOrgId)
+        .eq("id", form.customerId)
+        .maybeSingle()
+      if (cancelled || error) return
+      const email = (data as { billing_email?: string | null } | null)?.billing_email?.trim() ?? ""
+      if (!email) return
+      setForm((prev) =>
+        prev.customerId === form.customerId && !prev.confirmationEmail.trim()
+          ? { ...prev, confirmationEmail: email }
+          : prev,
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, activeOrgId, form.customerId])
 
   function handleLocationChange(v: string) {
     if (v === "__add_new__") {
@@ -460,37 +498,64 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
       form.technicianId?.trim() ? form.technicianId.trim() : null,
     )
 
-    const { error: insertError } = await supabase.from("work_orders").insert({
-      organization_id: activeOrgId,
-      customer_id: form.customerId,
-      equipment_id: form.equipmentId,
-      title,
-      status: "scheduled",
-      priority: uiPriorityToDb(form.priority as WorkOrderPriority),
-      type: uiTypeToDb(form.serviceType as WorkOrderType),
-      scheduled_on: form.date,
-      scheduled_time: scheduledTime,
-      ...assign,
-      notes: notesCombined,
-      problem_reported: problemReported,
-      repair_log: {
-        problemReported,
-        diagnosis: "",
-        partsUsed: [],
-        laborHours: 0,
-        technicianNotes: "",
-        photos: [],
-        signatureDataUrl: "",
-        signedBy: "",
-        signedAt: "",
-      },
-    })
+    const { data: insertedRow, error: insertError } = await supabase
+      .from("work_orders")
+      .insert({
+        organization_id: activeOrgId,
+        customer_id: form.customerId,
+        equipment_id: form.equipmentId,
+        title,
+        status: "scheduled",
+        priority: uiPriorityToDb(form.priority as WorkOrderPriority),
+        type: uiTypeToDb(form.serviceType as WorkOrderType),
+        scheduled_on: form.date,
+        scheduled_time: scheduledTime,
+        ...assign,
+        notes: notesCombined,
+        problem_reported: problemReported,
+        repair_log: {
+          problemReported,
+          diagnosis: "",
+          partsUsed: [],
+          laborHours: 0,
+          technicianNotes: "",
+          photos: [],
+          signatureDataUrl: "",
+          signedBy: "",
+          signedAt: "",
+        },
+      })
+      .select("id")
+      .single()
 
     setSubmitting(false)
 
     if (insertError) {
       setSubmitError(insertError.message)
       return
+    }
+
+    // Phase: Scheduling Field-Speed Polish — fire-and-forget appointment
+    // confirmation email. Reuses the same /api/email/work-order-summary
+    // route (capability-gated by canEditWorkOrders ∨ canManageDispatch) but
+    // switches the body via `variant: "appointment_confirmation"`. We never
+    // block the dispatcher's "scheduled" success state on this network call.
+    const newWoId = (insertedRow as { id?: string } | null)?.id ?? null
+    const recipient = form.confirmationEmail.trim()
+    if (form.sendConfirmation && newWoId && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      void fetch("/api/email/work-order-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: activeOrgId,
+          workOrderId: newWoId,
+          to: recipient,
+          variant: "appointment_confirmation",
+        }),
+      }).catch(() => {
+        // Intentionally swallowed: dispatcher already has a scheduled WO,
+        // and the failure surfaces in the audit/communication log.
+      })
     }
 
     setSubmitted(true)
@@ -870,6 +935,27 @@ export function ScheduleServiceDrawer({ open, onClose, onScheduled }: Props) {
                     onChange={(v) => set("repeatSchedule", v)}
                   />
                 </div>
+                {form.sendConfirmation ? (
+                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 flex flex-col gap-1.5">
+                    <Label className="text-[11px] font-medium flex items-center gap-1.5 text-muted-foreground">
+                      <Mail className="w-3 h-3" />
+                      Confirmation recipient
+                    </Label>
+                    <Input
+                      type="email"
+                      value={form.confirmationEmail}
+                      onChange={(e) => set("confirmationEmail", e.target.value)}
+                      placeholder="customer@example.com"
+                      className="h-8 text-xs"
+                      autoComplete="email"
+                      inputMode="email"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Sent right after the work order is scheduled. Reuses the
+                      existing customer email infrastructure.
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               {submitError && (

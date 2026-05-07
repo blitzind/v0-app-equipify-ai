@@ -297,6 +297,72 @@ export type WorkOrderSummaryEmailArgs = {
   messagePlain?: string
 }
 
+export type AppointmentConfirmationEmailArgs = {
+  organizationName: string
+  customerName: string
+  equipmentName: string
+  workOrderLabel: string
+  /** Friendly date label (e.g. "Mon May 11, 2026"). */
+  scheduledDateLabel: string
+  /** Optional friendly time-window label (e.g. "9:00 AM"). */
+  scheduledTimeLabel?: string | null
+  technicianLabel?: string | null
+  locationLine?: string | null
+  /** Optional dispatcher / scheduler note appended verbatim to the email. */
+  messagePlain?: string
+}
+
+/**
+ * Phase: Scheduling Field-Speed Polish — appointment confirmation template.
+ *
+ * Reuses the same Equipify-branded shell as the other transactional emails
+ * (`wrapEquipifyEmail`) so we never spawn a parallel email design. The only
+ * difference vs. `buildWorkOrderSummaryEmailContent` is the framing: this
+ * template is sent *before* service to set expectations, while the summary
+ * goes out *after* completion.
+ */
+export function buildAppointmentConfirmationEmailContent(
+  args: AppointmentConfirmationEmailArgs,
+): { subject: string; html: string; text: string } {
+  const subject = `Appointment confirmed — ${args.workOrderLabel}`
+  const timeLine = args.scheduledTimeLabel?.trim()
+    ? `${escapeHtml(args.scheduledDateLabel)} at <strong>${escapeHtml(args.scheduledTimeLabel)}</strong>`
+    : `${escapeHtml(args.scheduledDateLabel)}`
+  const inner = `<p>Dear ${escapeHtml(args.customerName)},</p>
+<p>This confirms your upcoming service appointment with <strong>${escapeHtml(args.organizationName)}</strong>.</p>
+<ul style="padding-left:18px;margin:12px 0;">
+<li><strong>Job:</strong> ${escapeHtml(args.workOrderLabel)}</li>
+<li><strong>Equipment:</strong> ${escapeHtml(args.equipmentName)}</li>
+<li><strong>When:</strong> ${timeLine}</li>
+${args.technicianLabel ? `<li><strong>Technician:</strong> ${escapeHtml(args.technicianLabel)}</li>` : ""}
+${args.locationLine ? `<li><strong>Where:</strong> ${escapeHtml(args.locationLine)}</li>` : ""}
+</ul>
+${
+  args.messagePlain?.trim() ?
+    plainTextToHtml(args.messagePlain)
+  : `<p>If anything needs to change, reply to this email and we'll reach out as soon as possible.</p>`
+}
+<p style="font-size:13px;color:#475569;">A reminder may follow closer to the visit. You can also view this appointment in your customer portal once portal access is enabled.</p>`
+  const html = wrapEquipifyEmail(args.organizationName, inner)
+  const text = [
+    `Dear ${args.customerName},`,
+    "",
+    `Appointment confirmed — ${args.organizationName}`,
+    `Job: ${args.workOrderLabel}`,
+    `Equipment: ${args.equipmentName}`,
+    args.scheduledTimeLabel?.trim()
+      ? `When: ${args.scheduledDateLabel} at ${args.scheduledTimeLabel}`
+      : `When: ${args.scheduledDateLabel}`,
+    args.technicianLabel ? `Technician: ${args.technicianLabel}` : "",
+    args.locationLine ? `Where: ${args.locationLine}` : "",
+    "",
+    args.messagePlain?.trim() || "Reply to this email if anything needs to change.",
+  ]
+    .filter(Boolean)
+    .join("\n")
+  return { subject, html, text }
+}
+
 export function buildWorkOrderSummaryEmailContent(
   args: WorkOrderSummaryEmailArgs,
 ): { subject: string; html: string; text: string } {

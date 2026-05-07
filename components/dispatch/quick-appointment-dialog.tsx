@@ -1,7 +1,20 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { AlertTriangle, Calendar, ChevronDown, Clock, Loader2, MapPin, User, Wrench, X, Zap } from "lucide-react"
+import {
+  AlertTriangle,
+  Calendar,
+  ChevronDown,
+  Clock,
+  Loader2,
+  Mail,
+  MapPin,
+  Send,
+  User,
+  Wrench,
+  X,
+  Zap,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,7 +65,7 @@ import {
  * drawer remains available for richer flows (notifications, locations, etc.).
  */
 
-type CustomerOption = { id: string; company_name: string }
+type CustomerOption = { id: string; company_name: string; billing_email: string | null }
 type EquipmentOption = {
   id: string
   name: string
@@ -117,6 +130,10 @@ export function QuickAppointmentDialog({
   const [timeHhMm, setTimeHhMm] = useState<string>(defaultTimeHhMm ?? "09:00")
   const [technicianId, setTechnicianId] = useState<string>(defaultTechnicianId ?? "")
   const [notes, setNotes] = useState("")
+  // Phase: Scheduling Field-Speed Polish — optional confirmation send.
+  // Default off so we never send mail unless the dispatcher opts in.
+  const [sendConfirmation, setSendConfirmation] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState("")
 
   useEffect(() => {
     if (!open) return
@@ -128,6 +145,8 @@ export function QuickAppointmentDialog({
     setTimeHhMm(defaultTimeHhMm ?? "09:00")
     setTechnicianId(defaultTechnicianId ?? "")
     setNotes("")
+    setSendConfirmation(false)
+    setConfirmationEmail("")
     setSubmitError(null)
   }, [open, defaultDate, defaultTimeHhMm, defaultTechnicianId])
 
@@ -137,21 +156,58 @@ export function QuickAppointmentDialog({
     void (async () => {
       setLoadingRefs(true)
       const supabase = createBrowserSupabaseClient()
-      const { data } = await supabase
+      // Schema-drift safe: include billing_email when present, but fall back
+      // to the legacy column set if the column doesn't exist on this org.
+      let { data, error } = await supabase
         .from("customers")
-        .select("id, company_name")
+        .select("id, company_name, billing_email")
         .eq("organization_id", organizationId)
         .eq("status", "active")
         .is("archived_at", null)
         .order("company_name")
+      if (error) {
+        const fallback = await supabase
+          .from("customers")
+          .select("id, company_name")
+          .eq("organization_id", organizationId)
+          .eq("status", "active")
+          .is("archived_at", null)
+          .order("company_name")
+        data = fallback.data as Array<{ id: string; company_name: string }> | null
+      }
       if (cancelled) return
-      setCustomers((data as CustomerOption[]) ?? [])
+      setCustomers(
+        ((data ?? []) as Array<{ id: string; company_name: string; billing_email?: string | null }>).map((c) => ({
+          id: c.id,
+          company_name: c.company_name,
+          billing_email: (c.billing_email ?? null) || null,
+        })),
+      )
       setLoadingRefs(false)
     })()
     return () => {
       cancelled = true
     }
   }, [open, organizationId, orgStatus])
+
+  // Phase: Scheduling Field-Speed Polish — auto-select the only equipment
+  // option to remove a tap on the most common case (single asset per
+  // customer site). Never overrides an explicit pick.
+  useEffect(() => {
+    if (!equipmentId && equipment.length === 1) {
+      setEquipmentId(equipment[0].id)
+    }
+  }, [equipment, equipmentId])
+
+  // Phase: Scheduling Field-Speed Polish — prefill confirmation recipient
+  // from the selected customer's billing_email when available.
+  useEffect(() => {
+    if (!customerId) return
+    const cust = customers.find((c) => c.id === customerId)
+    const email = cust?.billing_email?.trim() ?? ""
+    if (!email) return
+    setConfirmationEmail((prev) => (prev.trim() ? prev : email))
+  }, [customerId, customers])
 
   useEffect(() => {
     if (!open || !organizationId || !customerId) {
@@ -307,6 +363,28 @@ export function QuickAppointmentDialog({
     const techLabel = technicianId
       ? technicians.find((t) => t.id === technicianId)?.label ?? null
       : null
+
+    // Phase: Scheduling Field-Speed Polish — fire-and-forget appointment
+    // confirmation email when the dispatcher opted in. Reuses the
+    // capability-gated /api/email/work-order-summary route.
+    const confirmationRecipient = confirmationEmail.trim()
+    if (
+      newWoId &&
+      sendConfirmation &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(confirmationRecipient)
+    ) {
+      void fetch("/api/email/work-order-summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          workOrderId: newWoId,
+          to: confirmationRecipient,
+          variant: "appointment_confirmation",
+        }),
+      }).catch(() => {})
+    }
+
     if (newWoId) {
       void emitSchedulingEvent({
         organizationId,
@@ -387,6 +465,8 @@ export function QuickAppointmentDialog({
     conflicts,
     neighborConflicts,
     technicians,
+    sendConfirmation,
+    confirmationEmail,
   ])
 
   if (!open) return null
@@ -571,6 +651,38 @@ export function QuickAppointmentDialog({
             />
           </div>
 
+          {/* Phase: Scheduling Field-Speed Polish — confirmation toggle */}
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sendConfirmation}
+                onChange={(e) => setSendConfirmation(e.target.checked)}
+                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-primary"
+              />
+              <span className="flex-1">
+                <span className="flex items-center gap-1 font-medium text-foreground">
+                  <Mail className="h-3 w-3" /> Send confirmation to customer
+                </span>
+                <span className="block text-[11px] text-muted-foreground">
+                  Sends an appointment email right after the work order is
+                  created. Reuses the existing customer email pipeline.
+                </span>
+              </span>
+            </label>
+            {sendConfirmation ? (
+              <Input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={confirmationEmail}
+                onChange={(e) => setConfirmationEmail(e.target.value)}
+                placeholder="customer@example.com"
+                className="h-9 text-sm"
+              />
+            ) : null}
+          </div>
+
           {customerId && selectedCustomerName ? (
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Wrench className="h-3 w-3" /> Customer: {selectedCustomerName}
@@ -646,17 +758,30 @@ export function QuickAppointmentDialog({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2 px-5 py-4 border-t border-border">
-          <Button variant="outline" className="flex-1 h-9" onClick={onClose} disabled={submitting}>
+        {/* Phase: Scheduling Field-Speed Polish — sticky footer with bigger
+            tap targets (≥44px tall) for in-vehicle use. */}
+        <div className="flex items-center gap-2 px-5 py-3 border-t border-border bg-card sm:py-4">
+          <Button
+            variant="outline"
+            className="flex-1 h-11 sm:h-10"
+            onClick={onClose}
+            disabled={submitting}
+          >
             Cancel
           </Button>
           <Button
-            className="flex-1 h-9 gap-1.5"
+            className="flex-1 h-11 sm:h-10 gap-1.5"
             disabled={!canSubmit}
             onClick={() => void handleSubmit()}
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-            Create work order
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : sendConfirmation ? (
+              <Send className="h-4 w-4" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            {sendConfirmation ? "Save & send" : "Create work order"}
           </Button>
         </div>
       </div>

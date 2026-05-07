@@ -11,16 +11,35 @@ export async function GET() {
 
   const { svc, portalUser } = ctx
 
-  const { data: rows, error } = await svc
+  // Phase: Scheduling Field-Speed Polish — also expose scheduled_time so the
+  // portal list can render a clear "When" column for upcoming visits.
+  // Schema-drift safe: `scheduled_time` has shipped with work_orders since
+  // the foundation migration, but we still tolerate a missing column.
+  let { data: rows, error } = await svc
     .from("work_orders")
     .select(
-      "id, work_order_number, title, status, type, priority, scheduled_on, completed_at, assigned_user_id, equipment_id",
+      "id, work_order_number, title, status, type, priority, scheduled_on, scheduled_time, completed_at, assigned_user_id, equipment_id",
     )
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .eq("is_archived", false)
     .order("created_at", { ascending: false })
     .limit(200)
+
+  if (error && /scheduled_time/i.test(error.message)) {
+    const fallback = await svc
+      .from("work_orders")
+      .select(
+        "id, work_order_number, title, status, type, priority, scheduled_on, completed_at, assigned_user_id, equipment_id",
+      )
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("is_archived", false)
+      .order("created_at", { ascending: false })
+      .limit(200)
+    rows = fallback.data
+    error = fallback.error
+  }
 
   if (error) {
     return NextResponse.json({ error: "Could not load work orders." }, { status: 500 })
@@ -44,20 +63,29 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    items: (rows ?? []).map((w) => ({
-      id: w.id as string,
-      display: getWorkOrderDisplay({
+    items: (rows ?? []).map((w) => {
+      const wt = w as typeof w & { scheduled_time?: string | null }
+      return {
         id: w.id as string,
-        workOrderNumber: w.work_order_number as number | null,
-      }),
-      title: w.title as string,
-      statusLabel: mapWorkOrderStatus(w.status as string),
-      typeLabel: mapWorkOrderType(w.type as string),
-      priority: w.priority as string,
-      scheduledOn: (w.scheduled_on as string | null) ?? null,
-      completedAt: (w.completed_at as string | null) ?? null,
-      equipmentName: equipMap.get(w.equipment_id as string) ?? "Equipment",
-      technicianName: w.assigned_user_id ? (techMap.get(w.assigned_user_id as string) ?? null) : null,
-    })),
+        display: getWorkOrderDisplay({
+          id: w.id as string,
+          workOrderNumber: w.work_order_number as number | null,
+        }),
+        title: w.title as string,
+        statusLabel: mapWorkOrderStatus(w.status as string),
+        typeLabel: mapWorkOrderType(w.type as string),
+        priority: w.priority as string,
+        scheduledOn: (w.scheduled_on as string | null) ?? null,
+        // `HH:MM:SS` from postgres `time without time zone`; truncate to HH:MM
+        // for the portal which only displays start time.
+        scheduledTime:
+          typeof wt.scheduled_time === "string" && wt.scheduled_time.length >= 5
+            ? wt.scheduled_time.slice(0, 5)
+            : null,
+        completedAt: (w.completed_at as string | null) ?? null,
+        equipmentName: equipMap.get(w.equipment_id as string) ?? "Equipment",
+        technicianName: w.assigned_user_id ? (techMap.get(w.assigned_user_id as string) ?? null) : null,
+      }
+    }),
   })
 }

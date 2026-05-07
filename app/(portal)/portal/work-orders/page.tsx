@@ -12,6 +12,12 @@ type Wo = {
   typeLabel: string
   priority: string
   scheduledOn: string | null
+  /**
+   * Phase: Scheduling Field-Speed Polish — start time (HH:MM, 24h) of the
+   * appointment. Optional; the API returns null for legacy or unscheduled
+   * records.
+   */
+  scheduledTime: string | null
   completedAt: string | null
   equipmentName: string
   technicianName: string | null
@@ -19,7 +25,22 @@ type Wo = {
 
 function fmtDate(d: string | null) {
   if (!d) return "—"
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return new Date(`${d}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function fmtTime(hhmm: string | null) {
+  if (!hhmm) return null
+  const [h, m] = hhmm.split(":")
+  const hour = Number.parseInt(h ?? "", 10)
+  const min = Number.parseInt(m ?? "0", 10)
+  if (!Number.isFinite(hour)) return null
+  const d = new Date()
+  d.setHours(hour, Number.isFinite(min) ? min : 0, 0, 0)
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -126,7 +147,20 @@ export default function PortalWorkOrdersPage() {
                       <StatusBadge status={wo.statusLabel} />
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--portal-nav-text)" }}>
-                      {fmtDate(wo.scheduledOn)}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{fmtDate(wo.scheduledOn)}</span>
+                        {(() => {
+                          const t = fmtTime(wo.scheduledTime)
+                          return t ? (
+                            <span
+                              className="text-[10px] font-medium"
+                              style={{ color: "var(--portal-secondary)" }}
+                            >
+                              {t}
+                            </span>
+                          ) : null
+                        })()}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--portal-secondary)" }}>
                       {wo.technicianName ?? "—"}

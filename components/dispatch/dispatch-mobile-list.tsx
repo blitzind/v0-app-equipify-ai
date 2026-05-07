@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Boxes, Plus } from "lucide-react"
+import { Boxes, CalendarPlus, Plus, UserPlus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
@@ -78,50 +78,105 @@ export function DispatchMobileList({
               onClick={() =>
                 onQuickAdd({ technicianId: null, scheduledOn: selectedYmd, scheduledTimeHhMm: null })
               }
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
               aria-label="Quick add unassigned"
             >
-              <Plus className="h-3 w-3" /> Quick add
+              <Plus className="h-3.5 w-3.5" /> Quick add
             </button>
           ) : null}
         </div>
         <div className="flex flex-col gap-2">
           {unassigned.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Inbox is clear. Tap{" "}
-              <span className="font-medium text-foreground">Quick add</span> to queue a new job.
-            </p>
+            <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
+              <CalendarPlus className="mx-auto h-6 w-6 text-muted-foreground/60" />
+              <p className="mt-2 text-xs font-medium text-foreground">Inbox is clear</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                No unassigned work today. Tap{" "}
+                <span className="font-medium text-foreground">Quick add</span> to queue a new
+                appointment.
+              </p>
+              {onQuickAdd ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onQuickAdd({
+                      technicianId: null,
+                      scheduledOn: selectedYmd,
+                      scheduledTimeHhMm: null,
+                    })
+                  }
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary min-h-[36px]"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Quick add appointment
+                </button>
+              ) : null}
+            </div>
           ) : (
             unassigned.map((wo) => (
-              <button
+              <div
                 key={wo.id}
-                type="button"
-                onClick={() => onOpenWo(wo.id)}
-                className={cn("rounded-lg border px-3 py-2 text-left text-sm", cardTone(wo.status))}
+                className={cn(
+                  "flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                  cardTone(wo.status),
+                )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-[10px] text-primary">
-                    {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
-                  </p>
-                  {wo.equipmentCount && wo.equipmentCount > 0 ? (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                      <Boxes className="h-3 w-3" />
-                      {wo.equipmentCount}
-                    </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenWo(wo.id)}
+                  className="flex flex-col gap-1 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-[10px] text-primary">
+                      {getWorkOrderDisplay({ id: wo.id, workOrderNumber: wo.work_order_number ?? null })}
+                    </p>
+                    {wo.equipmentCount && wo.equipmentCount > 0 ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                        <Boxes className="h-3 w-3" />
+                        {wo.equipmentCount}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="font-medium">{wo.title}</p>
+                  <p className="text-xs text-muted-foreground">{wo.customerName}</p>
+                  {wo.assigned_user_id && wo.technicianLabel ? (
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {wo.technicianLabel}
+                      {wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}
+                    </p>
+                  ) : wo.serviceLocationLabel ? (
+                    <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
                   ) : null}
-                </div>
-                <p className="font-medium">{wo.title}</p>
-                <p className="text-xs text-muted-foreground">{wo.customerName}</p>
-                {wo.assigned_user_id && wo.technicianLabel ? (
-                  <p className="truncate text-[10px] text-muted-foreground">
-                    {wo.technicianLabel}
-                    {wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}
-                  </p>
-                ) : wo.serviceLocationLabel ? (
-                  <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
+                  <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
+                </button>
+                {/* Phase: Scheduling Field-Speed Polish — quick actions row.
+                    Direct path to schedule the unassigned job from mobile. */}
+                {onQuickAdd ? (
+                  <div className="flex items-center gap-1.5 pt-1 border-t border-border/40">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onQuickAdd({
+                          technicianId: null,
+                          scheduledOn: selectedYmd,
+                          scheduledTimeHhMm: null,
+                        })
+                      }
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
+                      aria-label="Schedule like this one"
+                    >
+                      <CalendarPlus className="h-3.5 w-3.5" /> Schedule similar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenWo(wo.id)}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
+                      aria-label="Open to assign technician"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" /> Assign
+                    </button>
+                  </div>
                 ) : null}
-                <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -144,19 +199,35 @@ export function DispatchMobileList({
                   onClick={() =>
                     onQuickAdd({ technicianId: t.id, scheduledOn: selectedYmd, scheduledTimeHhMm: null })
                   }
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
                   aria-label={`Quick add for ${t.label}`}
                 >
-                  <Plus className="h-3 w-3" /> Add
+                  <Plus className="h-3.5 w-3.5" /> Add
                 </button>
               ) : null}
             </div>
             {list.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Nothing scheduled this day. Tap{" "}
-                <span className="font-medium text-foreground">Add</span> to drop a job on
-                {` ${t.label.split(" ")[0]}'s`} day.
-              </p>
+              <div className="rounded-lg border border-dashed border-border bg-muted/15 px-3 py-4 text-center">
+                <p className="text-[11px] text-muted-foreground">
+                  Nothing scheduled this day for{" "}
+                  <span className="font-medium text-foreground">{t.label.split(" ")[0]}</span>.
+                </p>
+                {onQuickAdd ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onQuickAdd({
+                        technicianId: t.id,
+                        scheduledOn: selectedYmd,
+                        scheduledTimeHhMm: null,
+                      })
+                    }
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary min-h-[36px]"
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5" /> Drop a job here
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {list.map((wo) => (

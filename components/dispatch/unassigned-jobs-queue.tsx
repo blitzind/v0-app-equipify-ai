@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { GripVertical, Loader2, Sparkles } from "lucide-react"
+import { CalendarPlus, GripVertical, Inbox, Loader2, Sparkles } from "lucide-react"
 
 export type UnassignedQueueRow = {
   id: string
@@ -140,12 +140,20 @@ export function UnassignedJobsQueue({
   suggestionsByWoId,
   assigningWoId,
   onAssign,
+  onQuickAdd,
 }: {
   loading: boolean
   rows: UnassignedQueueRow[]
   suggestionsByWoId: Record<string, { id: string; name: string; reasons: string[] }[]>
   assigningWoId: string | null
   onAssign: (woId: string) => void
+  /**
+   * Phase: Scheduling Field-Speed Polish — optional CTA exposed in the
+   * empty state to jump straight into Quick Add when the queue is clear.
+   * Callers that don't have a quick-add flow available can omit this and
+   * the empty state degrades gracefully to the previous text-only message.
+   */
+  onQuickAdd?: () => void
 }) {
   if (loading) {
     return (
@@ -157,9 +165,25 @@ export function UnassignedJobsQueue({
 
   if (rows.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground py-4 text-center rounded-xl border border-dashed border-border bg-muted/10 px-3">
-        No unassigned open work orders.
-      </p>
+      <div className="rounded-xl border border-dashed border-border bg-muted/10 px-4 py-6 text-center">
+        <Inbox className="mx-auto h-6 w-6 text-muted-foreground/60" aria-hidden />
+        <p className="mt-2 text-sm font-medium text-foreground">All clear</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          No unassigned open work orders right now.
+        </p>
+        {onQuickAdd ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3 h-8 gap-1.5 text-xs"
+            onClick={onQuickAdd}
+          >
+            <CalendarPlus className="h-3.5 w-3.5" />
+            Quick add appointment
+          </Button>
+        ) : null}
+      </div>
     )
   }
 
