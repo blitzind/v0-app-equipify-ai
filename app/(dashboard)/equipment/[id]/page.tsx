@@ -26,6 +26,11 @@ import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecyc
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import {
+  loadEquipmentSignalsByIds,
+  type EquipmentSignals,
+} from "@/lib/equipment/intelligence-rollup"
+import { EquipmentSignalsRow } from "@/components/equipment/equipment-signals-row"
+import {
   ChevronLeft,
   ClipboardList,
   FileText,
@@ -198,6 +203,7 @@ export default function EquipmentDetailPage() {
     { id: string; created_at: string; templateName: string | null; workOrderLabel: string | null }[]
   >([])
   const [techProfiles, setTechProfiles] = useState<Record<string, string>>({})
+  const [signals, setSignals] = useState<EquipmentSignals | null>(null)
   const [tab, setTab] = useState("overview")
 
   const load = useCallback(async () => {
@@ -337,6 +343,28 @@ export default function EquipmentDetailPage() {
       setLoading(false)
     }
   }, [id, activeOrg.status, activeOrg.organizationId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!eq?.id || activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setSignals(null)
+      return () => {
+        cancelled = true
+      }
+    }
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const m = await loadEquipmentSignalsByIds(supabase, {
+        organizationId: activeOrg.organizationId,
+        equipmentIds: [eq.id],
+      })
+      if (cancelled) return
+      setSignals(m.get(eq.id) ?? null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [eq?.id, activeOrg.status, activeOrg.organizationId])
 
   useEffect(() => {
     void load()
@@ -514,6 +542,7 @@ export default function EquipmentDetailPage() {
               <Badge variant="secondary" className={cn("text-xs border mt-3", STATUS_COLORS[eq.status])}>
                 {eq.status}
               </Badge>
+              <EquipmentSignalsRow signals={signals} size="md" className="mt-3" />
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button size="sm" variant="outline" asChild>

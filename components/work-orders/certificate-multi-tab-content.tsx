@@ -28,6 +28,11 @@ import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { CertificateTabContent } from "@/components/work-orders/certificate-tab-content"
+import { CertificateAttachmentsCard } from "@/components/work-orders/certificate-attachments-card"
+import {
+  loadTechnicianSignaturePath,
+  signedUrlForTechnicianSignature,
+} from "@/lib/technicians/signature-storage"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useTenant } from "@/lib/tenant-store"
@@ -113,6 +118,7 @@ export function CertificateMultiTabContent({
   const [savingAssetId, setSavingAssetId] = useState<string | null>(null)
   const [releasingAssetId, setReleasingAssetId] = useState<string | null>(null)
   const [portalRules, setPortalRules] = useState<PortalRulesState | null>(null)
+  const [storedTechSignatureUrl, setStoredTechSignatureUrl] = useState<string | null>(null)
   const touchedRef = useRef<Record<string, Set<string>>>({})
 
   const equipmentKey = equipmentAssets.map((a) => a.id).join(",")
@@ -243,6 +249,44 @@ export function CertificateMultiTabContent({
     equipmentKey,
     equipmentAssets,
   ])
+
+  // Resolve the assigned technician's stored signature (Phase 2). When the
+  // WO has a technicians-table assignee with a signature on file, the cert
+  // output uses it as a fallback when no fresh visit signature was captured.
+  useEffect(() => {
+    let cancelled = false
+    const techId = workOrder.technicianId?.trim()
+    if (
+      !orgId ||
+      !techId ||
+      techId === "unassigned" ||
+      // Live capture from the work order overrides the stored fallback.
+      Boolean(workOrder.repairLog.signatureDataUrl?.trim())
+    ) {
+      setStoredTechSignatureUrl(null)
+      return () => {
+        cancelled = true
+      }
+    }
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const sig = await loadTechnicianSignaturePath(supabase, {
+        organizationId: orgId,
+        technicianId: techId,
+      })
+      if (cancelled) return
+      if (!sig?.storagePath) {
+        setStoredTechSignatureUrl(null)
+        return
+      }
+      const url = await signedUrlForTechnicianSignature(supabase, sig.storagePath)
+      if (cancelled) return
+      setStoredTechSignatureUrl(url ?? null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, workOrder.technicianId, workOrder.repairLog.signatureDataUrl])
 
   const emitCompletion = useCallback(() => {
     if (!onCompletionSlotsChange) return
@@ -510,7 +554,7 @@ export function CertificateMultiTabContent({
                       workOrder.repairLog.signatureDataUrl?.startsWith("data") ||
                       workOrder.repairLog.signatureDataUrl?.startsWith("http")
                         ? workOrder.repairLog.signatureDataUrl
-                        : null
+                        : storedTechSignatureUrl
                     }
                     completedAtLabel={workOrder.completedDate ? fmtShort(workOrder.completedDate) : null}
                     manageTemplatesHref="/calibration-templates"
@@ -523,6 +567,15 @@ export function CertificateMultiTabContent({
                         : undefined
                     }
                     releaseToPortalBusy={releasingAssetId === asset.id}
+                    attachmentsSlot={
+                      <CertificateAttachmentsCard
+                        organizationId={orgId}
+                        workOrderId={workOrder.id}
+                        equipmentId={asset.id}
+                        calibrationRecordId={st.recordId ?? null}
+                        canManage={orgPermissions.canReleaseCertificatesToPortal}
+                      />
+                    }
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">Loading asset certificate…</p>

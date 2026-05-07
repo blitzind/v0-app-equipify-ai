@@ -62,6 +62,11 @@ import {
   isEquipmentListSchemaMismatchError,
   logEquipmentListQueryFailure,
 } from "@/lib/equipment/equipment-detail-queries"
+import {
+  loadEquipmentSignalsByIds,
+  type EquipmentSignals,
+} from "@/lib/equipment/intelligence-rollup"
+import { EquipmentSignalsRow } from "@/components/equipment/equipment-signals-row"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
@@ -154,7 +159,13 @@ function DueBadge({ nextDueDate }: { nextDueDate: string }) {
   return <span className="text-xs text-muted-foreground">{fmtDate(nextDueDate)}</span>
 }
 
-function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; selected: boolean; onSelect: () => void; onOpen: (id: string) => void }) {
+function EquipmentCard({ eq, signals, selected, onSelect, onOpen }: {
+  eq: Equipment
+  signals?: EquipmentSignals
+  selected: boolean
+  onSelect: () => void
+  onOpen: (id: string) => void
+}) {
   const days = daysToDue(eq.nextDueDate)
   const urgent = days < 0 || days <= 7
 
@@ -242,6 +253,8 @@ function EquipmentCard({ eq, selected, onSelect, onOpen }: { eq: Equipment; sele
               View <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
+          <EquipmentSignalsRow signals={signals} className="mt-2" />
+
         </div>
       </CardContent>
     </Card>
@@ -252,6 +265,7 @@ function EquipmentPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { equipmentCreateEligibility } = useBillingAccess()
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [signalsMap, setSignalsMap] = useState<Map<string, EquipmentSignals>>(() => new Map())
   const [refreshToken, setRefreshToken] = useState(0)
   const allCategories = useMemo(() => [...new Set(equipment.map((e) => e.category))].sort(), [equipment])
   const searchParams = useSearchParams()
@@ -444,6 +458,28 @@ function EquipmentPageInner() {
       active = false
     }
   }, [refreshToken, orgStatus, activeOrgId, archiveScope])
+
+  useEffect(() => {
+    let active = true
+    if (orgStatus !== "ready" || !activeOrgId || equipment.length === 0) {
+      setSignalsMap(new Map())
+      return () => {
+        active = false
+      }
+    }
+    const ids = equipment.slice(0, 250).map((e) => e.id)
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const map = await loadEquipmentSignalsByIds(supabase, {
+        organizationId: activeOrgId,
+        equipmentIds: ids,
+      })
+      if (active) setSignalsMap(map)
+    })()
+    return () => {
+      active = false
+    }
+  }, [equipment, orgStatus, activeOrgId])
 
   const filtered = useMemo(() => {
     let list = [...equipment]
@@ -773,6 +809,7 @@ function EquipmentPageInner() {
                             eq.customerName,
                           )}
                         </span>
+                        <EquipmentSignalsRow signals={signalsMap.get(eq.id)} className="mt-0.5" />
                       </div>
                     </TableCell>
                     <TableCell>
@@ -830,6 +867,7 @@ function EquipmentPageInner() {
                 <EquipmentCard
                   key={eq.id}
                   eq={eq}
+                  signals={signalsMap.get(eq.id)}
                   selected={selected.has(eq.id)}
                   onSelect={() => toggleSelect(eq.id)}
                   onOpen={(id) => setSelectedEquipmentId(id)}

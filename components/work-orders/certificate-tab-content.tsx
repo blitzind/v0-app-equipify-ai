@@ -68,6 +68,8 @@ type CertificateTabContentProps = {
   portalReleasedAt?: string | null
   onReleaseToPortal?: () => void | Promise<void>
   releaseToPortalBusy?: boolean
+  /** Optional slot rendered above the template fields — used for the cert attachments card. */
+  attachmentsSlot?: React.ReactNode
 }
 
 function fmtDateTime(iso: string) {
@@ -118,6 +120,7 @@ export function CertificateTabContent({
   equipmentScopeId = undefined,
   embedded = false,
   staffPortalLines,
+  attachmentsSlot,
   portalReleasedAt,
   onReleaseToPortal,
   releaseToPortalBusy = false,
@@ -422,6 +425,8 @@ export function CertificateTabContent({
           ) : null}
         </div>
       ) : null}
+
+      {attachmentsSlot ? <div>{attachmentsSlot}</div> : null}
 
       {!selectedTemplate ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/10 py-10 text-center">

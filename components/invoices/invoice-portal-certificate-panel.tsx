@@ -10,7 +10,7 @@ import { useInvoices } from "@/lib/quote-invoice-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Lock } from "lucide-react"
 
 export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoice }) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
@@ -25,6 +25,8 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
     invoice.portalCertificateReleaseOverride ?? "",
   )
   const [saving, setSaving] = useState(false)
+  const [certCount, setCertCount] = useState<number | null>(null)
+  const [releasedCertCount, setReleasedCertCount] = useState<number | null>(null)
 
   useEffect(() => {
     setOverrideLocal(invoice.portalCertificateReleaseOverride ?? "")
@@ -64,9 +66,34 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
         const linked = await fetchInvoicesLinkedToWorkOrder(supabase, organizationId, woId)
         setHasLinked(linked.length > 0)
         setLinkedPaid(allLinkedInvoicesPaid(linked))
+
+        // Phase 2: count certificates linked to this work order, plus how many
+        // are already released to the portal (when manual_release rule applies).
+        const totalRes = await supabase
+          .from("calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("work_order_id", woId)
+        const total = totalRes.error ? null : totalRes.count ?? 0
+        setCertCount(total)
+
+        const releasedRes = await supabase
+          .from("calibration_records")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("work_order_id", woId)
+          .not("portal_released_at", "is", null)
+        if (releasedRes.error) {
+          // Phase 1 column may be missing on legacy DBs.
+          setReleasedCertCount(null)
+        } else {
+          setReleasedCertCount(releasedRes.count ?? 0)
+        }
       } else {
         setHasLinked(false)
         setLinkedPaid(false)
+        setCertCount(null)
+        setReleasedCertCount(null)
       }
     } finally {
       setLoading(false)
@@ -107,6 +134,8 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
     }
   }
 
+  const blockedByPayment = hasLinked && !linkedPaid && bullets.some((b) => b.tone === "warning")
+
   return (
     <div className="rounded-xl border border-border bg-muted/15 p-4 space-y-3">
       <div>
@@ -116,6 +145,27 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
           invoice totals or QuickBooks sync.
         </p>
       </div>
+
+      {certCount !== null && certCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground">
+            <FileText className="w-3 h-3" aria-hidden />
+            {certCount} certificate{certCount === 1 ? "" : "s"} on linked job
+          </span>
+          {releasedCertCount !== null && releasedCertCount > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/10 px-2 py-1 text-[11px] text-[color:var(--status-success)]">
+              <CheckCircle2 className="w-3 h-3" aria-hidden />
+              {releasedCertCount} released
+            </span>
+          ) : null}
+          {blockedByPayment ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1 text-[11px] text-[color:var(--status-warning)]">
+              <Lock className="w-3 h-3" aria-hidden />
+              Blocked until invoice paid
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <label className="text-[10px] font-medium text-foreground" htmlFor="inv-cert-override">

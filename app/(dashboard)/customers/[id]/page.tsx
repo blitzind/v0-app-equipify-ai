@@ -54,6 +54,13 @@ import {
 } from "@/lib/customers/rollup-metrics"
 import { CustomerRollupCard } from "@/components/customers/customer-rollup-card"
 import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
+import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
+import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
+import {
+  loadEquipmentCategoryBreakdown,
+  type EquipmentCategoryBreakdownRow,
+} from "@/lib/equipment/intelligence-rollup"
+import { loadCustomerRollupTree } from "@/lib/customers/consolidated-rollup"
 import { ParentAccountCard } from "@/components/customers/parent-account-card"
 
 type CustomerStatus = "Active" | "Inactive"
@@ -423,6 +430,9 @@ export default function CustomerDetailPage() {
   const [hierarchyLoading, setHierarchyLoading] = useState(false)
   const [hierarchyDialogOpen, setHierarchyDialogOpen] = useState(false)
   const [rollupMetrics, setRollupMetrics] = useState<CustomerRollupMetrics | null>(null)
+  const [equipmentBreakdown, setEquipmentBreakdown] = useState<EquipmentCategoryBreakdownRow[] | null>(null)
+  const [equipmentBreakdownLoading, setEquipmentBreakdownLoading] = useState(false)
+  const [equipmentBreakdownIncludesChildren, setEquipmentBreakdownIncludesChildren] = useState(false)
   const [rollupLoading, setRollupLoading] = useState(false)
 
   useEffect(() => {
@@ -649,6 +659,46 @@ export default function CustomerDetailPage() {
       cancelled = true
     }
   }, [hierarchySummary, refreshToken])
+
+  // Equipment Intelligence Phase 2 — category breakdown for this customer.
+  // For parent accounts we expand to the full rollup tree (self + descendants);
+  // for standalone or child accounts we scope to the customer alone.
+  useEffect(() => {
+    let cancelled = false
+    if (!customer) {
+      setEquipmentBreakdown(null)
+      setEquipmentBreakdownIncludesChildren(false)
+      setEquipmentBreakdownLoading(false)
+      return
+    }
+    setEquipmentBreakdownLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const isParent = Boolean(
+        hierarchySummary && hierarchySummary.childCount > 0,
+      )
+      let customerIds: string[] = [customer.id]
+      if (isParent) {
+        const tree = await loadCustomerRollupTree(supabase, {
+          organizationId: customer.organizationId,
+          rootCustomerId: customer.id,
+        }).catch(() => [])
+        if (tree.length > 0) customerIds = tree.map((n) => n.id)
+      }
+      const rows = await loadEquipmentCategoryBreakdown(supabase, {
+        organizationId: customer.organizationId,
+        customerIds,
+        since: null,
+      }).catch(() => [] as EquipmentCategoryBreakdownRow[])
+      if (cancelled) return
+      setEquipmentBreakdown(rows)
+      setEquipmentBreakdownIncludesChildren(isParent && customerIds.length > 1)
+      setEquipmentBreakdownLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customer, hierarchySummary, refreshToken])
 
   useEffect(() => {
     if (!customer) {
@@ -1492,6 +1542,28 @@ export default function CustomerDetailPage() {
               metrics={rollupMetrics}
               loading={rollupLoading}
               rootCompanyName={customer.company}
+            />
+          ) : null}
+
+          {/* Phase 2: Portal certificate release clarity */}
+          {activeOrgId ? (
+            <CustomerPortalCertificateRuleCard
+              organizationId={activeOrgId}
+              customerMode={customer.portalCertificateReleaseMode}
+            />
+          ) : null}
+
+          {/* Equipment Intelligence Phase 2 — category breakdown */}
+          {equipmentBreakdown !== null && equipmentBreakdown.length > 0 ? (
+            <EquipmentCategoryBreakdownCard
+              rows={equipmentBreakdown}
+              loading={equipmentBreakdownLoading}
+              title="Equipment intelligence"
+              subtitle={
+                equipmentBreakdownIncludesChildren
+                  ? `Service load and revenue grouped by equipment type, including all sub-accounts.`
+                  : `Service load and revenue grouped by equipment type for this account.`
+              }
             />
           ) : null}
 

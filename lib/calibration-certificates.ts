@@ -495,6 +495,8 @@ export type CompletedCertificateListItem = {
   equipmentCode: string | null
   equipmentSerialNumber: string | null
   technicianName: string | null
+  /** Storage path inside `equipify-signatures` bucket when the assigned technician has a stored signature on file. */
+  technicianSignaturePath?: string | null
   repairLog: RepairLog
   customerSignaturePath: string | null
   customerSignatureCapturedAt: string | null
@@ -756,14 +758,29 @@ export async function loadCompletedCertificateItemByRecordId(
     .maybeSingle()
 
   let technicianName: string | null = null
+  let technicianSignaturePath: string | null = null
   if (wo.assigned_technician_id) {
-    const { data: tr } = await supabase
+    // Schema-drift safe: Phase 2 added `signature_url`; legacy DBs return null.
+    let tRow: { full_name?: string | null; signature_url?: string | null } | null = null
+    const tFull = await supabase
       .from("technicians")
-      .select("full_name")
+      .select("full_name, signature_url")
       .eq("organization_id", organizationId)
       .eq("id", wo.assigned_technician_id)
       .maybeSingle()
-    technicianName = (tr as { full_name?: string } | null)?.full_name?.trim() || null
+    if (tFull.error) {
+      const tLegacy = await supabase
+        .from("technicians")
+        .select("full_name")
+        .eq("organization_id", organizationId)
+        .eq("id", wo.assigned_technician_id)
+        .maybeSingle()
+      tRow = (tLegacy.data as { full_name?: string | null } | null) ?? null
+    } else {
+      tRow = tFull.data as { full_name?: string | null; signature_url?: string | null } | null
+    }
+    technicianName = tRow?.full_name?.trim() || null
+    technicianSignaturePath = tRow?.signature_url?.trim() || null
   } else if (wo.assigned_user_id) {
     const { data: pr } = await supabase
       .from("profiles")
@@ -808,6 +825,7 @@ export async function loadCompletedCertificateItemByRecordId(
     equipmentCode: eqRow?.equipment_code ?? null,
     equipmentSerialNumber: eqRow?.serial_number ?? null,
     technicianName,
+    technicianSignaturePath,
     repairLog,
     customerSignaturePath: wo.signature_url,
     customerSignatureCapturedAt: wo.signature_captured_at,
@@ -840,8 +858,16 @@ export async function buildCompletedCertificatePdfHtml(
     customerSignatureUrl = await signedUrlForAttachmentPath(supabase, item.customerSignaturePath)
   }
   const sig = item.repairLog.signatureDataUrl
-  const techSig =
+  let techSig: string | null =
     sig && (sig.startsWith("data:") || sig.startsWith("http")) ? sig : null
+  // Phase 2 fallback: when no fresh visit signature was captured, render the
+  // technician's stored signature image from the `equipify-signatures` bucket.
+  if (!techSig && item.technicianSignaturePath?.trim()) {
+    const { data: signed } = await supabase.storage
+      .from("equipify-signatures")
+      .createSignedUrl(item.technicianSignaturePath, 3600)
+    if (signed?.signedUrl) techSig = signed.signedUrl
+  }
 
   const completedDate = item.workOrderCompletedAt
   const scheduledDate = item.workOrderScheduledOn

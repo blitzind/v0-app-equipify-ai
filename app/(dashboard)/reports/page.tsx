@@ -18,6 +18,11 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { reportRangeFromPreset } from "@/lib/reporting/date-range"
 import type { ReportAnalyticsResponse } from "@/lib/reporting/types"
 import { downloadCsv, rowsToCsv } from "@/lib/reporting/export-csv"
+import {
+  loadEquipmentCategoryBreakdown,
+  type EquipmentCategoryBreakdownRow,
+} from "@/lib/equipment/intelligence-rollup"
+import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 
 const woByTypeFallback = [
   { type: "Repair", count: 98, fill: "var(--color-chart-1)" },
@@ -181,6 +186,9 @@ export default function ReportsPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
 
+  const [equipmentIntelRows, setEquipmentIntelRows] = useState<EquipmentCategoryBreakdownRow[] | null>(null)
+  const [equipmentIntelLoading, setEquipmentIntelLoading] = useState(false)
+
   const [presets, setPresets] = useState<SavedPreset[]>([])
   const [presetName, setPresetName] = useState("")
 
@@ -296,6 +304,38 @@ export default function ReportsPage() {
   useEffect(() => {
     void fetchAnalytics()
   }, [fetchAnalytics])
+
+  // Equipment Intelligence — Phase 2: org-wide (or customer-scoped) category
+  // breakdown including revenue + upcoming due counts. Runs in parallel with
+  // analytics; failures degrade silently to an empty list.
+  useEffect(() => {
+    if (!orgId) {
+      setEquipmentIntelRows(null)
+      return
+    }
+    let cancelled = false
+    setEquipmentIntelLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const customerIds =
+        customerId !== "all" ? [customerId] : undefined
+      const rows = await loadEquipmentCategoryBreakdown(supabase, {
+        organizationId: orgId,
+        customerIds,
+        since: from,
+      }).catch(() => [] as EquipmentCategoryBreakdownRow[])
+      if (cancelled) return
+      const filtered =
+        equipmentCategory !== "all"
+          ? rows.filter((r) => r.category === equipmentCategory)
+          : rows
+      setEquipmentIntelRows(filtered)
+      setEquipmentIntelLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, from, customerId, equipmentCategory])
 
   const hasActiveFilters =
     customerId !== "all" ||
@@ -1014,6 +1054,17 @@ export default function ReportsPage() {
             </div>
           </Section>
         </div>
+
+        {/* ── Equipment Intelligence (Phase 2) ── */}
+        <EquipmentCategoryBreakdownCard
+          rows={equipmentIntelRows}
+          loading={equipmentIntelLoading}
+          title="Equipment Intelligence"
+          subtitle={`Equipment count, open service load, upcoming due, and revenue grouped by equipment type${
+            customerId !== "all" ? " for the selected customer" : ""
+          }${equipmentCategory !== "all" ? ` (filtered to "${equipmentCategory}")` : ""}.`}
+          emptyLabel="No equipment activity in this scope yet."
+        />
 
         {/* ── Overdue invoices ── */}
         <Section

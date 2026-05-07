@@ -78,6 +78,7 @@ import {
   uploadProfileAvatar,
   removeAvatarObjectIfInBucket,
 } from "@/lib/profile/avatar-storage"
+import { TechnicianSignatureCardForMember } from "@/components/technicians/technician-signature-card"
 
 let toastCounter = 0
 
@@ -1499,6 +1500,15 @@ export function TechnicianDrawer({
                   <p className="text-xs font-medium text-foreground capitalize">{memberStatus}</p>
                 </div>
               </div>
+
+              {techId && activeOrgId ? (
+                <TechnicianSignatureCardForMember
+                  organizationId={activeOrgId}
+                  memberOrTechId={techId}
+                  technicianName={displayName}
+                  canManage={canEditAvatar}
+                />
+              ) : null}
 
               <div className={cn(DRAWER_NESTED_CARD, "p-4 space-y-3")}>
                 <div className="flex items-center gap-2">
