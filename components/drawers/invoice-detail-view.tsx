@@ -19,6 +19,8 @@ import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { buildInvoiceServiceTimeline } from "@/lib/lifecycle/service-timeline"
+import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -1247,8 +1249,14 @@ function CommentsTab() {
   )
 }
 
+function linkedWorkOrderIdsForInvoice(invoice: AdminInvoice): string[] {
+  const ids = [...(invoice.linkedWorkOrderIds ?? []), invoice.workOrderId].filter((x): x is string => Boolean(x?.trim()))
+  return [...new Set(ids)]
+}
+
 function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
-  if (!invoice.workOrderId) {
+  const woIds = linkedWorkOrderIdsForInvoice(invoice)
+  if (woIds.length === 0) {
     return (
       <div className="rounded-lg border-2 border-dashed border-border py-10 text-center">
         <ClipboardList className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -1259,24 +1267,27 @@ function WorkOrdersTab({ invoice }: { invoice: AdminInvoice }) {
 
   return (
     <div className="space-y-2">
-      <Link
-        href={`/work-orders?open=${invoice.workOrderId}`}
-        className={cn(
-          DRAWER_NESTED_CARD,
-          "flex items-center justify-between p-3 rounded-xl hover:border-primary/30 ds-hover-list-row-xs cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
-        )}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-            <ClipboardList className="w-4 h-4 text-primary" />
+      {woIds.map((woId) => (
+        <Link
+          key={woId}
+          href={`/work-orders?open=${encodeURIComponent(woId)}`}
+          className={cn(
+            DRAWER_NESTED_CARD,
+            "flex items-center justify-between p-3 rounded-xl hover:border-primary/30 ds-hover-list-row-xs cursor-pointer group shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <ClipboardList className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay({ id: woId })}</p>
+              <p className="text-[10px] text-muted-foreground">{invoice.equipmentName}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold font-mono text-primary">{getWorkOrderDisplay({ id: invoice.workOrderId })}</p>
-            <p className="text-[10px] text-muted-foreground">{invoice.equipmentName}</p>
-          </div>
-        </div>
-        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-      </Link>
+          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+        </Link>
+      ))}
     </div>
   )
 }
@@ -1461,6 +1472,16 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { workspace } = useTenant()
   const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+
+  const invoiceLinkedWoLabels = useMemo(() => {
+    const ids = linkedWorkOrderIdsForInvoice(invoice)
+    return ids.map((id) => ({ id, label: getWorkOrderDisplay({ id }) }))
+  }, [invoice])
+
+  const invoiceLifecycleEvents = useMemo(
+    () => buildInvoiceServiceTimeline(invoice, invoiceLinkedWoLabels),
+    [invoice, invoiceLinkedWoLabels],
+  )
 
   // Tabs + layout state
   const [activeTab,    setActiveTab]    = useState<Tab>("info")
@@ -1929,30 +1950,35 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
           {/* Tab body */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
             {activeTab === "info" && (
-              <InfoTab
-                invoice={invoice}
-                editing={editing}
-                draft={draft}
-                draftItems={draftItems}
-                setDraftItems={setDraftItems}
-                setField={setField}
-                organizationName={documentBranding.organizationName}
-                onApplyReminder={handleApplyReminder}
-                catalogLineActions={
-                  editing && orgStatus === "ready" && organizationId ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs gap-1.5"
-                      onClick={() => setCatalogPickerOpen(true)}
-                    >
-                      <PackageSearch className="w-3.5 h-3.5" />
-                      Add from catalog
-                    </Button>
-                  ) : null
-                }
-              />
+              <div className="space-y-5">
+                {!editing ? (
+                  <ServiceLifecycleTimeline title="Service timeline" events={invoiceLifecycleEvents} />
+                ) : null}
+                <InfoTab
+                  invoice={invoice}
+                  editing={editing}
+                  draft={draft}
+                  draftItems={draftItems}
+                  setDraftItems={setDraftItems}
+                  setField={setField}
+                  organizationName={documentBranding.organizationName}
+                  onApplyReminder={handleApplyReminder}
+                  catalogLineActions={
+                    editing && orgStatus === "ready" && organizationId ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1.5"
+                        onClick={() => setCatalogPickerOpen(true)}
+                      >
+                        <PackageSearch className="w-3.5 h-3.5" />
+                        Add from catalog
+                      </Button>
+                    ) : null
+                  }
+                />
+              </div>
             )}
             {activeTab === "payments"    && <PaymentsTab   invoice={invoice} />}
             {activeTab === "files"       && <FilesTab      invoice={invoice} />}

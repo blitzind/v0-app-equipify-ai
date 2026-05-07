@@ -870,6 +870,8 @@ export interface WorkOrderDetailExperienceProps {
   fullPageHref?: string
   /** Leading slot (e.g. back button on page) */
   leading?: React.ReactNode
+  /** Top of Overview tab — billing linkage, lifecycle timeline, etc. */
+  overviewLeadSlot?: React.ReactNode
   /** `drawer` aligns chrome with `EquipmentDrawer` (underline tabs, KPI cards, quick actions). */
   layout?: "page" | "drawer"
   /** Controlled tabs (e.g. confirm before leaving Parts tab with unsaved edits). Requires both. */
@@ -965,6 +967,7 @@ export function WorkOrderDetailExperience({
   onArchive,
   fullPageHref,
   leading,
+  overviewLeadSlot,
   layout = "page",
   tabsValue,
   onTabsValueChange,
@@ -1296,6 +1299,7 @@ export function WorkOrderDetailExperience({
         <div className={tabScrollWrapClass}>
 
         <TabsContent value="overview" className="space-y-4 mt-0">
+          {overviewLeadSlot ? <div className="space-y-4">{overviewLeadSlot}</div> : null}
           {isDrawer && workOrder.isArchived ? (
             <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
               This work order is archived. It is hidden from default lists until restored.

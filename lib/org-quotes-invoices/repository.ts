@@ -132,31 +132,19 @@ export async function fetchQuotesForOrganization(
   return { quotes }
 }
 
-export async function fetchInvoicesForOrganization(
+async function hydrateAdminInvoicesFromRows(
   supabase: SupabaseClient,
   organizationId: string,
-  options?: { visibility?: RecordArchiveVisibility },
-): Promise<{ invoices: AdminInvoice[]; error?: string }> {
-  const visibility = options?.visibility ?? "active"
-  let q = supabase
-    .from("org_invoices")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("issued_at", { ascending: false })
-
-  q = applyArchivedAtScope(q, visibility)
-
-  const { data: rows, error } = await q
-
-  if (error) return { invoices: [], error: error.message }
-  const list = (rows ?? []) as OrgInvoiceRow[]
-  if (list.length === 0) return { invoices: [] }
+  list: OrgInvoiceRow[],
+): Promise<AdminInvoice[]> {
+  if (list.length === 0) return []
 
   const customerIds = [...new Set(list.map((r) => r.customer_id))]
   const equipIds = [...new Set(list.map((r) => r.equipment_id).filter((id): id is string => Boolean(id)))]
   const creatorIds = [...new Set(list.map((r) => r.created_by).filter((id): id is string => Boolean(id)))]
+  const invoiceIds = list.map((r) => r.id)
 
-  const [custRes, eqRes, profMap] = await Promise.all([
+  const [custRes, eqRes, profMap, linkRes] = await Promise.all([
     supabase.from("customers").select("id, company_name").eq("organization_id", organizationId).in("id", customerIds),
     equipIds.length
       ? supabase
@@ -166,6 +154,13 @@ export async function fetchInvoicesForOrganization(
           .in("id", equipIds)
       : Promise.resolve({ data: [] as unknown[] }),
     profileLabelsById(supabase, creatorIds),
+    invoiceIds.length
+      ? supabase
+          .from("invoice_work_order_links")
+          .select("invoice_id, work_order_id")
+          .eq("organization_id", organizationId)
+          .in("invoice_id", invoiceIds)
+      : Promise.resolve({ data: [] as unknown[] }),
   ])
 
   const custMap = new Map((custRes.data as Array<{ id: string; company_name: string }> | null)?.map((c) => [c.id, c.company_name]) ?? [])
@@ -188,13 +183,116 @@ export async function fetchInvoicesForOrganization(
       }),
     ]),
   )
-  const invoices: AdminInvoice[] = list.map((row) =>
-    mapOrgInvoiceToAdmin(row, {
+
+  const linkMap = new Map<string, string[]>()
+  for (const r of (linkRes.data ?? []) as Array<{ invoice_id: string; work_order_id: string }>) {
+    const cur = linkMap.get(r.invoice_id) ?? []
+    cur.push(r.work_order_id)
+    linkMap.set(r.invoice_id, cur)
+  }
+
+  return list.map((row) => {
+    const fromLinks = linkMap.get(row.id) ?? []
+    const merged = [...new Set([...fromLinks, ...(row.work_order_id ? [row.work_order_id] : [])])]
+    return mapOrgInvoiceToAdmin(row, {
       customerName: custMap.get(row.customer_id) ?? "Customer",
       equipmentName: row.equipment_id ? eqMap.get(row.equipment_id) ?? "" : "",
       createdByLabel: row.created_by ? profMap.get(row.created_by) ?? "Team" : "Team",
-    }),
-  )
+      linkedWorkOrderIds: merged.length ? merged : undefined,
+    })
+  })
+}
+
+/** Updates linked work orders’ billing_state for lifecycle visibility (Phase 1). */
+async function syncLinkedWorkOrdersBillingState(
+  supabase: SupabaseClient,
+  organizationId: string,
+  invoiceId: string,
+  billingState: "invoiced" | "paid",
+): Promise<void> {
+  const { data: linkRows } = await supabase
+    .from("invoice_work_order_links")
+    .select("work_order_id")
+    .eq("organization_id", organizationId)
+    .eq("invoice_id", invoiceId)
+
+  const { data: invRow } = await supabase
+    .from("org_invoices")
+    .select("work_order_id")
+    .eq("organization_id", organizationId)
+    .eq("id", invoiceId)
+    .maybeSingle()
+
+  const ids = new Set<string>()
+  for (const r of (linkRows ?? []) as Array<{ work_order_id: string }>) {
+    if (r.work_order_id) ids.add(r.work_order_id)
+  }
+  const legacyWo = (invRow as { work_order_id?: string | null } | null)?.work_order_id
+  if (legacyWo) ids.add(legacyWo)
+
+  if (ids.size === 0) return
+
+  await supabase
+    .from("work_orders")
+    .update({ billing_state: billingState, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .in("id", [...ids])
+}
+
+export async function fetchInvoicesForOrganization(
+  supabase: SupabaseClient,
+  organizationId: string,
+  options?: { visibility?: RecordArchiveVisibility },
+): Promise<{ invoices: AdminInvoice[]; error?: string }> {
+  const visibility = options?.visibility ?? "active"
+  let q = supabase
+    .from("org_invoices")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("issued_at", { ascending: false })
+
+  q = applyArchivedAtScope(q, visibility)
+
+  const { data: rows, error } = await q
+
+  if (error) return { invoices: [], error: error.message }
+  const list = (rows ?? []) as OrgInvoiceRow[]
+  const invoices = await hydrateAdminInvoicesFromRows(supabase, organizationId, list)
+
+  return { invoices }
+}
+
+/** Invoices linked to a work order (legacy column + junction table). */
+export async function fetchInvoicesForWorkOrder(
+  supabase: SupabaseClient,
+  organizationId: string,
+  workOrderId: string,
+): Promise<{ invoices: AdminInvoice[]; error?: string }> {
+  const [directRes, linkRes] = await Promise.all([
+    supabase.from("org_invoices").select("id").eq("organization_id", organizationId).eq("work_order_id", workOrderId),
+    supabase
+      .from("invoice_work_order_links")
+      .select("invoice_id")
+      .eq("organization_id", organizationId)
+      .eq("work_order_id", workOrderId),
+  ])
+
+  const ids = new Set<string>()
+  for (const r of (directRes.data ?? []) as Array<{ id: string }>) ids.add(r.id)
+  for (const r of (linkRes.data ?? []) as Array<{ invoice_id: string }>) ids.add(r.invoice_id)
+
+  if (ids.size === 0) return { invoices: [] }
+
+  const { data: rows, error } = await supabase
+    .from("org_invoices")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .in("id", [...ids])
+    .order("issued_at", { ascending: false })
+
+  if (error) return { invoices: [], error: error.message }
+  const list = (rows ?? []) as OrgInvoiceRow[]
+  const invoices = await hydrateAdminInvoicesFromRows(supabase, organizationId, list)
 
   return { invoices }
 }
@@ -346,36 +444,51 @@ export async function insertOrgInvoice(
     lineItems: LineItemJson[]
     notes: string | null
     internalNotes: string | null
+    /** DB terms_code — drives due dates & QB alignment */
+    termsCode?: string | null
+    termsCustomDays?: number | null
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
 
-  const { data, error } = await supabase
-    .from("org_invoices")
-    .insert({
-      organization_id: payload.organizationId,
-      customer_id: payload.customerId,
-      equipment_id: payload.equipmentId,
-      work_order_id: payload.workOrderId,
-      quote_id: payload.quoteId,
-      calibration_record_id: payload.calibrationRecordId,
-      seed_key: seedKey,
-      title: payload.title.trim(),
-      amount_cents: payload.amountCents,
-      status: invoiceStatusUiToDb(payload.status),
-      issued_at: payload.issuedAt,
-      due_date: payload.dueDate || null,
-      paid_at: payload.paidAt,
-      line_items: payload.lineItems,
-      notes: payload.notes?.trim() ? payload.notes.trim() : null,
-      internal_notes: payload.internalNotes?.trim() ? payload.internalNotes.trim() : null,
-    })
-    .select("id")
-    .maybeSingle()
+  const insertRow: Record<string, unknown> = {
+    organization_id: payload.organizationId,
+    customer_id: payload.customerId,
+    equipment_id: payload.equipmentId,
+    work_order_id: payload.workOrderId,
+    quote_id: payload.quoteId,
+    calibration_record_id: payload.calibrationRecordId,
+    seed_key: seedKey,
+    title: payload.title.trim(),
+    amount_cents: payload.amountCents,
+    status: invoiceStatusUiToDb(payload.status),
+    issued_at: payload.issuedAt,
+    due_date: payload.dueDate || null,
+    paid_at: payload.paidAt,
+    line_items: payload.lineItems,
+    notes: payload.notes?.trim() ? payload.notes.trim() : null,
+    internal_notes: payload.internalNotes?.trim() ? payload.internalNotes.trim() : null,
+  }
+  if (payload.termsCode !== undefined) insertRow.terms_code = payload.termsCode
+  if (payload.termsCustomDays !== undefined) insertRow.terms_custom_days = payload.termsCustomDays
+
+  const { data, error } = await supabase.from("org_invoices").insert(insertRow).select("id").maybeSingle()
 
   if (error) return { error: error.message }
   const id = (data as { id: string } | null)?.id
   if (id) {
+    if (payload.workOrderId) {
+      const { error: linkErr } = await supabase.from("invoice_work_order_links").insert({
+        organization_id: payload.organizationId,
+        invoice_id: id,
+        work_order_id: payload.workOrderId,
+        sort_order: 0,
+      })
+      if (linkErr && !String(linkErr.message).includes("duplicate")) {
+        return { error: linkErr.message }
+      }
+      await syncLinkedWorkOrdersBillingState(supabase, payload.organizationId, id, "invoiced")
+    }
     queueQuickBooksInvoiceAutoSync(payload.organizationId, id)
   }
   return { id }
@@ -415,6 +528,9 @@ export async function updateOrgInvoice(
     .eq("organization_id", organizationId)
 
   if (error) return { error: error.message }
+  if (patch.status === "Paid") {
+    await syncLinkedWorkOrdersBillingState(supabase, organizationId, invoiceId, "paid")
+  }
   queueQuickBooksInvoiceAutoSync(organizationId, invoiceId)
   return {}
 }

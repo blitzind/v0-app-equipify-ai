@@ -74,6 +74,9 @@ interface QuoteInvoiceContextValue {
     lineItems: LineItemJson[]
     notes: string | null
     internalNotes: string | null
+    /** org_invoices.terms_code — Net 30 default applied server-side if omitted */
+    termsCode?: string | null
+    termsCustomDays?: number | null
   }) => Promise<{ id?: string; error?: string }>
   updateInvoice: (id: string, patch: Parameters<typeof updateOrgInvoice>[3]) => Promise<{ error?: string }>
   archiveInvoice: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>

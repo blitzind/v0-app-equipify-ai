@@ -47,6 +47,8 @@ export type OrgInvoiceRow = {
   quote_id: string | null
   archived_at: string | null
   sent_at: string | null
+  terms_code?: string | null
+  terms_custom_days?: number | null
   archived_by?: string | null
   archive_reason?: string | null
 }
@@ -193,18 +195,27 @@ export function mapOrgInvoiceToAdmin(
     customerName: string
     equipmentName: string
     createdByLabel: string
+    /** From invoice_work_order_links; must include work_order_id when present. */
+    linkedWorkOrderIds?: string[]
   },
 ): AdminInvoice {
   const lineItems = parseLineItems(row.line_items)
   const issueDate = row.issued_at ? row.issued_at.slice(0, 10) : ""
   const dueDate = row.due_date ? row.due_date.slice(0, 10) : issueDate
   const paidDate = row.paid_at ? row.paid_at.slice(0, 10) : ""
+  const linked = names.linkedWorkOrderIds?.length
+    ? [...new Set(names.linkedWorkOrderIds)]
+    : row.work_order_id
+      ? [row.work_order_id]
+      : []
+  const primaryWo = linked[0] ?? row.work_order_id ?? ""
   return {
     id: row.id,
     invoiceNumber: row.invoice_number,
     customerId: row.customer_id,
     customerName: names.customerName,
-    workOrderId: row.work_order_id ?? "",
+    workOrderId: primaryWo,
+    linkedWorkOrderIds: linked.length ? linked : undefined,
     equipmentId: row.equipment_id ?? "",
     equipmentName: names.equipmentName,
     issueDate,
@@ -220,5 +231,7 @@ export function mapOrgInvoiceToAdmin(
     sentAt: row.sent_at ?? undefined,
     calibrationRecordId: row.calibration_record_id ?? undefined,
     isArchived: rowIsArchived(row.archived_at),
+    termsCode: row.terms_code ?? null,
+    termsCustomDays: row.terms_custom_days ?? null,
   }
 }

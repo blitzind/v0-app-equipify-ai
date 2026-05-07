@@ -26,7 +26,10 @@ import {
 } from "@/lib/work-orders/work-order-completion"
 import { cloneTasks, tasksEqual, type TaskDraft } from "@/lib/work-orders/tasks-snapshot"
 import { useWorkOrders } from "@/lib/work-order-store"
-import type { Part, RepairLog, WorkOrder, WorkOrderStatus } from "@/lib/mock-data"
+import type { AdminInvoice, Part, RepairLog, WorkOrder, WorkOrderStatus } from "@/lib/mock-data"
+import { fetchInvoicesForWorkOrder } from "@/lib/org-quotes-invoices/repository"
+import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
+import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -71,6 +74,10 @@ const LABOR_RATE = 95
 function fmtShortDate(d: string) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+function fmtUsd(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
 }
 
 const nextStatus: Partial<Record<WorkOrderStatus, WorkOrderStatus>> = {
@@ -137,6 +144,7 @@ export default function WorkOrderDetailPage() {
   const [completionCertSlots, setCompletionCertSlots] = useState<CompletionCertificateSlot[]>([])
   const [pageWoTab, setPageWoTab] = useState("overview")
   const [pageCertificateFocusEqId, setPageCertificateFocusEqId] = useState<string | null>(null)
+  const [linkedInvoices, setLinkedInvoices] = useState<AdminInvoice[]>([])
 
   const reload = useCallback(async () => {
     if (!workOrderRouteId) {
@@ -233,6 +241,28 @@ export default function WorkOrderDetailPage() {
   }, [activeOrg.status, activeOrg.organizationId])
 
   const wo = dbWo ?? storeWo
+  const woTimelineEvents = useMemo(() => {
+    if (!wo) return []
+    return buildWorkOrderServiceTimeline(wo, linkedInvoices)
+  }, [wo, linkedInvoices])
+
+  useEffect(() => {
+    if (!wo?.id || activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setLinkedInvoices([])
+      return
+    }
+    let cancelled = false
+    const supabase = createBrowserSupabaseClient()
+    const orgId = activeOrg.organizationId
+    void (async () => {
+      const { invoices, error } = await fetchInvoicesForWorkOrder(supabase, orgId, wo.id)
+      if (!cancelled) setLinkedInvoices(error ? [] : invoices)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wo?.id, activeOrg.status, activeOrg.organizationId])
+
   const orgBlockingDetail =
     activeOrg.switching || activeOrg.status !== "ready" || !activeOrg.organizationId
   const awaitingDb =
@@ -855,6 +885,39 @@ export default function WorkOrderDetailPage() {
       <WorkOrderDetailExperience
         tabsValue={pageWoTab}
         onTabsValueChange={setPageWoTab}
+        overviewLeadSlot={
+          <>
+            {linkedInvoices.length > 0 ? (
+              <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                <div className="border-b border-border bg-muted/30 dark:bg-muted/15 px-4 py-2.5 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Linked invoices
+                  </p>
+                  <span className="text-[10px] text-muted-foreground">{linkedInvoices.length} linked</span>
+                </div>
+                <ul className="divide-y divide-border/70">
+                  {linkedInvoices.map((inv) => (
+                    <li key={inv.id}>
+                      <Link
+                        href={`/invoices?open=${encodeURIComponent(inv.id)}`}
+                        className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-muted/40 transition-colors"
+                      >
+                        <span className="font-medium text-foreground">
+                          {inv.invoiceNumber?.trim() ? inv.invoiceNumber : "Invoice"}
+                        </span>
+                        <span className="text-xs text-muted-foreground tabular-nums text-right">
+                          {fmtUsd(inv.amount)} · {inv.status}
+                          {inv.dueDate ? ` · Due ${fmtShortDate(inv.dueDate)}` : ""}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <ServiceLifecycleTimeline title="Service timeline" events={woTimelineEvents} />
+          </>
+        }
         workOrder={workOrder}
         internalNotes={internalNotes}
         onInternalNotesChange={setInternalNotes}

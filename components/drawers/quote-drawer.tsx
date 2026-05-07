@@ -12,6 +12,7 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import type { updateOrgQuote } from "@/lib/org-quotes-invoices/repository"
 import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
+import { computeDueDateYmd } from "@/lib/billing/invoice-terms"
 import { normalizeTimeForDb, uiPriorityToDb, uiTypeToDb } from "@/lib/work-orders/db-map"
 import type { WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
@@ -824,9 +825,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     if (!quote) return
     setConvertingToInvoice(true)
     const issuedAt = new Date().toISOString().split("T")[0]
-    const due = new Date()
-    due.setDate(due.getDate() + 30)
-    const dueDate = due.toISOString().split("T")[0]
+    const dueDate = computeDueDateYmd(issuedAt, "net_30")
     const lineItemsJson = quote.lineItems
       .filter((li) => li.description.trim())
       .map((li) => ({
@@ -853,6 +852,8 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       lineItems: fallbackLine,
       notes: quote.notes?.trim() ? quote.notes.trim() : null,
       internalNotes: quote.internalNotes?.trim() ? quote.internalNotes.trim() : null,
+      termsCode: "net_30",
+      termsCustomDays: null,
     })
     setConvertingToInvoice(false)
     if (error) {

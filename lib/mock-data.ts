@@ -1738,7 +1738,10 @@ export interface AdminInvoice {
   invoiceNumber?: string
   customerId: string
   customerName: string
+  /** Legacy primary work order id from org_invoices.work_order_id — mirror first entry of linkedWorkOrderIds when present. */
   workOrderId: string
+  /** All work orders linked via invoice_work_order_links (multi-WO invoice ready). */
+  linkedWorkOrderIds?: string[]
   equipmentId: string
   equipmentName: string
   issueDate: string
@@ -1766,6 +1769,10 @@ export interface AdminInvoice {
   calibrationRecordId?: string
   /** Soft-archived invoice (hidden from default lists). */
   isArchived?: boolean
+  /** org_invoices.terms_code */
+  termsCode?: string | null
+  /** When terms_code is custom */
+  termsCustomDays?: number | null
 }
 
 export const adminInvoices: AdminInvoice[] = [

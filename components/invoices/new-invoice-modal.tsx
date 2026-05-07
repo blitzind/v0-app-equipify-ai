@@ -14,6 +14,11 @@ import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equ
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
 import type { AdminQuote, InvoiceStatus } from "@/lib/mock-data"
+import {
+  PAYMENT_TERMS_OPTIONS,
+  computeDueDateYmd,
+  type InvoiceTermsCode,
+} from "@/lib/billing/invoice-terms"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
@@ -114,10 +119,6 @@ function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n)
 }
 
-const PAYMENT_TERMS = [
-  "Due on Receipt", "Net 7", "Net 14", "Net 30", "Net 45", "Net 60",
-]
-
 type CustomerOption = { id: string; company_name: string }
 type EquipmentOption = {
   id: string
@@ -180,8 +181,10 @@ export function NewInvoiceModal({
   const [lineItems, setLineItems] = useState<LineItem[]>([newLineItem()])
   const [discount, setDiscount] = useState("")
   const [tax, setTax] = useState("")
+  const [issuedAt, setIssuedAt] = useState("")
   const [dueDate, setDueDate] = useState("")
-  const [paymentTerms, setPaymentTerms] = useState("Net 30")
+  const [termsCode, setTermsCode] = useState<InvoiceTermsCode>("net_30")
+  const [termsCustomDays, setTermsCustomDays] = useState(30)
   const [notes, setNotes] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
   const [calibrationRecordId, setCalibrationRecordId] = useState("")
@@ -222,6 +225,10 @@ export function NewInvoiceModal({
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       const hasPrefill = Boolean(initialWorkOrderId || initialCalibrationRecordId || prefilledCatalogItem?.catalogItemId)
+      const today = new Date().toISOString().split("T")[0]
+      setIssuedAt(today)
+      setTermsCode("net_30")
+      setTermsCustomDays(30)
       if (!hasPrefill) {
         setCustomerId("")
         setWorkOrderId("")
@@ -231,8 +238,6 @@ export function NewInvoiceModal({
         setLineItems([newLineItem()])
         setDiscount("")
         setTax("")
-        setDueDate("")
-        setPaymentTerms("Net 30")
         setNotes("")
         setInternalNotes("")
         setStatus("Draft")
@@ -262,6 +267,11 @@ export function NewInvoiceModal({
       setAddEquipmentOpen(false)
     }
   }, [open, initialWorkOrderId, initialCalibrationRecordId, prefilledCatalogItem])
+
+  useEffect(() => {
+    if (!open || !issuedAt) return
+    setDueDate(computeDueDateYmd(issuedAt, termsCode, termsCustomDays))
+  }, [open, issuedAt, termsCode, termsCustomDays])
 
   useEffect(() => {
     if (!open) return
@@ -461,6 +471,7 @@ export function NewInvoiceModal({
     const errs: Record<string, string> = {}
     if (!customerId) errs.customerId = "Customer is required."
     if (!title.trim()) errs.title = "Invoice title is required."
+    if (!issuedAt) errs.issuedAt = "Issue date is required."
     if (!dueDate) errs.dueDate = "Due date is required."
     const hasItem = lineItems.some((li) => li.description.trim() && (parseFloat(li.unit) || 0) > 0)
     if (!hasItem) errs.lineItems = "At least one line item with a description and price is required."
@@ -476,7 +487,6 @@ export function NewInvoiceModal({
     }
     if (toastRecordEligibilityBlocked(standardCreateEligibility)) return
     setSubmitting(true)
-    const issuedAt = new Date().toISOString().split("T")[0]
     const lineItemsJson = lineItems
       .filter((li) => li.description.trim())
       .map((li) => {
@@ -514,6 +524,8 @@ export function NewInvoiceModal({
       lineItems: lineItemsJson,
       notes: notes.trim() ? notes.trim() : null,
       internalNotes: internalNotes.trim() ? internalNotes.trim() : null,
+      termsCode,
+      termsCustomDays: termsCode === "custom" ? termsCustomDays : null,
     })
     setSubmitting(false)
     if (saveError) {
@@ -851,25 +863,53 @@ export function NewInvoiceModal({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label required>Issue Date</Label>
+                  <FieldInput type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+                  <FieldError msg={errors.issuedAt} />
+                </div>
+                <div>
                   <Label required>Due Date</Label>
                   <FieldInput
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
+                    min={issuedAt || undefined}
                   />
                   <FieldError msg={errors.dueDate} />
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Updates when issue date or payment terms change; you can override manually.
+                  </p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Payment Terms</Label>
-                  <FieldSelect value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}>
-                    {PAYMENT_TERMS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                  <FieldSelect
+                    value={termsCode}
+                    onChange={(e) => setTermsCode(e.target.value as InvoiceTermsCode)}
+                  >
+                    {PAYMENT_TERMS_OPTIONS.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.label}
                       </option>
                     ))}
                   </FieldSelect>
                 </div>
+                {termsCode === "custom" ? (
+                  <div>
+                    <Label required>Custom net days</Label>
+                    <FieldInput
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={termsCustomDays}
+                      onChange={(e) => setTermsCustomDays(parseInt(e.target.value, 10) || 1)}
+                    />
+                  </div>
+                ) : (
+                  <div aria-hidden className="hidden sm:block" />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
