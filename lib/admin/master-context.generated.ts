@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 140,
-  sqlMigrations: 100,
+  apiRouteHandlers: 143,
+  sqlMigrations: 101,
   dashboardPages: 55,
-  componentsTsx: 176,
-  libTsFiles: 296,
+  componentsTsx: 182,
+  libTsFiles: 299,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **140** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **100** |
+| API route handlers (\`app/api/**/route.ts\`) | **143** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **101** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **55** |
-| \`components/**/*.tsx\` | **176** |
-| \`lib/**/*.ts\` | **296** |
+| \`components/**/*.tsx\` | **182** |
+| \`lib/**/*.ts\` | **299** |
 
 ### Vercel crons
 
@@ -125,7 +125,10 @@ organizations/[organizationId]/prospects/[prospectId]/route.ts
 organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts
 organizations/[organizationId]/prospects/route.ts
 organizations/[organizationId]/reports/analytics/route.ts
+organizations/[organizationId]/workflow-automations/[automationId]/duplicate/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/route.ts
+organizations/[organizationId]/workflow-automations/[automationId]/runs/route.ts
+organizations/[organizationId]/workflow-automations/[automationId]/test/route.ts
 organizations/[organizationId]/workflow-automations/route.ts
 organizations/[organizationId]/workflows/emit/route.ts
 organizations/[organizationId]/workspace/document-logo/route.ts

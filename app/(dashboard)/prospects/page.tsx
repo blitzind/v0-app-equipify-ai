@@ -27,8 +27,6 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -213,7 +211,7 @@ function ProspectsPageInner() {
 
   return (
     <div className="flex flex-col gap-8 min-w-0">
-      {/* Hero — title card (no primary CTA here; action lives in filters row) */}
+      {/* Hero — title card (no decorative right-side graphic; matches dashboard shell rhythm) */}
       <section
         className={cn(
           "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6",
@@ -221,37 +219,24 @@ function ProspectsPageInner() {
           "dark:shadow-[0_1px_3px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.12)]",
         )}
       >
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-          <div className="flex gap-4 min-w-0">
-            <div
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0"
-              style={{
-                backgroundColor: "color-mix(in srgb, var(--primary) 14%, var(--card))",
-                borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
-              }}
-            >
-              <Users className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
-            </div>
-            <div className="min-w-0 pt-0.5">
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
-                Prospects
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl text-pretty leading-relaxed">
-                Inbound leads and opportunities. Convert promising prospects into customers while
-                preserving pre-conversion history.
-              </p>
-            </div>
-          </div>
-          {/* Low-weight decorative graphic — matches modern shell hero rhythm */}
+        <div className="flex gap-4 min-w-0">
           <div
-            className="hidden sm:flex items-center justify-center shrink-0 pointer-events-none select-none"
-            aria-hidden
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--primary) 14%, var(--card))",
+              borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
+            }}
           >
-            <div className="relative h-[72px] w-[120px] sm:h-[80px] sm:w-[132px]">
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full bg-primary/[0.07] ring-1 ring-primary/10" />
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary/[0.05] ring-1 ring-border/60" />
-              <Inbox className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 text-primary/35" strokeWidth={1.25} />
-            </div>
+            <Users className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
+          </div>
+          <div className="min-w-0 pt-0.5">
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
+              Prospects
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl text-pretty leading-relaxed">
+              Inbound leads and opportunities. Convert promising prospects into customers while
+              preserving pre-conversion history.
+            </p>
           </div>
         </div>
       </section>
@@ -307,86 +292,78 @@ function ProspectsPageInner() {
         />
       </div>
 
-      {/* Filters + actions — CTA on same row as filters at lg+; full-width CTA on small screens */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4 lg:flex-wrap min-w-0">
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Search</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Company, contact, email…"
-              className="h-9 text-sm pl-8 w-full"
-            />
-          </div>
+      {/*
+        Toolbar — single row on desktop, wraps cleanly on tablet/mobile.
+        Visual rhythm matches /equipment, /customers, /work-orders:
+          - search box: bordered card container with inline icon, min-h-11
+          - selects: w-32 sm:w-36 (status / follow-up) and w-[132px] (archive)
+          - primary action: ml-auto on desktop, full-width below sm
+        No labels above controls — placeholders carry the meaning, same
+        as the sibling list pages.
+      */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2 min-w-0">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Company, contact, email…"
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
+          />
         </div>
 
-        <div
-          className={cn(
-            "flex flex-col gap-3 w-full min-w-0",
-            "sm:grid sm:grid-cols-2",
-            "lg:flex lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3 lg:w-auto lg:ml-auto lg:justify-end",
-          )}
-        >
-          <div className="space-y-1.5 min-w-0 sm:min-w-[11rem]">
-            <Label className="text-xs text-muted-foreground">Status</Label>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProspectStatus | "all")}>
-              <SelectTrigger className="h-9 w-full text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                {PROSPECT_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {formatProspectStatus(s)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 min-w-0 sm:min-w-[12rem]">
-            <Label className="text-xs text-muted-foreground">Follow-up</Label>
-            <Select value={followUpFilter} onValueChange={(v) => setFollowUpFilter(v as FollowUpBucket)}>
-              <SelectTrigger className="h-9 w-full text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All follow-ups</SelectItem>
-                <SelectItem value="overdue">{formatFollowUpBucket("overdue")}</SelectItem>
-                <SelectItem value="today">{formatFollowUpBucket("today")}</SelectItem>
-                <SelectItem value="this_week">{formatFollowUpBucket("this_week")}</SelectItem>
-                <SelectItem value="upcoming">{formatFollowUpBucket("upcoming")}</SelectItem>
-                <SelectItem value="none">{formatFollowUpBucket("none")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5 min-w-0 sm:min-w-[10rem]">
-            <Label className="text-xs text-muted-foreground">Archive</Label>
-            <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as ArchiveScope)}>
-              <SelectTrigger className="h-9 w-full text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active only</SelectItem>
-                <SelectItem value="archived">Archived only</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {canManage ? (
-            <div className="w-full col-span-2 sm:col-span-2 lg:col-auto flex lg:items-end lg:shrink-0">
-              <Button
-                type="button"
-                className="w-full lg:w-auto h-9 gap-1.5 px-4 font-semibold shrink-0"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="w-4 h-4" aria-hidden />
-                New prospect
-              </Button>
-            </div>
-          ) : null}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProspectStatus | "all")}>
+            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {PROSPECT_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {formatProspectStatus(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={followUpFilter} onValueChange={(v) => setFollowUpFilter(v as FollowUpBucket)}>
+            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Follow-up" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All follow-ups</SelectItem>
+              <SelectItem value="overdue">{formatFollowUpBucket("overdue")}</SelectItem>
+              <SelectItem value="today">{formatFollowUpBucket("today")}</SelectItem>
+              <SelectItem value="this_week">{formatFollowUpBucket("this_week")}</SelectItem>
+              <SelectItem value="upcoming">{formatFollowUpBucket("upcoming")}</SelectItem>
+              <SelectItem value="none">{formatFollowUpBucket("none")}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as ArchiveScope)}>
+            <SelectTrigger className="w-[132px] min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Records" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+
+        {canManage ? (
+          <Button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="w-full sm:w-auto sm:ml-auto gap-1.5 min-h-11 lg:min-h-10 px-4 font-semibold shrink-0"
+          >
+            <Plus className="w-4 h-4" aria-hidden />
+            New prospect
+          </Button>
+        ) : null}
       </div>
 
       {error ? (
