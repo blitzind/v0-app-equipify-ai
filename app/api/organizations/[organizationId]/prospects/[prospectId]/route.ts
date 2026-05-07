@@ -7,6 +7,7 @@ import {
   parseOptionalCents,
   parseOptionalIso,
 } from "@/lib/prospects/server-helpers"
+import { recordProspectStatusChange } from "@/lib/prospects/status-events"
 
 export const runtime = "nodejs"
 
@@ -35,7 +36,7 @@ export async function PATCH(
 
   const gate = await requireOrgPermission(organizationId, "canManageProspects")
   if ("error" in gate) return gate.error
-  const { supabase } = gate
+  const { supabase, userId } = gate
 
   let body: Record<string, unknown>
   try {
@@ -84,6 +85,15 @@ export async function PATCH(
     return jsonError("No editable fields supplied.", 400)
   }
 
+  // Read current row first so we can detect a status delta and emit the
+  // workflow trigger / audit event after the update commits.
+  const { data: previous } = await supabase
+    .from("prospects")
+    .select("status, company_name")
+    .eq("organization_id", organizationId)
+    .eq("id", prospectId)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from("prospects")
     .update(update)
@@ -93,6 +103,19 @@ export async function PATCH(
     .single()
 
   if (error || !data) return jsonError(error?.message ?? "Prospect not found.", 404, "not_found")
+
+  if (previous && update.status && previous.status !== update.status) {
+    await recordProspectStatusChange({
+      supabase,
+      organizationId,
+      prospectId,
+      companyName: (data as { company_name: string }).company_name ?? previous.company_name,
+      previousStatus: previous.status as ProspectStatus,
+      nextStatus: update.status as ProspectStatus,
+      reason: "manual_edit",
+      actorUserId: userId,
+    })
+  }
 
   return NextResponse.json({ prospect: data })
 }

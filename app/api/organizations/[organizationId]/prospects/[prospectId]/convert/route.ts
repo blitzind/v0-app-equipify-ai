@@ -3,6 +3,8 @@ import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { requireCanCreateRecord } from "@/lib/billing/server-guard"
 import { optionalString } from "@/lib/prospects/server-helpers"
+import { recordProspectStatusChange } from "@/lib/prospects/status-events"
+import type { ProspectStatus } from "@/lib/prospects/types"
 
 export const runtime = "nodejs"
 
@@ -159,7 +161,28 @@ export async function POST(
     return jsonError(stampError.message, 500, "update_failed")
   }
 
-  // 4. Log a single conversion event on the customer timeline.
+  // 4a. Phase 2: emit the prospect status-change foundation (won) so the
+  //     prospect timeline + future workflow rules see the conversion as a
+  //     status delta. The conversion-specific customer-timeline event below
+  //     is intentionally separate so customers see "Prospect converted"
+  //     while the prospect timeline sees "Status: Quoted → Won".
+  if (typeof prospect.status === "string" && prospect.status !== "won") {
+    await recordProspectStatusChange({
+      supabase,
+      organizationId,
+      prospectId,
+      companyName: prospect.company_name as string,
+      previousStatus: prospect.status as ProspectStatus,
+      nextStatus: "won",
+      reason: "converted_to_customer",
+      actorUserId: userId,
+      extraMetadata: {
+        converted_customer_id: customer.id,
+      },
+    })
+  }
+
+  // 4b. Log a single conversion event on the customer timeline.
   await logCommunicationEvent(supabase, {
     organizationId,
     channel: "system",

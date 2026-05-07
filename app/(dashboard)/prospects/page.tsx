@@ -10,7 +10,8 @@
  * insert path managed server-side.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   AlertCircle,
   Calendar,
@@ -65,7 +66,21 @@ import { cn } from "@/lib/utils"
 
 type ArchiveScope = "active" | "archived" | "all"
 
+/**
+ * `useSearchParams` requires a Suspense boundary during static export. The
+ * page is a tiny shell that wraps the real component (which holds
+ * `useSearchParams`) in `<Suspense>`. Loading state is intentionally minimal
+ * because the inner page also has its own skeleton.
+ */
 export default function ProspectsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading prospects…</div>}>
+      <ProspectsPageInner />
+    </Suspense>
+  )
+}
+
+function ProspectsPageInner() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions, status: permStatus } = useOrgPermissions()
   const { toast } = useToast()
@@ -76,9 +91,28 @@ export default function ProspectsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // `?followup=overdue|today|this_week|upcoming|none` deep-links from the
+  // dashboard widget and KPI tiles. We seed the filter from the URL on
+  // first render but never write back — the user's clicks own the filter
+  // after that.
+  const searchParams = useSearchParams()
+  const initialFollowUp = ((): FollowUpBucket => {
+    const raw = searchParams?.get("followup")?.toLowerCase()
+    if (
+      raw === "overdue" ||
+      raw === "today" ||
+      raw === "this_week" ||
+      raw === "upcoming" ||
+      raw === "none"
+    ) {
+      return raw
+    }
+    return "all"
+  })()
+
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | "all">("all")
-  const [followUpFilter, setFollowUpFilter] = useState<FollowUpBucket>("all")
+  const [followUpFilter, setFollowUpFilter] = useState<FollowUpBucket>(initialFollowUp)
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>("active")
 
   const [createOpen, setCreateOpen] = useState(false)
@@ -135,16 +169,18 @@ export default function ProspectsPage() {
   const followUpKpis = useMemo(() => {
     let overdue = 0
     let today = 0
+    let thisWeek = 0
     let upcoming = 0
     let none = 0
     for (const r of rows) {
       const bucket = followUpBucketFor(r.next_follow_up_at)
       if (bucket === "overdue") overdue += 1
       else if (bucket === "today") today += 1
+      else if (bucket === "this_week") thisWeek += 1
       else if (bucket === "upcoming") upcoming += 1
       else none += 1
     }
-    return { overdue, today, upcoming, none }
+    return { overdue, today, thisWeek, upcoming, none }
   }, [rows])
 
   const statusKpis = useMemo(() => {
@@ -205,7 +241,7 @@ export default function ProspectsPage() {
       ) : null}
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
         <KpiTile
           label="Overdue follow-ups"
           value={followUpKpis.overdue}
@@ -223,11 +259,19 @@ export default function ProspectsPage() {
           onClick={() => setFollowUpFilter("today")}
         />
         <KpiTile
+          label="This week"
+          value={followUpKpis.thisWeek}
+          icon={CalendarClock}
+          tone={followUpKpis.thisWeek > 0 ? "violet" : "muted"}
+          sub="Through end of week"
+          onClick={() => setFollowUpFilter("this_week")}
+        />
+        <KpiTile
           label="Upcoming"
           value={followUpKpis.upcoming}
           icon={CalendarClock}
           tone="blue"
-          sub="Scheduled follow-ups"
+          sub="Scheduled later"
           onClick={() => setFollowUpFilter("upcoming")}
         />
         <KpiTile
@@ -279,6 +323,7 @@ export default function ProspectsPage() {
               <SelectItem value="all">All follow-ups</SelectItem>
               <SelectItem value="overdue">{formatFollowUpBucket("overdue")}</SelectItem>
               <SelectItem value="today">{formatFollowUpBucket("today")}</SelectItem>
+              <SelectItem value="this_week">{formatFollowUpBucket("this_week")}</SelectItem>
               <SelectItem value="upcoming">{formatFollowUpBucket("upcoming")}</SelectItem>
               <SelectItem value="none">{formatFollowUpBucket("none")}</SelectItem>
             </SelectContent>
@@ -449,7 +494,7 @@ function KpiTile({
   label: string
   value: number
   icon: typeof Sparkles
-  tone: "rose" | "amber" | "blue" | "emerald" | "muted"
+  tone: "rose" | "amber" | "blue" | "emerald" | "violet" | "muted"
   sub: string
   onClick?: () => void
 }) {
@@ -462,7 +507,9 @@ function KpiTile({
           ? "text-blue-700 dark:text-blue-300 bg-blue-500/10"
           : tone === "emerald"
             ? "text-emerald-700 dark:text-emerald-300 bg-emerald-500/10"
-            : "text-muted-foreground bg-muted/40"
+            : tone === "violet"
+              ? "text-violet-700 dark:text-violet-300 bg-violet-500/10"
+              : "text-muted-foreground bg-muted/40"
   return (
     <button
       type="button"

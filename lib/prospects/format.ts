@@ -46,9 +46,17 @@ export function prospectStatusBadgeClasses(status: ProspectStatus | string): str
 }
 
 /**
- * Bucket a follow-up timestamp into a stable enum used by the list filter
- * and KPI tiles. `null` follow-ups land in `"none"`. The cutoff is "end of
- * today" (browser local), which matches the user's intent better than UTC.
+ * Bucket a follow-up timestamp into a stable enum used by the list filter,
+ * KPI tiles, and the dashboard widget. `null` follow-ups land in `"none"`.
+ * Cutoffs are computed in the browser's local timezone so "today" /
+ * "this week" reflect the user's working week, not UTC.
+ *
+ * Buckets:
+ *   - `overdue`   — past due (anything before start of today)
+ *   - `today`     — between start-of-today and end-of-today
+ *   - `this_week` — tomorrow through end of the current ISO week (Sunday)
+ *   - `upcoming`  — anything later than this week
+ *   - `none`      — no follow-up scheduled
  */
 export function followUpBucketFor(
   iso: string | null | undefined,
@@ -62,9 +70,17 @@ export function followUpBucketFor(
   startOfToday.setHours(0, 0, 0, 0)
   const endOfToday = new Date(startOfToday)
   endOfToday.setDate(endOfToday.getDate() + 1)
+  // End of "this week" = the start of the day *after* the upcoming Sunday.
+  // getDay() returns 0..6 with 0 = Sunday; daysUntilSunday rolls Sunday
+  // forward to "next Sunday" so today's Sunday still has at least one day
+  // of "this week" headroom.
+  const daysUntilSunday = (7 - startOfToday.getDay()) % 7 || 7
+  const endOfThisWeek = new Date(startOfToday)
+  endOfThisWeek.setDate(endOfThisWeek.getDate() + daysUntilSunday + 1)
 
   if (ts < startOfToday.getTime()) return "overdue"
   if (ts < endOfToday.getTime()) return "today"
+  if (ts < endOfThisWeek.getTime()) return "this_week"
   return "upcoming"
 }
 
@@ -74,6 +90,8 @@ export function formatFollowUpBucket(bucket: FollowUpBucket): string {
       return "Overdue"
     case "today":
       return "Due today"
+    case "this_week":
+      return "This week"
     case "upcoming":
       return "Upcoming"
     case "none":

@@ -24,8 +24,21 @@ export const ACTIVE_PROSPECT_STATUSES: ProspectStatus[] = [
   "quoted",
 ]
 
-/** Bucket for the follow-up filter on the list page. */
-export type FollowUpBucket = "all" | "overdue" | "today" | "upcoming" | "none"
+/**
+ * Bucket for the follow-up filter on the list page and dashboard widget.
+ *
+ * `this_week` covers the rest of the current week (after today, through
+ * Sunday). `upcoming` is *next week onward* — kept distinct from
+ * `this_week` so the dashboard widget can prioritize "what should I act on
+ * right now" without dragging in everything in the next 90 days.
+ */
+export type FollowUpBucket =
+  | "all"
+  | "overdue"
+  | "today"
+  | "this_week"
+  | "upcoming"
+  | "none"
 
 export type ProspectRow = {
   id: string

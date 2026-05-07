@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 139,
+  apiRouteHandlers: 140,
   sqlMigrations: 100,
   dashboardPages: 55,
-  componentsTsx: 174,
-  libTsFiles: 292,
+  componentsTsx: 176,
+  libTsFiles: 294,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **139** |
+| API route handlers (\`app/api/**/route.ts\`) | **140** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **100** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **55** |
-| \`components/**/*.tsx\` | **174** |
-| \`lib/**/*.ts\` | **292** |
+| \`components/**/*.tsx\` | **176** |
+| \`lib/**/*.ts\` | **294** |
 
 ### Vercel crons
 
@@ -119,6 +119,7 @@ organizations/[organizationId]/price-list-imports/[importId]/extract/route.ts
 organizations/[organizationId]/price-list-imports/[importId]/route.ts
 organizations/[organizationId]/price-list-imports/route.ts
 organizations/[organizationId]/prospects/[prospectId]/convert/route.ts
+organizations/[organizationId]/prospects/[prospectId]/draft-followup/route.ts
 organizations/[organizationId]/prospects/[prospectId]/follow-up/route.ts
 organizations/[organizationId]/prospects/[prospectId]/route.ts
 organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts

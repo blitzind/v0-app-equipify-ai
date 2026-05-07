@@ -50,6 +50,9 @@ import {
 import { ProspectFormDialog } from "@/components/prospects/prospect-form-dialog"
 import { LogFollowUpDialog } from "@/components/prospects/log-follow-up-dialog"
 import { ConvertProspectDialog } from "@/components/prospects/convert-prospect-dialog"
+import { AiDraftFollowUpDialog } from "@/components/prospects/ai-draft-followup-dialog"
+import { useBillingAccessOptional } from "@/lib/billing-access-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 type TimelineEvent = {
   id: string
@@ -86,11 +89,18 @@ export function ProspectDrawer({
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [loadingTimeline, setLoadingTimeline] = useState(false)
 
+  const billingAccess = useBillingAccessOptional()
+  const orgPerms = useOrgPermissions()
+  const aiDraftAvailable = Boolean(
+    billingAccess?.insightsAllowed && orgPerms?.permissions?.canViewInsights,
+  )
+
   const [editOpen, setEditOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [convertOpen, setConvertOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
 
   useEffect(() => {
     if (!open || !prospect) return
@@ -195,6 +205,18 @@ export function ProspectDrawer({
               >
                 <MessageSquarePlus className="w-3.5 h-3.5" /> Log follow-up
               </Button>
+              {aiDraftAvailable ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5 text-primary"
+                  onClick={() => setAiOpen(true)}
+                  disabled={Boolean(prospect.archived_at)}
+                  title="Draft a follow-up email with AI"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> AI draft
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 variant="outline"
@@ -333,11 +355,25 @@ export function ProspectDrawer({
         <DrawerSection title="Growth roadmap">
           <p className="text-xs text-muted-foreground inline-flex items-start gap-1.5">
             <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
-            Coming soon: AI follow-up suggestions, automated nurture sequences, review &amp;
-            referral campaigns. This pipeline is the foundation those tools will plug into.
+            <span>
+              {aiDraftAvailable
+                ? "AI follow-up drafting is live. Coming next: campaigns, review & referral asks, and automated nurture sequences keyed to status changes."
+                : "Coming next: AI follow-up suggestions, campaigns, review & referral asks, and automated nurture sequences keyed to status changes."}
+            </span>
           </p>
         </DrawerSection>
       </DetailDrawer>
+
+      <AiDraftFollowUpDialog
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+        organizationId={organizationId}
+        prospect={prospect}
+        onSavedAsNote={() => {
+          onChanged()
+          void refreshTimeline()
+        }}
+      />
 
       <ProspectFormDialog
         open={editOpen}

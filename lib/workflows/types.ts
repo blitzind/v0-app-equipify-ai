@@ -10,6 +10,13 @@ export type WorkflowTriggerType =
   | "equipment_warranty_expiring"
   | "certificate_uploaded"
   | "ai_assistant_digest_ready"
+  /**
+   * Leads + Follow-Up Phase 2: fired by prospect mutations whenever the
+   * pipeline status moves (e.g. new → contacted, contacted → quoted).
+   * Phase 2 emits the trigger but does not yet ship a builder UI rule for
+   * it; future Growth automations can hook in without further plumbing.
+   */
+  | "prospect_status_changed"
 
 export type WorkflowActionType =
   | "send_email"
@@ -59,6 +66,8 @@ export type WorkflowEventContext = {
   calibration_record?: Record<string, unknown>
   /** Operational AI assistant digest (trigger `ai_assistant_digest_ready`). */
   ai_assistant?: Record<string, unknown>
+  /** Leads + Follow-Up Phase 2: prospect snapshot for prospect triggers. */
+  prospect?: Record<string, unknown>
   /** Flattened helpers */
   equipment_category?: string | null
 }

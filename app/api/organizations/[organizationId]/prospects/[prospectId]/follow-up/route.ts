@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { parseOptionalIso, optionalString } from "@/lib/prospects/server-helpers"
+import { recordProspectStatusChange } from "@/lib/prospects/status-events"
+import type { ProspectStatus } from "@/lib/prospects/types"
 import type { CommunicationChannel } from "@/lib/notifications/types"
 
 export const runtime = "nodejs"
@@ -152,6 +154,32 @@ export async function POST(
     .eq("id", prospectId)
 
   if (updateError) return jsonError(updateError.message, 500, "update_failed")
+
+  // Phase 2: when a follow-up advances the pipeline (e.g. first touch
+  // bumps "new" → "contacted"), emit the dedicated status-change event +
+  // workflow trigger. The follow-up event itself is already logged above
+  // and is a separate timeline entry.
+  if (
+    typeof update.status === "string" &&
+    typeof prospect.status === "string" &&
+    update.status !== prospect.status
+  ) {
+    await recordProspectStatusChange({
+      supabase,
+      organizationId,
+      prospectId,
+      companyName: prospect.company_name as string,
+      previousStatus: prospect.status as ProspectStatus,
+      nextStatus: update.status as ProspectStatus,
+      reason: "follow_up",
+      actorUserId: userId,
+      extraMetadata: {
+        triggered_by: "follow_up_event",
+        communication_event_id: eventResult.id,
+        channel,
+      },
+    })
+  }
 
   return NextResponse.json({ ok: true, communication_event_id: eventResult.id })
 }
