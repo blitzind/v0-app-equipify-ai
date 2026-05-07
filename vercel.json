@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/process-ai-jobs",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/process-import-runs",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

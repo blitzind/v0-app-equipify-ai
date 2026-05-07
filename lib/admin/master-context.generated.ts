@@ -27,6 +27,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 - \`/api/cron/maintenance-due\` — cron: \`0 6 * * *\`
 - \`/api/cron/process-ai-jobs\` — cron: \`* * * * *\`
+- \`/api/cron/process-import-runs\` — cron: \`*/5 * * * *\`
 
 ### API routes (relative to \`app/api\`)
 
