@@ -21,6 +21,7 @@ const TRIGGER_TYPES = new Set<string>([
   "equipment_warranty_expiring",
   "certificate_uploaded",
   "ai_assistant_digest_ready",
+  "prospect_status_changed",
 ])
 
 function jsonError(message: string, status: number) {

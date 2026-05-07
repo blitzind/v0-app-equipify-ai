@@ -17,10 +17,10 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  Inbox,
   Plus,
   Search,
   Sparkles,
-  UserPlus2,
   Users,
 } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -212,25 +212,49 @@ function ProspectsPageInner() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" />
-            Prospects
-          </h1>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Inbound leads and opportunities. Convert promising prospects into customers from the
-            drawer — pre-conversion history is preserved on the prospect record.
-          </p>
+    <div className="flex flex-col gap-8 min-w-0">
+      {/* Hero — title card (no primary CTA here; action lives in filters row) */}
+      <section
+        className={cn(
+          "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6",
+          "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+          "dark:shadow-[0_1px_3px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.12)]",
+        )}
+      >
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+          <div className="flex gap-4 min-w-0">
+            <div
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--primary) 14%, var(--card))",
+                borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
+              }}
+            >
+              <Users className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
+                Prospects
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl text-pretty leading-relaxed">
+                Inbound leads and opportunities. Convert promising prospects into customers while
+                preserving pre-conversion history.
+              </p>
+            </div>
+          </div>
+          {/* Low-weight decorative graphic — matches modern shell hero rhythm */}
+          <div
+            className="hidden sm:flex items-center justify-center shrink-0 pointer-events-none select-none"
+            aria-hidden
+          >
+            <div className="relative h-[72px] w-[120px] sm:h-[80px] sm:w-[132px]">
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full bg-primary/[0.07] ring-1 ring-primary/10" />
+              <div className="absolute right-8 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary/[0.05] ring-1 ring-border/60" />
+              <Inbox className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 text-primary/35" strokeWidth={1.25} />
+            </div>
+          </div>
         </div>
-        {canManage ? (
-          <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-3.5 h-3.5" /> New prospect
-          </Button>
-        ) : null}
-      </div>
+      </section>
 
       {!canManage ? (
         <RestrictedNotice
@@ -240,8 +264,8 @@ function ProspectsPageInner() {
         />
       ) : null}
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+      {/* KPI strip — aligned with dashboard StatCard visual language */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <KpiTile
           label="Overdue follow-ups"
           value={followUpKpis.overdue}
@@ -283,64 +307,85 @@ function ProspectsPageInner() {
         />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:flex-wrap">
-        <div className="flex-1 min-w-0">
-          <Label className="text-xs">Search</Label>
+      {/* Filters + actions — CTA on same row as filters at lg+; full-width CTA on small screens */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4 lg:flex-wrap min-w-0">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Search</Label>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Company, contact, email…"
-              className="h-9 text-sm pl-8"
+              className="h-9 text-sm pl-8 w-full"
             />
           </div>
         </div>
-        <div className="sm:basis-[12rem] min-w-0">
-          <Label className="text-xs">Status</Label>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProspectStatus | "all")}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {PROSPECT_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {formatProspectStatus(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="sm:basis-[14rem] min-w-0">
-          <Label className="text-xs">Follow-up</Label>
-          <Select value={followUpFilter} onValueChange={(v) => setFollowUpFilter(v as FollowUpBucket)}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All follow-ups</SelectItem>
-              <SelectItem value="overdue">{formatFollowUpBucket("overdue")}</SelectItem>
-              <SelectItem value="today">{formatFollowUpBucket("today")}</SelectItem>
-              <SelectItem value="this_week">{formatFollowUpBucket("this_week")}</SelectItem>
-              <SelectItem value="upcoming">{formatFollowUpBucket("upcoming")}</SelectItem>
-              <SelectItem value="none">{formatFollowUpBucket("none")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="sm:basis-[10rem] min-w-0">
-          <Label className="text-xs">Archive</Label>
-          <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as ArchiveScope)}>
-            <SelectTrigger className="h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active only</SelectItem>
-              <SelectItem value="archived">Archived only</SelectItem>
-              <SelectItem value="all">All</SelectItem>
-            </SelectContent>
-          </Select>
+
+        <div
+          className={cn(
+            "flex flex-col gap-3 w-full min-w-0",
+            "sm:grid sm:grid-cols-2",
+            "lg:flex lg:flex-row lg:flex-nowrap lg:items-end lg:gap-3 lg:w-auto lg:ml-auto lg:justify-end",
+          )}
+        >
+          <div className="space-y-1.5 min-w-0 sm:min-w-[11rem]">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProspectStatus | "all")}>
+              <SelectTrigger className="h-9 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {PROSPECT_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {formatProspectStatus(s)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 min-w-0 sm:min-w-[12rem]">
+            <Label className="text-xs text-muted-foreground">Follow-up</Label>
+            <Select value={followUpFilter} onValueChange={(v) => setFollowUpFilter(v as FollowUpBucket)}>
+              <SelectTrigger className="h-9 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All follow-ups</SelectItem>
+                <SelectItem value="overdue">{formatFollowUpBucket("overdue")}</SelectItem>
+                <SelectItem value="today">{formatFollowUpBucket("today")}</SelectItem>
+                <SelectItem value="this_week">{formatFollowUpBucket("this_week")}</SelectItem>
+                <SelectItem value="upcoming">{formatFollowUpBucket("upcoming")}</SelectItem>
+                <SelectItem value="none">{formatFollowUpBucket("none")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 min-w-0 sm:min-w-[10rem]">
+            <Label className="text-xs text-muted-foreground">Archive</Label>
+            <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as ArchiveScope)}>
+              <SelectTrigger className="h-9 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active only</SelectItem>
+                <SelectItem value="archived">Archived only</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {canManage ? (
+            <div className="w-full col-span-2 sm:col-span-2 lg:col-auto flex lg:items-end lg:shrink-0">
+              <Button
+                type="button"
+                className="w-full lg:w-auto h-9 gap-1.5 px-4 font-semibold shrink-0"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="w-4 h-4" aria-hidden />
+                New prospect
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -351,7 +396,7 @@ function ProspectsPageInner() {
       ) : null}
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.15)]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -373,7 +418,7 @@ function ProspectsPageInner() {
                 </TableRow>
               ) : followUpFiltered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center">
+                  <TableCell colSpan={6} className="py-7 sm:py-8 text-center align-middle">
                     <EmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
                   </TableCell>
                 </TableRow>
@@ -498,57 +543,102 @@ function KpiTile({
   sub: string
   onClick?: () => void
 }) {
-  const accent =
+  const iconColor =
     tone === "rose"
-      ? "text-rose-700 dark:text-rose-300 bg-rose-500/10"
+      ? "text-rose-700 dark:text-rose-300"
       : tone === "amber"
-        ? "text-amber-700 dark:text-amber-300 bg-amber-500/10"
+        ? "text-amber-700 dark:text-amber-300"
         : tone === "blue"
-          ? "text-blue-700 dark:text-blue-300 bg-blue-500/10"
+          ? "text-blue-700 dark:text-blue-300"
           : tone === "emerald"
-            ? "text-emerald-700 dark:text-emerald-300 bg-emerald-500/10"
+            ? "text-emerald-700 dark:text-emerald-300"
             : tone === "violet"
-              ? "text-violet-700 dark:text-violet-300 bg-violet-500/10"
-              : "text-muted-foreground bg-muted/40"
+              ? "text-violet-700 dark:text-violet-300"
+              : "text-muted-foreground"
+  const iconBg =
+    tone === "rose"
+      ? "bg-rose-500/10"
+      : tone === "amber"
+        ? "bg-amber-500/10"
+        : tone === "blue"
+          ? "bg-blue-500/10"
+          : tone === "emerald"
+            ? "bg-emerald-500/10"
+            : tone === "violet"
+              ? "bg-violet-500/10"
+              : "bg-muted/50"
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        "bg-card rounded-xl border border-border p-4 flex flex-col gap-2 justify-between text-left h-full",
-        "shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
-        onClick ? "hover:border-primary/40 transition-colors" : "cursor-default",
+        "group bg-card rounded-xl border border-border p-4 sm:p-5 flex flex-col text-left h-full min-h-[148px]",
+        "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+        "dark:shadow-[0_1px_3px_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.1)]",
+        onClick &&
+          "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] hover:-translate-y-px hover:border-primary/30 transition-all duration-200",
+        !onClick && "cursor-default",
       )}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-start justify-between gap-2 min-h-[2rem]">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground leading-snug">
           {label}
         </p>
-        <div className={cn("w-7 h-7 rounded-md flex items-center justify-center shrink-0", accent.split(" ").slice(-1)[0])}>
-          <Icon className={cn("w-3.5 h-3.5", accent.split(" ")[0])} />
+        <div
+          className={cn(
+            "flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0",
+            "ring-2 ring-transparent ring-offset-1 ring-offset-card",
+            onClick && "group-hover:ring-primary/20 transition-all duration-200",
+            iconBg,
+          )}
+        >
+          <Icon
+            className={cn(
+              "w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200",
+              onClick && "group-hover:scale-110",
+              iconColor,
+            )}
+          />
         </div>
       </div>
-      <span className="text-2xl font-semibold tabular-nums">{value}</span>
-      <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{sub}</p>
+      <div className="mt-3 flex flex-col flex-1">
+        <span className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-foreground ds-tabular">
+          {value}
+        </span>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{sub}</p>
+      </div>
     </button>
   )
 }
 
 function EmptyState({ canManage, onCreate }: { canManage: boolean; onCreate: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-2">
-      <UserPlus2 className="w-6 h-6 text-muted-foreground" />
-      <p className="text-sm font-medium">No prospects in this view yet.</p>
-      <p className="text-xs text-muted-foreground max-w-sm">
-        Add inbound leads here and follow up consistently. When a prospect is ready, convert them
-        into a customer in one click — no data re-entry required.
-      </p>
+    <div className="flex flex-col items-center gap-3 px-4 py-1 max-w-md mx-auto">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60 ring-1 ring-border/60">
+        <Inbox className="h-6 w-6 text-muted-foreground/90" strokeWidth={1.5} aria-hidden />
+      </div>
+      <div className="space-y-1.5 text-center">
+        <p className="text-sm font-semibold text-foreground">Nothing matches this view</p>
+        <p className="text-sm text-muted-foreground/90 leading-relaxed">
+          Try another filter, search term, or archive scope. Add inbound leads here to track follow-ups
+          and convert when they are ready — history stays on the prospect record.
+        </p>
+      </div>
       {canManage ? (
-        <Button size="sm" className="gap-1.5 mt-1" onClick={onCreate}>
-          <Plus className="w-3.5 h-3.5" /> New prospect
+        <Button
+          type="button"
+          className="mt-1 h-9 gap-1.5 px-4 w-full max-w-xs font-semibold sm:w-auto"
+          onClick={onCreate}
+        >
+          <Plus className="w-4 h-4" aria-hidden />
+          New prospect
         </Button>
-      ) : null}
+      ) : (
+        <p className="text-xs text-muted-foreground/80 text-center max-w-sm">
+          Ask an owner, admin, or manager to add prospects or adjust filters.
+        </p>
+      )}
     </div>
   )
 }

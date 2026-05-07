@@ -21,7 +21,14 @@ const TRIGGER_TYPES = new Set<string>([
   "equipment_warranty_expiring",
   "certificate_uploaded",
   "ai_assistant_digest_ready",
+  // Workflow Automations Phase 1: prospect_status_changed becomes a
+  // first-class authorable trigger now that the dispatch + builder UI
+  // path is in place. The dispatcher emits this event from the Phase 2
+  // prospects mutations.
+  "prospect_status_changed",
 ])
+
+const RECENT_RUN_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
@@ -68,37 +75,53 @@ export async function GET(
   const ids = list.map((r: { id: string }) => r.id)
   const lastRunByAutomation = new Map<
     string,
-    { status: string; started_at: string; completed_at: string | null }
+    { status: string; started_at: string; completed_at: string | null; error_message?: string | null }
   >()
+  // Phase 1 visibility: count failed + total runs over the last 14 days
+  // so the UI can surface "3 failures in the last 14 days" without
+  // requiring a separate runs API call. Cheap because we already pull
+  // a bounded `workflow_runs` window.
+  const recentRunStats = new Map<string, { runs: number; failures: number }>()
+  const since = new Date(Date.now() - RECENT_RUN_LOOKBACK_MS).toISOString()
 
   if (ids.length > 0) {
     const { data: runs } = await supabase
       .from("workflow_runs")
-      .select("automation_id, status, started_at, completed_at")
+      .select("automation_id, status, started_at, completed_at, error_message")
       .eq("organization_id", organizationId)
       .in("automation_id", ids)
+      .gte("started_at", since)
       .order("started_at", { ascending: false })
-      .limit(400)
+      .limit(800)
 
     for (const row of (runs ?? []) as Array<{
       automation_id: string
       status: string
       started_at: string
       completed_at: string | null
+      error_message: string | null
     }>) {
       if (!lastRunByAutomation.has(row.automation_id)) {
         lastRunByAutomation.set(row.automation_id, {
           status: row.status,
           started_at: row.started_at,
           completed_at: row.completed_at,
+          error_message: row.error_message,
         })
       }
+      const stats = recentRunStats.get(row.automation_id) ?? { runs: 0, failures: 0 }
+      stats.runs += 1
+      if (row.status === "failed") stats.failures += 1
+      recentRunStats.set(row.automation_id, stats)
     }
   }
 
   const enriched = list.map((a: Record<string, unknown> & { id: string }) => ({
     ...a,
     last_run: lastRunByAutomation.get(a.id) ?? null,
+    recent_runs_count: recentRunStats.get(a.id)?.runs ?? 0,
+    recent_failure_count: recentRunStats.get(a.id)?.failures ?? 0,
+    recent_window_days: 14,
   }))
 
   return NextResponse.json({
