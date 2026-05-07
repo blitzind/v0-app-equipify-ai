@@ -9,6 +9,17 @@ import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +46,12 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
+import { InventoryOverviewKpis } from "@/components/inventory/inventory-overview-kpis"
+import { InventoryVehicleStockSummary } from "@/components/inventory/inventory-vehicle-stock-summary"
+import { InventoryRecentActivityCard } from "@/components/inventory/inventory-recent-activity-card"
+import { isLowStock } from "@/lib/inventory/format"
 
 const MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
@@ -120,7 +137,16 @@ export default function InventoryPage() {
   const { toast } = useToast()
   const { isPlatformAdmin } = useAdmin()
   const { organizationId, status } = useActiveOrganization()
+  const orgPerms = useOrgPermissions()
   const [canManage, setCanManage] = useState(false)
+  // Inventory adjust is gated by `canAdjustInventoryStock` server-side; we
+  // mirror that on the client so non-managers see the restricted notice
+  // instead of a button that 403s. `canManageInventory` covers
+  // receive/transfer/thresholds/locations/vehicle assignment.
+  const canAdjust = Boolean(orgPerms.permissions.canAdjustInventoryStock || isPlatformAdmin)
+  const canConsumeOnWorkOrder = Boolean(
+    orgPerms.permissions.canConsumePartsOnWorkOrders || isPlatformAdmin,
+  )
 
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -318,6 +344,7 @@ export default function InventoryPage() {
   const [adjLoc, setAdjLoc] = useState("")
   const [adjQty, setAdjQty] = useState("1")
   const [adjDir, setAdjDir] = useState<"in" | "out">("in")
+  const [adjConfirmOpen, setAdjConfirmOpen] = useState(false)
 
   const [xfCatalog, setXfCatalog] = useState("")
   const [xfFrom, setXfFrom] = useState("")
@@ -350,6 +377,22 @@ export default function InventoryPage() {
         reorder_quantity: thrQty === "" ? null : Number(thrQty),
       })
       toast({ title: "Reorder thresholds saved" })
+      void load()
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : "Failed", variant: "destructive" })
+    }
+  }
+
+  async function submitAdjustment() {
+    if (!canAdjust || !baseUrl) return
+    try {
+      await postJson(`${baseUrl}/inventory/adjust`, {
+        catalog_item_id: adjCatalog,
+        location_id: adjLoc,
+        direction: adjDir,
+        quantity: Number(adjQty),
+      })
+      toast({ title: "Stock adjusted" })
       void load()
     } catch (e) {
       toast({ title: e instanceof Error ? e.message : "Failed", variant: "destructive" })
@@ -412,6 +455,50 @@ export default function InventoryPage() {
         </div>
 
         <TabsContent value="overview" className="space-y-4">
+          <InventoryOverviewKpis
+            lowStockCount={lowStock.length}
+            vehicleCount={locations.filter((l) => l.is_active && l.location_type === "vehicle").length}
+            vehiclesLowStock={
+              new Set(
+                stock
+                  .filter((s) =>
+                    isLowStock({
+                      quantity_available: Number(s.quantity_available),
+                      reorder_point: s.reorder_point,
+                    }),
+                  )
+                  .filter((s) => {
+                    const loc = locations.find((l) => l.id === s.location_id)
+                    return loc?.location_type === "vehicle"
+                  })
+                  .map((s) => s.location_id),
+              ).size
+            }
+            recentTxnCount={transactions.length}
+            recentConsumedCount={transactions.filter((t) => t.transaction_type === "consume").length}
+            reorderNeededCount={
+              stock.filter(
+                (s) =>
+                  s.reorder_point != null &&
+                  Number(s.quantity_available) <= Number(s.reorder_point),
+              ).length
+            }
+          />
+
+          {!canManage ? (
+            <RestrictedNotice
+              capability="canManageInventory"
+              title="Inventory edits are restricted to your role"
+              body="You can view stock balances, low-stock alerts, and recent activity. Ask an owner, admin, or manager to record stock movements on your behalf."
+            />
+          ) : null}
+
+          <InventoryVehicleStockSummary
+            stock={stock}
+            locations={locations}
+            vehicleAssignments={vehicleAssignments}
+          />
+
           {lowStock.length > 0 && (
             <Card className={cn(INV_CARD_CLASS, "border-amber-500/30 bg-amber-500/5")}>
               <CardHeader className="pb-2">
@@ -445,6 +532,17 @@ export default function InventoryPage() {
             </Card>
           )}
 
+          <InventoryRecentActivityCard
+            transactions={transactions}
+            catalogParts={catalogParts.map((c) => ({ id: c.id, name: c.name }))}
+            locations={locations.map((l) => ({
+              id: l.id,
+              name: l.name,
+              location_type: l.location_type,
+            }))}
+            workOrders={recentWorkOrders.map((w) => ({ id: w.id, display: w.display }))}
+          />
+
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -473,20 +571,53 @@ export default function InventoryPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {stock.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-sm">
-                        <span className="font-medium">{r.item_name ?? "—"}</span>
-                        {r.part_number ? (
-                          <span className="block text-[11px] text-muted-foreground">{r.part_number}</span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-sm">{r.location_name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.quantity_on_hand}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.quantity_allocated}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.quantity_available}</TableCell>
-                    </TableRow>
-                  ))}
+                  {stock.map((r) => {
+                    const loc = locations.find((l) => l.id === r.location_id)
+                    const isVehicle = loc?.location_type === "vehicle"
+                    const techName = isVehicle
+                      ? vehicleAssignments.find((a) => a.inventory_location_id === r.location_id)
+                          ?.technician_name ?? null
+                      : null
+                    const low = isLowStock({
+                      quantity_available: Number(r.quantity_available),
+                      reorder_point: r.reorder_point,
+                    })
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-sm">
+                          <span className="font-medium">{r.item_name ?? "—"}</span>
+                          {r.part_number ? (
+                            <span className="block text-[11px] text-muted-foreground">{r.part_number}</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span>{r.location_name}</span>
+                            {isVehicle ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-4 border-blue-500/40 text-blue-700 dark:text-blue-300"
+                              >
+                                <Truck className="w-2.5 h-2.5 mr-1" />
+                                {techName ?? "Vehicle"}
+                              </Badge>
+                            ) : null}
+                            {low ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-700 dark:text-amber-300"
+                              >
+                                Low
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{r.quantity_on_hand}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.quantity_allocated}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.quantity_available}</TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -614,21 +745,16 @@ export default function InventoryPage() {
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canManage}
-                  onClick={async () => {
-                    if (!baseUrl) return
-                    try {
-                      await postJson(`${baseUrl}/inventory/adjust`, {
-                        catalog_item_id: adjCatalog,
-                        location_id: adjLoc,
-                        direction: adjDir,
-                        quantity: Number(adjQty),
-                      })
-                      toast({ title: "Stock adjusted" })
-                      void load()
-                    } catch (e) {
-                      toast({ title: e instanceof Error ? e.message : "Failed", variant: "destructive" })
+                  disabled={!canAdjust || !adjCatalog || !adjLoc || !Number.isFinite(Number(adjQty)) || Number(adjQty) <= 0}
+                  onClick={() => {
+                    // Decreases are destructive (cycle counts that drop on-hand,
+                    // write-offs). We always confirm those; increases apply
+                    // immediately so manager workflow stays fast.
+                    if (adjDir === "out") {
+                      setAdjConfirmOpen(true)
+                      return
                     }
+                    void submitAdjustment()
                   }}
                 >
                   Apply adjustment
@@ -733,7 +859,8 @@ export default function InventoryPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Transfer between locations</CardTitle>
               <CardDescription className="text-xs">
-                Moves available quantity from warehouse to vehicle or between bins.
+                Moves available quantity from a warehouse, vehicle, or job site to another
+                location. Both rows must already exist (or will be created with zero on-hand).
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
@@ -753,35 +880,35 @@ export default function InventoryPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className={cn(INV_FIELD, "sm:basis-[10rem]")}>
-                  <Label className="text-xs">From</Label>
+                <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
+                  <Label className="text-xs">Source location</Label>
                   <Select value={xfFrom} onValueChange={setXfFrom} disabled={!canManage}>
                     <SelectTrigger className="h-9 w-full text-xs">
-                      <SelectValue placeholder="Source…" />
+                      <SelectValue placeholder="Where the parts are now…" />
                     </SelectTrigger>
                     <SelectContent>
                       {locations
                         .filter((l) => l.is_active)
                         .map((l) => (
                           <SelectItem key={l.id} value={l.id}>
-                            {l.name}
+                            {l.name} ({l.location_type})
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className={cn(INV_FIELD, "sm:basis-[10rem]")}>
-                  <Label className="text-xs">To</Label>
+                <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
+                  <Label className="text-xs">Destination location</Label>
                   <Select value={xfTo} onValueChange={setXfTo} disabled={!canManage}>
                     <SelectTrigger className="h-9 w-full text-xs">
-                      <SelectValue placeholder="Destination…" />
+                      <SelectValue placeholder="Where they're going…" />
                     </SelectTrigger>
                     <SelectContent>
                       {locations
-                        .filter((l) => l.is_active)
+                        .filter((l) => l.is_active && l.id !== xfFrom)
                         .map((l) => (
                           <SelectItem key={l.id} value={l.id}>
-                            {l.name}
+                            {l.name} ({l.location_type})
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -905,7 +1032,7 @@ export default function InventoryPage() {
               <div className={INV_FORM_ROW}>
                 <div className={cn(INV_FIELD, "sm:basis-[16rem]")}>
                   <Label className="text-xs">Work order</Label>
-                  <Select value={conWo} onValueChange={setConWo} disabled={!canManage || recentWorkOrders.length === 0}>
+                  <Select value={conWo} onValueChange={setConWo} disabled={!canConsumeOnWorkOrder || recentWorkOrders.length === 0}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue
                         placeholder={
@@ -932,7 +1059,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
                   <Label className="text-xs">Part</Label>
-                  <Select value={conCatalog} onValueChange={setConCatalog} disabled={!canManage}>
+                  <Select value={conCatalog} onValueChange={setConCatalog} disabled={!canConsumeOnWorkOrder}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Catalog…" />
                     </SelectTrigger>
@@ -946,17 +1073,17 @@ export default function InventoryPage() {
                   </Select>
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[10rem]")}>
-                  <Label className="text-xs">Location</Label>
-                  <Select value={conLoc} onValueChange={setConLoc} disabled={!canManage}>
+                  <Label className="text-xs">Source location</Label>
+                  <Select value={conLoc} onValueChange={setConLoc} disabled={!canConsumeOnWorkOrder}>
                     <SelectTrigger className="h-9 w-full text-xs">
-                      <SelectValue placeholder="From…" />
+                      <SelectValue placeholder="Where it came from…" />
                     </SelectTrigger>
                     <SelectContent>
                       {locations
                         .filter((l) => l.is_active)
                         .map((l) => (
                           <SelectItem key={l.id} value={l.id}>
-                            {l.name}
+                            {l.name} ({l.location_type})
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -969,14 +1096,14 @@ export default function InventoryPage() {
                     onChange={(e) => setConQty(e.target.value)}
                     className="h-9 text-xs"
                     inputMode="numeric"
-                    disabled={!canManage}
+                    disabled={!canConsumeOnWorkOrder}
                   />
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canManage || !conWo}
+                  disabled={!canConsumeOnWorkOrder || !conWo}
                   onClick={async () => {
                     if (!baseUrl) return
                     try {
@@ -1088,6 +1215,31 @@ export default function InventoryPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={adjConfirmOpen} onOpenChange={setAdjConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm stock decrease</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                You're about to decrease on-hand quantity by{" "}
+                <span className="font-semibold tabular-nums">{adjQty}</span> for the selected
+                location.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Stock adjustments are logged on the inventory ledger and cannot be edited
+                directly. For incorrect counts, apply an offsetting increase later.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void submitAdjustment()}>
+              Apply decrease
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={locOpen} onOpenChange={setLocOpen}>
         <DialogContent className="sm:max-w-md">

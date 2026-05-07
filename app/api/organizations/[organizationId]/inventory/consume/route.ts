@@ -20,7 +20,16 @@ export async function POST(
     return NextResponse.json({ message: "Invalid organization." }, { status: 400 })
   }
 
-  const gate = await requireOrgInventoryWrite(organizationId)
+  // Phase 1 (Inventory): consumption is a field-team workflow.
+  // `canConsumePartsOnWorkOrders` is granted to owner/admin/manager/tech in
+  // the central capability map (only viewer is excluded), so requiring that
+  // capability here unlocks the technician mobile flow without weakening any
+  // gate the manager-only roles already passed under the legacy
+  // `canManageInventory` check. Service-role client comes from the same gate.
+  const gate = await requireOrgInventoryWrite(organizationId, {
+    capability: "canConsumePartsOnWorkOrders",
+    forbiddenMessage: "You don't have permission to consume parts on work orders.",
+  })
   if ("error" in gate) return gate.error
 
   let body: {

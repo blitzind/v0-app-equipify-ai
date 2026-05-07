@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 133,
+  apiRouteHandlers: 134,
   sqlMigrations: 99,
   dashboardPages: 54,
-  componentsTsx: 165,
-  libTsFiles: 288,
+  componentsTsx: 170,
+  libTsFiles: 289,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **133** |
+| API route handlers (\`app/api/**/route.ts\`) | **134** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **99** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **54** |
-| \`components/**/*.tsx\` | **165** |
-| \`lib/**/*.ts\` | **288** |
+| \`components/**/*.tsx\` | **170** |
+| \`lib/**/*.ts\` | **289** |
 
 ### Vercel crons
 
@@ -93,6 +93,7 @@ organizations/[organizationId]/inventory/locations/route.ts
 organizations/[organizationId]/inventory/low-stock/route.ts
 organizations/[organizationId]/inventory/receive/route.ts
 organizations/[organizationId]/inventory/reorder-record/route.ts
+organizations/[organizationId]/inventory/restock-request/route.ts
 organizations/[organizationId]/inventory/stock/route.ts
 organizations/[organizationId]/inventory/thresholds/route.ts
 organizations/[organizationId]/inventory/transactions/route.ts

@@ -29,6 +29,7 @@ import {
   type CompletionCertificateSlot,
 } from "@/lib/work-orders/work-order-completion"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
+import { WorkOrderInventoryUsageCard } from "@/components/inventory/work-order-inventory-usage-card"
 import {
   WorkOrderCloseOutDialog,
   WorkOrderCustomerEmailDraftDialog,
@@ -1932,34 +1933,42 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             tabsValue={drawerTab}
             onTabsValueChange={handleDrawerTabChange}
             partsTabToolbar={
-              partsDirty ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
-                  <span className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                    Unsaved changes
-                  </span>
-                  <div className="ml-auto flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      onClick={revertParts}
-                      disabled={partsSaving}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => void saveParts()}
-                      disabled={partsSaving}
-                    >
-                      {partsSaving ? "Saving…" : "Save changes"}
-                    </Button>
+              <div className="flex flex-col gap-2">
+                {partsDirty ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+                    <span className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                      Unsaved changes
+                    </span>
+                    <div className="ml-auto flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={revertParts}
+                        disabled={partsSaving}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => void saveParts()}
+                        disabled={partsSaving}
+                      >
+                        {partsSaving ? "Saving…" : "Save changes"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ) : null
+                ) : null}
+                {orgStatus === "ready" && activeOrgId && wo.id ? (
+                  <WorkOrderInventoryUsageCard
+                    organizationId={activeOrgId}
+                    workOrderId={wo.id}
+                  />
+                ) : null}
+              </div>
             }
             partsTableExtraActions={
               !wo.isArchived && orgStatus === "ready" && activeOrgId ? (

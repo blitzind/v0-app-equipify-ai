@@ -9,6 +9,8 @@ import { applyArchivedAtScope } from "@/lib/archive-scope"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { TechnicianInventoryMobileCard } from "@/components/inventory/technician-inventory-mobile-card"
+import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear()
@@ -296,6 +298,35 @@ export default function TechnicianTodayPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Technician-friendly inventory panel — appears beneath the day's
+              jobs so a tech can use a part on the *first* scheduled job
+              without leaving Today, and request a restock for anything
+              running low. The panel resolves their assigned vehicle bin
+              automatically. */}
+          <TechnicianInventoryMobileCard
+            activeWorkOrder={
+              todayRows[0]
+                ? {
+                    id: todayRows[0].id,
+                    display: getWorkOrderDisplay({
+                      id: todayRows[0].id,
+                      workOrderNumber: todayRows[0].work_order_number ?? null,
+                    }),
+                    title: todayRows[0].title,
+                  }
+                : openRows[0]
+                  ? {
+                      id: openRows[0].id,
+                      display: getWorkOrderDisplay({
+                        id: openRows[0].id,
+                        workOrderNumber: openRows[0].work_order_number ?? null,
+                      }),
+                      title: openRows[0].title,
+                    }
+                  : null
+            }
+          />
         </>
       )}
     </div>
