@@ -143,7 +143,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
 }
 
 // Routes that render their own full-bleed hero — PageHero is suppressed.
-const HERO_SUPPRESS = new Set(["/insights", "/ai-assistants", "/integrations"])
+const HERO_SUPPRESS = new Set(["/insights", "/ai-assistants", "/ai-ops", "/integrations"])
 
 /** Per-area hero icon color (title card only); primary CTAs stay orange via `Button`. */
 const FEATURE_ICON_HEX: Record<string, string> = {

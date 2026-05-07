@@ -23,6 +23,7 @@ import { WorkOrderStatus } from "@/components/dashboard/work-order-status"
 import { OperationalInsightsWidget } from "@/components/dashboard/ai-insights-widget"
 import { MaintenanceAutomationStats } from "@/components/dashboard/maintenance-automation-stats"
 import { ProspectFollowUpWidget } from "@/components/dashboard/prospect-follow-up-widget"
+import { AiOpsSummaryWidget } from "@/components/ai-ops/ai-ops-summary-widget"
 import { cn } from "@/lib/utils"
 
 function formatUsdFromCents(cents: number): string {
@@ -166,7 +167,10 @@ export default function DashboardPage() {
 
       <MaintenanceAutomationStats />
 
-      <ProspectFollowUpWidget />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+        <AiOpsSummaryWidget />
+        <ProspectFollowUpWidget />
+      </div>
 
       <OperationalInsightsWidget insights={operationalInsights} loading={loading} error={error} />
 

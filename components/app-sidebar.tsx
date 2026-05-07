@@ -123,6 +123,13 @@ const NAV_GROUPS: NavGroup[] = [
         requireAiPlan: true,
       },
       {
+        label: "AI Operations",
+        href: "/ai-ops",
+        icon: Bot,
+        highlight: true,
+        anyOf: ["canViewInsights"],
+      },
+      {
         label: "Communications",
         href: "/communications",
         icon: Bell,

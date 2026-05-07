@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 147,
-  sqlMigrations: 101,
-  dashboardPages: 55,
-  componentsTsx: 190,
-  libTsFiles: 303,
+  apiRouteHandlers: 149,
+  sqlMigrations: 102,
+  dashboardPages: 56,
+  componentsTsx: 193,
+  libTsFiles: 306,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **147** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **101** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **55** |
-| \`components/**/*.tsx\` | **190** |
-| \`lib/**/*.ts\` | **303** |
+| API route handlers (\`app/api/**/route.ts\`) | **149** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **102** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **56** |
+| \`components/**/*.tsx\` | **193** |
+| \`lib/**/*.ts\` | **306** |
 
 ### Vercel crons
 
@@ -62,6 +62,8 @@ organizations/[organizationId]/ai-assistants/[assistantId]/enqueue/route.ts
 organizations/[organizationId]/ai-assistants/[assistantId]/run/route.ts
 organizations/[organizationId]/ai-assistants/route.ts
 organizations/[organizationId]/ai-jobs/[jobId]/route.ts
+organizations/[organizationId]/ai-ops/dismissals/route.ts
+organizations/[organizationId]/ai-ops/recommendations/route.ts
 organizations/[organizationId]/ai-usage/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
