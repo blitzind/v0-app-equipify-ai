@@ -24,6 +24,9 @@ import {
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
+import type { OperationalBadge, OpsFlags } from "@/lib/dispatch/operational-badges"
+import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
+import { AlertTriangle } from "lucide-react"
 
 export type DispatchTech = {
   id: string
@@ -42,6 +45,12 @@ export type DispatchWo = {
   customer_id: string
   customerName: string
   work_order_number?: number | null
+  priority?: string | null
+  type?: string | null
+  opsBadges: OperationalBadge[]
+  opsFlags?: OpsFlags
+  technicianLabel?: string | null
+  serviceLocationLabel?: string | null
 }
 
 function cardTone(status: string): string {
@@ -66,16 +75,23 @@ function WoCard({
   dragging,
   overlay,
   onOpen,
+  slotOverlap,
 }: {
   wo: DispatchWo
   dragging?: boolean
   overlay?: boolean
   onOpen: (id: string) => void
+  slotOverlap?: boolean
 }) {
   const num = getWorkOrderDisplay({
     id: wo.id,
     workOrderNumber: wo.work_order_number ?? null,
   })
+  const metaLine =
+    wo.assigned_user_id && wo.technicianLabel
+      ? `${wo.technicianLabel}${wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}`
+      : wo.serviceLocationLabel ?? ""
+
   return (
     <button
       type="button"
@@ -88,9 +104,19 @@ function WoCard({
         "cursor-grab active:cursor-grabbing",
       )}
     >
-      <p className="font-mono text-[10px] text-primary">{num}</p>
+      <div className="flex items-start gap-1">
+        <p className="min-w-0 flex-1 font-mono text-[10px] text-primary">{num}</p>
+        {slotOverlap ? (
+          <AlertTriangle
+            className="h-3 w-3 shrink-0 text-[color:var(--status-warning)]"
+            aria-label="Overlapping appointments"
+          />
+        ) : null}
+      </div>
       <p className="line-clamp-2 font-medium leading-snug">{wo.title}</p>
       <p className="truncate text-[10px] text-muted-foreground">{wo.customerName}</p>
+      {metaLine ? <p className="truncate text-[10px] text-muted-foreground">{metaLine}</p> : null}
+      <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1" />
     </button>
   )
 }
@@ -98,9 +124,11 @@ function WoCard({
 function DraggableWo({
   wo,
   onOpen,
+  slotOverlap,
 }: {
   wo: DispatchWo
   onOpen: (id: string) => void
+  slotOverlap?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: DND.wo(wo.id),
@@ -112,7 +140,7 @@ function DraggableWo({
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none">
-      <WoCard wo={wo} dragging={isDragging} onOpen={onOpen} />
+      <WoCard wo={wo} dragging={isDragging} onOpen={onOpen} slotOverlap={slotOverlap} />
     </div>
   )
 }
@@ -211,6 +239,16 @@ export function DispatchBoard({
     [workOrders, selectedYmd],
   )
 
+  const workloadByTech = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const wo of workOrders) {
+      if (!wo.assigned_user_id || wo.scheduled_on !== selectedYmd) continue
+      const uid = wo.assigned_user_id
+      m.set(uid, (m.get(uid) ?? 0) + 1)
+    }
+    return m
+  }, [workOrders, selectedYmd])
+
   function handleDragStart(e: DragStartEvent) {
     const id = String(e.active.id)
     const woId = DND.parseWo(id)
@@ -301,6 +339,9 @@ export function DispatchBoard({
                       size="xs"
                     />
                     <span className="truncate text-xs font-semibold text-foreground">{t.label}</span>
+                    <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                      ({workloadByTech.get(t.id) ?? 0})
+                    </span>
                   </div>
                 </div>
               ))}
@@ -316,7 +357,12 @@ export function DispatchBoard({
                     return (
                       <DroppableSlot key={`${tech.id}-${slotIdx}`} techId={tech.id} slotIdx={slotIdx}>
                         {list.map((wo) => (
-                          <DraggableWo key={wo.id} wo={wo} onOpen={onOpenWo} />
+                          <DraggableWo
+                            key={wo.id}
+                            wo={wo}
+                            onOpen={onOpenWo}
+                            slotOverlap={list.length > 1}
+                          />
                         ))}
                       </DroppableSlot>
                     )

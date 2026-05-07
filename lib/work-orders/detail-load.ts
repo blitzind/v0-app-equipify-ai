@@ -113,6 +113,7 @@ type WoRow = {
   warranty_vendor_id?: string | null
   calibration_template_id?: string | null
   archived_at?: string | null
+  billing_state?: string | null
 }
 
 export type WorkOrderPhotoGalleryItem = {
@@ -148,6 +149,10 @@ export type WorkOrderEquipmentAsset = {
   calibrationRecordId: string | null
   /** Matches `work_orders.equipment_id` (primary / header asset). */
   isPrimary: boolean
+  /** From `equipment.next_due_at` (YYYY-MM-DD) for operational badges. */
+  nextServiceDueYmd?: string | null
+  /** From `equipment.next_calibration_due_at` (YYYY-MM-DD). */
+  nextCalibrationDueYmd?: string | null
 }
 
 export type LoadedWorkOrderDetail = {
@@ -231,7 +236,7 @@ async function fetchWorkOrderEquipmentAssets(
   const [{ data: eqRows }, { data: certRows }, templates] = await Promise.all([
     supabase
       .from("equipment")
-      .select("id, name, equipment_code, serial_number, category, location_label")
+      .select("id, name, equipment_code, serial_number, category, location_label, next_due_at, next_calibration_due_at")
       .eq("organization_id", organizationId)
       .in("id", ids),
     supabase
@@ -277,6 +282,8 @@ async function fetchWorkOrderEquipmentAssets(
         serial_number: string | null
         category: string | null
         location_label: string | null
+        next_due_at?: string | null
+        next_calibration_due_at?: string | null
       }) => [e.id, e],
     ),
   )
@@ -286,6 +293,8 @@ async function fetchWorkOrderEquipmentAssets(
     const rec = latestRecordByEquipment.get(slot.equipmentId)
     const tmpl = rec ? templateById.get(rec.templateId) ?? null : null
     const certStatus = resolveCertificateStatus(tmpl, rec?.values ?? {}, Boolean(rec))
+    const nd = e?.next_due_at?.trim() || null
+    const ncd = e?.next_calibration_due_at?.trim() || null
 
     return {
       id: slot.equipmentId,
@@ -300,6 +309,8 @@ async function fetchWorkOrderEquipmentAssets(
       certificateStatus: certStatus,
       calibrationRecordId: rec?.id ?? null,
       isPrimary: slot.equipmentId === fallback.equipmentId,
+      nextServiceDueYmd: nd,
+      nextCalibrationDueYmd: ncd,
     }
   })
 }
@@ -400,7 +411,9 @@ export async function loadWorkOrderDetailForOrg(
       .maybeSingle(),
     supabase
       .from("equipment")
-      .select("name, location_label, equipment_code, serial_number, category, warranty_start_date, warranty_expiration_date, warranty_expires_at")
+      .select(
+        "name, location_label, equipment_code, serial_number, category, warranty_start_date, warranty_expiration_date, warranty_expires_at, next_due_at, next_calibration_due_at",
+      )
       .eq("id", w.equipment_id)
       .eq("organization_id", organizationId)
       .maybeSingle(),
@@ -452,6 +465,8 @@ export async function loadWorkOrderDetailForOrg(
     warranty_start_date?: string | null
     warranty_expiration_date?: string | null
     warranty_expires_at?: string | null
+    next_due_at?: string | null
+    next_calibration_due_at?: string | null
   } | null
   const equipmentName = eqRow
     ? getEquipmentDisplayPrimary({
@@ -624,6 +639,7 @@ export async function loadWorkOrderDetailForOrg(
     customerSignaturePreviewUrl,
     customerSignatureCapturedAt: w.signature_captured_at ?? null,
     billableToCustomer: w.billable_to_customer ?? true,
+    billingState: w.billing_state ?? null,
     warrantyReviewRequired: w.warranty_review_required ?? false,
     warrantyVendorId: w.warranty_vendor_id ?? null,
     warrantyVendorName,

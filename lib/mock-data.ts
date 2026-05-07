@@ -540,6 +540,8 @@ export interface WorkOrder {
   customerSignatureCapturedAt?: string | null
   /** Warranty-aware billing controls from `work_orders`. */
   billableToCustomer?: boolean
+  /** Supabase `billing_state`: not_billable | ready_for_billing | invoiced | paid */
+  billingState?: string | null
   warrantyReviewRequired?: boolean
   warrantyVendorId?: string | null
   warrantyVendorName?: string | null

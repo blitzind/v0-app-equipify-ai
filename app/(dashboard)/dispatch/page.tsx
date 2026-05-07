@@ -25,6 +25,12 @@ import {
 import { DispatchMobileList } from "@/components/dispatch/dispatch-mobile-list"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
 import { Button } from "@/components/ui/button"
+import {
+  enrichDispatchWorkOrders,
+  filterDispatchRows,
+  sortDispatchRows,
+} from "@/lib/dispatch/build-dispatch-wos"
+import type { DispatchFilterId } from "@/lib/dispatch/operational-badges"
 
 const ROSTER_MEMBER_ROLES = ["owner", "admin", "manager", "tech"] as const
 const DISPATCH_STATUSES = ["open", "scheduled", "in_progress", "completed"] as const
@@ -49,11 +55,18 @@ function DispatchPageInner() {
   const [persistBusy, setPersistBusy] = useState(false)
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
+  const [dispatchFilter, setDispatchFilter] = useState<DispatchFilterId>("all")
+  const [dispatchSort, setDispatchSort] = useState<"schedule" | "priority">("schedule")
 
   const weekStart = useMemo(() => startOfWeekMonday(weekAnchor), [weekAnchor])
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
+
+  const displayWorkOrders = useMemo(() => {
+    const filtered = filterDispatchRows(workOrders, dispatchFilter)
+    return sortDispatchRows(filtered, dispatchSort)
+  }, [workOrders, dispatchFilter, dispatchSort])
 
   useEffect(() => {
     const days = weekDays.map((d) => toYmd(d))
@@ -110,11 +123,12 @@ function DispatchPageInner() {
     setTechnicians(techList)
 
     const selFull =
-      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id"
+      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at"
     const selMini =
-      "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id"
+      "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, created_at"
 
-    async function fetchRange() {
+    async function fetchRange(): Promise<{ data: unknown; error: { message: string } | null; mini: boolean }> {
+      let mini = false
       let q = supabase
         .from("work_orders")
         .select(selFull)
@@ -126,6 +140,7 @@ function DispatchPageInner() {
 
       let res = await q
       if (res.error && missingWorkOrderNumberColumn(res.error)) {
+        mini = true
         res = await supabase
           .from("work_orders")
           .select(selMini)
@@ -135,10 +150,11 @@ function DispatchPageInner() {
           .gte("scheduled_on", ws)
           .lte("scheduled_on", we)
       }
-      return res
+      return { data: res.data, error: res.error, mini }
     }
 
-    async function fetchUnassigned() {
+    async function fetchUnassigned(): Promise<{ data: unknown; error: { message: string } | null; mini: boolean }> {
+      let mini = false
       let q = supabase
         .from("work_orders")
         .select(selFull)
@@ -149,6 +165,7 @@ function DispatchPageInner() {
 
       let res = await q
       if (res.error && missingWorkOrderNumberColumn(res.error)) {
+        mini = true
         res = await supabase
           .from("work_orders")
           .select(selMini)
@@ -157,7 +174,7 @@ function DispatchPageInner() {
           .is("assigned_user_id", null)
           .in("status", ["open", "scheduled", "in_progress"])
       }
-      return res
+      return { data: res.data, error: res.error, mini }
     }
 
     const [rangeRes, unassignRes] = await Promise.all([fetchRange(), fetchUnassigned()])
@@ -175,27 +192,58 @@ function DispatchPageInner() {
       return
     }
 
-    const rowMap = new Map<string, DispatchWo>()
-    const ingest = (rows: unknown) => {
-      for (const r of (rows as DispatchWo[]) ?? []) {
+    type RawWo = {
+      id: string
+      work_order_number?: number | null
+      title: string
+      status: string
+      scheduled_on: string | null
+      scheduled_time: string | null
+      assigned_user_id: string | null
+      customer_id: string
+      equipment_id: string
+      priority?: string | null
+      type?: string | null
+      billing_state?: string | null
+      maintenance_plan_id?: string | null
+      calibration_template_id?: string | null
+      billable_to_customer?: boolean | null
+      warranty_review_required?: boolean | null
+      total_parts_cents?: number | null
+      created_at?: string | null
+    }
+
+    const rowMap = new Map<string, RawWo>()
+    const ingest = (rows: unknown, mini: boolean) => {
+      for (const r of (rows as Partial<RawWo>[]) ?? []) {
+        if (!r.id || !r.title || !r.customer_id) continue
         rowMap.set(r.id, {
           id: r.id,
+          work_order_number: r.work_order_number ?? null,
           title: r.title,
-          status: r.status,
-          scheduled_on: r.scheduled_on,
-          scheduled_time: r.scheduled_time,
-          assigned_user_id: r.assigned_user_id,
+          status: r.status ?? "open",
+          scheduled_on: r.scheduled_on ?? null,
+          scheduled_time: r.scheduled_time ?? null,
+          assigned_user_id: r.assigned_user_id ?? null,
           customer_id: r.customer_id,
-          customerName: "",
-          work_order_number: "work_order_number" in r ? (r as { work_order_number?: number | null }).work_order_number : null,
+          equipment_id: r.equipment_id ?? "",
+          priority: r.priority ?? "normal",
+          type: r.type ?? "repair",
+          billing_state: mini ? null : (r.billing_state ?? null),
+          maintenance_plan_id: mini ? null : (r.maintenance_plan_id ?? null),
+          calibration_template_id: mini ? null : (r.calibration_template_id ?? null),
+          billable_to_customer: mini ? true : (r.billable_to_customer ?? true),
+          warranty_review_required: mini ? false : Boolean(r.warranty_review_required),
+          total_parts_cents: mini ? 0 : (r.total_parts_cents ?? 0),
+          created_at: r.created_at ?? new Date(0).toISOString(),
         })
       }
     }
-    ingest(rangeRes.data)
-    ingest(unassignRes.data)
+    ingest(rangeRes.data, rangeRes.mini)
+    ingest(unassignRes.data, unassignRes.mini)
 
-    const merged = [...rowMap.values()]
-    const custIds = [...new Set(merged.map((w) => w.customer_id).filter(Boolean))] as string[]
+    const mergedRaw = [...rowMap.values()]
+    const custIds = [...new Set(mergedRaw.map((w) => w.customer_id).filter(Boolean))] as string[]
 
     const customerMap = new Map<string, string>()
     if (custIds.length > 0) {
@@ -210,11 +258,10 @@ function DispatchPageInner() {
       })
     }
 
-    for (const wo of merged) {
-      wo.customerName = customerMap.get(wo.customer_id) ?? "Customer"
-    }
+    const techByUserId = new Map(techList.map((t) => [t.id, t] as const))
+    const enriched = await enrichDispatchWorkOrders(supabase, orgId, mergedRaw, techByUserId, customerMap)
 
-    setWorkOrders(merged)
+    setWorkOrders(enriched)
     setLoading(false)
   }, [activeOrgId, orgStatus, weekStart, weekEnd, refresh])
 
@@ -267,7 +314,7 @@ function DispatchPageInner() {
       ) : null}
 
       {/* Week + day picker */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -315,6 +362,46 @@ function DispatchPageInner() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Operational focus">
+          {(
+            [
+              ["all", "All"],
+              ["billing_ready", "Ready to bill"],
+              ["cert_pending", "Cert / compliance"],
+              ["pm_risk", "PM & calibration"],
+              ["unassigned_aging", "Unassigned aging"],
+              ["warranty_review", "Warranty review"],
+            ] as const
+          ).map(([id, label]) => {
+            const active = dispatchFilter === id
+            return (
+              <Button
+                key={id}
+                type="button"
+                size="sm"
+                variant={active ? "default" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => setDispatchFilter(id)}
+              >
+                {label}
+              </Button>
+            )
+          })}
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="shrink-0">Sort</span>
+          <select
+            value={dispatchSort}
+            onChange={(e) => setDispatchSort(e.target.value as "schedule" | "priority")}
+            className="rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
+          >
+            <option value="schedule">By time</option>
+            <option value="priority">By priority</option>
+          </select>
+        </label>
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading dispatch…</p>
       ) : (
@@ -322,7 +409,7 @@ function DispatchPageInner() {
           <div className="hidden md:block">
             <DispatchBoard
               technicians={technicians}
-              workOrders={workOrders}
+              workOrders={displayWorkOrders}
               selectedYmd={selectedYmd}
               onOpenWo={setSelectedWoId}
               onMoveWo={handleMoveWo}
@@ -332,7 +419,7 @@ function DispatchPageInner() {
           <div className="md:hidden">
             <DispatchMobileList
               technicians={technicians}
-              workOrders={workOrders}
+              workOrders={displayWorkOrders}
               selectedYmd={selectedYmd}
               onOpenWo={setSelectedWoId}
             />

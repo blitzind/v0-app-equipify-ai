@@ -84,6 +84,12 @@ import { buildWorkOrderPartFromCatalog } from "@/lib/catalog/catalog-line-snapsh
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
+import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
+import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
+import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
+import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
+import { fetchInvoicesForWorkOrder } from "@/lib/org-quotes-invoices/repository"
+import type { AdminInvoice } from "@/lib/mock-data"
 
 let toastCounter = 0
 
@@ -329,6 +335,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [equipmentAssets, setEquipmentAssets] = useState<WorkOrderEquipmentAsset[]>([])
   const [addEquipmentOpen, setAddEquipmentOpen] = useState(false)
   const [completionCertSlots, setCompletionCertSlots] = useState<CompletionCertificateSlot[]>([])
+  const [linkedInvoices, setLinkedInvoices] = useState<AdminInvoice[]>([])
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -448,6 +455,22 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     void loadWorkOrder()
   }, [workOrderId, loadWorkOrder, initialTab])
 
+  useEffect(() => {
+    if (!workOrderId || orgStatus !== "ready" || !activeOrgId) {
+      setLinkedInvoices([])
+      return
+    }
+    const supabase = createBrowserSupabaseClient()
+    let cancelled = false
+    void (async () => {
+      const { invoices } = await fetchInvoicesForWorkOrder(supabase, activeOrgId, workOrderId)
+      if (!cancelled) setLinkedInvoices(invoices ?? [])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [workOrderId, activeOrgId, orgStatus])
+
   const displayWo = useMemo((): WorkOrder | null => {
     if (!wo) return null
     if (!editing) return wo
@@ -466,6 +489,18 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       scheduledTime: (draft.scheduledTime ?? wo.scheduledTime) as string,
     }
   }, [wo, editing, draft])
+
+  const operationalDrawerBadges = useMemo(() => {
+    const w = displayWo ?? wo
+    if (!w) return []
+    return deriveOperationalBadgesForDrawer(w, equipmentAssets)
+  }, [displayWo, wo, equipmentAssets])
+
+  const serviceTimelineEvents = useMemo(() => {
+    const w = displayWo ?? wo
+    if (!w) return []
+    return buildWorkOrderServiceTimeline(w, linkedInvoices)
+  }, [displayWo, wo, linkedInvoices])
 
   const { workspace } = useTenant()
   const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
@@ -1694,6 +1729,21 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               </DrawerSection>
             </div>
           )}
+
+          {!editing && operationalDrawerBadges.length > 0 ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Operational signals
+              </p>
+              <OperationalBadgeRow badges={operationalDrawerBadges} cap={8} />
+            </div>
+          ) : null}
+
+          {!editing && serviceTimelineEvents.length > 0 ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <ServiceLifecycleTimeline title="Service timeline" events={serviceTimelineEvents} />
+            </div>
+          ) : null}
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
           <WorkOrderDetailExperience

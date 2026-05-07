@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
+import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { formatSlotLabel, timeToSlotIndex } from "@/lib/dispatch/board-utils"
 
 function cardTone(status: string): string {
@@ -74,6 +75,15 @@ export function DispatchMobileList({
                 </p>
                 <p className="font-medium">{wo.title}</p>
                 <p className="text-xs text-muted-foreground">{wo.customerName}</p>
+                {wo.assigned_user_id && wo.technicianLabel ? (
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {wo.technicianLabel}
+                    {wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}
+                  </p>
+                ) : wo.serviceLocationLabel ? (
+                  <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
+                ) : null}
+                <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
               </button>
             ))
           )}
@@ -104,6 +114,15 @@ export function DispatchMobileList({
                 </p>
                     <p className="font-medium">{wo.title}</p>
                     <p className="text-xs text-muted-foreground">{wo.customerName}</p>
+                    {wo.technicianLabel ? (
+                      <p className="truncate text-[10px] text-muted-foreground">
+                        {wo.technicianLabel}
+                        {wo.serviceLocationLabel ? ` · ${wo.serviceLocationLabel}` : ""}
+                      </p>
+                    ) : wo.serviceLocationLabel ? (
+                      <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
+                    ) : null}
+                    <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
                   </button>
                 ))}
               </div>
