@@ -7,6 +7,7 @@ import {
 } from "@/lib/portal/display-mappers"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
+import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 
 export const runtime = "nodejs"
 
@@ -179,6 +180,14 @@ export async function GET() {
     | { id?: string; amount_cents?: number; title?: string }
     | null
 
+  let certificateSummary = { total: 0, unlocked: 0, locked: 0 }
+  try {
+    const pack = await buildPortalCertificateItems(svc, orgId, custId)
+    certificateSummary = pack.summary
+  } catch {
+    certificateSummary = { total: 0, unlocked: 0, locked: 0 }
+  }
+
   const planRows = plans.data ?? []
   const planEquipIds = [...new Set(planRows.map((r) => r.equipment_id).filter(Boolean))] as string[]
   let planEquipMap = new Map<string, string>()
@@ -239,5 +248,6 @@ export async function GET() {
     formatters: {
       currency: { outstandingLabel: fmtCurrency(unpaidCents) },
     },
+    certificateSummary,
   })
 }

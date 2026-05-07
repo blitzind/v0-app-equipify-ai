@@ -17,6 +17,11 @@ import {
 import { usePortalSession } from "@/components/portal/portal-session-context"
 
 type DashboardPayload = {
+  certificateSummary?: {
+    total: number
+    unlocked: number
+    locked: number
+  }
   stats: {
     equipmentTotal: number
     equipmentDueSoon: number
@@ -285,6 +290,25 @@ export default function PortalDashboardPage() {
         </div>
       )}
 
+      {data.certificateSummary && data.certificateSummary.total > 0 && (
+        <div className="portal-card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Compliance documents
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+              {data.certificateSummary.unlocked} available · {data.certificateSummary.locked} pending release
+            </p>
+          </div>
+          <Link
+            href="/portal/certificates"
+            className="portal-btn-secondary text-xs inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium"
+          >
+            View certificates
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Equipment"
@@ -431,9 +455,13 @@ export default function PortalDashboardPage() {
                 </p>
               )}
               {data.recentInvoices.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between">
+                <Link
+                  key={inv.id}
+                  href={`/portal/invoices/${inv.id}`}
+                  className="flex items-center justify-between rounded-md px-1 py-1 -mx-1 hover:bg-[--portal-surface-2] transition-colors"
+                >
                   <div>
-                    <p className="text-xs font-mono font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    <p className="text-xs font-mono font-medium" style={{ color: "var(--portal-accent)" }}>
                       {inv.number}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
@@ -446,7 +474,7 @@ export default function PortalDashboardPage() {
                     </p>
                     <StatusBadge status={inv.statusLabel} />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

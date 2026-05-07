@@ -626,6 +626,113 @@ export async function listCompletedCertificatesForOrg(
   return rows
 }
 
+/** Load one saved certificate row with the same enrichment as list exports (for portal download). */
+export async function loadCompletedCertificateItemByRecordId(
+  supabase: SupabaseClient,
+  organizationId: string,
+  recordId: string,
+): Promise<CompletedCertificateListItem | null> {
+  const { data: rec, error } = await supabase
+    .from("calibration_records")
+    .select("id, organization_id, work_order_id, equipment_id, template_id, values, created_at")
+    .eq("organization_id", organizationId)
+    .eq("id", recordId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!rec) return null
+
+  const r = rec as CalibrationRecordRow
+  const woMap = await fetchWorkOrdersForCertificateList(supabase, organizationId, [r.work_order_id])
+  const wo = woMap.get(r.work_order_id)
+  if (!wo) return null
+
+  const { data: tmplRow } = await supabase
+    .from("calibration_templates")
+    .select(
+      "id, organization_id, name, equipment_category_id, fields, archived_at, ai_generated, ai_confidence, human_verified_at, human_verified_by, created_at, updated_at",
+    )
+    .eq("organization_id", organizationId)
+    .eq("id", r.template_id)
+    .maybeSingle()
+
+  if (!tmplRow) return null
+  const tmpl = mapTemplateRow(tmplRow as CalibrationTemplateRow)
+
+  const eqKey = r.equipment_id ?? wo.equipment_id
+  const { data: eqRow } = await supabase
+    .from("equipment")
+    .select("id, name, location_label, equipment_code, serial_number, category")
+    .eq("organization_id", organizationId)
+    .eq("id", eqKey)
+    .maybeSingle()
+
+  const { data: custRow } = await supabase
+    .from("customers")
+    .select("company_name")
+    .eq("organization_id", organizationId)
+    .eq("id", wo.customer_id)
+    .maybeSingle()
+
+  let technicianName: string | null = null
+  if (wo.assigned_technician_id) {
+    const { data: tr } = await supabase
+      .from("technicians")
+      .select("full_name")
+      .eq("organization_id", organizationId)
+      .eq("id", wo.assigned_technician_id)
+      .maybeSingle()
+    technicianName = (tr as { full_name?: string } | null)?.full_name?.trim() || null
+  } else if (wo.assigned_user_id) {
+    const { data: pr } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", wo.assigned_user_id)
+      .maybeSingle()
+    technicianName =
+      ((pr as { full_name?: string; email?: string } | null)?.full_name?.trim() ||
+        (pr as { email?: string } | null)?.email?.trim()) ||
+      null
+  }
+
+  const equipmentLabel = eqRow
+    ? getEquipmentDisplayPrimary({
+        id: eqKey,
+        name: eqRow.name,
+        equipment_code: eqRow.equipment_code,
+        serial_number: eqRow.serial_number,
+        category: eqRow.category,
+      })
+    : "Equipment"
+
+  const repairLog = parseRepairLog(wo.repair_log)
+
+  return {
+    recordId: r.id,
+    savedAt: r.created_at,
+    template: tmpl,
+    values: r.values && typeof r.values === "object" ? (r.values as Record<string, unknown>) : {},
+    workOrderId: wo.id,
+    workOrderLabel: getWorkOrderDisplay({
+      id: wo.id,
+      workOrderNumber: wo.work_order_number ?? null,
+    }),
+    workOrderTitle: wo.title?.trim() || "",
+    workOrderStatusLabel: formatWorkOrderStatusLabel(wo.status),
+    workOrderCompletedAt: wo.completed_at,
+    workOrderScheduledOn: wo.scheduled_on,
+    customerName: (custRow as { company_name?: string } | null)?.company_name?.trim() || "Unknown customer",
+    serviceLocation: eqRow?.location_label?.trim() ?? "",
+    equipmentLabel,
+    equipmentCode: eqRow?.equipment_code ?? null,
+    equipmentSerialNumber: eqRow?.serial_number ?? null,
+    technicianName,
+    repairLog,
+    customerSignaturePath: wo.signature_url,
+    customerSignatureCapturedAt: wo.signature_captured_at,
+  }
+}
+
 /** Build print-ready HTML for a saved certificate (matches Work Order certificate PDF content). */
 export async function buildCompletedCertificatePdfHtml(
   supabase: SupabaseClient,

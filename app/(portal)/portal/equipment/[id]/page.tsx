@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   Clock,
   ArrowUpRight,
+  ShieldCheck,
+  Receipt,
+  Download,
 } from "lucide-react"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 function fmtDate(d: string | null | undefined) {
@@ -41,6 +44,7 @@ type DetailPayload = {
     warrantyExpiresAt: string | null
     lastServiceAt: string | null
     nextDueAt: string | null
+    nextCalibrationDueAt: string | null
     locationLabel: string | null
     notes: string | null
   }
@@ -53,6 +57,23 @@ type DetailPayload = {
     scheduledOn: string | null
     completedAt: string | null
     totalCents: number
+  }>
+  certificates: Array<{
+    id: string
+    templateName: string
+    createdAt: string
+    unlocked: boolean
+    reasonLabel: string
+    downloadPath: string | null
+  }>
+  invoices: Array<{
+    id: string
+    invoiceNumber: string
+    title: string
+    amountCents: number
+    statusLabel: string
+    issuedAt: string
+    dueDate: string | null
   }>
 }
 
@@ -94,6 +115,7 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
 
   const eq = data.equipment
   const days = daysUntil(eq.nextDueAt)
+  const calDays = daysUntil(eq.nextCalibrationDueAt)
   const warrantyDays = daysUntil(eq.warrantyExpiresAt)
   const totalSpend = data.serviceHistory.reduce((s, h) => s + h.totalCents, 0)
   const lastService = data.serviceHistory.find((h) => h.completedAt)?.completedAt ?? eq.lastServiceAt
@@ -227,6 +249,95 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
           )}
         </div>
       </div>
+
+      {(eq.nextCalibrationDueAt || data.certificates.length > 0) && (
+        <div className="portal-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck size={16} style={{ color: "var(--portal-accent)" }} />
+            <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Compliance & calibration
+            </h3>
+          </div>
+          {eq.nextCalibrationDueAt ? (
+            <p className="text-sm" style={{ color: calDays != null && calDays < 0 ? "var(--portal-danger)" : "var(--portal-secondary)" }}>
+              Next calibration due: {fmtDate(eq.nextCalibrationDueAt)}
+              {calDays != null ? ` (${calDays < 0 ? `${Math.abs(calDays)}d overdue` : `${calDays}d`})` : ""}
+            </p>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+              No calibration due date on file.
+            </p>
+          )}
+          {data.certificates.length > 0 ? (
+            <div className="mt-4 divide-y" style={{ borderColor: "var(--portal-border-light)" }}>
+              {data.certificates.slice(0, 6).map((c) => (
+                <div key={c.id} className="flex items-center justify-between gap-2 py-2 first:pt-0">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium truncate" style={{ color: "var(--portal-foreground)" }}>
+                      {c.templateName}
+                    </p>
+                    <p className="text-[11px] truncate" style={{ color: "var(--portal-nav-text)" }}>
+                      {fmtDate(c.createdAt)} · {c.reasonLabel}
+                    </p>
+                  </div>
+                  {c.downloadPath ?
+                    <a
+                      href={c.downloadPath}
+                      className="text-[11px] shrink-0 flex items-center gap-1 font-medium"
+                      style={{ color: "var(--portal-accent)" }}
+                    >
+                      <Download size={11} /> PDF/HTML
+                    </a>
+                  : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs mt-3" style={{ color: "var(--portal-nav-text)" }}>
+              Certificates appear here after service visits with saved calibration records.
+            </p>
+          )}
+          <Link href="/portal/certificates" className="text-xs font-medium mt-3 inline-block" style={{ color: "var(--portal-accent)" }}>
+            Open compliance archive →
+          </Link>
+        </div>
+      )}
+
+      {data.invoices.length > 0 && (
+        <div className="portal-card">
+          <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--portal-border-light)" }}>
+            <Receipt size={15} style={{ color: "var(--portal-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Invoices for this equipment
+            </h2>
+          </div>
+          <div className="divide-y" style={{ borderColor: "var(--portal-border-light)" }}>
+            {data.invoices.map((inv) => (
+              <Link
+                key={inv.id}
+                href={`/portal/invoices/${inv.id}`}
+                className="flex items-center justify-between px-5 py-3 hover:bg-[--portal-surface-2] transition-colors"
+              >
+                <div>
+                  <p className="text-xs font-mono font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    {inv.invoiceNumber}
+                  </p>
+                  <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
+                    {fmtDate(inv.issuedAt)}
+                    {inv.dueDate ? ` · Due ${fmtDate(inv.dueDate)}` : ""}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold tabular-nums">{fmtCurrency(inv.amountCents)}</p>
+                  <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
+                    {inv.statusLabel}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         {[

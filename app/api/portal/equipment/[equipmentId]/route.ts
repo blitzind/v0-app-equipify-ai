@@ -5,6 +5,8 @@ import {
   mapWorkOrderType,
 } from "@/lib/portal/display-mappers"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
+import { mapInvoiceStatus } from "@/lib/portal/display-mappers"
+import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 export const runtime = "nodejs"
@@ -26,17 +28,32 @@ export async function GET(
 
   const { svc, portalUser } = ctx
 
-  const { data: eq, error } = await svc
+  const selFull =
+    "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, next_calibration_due_at, location_label, notes"
+  const selFallback =
+    "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
+
+  let eqRes = await svc
     .from("equipment")
-    .select(
-      "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes",
-    )
+    .select(selFull)
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .eq("id", equipmentId)
     .eq("is_archived", false)
     .maybeSingle()
 
+  if (eqRes.error) {
+    eqRes = await svc
+      .from("equipment")
+      .select(selFallback)
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("id", equipmentId)
+      .eq("is_archived", false)
+      .maybeSingle()
+  }
+
+  const { data: eq, error } = eqRes
   if (error || !eq) {
     return NextResponse.json({ error: "Equipment not found." }, { status: 404 })
   }
@@ -50,6 +67,41 @@ export async function GET(
     .eq("is_archived", false)
     .order("created_at", { ascending: false })
     .limit(25)
+
+  const woIds = (wos ?? []).map((w) => w.id as string)
+
+  let certificates: Awaited<ReturnType<typeof buildPortalCertificateItems>>["items"] = []
+  try {
+    if (woIds.length > 0) {
+      const pack = await buildPortalCertificateItems(svc, portalUser.organization_id, portalUser.customer_id, {
+        workOrderIds: woIds,
+      })
+      certificates = pack.items
+    }
+  } catch {
+    certificates = []
+  }
+
+  const { data: invRows } = await svc
+    .from("org_invoices")
+    .select("id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date")
+    .eq("organization_id", portalUser.organization_id)
+    .eq("customer_id", portalUser.customer_id)
+    .eq("equipment_id", equipmentId)
+    .order("issued_at", { ascending: false })
+    .limit(15)
+
+  const invoices =
+    (invRows ?? []).map((r) => ({
+      id: r.id as string,
+      invoiceNumber: r.invoice_number as string,
+      title: r.title as string,
+      amountCents: r.amount_cents as number,
+      statusLabel: mapInvoiceStatus(r.status as string),
+      issuedAt: r.issued_at as string,
+      paidAt: (r.paid_at as string | null) ?? null,
+      dueDate: (r as { due_date?: string | null }).due_date ?? null,
+    })) ?? []
 
   const history =
     wos?.map((w) => ({
@@ -79,9 +131,12 @@ export async function GET(
       warrantyExpiresAt: (eq.warranty_expires_at as string | null) ?? null,
       lastServiceAt: (eq.last_service_at as string | null) ?? null,
       nextDueAt: (eq.next_due_at as string | null) ?? null,
+      nextCalibrationDueAt: ((eq as { next_calibration_due_at?: string | null }).next_calibration_due_at as string | null) ?? null,
       locationLabel: (eq.location_label as string | null) ?? null,
       notes: (eq.notes as string | null) ?? null,
     },
     serviceHistory: history,
+    certificates,
+    invoices,
   })
 }

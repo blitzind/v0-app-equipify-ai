@@ -12,7 +12,7 @@ export async function GET() {
 
   const { data, error } = await svc
     .from("org_invoices")
-    .select("id, invoice_number, title, amount_cents, status, issued_at, paid_at, equipment_id")
+    .select("id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id")
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .order("issued_at", { ascending: false })
@@ -31,6 +31,7 @@ export async function GET() {
       statusLabel: mapInvoiceStatus(r.status as string),
       issuedAt: r.issued_at as string,
       paidAt: (r.paid_at as string | null) ?? null,
+      dueDate: (r as { due_date?: string | null }).due_date ?? null,
       equipmentId: (r.equipment_id as string | null) ?? null,
       payOnlineReady: false,
     })),

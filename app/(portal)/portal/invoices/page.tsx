@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Receipt } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,7 @@ type Inv = {
   amountCents: number
   statusLabel: string
   issuedAt: string
+  dueDate?: string | null
   payOnlineReady: boolean
 }
 
@@ -77,6 +79,7 @@ export default function PortalInvoicesPage() {
                 <tr className="border-b text-left text-[11px] uppercase tracking-wide" style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-nav-text)" }}>
                   <th className="px-4 py-2.5 font-medium">Invoice</th>
                   <th className="px-4 py-2.5 font-medium">Issued</th>
+                  <th className="px-4 py-2.5 font-medium hidden md:table-cell">Due</th>
                   <th className="px-4 py-2.5 font-medium text-right">Amount</th>
                   <th className="px-4 py-2.5 font-medium text-right">Status</th>
                   <th className="px-4 py-2.5 font-medium text-right">Pay</th>
@@ -86,15 +89,22 @@ export default function PortalInvoicesPage() {
                 {items.map((inv) => (
                   <tr key={inv.id} className="border-b last:border-0" style={{ borderColor: "var(--portal-border-light)" }}>
                     <td className="px-4 py-2.5">
-                      <span className="text-xs font-mono font-medium" style={{ color: "var(--portal-foreground)" }}>
+                      <Link
+                        href={`/portal/invoices/${inv.id}`}
+                        className="text-xs font-mono font-medium hover:underline"
+                        style={{ color: "var(--portal-accent)" }}
+                      >
                         {inv.invoiceNumber}
-                      </span>
+                      </Link>
                       <p className="text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
                         {inv.title}
                       </p>
                     </td>
                     <td className="px-4 py-2.5 text-xs" style={{ color: "var(--portal-secondary)" }}>
                       {fmtDate(inv.issuedAt)}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs hidden md:table-cell" style={{ color: "var(--portal-secondary)" }}>
+                      {inv.dueDate ? fmtDate(inv.dueDate) : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-right font-semibold tabular-nums" style={{ color: "var(--portal-foreground)" }}>
                       {fmtCurrency(inv.amountCents)}
