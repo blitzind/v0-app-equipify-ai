@@ -8,7 +8,6 @@ import { useTenant } from "@/lib/tenant-store"
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import { useBillingAccessOptional } from "@/lib/billing-access-context"
 import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
@@ -37,8 +36,6 @@ type NavItem = {
   highlight?: boolean
   /** User needs at least one of these permissions (OR). Omit for routes available to all members. */
   anyOf?: (keyof OrgPermissions)[]
-  /** AI routes also require plan/billing feature access when applicable. */
-  requireAiPlan?: boolean
   /** Renders the row in a disabled "coming soon" style. */
   comingSoon?: boolean
 }
@@ -121,7 +118,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Sparkles,
         highlight: true,
         anyOf: ["canViewInsights"],
-        requireAiPlan: true,
       },
       {
         label: "AI Operations",
@@ -142,7 +138,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Bot,
         highlight: true,
         anyOf: ["canViewInsights"],
-        requireAiPlan: true,
       },
     ],
   },
@@ -163,13 +158,16 @@ const NAV_GROUPS: NavGroup[] = [
 function navItemAllowed(
   item: NavItem,
   perms: OrgPermissions,
-  insightsAllowed: boolean,
 ): boolean {
   // Coming-soon placeholders always render so the user can see roadmap items.
   if (item.comingSoon) return true
-  if (item.requireAiPlan && !insightsAllowed) return false
   if (!item.anyOf?.length) return true
   return item.anyOf.some((k) => perms[k])
+}
+
+function debugNavResolution(details: Record<string, unknown>) {
+  if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
+  console.info("[equipify:nav]", details)
 }
 
 function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
@@ -190,7 +188,7 @@ function resolveNavPermissions(args: {
 
   // While membership permissions are resolving, keep the shell useful instead
   // of rendering an almost-empty sidebar from the deny-all fallback.
-  if (args.status === "loading") {
+  if (args.status !== "ready") {
     return getOrgPermissionsForRole("owner")
   }
 
@@ -249,8 +247,6 @@ function SidebarBody({
   const pathname = usePathname()
   const { workspace } = useTenant()
   const { permissions, role, status: permissionsStatus } = useOrgPermissions()
-  const billingAccess = useBillingAccessOptional()
-  const insightsAllowed = billingAccess?.insightsAllowed ?? false
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
     useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
@@ -270,12 +266,19 @@ function SidebarBody({
         status: permissionsStatus,
         permissions,
       })
-      return NAV_GROUPS.map((group) => ({
+      const groups = NAV_GROUPS.map((group) => ({
         ...group,
-        items: group.items.filter((item) => navItemAllowed(item, navPermissions, insightsAllowed)),
+        items: group.items.filter((item) => navItemAllowed(item, navPermissions)),
       })).filter((group) => group.items.length > 0)
+      debugNavResolution({
+        role,
+        permissionsStatus,
+        organizationStatus: orgStatus,
+        visibleGroups: groups.map((group) => ({ id: group.id, itemCount: group.items.length })),
+      })
+      return groups
     },
-    [permissions, role, permissionsStatus, insightsAllowed],
+    [permissions, role, permissionsStatus, orgStatus],
   )
 
   // In mobile mode always show expanded; desktop respects collapsed state

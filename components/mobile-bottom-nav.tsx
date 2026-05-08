@@ -31,6 +31,11 @@ function allowed(perms: OrgPermissions, anyOf?: (keyof OrgPermissions)[]) {
   return anyOf.some((key) => perms[key])
 }
 
+function debugMobileNavResolution(details: Record<string, unknown>) {
+  if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true") return
+  console.info("[equipify:mobile-nav]", details)
+}
+
 function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
   return role === "owner" || role === "admin" || role === "manager"
 }
@@ -43,7 +48,7 @@ function resolveMobileNavPermissions(args: {
   if (isPrivilegedNavRole(args.role)) {
     return getOrgPermissionsForRole(args.role)
   }
-  if (args.status === "loading") {
+  if (args.status !== "ready") {
     return getOrgPermissionsForRole("owner")
   }
   return args.permissions
@@ -96,6 +101,7 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const { permissions, role, status } = useOrgPermissions()
   const { standardCreateEligibility, equipmentCreateEligibility } = useBillingAccess()
   const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  debugMobileNavResolution({ surface: "quick-add", role, status })
 
   function fire(action: QuickAddAction) {
     if (action === "new-equipment") {
@@ -164,6 +170,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
   const { permissions, role, status } = useOrgPermissions()
   const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  debugMobileNavResolution({ surface: "more", role, status })
 
   const items: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
     { icon: HardHat, label: "Today", href: "/technicians/today", anyOf: ["canUseTechnicianWorkspace"] },
@@ -222,6 +229,12 @@ export function MobileBottomNav() {
   const pathname = usePathname()
   const { permissions, role, status } = useOrgPermissions()
   const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  debugMobileNavResolution({
+    surface: "bottom-nav",
+    role,
+    status,
+    technicianWorkspace: navPermissions.canUseTechnicianWorkspace,
+  })
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
 

@@ -1,9 +1,14 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useState } from "react"
 import { Bot } from "lucide-react"
-import { AidenChatPanel } from "@/components/aiden/aiden-chat-panel"
 import { Button } from "@/components/ui/button"
+
+const AidenChatPanel = dynamic(
+  () => import("@/components/aiden/aiden-chat-panel").then((mod) => mod.AidenChatPanel),
+  { ssr: false },
+)
 
 export function AidenChatLauncher() {
   const [open, setOpen] = useState(false)
@@ -21,7 +26,7 @@ export function AidenChatLauncher() {
           Ask AIden
         </Button>
       </div>
-      <AidenChatPanel open={open} onOpenChange={setOpen} />
+      {open ? <AidenChatPanel open={open} onOpenChange={setOpen} /> : null}
     </>
   )
 }
