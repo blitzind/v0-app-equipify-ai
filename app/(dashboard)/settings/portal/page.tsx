@@ -108,7 +108,7 @@ const MODULE_OPTIONS = [
   { key: "equipment",   label: "Equipment",      description: "Customers can view their registered equipment" },
   { key: "quotes",      label: "Quotes",         description: "Customers can view and accept quotes" },
   { key: "documents",   label: "Documents",      description: "Customers can access shared files" },
-  { key: "scheduling",  label: "Self-Schedule",  description: "Customers can request and schedule service visits" },
+  { key: "scheduling",  label: "Service Requests",  description: "Customers can request service; staff confirms scheduling" },
   { key: "payments",    label: "Online Payments",description: "Customers can pay invoices directly from the portal" },
 ]
 

@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ClipboardList, Search } from "lucide-react"
+import { CalendarClock, CheckCircle2, ClipboardList, Clock3, Search, Wrench } from "lucide-react"
 
 type Wo = {
   id: string
   display: string
   title: string
   statusLabel: string
+  appointmentGroup: "upcoming" | "in_progress" | "completed" | "all"
+  isAppointment: boolean
   typeLabel: string
   priority: string
   scheduledOn: string | null
@@ -20,8 +22,11 @@ type Wo = {
   scheduledTime: string | null
   completedAt: string | null
   equipmentName: string
+  locationLabel: string | null
   technicianName: string | null
 }
+
+type Filter = "upcoming" | "in_progress" | "completed" | "all"
 
 function fmtDate(d: string | null) {
   if (!d) return "—"
@@ -46,6 +51,8 @@ function fmtTime(hhmm: string | null) {
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; text: string }> = {
     Open: { bg: "var(--portal-accent-muted)", text: "var(--portal-accent-text)" },
+    "Pending confirmation": { bg: "var(--portal-warning-muted)", text: "var(--portal-warning)" },
+    Canceled: { bg: "var(--portal-danger-muted)", text: "var(--portal-danger)" },
     Scheduled: { bg: "#f0fdf4", text: "#15803d" },
     "In Progress": { bg: "#fff7ed", text: "#c2410c" },
     Completed: { bg: "var(--portal-success-muted)", text: "var(--portal-success)" },
@@ -60,10 +67,52 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+function whenLabel(wo: Wo): string {
+  if (wo.appointmentGroup === "completed") return wo.completedAt ? fmtDate(wo.completedAt.slice(0, 10)) : fmtDate(wo.scheduledOn)
+  const time = fmtTime(wo.scheduledTime)
+  return `${fmtDate(wo.scheduledOn)}${time ? ` at ${time}` : ""}`
+}
+
+function ServiceCard({ wo }: { wo: Wo }) {
+  const Icon = wo.appointmentGroup === "completed" ? CheckCircle2 : wo.appointmentGroup === "in_progress" ? Wrench : CalendarClock
+  return (
+    <div className="portal-card p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--portal-accent-muted)" }}>
+          <Icon size={17} style={{ color: "var(--portal-accent)" }} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--portal-foreground)" }}>{wo.title}</p>
+            <StatusBadge status={wo.statusLabel} />
+          </div>
+          <p className="mt-1 text-xs font-medium" style={{ color: "var(--portal-secondary)" }}>
+            {whenLabel(wo)}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--portal-nav-text)" }}>
+            {[wo.display, wo.equipmentName, wo.locationLabel, wo.technicianName ? `Technician: ${wo.technicianName}` : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/portal/documents" className="inline-flex items-center rounded-md border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-accent)" }}>
+              Documents
+            </Link>
+            <Link href="/portal/certificates" className="inline-flex items-center rounded-md border px-2.5 py-1.5 text-xs font-medium" style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-nav-text)" }}>
+              Certificates
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PortalWorkOrdersPage() {
   const [items, setItems] = useState<Wo[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
+  const [filter, setFilter] = useState<Filter>("upcoming")
 
   useEffect(() => {
     fetch("/api/portal/work-orders")
@@ -74,22 +123,43 @@ export default function PortalWorkOrdersPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return items
     return items.filter((w) => {
+      if (filter !== "all" && w.appointmentGroup !== filter) return false
       const hay = `${w.display} ${w.title} ${w.equipmentName} ${w.technicianName ?? ""}`.toLowerCase()
-      return hay.includes(q)
+      return q ? hay.includes(q) : true
     })
-  }, [items, query])
+  }, [items, query, filter])
+
+  const upcoming = useMemo(
+    () =>
+      items
+        .filter((w) => w.appointmentGroup === "upcoming" && w.isAppointment)
+        .sort((a, b) => `${a.scheduledOn ?? ""} ${a.scheduledTime ?? ""}`.localeCompare(`${b.scheduledOn ?? ""} ${b.scheduledTime ?? ""}`)),
+    [items],
+  )
+  const recentCompleted = useMemo(
+    () =>
+      items
+        .filter((w) => w.appointmentGroup === "completed")
+        .slice(0, 4),
+    [items],
+  )
+  const filters: Array<{ id: Filter; label: string; count: number }> = [
+    { id: "upcoming", label: "Upcoming", count: items.filter((w) => w.appointmentGroup === "upcoming").length },
+    { id: "in_progress", label: "In progress", count: items.filter((w) => w.appointmentGroup === "in_progress").length },
+    { id: "completed", label: "Completed", count: items.filter((w) => w.appointmentGroup === "completed").length },
+    { id: "all", label: "All", count: items.length },
+  ]
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: "var(--portal-foreground)" }}>
-            Work Orders
+            Service visits
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
-            Service activity across your locations.
+            Upcoming appointments and service history across your locations.
           </p>
         </div>
         <div className="relative max-w-xs w-full">
@@ -104,11 +174,58 @@ export default function PortalWorkOrdersPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarClock size={15} style={{ color: "var(--portal-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>Upcoming service visits</h2>
+          </div>
+          {loading ? (
+            <p className="portal-card p-4 text-sm" style={{ color: "var(--portal-nav-text)" }}>Loading appointments…</p>
+          ) : upcoming.length === 0 ? (
+            <p className="portal-card p-4 text-sm" style={{ color: "var(--portal-nav-text)" }}>No upcoming scheduled visits.</p>
+          ) : (
+            <div className="space-y-3">{upcoming.slice(0, 3).map((wo) => <ServiceCard key={wo.id} wo={wo} />)}</div>
+          )}
+        </section>
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock3 size={15} style={{ color: "var(--portal-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>Recent service activity</h2>
+          </div>
+          {loading ? (
+            <p className="portal-card p-4 text-sm" style={{ color: "var(--portal-nav-text)" }}>Loading service history…</p>
+          ) : recentCompleted.length === 0 ? (
+            <p className="portal-card p-4 text-sm" style={{ color: "var(--portal-nav-text)" }}>No completed service visits yet.</p>
+          ) : (
+            <div className="space-y-3">{recentCompleted.map((wo) => <ServiceCard key={wo.id} wo={wo} />)}</div>
+          )}
+        </section>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {filters.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setFilter(f.id)}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium"
+            style={{
+              borderColor: filter === f.id ? "var(--portal-accent)" : "var(--portal-border-light)",
+              background: filter === f.id ? "var(--portal-accent-muted)" : "transparent",
+              color: filter === f.id ? "var(--portal-accent-text)" : "var(--portal-nav-text)",
+            }}
+          >
+            {f.label} · {f.count}
+          </button>
+        ))}
+      </div>
+
       <div className="portal-card overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--portal-border-light)" }}>
           <ClipboardList size={16} style={{ color: "var(--portal-accent)" }} />
           <span className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
-            All work orders
+            {filters.find((f) => f.id === filter)?.label ?? "All"} service records
           </span>
         </div>
         {loading && <p className="p-6 text-sm" style={{ color: "var(--portal-nav-text)" }}>Loading…</p>}
@@ -125,7 +242,7 @@ export default function PortalWorkOrdersPage() {
                   <th className="px-4 py-2.5 font-medium">Work order</th>
                   <th className="px-4 py-2.5 font-medium">Equipment</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Scheduled</th>
+                  <th className="px-4 py-2.5 font-medium">Appointment / service date</th>
                   <th className="px-4 py-2.5 font-medium">Technician</th>
                 </tr>
               </thead>
@@ -142,6 +259,9 @@ export default function PortalWorkOrdersPage() {
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--portal-foreground)" }}>
                       {wo.equipmentName}
+                      {wo.locationLabel ? (
+                        <p className="mt-0.5 text-[11px]" style={{ color: "var(--portal-nav-text)" }}>{wo.locationLabel}</p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={wo.statusLabel} />
@@ -174,7 +294,7 @@ export default function PortalWorkOrdersPage() {
       </div>
 
       <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
-        Need help? <Link href="/portal/request-repair" style={{ color: "var(--portal-accent)" }} className="font-medium">Submit a service request</Link>.
+        Need a new visit? <Link href="/portal/request-repair" style={{ color: "var(--portal-accent)" }} className="font-medium">Submit a service request</Link>. Your service provider will confirm scheduling.
       </p>
     </div>
   )

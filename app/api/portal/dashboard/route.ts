@@ -17,6 +17,18 @@ function fmtCurrency(cents: number) {
   )
 }
 
+function customerWorkOrderStatus(status: string, scheduledOn: string | null): string {
+  if (status === "canceled" || status === "cancelled") return "Canceled"
+  if (status === "in_progress") return "In progress"
+  if (status === "completed" || status === "completed_pending_signature" || status === "invoiced") return "Completed"
+  if (scheduledOn) return "Scheduled"
+  return "Pending confirmation"
+}
+
+function timeLabel(raw: unknown): string | null {
+  return typeof raw === "string" && raw.length >= 5 ? raw.slice(0, 5) : null
+}
+
 export async function GET() {
   const ctx = await requirePortalSession()
   if (ctx instanceof NextResponse) return ctx
@@ -209,6 +221,66 @@ export async function GET() {
     intervalLabel: `${p.interval_value} ${p.interval_unit}`,
   }))
 
+  const today = new Date().toISOString().slice(0, 10)
+  const [{ data: nextAppointmentRows }, { data: recentCompletedRows }] = await Promise.all([
+    svc
+      .from("work_orders")
+      .select("id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, equipment_id")
+      .eq("organization_id", orgId)
+      .eq("customer_id", custId)
+      .eq("is_archived", false)
+      .not("scheduled_on", "is", null)
+      .gte("scheduled_on", today)
+      .not("status", "in", "(completed,completed_pending_signature,invoiced,canceled,cancelled)")
+      .order("scheduled_on", { ascending: true })
+      .limit(1),
+    svc
+      .from("work_orders")
+      .select("id, work_order_number, title, status, completed_at, scheduled_on, equipment_id")
+      .eq("organization_id", orgId)
+      .eq("customer_id", custId)
+      .eq("is_archived", false)
+      .in("status", ["completed", "completed_pending_signature", "invoiced"])
+      .order("completed_at", { ascending: false, nullsFirst: false })
+      .limit(1),
+  ])
+
+  const appointmentRows = [...(nextAppointmentRows ?? []), ...(recentCompletedRows ?? [])]
+  const appointmentEquipIds = [...new Set(appointmentRows.map((w) => w.equipment_id).filter(Boolean))] as string[]
+  const appointmentUserIds = [...new Set((nextAppointmentRows ?? []).map((w) => w.assigned_user_id).filter(Boolean))] as string[]
+  const appointmentTechIds = [...new Set((nextAppointmentRows ?? []).map((w) => w.assigned_technician_id).filter(Boolean))] as string[]
+  let appointmentEquipMap = new Map<string, { name: string; location: string | null }>()
+  let appointmentUserMap = new Map<string, string>()
+  let appointmentTechMap = new Map<string, string>()
+  if (appointmentEquipIds.length > 0) {
+    const { data: eqs } = await svc
+      .from("equipment")
+      .select("id, name, location_label")
+      .eq("organization_id", orgId)
+      .in("id", appointmentEquipIds)
+    appointmentEquipMap = new Map(
+      (eqs ?? []).map((e) => [
+        e.id as string,
+        { name: (e.name as string) ?? "Equipment", location: (e.location_label as string | null) ?? null },
+      ]),
+    )
+  }
+  if (appointmentUserIds.length > 0) {
+    const { data: users } = await svc.from("profiles").select("id, full_name").in("id", appointmentUserIds)
+    appointmentUserMap = new Map((users ?? []).map((u) => [u.id as string, (u.full_name as string) ?? ""]))
+  }
+  if (appointmentTechIds.length > 0) {
+    const { data: techs } = await svc
+      .from("technicians")
+      .select("id, full_name")
+      .eq("organization_id", orgId)
+      .in("id", appointmentTechIds)
+    appointmentTechMap = new Map((techs ?? []).map((t) => [t.id as string, (t.full_name as string) ?? ""]))
+  }
+
+  const nextAppointment = (nextAppointmentRows ?? [])[0]
+  const recentCompleted = (recentCompletedRows ?? [])[0]
+
   return NextResponse.json({
     stats: {
       equipmentTotal: eqCountRes.count ?? 0,
@@ -243,6 +315,41 @@ export async function GET() {
           planName: nextPlan.name as string,
           equipmentName: nextPlanEquipName ?? "Equipment",
           nextDueDate: nextPlan.next_due_date as string | null,
+        }
+      : null,
+    nextAppointment: nextAppointment
+      ? {
+          id: nextAppointment.id as string,
+          display: getWorkOrderDisplay({
+            id: nextAppointment.id as string,
+            workOrderNumber: nextAppointment.work_order_number as number | null,
+          }),
+          title: nextAppointment.title as string,
+          statusLabel: customerWorkOrderStatus(nextAppointment.status as string, nextAppointment.scheduled_on as string | null),
+          scheduledOn: nextAppointment.scheduled_on as string | null,
+          scheduledTime: timeLabel(nextAppointment.scheduled_time),
+          equipmentName: appointmentEquipMap.get(nextAppointment.equipment_id as string)?.name ?? "Equipment",
+          locationLabel: appointmentEquipMap.get(nextAppointment.equipment_id as string)?.location ?? null,
+          technicianName:
+            nextAppointment.assigned_technician_id && appointmentTechMap.get(nextAppointment.assigned_technician_id as string)
+              ? appointmentTechMap.get(nextAppointment.assigned_technician_id as string) ?? null
+              : nextAppointment.assigned_user_id
+                ? appointmentUserMap.get(nextAppointment.assigned_user_id as string) ?? null
+                : null,
+        }
+      : null,
+    recentCompletedService: recentCompleted
+      ? {
+          id: recentCompleted.id as string,
+          display: getWorkOrderDisplay({
+            id: recentCompleted.id as string,
+            workOrderNumber: recentCompleted.work_order_number as number | null,
+          }),
+          title: recentCompleted.title as string,
+          statusLabel: customerWorkOrderStatus(recentCompleted.status as string, recentCompleted.scheduled_on as string | null),
+          completedAt: recentCompleted.completed_at as string | null,
+          equipmentName: appointmentEquipMap.get(recentCompleted.equipment_id as string)?.name ?? "Equipment",
+          locationLabel: appointmentEquipMap.get(recentCompleted.equipment_id as string)?.location ?? null,
         }
       : null,
     formatters: {

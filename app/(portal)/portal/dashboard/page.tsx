@@ -65,6 +65,26 @@ type DashboardPayload = {
     equipmentName: string
     nextDueDate: string | null
   } | null
+  nextAppointment: {
+    id: string
+    display: string
+    title: string
+    statusLabel: string
+    scheduledOn: string | null
+    scheduledTime: string | null
+    equipmentName: string
+    locationLabel: string | null
+    technicianName: string | null
+  } | null
+  recentCompletedService: {
+    id: string
+    display: string
+    title: string
+    statusLabel: string
+    completedAt: string | null
+    equipmentName: string
+    locationLabel: string | null
+  } | null
   formatters: { currency: { outstandingLabel: string } }
 }
 
@@ -92,6 +112,16 @@ function fmtCurrency(cents: number) {
 function daysUntil(dateStr: string | null | undefined) {
   if (!dateStr) return null
   return Math.round((new Date(dateStr).getTime() - Date.now()) / 86_400_000)
+}
+
+function fmtTime(hhmm: string | null | undefined) {
+  if (!hhmm) return null
+  const [h, m] = hhmm.split(":")
+  const hour = Number.parseInt(h ?? "", 10)
+  if (!Number.isFinite(hour)) return null
+  const d = new Date()
+  d.setHours(hour, Number.parseInt(m ?? "0", 10) || 0, 0, 0)
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -243,6 +273,8 @@ export default function PortalDashboardPage() {
   const overdueInvoice = data.alerts.overdueInvoice
   const pendingQuote = data.alerts.pendingQuote
   const activePlan = data.nextScheduledService
+  const nextAppointment = data.nextAppointment
+  const recentCompletedService = data.recentCompletedService
 
   return (
     <div className="space-y-8">
@@ -260,10 +292,86 @@ export default function PortalDashboardPage() {
             <Wrench size={14} />
             Request Repair
           </Link>
-          <Link href="/portal/book-maintenance" className="portal-btn-secondary">
+          <Link href="/portal/work-orders" className="portal-btn-secondary">
             <Calendar size={14} />
-            Book Service
+            View Visits
           </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="portal-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Next Service Visit
+            </h3>
+            <Link href="/portal/work-orders" className="text-xs font-medium" style={{ color: "var(--portal-accent)" }}>
+              View all
+            </Link>
+          </div>
+          {nextAppointment ? (
+            <Link href="/portal/work-orders" className="block rounded-md px-1 py-1 -mx-1 hover:bg-[--portal-surface-2] transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--portal-foreground)" }}>
+                    {nextAppointment.title}
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--portal-nav-text)" }}>
+                    {[nextAppointment.display, nextAppointment.equipmentName, nextAppointment.locationLabel].filter(Boolean).join(" · ")}
+                  </p>
+                  <p className="mt-1 text-xs font-medium" style={{ color: "var(--portal-secondary)" }}>
+                    {fmtDate(nextAppointment.scheduledOn)}
+                    {fmtTime(nextAppointment.scheduledTime) ? ` at ${fmtTime(nextAppointment.scheduledTime)}` : ""}
+                  </p>
+                  {nextAppointment.technicianName ? (
+                    <p className="mt-1 text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
+                      Technician: {nextAppointment.technicianName}
+                    </p>
+                  ) : null}
+                </div>
+                <StatusBadge status={nextAppointment.statusLabel} />
+              </div>
+            </Link>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+              No upcoming scheduled visits.
+            </p>
+          )}
+        </div>
+
+        <div className="portal-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+              Recent Service
+            </h3>
+            <Link href="/portal/work-orders" className="text-xs font-medium" style={{ color: "var(--portal-accent)" }}>
+              Service history
+            </Link>
+          </div>
+          {recentCompletedService ? (
+            <Link href="/portal/work-orders" className="block rounded-md px-1 py-1 -mx-1 hover:bg-[--portal-surface-2] transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--portal-foreground)" }}>
+                    {recentCompletedService.title}
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--portal-nav-text)" }}>
+                    {[recentCompletedService.display, recentCompletedService.equipmentName, recentCompletedService.locationLabel]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <p className="mt-1 text-xs font-medium" style={{ color: "var(--portal-secondary)" }}>
+                    Completed {fmtDate(recentCompletedService.completedAt)}
+                  </p>
+                </div>
+                <StatusBadge status={recentCompletedService.statusLabel} />
+              </div>
+            </Link>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+              No completed service visits yet.
+            </p>
+          )}
         </div>
       </div>
 
@@ -445,7 +553,7 @@ export default function PortalDashboardPage() {
               <div className="flex items-center gap-2 mb-3">
                 <Calendar size={14} style={{ color: "var(--portal-accent)" }} />
                 <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
-                  Next Scheduled Service
+                  Upcoming Maintenance
                 </h3>
               </div>
               <p className="text-sm font-medium" style={{ color: "var(--portal-foreground)" }}>
@@ -565,7 +673,7 @@ export default function PortalDashboardPage() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <QuickAction href="/portal/request-repair" icon={Wrench} label="Request a Repair" description="Submit a service request" />
-          <QuickAction href="/portal/book-maintenance" icon={Calendar} label="Book Maintenance" description="Schedule a visit" />
+          <QuickAction href="/portal/work-orders" icon={Calendar} label="Service Visits" description="View appointments and history" />
           <QuickAction href="/portal/invoices" icon={Receipt} label="Invoices" description="View balances and statements" />
           <QuickAction
             href="/portal/documents"
