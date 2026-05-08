@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T20:46:57.103Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T20:53:41.853Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -100,8 +100,8 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Technicians
 - **Routes:** \`/technicians\`, \`/technicians/today\`, \`/technicians/daily\`
-- **Purpose:** Roster, certifications, field UX.
-- **Status:** Implemented (operational technician table + UI).
+- **Purpose:** Roster, organization-managed skill tags, certifications, field UX.
+- **Status:** Implemented (operational technician table + UI; skill tag options managed in Settings → Team).
 - **Gaps:** Permissions refinements for field-only users.
 
 ### Certificates (calibration)

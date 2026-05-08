@@ -7,13 +7,16 @@ import type { TechSkill, TechStatus } from "@/lib/mock-data"
 import {
   ALL_REGIONS,
   ALL_ROLES,
-  ALL_SKILLS,
   ALL_STATUSES,
 } from "@/lib/technicians/roster-form-constants"
 import {
   queryDrawerOrganizationMember,
   queryDrawerProfile,
 } from "@/lib/technicians/roster-queries"
+import {
+  skillTagOptionNames,
+  type TechnicianSkillTagOption,
+} from "@/lib/technicians/skill-tags"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -301,6 +304,7 @@ export function TechnicianDrawer({
   const [skills, setSkills] = useState<TechSkill[]>([])
   const [availabilityStatus, setAvailabilityStatus] = useState<TechStatus>("Available")
   const [startDate, setStartDate] = useState("")
+  const [skillTagOptions, setSkillTagOptions] = useState<TechnicianSkillTagOption[]>([])
 
   const [editOpen, setEditOpen] = useState(false)
   const [draftName, setDraftName] = useState("")
@@ -467,8 +471,7 @@ export function TechnicianDrawer({
       start_date?: string | null
     }
 
-    const skillAllow = new Set<string>(ALL_SKILLS)
-    const parsedSkills = (tom.skills ?? []).filter((s): s is TechSkill => skillAllow.has(s))
+    const parsedSkills = (tom.skills ?? []).map((s) => s.trim()).filter((s): s is TechSkill => Boolean(s))
     const av = tom.availability_status
     const parsedAvail: TechStatus =
       av === "Available" || av === "On Job" || av === "Off" || av === "Vacation" ? av : "Available"
@@ -493,6 +496,25 @@ export function TechnicianDrawer({
     if (!techId) return
     void reloadTech()
   }, [techId, reloadTech])
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !activeOrgId) {
+      setSkillTagOptions([])
+      return
+    }
+    let active = true
+    void (async () => {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(activeOrgId)}/technician-skill-tags`, {
+        cache: "no-store",
+      })
+      const data = (await res.json().catch(() => ({}))) as { tags?: TechnicianSkillTagOption[] }
+      if (!active || !res.ok) return
+      setSkillTagOptions(data.tags ?? [])
+    })()
+    return () => {
+      active = false
+    }
+  }, [activeOrgId, orgStatus])
 
   useEffect(() => {
     setOpenScheduleWoId(null)
@@ -1024,6 +1046,8 @@ export function TechnicianDrawer({
   function toggleDraftSkill(s: TechSkill) {
     setDraftSkills((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]))
   }
+
+  const editableSkillOptions = skillTagOptionNames(skillTagOptions, draftSkills.length ? draftSkills : skills)
 
   const canEditAvatar = Boolean(
     techId && (viewerIsAdmin || (viewerUserId !== null && techId === viewerUserId)),
@@ -2357,7 +2381,7 @@ export function TechnicianDrawer({
             <div className="space-y-2">
               <Label>Skill Tags</Label>
               <div className="flex flex-wrap gap-2">
-                {ALL_SKILLS.map((s) => (
+                {editableSkillOptions.map((s) => (
                   <button
                     key={s}
                     type="button"

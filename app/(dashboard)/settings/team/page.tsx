@@ -5,7 +5,7 @@ import { useTenant } from "@/lib/tenant-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
   UserPlus, MoreHorizontal, Check, X, Mail, Shield,
-  UserX, RotateCcw, Pencil, Loader2, Camera,
+  UserX, RotateCcw, Pencil, Loader2, Camera, Tags, Archive,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -36,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MEMBERSHIP_ROLES, type MembershipRole } from "@/lib/team/membership"
+import type { TechnicianSkillTagOption } from "@/lib/technicians/skill-tags"
 
 // ─── Role definitions (DB roles) ──────────────────────────────────────────────
 
@@ -168,6 +169,12 @@ export default function TeamPage() {
   const [editStatus, setEditStatus] = useState<"active" | "suspended">("active")
   const [editSaving, setEditSaving] = useState(false)
   const [editAvatarUploading, setEditAvatarUploading] = useState(false)
+  const [skillTags, setSkillTags] = useState<TechnicianSkillTagOption[]>([])
+  const [skillTagsLoading, setSkillTagsLoading] = useState(false)
+  const [skillTagDraft, setSkillTagDraft] = useState("")
+  const [skillTagSaving, setSkillTagSaving] = useState(false)
+  const [editingSkillTagId, setEditingSkillTagId] = useState<string | null>(null)
+  const [editingSkillTagName, setEditingSkillTagName] = useState("")
 
   const loadTeam = useCallback(async () => {
     if (!organizationId) {
@@ -210,6 +217,37 @@ export default function TeamPage() {
     void loadTeam()
   }, [loadTeam])
 
+  const loadSkillTags = useCallback(async () => {
+    if (!organizationId) {
+      setSkillTags([])
+      return
+    }
+    setSkillTagsLoading(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/technician-skill-tags`, {
+        cache: "no-store",
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        tags?: TechnicianSkillTagOption[]
+        message?: string
+      }
+      if (!res.ok) throw new Error(data.message ?? "Could not load skill tags.")
+      setSkillTags(data.tags ?? [])
+    } catch (e) {
+      pushToast({
+        title: "Could not load skill tags",
+        description: e instanceof Error ? e.message : "Request failed.",
+        variant: "destructive",
+      })
+    } finally {
+      setSkillTagsLoading(false)
+    }
+  }, [organizationId])
+
+  useEffect(() => {
+    void loadSkillTags()
+  }, [loadSkillTags])
+
   const seatLimit = plan.seats
   const usedSeats = useMemo(() => members.filter((m) => m.status === "active").length, [members])
   const atLimit = seatLimit !== -1 && usedSeats >= seatLimit
@@ -218,6 +256,7 @@ export default function TeamPage() {
     if (currentUserRole === "owner") return [...MEMBERSHIP_ROLES]
     return MEMBERSHIP_ROLES.filter((r) => r !== "owner")
   }, [currentUserRole])
+  const canManageSkillTags = canManageTeam || currentUserRole === "manager"
 
   const editAvatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -439,6 +478,62 @@ export default function TeamPage() {
       pushToast({ title: "Remove failed", description: "Network error.", variant: "destructive" })
     } finally {
       setRemoveSubmitting(false)
+    }
+  }
+
+  async function addSkillTag() {
+    if (!organizationId) return
+    const name = skillTagDraft.trim()
+    if (!name) return
+    setSkillTagSaving(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/technician-skill-tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, sortOrder: (skillTags.length + 1) * 10 }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) throw new Error(data.message ?? "Could not add skill tag.")
+      setSkillTagDraft("")
+      pushToast({ title: "Skill tag added" })
+      await loadSkillTags()
+    } catch (e) {
+      pushToast({
+        title: "Could not add skill tag",
+        description: e instanceof Error ? e.message : "Request failed.",
+        variant: "destructive",
+      })
+    } finally {
+      setSkillTagSaving(false)
+    }
+  }
+
+  async function patchSkillTag(id: string, body: Record<string, unknown>, successTitle: string) {
+    if (!organizationId) return
+    setSkillTagSaving(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/technician-skill-tags/${encodeURIComponent(id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      )
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) throw new Error(data.message ?? "Could not update skill tag.")
+      pushToast({ title: successTitle })
+      setEditingSkillTagId(null)
+      setEditingSkillTagName("")
+      await loadSkillTags()
+    } catch (e) {
+      pushToast({
+        title: "Could not update skill tag",
+        description: e instanceof Error ? e.message : "Request failed.",
+        variant: "destructive",
+      })
+    } finally {
+      setSkillTagSaving(false)
     }
   }
 
@@ -752,6 +847,128 @@ export default function TeamPage() {
             )}
           </div>
         )}
+      </div>
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Tags className="h-4 w-4 text-primary" />
+              Technician skill tags
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Manage the selectable skill options shown on technician profiles.
+            </p>
+          </div>
+          {canManageSkillTags ? (
+            <div className="flex min-w-0 flex-1 justify-end gap-2 sm:flex-none">
+              <Input
+                value={skillTagDraft}
+                onChange={(e) => setSkillTagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void addSkillTag()
+                }}
+                placeholder="Add skill tag"
+                className="h-9 w-full sm:w-56"
+              />
+              <Button type="button" size="sm" disabled={skillTagSaving || !skillTagDraft.trim()} onClick={() => void addSkillTag()}>
+                {skillTagSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Add
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        <div className="px-6 py-4">
+          {skillTagsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading skill tags…</p>
+          ) : skillTags.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No skill tags yet.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {skillTags.map((tag) => {
+                const editing = editingSkillTagId === tag.id
+                return (
+                  <div
+                    key={tag.id}
+                    className={cn(
+                      "flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2",
+                      !tag.is_active && "bg-muted/40 opacity-70",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      {editing ? (
+                        <Input value={editingSkillTagName} onChange={(e) => setEditingSkillTagName(e.target.value)} className="h-8" autoFocus />
+                      ) : (
+                        <p className="truncate text-sm font-medium text-foreground">{tag.name}</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        {tag.usage_count ?? 0} technician{tag.usage_count === 1 ? "" : "s"}
+                        {!tag.is_active ? " · archived" : ""}
+                      </p>
+                    </div>
+                    {canManageSkillTags ? (
+                      <div className="flex shrink-0 items-center gap-1">
+                        {editing ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={skillTagSaving || !editingSkillTagName.trim()}
+                              onClick={() => void patchSkillTag(tag.id, { name: editingSkillTagName }, "Skill tag renamed")}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => {
+                                setEditingSkillTagId(null)
+                                setEditingSkillTagName("")
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => {
+                                setEditingSkillTagId(tag.id)
+                                setEditingSkillTagName(tag.name)
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() =>
+                                void patchSkillTag(
+                                  tag.id,
+                                  { isActive: !tag.is_active },
+                                  tag.is_active ? "Skill tag archived" : "Skill tag restored",
+                                )
+                              }
+                              title={tag.is_active ? "Archive skill tag" : "Restore skill tag"}
+                            >
+                              {tag.is_active ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <Dialog open={Boolean(editMember)} onOpenChange={(o) => !o && setEditMember(null)}>

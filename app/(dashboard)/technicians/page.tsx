@@ -70,6 +70,10 @@ import {
   queryOrganizationMembersForRoster,
   queryProfilesForRoster,
 } from "@/lib/technicians/roster-queries"
+import {
+  skillTagOptionNames,
+  type TechnicianSkillTagOption,
+} from "@/lib/technicians/skill-tags"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,9 +89,7 @@ function parseTechStatus(s: string | null | undefined): TechStatus {
 }
 
 function normalizeSkills(arr: string[] | null | undefined): TechSkill[] {
-  if (!arr?.length) return []
-  const allowed = new Set<string>(ALL_SKILLS)
-  return arr.filter((x): x is TechSkill => allowed.has(x))
+  return (arr ?? []).map((x) => x.trim()).filter((x): x is TechSkill => Boolean(x))
 }
 
 function formatMemberRole(role: string): string {
@@ -363,14 +365,16 @@ function ConfirmDeleteModal({
 function AddTechModal({
   onClose,
   onInvite,
+  skillOptions,
 }: {
   onClose: () => void
-  onInvite: (input: { fullName: string; email: string; avatarFile: File | null }) => Promise<{
+  onInvite: (input: { fullName: string; email: string; avatarFile: File | null; skills: string[] }) => Promise<{
     ok: boolean
     error?: string
     message?: string
     alreadyMember?: boolean
   }>
+  skillOptions: string[]
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewUrlRef = useRef<string | null>(null)
@@ -425,7 +429,7 @@ function AddTechModal({
     if (!fullName || !email) return
     setLoading(true)
     setFormError(null)
-    const result = await onInvite({ fullName, email, avatarFile })
+    const result = await onInvite({ fullName, email, avatarFile, skills: selectedSkills })
     setLoading(false)
     if (result.ok) {
       onClose()
@@ -570,7 +574,7 @@ function AddTechModal({
           <div className="space-y-2">
             <Label>Skill Tags</Label>
             <div className="flex flex-wrap gap-2">
-              {ALL_SKILLS.map((s) => (
+              {skillOptions.map((s) => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleSkill(s)}
@@ -894,6 +898,7 @@ function TechniciansPageInner() {
   const [rosterRefresh, setRosterRefresh] = useState(0)
   const [dispatchDrawerOpen, setDispatchDrawerOpen] = useState(false)
   const [dispatchInitialTechId, setDispatchInitialTechId] = useState<string | null>(null)
+  const [skillTagOptions, setSkillTagOptions] = useState<TechnicianSkillTagOption[]>([])
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -1076,6 +1081,25 @@ function TechniciansPageInner() {
   }, [rosterRefresh, orgStatus, activeOrgId])
 
   useEffect(() => {
+    if (orgStatus !== "ready" || !activeOrgId) {
+      setSkillTagOptions([])
+      return
+    }
+    let active = true
+    void (async () => {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(activeOrgId)}/technician-skill-tags`, {
+        cache: "no-store",
+      })
+      const data = (await res.json().catch(() => ({}))) as { tags?: TechnicianSkillTagOption[] }
+      if (!active || !res.ok) return
+      setSkillTagOptions(data.tags ?? [])
+    })()
+    return () => {
+      active = false
+    }
+  }, [orgStatus, activeOrgId])
+
+  useEffect(() => {
     const openId = searchParams.get("open")
     if (openId && techs.length > 0) {
       const match = techs.find((t) => t.id === openId)
@@ -1099,7 +1123,7 @@ function TechniciansPageInner() {
   }, [])
 
   const inviteTechnician = useCallback(
-    async (input: { fullName: string; email: string; avatarFile: File | null }) => {
+    async (input: { fullName: string; email: string; avatarFile: File | null; skills: string[] }) => {
       if (!activeOrgId) {
         return { ok: false as const, error: "No organization selected." }
       }
@@ -1129,6 +1153,14 @@ function TechniciansPageInner() {
         }
 
         const userId = typeof data.userId === "string" && data.userId ? data.userId : null
+        if (userId && input.skills.length > 0) {
+          const supabase = createBrowserSupabaseClient()
+          await supabase
+            .from("organization_members")
+            .update({ skills: input.skills, updated_at: new Date().toISOString() })
+            .eq("organization_id", activeOrgId)
+            .eq("user_id", userId)
+        }
         if (input.avatarFile && userId) {
           const fd = new FormData()
           fd.append("file", input.avatarFile)
@@ -1229,6 +1261,11 @@ function TechniciansPageInner() {
       })
   }, [techs, search, statusFilter, skillFilter, regionFilter, kpiFilter, jobsTodaySet])
 
+  const skillFilterOptions = useMemo(
+    () => skillTagOptionNames(skillTagOptions, techs.flatMap((t) => t.skills)),
+    [skillTagOptions, techs],
+  )
+
   function toggleKpi(f: KpiFilter) {
     setKpiFilter((prev) => (prev === f ? null : f))
   }
@@ -1312,7 +1349,7 @@ function TechniciansPageInner() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Skills</SelectItem>
-              {ALL_SKILLS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {skillFilterOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={regionFilter} onValueChange={setRegionFilter}>
@@ -1538,7 +1575,11 @@ function TechniciansPageInner() {
       )}
 
       {addTechOpen && (
-        <AddTechModal onClose={() => setAddTechOpen(false)} onInvite={inviteTechnician} />
+        <AddTechModal
+          onClose={() => setAddTechOpen(false)}
+          onInvite={inviteTechnician}
+          skillOptions={skillTagOptionNames(skillTagOptions, ALL_SKILLS)}
+        />
       )}
 
       <ToastStack toasts={toasts} onRemove={removeToast} />

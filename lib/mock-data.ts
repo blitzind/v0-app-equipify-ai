@@ -2332,32 +2332,7 @@ export const aiSummaryReport: AiSummaryReport = {
 }
 
 export type TechStatus = "Available" | "On Job" | "Off" | "Vacation"
-export type TechSkill =
-  | "HVAC"
-  | "Electrical"
-  | "Calibration"
-  | "Medical Equipment"
-  | "Industrial Repair"
-  | "Installations"
-  | "Refrigeration"
-  | "Hydraulics"
-  | "Welding"
-  | "PLC / Controls"
-  // Audiology
-  | "Audiometers"
-  | "ABR Systems"
-  | "Tympanometers"
-  | "OAE Systems"
-  | "VNG Systems"
-  | "Balance Systems"
-  | "Otoscopes"
-  | "Sound Booths"
-  | "Real Ear Systems"
-  | "Scheduling"
-  | "Customer Communication"
-  | "PM Plans"
-  | "Invoicing"
-  | "Field Service"
+export type TechSkill = string
 
 export interface TechCertification {
   name: string
