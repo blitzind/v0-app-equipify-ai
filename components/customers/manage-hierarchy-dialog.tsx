@@ -21,6 +21,12 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { missingCustomerHierarchyColumns } from "@/lib/customers/postgrest-fallback"
+import {
+  PAYMENT_TERMS_OPTIONS,
+  invoiceTermsCodeLabel,
+  netDaysForTermsCode,
+  type InvoiceTermsCode,
+} from "@/lib/billing/invoice-terms"
 
 type Props = {
   open: boolean
@@ -54,6 +60,14 @@ type Props = {
     defaultPoNumber: string | null
     invoiceInstructions: string | null
     invoiceDeliveryPreference: string | null
+    defaultPaymentTermsKey: string | null
+    defaultPaymentTermsDays: number | null
+    defaultPaymentTermsLabel: string | null
+    taxExempt: boolean
+    taxExemptionId: string | null
+    taxExemptionNotes: string | null
+    defaultTaxBasis: string | null
+    defaultTaxCategory: string | null
   }
 }
 
@@ -92,8 +106,15 @@ export function ManageHierarchyDialog({
   const [poBeforeService, setPoBeforeService] = useState(false)
   const [poBeforeInvoice, setPoBeforeInvoice] = useState(false)
   const [defaultPoNumber, setDefaultPoNumber] = useState("")
+  const [paymentTermsKey, setPaymentTermsKey] = useState<InvoiceTermsCode | "">("")
+  const [paymentTermsDays, setPaymentTermsDays] = useState(30)
   const [invoiceDeliveryPreference, setInvoiceDeliveryPreference] = useState("")
   const [invoiceInstructions, setInvoiceInstructions] = useState("")
+  const [taxExempt, setTaxExempt] = useState(false)
+  const [taxExemptionId, setTaxExemptionId] = useState("")
+  const [taxExemptionNotes, setTaxExemptionNotes] = useState("")
+  const [defaultTaxBasis, setDefaultTaxBasis] = useState("")
+  const [defaultTaxCategory, setDefaultTaxCategory] = useState("")
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,8 +141,16 @@ export function ManageHierarchyDialog({
     setPoBeforeService(initialBilling.poRequiredBeforeService)
     setPoBeforeInvoice(initialBilling.poRequiredBeforeInvoice)
     setDefaultPoNumber(initialBilling.defaultPoNumber ?? "")
+    const nextTerms = (initialBilling.defaultPaymentTermsKey ?? "") as InvoiceTermsCode | ""
+    setPaymentTermsKey(nextTerms)
+    setPaymentTermsDays(initialBilling.defaultPaymentTermsDays ?? netDaysForTermsCode(nextTerms || "net_30"))
     setInvoiceDeliveryPreference(initialBilling.invoiceDeliveryPreference ?? "")
     setInvoiceInstructions(initialBilling.invoiceInstructions ?? "")
+    setTaxExempt(initialBilling.taxExempt)
+    setTaxExemptionId(initialBilling.taxExemptionId ?? "")
+    setTaxExemptionNotes(initialBilling.taxExemptionNotes ?? "")
+    setDefaultTaxBasis(initialBilling.defaultTaxBasis ?? "")
+    setDefaultTaxCategory(initialBilling.defaultTaxCategory ?? "")
     setNotes(initialBilling.notes ?? "")
     setError(null)
   }, [open, initialParent?.id, initialBilling])
@@ -179,8 +208,21 @@ export function ManageHierarchyDialog({
         po_number_required_before_service: poBeforeService,
         po_number_required_before_invoice: poBeforeInvoice,
         default_po_number: defaultPoNumber.trim() || null,
+        default_invoice_terms_code: paymentTermsKey || null,
+        default_payment_terms_key: paymentTermsKey || null,
+        default_payment_terms_days: paymentTermsKey ? netDaysForTermsCode(paymentTermsKey, paymentTermsDays) : null,
+        default_payment_terms_label: paymentTermsKey
+          ? paymentTermsKey === "custom"
+            ? `Custom ${paymentTermsDays} days`
+            : invoiceTermsCodeLabel(paymentTermsKey)
+          : null,
         invoice_delivery_preference: invoiceDeliveryPreference.trim() || null,
         invoice_instructions: invoiceInstructions.trim() || null,
+        tax_exempt: taxExempt,
+        tax_exemption_id: taxExemptionId.trim() || null,
+        tax_exemption_notes: taxExemptionNotes.trim() || null,
+        default_tax_basis: defaultTaxBasis.trim() || null,
+        default_tax_category: defaultTaxCategory.trim() || null,
       }
       if (sameAsService) {
         // When inheriting, clear explicit billing fields so the read remains
@@ -521,7 +563,50 @@ export function ManageHierarchyDialog({
                   <option value="manual">Manual / customer system</option>
                 </select>
               </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-foreground">
+                  Payment terms
+                </label>
+                <select
+                  value={paymentTermsKey}
+                  onChange={(e) => {
+                    const next = e.target.value as InvoiceTermsCode | ""
+                    setPaymentTermsKey(next)
+                    if (next && next !== "custom") setPaymentTermsDays(netDaysForTermsCode(next))
+                  }}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                >
+                  <option value="">Use workspace default</option>
+                  {PAYMENT_TERMS_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {paymentTermsKey === "custom" ? (
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-foreground">
+                    Custom net days
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={paymentTermsDays}
+                    onChange={(e) => setPaymentTermsDays(Number.parseInt(e.target.value, 10) || 1)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+              ) : null}
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              {paymentTermsKey
+                ? paymentTermsKey === "due_on_receipt"
+                  ? "Invoices are due on the issue date."
+                  : `Invoices due ${netDaysForTermsCode(paymentTermsKey, paymentTermsDays)} days after issue date.`
+                : "Invoices use the workspace default terms, falling back to Net 30."}
+            </p>
             <div>
               <label className="mb-1 block text-[11px] font-medium text-foreground">
                 Invoice instructions
@@ -533,6 +618,70 @@ export function ManageHierarchyDialog({
                 placeholder="Include PO on invoice, submit through vendor portal, reference department code, etc."
                 className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
               />
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <span className={SECTION_HEADER}>Tax defaults</span>
+            <label className="flex items-start gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={taxExempt}
+                onChange={(e) => setTaxExempt(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+              />
+              <span>Customer is tax exempt by default</span>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-foreground">
+                  Exemption ID
+                </label>
+                <input
+                  value={taxExemptionId}
+                  onChange={(e) => setTaxExemptionId(e.target.value)}
+                  placeholder="Certificate or account ID"
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-foreground">
+                  Default tax basis
+                </label>
+                <select
+                  value={defaultTaxBasis}
+                  onChange={(e) => setDefaultTaxBasis(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                >
+                  <option value="">Use invoice context</option>
+                  <option value="service_location">Service location</option>
+                  <option value="billing_address">Billing address</option>
+                  <option value="manual">Manual review</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-[11px] font-medium text-foreground">
+                  Tax category
+                </label>
+                <input
+                  value={defaultTaxCategory}
+                  onChange={(e) => setDefaultTaxCategory(e.target.value)}
+                  placeholder="Optional future provider category for US jurisdiction tax"
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-[11px] font-medium text-foreground">
+                  Exemption notes
+                </label>
+                <textarea
+                  value={taxExemptionNotes}
+                  onChange={(e) => setTaxExemptionNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Store exemption notes for internal review. This is not tax-compliance validation."
+                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                />
+              </div>
             </div>
           </section>
 

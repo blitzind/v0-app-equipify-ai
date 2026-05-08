@@ -447,6 +447,10 @@ export async function insertOrgInvoice(
     /** DB terms_code — drives due dates & QB alignment */
     termsCode?: string | null
     termsCustomDays?: number | null
+    paymentTermsKey?: string | null
+    paymentTermsDays?: number | null
+    paymentTermsLabel?: string | null
+    dueDateOverridden?: boolean
     billingCustomerId?: string | null
     billingName?: string | null
     billingContactName?: string | null
@@ -460,6 +464,18 @@ export async function insertOrgInvoice(
     billingCountry?: string | null
     poNumber?: string | null
     invoiceInstructions?: string | null
+    taxCalculationMode?: string | null
+    taxBasis?: string | null
+    taxJurisdictionLabel?: string | null
+    taxRatePercent?: number | null
+    taxAmount?: number | null
+    taxableSubtotal?: number | null
+    nonTaxableSubtotal?: number | null
+    taxExemptionApplied?: boolean | null
+    taxExemptionReason?: string | null
+    taxProvider?: string | null
+    taxProviderReference?: string | null
+    taxSnapshotJson?: unknown
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
@@ -487,6 +503,10 @@ export async function insertOrgInvoice(
   }
   if (payload.termsCode !== undefined) insertRow.terms_code = payload.termsCode
   if (payload.termsCustomDays !== undefined) insertRow.terms_custom_days = payload.termsCustomDays
+  if (payload.paymentTermsKey !== undefined) insertRow.payment_terms_key = payload.paymentTermsKey
+  if (payload.paymentTermsDays !== undefined) insertRow.payment_terms_days = payload.paymentTermsDays
+  if (payload.paymentTermsLabel !== undefined) insertRow.payment_terms_label = payload.paymentTermsLabel?.trim() || null
+  if (payload.dueDateOverridden !== undefined) insertRow.due_date_overridden = payload.dueDateOverridden
   if (payload.billingCustomerId !== undefined) insertRow.billing_customer_id = payload.billingCustomerId
   if (payload.billingName !== undefined) insertRow.billing_name = payload.billingName?.trim() || null
   if (payload.billingContactName !== undefined) insertRow.billing_contact_name = payload.billingContactName?.trim() || null
@@ -500,6 +520,18 @@ export async function insertOrgInvoice(
   if (payload.billingCountry !== undefined) insertRow.billing_country = payload.billingCountry?.trim() || null
   if (payload.poNumber !== undefined) insertRow.po_number = payload.poNumber?.trim() || null
   if (payload.invoiceInstructions !== undefined) insertRow.invoice_instructions = payload.invoiceInstructions?.trim() || null
+  if (payload.taxCalculationMode !== undefined) insertRow.tax_calculation_mode = payload.taxCalculationMode
+  if (payload.taxBasis !== undefined) insertRow.tax_basis = payload.taxBasis
+  if (payload.taxJurisdictionLabel !== undefined) insertRow.tax_jurisdiction_label = payload.taxJurisdictionLabel?.trim() || null
+  if (payload.taxRatePercent !== undefined) insertRow.tax_rate_percent = payload.taxRatePercent
+  if (payload.taxAmount !== undefined) insertRow.tax_amount_cents = payload.taxAmount == null ? null : Math.round(payload.taxAmount * 100)
+  if (payload.taxableSubtotal !== undefined) insertRow.taxable_subtotal_cents = payload.taxableSubtotal == null ? null : Math.round(payload.taxableSubtotal * 100)
+  if (payload.nonTaxableSubtotal !== undefined) insertRow.non_taxable_subtotal_cents = payload.nonTaxableSubtotal == null ? null : Math.round(payload.nonTaxableSubtotal * 100)
+  if (payload.taxExemptionApplied !== undefined) insertRow.tax_exemption_applied = payload.taxExemptionApplied
+  if (payload.taxExemptionReason !== undefined) insertRow.tax_exemption_reason = payload.taxExemptionReason?.trim() || null
+  if (payload.taxProvider !== undefined) insertRow.tax_provider = payload.taxProvider?.trim() || null
+  if (payload.taxProviderReference !== undefined) insertRow.tax_provider_reference = payload.taxProviderReference?.trim() || null
+  if (payload.taxSnapshotJson !== undefined) insertRow.tax_snapshot_json = payload.taxSnapshotJson
 
   const { data, error } = await supabase.from("org_invoices").insert(insertRow).select("id").maybeSingle()
 
@@ -534,6 +566,7 @@ export async function updateOrgInvoice(
     paidAt: string | null
     sentAt: string | null
     dueDate: string
+    dueDateOverridden?: boolean
     notes: string
     lineItems: LineItemJson[]
     amountCents: number
@@ -545,7 +578,10 @@ export async function updateOrgInvoice(
   if (patch.status !== undefined) row.status = invoiceStatusUiToDb(patch.status)
   if (patch.paidAt !== undefined) row.paid_at = patch.paidAt
   if (patch.sentAt !== undefined) row.sent_at = patch.sentAt
-  if (patch.dueDate !== undefined) row.due_date = patch.dueDate || null
+  if (patch.dueDate !== undefined) {
+    row.due_date = patch.dueDate || null
+    row.due_date_overridden = patch.dueDateOverridden ?? true
+  }
   if (patch.notes !== undefined) row.notes = patch.notes?.trim() ? patch.notes.trim() : null
   if (patch.lineItems !== undefined) row.line_items = patch.lineItems
   if (patch.amountCents !== undefined) row.amount_cents = patch.amountCents

@@ -27,6 +27,7 @@ type DocumentKind =
   | "certificate"
   | "work_order_summary"
   | "certificate_attachment"
+  | "attachment"
 
 type Availability =
   | "available"
@@ -84,6 +85,7 @@ const KIND_LABEL: Record<DocumentKind, string> = {
   certificate: "Certificates",
   work_order_summary: "Service summaries",
   certificate_attachment: "Uploaded documents",
+  attachment: "Attached files",
 }
 
 const KIND_ICON: Record<DocumentKind, React.ElementType> = {
@@ -91,6 +93,7 @@ const KIND_ICON: Record<DocumentKind, React.ElementType> = {
   certificate: ShieldCheck,
   work_order_summary: Wrench,
   certificate_attachment: FileText,
+  attachment: FileText,
 }
 
 const KIND_FILTERS: Array<{ id: KindFilter; label: string }> = [
@@ -99,6 +102,7 @@ const KIND_FILTERS: Array<{ id: KindFilter; label: string }> = [
   { id: "certificate", label: "Certificates" },
   { id: "work_order_summary", label: "Service summaries" },
   { id: "certificate_attachment", label: "Uploaded documents" },
+  { id: "attachment", label: "Attached files" },
 ]
 
 function StatusPill({ avail, label }: { avail: Availability; label: string }) {
@@ -389,7 +393,7 @@ export default function PortalDocumentsPage() {
 
       {/* Summary cards */}
       {data ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {(
             [
               ["Invoices", data.countsByKind.invoice ?? 0, Receipt],
@@ -401,7 +405,7 @@ export default function PortalDocumentsPage() {
               ],
               [
                 "Uploaded",
-                data.countsByKind.certificate_attachment ?? 0,
+                (data.countsByKind.certificate_attachment ?? 0) + (data.countsByKind.attachment ?? 0),
                 FileText,
               ],
             ] as const
@@ -730,7 +734,7 @@ export default function PortalDocumentsPage() {
 
       {!loading && !loadError && filtered.length > 0 ? (
         <div className="space-y-6">
-          {(["invoice", "certificate", "work_order_summary", "certificate_attachment"] as DocumentKind[]).map(
+          {(["invoice", "certificate", "work_order_summary", "certificate_attachment", "attachment"] as DocumentKind[]).map(
             (kind) => {
               const list = grouped[kind]
               if (!list || list.length === 0) return null

@@ -34,6 +34,7 @@ export type PortalDocumentKind =
   | "certificate"
   | "work_order_summary"
   | "certificate_attachment"
+  | "attachment"
 
 export type PortalDocumentAvailability =
   | "available"
@@ -119,6 +120,7 @@ const EMPTY_KIND_COUNTS: Record<PortalDocumentKind, number> = {
   certificate: 0,
   work_order_summary: 0,
   certificate_attachment: 0,
+  attachment: 0,
 }
 
 const EMPTY_AVAIL_COUNTS: Record<PortalDocumentAvailability, number> = {
@@ -276,6 +278,7 @@ export async function buildPortalDocuments(
 
   const equipmentLabelById = new Map<string, string>()
   const locationLabelById = new Map<string, string | null>()
+  const equipmentCustomerById = new Map<string, string | null>()
 
   // ─── Invoices ────────────────────────────────────────────────────────────
   const { data: invRows, error: invErr } = await svc
@@ -319,16 +322,18 @@ export async function buildPortalDocuments(
   if (equipIds.size > 0) {
     const { data: eqs } = await svc
       .from("equipment")
-      .select("id, name, location_label")
+      .select("id, name, location_label, customer_id")
       .eq("organization_id", organizationId)
       .in("id", [...equipIds])
     for (const e of (eqs ?? []) as Array<{
       id: string
       name: string | null
       location_label: string | null
+      customer_id: string | null
     }>) {
       equipmentLabelById.set(e.id, (e.name ?? "").trim() || "Equipment")
       locationLabelById.set(e.id, (e.location_label ?? null) || null)
+      equipmentCustomerById.set(e.id, e.customer_id ?? null)
     }
   }
 
@@ -339,6 +344,7 @@ export async function buildPortalDocuments(
     string,
     { number: string | null; statusLabel: string; status: string }
   >()
+  const invoiceCustomerById = new Map<string, string | null>()
 
   for (const r of (invRows ?? []) as Array<{
     id: string
@@ -357,6 +363,7 @@ export async function buildPortalDocuments(
     const statusLabel = mapInvoiceStatus(r.status)
     const number = r.invoice_number?.trim() || null
     invoiceCtxById.set(r.id, { number, statusLabel, status: r.status })
+    invoiceCustomerById.set(r.id, r.customer_id ?? null)
     items.push({
       key: `invoice:${r.id}`,
       kind: "invoice",
@@ -661,6 +668,100 @@ export async function buildPortalDocuments(
         })
       }
     }
+  }
+
+  // ─── Unified portal-visible attachments ─────────────────────────────────
+  // These are explicitly released rows from the unified attachment registry.
+  // The download endpoint still re-checks portal scope and release status and
+  // returns only a short-lived signed URL.
+  try {
+    const relatedIds = [
+      ...customerIds,
+      ...(invRows ?? []).map((r) => (r as { id: string }).id),
+      ...(woRows ?? []).map((r) => (r as { id: string }).id),
+      ...equipmentCustomerById.keys(),
+    ]
+    const { data: docRows } = await svc
+      .from("org_document_attachments")
+      .select("id, attachment_type, file_name, mime_type, file_size_bytes, uploaded_at, related_entity_type, related_entity_id")
+      .eq("organization_id", organizationId)
+      .eq("portal_visible", true)
+      .eq("portal_release_status", "released")
+      .is("deleted_at", null)
+      .in("related_entity_id", [...new Set(relatedIds)])
+      .limit(300)
+
+    for (const row of (docRows ?? []) as Array<{
+      id: string
+      attachment_type: string
+      file_name: string
+      mime_type: string
+      file_size_bytes: number | null
+      uploaded_at: string
+      related_entity_type: string
+      related_entity_id: string
+    }>) {
+      const customerId =
+        row.related_entity_type === "customer"
+          ? row.related_entity_id
+          : row.related_entity_type === "invoice"
+            ? invoiceCustomerById.get(row.related_entity_id) ?? null
+            : row.related_entity_type === "work_order"
+              ? woCustomerById.get(row.related_entity_id) ?? null
+              : row.related_entity_type === "equipment"
+                ? equipmentCustomerById.get(row.related_entity_id) ?? null
+                : null
+      if (!customerId || !customerIds.includes(customerId)) continue
+
+      const equipmentLabel =
+        row.related_entity_type === "equipment"
+          ? equipmentLabelById.get(row.related_entity_id) ?? null
+          : null
+      const locationLabel =
+        row.related_entity_type === "equipment"
+          ? locationLabelById.get(row.related_entity_id) ?? null
+          : null
+      const invCtx =
+        row.related_entity_type === "invoice"
+          ? invoiceCtxById.get(row.related_entity_id) ?? null
+          : null
+      const woDisplay =
+        row.related_entity_type === "work_order"
+          ? getWorkOrderDisplay({ id: row.related_entity_id, workOrderNumber: null })
+          : null
+
+      items.push({
+        key: `attachment:${row.id}`,
+        kind: "attachment",
+        title: row.file_name?.trim() || "Attached document",
+        subtitle:
+          row.attachment_type === "external_certificate"
+            ? "Uploaded external certificate"
+            : "Attached document",
+        occurredAt: row.uploaded_at,
+        equipmentLabel,
+        locationLabel,
+        availability: "available",
+        availabilityReason: "Released by your service provider.",
+        blockedByInvoice: null,
+        viewPath:
+          row.related_entity_type === "invoice"
+            ? `/portal/invoices/${row.related_entity_id}`
+            : row.related_entity_type === "work_order"
+              ? "/portal/work-orders"
+              : "/portal/documents",
+        downloadPath: `/api/portal/attachments/${row.id}/download`,
+        statusLabel: "Available",
+        accountLabel: chipFor(customerId),
+        meta: {
+          invoiceNumber: invCtx?.number ?? null,
+          workOrderNumber: null,
+          workOrderDisplay: woDisplay,
+        },
+      })
+    }
+  } catch {
+    // Schema-drift safe: the unified attachment registry may not exist yet.
   }
 
   // ─── Final sort: newest first by occurredAt ─────────────────────────────

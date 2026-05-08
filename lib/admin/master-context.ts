@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T18:07:13.845Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T18:54:19.488Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -262,7 +262,7 @@ Roadmap informed by product direction (keep sequencing flexible):
 - **Parent/child** customer hierarchy
 - **Service-to-invoice** linkage hardening
 - Automatic **terms-based due dates**
-- **California / location-based tax** logic
+- **US jurisdiction / location-based tax** logic
 - **Equipment history** and **equipment-type reporting**
 - **Certificate attachments** and customer **release rules**
 - **Technician signature** handling

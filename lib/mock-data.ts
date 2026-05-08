@@ -1573,6 +1573,11 @@ export interface AdminQuote {
     qty: number
     unit: number
     source_ref?: string
+    taxable?: boolean
+    tax_category?: string
+    tax_rate_percent?: number
+    tax_amount?: number
+    tax_snapshot_json?: unknown
     catalog_item_id?: string
     sku?: string
     item_type?: string
@@ -1781,6 +1786,10 @@ export interface AdminInvoice {
   termsCode?: string | null
   /** When terms_code is custom */
   termsCustomDays?: number | null
+  paymentTermsKey?: string | null
+  paymentTermsDays?: number | null
+  paymentTermsLabel?: string | null
+  dueDateOverridden?: boolean
   /** org_invoices.portal_certificate_release_override — portal certificate policy only. */
   portalCertificateReleaseOverride?: string | null
   billingCustomerId?: string | null
@@ -1796,6 +1805,18 @@ export interface AdminInvoice {
   billingCountry?: string | null
   poNumber?: string | null
   invoiceInstructions?: string | null
+  taxCalculationMode?: string | null
+  taxBasis?: string | null
+  taxJurisdictionLabel?: string | null
+  taxRatePercent?: number | null
+  taxAmount?: number | null
+  taxableSubtotal?: number | null
+  nonTaxableSubtotal?: number | null
+  taxExemptionApplied?: boolean | null
+  taxExemptionReason?: string | null
+  taxProvider?: string | null
+  taxProviderReference?: string | null
+  taxSnapshotJson?: unknown
 }
 
 export const adminInvoices: AdminInvoice[] = [

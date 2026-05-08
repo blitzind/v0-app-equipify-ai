@@ -26,6 +26,7 @@ import {
   PAYMENT_TERMS_OPTIONS,
   computeDueDateYmd,
   invoiceTermsCodeLabel,
+  netDaysForTermsCode,
   resolveEffectiveTermsCode,
   type InvoiceTermsCode,
 } from "@/lib/billing/invoice-terms"
@@ -33,6 +34,13 @@ import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
+import {
+  calculateManualTaxAmount,
+  calculateTaxSubtotals,
+  formatTaxBasisLabel,
+  type TaxBasis,
+  type TaxCalculationMode,
+} from "@/lib/billing/tax-framework"
 
 function quoteOptionLabel(q: AdminQuote) {
   const num = q.quoteNumber?.trim()
@@ -115,6 +123,8 @@ interface LineItem {
   qty: string
   unit: string
   sourceRef?: string
+  taxable?: boolean
+  taxCategory?: string
   catalogItemId?: string
   skuSnapshot?: string
   itemTypeSnapshot?: string
@@ -205,9 +215,16 @@ export function NewInvoiceModal({
   const [title, setTitle] = useState("")
   const [lineItems, setLineItems] = useState<LineItem[]>([newLineItem()])
   const [discount, setDiscount] = useState("")
-  const [tax, setTax] = useState("")
+  const [taxCalculationMode, setTaxCalculationMode] = useState<TaxCalculationMode>("manual")
+  const [taxBasis, setTaxBasis] = useState<TaxBasis>("billing_address")
+  const [taxJurisdictionLabel, setTaxJurisdictionLabel] = useState("")
+  const [taxRatePercent, setTaxRatePercent] = useState("")
+  const [taxAmountOverride, setTaxAmountOverride] = useState("")
+  const [taxExemptionApplied, setTaxExemptionApplied] = useState(false)
+  const [taxExemptionReason, setTaxExemptionReason] = useState("")
   const [issuedAt, setIssuedAt] = useState("")
   const [dueDate, setDueDate] = useState("")
+  const [dueDateOverridden, setDueDateOverridden] = useState(false)
   const [termsCode, setTermsCode] = useState<InvoiceTermsCode>("net_30")
   const [termsCustomDays, setTermsCustomDays] = useState(30)
   /** Whether the user manually edited the terms (so we don't override on customer change). */
@@ -264,6 +281,7 @@ export function NewInvoiceModal({
       setTermsCode("net_30")
       setTermsCustomDays(30)
       setTermsManuallySet(false)
+      setDueDateOverridden(false)
       setLinkedCertCount(null)
       setLinkedCertReleasedCount(null)
       setCustomerTermsDefault(null)
@@ -277,7 +295,13 @@ export function NewInvoiceModal({
         setTitle("")
         setLineItems([newLineItem()])
         setDiscount("")
-        setTax("")
+        setTaxCalculationMode("manual")
+        setTaxBasis("billing_address")
+        setTaxJurisdictionLabel("")
+        setTaxRatePercent("")
+        setTaxAmountOverride("")
+        setTaxExemptionApplied(false)
+        setTaxExemptionReason("")
         setNotes("")
         setInternalNotes("")
         setPoNumber("")
@@ -311,8 +335,9 @@ export function NewInvoiceModal({
 
   useEffect(() => {
     if (!open || !issuedAt) return
+    if (dueDateOverridden) return
     setDueDate(computeDueDateYmd(issuedAt, termsCode, termsCustomDays))
-  }, [open, issuedAt, termsCode, termsCustomDays])
+  }, [open, issuedAt, termsCode, termsCustomDays, dueDateOverridden])
 
   useEffect(() => {
     if (!open) return
@@ -429,6 +454,14 @@ export function NewInvoiceModal({
       const equipmentData = equipmentRes.data as { location_label?: string | null } | null
       const billing = profileRes as CustomerBillingProfile | null
       if (billing?.defaultPoNumber) setPoNumber((prev) => prev || billing.defaultPoNumber || "")
+      if (billing?.taxExempt) {
+        setTaxExemptionApplied(true)
+        setTaxCalculationMode("exempt")
+        setTaxExemptionReason(billing.taxExemptionNotes || billing.taxExemptionId || "Customer marked tax exempt")
+      }
+      const locationLabel = equipmentData?.location_label?.trim() || null
+      setTaxBasis("service_location")
+      if (locationLabel) setTaxJurisdictionLabel(locationLabel)
       const repairLog = parseRepairLog(row.repair_log)
       const pricedLines = (lineRes.data ?? []) as Array<{
         id: string
@@ -472,7 +505,7 @@ export function NewInvoiceModal({
         title: row.title.trim() || "Service visit",
         serviceDate,
         technicianName,
-        locationLabel: equipmentData?.location_label?.trim() || null,
+        locationLabel,
         hadPricedItems: generated.some((li) => (parseFloat(li.unit) || 0) > 0),
       })
     })()
@@ -578,6 +611,21 @@ export function NewInvoiceModal({
       setCustomerHierarchy(summary)
       setBillingProfile(profile)
       if (profile?.defaultPoNumber) setPoNumber((prev) => prev || profile.defaultPoNumber || "")
+      if (profile?.taxExempt) {
+        setTaxExemptionApplied(true)
+        setTaxCalculationMode("exempt")
+        setTaxExemptionReason(profile.taxExemptionNotes || profile.taxExemptionId || "Customer marked tax exempt")
+      } else {
+        setTaxExemptionApplied(false)
+        setTaxCalculationMode("manual")
+      }
+      if (
+        profile?.defaultTaxBasis === "service_location" ||
+        profile?.defaultTaxBasis === "billing_address" ||
+        profile?.defaultTaxBasis === "manual"
+      ) {
+        setTaxBasis(profile.defaultTaxBasis)
+      }
     })()
     return () => {
       cancelled = true
@@ -620,18 +668,21 @@ export function NewInvoiceModal({
       }
 
       if (cancelled) return
-      setCustomerTermsDefault(custCode)
+      const profileCode = billingProfile?.defaultPaymentTermsKey ?? null
+      const profileDays = billingProfile?.defaultPaymentTermsDays ?? null
+      setCustomerTermsDefault(profileCode ?? custCode)
       setOrgTermsDefault(orgCode)
 
       if (!termsManuallySet) {
-        const next = resolveEffectiveTermsCode({ customerCode: custCode, organizationCode: orgCode })
-        if (next !== "custom") setTermsCode(next)
+        const next = resolveEffectiveTermsCode({ customerCode: profileCode ?? custCode, organizationCode: orgCode })
+        setTermsCode(next)
+        if (next === "custom" && profileDays && profileDays > 0) setTermsCustomDays(profileDays)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [open, organizationId, customerId, termsManuallySet])
+  }, [open, organizationId, customerId, termsManuallySet, billingProfile?.defaultPaymentTermsKey, billingProfile?.defaultPaymentTermsDays])
 
   // Invoicing Phase 2: surface certificate availability for the selected work
   // order so staff know how many certificates are on the linked job and how
@@ -705,10 +756,18 @@ export function NewInvoiceModal({
     return sum + qty * unit
   }, 0)
   const discountAmt = discount ? subtotal * (parseFloat(discount) / 100) : 0
-  const taxAmt = tax ? (subtotal - discountAmt) * (parseFloat(tax) / 100) : 0
+  const taxSubtotals = calculateTaxSubtotals(
+    lineItems.map((li) => ({ qty: parseFloat(li.qty) || 0, unit: parseFloat(li.unit) || 0, taxable: li.taxable })),
+  )
+  const taxableSubtotalAfterDiscount = Math.max(0, taxSubtotals.taxableSubtotal - discountAmt)
+  const calculatedTaxAmt =
+    taxCalculationMode === "exempt" || taxExemptionApplied
+      ? 0
+      : calculateManualTaxAmount(taxableSubtotalAfterDiscount, parseFloat(taxRatePercent) || 0)
+  const taxAmt = taxAmountOverride.trim() ? Math.max(0, parseFloat(taxAmountOverride) || 0) : calculatedTaxAmt
   const total = subtotal - discountAmt + taxAmt
 
-  const updateLineItem = useCallback((id: string, field: keyof LineItem, value: string) => {
+  const updateLineItem = useCallback((id: string, field: keyof LineItem, value: string | boolean) => {
     setLineItems((prev) => prev.map((li) => (li.id === id ? { ...li, [field]: value } : li)))
   }, [])
   const addLineItem = useCallback(() => setLineItems((prev) => [...prev, newLineItem()]), [])
@@ -744,6 +803,10 @@ export function NewInvoiceModal({
           qty: number
           unit: number
           source_ref?: string
+          taxable?: boolean
+          tax_category?: string
+          tax_rate_percent?: number
+          tax_amount?: number
           catalog_item_id?: string
           sku?: string
           item_type?: string
@@ -758,6 +821,12 @@ export function NewInvoiceModal({
         if (li.itemTypeSnapshot) row.item_type = li.itemTypeSnapshot
         if (li.unitLabelSnapshot) row.unit_label = li.unitLabelSnapshot
         if (li.sourceRef) row.source_ref = li.sourceRef
+        row.taxable = li.taxable !== false
+        if (li.taxCategory?.trim()) row.tax_category = li.taxCategory.trim()
+        if (taxCalculationMode !== "exempt" && !taxExemptionApplied && row.taxable) {
+          row.tax_rate_percent = parseFloat(taxRatePercent) || 0
+          row.tax_amount = calculateManualTaxAmount(row.qty * row.unit, row.tax_rate_percent)
+        }
         return row
       })
     const { id, error: saveError } = await addInvoiceFromPayload({
@@ -777,6 +846,10 @@ export function NewInvoiceModal({
       internalNotes: internalNotes.trim() ? internalNotes.trim() : null,
       termsCode,
       termsCustomDays: termsCode === "custom" ? termsCustomDays : null,
+      paymentTermsKey: termsCode,
+      paymentTermsDays: netDaysForTermsCode(termsCode, termsCustomDays),
+      paymentTermsLabel: termsCode === "custom" ? `Custom ${termsCustomDays} days` : invoiceTermsCodeLabel(termsCode),
+      dueDateOverridden,
       billingCustomerId: billingProfile?.billingCustomerId ?? null,
       billingName: billingProfile?.billingName ?? null,
       billingContactName: billingProfile?.billingContactName ?? null,
@@ -790,6 +863,23 @@ export function NewInvoiceModal({
       billingCountry: billingProfile?.country ?? null,
       poNumber: poNumber.trim() || null,
       invoiceInstructions: billingProfile?.invoiceInstructions ?? null,
+      taxCalculationMode,
+      taxBasis,
+      taxJurisdictionLabel: taxJurisdictionLabel.trim() || null,
+      taxRatePercent: parseFloat(taxRatePercent) || null,
+      taxAmount: taxAmt,
+      taxableSubtotal: taxableSubtotalAfterDiscount,
+      nonTaxableSubtotal: taxSubtotals.nonTaxableSubtotal,
+      taxExemptionApplied,
+      taxExemptionReason: taxExemptionReason.trim() || null,
+      taxProvider: taxCalculationMode.startsWith("provider_") ? "provider_pending" : null,
+      taxProviderReference: null,
+      taxSnapshotJson: {
+        mode: taxCalculationMode,
+        basis: taxBasis,
+        label: taxCalculationMode === "manual" ? "Manual tax estimate" : null,
+        manualOverride: Boolean(taxAmountOverride.trim()),
+      },
     })
     setSubmitting(false)
     if (saveError) {
@@ -1051,11 +1141,12 @@ export function NewInvoiceModal({
                   </div>
                 ) : null}
 
-                <div className="grid grid-cols-[1fr_60px_90px_80px_32px] gap-2 mb-1.5 px-0.5">
+                <div className="grid grid-cols-[1fr_60px_90px_80px_72px_32px] gap-2 mb-1.5 px-0.5">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground text-center">Qty</span>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Unit Price</span>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground text-right">Total</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground text-center">Taxable</span>
                   <span />
                 </div>
 
@@ -1063,7 +1154,7 @@ export function NewInvoiceModal({
                   {lineItems.map((li) => {
                     const rowTotal = (parseFloat(li.qty) || 0) * (parseFloat(li.unit) || 0)
                     return (
-                      <div key={li.id} className="grid grid-cols-[1fr_60px_90px_80px_32px] gap-2 items-center">
+                      <div key={li.id} className="grid grid-cols-[1fr_60px_90px_80px_72px_32px] gap-2 items-center">
                         <FieldInput
                           value={li.description}
                           onChange={(e) => updateLineItem(li.id, "description", e.target.value)}
@@ -1092,6 +1183,14 @@ export function NewInvoiceModal({
                             <span className="text-muted-foreground/40">—</span>
                           )}
                         </div>
+                        <label className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={li.taxable !== false}
+                            onChange={(e) => updateLineItem(li.id, "taxable", e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-border"
+                          />
+                        </label>
                         <button
                           type="button"
                           onClick={() => removeLineItem(li.id)}
@@ -1133,26 +1232,17 @@ export function NewInvoiceModal({
                       {discountAmt > 0 ? `- ${fmtCurrency(discountAmt)}` : "—"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Tax</span>
-                      <div className="relative w-20">
-                        <FieldInput
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={tax}
-                          onChange={(e) => setTax(e.target.value)}
-                          placeholder="0"
-                          className="pr-5 text-right text-xs py-1"
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground ds-tabular">
-                      {taxAmt > 0 ? `+ ${fmtCurrency(taxAmt)}` : "—"}
-                    </span>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Taxable subtotal</span>
+                    <span className="ds-tabular">{fmtCurrency(taxableSubtotalAfterDiscount)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Non-taxable subtotal</span>
+                    <span className="ds-tabular">{fmtCurrency(taxSubtotals.nonTaxableSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{taxCalculationMode === "manual" ? "Manual tax estimate" : "Tax"}</span>
+                    <span className="ds-tabular">{taxAmt > 0 ? `+ ${fmtCurrency(taxAmt)}` : "—"}</span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold text-foreground border-t border-border pt-2 mt-1">
                     <span>Total</span>
@@ -1172,12 +1262,29 @@ export function NewInvoiceModal({
                   <FieldInput
                     type="date"
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    onChange={(e) => {
+                      setDueDate(e.target.value)
+                      setDueDateOverridden(true)
+                    }}
                     min={issuedAt || undefined}
                   />
                   <FieldError msg={errors.dueDate} />
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    Updates when issue date or payment terms change; you can override manually.
+                    {dueDateOverridden
+                      ? "Manual override is active."
+                      : `Auto-calculated from ${invoiceTermsCodeLabel(termsCode)}.`}
+                    {dueDateOverridden ? (
+                      <button
+                        type="button"
+                        className="ml-1 font-medium text-primary hover:underline"
+                        onClick={() => {
+                          setDueDateOverridden(false)
+                          setDueDate(computeDueDateYmd(issuedAt, termsCode, termsCustomDays))
+                        }}
+                      >
+                        Reset
+                      </button>
+                    ) : null}
                   </p>
                 </div>
               </div>
@@ -1190,6 +1297,7 @@ export function NewInvoiceModal({
                     onChange={(e) => {
                       setTermsCode(e.target.value as InvoiceTermsCode)
                       setTermsManuallySet(true)
+                      setDueDateOverridden(false)
                     }}
                   >
                     {PAYMENT_TERMS_OPTIONS.map((t) => (
@@ -1219,6 +1327,7 @@ export function NewInvoiceModal({
                       onChange={(e) => {
                         setTermsCustomDays(parseInt(e.target.value, 10) || 1)
                         setTermsManuallySet(true)
+                        setDueDateOverridden(false)
                       }}
                     />
                   </div>
@@ -1286,6 +1395,98 @@ export function NewInvoiceModal({
                   ) : null}
                 </div>
               ) : null}
+
+              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Tax</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {taxCalculationMode === "manual"
+                        ? "Manual US jurisdiction-based tax estimate only. No tax provider is being called."
+                        : formatTaxBasisLabel(taxBasis)}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {taxCalculationMode === "exempt" ? "Exempt" : "Manual estimate"}
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Tax mode</Label>
+                    <FieldSelect
+                      value={taxCalculationMode}
+                      onChange={(e) => {
+                        const mode = e.target.value as TaxCalculationMode
+                        setTaxCalculationMode(mode)
+                        setTaxExemptionApplied(mode === "exempt")
+                      }}
+                    >
+                      <option value="manual">Manual tax estimate</option>
+                      <option value="exempt">Tax exempt</option>
+                      <option value="provider_pending">Provider pending</option>
+                    </FieldSelect>
+                  </div>
+                  <div>
+                    <Label>Tax basis</Label>
+                    <FieldSelect value={taxBasis} onChange={(e) => setTaxBasis(e.target.value as TaxBasis)}>
+                      <option value="service_location">Service location</option>
+                      <option value="billing_address">Billing address</option>
+                      <option value="manual">Manual</option>
+                    </FieldSelect>
+                  </div>
+                  <div>
+                    <Label>US tax jurisdiction / basis label</Label>
+                    <FieldInput
+                      value={taxJurisdictionLabel}
+                      onChange={(e) => setTaxJurisdictionLabel(e.target.value)}
+                      placeholder={workOrderPrefill?.locationLabel || "e.g. state/county/city/district"}
+                    />
+                  </div>
+                  <div>
+                    <Label>Manual tax rate</Label>
+                    <div className="relative">
+                      <FieldInput
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.0001"
+                        value={taxRatePercent}
+                        onChange={(e) => setTaxRatePercent(e.target.value)}
+                        disabled={taxCalculationMode === "exempt"}
+                        placeholder="0"
+                        className="pr-6 text-right"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Manual tax amount override</Label>
+                    <FieldInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={taxAmountOverride}
+                      onChange={(e) => setTaxAmountOverride(e.target.value)}
+                      disabled={taxCalculationMode === "exempt"}
+                      placeholder={fmtCurrency(calculatedTaxAmt)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Exemption reason</Label>
+                    <FieldInput
+                      value={taxExemptionReason}
+                      onChange={(e) => setTaxExemptionReason(e.target.value)}
+                      placeholder="Certificate ID or reason"
+                    />
+                  </div>
+                </div>
+                {taxBasis !== "service_location" && !workOrderPrefill?.locationLabel ? (
+                  <div className="flex items-start gap-2 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                    <span>No service location was found for this invoice, so jurisdiction-based tax basis may need manual review.</span>
+                  </div>
+                ) : null}
+              </div>
 
               <div>
                 <Label>Notes</Label>

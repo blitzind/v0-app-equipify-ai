@@ -45,7 +45,9 @@ import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { InvoicePortalCertificatePanel } from "@/components/invoices/invoice-portal-certificate-panel"
 import { InvoiceSourcePanel } from "@/components/invoices/invoice-source-panel"
+import { DocumentAttachmentsPanel } from "@/components/attachments/document-attachments-panel"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
+import { formatTaxBasisLabel, formatTaxModeLabel } from "@/lib/billing/tax-framework"
 import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
@@ -366,8 +368,7 @@ function InvoicePreview({
 }) {
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const subtotal  = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  const taxRate   = 0.0875
-  const taxAmt    = settings.showTax ? subtotal * taxRate : 0
+  const taxAmt    = settings.showTax ? invoice.taxAmount ?? 0 : 0
   const total     = subtotal + taxAmt
   const amountDue = invoice.status === "Paid" ? 0 : total
 
@@ -1081,17 +1082,18 @@ function InfoTab({
             <span className={invoice.status === "Overdue" ? "text-destructive font-semibold" : ""}>{fmtDate(invoice.dueDate)}</span>
           } />
         )}
-        {!editing && invoice.termsCode ? (
+        {!editing && (invoice.paymentTermsKey || invoice.termsCode) ? (
           <Row
             label="Payment Terms"
             value={
               <span className="inline-flex items-center gap-1 text-xs">
                 <Badge variant="outline" className="text-[10px] font-semibold">
-                  {invoiceTermsCodeLabel(invoice.termsCode)}
+                  {invoice.paymentTermsLabel || invoiceTermsCodeLabel(invoice.paymentTermsKey || invoice.termsCode)}
                 </Badge>
-                {invoice.termsCode === "custom" && invoice.termsCustomDays
-                  ? `${invoice.termsCustomDays} days`
+                {(invoice.paymentTermsKey || invoice.termsCode) === "custom" && (invoice.paymentTermsDays || invoice.termsCustomDays)
+                  ? `${invoice.paymentTermsDays || invoice.termsCustomDays} days`
                   : null}
+                {invoice.dueDateOverridden ? " · due date manually overridden" : null}
               </span>
             }
           />
@@ -1128,6 +1130,36 @@ function InfoTab({
                   <p className="rounded-md border border-border bg-muted/20 px-2 py-1 text-muted-foreground">
                     {invoice.invoiceInstructions}
                   </p>
+                ) : null}
+              </div>
+            }
+          />
+        ) : null}
+        {!editing && (invoice.taxCalculationMode || invoice.taxAmount != null || invoice.taxableSubtotal != null) ? (
+          <Row
+            label="Tax"
+            value={
+              <div className="space-y-1 text-xs">
+                <p className="font-medium text-foreground">
+                  {formatTaxModeLabel(invoice.taxCalculationMode)}
+                </p>
+                <p className="text-muted-foreground">
+                  Basis: {formatTaxBasisLabel(invoice.taxBasis)}
+                  {invoice.taxJurisdictionLabel ? ` · ${invoice.taxJurisdictionLabel}` : ""}
+                </p>
+                <p className="text-muted-foreground">
+                  Taxable {fmtCurrency(invoice.taxableSubtotal ?? 0)} · Non-taxable {fmtCurrency(invoice.nonTaxableSubtotal ?? 0)}
+                </p>
+                <p className="text-muted-foreground">
+                  Rate {invoice.taxRatePercent ?? 0}% · Tax {fmtCurrency(invoice.taxAmount ?? 0)}
+                </p>
+                {invoice.taxExemptionApplied ? (
+                  <p className="rounded-md border border-border bg-muted/20 px-2 py-1 text-muted-foreground">
+                    Exemption applied{invoice.taxExemptionReason ? `: ${invoice.taxExemptionReason}` : ""}
+                  </p>
+                ) : null}
+                {invoice.taxProviderReference ? (
+                  <p className="text-muted-foreground">Provider ref: {invoice.taxProviderReference}</p>
                 ) : null}
               </div>
             }
@@ -1189,7 +1221,7 @@ function InfoTab({
 
 function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
   const total   = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  const taxAmt  = total * 0.0875
+  const taxAmt  = invoice.taxAmount ?? 0
   const grandTotal = total + taxAmt
   const isPaid  = invoice.status === "Paid"
 
@@ -1258,6 +1290,13 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
 function FilesTab({ invoice }: { invoice: AdminInvoice }) {
   return (
     <div className="space-y-4">
+      <DocumentAttachmentsPanel
+        entityType="invoice"
+        entityId={invoice.id}
+        title="Invoice attachments"
+        description="Attach certificate PDFs, signed paperwork, service reports, or internal invoice documents."
+        defaultAttachmentType="external_certificate"
+      />
       {invoice.equipmentId ? (
         <CertificatePanel
           equipmentId={invoice.equipmentId}
@@ -1525,6 +1564,7 @@ function ReadOnlyLineItems({
           <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
           <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-10">Qty</th>
           <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Unit</th>
+          <th className="text-center px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Tax</th>
           <th className="text-right px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Total</th>
         </tr>
       </thead>
@@ -1536,6 +1576,9 @@ function ReadOnlyLineItems({
             <td className="px-3 py-2 text-right text-muted-foreground">
               {maskMoney ? "—" : fmtCurrency(item.unit)}
             </td>
+            <td className="px-3 py-2 text-center text-muted-foreground">
+              {item.taxable === false ? "No" : "Yes"}
+            </td>
             <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
               {maskMoney ? "—" : fmtCurrency(item.qty * item.unit)}
             </td>
@@ -1544,7 +1587,7 @@ function ReadOnlyLineItems({
       </tbody>
       <tfoot className="ds-tfoot-bg border-t border-border">
         <tr>
-          <td colSpan={3} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
+          <td colSpan={4} className="px-3 py-2 text-right font-semibold text-foreground text-xs uppercase tracking-wide">Total</td>
           <td className="px-3 py-2 text-right font-bold text-foreground tabular-nums">
             {maskMoney ? "—" : fmtCurrency(total)}
           </td>
@@ -1662,6 +1705,11 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
         if (li.sku) row.sku = li.sku
         if (li.item_type) row.item_type = li.item_type
         if (li.unit_label) row.unit_label = li.unit_label
+        if (li.source_ref) row.source_ref = li.source_ref
+        if (li.taxable !== undefined) row.taxable = li.taxable
+        if (li.tax_category) row.tax_category = li.tax_category
+        if (li.tax_rate_percent !== undefined) row.tax_rate_percent = li.tax_rate_percent
+        if (li.tax_amount !== undefined) row.tax_amount = li.tax_amount
         return row
       }),
       amountCents: Math.round(newTotal * 100),

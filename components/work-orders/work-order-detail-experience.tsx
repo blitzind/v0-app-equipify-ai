@@ -70,6 +70,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { DocumentAttachmentsPanel } from "@/components/attachments/document-attachments-panel"
 
 // ─── Styles (match existing WO page) ─────────────────────────────────────────
 
@@ -1857,6 +1858,16 @@ export function WorkOrderDetailExperience({
               onRemoveLegacyPhoto={onRemoveLegacyPhoto}
               onRemoveDocument={onRemoveDocument}
             />
+            <div className="mt-4">
+              <DocumentAttachmentsPanel
+                entityType="work_order"
+                entityId={workOrder.id}
+                title="Linked work order documents"
+                description="Attach customer-facing service reports, external certificates, signed paperwork, or internal files."
+                defaultAttachmentType="service_report"
+                compact
+              />
+            </div>
           </Section>
         </TabsContent>
 

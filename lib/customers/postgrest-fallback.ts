@@ -22,6 +22,14 @@ const HIERARCHY_KEYS = [
   "default_po_number",
   "invoice_delivery_preference",
   "invoice_instructions",
+  "default_payment_terms_key",
+  "default_payment_terms_days",
+  "default_payment_terms_label",
+  "tax_exempt",
+  "tax_exemption_id",
+  "tax_exemption_notes",
+  "default_tax_basis",
+  "default_tax_category",
 ] as const
 
 /**

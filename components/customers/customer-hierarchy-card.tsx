@@ -28,6 +28,7 @@ import {
   Network,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -347,6 +348,27 @@ export function CustomerHierarchyCard({
                 {billingAddress.defaultPoNumber ? ` · Default ${billingAddress.defaultPoNumber}` : ""}
               </p>
             </div>
+          ) : null}
+          {billingAddress.defaultPaymentTermsKey ? (
+            <p className="mt-2 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Payment terms:</span>{" "}
+              {billingAddress.defaultPaymentTermsLabel || invoiceTermsCodeLabel(billingAddress.defaultPaymentTermsKey)}
+              {billingAddress.defaultPaymentTermsKey === "custom" && billingAddress.defaultPaymentTermsDays
+                ? ` (${billingAddress.defaultPaymentTermsDays} days)`
+                : ""}
+            </p>
+          ) : null}
+          {billingAddress.taxExempt || billingAddress.defaultTaxBasis || billingAddress.defaultTaxCategory ? (
+            <p className="mt-2 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Tax defaults:</span>{" "}
+              {[
+                billingAddress.taxExempt ? "Tax exempt" : null,
+                billingAddress.defaultTaxBasis ? `Basis ${billingAddress.defaultTaxBasis.replace(/_/g, " ")}` : null,
+                billingAddress.defaultTaxCategory ? `Category ${billingAddress.defaultTaxCategory}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           ) : null}
           {billingAddress.invoiceInstructions ? (
             <p className="mt-2 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground">

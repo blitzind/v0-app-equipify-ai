@@ -1,4 +1,6 @@
 import { resolveMapped } from "./map-columns"
+import { normalizeImportedInvoiceTerms } from "@/lib/billing/invoice-terms"
+import { normalizeBooleanImport } from "@/lib/billing/tax-framework"
 import type { PreviewIssue, PreviewResult, PreviewSampleRow } from "./public-types"
 import type { ImportEngineContext } from "./types"
 import { MIGRATION_IMPORT_MAX_ROWS } from "./constants"
@@ -272,6 +274,27 @@ export async function buildCustomerPreview(
         message: "PO is marked required, but no invoice instructions are mapped for this customer.",
       })
     }
+    const importedTerms =
+      resolveMapped(row, columnMapping, "default_payment_terms_key") ||
+      resolveMapped(row, columnMapping, "default_payment_terms_label")
+    const importedTermsDays = resolveMapped(row, columnMapping, "default_payment_terms_days")
+    if ((importedTerms || importedTermsDays) && !normalizeImportedInvoiceTerms(importedTerms, importedTermsDays)) {
+      issues.push({
+        rowIndex,
+        severity: "warning",
+        code: "unrecognized_payment_terms",
+        message: "Payment terms could not be recognized. Use values like Net 30, net_30, 30, Due on Receipt, or Custom 45.",
+      })
+    }
+    const importedTaxExempt = resolveMapped(row, columnMapping, "tax_exempt")
+    if (importedTaxExempt && normalizeBooleanImport(importedTaxExempt) === null) {
+      issues.push({
+        rowIndex,
+        severity: "warning",
+        code: "ambiguous_tax_exempt",
+        message: "Tax exempt value is ambiguous. Use Yes/No, True/False, or Exempt/Taxable.",
+      })
+    }
 
     const maxChecks = [
       oversized("company_name", company, 200),
@@ -285,6 +308,10 @@ export async function buildCustomerPreview(
       oversized("billing_contact_email", resolveMapped(row, columnMapping, "billing_contact_email"), 254),
       oversized("default_po_number", resolveMapped(row, columnMapping, "default_po_number"), 120),
       oversized("invoice_instructions", resolveMapped(row, columnMapping, "invoice_instructions"), 4000),
+      oversized("default_payment_terms_label", resolveMapped(row, columnMapping, "default_payment_terms_label"), 120),
+      oversized("tax_exemption_id", resolveMapped(row, columnMapping, "tax_exemption_id"), 120),
+      oversized("tax_exemption_notes", resolveMapped(row, columnMapping, "tax_exemption_notes"), 1000),
+      oversized("default_tax_basis", resolveMapped(row, columnMapping, "default_tax_basis"), 40),
       oversized("legacy_source_ids", resolveMapped(row, columnMapping, "legacy_source_ids"), 1000),
     ]
     for (const issue of maxChecks) {

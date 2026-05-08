@@ -19,6 +19,7 @@ import {
   WORK_ORDER_ATTACHMENTS_BUCKET,
   signedUrlForAttachmentPath,
 } from "@/lib/work-orders/work-order-tab-data"
+import { releaseStatusForVisibility } from "@/lib/attachments/document-attachments"
 
 export type CertificateAttachmentCategory = "external_calibration" | "supplementary"
 
@@ -209,6 +210,31 @@ export async function uploadCertificateAttachment(
     }
     throw new Error(error.message)
   }
+
+  // Also register the upload in the unified document registry. This keeps the
+  // existing certificate attachment flow intact while making external PDFs
+  // discoverable from invoice/work-order/equipment document surfaces.
+  await supabase.from("org_document_attachments").insert({
+    organization_id: args.organizationId,
+    attachment_type: args.category === "external_calibration" ? "external_certificate" : "document",
+    storage_bucket: WORK_ORDER_ATTACHMENTS_BUCKET,
+    storage_path: storagePath,
+    file_name: args.file.name,
+    mime_type: args.file.type || "application/octet-stream",
+    file_size_bytes: args.file.size,
+    uploaded_by: user.id,
+    visibility_scope: "pending_release",
+    related_entity_type: args.calibrationRecordId ? "calibration_record" : "work_order",
+    related_entity_id: args.calibrationRecordId ?? args.workOrderId,
+    portal_visible: false,
+    portal_release_status: releaseStatusForVisibility("pending_release"),
+    source_system: "certificate_upload",
+    metadata_json: {
+      work_order_id: args.workOrderId,
+      equipment_id: args.equipmentId ?? null,
+      certificate_attachment_id: (data as Row).id,
+    },
+  })
 
   return mapRow(data as Row)
 }

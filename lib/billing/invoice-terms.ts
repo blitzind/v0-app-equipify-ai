@@ -73,6 +73,59 @@ export function invoiceTermsCodeLabel(code: string | null | undefined): string {
   return row?.label ?? (code ? code.replace(/_/g, " ") : "Net 30")
 }
 
+export type NormalizedInvoiceTerms = {
+  code: InvoiceTermsCode
+  days: number
+  label: string
+}
+
+export function normalizeImportedInvoiceTerms(
+  value: string | null | undefined,
+  customDays?: string | number | null,
+): NormalizedInvoiceTerms | null {
+  const raw = (value ?? "").trim()
+  const rawDays = typeof customDays === "number" ? customDays : Number.parseInt(String(customDays ?? ""), 10)
+  const compact = raw.toLowerCase().replace(/[^a-z0-9]+/g, "")
+  const numberOnly = Number.parseInt(raw, 10)
+
+  if (!raw && Number.isFinite(rawDays) && rawDays > 0) {
+    return { code: "custom", days: Math.floor(rawDays), label: `Custom ${Math.floor(rawDays)} days` }
+  }
+
+  if (["dueonreceipt", "receipt", "uponreceipt", "cod", "0"].includes(compact)) {
+    return { code: "due_on_receipt", days: 0, label: "Due on Receipt" }
+  }
+
+  const netMatch = compact.match(/^net(\d+)$/)
+  const customMatch = compact.match(/^custom(\d+)$/)
+  const days = customMatch ? Number.parseInt(customMatch[1], 10) : netMatch ? Number.parseInt(netMatch[1], 10) : numberOnly
+  const codeByDays: Record<number, InvoiceTermsCode> = {
+    7: "net_7",
+    14: "net_14",
+    15: "net_15",
+    30: "net_30",
+    45: "net_45",
+    60: "net_60",
+  }
+
+  if (Number.isFinite(days) && days >= 0) {
+    if (days === 0) return { code: "due_on_receipt", days: 0, label: "Due on Receipt" }
+    const preset = codeByDays[days]
+    if (preset && !customMatch) return { code: preset, days, label: invoiceTermsCodeLabel(preset) }
+    if (days >= 1 && days <= 365) return { code: "custom", days, label: `Custom ${days} days` }
+  }
+
+  const exact = PAYMENT_TERMS_OPTIONS.find(
+    (option) => option.code === raw || option.label.toLowerCase() === raw.toLowerCase(),
+  )
+  if (exact) {
+    const daysForCode = netDaysForTermsCode(exact.code, rawDays)
+    return { code: exact.code, days: daysForCode, label: invoiceTermsCodeLabel(exact.code) }
+  }
+
+  return null
+}
+
 /** UI options for editing org/customer defaults (allows "use default" inheritance). */
 export const CUSTOMER_TERMS_OPTIONS: { code: InvoiceTermsCode | ""; label: string; helper: string }[] = [
   { code: "", label: "Use organization default", helper: "Inherit the workspace default for new invoices." },

@@ -2501,6 +2501,14 @@ export default function CustomerDetailPage() {
             defaultPoNumber: hierarchySummary.billingAddress.defaultPoNumber,
             invoiceInstructions: hierarchySummary.billingAddress.invoiceInstructions,
             invoiceDeliveryPreference: hierarchySummary.billingAddress.invoiceDeliveryPreference,
+            defaultPaymentTermsKey: hierarchySummary.billingAddress.defaultPaymentTermsKey,
+            defaultPaymentTermsDays: hierarchySummary.billingAddress.defaultPaymentTermsDays,
+            defaultPaymentTermsLabel: hierarchySummary.billingAddress.defaultPaymentTermsLabel,
+            taxExempt: hierarchySummary.billingAddress.taxExempt,
+            taxExemptionId: hierarchySummary.billingAddress.taxExemptionId,
+            taxExemptionNotes: hierarchySummary.billingAddress.taxExemptionNotes,
+            defaultTaxBasis: hierarchySummary.billingAddress.defaultTaxBasis,
+            defaultTaxCategory: hierarchySummary.billingAddress.defaultTaxCategory,
           }}
         />
       ) : null}

@@ -77,6 +77,10 @@ interface QuoteInvoiceContextValue {
     /** org_invoices.terms_code — Net 30 default applied server-side if omitted */
     termsCode?: string | null
     termsCustomDays?: number | null
+    paymentTermsKey?: string | null
+    paymentTermsDays?: number | null
+    paymentTermsLabel?: string | null
+    dueDateOverridden?: boolean
     billingCustomerId?: string | null
     billingName?: string | null
     billingContactName?: string | null
@@ -90,6 +94,18 @@ interface QuoteInvoiceContextValue {
     billingCountry?: string | null
     poNumber?: string | null
     invoiceInstructions?: string | null
+    taxCalculationMode?: string | null
+    taxBasis?: string | null
+    taxJurisdictionLabel?: string | null
+    taxRatePercent?: number | null
+    taxAmount?: number | null
+    taxableSubtotal?: number | null
+    nonTaxableSubtotal?: number | null
+    taxExemptionApplied?: boolean | null
+    taxExemptionReason?: string | null
+    taxProvider?: string | null
+    taxProviderReference?: string | null
+    taxSnapshotJson?: unknown
   }) => Promise<{ id?: string; error?: string }>
   updateInvoice: (id: string, patch: Parameters<typeof updateOrgInvoice>[3]) => Promise<{ error?: string }>
   archiveInvoice: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>

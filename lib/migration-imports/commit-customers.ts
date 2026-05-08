@@ -1,5 +1,7 @@
 import { resolveMapped } from "./map-columns"
 import { resolveImportStrategy } from "./strategy"
+import { normalizeImportedInvoiceTerms } from "@/lib/billing/invoice-terms"
+import { normalizeBooleanImport } from "@/lib/billing/tax-framework"
 import type { CommitResult, ImportEngineContext, RowOutcome } from "./types"
 
 function normName(s: string) {
@@ -67,6 +69,14 @@ type CustomerRow = {
   default_po_number: string | null
   invoice_instructions: string | null
   billing_behavior: string | null
+  default_invoice_terms_code: string | null
+  default_payment_terms_key: string | null
+  default_payment_terms_days: number | null
+  default_payment_terms_label: string | null
+  tax_exempt: boolean | null
+  tax_exemption_id: string | null
+  tax_exemption_notes: string | null
+  default_tax_basis: string | null
 }
 
 export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitResult> {
@@ -75,7 +85,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
 
   const { data: existing } = await supabase
     .from("customers")
-    .select("id, company_name, external_code, notes, status, parent_customer_id, billing_name, billing_contact_name, billing_email, billing_contact_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, po_required, default_po_number, invoice_instructions, billing_behavior")
+    .select("id, company_name, external_code, notes, status, parent_customer_id, billing_name, billing_contact_name, billing_email, billing_contact_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, po_required, default_po_number, invoice_instructions, billing_behavior, default_invoice_terms_code, default_payment_terms_key, default_payment_terms_days, default_payment_terms_label, tax_exempt, tax_exemption_id, tax_exemption_notes, default_tax_basis")
     .eq("organization_id", organizationId)
     .is("archived_at", null)
 
@@ -199,6 +209,11 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       invoice_instructions: string
       billing_behavior: "own_billing" | "parent_billing" | "custom" | null
       po_required: boolean | null
+      payment_terms: ReturnType<typeof normalizeImportedInvoiceTerms>
+      tax_exempt: boolean | null
+      tax_exemption_id: string
+      tax_exemption_notes: string
+      default_tax_basis: string
     },
     current?: CustomerRow,
   ) {
@@ -224,10 +239,25 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
     if (values.billing_behavior && (strategy === "update_existing" || !current || !current.billing_behavior)) {
       patch.billing_behavior = values.billing_behavior
     }
+    if (
+      values.payment_terms &&
+      (strategy === "update_existing" || !current || !current.default_payment_terms_key)
+    ) {
+      patch.default_invoice_terms_code = values.payment_terms.code
+      patch.default_payment_terms_key = values.payment_terms.code
+      patch.default_payment_terms_days = values.payment_terms.days
+      patch.default_payment_terms_label = values.payment_terms.label
+    }
     if (values.po_required !== null && (strategy === "update_existing" || !current || current.po_required === null)) {
       patch.po_required = values.po_required
       if (values.po_required) patch.po_number_required_before_invoice = true
     }
+    if (values.tax_exempt !== null && (strategy === "update_existing" || !current || current.tax_exempt === null)) {
+      patch.tax_exempt = values.tax_exempt
+    }
+    setText("tax_exemption_id", values.tax_exemption_id)
+    setText("tax_exemption_notes", values.tax_exemption_notes)
+    setText("default_tax_basis", values.default_tax_basis)
     if (
       (values.billing_address_line1 || values.billing_city || values.billing_state || values.billing_postal_code) &&
       (strategy === "update_existing" || !current || current.billing_address_line1 === null)
@@ -292,6 +322,10 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       tooLong(resolveMapped(row, columnMapping, "notes"), 8000) ? "notes" : null,
       tooLong(resolveMapped(row, columnMapping, "tax_id"), 120) ? "tax_id" : null,
       tooLong(resolveMapped(row, columnMapping, "po_requirements"), 1000) ? "po_requirements" : null,
+      tooLong(resolveMapped(row, columnMapping, "default_payment_terms_label"), 120) ? "default_payment_terms_label" : null,
+      tooLong(resolveMapped(row, columnMapping, "tax_exemption_id"), 120) ? "tax_exemption_id" : null,
+      tooLong(resolveMapped(row, columnMapping, "tax_exemption_notes"), 1000) ? "tax_exemption_notes" : null,
+      tooLong(resolveMapped(row, columnMapping, "default_tax_basis"), 40) ? "default_tax_basis" : null,
       tooLong(resolveMapped(row, columnMapping, "legacy_source_ids"), 1000) ? "legacy_source_ids" : null,
     ].filter(Boolean)
     if (oversizedFields.length > 0) {
@@ -343,6 +377,15 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       po_required:
         truthyImportValue(resolveMapped(row, columnMapping, "po_required")) ??
         truthyImportValue(resolveMapped(row, columnMapping, "po_requirements")),
+      payment_terms: normalizeImportedInvoiceTerms(
+        resolveMapped(row, columnMapping, "default_payment_terms_key") ||
+          resolveMapped(row, columnMapping, "default_payment_terms_label"),
+        resolveMapped(row, columnMapping, "default_payment_terms_days"),
+      ),
+      tax_exempt: normalizeBooleanImport(resolveMapped(row, columnMapping, "tax_exempt")),
+      tax_exemption_id: resolveMapped(row, columnMapping, "tax_exemption_id"),
+      tax_exemption_notes: resolveMapped(row, columnMapping, "tax_exemption_notes"),
+      default_tax_basis: resolveMapped(row, columnMapping, "default_tax_basis"),
     }
 
     const match = findMatch(company, ext, cEmail, cPhone, addressKey)
@@ -593,6 +636,14 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         default_po_number: billingValues.default_po_number.trim() || null,
         invoice_instructions: billingValues.invoice_instructions.trim() || null,
         billing_behavior: billingValues.billing_behavior,
+        default_invoice_terms_code: billingValues.payment_terms?.code ?? null,
+        default_payment_terms_key: billingValues.payment_terms?.code ?? null,
+        default_payment_terms_days: billingValues.payment_terms?.days ?? null,
+        default_payment_terms_label: billingValues.payment_terms?.label ?? null,
+        tax_exempt: billingValues.tax_exempt,
+        tax_exemption_id: billingValues.tax_exemption_id.trim() || null,
+        tax_exemption_notes: billingValues.tax_exemption_notes.trim() || null,
+        default_tax_basis: billingValues.default_tax_basis.trim() || null,
         created_by: userId,
       })
       .select("id")
@@ -631,6 +682,14 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       default_po_number: billingValues.default_po_number.trim() || null,
       invoice_instructions: billingValues.invoice_instructions.trim() || null,
       billing_behavior: billingValues.billing_behavior,
+      default_invoice_terms_code: billingValues.payment_terms?.code ?? null,
+      default_payment_terms_key: billingValues.payment_terms?.code ?? null,
+      default_payment_terms_days: billingValues.payment_terms?.days ?? null,
+      default_payment_terms_label: billingValues.payment_terms?.label ?? null,
+      tax_exempt: billingValues.tax_exempt,
+      tax_exemption_id: billingValues.tax_exemption_id.trim() || null,
+      tax_exemption_notes: billingValues.tax_exemption_notes.trim() || null,
+      default_tax_basis: billingValues.default_tax_basis.trim() || null,
     }
     customersById.set(customerId, newRow)
     if (ext) byCode.set(ext.toLowerCase(), customerId)

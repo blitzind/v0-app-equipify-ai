@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 161,
-  sqlMigrations: 108,
+  apiRouteHandlers: 164,
+  sqlMigrations: 111,
   dashboardPages: 56,
-  componentsTsx: 202,
-  libTsFiles: 321,
+  componentsTsx: 203,
+  libTsFiles: 323,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **161** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **108** |
+| API route handlers (\`app/api/**/route.ts\`) | **164** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **111** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **56** |
-| \`components/**/*.tsx\` | **202** |
-| \`lib/**/*.ts\` | **321** |
+| \`components/**/*.tsx\` | **203** |
+| \`lib/**/*.ts\` | **323** |
 
 ### Vercel crons
 
@@ -77,6 +77,8 @@ organizations/[organizationId]/ai-ops/recommendations/[recommendationKey]/narrat
 organizations/[organizationId]/ai-ops/recommendations/[recommendationKey]/timeline/route.ts
 organizations/[organizationId]/ai-ops/recommendations/route.ts
 organizations/[organizationId]/ai-usage/route.ts
+organizations/[organizationId]/attachments/[attachmentId]/route.ts
+organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
 organizations/[organizationId]/calibration-templates/import-commit/route.ts
@@ -168,6 +170,7 @@ platform/import-operations/bulk-retry/route.ts
 platform/import-operations/route.ts
 platform/import-operations/runs/[runId]/notes/route.ts
 portal/access/exchange/route.ts
+portal/attachments/[attachmentId]/download/route.ts
 portal/bootstrap/route.ts
 portal/certificate-attachments/[attachmentId]/download/route.ts
 portal/certificates/[recordId]/download/route.ts

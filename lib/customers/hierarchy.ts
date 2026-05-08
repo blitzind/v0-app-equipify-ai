@@ -63,6 +63,14 @@ export type BillingAddress = {
   defaultPoNumber: string | null
   invoiceInstructions: string | null
   invoiceDeliveryPreference: string | null
+  defaultPaymentTermsKey: string | null
+  defaultPaymentTermsDays: number | null
+  defaultPaymentTermsLabel: string | null
+  taxExempt: boolean
+  taxExemptionId: string | null
+  taxExemptionNotes: string | null
+  defaultTaxBasis: string | null
+  defaultTaxCategory: string | null
 }
 
 export type CustomerHierarchySummary = {
@@ -122,6 +130,15 @@ type CustomerHierarchyRow = {
   default_po_number: string | null
   invoice_delivery_preference: string | null
   invoice_instructions: string | null
+  default_invoice_terms_code: string | null
+  default_payment_terms_key: string | null
+  default_payment_terms_days: number | null
+  default_payment_terms_label: string | null
+  tax_exempt: boolean | null
+  tax_exemption_id: string | null
+  tax_exemption_notes: string | null
+  default_tax_basis: string | null
+  default_tax_category: string | null
 }
 
 type LegacyCustomerRow = {
@@ -146,7 +163,9 @@ const CUSTOMER_HIERARCHY_SELECT =
   "id, organization_id, company_name, status, archived_at, " +
   "parent_customer_id, billing_address_same_as_service, billing_name, billing_attention, billing_contact_name, billing_email, billing_contact_phone, " +
   "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, billing_notes, " +
-  "billing_behavior, po_required, po_number_required_before_service, po_number_required_before_invoice, default_po_number, invoice_delivery_preference, invoice_instructions"
+  "billing_behavior, po_required, po_number_required_before_service, po_number_required_before_invoice, default_po_number, invoice_delivery_preference, invoice_instructions, " +
+  "default_invoice_terms_code, default_payment_terms_key, default_payment_terms_days, default_payment_terms_label, " +
+  "tax_exempt, tax_exemption_id, tax_exemption_notes, default_tax_basis, default_tax_category"
 
 const CUSTOMER_LITE_SELECT = "id, organization_id, company_name, status, archived_at"
 
@@ -217,6 +236,14 @@ function deriveBillingAddress(
         defaultPoNumber: row?.default_po_number?.trim() || null,
         invoiceInstructions: row?.invoice_instructions?.trim() || null,
         invoiceDeliveryPreference: row?.invoice_delivery_preference?.trim() || null,
+        defaultPaymentTermsKey: row?.default_payment_terms_key?.trim() || row?.default_invoice_terms_code?.trim() || null,
+        defaultPaymentTermsDays: row?.default_payment_terms_days ?? null,
+        defaultPaymentTermsLabel: row?.default_payment_terms_label?.trim() || null,
+        taxExempt: Boolean(row?.tax_exempt),
+        taxExemptionId: row?.tax_exemption_id?.trim() || null,
+        taxExemptionNotes: row?.tax_exemption_notes?.trim() || null,
+        defaultTaxBasis: row?.default_tax_basis?.trim() || null,
+        defaultTaxCategory: row?.default_tax_category?.trim() || null,
       },
       missing: !defaultService || !defaultService.line1?.trim() || !defaultService.city?.trim(),
     }
@@ -246,6 +273,14 @@ function deriveBillingAddress(
       defaultPoNumber: row?.default_po_number?.trim() || null,
       invoiceInstructions: row?.invoice_instructions?.trim() || null,
       invoiceDeliveryPreference: row?.invoice_delivery_preference?.trim() || null,
+      defaultPaymentTermsKey: row?.default_payment_terms_key?.trim() || row?.default_invoice_terms_code?.trim() || null,
+      defaultPaymentTermsDays: row?.default_payment_terms_days ?? null,
+      defaultPaymentTermsLabel: row?.default_payment_terms_label?.trim() || null,
+      taxExempt: Boolean(row?.tax_exempt),
+      taxExemptionId: row?.tax_exemption_id?.trim() || null,
+      taxExemptionNotes: row?.tax_exemption_notes?.trim() || null,
+      defaultTaxBasis: row?.default_tax_basis?.trim() || null,
+      defaultTaxCategory: row?.default_tax_category?.trim() || null,
     },
     missing: !line1 || !city,
   }
@@ -313,6 +348,10 @@ export async function loadCustomerHierarchy(
       default_po_number: null,
       invoice_delivery_preference: null,
       invoice_instructions: null,
+      default_invoice_terms_code: null,
+      default_payment_terms_key: null,
+      default_payment_terms_days: null,
+      default_payment_terms_label: null,
     }
   } else if (fullRes.error || !fullRes.data) {
     return null

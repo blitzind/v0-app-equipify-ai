@@ -49,6 +49,10 @@ export type OrgInvoiceRow = {
   sent_at: string | null
   terms_code?: string | null
   terms_custom_days?: number | null
+  payment_terms_key?: string | null
+  payment_terms_days?: number | null
+  payment_terms_label?: string | null
+  due_date_overridden?: boolean | null
   archived_by?: string | null
   archive_reason?: string | null
   portal_certificate_release_override?: string | null
@@ -65,6 +69,18 @@ export type OrgInvoiceRow = {
   billing_country?: string | null
   po_number?: string | null
   invoice_instructions?: string | null
+  tax_calculation_mode?: string | null
+  tax_basis?: string | null
+  tax_jurisdiction_label?: string | null
+  tax_rate_percent?: number | string | null
+  tax_amount_cents?: number | null
+  taxable_subtotal_cents?: number | null
+  non_taxable_subtotal_cents?: number | null
+  tax_exemption_applied?: boolean | null
+  tax_exemption_reason?: string | null
+  tax_provider?: string | null
+  tax_provider_reference?: string | null
+  tax_snapshot_json?: unknown
 }
 
 export type LineItemJson = {
@@ -73,6 +89,11 @@ export type LineItemJson = {
   unit: number
   /** Optional internal trace for generated lines, e.g. work_order:labor. */
   source_ref?: string
+  taxable?: boolean
+  tax_category?: string
+  tax_rate_percent?: number
+  tax_amount?: number
+  tax_snapshot_json?: unknown
   /** When present, ties the line back to a reusable catalog template for usage reporting. */
   catalog_item_id?: string
   /** Snapshot fields copied from catalog at line creation; later catalog edits do not change stored quotes/invoices. */
@@ -97,6 +118,11 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
     }
     const sourceRef = o.source_ref
     if (typeof sourceRef === "string" && sourceRef.trim()) row.source_ref = sourceRef.trim()
+    if (typeof o.taxable === "boolean") row.taxable = o.taxable
+    if (typeof o.tax_category === "string" && o.tax_category.trim()) row.tax_category = o.tax_category.trim()
+    if (typeof o.tax_rate_percent === "number") row.tax_rate_percent = o.tax_rate_percent
+    if (typeof o.tax_amount === "number") row.tax_amount = o.tax_amount
+    if (o.tax_snapshot_json !== undefined) row.tax_snapshot_json = o.tax_snapshot_json
     if (typeof cid === "string" && cid.trim()) row.catalog_item_id = cid.trim()
     const sku = o.sku
     const itemType = o.item_type
@@ -251,6 +277,10 @@ export function mapOrgInvoiceToAdmin(
     isArchived: rowIsArchived(row.archived_at),
     termsCode: row.terms_code ?? null,
     termsCustomDays: row.terms_custom_days ?? null,
+    paymentTermsKey: row.payment_terms_key ?? row.terms_code ?? null,
+    paymentTermsDays: row.payment_terms_days ?? row.terms_custom_days ?? null,
+    paymentTermsLabel: row.payment_terms_label ?? null,
+    dueDateOverridden: Boolean(row.due_date_overridden),
     portalCertificateReleaseOverride: row.portal_certificate_release_override ?? null,
     billingCustomerId: row.billing_customer_id ?? null,
     billingName: row.billing_name ?? null,
@@ -265,5 +295,17 @@ export function mapOrgInvoiceToAdmin(
     billingCountry: row.billing_country ?? null,
     poNumber: row.po_number ?? null,
     invoiceInstructions: row.invoice_instructions ?? null,
+    taxCalculationMode: row.tax_calculation_mode ?? null,
+    taxBasis: row.tax_basis ?? null,
+    taxJurisdictionLabel: row.tax_jurisdiction_label ?? null,
+    taxRatePercent: row.tax_rate_percent == null ? null : Number(row.tax_rate_percent),
+    taxAmount: row.tax_amount_cents == null ? null : row.tax_amount_cents / 100,
+    taxableSubtotal: row.taxable_subtotal_cents == null ? null : row.taxable_subtotal_cents / 100,
+    nonTaxableSubtotal: row.non_taxable_subtotal_cents == null ? null : row.non_taxable_subtotal_cents / 100,
+    taxExemptionApplied: row.tax_exemption_applied ?? null,
+    taxExemptionReason: row.tax_exemption_reason ?? null,
+    taxProvider: row.tax_provider ?? null,
+    taxProviderReference: row.tax_provider_reference ?? null,
+    taxSnapshotJson: row.tax_snapshot_json,
   }
 }
