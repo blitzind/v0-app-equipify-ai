@@ -9,7 +9,7 @@ import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useBillingAccessOptional } from "@/lib/billing-access-context"
-import type { OrgPermissions } from "@/lib/permissions/model"
+import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
@@ -172,6 +172,31 @@ function navItemAllowed(
   return item.anyOf.some((k) => perms[k])
 }
 
+function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
+  return role === "owner" || role === "admin" || role === "manager"
+}
+
+function resolveNavPermissions(args: {
+  role: OrgMemberRole | null
+  status: "loading" | "ready" | "no_org"
+  permissions: OrgPermissions
+}): OrgPermissions {
+  // Navigation should not let a commercial profile overlay accidentally hide
+  // the owner/admin/manager workspace. Page/API permission checks still use the
+  // effective capability set as the source of truth for mutations.
+  if (isPrivilegedNavRole(args.role)) {
+    return getOrgPermissionsForRole(args.role)
+  }
+
+  // While membership permissions are resolving, keep the shell useful instead
+  // of rendering an almost-empty sidebar from the deny-all fallback.
+  if (args.status === "loading") {
+    return getOrgPermissionsForRole("owner")
+  }
+
+  return args.permissions
+}
+
 // ─── Collapse persistence ────────────────────────────────────────────────────
 
 const NAV_GROUP_STORAGE_KEY = "equipify:nav:groups:collapsed/v1"
@@ -223,7 +248,7 @@ function SidebarBody({
 }) {
   const pathname = usePathname()
   const { workspace } = useTenant()
-  const { permissions } = useOrgPermissions()
+  const { permissions, role, status: permissionsStatus } = useOrgPermissions()
   const billingAccess = useBillingAccessOptional()
   const insightsAllowed = billingAccess?.insightsAllowed ?? false
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
@@ -239,12 +264,18 @@ function SidebarBody({
   }
 
   const visibleGroups = useMemo(
-    () =>
-      NAV_GROUPS.map((group) => ({
+    () => {
+      const navPermissions = resolveNavPermissions({
+        role,
+        status: permissionsStatus,
+        permissions,
+      })
+      return NAV_GROUPS.map((group) => ({
         ...group,
-        items: group.items.filter((item) => navItemAllowed(item, permissions, insightsAllowed)),
-      })).filter((group) => group.items.length > 0),
-    [permissions, insightsAllowed],
+        items: group.items.filter((item) => navItemAllowed(item, navPermissions, insightsAllowed)),
+      })).filter((group) => group.items.length > 0)
+    },
+    [permissions, role, permissionsStatus, insightsAllowed],
   )
 
   // In mobile mode always show expanded; desktop respects collapsed state

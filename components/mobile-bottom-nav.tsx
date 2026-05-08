@@ -8,7 +8,7 @@ import { useQuickAddDispatch } from "@/lib/quick-add-context"
 import type { QuickAddAction } from "@/lib/quick-add-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import type { OrgPermissions } from "@/lib/permissions/model"
+import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
@@ -29,6 +29,24 @@ function isActive(pathname: string, href: string) {
 function allowed(perms: OrgPermissions, anyOf?: (keyof OrgPermissions)[]) {
   if (!anyOf?.length) return true
   return anyOf.some((key) => perms[key])
+}
+
+function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
+  return role === "owner" || role === "admin" || role === "manager"
+}
+
+function resolveMobileNavPermissions(args: {
+  role: OrgMemberRole | null
+  status: "loading" | "ready" | "no_org"
+  permissions: OrgPermissions
+}): OrgPermissions {
+  if (isPrivilegedNavRole(args.role)) {
+    return getOrgPermissionsForRole(args.role)
+  }
+  if (args.status === "loading") {
+    return getOrgPermissionsForRole("owner")
+  }
+  return args.permissions
 }
 
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
@@ -75,8 +93,9 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const dispatch = useQuickAddDispatch()
   const router = useRouter()
   const pathname = usePathname()
-  const { permissions } = useOrgPermissions()
+  const { permissions, role, status } = useOrgPermissions()
   const { standardCreateEligibility, equipmentCreateEligibility } = useBillingAccess()
+  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
 
   function fire(action: QuickAddAction) {
     if (action === "new-equipment") {
@@ -102,7 +121,7 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
     { icon: ClipboardPlus, label: "New Work Order",  action: "new-work-order", anyOf: ["canViewAllWorkOrders", "canManageDispatch"] },
     { icon: FilePlus,      label: "Create Quote",    action: "new-quote", anyOf: ["canEditQuotes"] },
     { icon: ReceiptText,   label: "Create Invoice",  action: "new-invoice", anyOf: ["canEditInvoices"] },
-  ].filter((item) => allowed(permissions, item.anyOf))
+  ].filter((item) => allowed(navPermissions, item.anyOf))
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -143,7 +162,8 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
 
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
-  const { permissions } = useOrgPermissions()
+  const { permissions, role, status } = useOrgPermissions()
+  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
 
   const items: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
     { icon: HardHat, label: "Today", href: "/technicians/today", anyOf: ["canUseTechnicianWorkspace"] },
@@ -156,7 +176,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     { icon: BarChart3, label: "Reports", href: "/reports", anyOf: ["canViewOperationalReports", "canViewFinancialReports"] },
     { icon: Sparkles, label: "Insights", href: "/insights", anyOf: ["canViewInsights"] },
     { icon: Settings, label: "Settings", href: "/settings/workspace", anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"] },
-  ].filter((item) => allowed(permissions, item.anyOf))
+  ].filter((item) => allowed(navPermissions, item.anyOf))
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -200,17 +220,18 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 export function MobileBottomNav() {
   const pathname = usePathname()
-  const { permissions } = useOrgPermissions()
+  const { permissions, role, status } = useOrgPermissions()
+  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
 
   const navItems: ({ icon: React.ElementType; label: string; href: string } | null)[] = [
     { icon: LayoutDashboard, label: "Home",      href: "/" },
-    permissions.canUseTechnicianWorkspace
+    navPermissions.canUseTechnicianWorkspace
       ? { icon: HardHat, label: "Today", href: "/technicians/today" }
       : { icon: CalendarClock,   label: "Schedule",  href: "/service-schedule" },
     null, // center FAB
-    permissions.canUseTechnicianWorkspace
+    navPermissions.canUseTechnicianWorkspace
       ? { icon: ClipboardList, label: "Jobs", href: "/work-orders" }
       : { icon: Users,           label: "Customers", href: "/customers" },
     { icon: MoreHorizontal,  label: "More",      href: "" },
