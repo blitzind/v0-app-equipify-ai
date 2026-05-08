@@ -16,9 +16,13 @@ import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import {
   fetchCalibrationRecordsForEquipment,
+  fetchCertificateAttachmentsForEquipmentHistory,
+  fetchDocumentAttachmentsForEquipmentHistory,
   fetchInvoicesForEquipmentAsset,
   fetchWorkOrdersLinkedToEquipment,
+  type EquipmentCertificateAttachmentRow,
   type EquipmentCertRow,
+  type EquipmentDocumentAttachmentRow,
   type EquipmentInvoiceRow,
 } from "@/lib/equipment/equipment-detail-queries"
 import { buildEquipmentLifecycleTimeline, sumInvoiceAmountCents } from "@/lib/lifecycle/equipment-timeline"
@@ -44,6 +48,8 @@ import {
   ExternalLink,
   Users,
   Receipt,
+  FileBadge2,
+  Paperclip,
 } from "lucide-react"
 
 type DbEquipmentRow = {
@@ -92,6 +98,32 @@ type PlanRow = {
   next_due_date: string | null
   equipment_id: string
 }
+
+type EquipmentHistoryFilter = "all" | "service" | "calibration" | "documents" | "billing" | "warranty" | "maintenance" | "notes"
+type EquipmentHistoryEvent = {
+  id: string
+  category: Exclude<EquipmentHistoryFilter, "all">
+  at: string
+  title: string
+  description?: string
+  status?: string | null
+  href?: string
+  sourceType: string
+  sourceId: string
+  workOrderLabel?: string | null
+  technicianLabel?: string | null
+}
+
+const HISTORY_FILTERS: Array<{ id: EquipmentHistoryFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "service", label: "Service" },
+  { id: "calibration", label: "Calibration" },
+  { id: "documents", label: "Documents" },
+  { id: "billing", label: "Billing" },
+  { id: "warranty", label: "Warranty" },
+  { id: "maintenance", label: "Maintenance" },
+  { id: "notes", label: "Notes" },
+]
 
 function fmtDate(iso: string) {
   if (!iso) return "—"
@@ -153,6 +185,58 @@ function eqPlanIntervalLabel(row: PlanRow): string {
   return interval === "Custom" ? `${customIntervalDays} day cycle` : interval
 }
 
+function formatHistoryDate(raw: string): string {
+  if (!raw) return "—"
+  const d = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return raw
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function historyTone(category: EquipmentHistoryEvent["category"]): string {
+  switch (category) {
+    case "service":
+      return "bg-primary/10 text-primary border-primary/25"
+    case "calibration":
+      return "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/25"
+    case "documents":
+      return "bg-muted text-muted-foreground border-border"
+    case "billing":
+      return "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/25"
+    case "warranty":
+      return "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/25"
+    case "maintenance":
+      return "bg-secondary text-secondary-foreground border-border"
+    case "notes":
+      return "bg-card text-muted-foreground border-border"
+  }
+}
+
+function HistoryIcon({ category }: { category: EquipmentHistoryEvent["category"] }) {
+  const cls = "h-4 w-4"
+  switch (category) {
+    case "service":
+      return <Wrench className={cls} />
+    case "calibration":
+      return <FileBadge2 className={cls} />
+    case "documents":
+      return <Paperclip className={cls} />
+    case "billing":
+      return <Receipt className={cls} />
+    case "warranty":
+      return <Shield className={cls} />
+    case "maintenance":
+      return <Calendar className={cls} />
+    case "notes":
+      return <StickyNote className={cls} />
+  }
+}
+
 function warrantyKpiLabel(days: number, hasDate: boolean): string {
   if (!hasDate) return "—"
   if (days < 0) return "Expired"
@@ -190,6 +274,98 @@ function rowToEquipment(row: DbEquipmentRow, customerName: string): Equipment {
   }
 }
 
+function EquipmentHistoryTimeline({
+  events,
+  filter,
+  onFilterChange,
+}: {
+  events: EquipmentHistoryEvent[]
+  filter: EquipmentHistoryFilter
+  onFilterChange: (filter: EquipmentHistoryFilter) => void
+}) {
+  const visible = filter === "all" ? events : events.filter((event) => event.category === filter)
+  return (
+    <Card className="border-border">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Equipment history</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Device-level service, calibration, document, billing, warranty, and maintenance events.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {HISTORY_FILTERS.map((item) => (
+              <Button
+                key={item.id}
+                type="button"
+                size="sm"
+                variant={filter === item.id ? "default" : "outline"}
+                className="h-7 px-2 text-xs"
+                onClick={() => onFilterChange(item.id)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center">
+            <p className="text-sm font-medium text-foreground">No history events yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Linked work orders, certificates, invoices, attachments, and maintenance activity will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="relative space-y-3">
+            <div className="absolute left-4 top-2 bottom-2 w-px bg-border" aria-hidden />
+            {visible.map((event) => {
+              const body = (
+                <div className="relative flex gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-sm transition-colors hover:border-primary/30">
+                  <div className={cn("relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background", historyTone(event.category))}>
+                    <HistoryIcon category={event.category} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                      <Badge variant="outline" className={cn("text-[10px] capitalize", historyTone(event.category))}>
+                        {event.category}
+                      </Badge>
+                      {event.status ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {event.status}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{formatHistoryDate(event.at)}</p>
+                    {event.description ? (
+                      <p className="mt-1 text-sm text-muted-foreground leading-snug">{event.description}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                      {event.workOrderLabel ? <span>{event.workOrderLabel}</span> : null}
+                      {event.technicianLabel ? <span>Technician: {event.technicianLabel}</span> : null}
+                      <span>{event.sourceType}</span>
+                    </div>
+                  </div>
+                  {event.href ? <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
+                </div>
+              )
+              return event.href ? (
+                <Link key={event.id} href={event.href} className="block">
+                  {body}
+                </Link>
+              ) : (
+                <div key={event.id}>{body}</div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>()
   const id = typeof params.id === "string" ? params.id : ""
@@ -201,11 +377,14 @@ export default function EquipmentDetailPage() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [invoiceRows, setInvoiceRows] = useState<EquipmentInvoiceRow[]>([])
   const [certificateLines, setCertificateLines] = useState<
-    { id: string; created_at: string; templateName: string | null; workOrderLabel: string | null }[]
+    { id: string; created_at: string; templateName: string | null; workOrderLabel: string | null; workOrderId: string | null }[]
   >([])
+  const [documentRows, setDocumentRows] = useState<EquipmentDocumentAttachmentRow[]>([])
+  const [certificateAttachmentRows, setCertificateAttachmentRows] = useState<EquipmentCertificateAttachmentRow[]>([])
   const [techProfiles, setTechProfiles] = useState<Record<string, string>>({})
   const [signals, setSignals] = useState<EquipmentSignals | null>(null)
   const [tab, setTab] = useState("overview")
+  const [historyFilter, setHistoryFilter] = useState<EquipmentHistoryFilter>("all")
 
   const load = useCallback(async () => {
     if (!id) {
@@ -214,6 +393,8 @@ export default function EquipmentDetailPage() {
       setPlans([])
       setInvoiceRows([])
       setCertificateLines([])
+      setDocumentRows([])
+      setCertificateAttachmentRows([])
       setTechProfiles({})
       setLoading(false)
       return
@@ -230,6 +411,8 @@ export default function EquipmentDetailPage() {
         setPlans([])
         setInvoiceRows([])
         setCertificateLines([])
+        setDocumentRows([])
+        setCertificateAttachmentRows([])
         setTechProfiles({})
         return
       }
@@ -255,6 +438,8 @@ export default function EquipmentDetailPage() {
         setPlans([])
         setInvoiceRows([])
         setCertificateLines([])
+        setDocumentRows([])
+        setCertificateAttachmentRows([])
         setTechProfiles({})
         return
       }
@@ -286,8 +471,9 @@ export default function EquipmentDetailPage() {
         setTechProfiles({})
       }
 
+      const woIds = woList.map((w) => w.id)
       const [{ rows: invs }, { rows: certs }] = await Promise.all([
-        fetchInvoicesForEquipmentAsset(supabase, oid, er.id),
+        fetchInvoicesForEquipmentAsset(supabase, oid, er.id, woIds),
         fetchCalibrationRecordsForEquipment(supabase, oid, er.id),
       ])
       setInvoiceRows(invs)
@@ -327,9 +513,21 @@ export default function EquipmentDetailPage() {
             created_at: c.created_at,
             templateName: tplMap[c.template_id] ?? null,
             workOrderLabel: woLbl,
+            workOrderId: c.work_order_id,
           }
         }),
       )
+
+      const certIds = certs.map((c) => c.id)
+      const [{ rows: docs }, { rows: certUploads }] = await Promise.all([
+        fetchDocumentAttachmentsForEquipmentHistory(supabase, oid, er.id, {
+          workOrderIds: woIds,
+          calibrationRecordIds: certIds,
+        }),
+        fetchCertificateAttachmentsForEquipmentHistory(supabase, oid, er.id, woIds),
+      ])
+      setDocumentRows(docs)
+      setCertificateAttachmentRows(certUploads)
 
       const { data: planData } = await supabase
         .from("maintenance_plans")
@@ -378,10 +576,6 @@ export default function EquipmentDetailPage() {
   const completedCount = useMemo(
     () => workOrders.filter((w) => w.status === "completed" || w.status === "invoiced").length,
     [workOrders],
-  )
-  const activePlanCount = useMemo(
-    () => plans.filter((p) => planStatusDbToUi(p.status) === "Active").length,
-    [plans],
   )
   const warrantyDays = eq ? daysToDue(eq.warrantyExpiration) : 9999
   const warrantyHasDate = Boolean(eq?.warrantyExpiration?.trim())
@@ -438,6 +632,226 @@ export default function EquipmentDetailPage() {
       })),
     )
   }, [eq, workOrders, techProfiles, invoiceRows, certificateLines, plans])
+
+  const historyEvents = useMemo<EquipmentHistoryEvent[]>(() => {
+    if (!eq) return []
+    const events: EquipmentHistoryEvent[] = []
+    const woById = new Map(workOrders.map((wo) => [wo.id, wo]))
+    const todayYmd = new Date().toISOString().slice(0, 10)
+
+    if (eq.installDate?.trim()) {
+      events.push({
+        id: "equipment-install",
+        category: "maintenance",
+        at: eq.installDate,
+        title: "Equipment installed / recorded",
+        description: [eq.manufacturer, eq.location].filter(Boolean).join(" · ") || undefined,
+        sourceType: "Equipment",
+        sourceId: eq.id,
+      })
+    }
+
+    if (eq.notes?.trim()) {
+      events.push({
+        id: "equipment-notes",
+        category: "notes",
+        at: eq.installDate || workOrders[0]?.created_at || new Date().toISOString(),
+        title: "Equipment notes",
+        description: eq.notes.trim(),
+        sourceType: "Equipment",
+        sourceId: eq.id,
+      })
+    }
+
+    if (eq.warrantyExpiration?.trim()) {
+      const ymd = eq.warrantyExpiration.slice(0, 10)
+      events.push({
+        id: "equipment-warranty",
+        category: "warranty",
+        at: ymd,
+        title: ymd < todayYmd ? "Warranty expired" : "Warranty expiration scheduled",
+        description: ymd < todayYmd ? "Coverage period has ended." : "Coverage remains active until this date.",
+        status: warrantyKpi,
+        sourceType: "Equipment",
+        sourceId: eq.id,
+      })
+    }
+
+    for (const wo of workOrders) {
+      const woLabel = formatWorkOrderDisplay(wo.work_order_number, wo.id)
+      const technicianLabel = wo.assigned_technician_id ? techProfiles[wo.assigned_technician_id] ?? null : null
+      events.push({
+        id: `wo-${wo.id}-created`,
+        category: "service",
+        at: wo.created_at,
+        title: "Work order created",
+        description: wo.title,
+        status: woDbStatusLabel(wo.status),
+        href: `/work-orders?open=${encodeURIComponent(wo.id)}`,
+        sourceType: "Work order",
+        sourceId: wo.id,
+        workOrderLabel: woLabel,
+        technicianLabel,
+      })
+
+      if (wo.scheduled_on?.trim()) {
+        events.push({
+          id: `wo-${wo.id}-scheduled`,
+          category: "service",
+          at: wo.scheduled_on,
+          title: "Service scheduled",
+          description: wo.title,
+          status: woDbTypeLabel(wo.type),
+          href: `/work-orders?open=${encodeURIComponent(wo.id)}`,
+          sourceType: "Work order",
+          sourceId: wo.id,
+          workOrderLabel: woLabel,
+          technicianLabel,
+        })
+      }
+
+      if (technicianLabel) {
+        events.push({
+          id: `wo-${wo.id}-assigned`,
+          category: "service",
+          at: wo.scheduled_on || wo.created_at,
+          title: "Technician assigned",
+          description: wo.title,
+          href: `/work-orders?open=${encodeURIComponent(wo.id)}`,
+          sourceType: "Work order",
+          sourceId: wo.id,
+          workOrderLabel: woLabel,
+          technicianLabel,
+        })
+      }
+
+      if (wo.completed_at) {
+        events.push({
+          id: `wo-${wo.id}-completed`,
+          category: "service",
+          at: wo.completed_at,
+          title: "Service completed",
+          description: wo.title,
+          status: woDbStatusLabel(wo.status),
+          href: `/work-orders?open=${encodeURIComponent(wo.id)}`,
+          sourceType: "Work order",
+          sourceId: wo.id,
+          workOrderLabel: woLabel,
+          technicianLabel,
+        })
+      }
+    }
+
+    for (const cert of certificateLines) {
+      const wo = cert.workOrderId ? woById.get(cert.workOrderId) : undefined
+      events.push({
+        id: `cert-${cert.id}`,
+        category: "calibration",
+        at: cert.created_at,
+        title: "Calibration / certificate created",
+        description: [cert.templateName?.trim() || "Certificate", cert.workOrderLabel?.trim()].filter(Boolean).join(" · "),
+        href: cert.workOrderId ? `/work-orders?open=${encodeURIComponent(cert.workOrderId)}&tab=certificates` : undefined,
+        sourceType: "Calibration record",
+        sourceId: cert.id,
+        workOrderLabel: cert.workOrderLabel,
+        technicianLabel: wo?.assigned_technician_id ? techProfiles[wo.assigned_technician_id] ?? null : null,
+      })
+    }
+
+    for (const upload of certificateAttachmentRows) {
+      const wo = woById.get(upload.work_order_id)
+      events.push({
+        id: `cert-upload-${upload.id}`,
+        category: "documents",
+        at: upload.uploaded_at,
+        title: "Certificate uploaded",
+        description: upload.file_name,
+        href: `/work-orders?open=${encodeURIComponent(upload.work_order_id)}&tab=certificates`,
+        sourceType: "Certificate attachment",
+        sourceId: upload.id,
+        workOrderLabel: wo ? formatWorkOrderDisplay(wo.work_order_number, wo.id) : null,
+        technicianLabel: wo?.assigned_technician_id ? techProfiles[wo.assigned_technician_id] ?? null : null,
+      })
+    }
+
+    for (const doc of documentRows) {
+      const relatedWo =
+        doc.related_entity_type === "work_order"
+          ? woById.get(doc.related_entity_id)
+          : doc.related_entity_type === "calibration_record"
+            ? woById.get(certificateLines.find((cert) => cert.id === doc.related_entity_id)?.workOrderId ?? "")
+            : undefined
+      events.push({
+        id: `doc-${doc.id}`,
+        category: "documents",
+        at: doc.uploaded_at,
+        title: "Attachment uploaded",
+        description: doc.file_name,
+        status: doc.portal_release_status?.replace(/_/g, " "),
+        href: relatedWo ? `/work-orders?open=${encodeURIComponent(relatedWo.id)}&tab=attachments` : undefined,
+        sourceType: doc.related_entity_type.replace(/_/g, " "),
+        sourceId: doc.related_entity_id,
+        workOrderLabel: relatedWo ? formatWorkOrderDisplay(relatedWo.work_order_number, relatedWo.id) : null,
+      })
+    }
+
+    for (const inv of invoiceRows) {
+      const linkedWo = inv.linked_work_order_ids?.[0] ? woById.get(inv.linked_work_order_ids[0]) : undefined
+      events.push({
+        id: `invoice-${inv.id}`,
+        category: "billing",
+        at: inv.issued_at || new Date().toISOString(),
+        title: "Invoice created / linked",
+        description: [inv.invoice_number?.trim() || inv.title?.trim() || "Invoice", inv.amount_cents != null ? fmtCurrency(inv.amount_cents / 100) : null]
+          .filter(Boolean)
+          .join(" · "),
+        status: invoiceUiStatus(inv.status),
+        href: `/invoices?open=${encodeURIComponent(inv.id)}`,
+        sourceType: "Invoice",
+        sourceId: inv.id,
+        workOrderLabel: linkedWo ? formatWorkOrderDisplay(linkedWo.work_order_number, linkedWo.id) : null,
+      })
+    }
+
+    for (const plan of plans) {
+      events.push({
+        id: `plan-${plan.id}`,
+        category: "maintenance",
+        at: plan.next_due_date || new Date().toISOString(),
+        title: plan.next_due_date && plan.next_due_date.slice(0, 10) < todayYmd ? "Maintenance due / overdue" : "Maintenance plan due",
+        description: `${plan.name} · ${eqPlanIntervalLabel(plan)}`,
+        status: planStatusDbToUi(plan.status),
+        href: `/maintenance-plans?open=${encodeURIComponent(plan.id)}`,
+        sourceType: "Maintenance plan",
+        sourceId: plan.id,
+      })
+    }
+
+    return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+  }, [eq, workOrders, techProfiles, warrantyKpi, certificateLines, certificateAttachmentRows, documentRows, invoiceRows, plans])
+
+  const lastServiceDate = useMemo(() => {
+    const dates = [
+      ...(eq?.lastServiceDate ? [eq.lastServiceDate] : []),
+      ...workOrders.map((wo) => wo.completed_at).filter((date): date is string => Boolean(date)),
+    ]
+    return dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? ""
+  }, [eq?.lastServiceDate, workOrders])
+
+  const lastCalibrationDate = useMemo(() => {
+    return certificateLines
+      .map((cert) => cert.created_at)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? ""
+  }, [certificateLines])
+
+  const nextDueDate = useMemo(() => {
+    const candidates = [
+      eq?.nextDueDate,
+      eq?.nextCalibrationDue,
+      ...plans.map((plan) => plan.next_due_date),
+    ].filter((date): date is string => Boolean(date?.trim()))
+    return candidates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] ?? ""
+  }, [eq?.nextCalibrationDue, eq?.nextDueDate, plans])
 
   const invoicedRevenueCents = useMemo(() => sumInvoiceAmountCents(invoiceRows), [invoiceRows])
 
@@ -577,26 +991,38 @@ export default function EquipmentDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {(
           [
             {
-              label: "Open work orders",
+              label: "Total WOs",
+              value: String(workOrders.length),
+              sub: `${completedCount} completed`,
+              warn: false,
+            },
+            {
+              label: "Last service",
+              value: lastServiceDate ? fmtDate(lastServiceDate.slice(0, 10)) : "—",
+              sub: lastServiceDate ? "most recent completion" : "No completed service",
+              warn: false,
+            },
+            {
+              label: "Last calibration",
+              value: lastCalibrationDate ? fmtDate(lastCalibrationDate.slice(0, 10)) : "—",
+              sub: `${certificateLines.length} certificate${certificateLines.length === 1 ? "" : "s"}`,
+              warn: false,
+            },
+            {
+              label: "Next due",
+              value: nextDueDate ? fmtDate(nextDueDate.slice(0, 10)) : "—",
+              sub: nextDueDate && daysToDue(nextDueDate.slice(0, 10)) < 0 ? "overdue" : "service/cal/PM",
+              warn: Boolean(nextDueDate && daysToDue(nextDueDate.slice(0, 10)) < 0),
+            },
+            {
+              label: "Open issues",
               value: String(openWOs.length),
               sub: "not completed",
               warn: openWOs.length > 0,
-            },
-            {
-              label: "Completed work orders",
-              value: String(completedCount),
-              sub: "completed or invoiced",
-              warn: false,
-            },
-            {
-              label: "Active maintenance plans",
-              value: String(activePlanCount),
-              sub: "on this asset",
-              warn: false,
             },
             {
               label: "Warranty status",
@@ -611,7 +1037,7 @@ export default function EquipmentDetailPage() {
             className="bg-card rounded-xl border border-border p-4 flex flex-col gap-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] min-h-[100px]"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className={cn("text-2xl font-bold tracking-tight", warn ? "text-[color:var(--status-warning)]" : "text-foreground")}>
+            <p className={cn("text-xl font-bold tracking-tight leading-tight", warn ? "text-[color:var(--status-warning)]" : "text-foreground")}>
               {value}
             </p>
             <p className="text-xs text-muted-foreground leading-snug">{sub}</p>
@@ -623,6 +1049,9 @@ export default function EquipmentDetailPage() {
         <TabsList className="bg-card border border-border h-auto flex-wrap justify-start gap-1 p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm gap-1.5">
             <Cpu className="w-3.5 h-3.5" /> Overview
+          </TabsTrigger>
+          <TabsTrigger value="history" className="text-xs sm:text-sm gap-1.5">
+            <ClipboardList className="w-3.5 h-3.5" /> History ({historyEvents.length})
           </TabsTrigger>
           <TabsTrigger value="service" className="text-xs sm:text-sm gap-1.5">
             <Wrench className="w-3.5 h-3.5" /> Service ({workOrders.length})
@@ -746,6 +1175,14 @@ export default function EquipmentDetailPage() {
               </DrawerSection>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <EquipmentHistoryTimeline
+            events={historyEvents}
+            filter={historyFilter}
+            onFilterChange={setHistoryFilter}
+          />
         </TabsContent>
 
         <TabsContent value="service" className="mt-4 space-y-4">

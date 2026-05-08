@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T20:53:41.853Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:11:29.373Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -72,10 +72,11 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Equipment
 - **Routes:** \`/equipment\`, \`/equipment/[id]\`
-- **Purpose:** Asset registry, categories, warranty fields.
+- **Purpose:** Asset registry, categories, warranty fields, and device-level history timeline.
 - **Status:** Implemented.
-- **Tables:** \`equipment\` (+ migrations for warranty/metadata).
-- **Gaps:** Deeper equipment-type reporting and history rollups.
+- **Key UI:** Equipment detail History tab aggregates service, calibration, billing, document, warranty, notes, and maintenance activity.
+- **Tables:** \`equipment\` (+ migrations for warranty/metadata), plus linked \`work_orders\`, \`work_order_equipment\`, \`calibration_records\`, \`certificate_attachments\`, \`org_document_attachments\`, \`invoice_work_order_links\`, \`org_invoices\`, and \`maintenance_plans\`.
+- **Gaps:** Deeper equipment-type reporting and portal-facing equipment history.
 
 ### Work Orders
 - **Routes:** \`/work-orders\`, \`/work-orders/[id]\`
@@ -263,7 +264,7 @@ Roadmap informed by product direction (keep sequencing flexible):
 - **Service-to-invoice** linkage hardening
 - Automatic **terms-based due dates**
 - **US jurisdiction / location-based tax** logic
-- **Equipment history** and **equipment-type reporting**
+- **Equipment-type reporting** and portal-facing equipment history
 - **Certificate attachments** and customer **release rules**
 - **Technician signature** handling
 - Customer **portal document** access

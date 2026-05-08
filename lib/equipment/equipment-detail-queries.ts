@@ -212,7 +212,7 @@ export async function fetchWorkOrdersLinkedToEquipment(
         .limit(200)
     }
 
-    if (extra.error) return { rows: primaryRows, error: extra.message }
+    if (extra.error) return { rows: primaryRows, error: extra.error.message }
     extraRows = (extra.data ?? []) as Record<string, unknown>[]
   }
 
@@ -232,14 +232,16 @@ export type EquipmentInvoiceRow = {
   amount_cents: number | null
   issued_at: string | null
   invoice_number: string | null
+  linked_work_order_ids?: string[]
 }
 
 export async function fetchInvoicesForEquipmentAsset(
   supabase: SupabaseClient,
   organizationId: string,
   equipmentId: string,
+  workOrderIds: string[] = [],
 ): Promise<{ rows: EquipmentInvoiceRow[]; error?: string }> {
-  const { data, error } = await supabase
+  const { data: directData, error } = await supabase
     .from("org_invoices")
     .select("id, title, status, amount_cents, issued_at, invoice_number")
     .eq("organization_id", organizationId)
@@ -249,7 +251,49 @@ export async function fetchInvoicesForEquipmentAsset(
     .limit(150)
 
   if (error) return { rows: [], error: error.message }
-  return { rows: (data ?? []) as EquipmentInvoiceRow[] }
+
+  const rowsById = new Map<string, EquipmentInvoiceRow>()
+  for (const inv of (directData ?? []) as EquipmentInvoiceRow[]) {
+    rowsById.set(inv.id, { ...inv, linked_work_order_ids: [] })
+  }
+
+  if (workOrderIds.length > 0) {
+    const { data: linkRows, error: linkErr } = await supabase
+      .from("invoice_work_order_links")
+      .select("invoice_id, work_order_id")
+      .eq("organization_id", organizationId)
+      .in("work_order_id", workOrderIds)
+
+    if (!linkErr) {
+      const byInvoice = new Map<string, string[]>()
+      for (const link of (linkRows ?? []) as Array<{ invoice_id: string; work_order_id: string }>) {
+        const list = byInvoice.get(link.invoice_id) ?? []
+        list.push(link.work_order_id)
+        byInvoice.set(link.invoice_id, list)
+      }
+      const missingInvoiceIds = [...byInvoice.keys()].filter((invoiceId) => !rowsById.has(invoiceId))
+      if (missingInvoiceIds.length > 0) {
+        const { data: linkedData } = await supabase
+          .from("org_invoices")
+          .select("id, title, status, amount_cents, issued_at, invoice_number")
+          .eq("organization_id", organizationId)
+          .in("id", missingInvoiceIds)
+          .is("archived_at", null)
+        for (const inv of (linkedData ?? []) as EquipmentInvoiceRow[]) {
+          rowsById.set(inv.id, inv)
+        }
+      }
+      for (const [invoiceId, linked] of byInvoice) {
+        const inv = rowsById.get(invoiceId)
+        if (inv) inv.linked_work_order_ids = [...new Set([...(inv.linked_work_order_ids ?? []), ...linked])]
+      }
+    }
+  }
+
+  const rows = [...rowsById.values()].sort(
+    (a, b) => new Date(b.issued_at ?? 0).getTime() - new Date(a.issued_at ?? 0).getTime(),
+  )
+  return { rows }
 }
 
 export type EquipmentCertRow = {
@@ -274,4 +318,94 @@ export async function fetchCalibrationRecordsForEquipment(
 
   if (error) return { rows: [], error: error.message }
   return { rows: (data ?? []) as EquipmentCertRow[] }
+}
+
+export type EquipmentDocumentAttachmentRow = {
+  id: string
+  attachment_type: string
+  file_name: string
+  uploaded_at: string
+  related_entity_type: string
+  related_entity_id: string
+  portal_release_status: string
+}
+
+export async function fetchDocumentAttachmentsForEquipmentHistory(
+  supabase: SupabaseClient,
+  organizationId: string,
+  equipmentId: string,
+  relatedIds: { workOrderIds?: string[]; calibrationRecordIds?: string[] } = {},
+): Promise<{ rows: EquipmentDocumentAttachmentRow[]; error?: string }> {
+  const targets = [
+    { type: "equipment", ids: [equipmentId] },
+    { type: "work_order", ids: relatedIds.workOrderIds ?? [] },
+    { type: "calibration_record", ids: relatedIds.calibrationRecordIds ?? [] },
+  ].filter((target) => target.ids.length > 0)
+
+  const out: EquipmentDocumentAttachmentRow[] = []
+  for (const target of targets) {
+    const { data, error } = await supabase
+      .from("org_document_attachments")
+      .select("id, attachment_type, file_name, uploaded_at, related_entity_type, related_entity_id, portal_release_status")
+      .eq("organization_id", organizationId)
+      .eq("related_entity_type", target.type)
+      .in("related_entity_id", target.ids)
+      .is("deleted_at", null)
+      .order("uploaded_at", { ascending: false })
+      .limit(150)
+    if (error) return { rows: out, error: error.message }
+    out.push(...((data ?? []) as EquipmentDocumentAttachmentRow[]))
+  }
+
+  return {
+    rows: uniqueById(out).sort(
+      (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime(),
+    ),
+  }
+}
+
+export type EquipmentCertificateAttachmentRow = {
+  id: string
+  file_name: string
+  uploaded_at: string
+  work_order_id: string
+  calibration_record_id: string | null
+  equipment_id: string | null
+}
+
+export async function fetchCertificateAttachmentsForEquipmentHistory(
+  supabase: SupabaseClient,
+  organizationId: string,
+  equipmentId: string,
+  workOrderIds: string[],
+): Promise<{ rows: EquipmentCertificateAttachmentRow[]; error?: string }> {
+  const out: EquipmentCertificateAttachmentRow[] = []
+
+  const { data: scoped, error: scopedErr } = await supabase
+    .from("certificate_attachments")
+    .select("id, file_name, uploaded_at, work_order_id, calibration_record_id, equipment_id")
+    .eq("organization_id", organizationId)
+    .eq("equipment_id", equipmentId)
+    .order("uploaded_at", { ascending: false })
+    .limit(100)
+  if (scopedErr) return { rows: [], error: scopedErr.message }
+  out.push(...((scoped ?? []) as EquipmentCertificateAttachmentRow[]))
+
+  if (workOrderIds.length > 0) {
+    const { data: woScoped, error: woErr } = await supabase
+      .from("certificate_attachments")
+      .select("id, file_name, uploaded_at, work_order_id, calibration_record_id, equipment_id")
+      .eq("organization_id", organizationId)
+      .in("work_order_id", workOrderIds)
+      .order("uploaded_at", { ascending: false })
+      .limit(100)
+    if (woErr) return { rows: out, error: woErr.message }
+    out.push(...((woScoped ?? []) as EquipmentCertificateAttachmentRow[]).filter((row) => !row.equipment_id || row.equipment_id === equipmentId))
+  }
+
+  return {
+    rows: uniqueById(out).sort(
+      (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime(),
+    ),
+  }
 }
