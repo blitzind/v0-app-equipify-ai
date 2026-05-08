@@ -416,7 +416,7 @@ export function PurchaseOrderDrawer({
               >
                 <Download className="w-3.5 h-3.5" /> Download PDF
               </Button>
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-not-allowed opacity-60" disabled title="Coming soon">
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-not-allowed opacity-60" disabled title="Duplicate is not available for this purchase order yet.">
                 <Copy className="w-3.5 h-3.5" /> Duplicate
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-pointer" onClick={startEdit}>
@@ -746,7 +746,7 @@ export function PurchaseOrderDrawer({
                 <div className={cn(sectionCardClass, "border-dashed px-4 py-8 flex flex-col items-center gap-2")}>
                   <Paperclip className="w-5 h-5 text-muted-foreground/40" />
                   <p className="text-xs text-muted-foreground text-center">No attachments</p>
-                  <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Coming soon">
+                  <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Attachments cannot be uploaded from here yet.">
                     Upload file
                   </button>
                 </div>
@@ -760,7 +760,7 @@ export function PurchaseOrderDrawer({
                         type="button"
                         disabled
                         className="text-muted-foreground/50 cursor-not-allowed p-1"
-                        title="Coming soon"
+                        title="Attachment download is not available yet."
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
@@ -927,7 +927,7 @@ export function PurchaseOrderDrawer({
                 <div className={cn(sectionCardClass, "border-dashed flex flex-col items-center gap-2 py-8")}>
                   <Paperclip className="w-5 h-5 text-muted-foreground/40" />
                   <p className="text-xs text-muted-foreground">No attachments</p>
-                  <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Coming soon">
+                  <button type="button" disabled className="text-xs text-muted-foreground cursor-not-allowed" title="Attachments cannot be uploaded from here yet.">
                     Upload file
                   </button>
                 </div>
@@ -941,7 +941,7 @@ export function PurchaseOrderDrawer({
                         type="button"
                         disabled
                         className="text-muted-foreground/50 cursor-not-allowed"
-                        title="Coming soon"
+                        title="Attachment download is not available yet."
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>

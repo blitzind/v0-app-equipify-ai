@@ -466,15 +466,6 @@ function ProspectsPageInner() {
         </div>
       </div>
 
-      {/* Growth roadmap teaser */}
-      <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2.5 text-[11px] text-muted-foreground inline-flex items-start gap-1.5 max-w-2xl">
-        <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
-        <span>
-          Coming next: campaigns, review &amp; referral requests, automated nurture sequences, and
-          AI follow-up suggestions. This pipeline is the foundation those tools will plug into.
-        </span>
-      </div>
-
       <ProspectFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}

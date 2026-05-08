@@ -269,14 +269,13 @@ export default function PermissionsPage() {
       <div className="flex items-start gap-2.5 rounded-lg border ds-alert-info px-5 py-4">
         <Info size={14} className="mt-0.5 shrink-0 ds-icon-info" />
         <div>
-          <p className="text-sm font-medium">Custom role permissions</p>
+          <p className="text-sm font-medium">How permissions are applied</p>
           <p className="text-xs mt-0.5">
-            Granular per-permission overrides and custom roles are on the
-            roadmap. Until then, role assignments above (managed in{" "}
+            Role assignments above (managed in{" "}
             <a href="/settings/team" className="underline font-medium">
               Team settings
             </a>
-            ) are the source of truth, enforced by both UI gates and API guards.
+            ) are the source of truth and are enforced by both UI gates and API guards.
           </p>
         </div>
       </div>

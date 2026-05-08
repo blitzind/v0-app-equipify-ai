@@ -1827,7 +1827,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                         key={item.label}
                         type="button"
                         disabled={"soon" in item && item.soon}
-                        title={"soon" in item && item.soon ? "Coming soon" : undefined}
+                        title={"soon" in item && item.soon ? "Not available yet for this invoice." : undefined}
                         onClick={() => {
                           if ("soon" in item && item.soon) return
                           void Promise.resolve("run" in item ? item.run() : undefined).finally(() =>
@@ -1843,9 +1843,6 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                       >
                         <span className="text-muted-foreground shrink-0">{item.icon}</span>
                         <span className="flex-1">{item.label}</span>
-                        {"soon" in item && item.soon ? (
-                          <span className="text-[10px] text-muted-foreground shrink-0">Soon</span>
-                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -1930,7 +1927,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                         }
                         title={
                           "soon" in item && item.soon
-                            ? "Coming soon"
+                            ? "Not available yet for this invoice."
                             : item.label === "Archive Invoice" && !canArchiveRestore
                               ? "Owner, admin, or manager role required"
                               : undefined

@@ -112,7 +112,7 @@ function ComingSoonButton({ label }: { label: string }) {
           </Button>
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top">Coming soon</TooltipContent>
+      <TooltipContent side="top">Not available for this insight</TooltipContent>
     </Tooltip>
   )
 }

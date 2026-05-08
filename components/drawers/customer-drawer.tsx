@@ -21,7 +21,7 @@ import {
   MapPin, Phone, Mail, ClipboardList, FileText, Receipt,
   ExternalLink, Pencil, X, Plus, Trash2, Archive,
   MoreHorizontal, Star,
-  Globe, Send, Link2, RotateCcw, Clock, Activity,
+  Globe, Send, Link2, RotateCcw,
   Paintbrush, LayoutGrid, UserCog,
 } from "lucide-react"
 import type { Location } from "@/lib/mock-data"
@@ -1353,7 +1353,9 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <p className="text-xs font-semibold text-foreground">
                   {portalEnabled ? "Portal active" : "Portal disabled"}
                 </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">Last login: Apr 28, 2026 at 3:14 PM</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  {portalEnabled ? "The customer can sign in to the portal." : "The customer cannot sign in to the portal."}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2 self-center">
@@ -1383,39 +1385,14 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 key={label}
                 type="button"
                 disabled
-                title="Coming soon"
+                aria-disabled
+                title="Manage portal access from workspace settings."
                 className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-3 py-2.5 text-left text-xs font-medium text-muted-foreground shadow-[inset_0_1px_0_rgba(0,0,0,0.02)] transition-colors cursor-not-allowed opacity-60"
               >
                 <Icon size={13} className="shrink-0 text-muted-foreground" />
-                <span className="flex flex-col gap-0.5">
-                  <span>{label}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground/80">Coming soon</span>
-                </span>
+                <span className="truncate">{label}</span>
               </button>
             ))}
-          </div>
-
-          {/* Activity */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled
-              title="Coming soon"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground/50 cursor-not-allowed"
-            >
-              <Activity size={12} />
-              View portal activity log
-            </button>
-            <span className="text-muted-foreground/40">·</span>
-            <button
-              type="button"
-              disabled
-              title="Coming soon"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground/50 cursor-not-allowed"
-            >
-              <Clock size={12} />
-              Last login details
-            </button>
           </div>
 
           {/* Admin controls */}
@@ -1427,7 +1404,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <button
                 type="button"
                 disabled
-                title="Coming soon"
+                aria-disabled
+                title="Manage branding from workspace settings."
                 className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
               >
                 <Paintbrush size={12} className="text-muted-foreground" />
@@ -1436,7 +1414,8 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
               <button
                 type="button"
                 disabled
-                title="Coming soon"
+                aria-disabled
+                title="Manage portal contacts from workspace settings."
                 className={cn(DRAWER_NESTED_CARD, "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors cursor-not-allowed opacity-60 shadow-none")}
               >
                 <UserCog size={12} className="text-muted-foreground" />

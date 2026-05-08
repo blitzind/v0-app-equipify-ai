@@ -1,17 +1,12 @@
 "use client"
 
 /**
- * Workflow Automations Phase 2 — grouped action picker.
+ * Workflow Automations — grouped action picker.
  *
  * Modal for selecting an action to add to the visual stack. Cards are
  * grouped by "internal vs customer-facing" to nudge managers toward
  * safe automations (notify staff, create task) before customer-touching
  * ones (send email, send sms — flagged with the autoSafe warning).
- *
- * Phase 2 also reserves a "Coming soon" tier for future engine work
- * (webhooks, scheduled reminders, branching) — these cards are
- * disabled and clearly labelled so the roadmap is visible without
- * shipping unfinished engine features.
  */
 
 import { useMemo, useState } from "react"
@@ -19,15 +14,12 @@ import {
   Bell,
   Bot,
   ChevronRight,
-  Clock,
-  GitBranch,
   ListChecks,
   Mail,
   MessageSquare,
   Search,
   ShieldAlert,
   UserCheck,
-  Webhook,
   Wrench,
   type LucideIcon,
 } from "lucide-react"
@@ -53,34 +45,6 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   create_work_order: Wrench,
   create_ai_task: Bot,
 }
-
-type ComingSoon = {
-  id: string
-  label: string
-  description: string
-  icon: LucideIcon
-}
-
-const COMING_SOON: ComingSoon[] = [
-  {
-    id: "webhook",
-    label: "Send webhook",
-    description: "Forward the trigger payload to an external HTTPS endpoint (Phase 3).",
-    icon: Webhook,
-  },
-  {
-    id: "schedule_reminder",
-    label: "Schedule reminder",
-    description: "Wait N days, then run a follow-up step (Phase 3 delayed actions).",
-    icon: Clock,
-  },
-  {
-    id: "branch_condition",
-    label: "Conditional branch",
-    description: "Run different actions based on a runtime check (Phase 3 branches).",
-    icon: GitBranch,
-  },
-]
 
 type Props = {
   open: boolean
@@ -178,7 +142,7 @@ export function ActionPickerDialog({ open, onOpenChange, triggerType, onPick }: 
                               ? "Live"
                               : meta.availability === "logged"
                                 ? "Logged only"
-                                : "Coming soon"}
+                                : "Not enabled"}
                           </Badge>
                           {!meta.autoSafe ? (
                             <Badge
@@ -202,33 +166,6 @@ export function ActionPickerDialog({ open, onOpenChange, triggerType, onPick }: 
             )
           })}
 
-          <section className="flex flex-col gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Coming soon — Phase 3
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {COMING_SOON.filter((c) => filterMatch(c.label, c.description)).map((c) => {
-                const Icon = c.icon
-                return (
-                  <div
-                    key={c.id}
-                    className="rounded-xl border border-dashed border-border bg-muted/20 p-3 flex flex-col gap-1.5 opacity-80"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted shrink-0">
-                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm font-semibold text-foreground truncate">{c.label}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">{c.description}</p>
-                    <Badge variant="outline" className="text-[10px] self-start">
-                      Coming soon
-                    </Badge>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
         </div>
       </DialogContent>
     </Dialog>

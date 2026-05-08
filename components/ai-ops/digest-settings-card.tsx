@@ -704,9 +704,13 @@ export function AiOpsDigestSettingsCard() {
                         </p>
                         <p className="text-muted-foreground">
                           {run.triggerKind} · {new Date(run.createdAt).toLocaleString()}
-                          {run.errorMessage ? (
+                          {run.errorMessage && canManage ? (
                             <span className="text-red-600 dark:text-red-400 ml-1">
                               · {run.errorMessage}
+                            </span>
+                          ) : run.errorMessage ? (
+                            <span className="text-red-600 dark:text-red-400 ml-1">
+                              · Delivery failed
                             </span>
                           ) : null}
                         </p>

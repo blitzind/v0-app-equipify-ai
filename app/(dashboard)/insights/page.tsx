@@ -264,7 +264,7 @@ function SummaryReportModal({ onClose, report }: { onClose: () => void; report: 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled title="Coming soon" className="text-zinc-500 cursor-not-allowed opacity-60">
+            <Button variant="outline" size="sm" disabled title="PDF export is not available for this report yet." className="text-zinc-500 cursor-not-allowed opacity-60">
               <Download size={12} /> Export PDF
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100">

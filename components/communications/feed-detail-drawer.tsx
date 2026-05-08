@@ -19,7 +19,6 @@ import {
   ExternalLink,
   FlaskConical,
   Loader2,
-  Mail,
   RefreshCw,
   Send,
   Sparkles,
@@ -441,19 +440,6 @@ export function FeedDetailDrawer({
                 </Section>
               ) : null}
 
-              <Section label="Roadmap">
-                <ul className="text-xs text-muted-foreground space-y-1.5">
-                  <li className="flex items-center gap-1.5">
-                    <Mail className="w-3 h-3" aria-hidden /> Threaded conversations + inbound replies
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <Send className="w-3 h-3" aria-hidden /> Provider webhook sync (Resend)
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <Zap className="w-3 h-3" aria-hidden /> SMS, voicemail, call logs (Twilio)
-                  </li>
-                </ul>
-              </Section>
             </>
           ) : null}
         </div>

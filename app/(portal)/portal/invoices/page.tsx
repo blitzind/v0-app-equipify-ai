@@ -62,9 +62,6 @@ export default function PortalInvoicesPage() {
             </p>
           </div>
         </div>
-        <Button type="button" variant="outline" size="sm" disabled className="text-xs">
-          Pay online (coming soon)
-        </Button>
       </div>
 
       <div className="portal-card overflow-hidden">

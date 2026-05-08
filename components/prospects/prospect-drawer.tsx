@@ -363,16 +363,6 @@ export function ProspectDrawer({
           />
         </DrawerSection>
 
-        <DrawerSection title="Growth roadmap">
-          <p className="text-xs text-muted-foreground inline-flex items-start gap-1.5">
-            <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
-            <span>
-              {aiDraftAvailable
-                ? "AI follow-up drafting is live. Coming next: campaigns, review & referral asks, and automated nurture sequences keyed to status changes."
-                : "Coming next: AI follow-up suggestions, campaigns, review & referral asks, and automated nurture sequences keyed to status changes."}
-            </span>
-          </p>
-        </DrawerSection>
       </DetailDrawer>
 
       <AiDraftFollowUpDialog

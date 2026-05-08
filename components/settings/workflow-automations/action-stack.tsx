@@ -168,7 +168,7 @@ export function ActionStack({ actions, onChange, onRequestPicker, disabled = fal
                           ? "Live"
                           : meta.availability === "logged"
                             ? "Logged only"
-                            : "Coming soon"}
+                            : "Not enabled"}
                       </Badge>
                       {!meta.autoSafe ? (
                         <Badge
@@ -378,8 +378,7 @@ function ActionConfigFields({
       return (
         <>
           <p className="text-[11px] text-muted-foreground">
-            Phase 2 doesn&apos;t yet expose a technician picker — set
-            <code className="px-1">user_id</code> in the advanced JSON tab. The engine will assign that user to
+            Set <code className="px-1">user_id</code> in the advanced JSON tab. The engine will assign that user to
             the work order from the trigger payload.
           </p>
         </>
