@@ -83,6 +83,7 @@ type CustomerMappingField = {
 }
 
 const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "source_record_id", label: "Source record ID", description: "Preserved for source-system mapping." },
   { field: "company_name", label: "Customer name", required: true, description: "Required for creating customers." },
   { field: "external_code", label: "External ID" },
   { field: "contact_full_name", label: "Primary contact name" },
@@ -131,6 +132,66 @@ const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "parent_company_name", label: "Parent company name", description: "Preserved for future hierarchy support." },
 ] as const
 
+const EQUIPMENT_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "source_record_id", label: "Source record ID", description: "Preserved for source-system mapping." },
+  { field: "name", label: "Equipment name" },
+  { field: "equipment_code", label: "External equipment ID" },
+  { field: "serial_number", label: "Serial number", required: true },
+  { field: "customer_external_code", label: "Customer external ID" },
+  { field: "customer_company", label: "Customer company" },
+  { field: "location_label", label: "Location / site" },
+  { field: "manufacturer", label: "Make / manufacturer" },
+  { field: "category", label: "Equipment type / category" },
+  { field: "subcategory", label: "Model / subcategory" },
+  { field: "install_date", label: "Install date" },
+  { field: "warranty_expires_at", label: "Warranty expires" },
+  { field: "next_due_at", label: "Next service due" },
+  { field: "next_calibration_due_at", label: "Next calibration due" },
+  { field: "calibration_interval_months", label: "Calibration interval months" },
+  { field: "notes", label: "Notes" },
+]
+
+const WORK_ORDER_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "source_record_id", label: "Source record ID", description: "Preserved for source-system mapping." },
+  { field: "work_order_number", label: "Job / work order ID" },
+  { field: "title", label: "Title / summary", required: true },
+  { field: "customer_external_code", label: "Customer external ID" },
+  { field: "customer_company", label: "Customer company" },
+  { field: "equipment_serial", label: "Equipment serial" },
+  { field: "status", label: "Status" },
+  { field: "priority", label: "Priority" },
+  { field: "type", label: "Service type" },
+  { field: "scheduled_on", label: "Service / appointment date" },
+  { field: "completed_at", label: "Completed date" },
+  { field: "technician_name", label: "Technician" },
+  { field: "legacy_invoice_number", label: "Legacy invoice number" },
+  { field: "notes", label: "Notes" },
+]
+
+const INVOICE_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "source_record_id", label: "Source record ID", description: "Preserved for source-system mapping." },
+  { field: "invoice_number", label: "Invoice number", required: true },
+  { field: "customer_external_code", label: "Customer external ID" },
+  { field: "customer_company", label: "Customer company" },
+  { field: "work_order_number", label: "Job / work order ID" },
+  { field: "equipment_serial", label: "Equipment serial" },
+  { field: "title", label: "Title / memo" },
+  { field: "amount", label: "Total amount" },
+  { field: "balance", label: "Balance" },
+  { field: "issued_at", label: "Invoice date" },
+  { field: "due_date", label: "Due date" },
+  { field: "paid_at", label: "Paid date" },
+  { field: "status", label: "Status" },
+  { field: "notes", label: "Notes" },
+]
+
+const MAPPING_FIELDS_BY_KIND: Record<"customer" | "equipment" | "invoice" | "work_order", CustomerMappingField[]> = {
+  customer: CUSTOMER_MAPPING_FIELDS,
+  equipment: EQUIPMENT_MAPPING_FIELDS,
+  invoice: INVOICE_MAPPING_FIELDS,
+  work_order: WORK_ORDER_MAPPING_FIELDS,
+}
+
 function formatBytes(bytes?: number | null): string {
   if (!bytes) return "—"
   if (bytes < 1024) return `${bytes} B`
@@ -143,11 +204,13 @@ export function CsvImportFlow({
   title,
   description,
   backHref,
+  defaultSourceSystem = "",
 }: {
   kind: "customer" | "equipment" | "invoice" | "work_order"
   title: string
   description: string
   backHref: string
+  defaultSourceSystem?: string
 }) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { toast } = useToast()
@@ -157,7 +220,7 @@ export function CsvImportFlow({
   const [worksheetName, setWorksheetName] = useState("")
   const [detectedColumns, setDetectedColumns] = useState<string[]>([])
   const [inspectBusy, setInspectBusy] = useState(false)
-  const [sourceSystem, setSourceSystem] = useState("")
+  const [sourceSystem, setSourceSystem] = useState(defaultSourceSystem)
   const [busy, setBusy] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
   const [importRef, setImportRef] = useState<string | null>(null)
@@ -497,10 +560,10 @@ export function CsvImportFlow({
           ? "Mapped fields on matching customers may be replaced."
           : "Matching rows will fail instead of updating existing customers."
 
-  const mappingStorageKey =
-    kind === "customer" && sourceSystem.trim()
-      ? `equipify:migration-mapping:${kind}:${sourceSystem.trim().toLowerCase()}`
-      : null
+  const mappingFields = MAPPING_FIELDS_BY_KIND[kind]
+  const mappingStorageKey = sourceSystem.trim()
+    ? `equipify:migration-mapping:${kind}:${sourceSystem.trim().toLowerCase()}`
+    : null
 
   const saveMapping = () => {
     if (!mappingStorageKey) {
@@ -537,7 +600,7 @@ export function CsvImportFlow({
 
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="grid gap-2">
-          <Label htmlFor="csv-file">Customer file</Label>
+          <Label htmlFor="csv-file">Import file</Label>
           <Input
             id="csv-file"
             type="file"
@@ -768,7 +831,7 @@ export function CsvImportFlow({
             </div>
           ) : null}
 
-          {kind === "customer" ? (
+          {detectedColumns.length > 0 ? (
             <div className="grid gap-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -823,7 +886,7 @@ export function CsvImportFlow({
                 </div>
                 {detectedColumns.map((column) => {
                   const target = targetForSourceColumn(column)
-                  const targetMeta = CUSTOMER_MAPPING_FIELDS.find((field) => field.field === target)
+                  const targetMeta = mappingFields.find((field) => field.field === target)
                   return (
                     <div
                       key={column}
@@ -842,7 +905,7 @@ export function CsvImportFlow({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__ignore">Ignore column</SelectItem>
-                          {CUSTOMER_MAPPING_FIELDS.map((item) => (
+                          {mappingFields.map((item) => (
                             <SelectItem key={`${column}-${item.field}`} value={item.field}>
                               {item.label}
                               {item.required ? " *" : ""}

@@ -228,10 +228,16 @@ export default function MigrationCenterPage() {
           description="Bulk documentation workflows — ZIP matching is staged for a later phase."
         />
         <HubCard
+          href="/settings/imports/fieldpulse"
+          icon={Briefcase}
+          title="FieldPulse exports"
+          description="CSV migration path for FieldPulse customers, equipment, jobs, appointments, and invoices."
+        />
+        <HubCard
           href="/settings/imports/quickbooks"
           icon={Plug}
           title="QuickBooks continuity"
-          description="Record migration intent and jump to live QuickBooks integration settings."
+          description="Import historical QuickBooks data without modifying QuickBooks or outbound sync settings."
         />
       </div>
 

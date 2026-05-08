@@ -1,16 +1,84 @@
 import { NextResponse } from "next/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { loadJobCsvFromStorage } from "@/lib/migration-imports/load-job-csv"
 import { runCommit } from "@/lib/migration-imports/types"
 import type { MigrationCommitOptions, MigrationImportKind } from "@/lib/migration-imports/types"
 import { outcomesForClient } from "@/lib/migration-imports/public-response"
 import { resolveImportStrategy } from "@/lib/migration-imports/strategy"
 import { requireOrgMigrationAccess } from "@/lib/migration-imports/require-org-migration-access"
+import { resolveMapped } from "@/lib/migration-imports/map-columns"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function fieldPulseEntityType(entityKind: string | undefined): string | null {
+  if (entityKind === "customer") return "customer"
+  if (entityKind === "equipment") return "equipment"
+  if (entityKind === "work_order") return "work_order"
+  if (entityKind === "invoice") return "invoice"
+  return null
+}
+
+function sourceRecordId(kind: MigrationImportKind, row: Record<string, string>, mapping: Record<string, string>): string {
+  const direct = resolveMapped(row, mapping, "source_record_id")
+  if (direct) return direct
+  if (kind === "customer") {
+    return resolveMapped(row, mapping, "external_code") || resolveMapped(row, mapping, "legacy_source_ids")
+  }
+  if (kind === "equipment") return resolveMapped(row, mapping, "equipment_code")
+  if (kind === "work_order") return resolveMapped(row, mapping, "work_order_number")
+  if (kind === "invoice") return resolveMapped(row, mapping, "invoice_number")
+  return ""
+}
+
+async function upsertFieldPulseMappings(params: {
+  svc: SupabaseClient
+  organizationId: string
+  importJobId: string
+  kind: MigrationImportKind
+  rows: Record<string, string>[]
+  columnMapping: Record<string, string>
+  outcomes: Array<{ rowIndex: number; status: string; entityKind?: string; entityId?: string }>
+}) {
+  const now = new Date().toISOString()
+  const payload = params.outcomes
+    .map((outcome) => {
+      const entityType = fieldPulseEntityType(outcome.entityKind)
+      if (!entityType || !outcome.entityId || outcome.status === "error") return null
+      const row = params.rows[outcome.rowIndex - 1] ?? {}
+      const externalId = sourceRecordId(params.kind, row, params.columnMapping).trim()
+      if (!externalId) return null
+      return {
+        organization_id: params.organizationId,
+        provider: "fieldpulse",
+        entity_type: entityType,
+        internal_id: outcome.entityId,
+        external_id: externalId,
+        sync_status: "synced",
+        last_synced_at: now,
+        imported_at: now,
+        import_job_id: params.importJobId,
+        mapping_status:
+          outcome.status === "imported" ? "created" : outcome.status === "updated" ? "updated" : "matched",
+        mapping_confidence: 0.9,
+        metadata: {
+          source: "fieldpulse_csv_import",
+          raw_snapshot: row,
+        },
+        updated_at: now,
+      }
+    })
+    .filter(Boolean)
+
+  if (payload.length > 0) {
+    await params.svc.from("external_sync_mappings").upsert(payload, {
+      onConflict: "organization_id,provider,entity_type,internal_id",
+    })
+  }
+}
 
 export async function POST(
   request: Request,
@@ -38,7 +106,7 @@ export async function POST(
 
   const { data: job, error: jobErr } = await supabase
     .from("organization_import_jobs")
-    .select("kind, storage_path, column_mapping, status")
+    .select("kind, storage_path, column_mapping, status, source_system")
     .eq("organization_id", organizationId)
     .eq("id", jobId)
     .maybeSingle()
@@ -113,6 +181,19 @@ export async function POST(
     kind,
     importSeedPrefix: jobId,
   })
+
+  const sourceSystem = String((job as { source_system?: string | null }).source_system ?? "")
+  if (sourceSystem.toLowerCase().includes("fieldpulse")) {
+    await upsertFieldPulseMappings({
+      svc,
+      organizationId,
+      importJobId: jobId,
+      kind,
+      rows: parsed.rows,
+      columnMapping,
+      outcomes: result.outcomes,
+    })
+  }
 
   await supabase.from("organization_import_job_rows").delete().eq("import_job_id", jobId)
 

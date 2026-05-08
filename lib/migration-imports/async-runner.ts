@@ -2,11 +2,72 @@ import { loadJobCsvFromStorageForAsync } from "./load-job-csv"
 import { runCommit, type MigrationCommitOptions, type MigrationImportKind, type RowOutcome } from "./types"
 import { resolveImportStrategy } from "./strategy"
 import { MIGRATION_IMPORT_ASYNC_DEFAULT_CHUNK_SIZE } from "./constants"
+import { resolveMapped } from "./map-columns"
 
 type Gate = {
   userId: string
   supabase: any
   svc: any
+}
+
+function fieldPulseEntityType(entityKind: string | undefined): string | null {
+  if (entityKind === "customer") return "customer"
+  if (entityKind === "equipment") return "equipment"
+  if (entityKind === "work_order") return "work_order"
+  if (entityKind === "invoice") return "invoice"
+  return null
+}
+
+function sourceRecordId(kind: MigrationImportKind, row: Record<string, string>, mapping: Record<string, string>): string {
+  const direct = resolveMapped(row, mapping, "source_record_id")
+  if (direct) return direct
+  if (kind === "customer") return resolveMapped(row, mapping, "external_code") || resolveMapped(row, mapping, "legacy_source_ids")
+  if (kind === "equipment") return resolveMapped(row, mapping, "equipment_code")
+  if (kind === "work_order") return resolveMapped(row, mapping, "work_order_number")
+  if (kind === "invoice") return resolveMapped(row, mapping, "invoice_number")
+  return ""
+}
+
+async function upsertFieldPulseMappings(params: {
+  svc: any
+  organizationId: string
+  importJobId: string
+  kind: MigrationImportKind
+  rows: Record<string, string>[]
+  rowOffset: number
+  columnMapping: Record<string, string>
+  outcomes: RowOutcome[]
+}) {
+  const now = new Date().toISOString()
+  const payload = params.outcomes
+    .map((outcome) => {
+      const entityType = fieldPulseEntityType(outcome.entityKind)
+      if (!entityType || !outcome.entityId || outcome.status === "error") return null
+      const row = params.rows[outcome.rowIndex - params.rowOffset - 1] ?? {}
+      const externalId = sourceRecordId(params.kind, row, params.columnMapping).trim()
+      if (!externalId) return null
+      return {
+        organization_id: params.organizationId,
+        provider: "fieldpulse",
+        entity_type: entityType,
+        internal_id: outcome.entityId,
+        external_id: externalId,
+        sync_status: "synced",
+        last_synced_at: now,
+        imported_at: now,
+        import_job_id: params.importJobId,
+        mapping_status: outcome.status === "imported" ? "created" : outcome.status === "updated" ? "updated" : "matched",
+        mapping_confidence: 0.9,
+        metadata: { source: "fieldpulse_csv_import", raw_snapshot: row },
+        updated_at: now,
+      }
+    })
+    .filter(Boolean)
+  if (payload.length > 0) {
+    await params.svc.from("external_sync_mappings").upsert(payload, {
+      onConflict: "organization_id,provider,entity_type,internal_id",
+    })
+  }
 }
 
 export type AsyncRunPublic = {
@@ -213,7 +274,7 @@ export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: 
 
   const { data: job, error: jobErr } = await supabase
     .from("organization_import_jobs")
-    .select("kind, storage_path, column_mapping, options, status")
+    .select("kind, storage_path, column_mapping, options, status, source_system")
     .eq("organization_id", organizationId)
     .eq("id", jobId)
     .maybeSingle()
@@ -225,6 +286,7 @@ export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: 
     column_mapping: Record<string, string> | null
     options: Record<string, unknown> | null
     status: string
+    source_system: string | null
   }
   if (!j.storage_path) throw new Error("No uploaded file for this job.")
   if (j.status === "processing") throw new Error("Import is already running.")
@@ -263,7 +325,7 @@ export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: 
       updated_count: 0,
       skipped_count: 0,
       error_count: 0,
-      metadata: { strategy, options, columnMapping },
+      metadata: { strategy, options, columnMapping, sourceSystem: j.source_system ?? null },
       created_by: userId,
       committed_by: userId,
       started_at: now,
@@ -352,13 +414,13 @@ async function processRunById(
   try {
     const { data: job, error: jobErr } = await supabase
       .from("organization_import_jobs")
-      .select("kind, storage_path, cancel_requested_at")
+      .select("kind, storage_path, cancel_requested_at, source_system")
       .eq("organization_id", organizationId)
       .eq("id", jobId)
       .single()
     if (jobErr || !job) throw new Error(jobErr?.message ?? "Import job not found.")
 
-    const j = job as { kind: MigrationImportKind; storage_path: string | null; cancel_requested_at: string | null }
+    const j = job as { kind: MigrationImportKind; storage_path: string | null; cancel_requested_at: string | null; source_system: string | null }
     if (!j.storage_path) throw new Error("No uploaded file for this job.")
 
     const cancelRequested = Boolean(run.cancel_requested_at) || Boolean(j.cancel_requested_at)
@@ -467,6 +529,19 @@ async function processRunById(
     }))
     if (rowPayload.length > 0) {
       await supabase.from("organization_import_job_rows").upsert(rowPayload, { onConflict: "import_job_id,row_index" })
+    }
+    const sourceSystem = String(j.source_system ?? meta.sourceSystem ?? "")
+    if (sourceSystem.toLowerCase().includes("fieldpulse")) {
+      await upsertFieldPulseMappings({
+        svc,
+        organizationId,
+        importJobId: jobId,
+        kind: j.kind,
+        rows: nextRows,
+        rowOffset: offset,
+        columnMapping,
+        outcomes: shifted,
+      })
     }
 
     const processedCount = Number(run.processed_count ?? 0) + nextRows.length
