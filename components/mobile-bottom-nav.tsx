@@ -56,6 +56,9 @@ function resolveMobileNavPermissions(args: {
   if (args.status !== "ready") {
     return getOrgPermissionsForRole("owner")
   }
+  if (!args.role) {
+    return getOrgPermissionsForRole("owner")
+  }
   return args.permissions
 }
 

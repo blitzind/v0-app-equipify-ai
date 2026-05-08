@@ -8,6 +8,7 @@ import { useTenant } from "@/lib/tenant-store"
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useAdmin } from "@/lib/admin-store"
 import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
@@ -154,6 +155,30 @@ const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  {
+    id: "system",
+    label: "System",
+    items: [
+      {
+        label: "Settings",
+        href: "/settings/workspace",
+        icon: Settings,
+        anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"],
+      },
+      {
+        label: "Integrations",
+        href: "/settings/integrations",
+        icon: Building2,
+        anyOf: ["canManageIntegrations"],
+      },
+      {
+        label: "Billing",
+        href: "/settings/billing",
+        icon: Receipt,
+        anyOf: ["canViewBilling", "canEditOrgBilling"],
+      },
+    ],
+  },
 ]
 
 const FALLBACK_NAV_GROUPS: NavGroup[] = [
@@ -191,6 +216,10 @@ function debugNavResolution(details: Record<string, unknown>) {
   console.info("[equipify:nav]", details)
 }
 
+function shouldRenderNavDebugPanel(): boolean {
+  return process.env.NEXT_PUBLIC_DEBUG_NAV === "true"
+}
+
 function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
   return role === "owner" || role === "admin" || role === "manager"
 }
@@ -199,7 +228,13 @@ function resolveNavPermissions(args: {
   role: OrgMemberRole | null
   status: "loading" | "ready" | "no_org"
   permissions: OrgPermissions
+  platformAdmin: boolean
+  impersonating: boolean
 }): OrgPermissions {
+  if (args.platformAdmin || args.impersonating) {
+    return getOrgPermissionsForRole("owner")
+  }
+
   // Navigation should not let a commercial profile overlay accidentally hide
   // the owner/admin/manager workspace. Page/API permission checks still use the
   // effective capability set as the source of truth for mutations.
@@ -213,7 +248,21 @@ function resolveNavPermissions(args: {
     return getOrgPermissionsForRole("owner")
   }
 
+  // If membership lookup returned ready but no role, the shell should not
+  // collapse to a one-link sidebar. This commonly happens for platform-admin
+  // impersonation or transient membership resolution gaps.
+  if (!args.role) {
+    return getOrgPermissionsForRole("owner")
+  }
+
   return args.permissions
+}
+
+function enabledPermissionKeys(perms: OrgPermissions): string[] {
+  return Object.entries(perms)
+    .filter(([, value]) => Boolean(value))
+    .map(([key]) => key)
+    .sort()
 }
 
 // ─── Collapse persistence ────────────────────────────────────────────────────
@@ -268,6 +317,7 @@ function SidebarBody({
   const pathname = usePathname()
   const { workspace } = useTenant()
   const { permissions, role, status: permissionsStatus } = useOrgPermissions()
+  const { isPlatformAdmin, impersonation, sessionIdentityLoading } = useAdmin()
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
     useActiveOrganization()
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
@@ -290,12 +340,14 @@ function SidebarBody({
     setWsMenuOpen((v) => !v)
   }
 
-  const visibleGroups = useMemo(
+  const navResolution = useMemo(
     () => {
       const navPermissions = resolveNavPermissions({
         role,
         status: permissionsStatus,
         permissions,
+        platformAdmin: isPlatformAdmin || sessionIdentityLoading,
+        impersonating: impersonation.active,
       })
       debugNavResolution({
         event: "Nav items before filter",
@@ -305,18 +357,63 @@ function SidebarBody({
         permissionsStatus,
         organizationStatus: orgStatus,
       })
-      const groups = NAV_GROUPS.map((group) => ({
-        ...group,
-        items: group.items.filter((item) => navItemAllowed(item, navPermissions)),
-      })).filter((group) => group.items.length > 0)
+      const filteredOut: Array<{ label: string; reason: string }> = []
+      const groups = NAV_GROUPS.map((group) => {
+        const items = group.items.filter((item) => {
+          const allowed = navItemAllowed(item, navPermissions)
+          if (!allowed) {
+            filteredOut.push({
+              label: `${group.label} / ${item.label}`,
+              reason: item.anyOf?.length
+                ? `missing any of: ${item.anyOf.join(", ")}`
+                : "unknown filter",
+            })
+          }
+          return allowed
+        })
+        return { ...group, items }
+      }).filter((group) => group.items.length > 0)
+      const visibleLabels = groups.flatMap((group) => group.items.map((item) => `${group.label} / ${item.label}`))
       debugNavResolution({
         event: "Nav items after filter",
         visibleGroups: groups.map((group) => ({ id: group.id, itemCount: group.items.length })),
+        visibleLabels,
+        filteredOut,
       })
-      return groups.length > 0 ? groups : FALLBACK_NAV_GROUPS
+      const debug = shouldRenderNavDebugPanel()
+        ? {
+          role,
+          permissionsStatus,
+          organizationStatus: orgStatus,
+          organizationId: organizationId ?? null,
+          organizationName: organizations.find((org) => org.id === organizationId)?.name ?? null,
+          platformAdmin: isPlatformAdmin,
+          impersonating: impersonation.active,
+          enabledPermissions: enabledPermissionKeys(navPermissions),
+          visibleLabels,
+          filteredOut,
+        }
+        : null
+      return {
+        groups: groups.length > 0 ? groups : FALLBACK_NAV_GROUPS,
+        debug,
+      }
     },
-    [permissions, role, permissionsStatus, orgStatus],
+    [
+      permissions,
+      role,
+      permissionsStatus,
+      orgStatus,
+      organizationId,
+      organizations,
+      isPlatformAdmin,
+      sessionIdentityLoading,
+      impersonation.active,
+    ],
   )
+
+  const visibleGroups = navResolution.groups
+  const navDebug = navResolution.debug
 
   // In mobile mode always show expanded; desktop respects collapsed state
   const isCollapsed = isMobile ? false : collapsed
@@ -536,6 +633,29 @@ function SidebarBody({
 
       {/* ── Navigation ────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2 px-3">
+        {shouldRenderNavDebugPanel() && navDebug ? (
+          <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-400/10 p-2 text-[10px] leading-relaxed text-amber-50">
+            <p className="font-semibold">Nav Debug</p>
+            <p>Org: {navDebug.organizationName ?? "unknown"} ({navDebug.organizationId ?? "none"})</p>
+            <p>Role: {navDebug.role ?? "none"} · State: {navDebug.permissionsStatus}</p>
+            <p>Platform admin: {String(navDebug.platformAdmin)} · Impersonating: {String(navDebug.impersonating)}</p>
+            <p>Visible: {navDebug.visibleLabels.join(", ") || "none"}</p>
+            <details className="mt-1">
+              <summary>Filtered out ({navDebug.filteredOut.length})</summary>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                {navDebug.filteredOut.map((item) => (
+                  <li key={item.label}>
+                    {item.label}: {item.reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+            <details className="mt-1">
+              <summary>Enabled permissions ({navDebug.enabledPermissions.length})</summary>
+              <p className="mt-1 break-words">{navDebug.enabledPermissions.join(", ") || "none"}</p>
+            </details>
+          </div>
+        ) : null}
         {visibleGroups.map((group, gi) => {
           const groupCollapsed = collapsedGroups.has(group.id)
           const groupHasActive = group.items.some((item) => isItemActive(pathname, item.href))
