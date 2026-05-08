@@ -128,6 +128,10 @@ export async function generateRecommendations(args: {
     if (activeKeys.size > 0) items = items.filter((i) => !activeKeys.has(i.key))
   }
 
+  if (filter?.recommendationKey) {
+    items = items.filter((i) => i.key === filter.recommendationKey)
+  }
+
   // 5. Sort by priority (high → low), then by anchor (oldest first).
   items.sort((a, b) => {
     const p = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]

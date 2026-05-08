@@ -81,6 +81,28 @@ export type Recommendation = {
   metric: { label: string; value: string } | null
   /** Surface only the rule that produced it; useful for filters/debug. */
   ruleId: string
+  /**
+   * Phase 5 — optional overlay fields joined in the API layer (not from
+   * the deterministic engine).
+   */
+  lifecycleState?: RecommendationLifecycleState
+  /** Deterministic explainable score (higher = more urgent in UI ordering). */
+  commandScore?: number
+  commandScoreBreakdown?: RecommendationScoreBreakdownEntry[]
+}
+
+/** AI Ops Phase 5 — operator workflow overlay (stored server-side). */
+export type RecommendationLifecycleState =
+  | "pending"
+  | "acknowledged"
+  | "in_progress"
+  | "completed"
+  | "ignored"
+  | "escalated"
+
+export type RecommendationScoreBreakdownEntry = {
+  label: string
+  points: number
 }
 
 export type RecommendationFilter = {
@@ -90,6 +112,12 @@ export type RecommendationFilter = {
   includeDismissed?: boolean
   search?: string
   limit?: number
+  /**
+   * When set, return at most the single matching recommendation (or none).
+   * Used by server routes that re-derive a recommendation for an action
+   * without trusting client input.
+   */
+  recommendationKey?: string
 }
 
 export type RecommendationSummary = {

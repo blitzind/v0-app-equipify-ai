@@ -7,7 +7,10 @@ import { generateRecommendations } from "@/lib/ai-ops/engine"
 import type {
   RecommendationCategory,
   RecommendationPriority,
+  RecommendationSummary,
 } from "@/lib/ai-ops/types"
+import { loadLifecycleMap } from "@/lib/ai-ops/lifecycle-db"
+import { applyLifecycleScoresAndSort } from "@/lib/ai-ops/apply-command-layer"
 
 export const runtime = "nodejs"
 
@@ -82,6 +85,7 @@ export async function GET(
     VALID_PRIORITIES as readonly string[],
   )
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined
+  const engineLimit = Math.min(Math.max(limit ?? 50, 1), 100)
 
   const response = await generateRecommendations({
     supabase,
@@ -91,15 +95,35 @@ export async function GET(
       categories: categories.length ? categories : undefined,
       priorities: priorities.length ? priorities : undefined,
       search,
-      limit,
+      limit: Math.min(engineLimit * 2, 100),
       includeDismissed,
     },
   })
 
+  let items = response.items
+  const keys = items.map((i) => i.key)
+  const lifecycleMap = await loadLifecycleMap(supabase, organizationId, keys)
+  items = applyLifecycleScoresAndSort(items, lifecycleMap)
+  if (items.length > engineLimit) items = items.slice(0, engineLimit)
+
+  const summary: RecommendationSummary = {
+    total: items.length,
+    high: items.filter((i) => i.priority === "high").length,
+    medium: items.filter((i) => i.priority === "medium").length,
+    low: items.filter((i) => i.priority === "low").length,
+    byCategory: {},
+  }
+  for (const i of items) {
+    summary.byCategory[i.category] = (summary.byCategory[i.category] ?? 0) + 1
+  }
+
   return NextResponse.json({
     ...response,
+    items,
+    summary,
     role,
     canDismiss: Boolean(permissions.canManageWorkspaceSettings) || isPlatformAdmin,
+    canCommand: Boolean(permissions.canManageWorkspaceSettings) || isPlatformAdmin,
   })
 }
 

@@ -16,6 +16,7 @@ import type {
   RecommendationsResponse,
 } from "@/lib/ai-ops/types"
 import { RecommendationCard } from "./recommendation-card"
+import { AiOpsCommandCenterDrawer } from "./command-center-drawer"
 import {
   CATEGORY_ICON,
   CATEGORY_LABEL,
@@ -38,6 +39,7 @@ const ALL_PRIORITIES: RecommendationPriority[] = ["high", "medium", "low"]
 type ApiResponse = RecommendationsResponse & {
   role: string | null
   canDismiss: boolean
+  canCommand?: boolean
   error?: string
 }
 
@@ -52,6 +54,7 @@ export function AiOpsPage() {
   const [category, setCategory] = useState<"all" | RecommendationCategory>("all")
   const [priority, setPriority] = useState<"all" | RecommendationPriority>("all")
   const [refreshKey, setRefreshKey] = useState(0)
+  const [commandRec, setCommandRec] = useState<Recommendation | null>(null)
 
   const fetchRecs = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") return
@@ -92,6 +95,7 @@ export function AiOpsPage() {
   )
 
   function handleDismissed(key: string) {
+    setCommandRec((r) => (r?.key === key ? null : r))
     setData((prev) => {
       if (!prev) return prev
       const nextItems = prev.items.filter((i) => i.key !== key)
@@ -113,9 +117,9 @@ export function AiOpsPage() {
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-semibold tracking-tight">AI Operations</h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-              Practical next actions derived from your prospects, work orders, invoices,
-              inventory, automations, and communications. Read-only — Equipify never
-              changes records or sends messages on your behalf from here.
+              Operational recommendations from your live data. Use the command center for lifecycle,
+              timelines, and approval-based actions — Equipify never sends customer emails or mutates
+              records without your explicit confirmation.
             </p>
           </div>
         </div>
@@ -225,10 +229,22 @@ export function AiOpsPage() {
               canDismiss={Boolean(data?.canDismiss)}
               onDismissed={handleDismissed}
               organizationId={organizationId ?? ""}
+              canOpenCommandCenter={Boolean(data?.canCommand)}
+              onOpenCommandCenter={(r) => setCommandRec(r)}
             />
           ))}
         </div>
       )}
+      <AiOpsCommandCenterDrawer
+        open={commandRec !== null}
+        onOpenChange={(v) => {
+          if (!v) setCommandRec(null)
+        }}
+        rec={commandRec}
+        organizationId={organizationId ?? null}
+        generatedAtIso={data?.generatedAtIso ?? null}
+        canCommand={Boolean(data?.canCommand)}
+      />
     </div>
   )
 }

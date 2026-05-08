@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Bot,
   ChevronRight,
+  LayoutDashboard,
   Loader2,
   MoreHorizontal,
   Workflow,
@@ -48,11 +49,16 @@ export function RecommendationCard({
   canDismiss,
   onDismissed,
   organizationId,
+  onOpenCommandCenter,
+  canOpenCommandCenter,
 }: {
   rec: Recommendation
   canDismiss: boolean
   organizationId: string
   onDismissed: (key: string) => void
+  /** Phase 5 — opens command center drawer */
+  onOpenCommandCenter?: (rec: Recommendation) => void
+  canOpenCommandCenter?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [draftOpen, setDraftOpen] = useState(false)
@@ -144,6 +150,16 @@ export function RecommendationCard({
                   Rule-based
                 </Badge>
               ) : null}
+              {rec.lifecycleState ? (
+                <Badge variant="secondary" className="text-[10px] capitalize">
+                  {rec.lifecycleState.replace("_", " ")}
+                </Badge>
+              ) : null}
+              {rec.commandScore != null ? (
+                <Badge variant="outline" className="text-[10px] tabular-nums">
+                  Score {rec.commandScore}
+                </Badge>
+              ) : null}
             </div>
             <h3 className="text-sm font-semibold text-balance leading-snug text-foreground">
               {rec.title}
@@ -201,6 +217,18 @@ export function RecommendationCard({
         {organizationId ? <AiExplainPanel rec={rec} organizationId={organizationId} /> : null}
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          {canOpenCommandCenter && onOpenCommandCenter ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-8 gap-1"
+              onClick={() => onOpenCommandCenter(rec)}
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
+              Command center
+            </Button>
+          ) : null}
           {primary ? (
             <Button asChild size="sm" className="h-8 gap-1" onClick={logOpen}>
               <Link href={primary.href ?? "#"}>
