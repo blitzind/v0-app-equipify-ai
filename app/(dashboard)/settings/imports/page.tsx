@@ -38,8 +38,11 @@ type ImportJobListItem = {
   strategy?: string | null
   active_run_id?: string | null
   cancel_requested_at?: string | null
+  uploaded_by?: string | null
   created_at: string | null
   completed_at: string | null
+  source_type?: string | null
+  processing_duration_ms?: number | null
   user_message: string | null
 }
 
@@ -47,6 +50,22 @@ function listStrategyLabel(value: string | null | undefined): string {
   if (!value) return "—"
   const hit = IMPORT_STRATEGIES.find((s) => s.value === value)
   return hit?.label ?? value.replace(/_/g, " ")
+}
+
+function formatDuration(ms: number | null | undefined): string {
+  if (ms == null) return "—"
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === "completed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+  if (status === "completed_with_errors") return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+  if (status === "failed" || status === "cancelled") return "border-destructive/30 bg-destructive/10 text-destructive"
+  if (status === "processing" || status === "queued") return "border-primary/30 bg-primary/10 text-primary"
+  return "border-border bg-muted/40 text-muted-foreground"
 }
 
 function HubCard({
@@ -258,6 +277,7 @@ export default function MigrationCenterPage() {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Strategy</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">Rows</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Counts</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">Uploaded</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Summary</th>
                 </tr>
               </thead>
@@ -271,7 +291,7 @@ export default function MigrationCenterPage() {
                     </td>
                     <td className="px-3 py-2 capitalize">{j.kind.replace(/_/g, " ")}</td>
                     <td className="px-3 py-2">
-                      <span className="capitalize inline-flex items-center gap-1">
+                      <span className={cn("capitalize inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", statusBadgeClass(j.status))}>
                         {j.status === "completed_with_errors" ? (
                           <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" aria-label="Completed with errors" />
                         ) : null}
@@ -298,6 +318,16 @@ export default function MigrationCenterPage() {
                         "—"
                       )}
                     </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <div className="max-w-[160px]">
+                        <p className="truncate">{j.uploaded_by ?? "—"}</p>
+                        <p>
+                          {j.created_at ? new Date(j.created_at).toLocaleDateString() : "—"}
+                          {j.source_type ? ` · ${j.source_type.toUpperCase()}` : ""}
+                        </p>
+                        <p>Duration {formatDuration(j.processing_duration_ms)}</p>
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground text-xs max-w-[200px] truncate">
                       {j.status === "processing" || j.status === "queued"
                         ? `progress ${(j.processed_count ?? 0).toLocaleString()} / ${(j.row_count ?? 0).toLocaleString()}${j.cancel_requested_at ? " · cancel requested" : ""}`
@@ -312,8 +342,8 @@ export default function MigrationCenterPage() {
       </div>
 
       <p className="text-xs text-muted-foreground border-t border-border pt-4">
-        AI-assisted column mapping and async jobs are planned on top of this foundation. XLSX support can be added when a
-        spreadsheet parser is introduced — CSV works everywhere today.
+        CSV and XLSX imports use the same async-safe migration foundation. Open any import ref to review row outcomes,
+        download errors, or retry failed rows in a later pass.
       </p>
     </div>
   )

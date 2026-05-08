@@ -7,6 +7,15 @@ export type PreviewIssue = {
   message: string
 }
 
+export type DuplicateHint = {
+  rowIndex: number
+  message: string
+  importedLabel?: string
+  matchedLabel?: string
+  matchReason?: string
+  confidence?: "high" | "medium" | "low"
+}
+
 export type PreviewSampleRow = {
   rowIndex: number
   cells: Record<string, string>
@@ -24,13 +33,14 @@ export type ImportProjection = {
 export type PreviewResult = {
   rowCount: number
   truncated: boolean
-  duplicateHints: { rowIndex: number; message: string }[]
+  duplicateHints: DuplicateHint[]
   unresolvedRefs: { rowIndex: number; message: string }[]
   sampleRows: PreviewSampleRow[]
   summary: {
     errorRows: number
     warningRows: number
     okRows: number
+    issueCounts?: Record<string, number>
   }
   /** Present when strategy was supplied to preview/commit prep. */
   projection?: ImportProjection

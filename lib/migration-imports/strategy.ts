@@ -4,22 +4,22 @@ export const IMPORT_STRATEGIES: { value: MigrationImportStrategy; label: string;
   {
     value: "skip_duplicates",
     label: "Skip duplicates",
-    description: "Do not change existing records when a duplicate is detected.",
+    description: "Create new customers only and skip likely matches.",
   },
   {
     value: "update_empty_fields",
-    label: "Update only empty fields",
-    description: "For matches, fill blank fields only; never overwrite non-empty values.",
+    label: "Fill missing fields",
+    description: "Update existing customers only where mapped fields are currently blank.",
   },
   {
     value: "update_existing",
     label: "Update existing records",
-    description: "For matches, apply mapped CSV values (use with care).",
+    description: "Replace mapped fields on matching customers. Use with care.",
   },
   {
     value: "create_new_only",
-    label: "Only create new records",
-    description: "Fail rows that would match an existing record.",
+    label: "Create new only",
+    description: "Never update existing customers; matching rows fail for review.",
   },
 ]
 

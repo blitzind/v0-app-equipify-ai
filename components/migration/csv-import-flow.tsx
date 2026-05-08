@@ -48,6 +48,18 @@ type CommitJson = {
   }[]
 }
 
+type UploadInspection = {
+  fileName?: string
+  fileSize?: number
+  sourceType?: "csv" | "xlsx"
+  worksheets?: string[]
+  selectedWorksheet?: string | null
+  detectedColumns?: string[]
+  sampleValues?: Record<string, string>
+  rowCountEstimate?: number
+  message?: string
+}
+
 type AsyncRun = {
   runId: string
   status: string
@@ -61,6 +73,48 @@ type AsyncRun = {
   skippedCount: number
   errorCount: number
   cancelRequestedAt: string | null
+}
+
+type CustomerMappingField = {
+  field: string
+  label: string
+  required?: boolean
+  description?: string
+}
+
+const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
+  { field: "company_name", label: "Customer name", required: true, description: "Required for creating customers." },
+  { field: "external_code", label: "External ID" },
+  { field: "contact_full_name", label: "Primary contact name" },
+  { field: "contact_email", label: "Primary contact email" },
+  { field: "contact_phone", label: "Primary contact phone" },
+  { field: "address_line1", label: "Billing address line 1" },
+  { field: "address_line2", label: "Billing address line 2" },
+  { field: "city", label: "Billing city" },
+  { field: "state", label: "Billing state" },
+  { field: "postal_code", label: "Billing ZIP" },
+  { field: "country", label: "Billing country" },
+  { field: "service_address_line1", label: "Service address line 1" },
+  { field: "service_address_line2", label: "Service address line 2" },
+  { field: "service_city", label: "Service city" },
+  { field: "service_state", label: "Service state" },
+  { field: "service_postal_code", label: "Service ZIP" },
+  { field: "service_country", label: "Service country" },
+  { field: "location_name", label: "Site name" },
+  { field: "location_group", label: "Location group" },
+  { field: "notes", label: "Notes" },
+  { field: "po_requirements", label: "PO requirements" },
+  { field: "tax_id", label: "Tax ID" },
+  { field: "legacy_source_ids", label: "Legacy source ID" },
+  { field: "parent_external_code", label: "Parent external code", description: "Preserved for future hierarchy support." },
+  { field: "parent_company_name", label: "Parent company name", description: "Preserved for future hierarchy support." },
+] as const
+
+function formatBytes(bytes?: number | null): string {
+  if (!bytes) return "—"
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function CsvImportFlow({
@@ -78,6 +132,10 @@ export function CsvImportFlow({
   const { toast } = useToast()
 
   const [file, setFile] = useState<File | null>(null)
+  const [fileMeta, setFileMeta] = useState<UploadInspection | null>(null)
+  const [worksheetName, setWorksheetName] = useState("")
+  const [detectedColumns, setDetectedColumns] = useState<string[]>([])
+  const [inspectBusy, setInspectBusy] = useState(false)
   const [sourceSystem, setSourceSystem] = useState("")
   const [busy, setBusy] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
@@ -92,6 +150,49 @@ export function CsvImportFlow({
   const [asyncRun, setAsyncRun] = useState<AsyncRun | null>(null)
   const [asyncBusy, setAsyncBusy] = useState(false)
 
+  const inspectFile = useCallback(
+    async (nextFile: File) => {
+      if (!organizationId) return
+      setInspectBusy(true)
+      try {
+        const form = new FormData()
+        form.append("file", nextFile)
+        form.append("kind", kind)
+        form.append("inspectOnly", "true")
+        const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports`, {
+          method: "POST",
+          body: form,
+        })
+        const json = (await res.json()) as UploadInspection
+        if (!res.ok) {
+          toast({ title: "File inspection failed", description: json.message ?? "Could not inspect file.", variant: "destructive" })
+          setFileMeta(null)
+          setDetectedColumns([])
+          return
+        }
+        setFileMeta(json)
+        setDetectedColumns(json.detectedColumns ?? [])
+        setWorksheetName(json.selectedWorksheet ?? "")
+      } catch {
+        toast({ title: "File inspection failed", description: "Network error.", variant: "destructive" })
+      } finally {
+        setInspectBusy(false)
+      }
+    },
+    [kind, organizationId, toast],
+  )
+
+  useEffect(() => {
+    if (!file || !organizationId) return
+    setPreview(null)
+    setPreviewMeta(null)
+    setCommitResult(null)
+    setJobId(null)
+    setImportRef(null)
+    setAsyncRun(null)
+    void inspectFile(file)
+  }, [file, inspectFile, organizationId])
+
   const runUpload = useCallback(async () => {
     if (!organizationId || !file) return
     setBusy(true)
@@ -101,6 +202,7 @@ export function CsvImportFlow({
       form.append("file", file)
       form.append("kind", kind)
       if (sourceSystem.trim()) form.append("sourceSystem", sourceSystem.trim())
+      if (worksheetName.trim()) form.append("worksheetName", worksheetName.trim())
 
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports`, {
         method: "POST",
@@ -111,6 +213,14 @@ export function CsvImportFlow({
         columnMapping?: Record<string, string>
         preview?: PreviewResult
         rowCount?: number
+        fileName?: string
+        fileSize?: number
+        sourceType?: "csv" | "xlsx"
+        worksheets?: string[]
+        selectedWorksheet?: string | null
+        detectedColumns?: string[]
+        sampleValues?: Record<string, string>
+        rowCountEstimate?: number
         truncated?: boolean
         message?: string
       }
@@ -124,6 +234,18 @@ export function CsvImportFlow({
         rowCount: json.rowCount ?? json.preview?.rowCount ?? 0,
         truncated: Boolean(json.truncated),
       })
+      setFileMeta({
+        fileName: json.fileName ?? file.name,
+        fileSize: json.fileSize ?? file.size,
+        sourceType: json.sourceType,
+        worksheets: json.worksheets,
+        selectedWorksheet: json.selectedWorksheet,
+        detectedColumns: json.detectedColumns,
+        sampleValues: json.sampleValues,
+        rowCountEstimate: json.rowCountEstimate,
+      })
+      setDetectedColumns(json.detectedColumns ?? json.preview?.sampleRows.flatMap((row) => Object.keys(row.cells)) ?? [])
+      setWorksheetName(json.selectedWorksheet ?? worksheetName)
       setColumnMappingText(JSON.stringify(json.columnMapping ?? {}, null, 2))
       setImportRef(null)
       setAsyncRun(null)
@@ -133,7 +255,7 @@ export function CsvImportFlow({
     } finally {
       setBusy(false)
     }
-  }, [organizationId, file, kind, sourceSystem, toast])
+  }, [organizationId, file, kind, sourceSystem, toast, worksheetName])
 
   const runPreviewRefresh = useCallback(async () => {
     if (!organizationId || !jobId) return
@@ -305,6 +427,79 @@ export function CsvImportFlow({
       ? `You are about to import ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}. About ${proj.willCreate.toLocaleString()} will be created, ${proj.willUpdate.toLocaleString()} may update existing records, ${proj.willSkip.toLocaleString()} will be skipped, and ${Math.max(validationErrors, proj.willFail).toLocaleString()} rows have validation or merge issues in this estimate.`
       : `You are about to import ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}. Refresh preview for a detailed estimate. ${validationErrors} row${validationErrors === 1 ? "" : "s"} show validation errors in the sample.`
 
+  let parsedColumnMapping: Record<string, string> = {}
+  try {
+    parsedColumnMapping = JSON.parse(columnMappingText) as Record<string, string>
+  } catch {
+    parsedColumnMapping = {}
+  }
+
+  const updateMappedField = (field: string, value: string) => {
+    const next = { ...parsedColumnMapping }
+    if (value === "__ignore") {
+      delete next[field]
+    } else {
+      next[field] = value
+    }
+    setColumnMappingText(JSON.stringify(next, null, 2))
+  }
+
+  const updateSourceColumnMapping = (column: string, targetField: string) => {
+    const next = Object.fromEntries(
+      Object.entries(parsedColumnMapping).filter(([field, mappedColumn]) => field !== targetField && mappedColumn !== column),
+    )
+    if (targetField !== "__ignore") {
+      next[targetField] = column
+    }
+    setColumnMappingText(JSON.stringify(next, null, 2))
+  }
+
+  const targetForSourceColumn = (column: string) =>
+    Object.entries(parsedColumnMapping).find(([, mappedColumn]) => mappedColumn === column)?.[0] ?? "__ignore"
+
+  const hasRequiredCustomerName = kind !== "customer" || Boolean(parsedColumnMapping.company_name)
+  const hasReliableCustomerMatch =
+    kind !== "customer" ||
+    Boolean(parsedColumnMapping.company_name || parsedColumnMapping.external_code || parsedColumnMapping.contact_email)
+  const canStartImport = Boolean(jobId) && !asyncMode && hasRequiredCustomerName && hasReliableCustomerMatch
+
+  const issueCounts = preview?.summary.issueCounts ?? {}
+  const issueEntries = Object.entries(issueCounts).sort((a, b) => b[1] - a[1])
+  const rowsWithIssues = (preview?.summary.errorRows ?? 0) + (preview?.summary.warningRows ?? 0)
+  const recommendedAction =
+    strategy === "skip_duplicates"
+      ? "These rows will be skipped unless you choose an update strategy."
+      : strategy === "update_empty_fields"
+        ? "Only blank fields on matching customers will be filled."
+        : strategy === "update_existing"
+          ? "Mapped fields on matching customers may be replaced."
+          : "Matching rows will fail instead of updating existing customers."
+
+  const mappingStorageKey =
+    kind === "customer" && sourceSystem.trim()
+      ? `equipify:migration-mapping:${kind}:${sourceSystem.trim().toLowerCase()}`
+      : null
+
+  const saveMapping = () => {
+    if (!mappingStorageKey) {
+      toast({ title: "Add a legacy system", description: "Enter a source name before saving a reusable mapping." })
+      return
+    }
+    window.localStorage.setItem(mappingStorageKey, columnMappingText)
+    toast({ title: "Mapping saved", description: `Saved for ${sourceSystem.trim()}.` })
+  }
+
+  const loadSavedMapping = () => {
+    if (!mappingStorageKey) return
+    const saved = window.localStorage.getItem(mappingStorageKey)
+    if (!saved) {
+      toast({ title: "No saved mapping", description: `No mapping is saved for ${sourceSystem.trim()}.` })
+      return
+    }
+    setColumnMappingText(saved)
+    toast({ title: "Mapping loaded" })
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <div>
@@ -320,15 +515,72 @@ export function CsvImportFlow({
 
       <div className="rounded-lg border border-border bg-card p-5 space-y-4">
         <div className="grid gap-2">
-          <Label htmlFor="csv-file">CSV file</Label>
+          <Label htmlFor="csv-file">Customer file</Label>
           <Input
             id="csv-file"
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-          <p className="text-xs text-muted-foreground">UTF-8 CSV with a header row. Maximum 5,000 rows per batch.</p>
+          <p className="text-xs text-muted-foreground">
+            UTF-8 CSV or XLSX with a header row. Maximum 5,000 rows per preview batch; larger imports can use background processing.
+          </p>
         </div>
+        {file ? (
+          <div className="rounded-md border border-border bg-muted/20 p-3 text-sm space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">File:</span> {file.name}
+              </span>
+              <span>
+                <span className="font-medium text-foreground">Size:</span> {formatBytes(file.size)}
+              </span>
+              {inspectBusy ? (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Inspecting…
+                </span>
+              ) : null}
+              {fileMeta?.rowCountEstimate != null ? (
+                <span>
+                  <span className="font-medium text-foreground">Estimated rows:</span>{" "}
+                  {fileMeta.rowCountEstimate.toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+            {fileMeta?.worksheets && fileMeta.worksheets.length > 0 ? (
+              <div className="grid gap-2 max-w-sm">
+                <Label htmlFor="worksheet-name">Worksheet</Label>
+                <Select value={worksheetName} onValueChange={setWorksheetName}>
+                  <SelectTrigger id="worksheet-name">
+                    <SelectValue placeholder="Choose worksheet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fileMeta.worksheets.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {detectedColumns.length > 0 ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Detected columns</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {detectedColumns.slice(0, 24).map((column) => (
+                    <span key={column} className="rounded-full border border-border bg-background px-2 py-0.5 text-xs">
+                      {column}
+                    </span>
+                  ))}
+                  {detectedColumns.length > 24 ? (
+                    <span className="px-2 py-0.5 text-xs text-muted-foreground">+{detectedColumns.length - 24} more</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid gap-2">
           <Label htmlFor="source-system">Legacy system (optional)</Label>
           <Input
@@ -338,7 +590,7 @@ export function CsvImportFlow({
             onChange={(e) => setSourceSystem(e.target.value)}
           />
         </div>
-        <Button type="button" onClick={() => void runUpload()} disabled={!file || busy} className="gap-2">
+        <Button type="button" onClick={() => void runUpload()} disabled={!file || busy || inspectBusy} className="gap-2">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           Upload &amp; preview
         </Button>
@@ -375,10 +627,10 @@ export function CsvImportFlow({
             <div>
               <h3 className="text-sm font-medium text-foreground mb-2">Outcome estimate (current strategy)</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                <Stat label="Ready to create" value={String(proj.willCreate)} tone="positive" />
-                <Stat label="Will update" value={String(proj.willUpdate)} tone="amber" />
-                <Stat label="Will skip" value={String(proj.willSkip)} />
-                <Stat label="Will fail" value={String(proj.willFail)} tone="destructive" />
+                <Stat label="Likely new customers" value={String(proj.willCreate)} tone="positive" />
+                <Stat label="Likely updates" value={String(proj.willUpdate)} tone="amber" />
+                <Stat label="Likely skipped" value={String(proj.willSkip)} />
+                <Stat label="Rows with issues" value={String(Math.max(rowsWithIssues, proj.willFail))} tone="destructive" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Estimates use your mapping and existing workspace data. Refresh preview after changing strategy or mapping.
@@ -388,13 +640,56 @@ export function CsvImportFlow({
             <p className="text-xs text-muted-foreground">Refresh preview to compute outcome estimates for the selected strategy.</p>
           )}
 
+          {issueEntries.length > 0 ? (
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium text-foreground">Validation issues</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {issueEntries.slice(0, 8).map(([code, count]) => (
+                  <div key={code} className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                    <p className="font-medium text-foreground">{code.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-muted-foreground">{count} row{count === 1 ? "" : "s"} affected</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {(preview.duplicateHints.length > 0 || preview.unresolvedRefs.length > 0) && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm space-y-2">
               {preview.duplicateHints.length > 0 ? (
-                <p className="text-amber-800 dark:text-amber-200">
-                  <span className="font-medium">Possible duplicates in file:</span> {preview.duplicateHints.length} row
-                  {preview.duplicateHints.length === 1 ? "" : "s"} flagged — review before commit.
-                </p>
+                <div className="text-amber-800 dark:text-amber-200 space-y-1">
+                  <p>
+                    <span className="font-medium">Possible matches:</span> {preview.duplicateHints.length} row
+                    {preview.duplicateHints.length === 1 ? "" : "s"} flagged — review before commit.
+                  </p>
+                  <div className="overflow-x-auto rounded-md border border-amber-500/20 bg-background/70 mt-2">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-amber-500/20">
+                          <th className="text-left px-2 py-1.5">Row</th>
+                          <th className="text-left px-2 py-1.5">Imported</th>
+                          <th className="text-left px-2 py-1.5">Existing match</th>
+                          <th className="text-left px-2 py-1.5">Reason</th>
+                          <th className="text-left px-2 py-1.5">Recommended action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                    {preview.duplicateHints.slice(0, 6).map((hint) => (
+                          <tr key={`${hint.rowIndex}-${hint.message}`} className="border-b border-amber-500/10 last:border-0">
+                            <td className="px-2 py-1.5 font-mono">{hint.rowIndex}</td>
+                            <td className="px-2 py-1.5">{hint.importedLabel ?? "—"}</td>
+                            <td className="px-2 py-1.5">{hint.matchedLabel ?? "Existing customer"}</td>
+                            <td className="px-2 py-1.5">
+                              {hint.matchReason ?? hint.message}
+                              {hint.confidence ? ` · ${hint.confidence}` : ""}
+                            </td>
+                            <td className="px-2 py-1.5">{recommendedAction}</td>
+                          </tr>
+                    ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ) : null}
               {preview.unresolvedRefs.length > 0 ? (
                 <p className="text-amber-800 dark:text-amber-200">
@@ -451,23 +746,120 @@ export function CsvImportFlow({
             </div>
           ) : null}
 
-          <div className="grid gap-2">
-            <Label htmlFor="column-map">Column mapping (JSON)</Label>
-            <textarea
-              id="column-map"
-              className={cn(
-                "w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              )}
-              value={columnMappingText}
-              onChange={(e) => setColumnMappingText(e.target.value)}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => void runPreviewRefresh()} disabled={busy}>
-                Refresh preview
-              </Button>
+          {kind === "customer" ? (
+            <div className="grid gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Field mapping</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Review each source column, confirm the suggested Equipify field, or ignore columns you do not want imported.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={loadSavedMapping} disabled={!mappingStorageKey}>
+                    Load saved
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={saveMapping}>
+                    Save mapping
+                  </Button>
+                </div>
+              </div>
+              {!hasRequiredCustomerName || !hasReliableCustomerMatch ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800 dark:text-amber-200">
+                  {!hasRequiredCustomerName ? (
+                    <p className="font-medium">Map a Customer name column before importing.</p>
+                  ) : null}
+                  {!hasReliableCustomerMatch ? (
+                    <p>For safer matching, map at least one of Customer name, External ID, or Primary contact email.</p>
+                  ) : null}
+                  <p className="text-xs mt-1">
+                    Preview refresh is still available while you tune the mapping; commit and background import remain disabled until required mapping is valid.
+                  </p>
+                </div>
+              ) : null}
+              {parsedColumnMapping.parent_external_code || parsedColumnMapping.parent_company_name || parsedColumnMapping.location_group ? (
+                <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-sm text-sky-800 dark:text-sky-200">
+                  Hierarchy and site grouping fields are preserved in import row snapshots for future hierarchy support. This phase does not create parent/child relationships.
+                </div>
+              ) : null}
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(150px,1fr)_minmax(160px,1fr)_minmax(220px,260px)] bg-muted/40 text-xs font-medium text-muted-foreground">
+                  <div className="px-3 py-2">Source column</div>
+                  <div className="px-3 py-2">Sample value</div>
+                  <div className="px-3 py-2">Equipify field</div>
+                </div>
+                {detectedColumns.map((column) => {
+                  const target = targetForSourceColumn(column)
+                  const targetMeta = CUSTOMER_MAPPING_FIELDS.find((field) => field.field === target)
+                  return (
+                    <div
+                      key={column}
+                      className="grid grid-cols-1 sm:grid-cols-[minmax(150px,1fr)_minmax(160px,1fr)_minmax(220px,260px)] gap-2 border-t border-border px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{column}</p>
+                        {targetMeta?.required ? <p className="text-xs text-destructive">Required field</p> : null}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate py-2">
+                        {fileMeta?.sampleValues?.[column] || "—"}
+                      </p>
+                      <Select value={target} onValueChange={(value) => updateSourceColumnMapping(column, value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__ignore">Ignore column</SelectItem>
+                          {CUSTOMER_MAPPING_FIELDS.map((item) => (
+                            <SelectItem key={`${column}-${item.field}`} value={item.field}>
+                              {item.label}
+                              {item.required ? " *" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {targetMeta?.description ? (
+                        <p className="sm:col-start-3 text-xs text-muted-foreground -mt-1">{targetMeta.description}</p>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void runPreviewRefresh()} disabled={busy}>
+                  Refresh preview
+                </Button>
+              </div>
+              <details className="rounded-md border border-border bg-muted/20 p-3">
+                <summary className="cursor-pointer text-sm font-medium text-foreground">Advanced JSON mapping</summary>
+                <textarea
+                  className={cn(
+                    "mt-3 w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  )}
+                  value={columnMappingText}
+                  onChange={(e) => setColumnMappingText(e.target.value)}
+                />
+              </details>
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor="column-map">Column mapping (JSON)</Label>
+              <textarea
+                id="column-map"
+                className={cn(
+                  "w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                )}
+                value={columnMappingText}
+                onChange={(e) => setColumnMappingText(e.target.value)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void runPreviewRefresh()} disabled={busy}>
+                  Refresh preview
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-2 max-w-md">
             <Label htmlFor="import-strategy">Merge strategy</Label>
@@ -486,13 +878,18 @@ export function CsvImportFlow({
             <p className="text-xs text-muted-foreground">
               {IMPORT_STRATEGIES.find((s) => s.value === strategy)?.description ?? ""}
             </p>
+            {strategy === "update_existing" ? (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                This strategy can replace mapped fields on existing customers. Use it only after reviewing duplicate matches.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              disabled={busy || !jobId || asyncMode}
+              disabled={busy || !canStartImport}
               className="gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
@@ -502,7 +899,7 @@ export function CsvImportFlow({
               type="button"
               variant="outline"
               onClick={() => void startAsyncRun()}
-              disabled={busy || asyncBusy || !jobId || asyncMode}
+              disabled={busy || asyncBusy || !canStartImport}
               className="gap-2"
             >
               {asyncBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}

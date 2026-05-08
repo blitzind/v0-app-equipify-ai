@@ -138,7 +138,7 @@ function PortalLoginInner() {
           <p className="text-center text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-snug px-2 max-w-[min(22rem,92vw)] text-balance">
             Customer Portal
           </p>
-          <ProvidedByEquipify variant="onDark" size="lg" />
+          <ProvidedByEquipify variant="onDark" size="lg" logoHref="https://equipify.ai" />
           <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-1">
             <ShieldCheck size={11} className="text-white/70" aria-hidden />
             <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">

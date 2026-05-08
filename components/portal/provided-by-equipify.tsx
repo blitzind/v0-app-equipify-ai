@@ -15,11 +15,13 @@ export function ProvidedByEquipify({
   className,
   variant = "onDark",
   size = "lg",
+  logoHref,
 }: {
   className?: string
   /** Dark header (login strip / portal footer) vs light light-surface contexts */
   variant?: "onDark" | "onLight"
   size?: "sm" | "lg"
+  logoHref?: string
 }) {
   const labelClass =
     variant === "onDark" ? "text-white/65" : "text-[var(--portal-nav-text)]"
@@ -35,6 +37,12 @@ export function ProvidedByEquipify({
       : "h-3 w-auto max-w-[72px] sm:max-w-[84px]"
 
   const logoSizes = size === "lg" ? "240px" : "84px"
+  const logo = (
+    <BrandLogo
+      className={cn(logoSizeClass, "object-contain object-left opacity-95")}
+      sizes={logoSizes}
+    />
+  )
 
   return (
     <div
@@ -47,10 +55,18 @@ export function ProvidedByEquipify({
       aria-hidden={false}
     >
       <span className={cn(labelSizeClass, labelClass)}>Provided by</span>
-      <BrandLogo
-        className={cn(logoSizeClass, "object-contain object-left opacity-95")}
-        sizes={logoSizes}
-      />
+      {logoHref ? (
+        <a
+          href={logoHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F172A]"
+        >
+          {logo}
+        </a>
+      ) : (
+        logo
+      )}
       <span className="sr-only">Equipify</span>
     </div>
   )

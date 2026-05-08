@@ -74,6 +74,27 @@ function strategyLabel(value: string | null): string {
   return hit?.label ?? value.replace(/_/g, " ")
 }
 
+function statusBadgeClass(status: string): string {
+  if (status === "completed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+  if (status === "completed_with_errors") return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+  if (status === "failed" || status === "cancelled") return "border-destructive/30 bg-destructive/10 text-destructive"
+  if (status === "processing" || status === "queued") return "border-primary/30 bg-primary/10 text-primary"
+  return "border-border bg-muted/40 text-muted-foreground"
+}
+
+function validationNumber(summary: Record<string, unknown> | null, key: string): number {
+  const value = summary?.[key]
+  return typeof value === "number" ? value : 0
+}
+
+function issueCounts(summary: Record<string, unknown> | null): Array<[string, number]> {
+  const counts = summary?.issueCounts
+  if (!counts || typeof counts !== "object") return []
+  return Object.entries(counts as Record<string, unknown>)
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number")
+    .sort((a, b) => b[1] - a[1])
+}
+
 export default function ImportJobDetailPage() {
   const params = useParams()
   const jobId = typeof params.jobId === "string" ? params.jobId : null
@@ -215,6 +236,11 @@ export default function ImportJobDetailPage() {
               #{job.importRef}
             </span>
           ) : null}
+          {job ? (
+            <span className={cn("capitalize inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", statusBadgeClass(job.status))}>
+              {job.status.replace(/_/g, " ")}
+            </span>
+          ) : null}
         </div>
         <p className="text-sm text-muted-foreground mt-1">Review outcomes, strategy, and downloadable reports.</p>
       </div>
@@ -309,14 +335,42 @@ export default function ImportJobDetailPage() {
             {job.validation_summary && Object.keys(job.validation_summary).length > 0 ? (
               <div className="border-t border-border pt-3">
                 <h2 className="text-sm font-semibold text-foreground mb-2">Validation summary</h2>
-                <pre className="text-xs bg-muted/40 rounded-md p-3 overflow-x-auto max-h-48 overflow-y-auto">
-                  {JSON.stringify(job.validation_summary, null, 2)}
-                </pre>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <Count label="Blocking errors" value={validationNumber(job.validation_summary, "errorRows")} tone="destructive" />
+                  <Count label="Warnings" value={validationNumber(job.validation_summary, "warningRows")} />
+                  <Count label="Clean rows" value={validationNumber(job.validation_summary, "okRows")} />
+                </div>
+                {issueCounts(job.validation_summary).length > 0 ? (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {issueCounts(job.validation_summary).slice(0, 8).map(([code, count]) => (
+                      <div key={code} className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                        <p className="font-medium text-foreground">{code.replace(/_/g, " ")}</p>
+                        <p className="text-xs text-muted-foreground">{count} row{count === 1 ? "" : "s"} affected</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <details className="mt-3 rounded-md border border-border bg-muted/20 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-foreground">Developer details</summary>
+                  <pre className="mt-3 text-xs bg-background rounded-md p-3 overflow-x-auto max-h-48 overflow-y-auto">
+                    {JSON.stringify(job.validation_summary, null, 2)}
+                  </pre>
+                </details>
               </div>
             ) : null}
 
             {job.canExport && organizationId ? (
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                {job.status === "failed" || job.partialImport ? (
+                  <Button variant="default" size="sm" asChild className="gap-2">
+                    <a
+                      href={`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/export?filter=failed`}
+                    >
+                      <Download className="h-4 w-4" aria-hidden />
+                      Download errors
+                    </a>
+                  </Button>
+                ) : null}
                 <Button variant="outline" size="sm" asChild className="gap-2">
                   <a
                     href={`/api/organizations/${encodeURIComponent(organizationId)}/migration-imports/${encodeURIComponent(jobId)}/export?filter=all`}

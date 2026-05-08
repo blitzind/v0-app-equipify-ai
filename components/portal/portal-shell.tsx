@@ -196,7 +196,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           background: "#0F172A",
         }}
       >
-        <ProvidedByEquipify variant="onDark" size="lg" />
+        <ProvidedByEquipify variant="onDark" size="lg" logoHref="https://equipify.ai" />
       </footer>
     </div>
   )

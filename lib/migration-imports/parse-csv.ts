@@ -64,6 +64,21 @@ export function parseCsvText(text: string, maxRows: number): ParsedCsv {
   return { headers, rows }
 }
 
+function escapeCsvCell(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+export function serializeCsv(headers: string[], rows: Record<string, string>[]): string {
+  const lines = [headers.map(escapeCsvCell).join(",")]
+  for (const row of rows) {
+    lines.push(headers.map((header) => escapeCsvCell(row[header] ?? "")).join(","))
+  }
+  return lines.join("\n")
+}
+
 export function shortImportRef(id: string): string {
   return id.replace(/-/g, "").slice(0, 8).toUpperCase()
 }

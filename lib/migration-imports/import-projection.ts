@@ -9,6 +9,25 @@ function normName(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+function normPhone(s: string) {
+  return s.replace(/\D/g, "")
+}
+
+function normAddress(parts: string[]) {
+  return parts.map((part) => normName(part)).filter(Boolean).join("|")
+}
+
+function isValidEmail(s: string) {
+  if (!s.trim()) return true
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+}
+
+function isValidPhone(s: string) {
+  if (!s.trim()) return true
+  const digits = normPhone(s)
+  return digits.length >= 7 && digits.length <= 15
+}
+
 function parseDate(raw: string): string | null {
   const s = raw.trim()
   if (!s) return null
@@ -58,14 +77,36 @@ export async function computeImportProjection(
 
     const { data: contactRows } = await supabase
       .from("customer_contacts")
-      .select("customer_id, email")
+      .select("customer_id, email, phone")
       .eq("organization_id", organizationId)
 
     const emailToCustomer = new Map<string, string>()
+    const phoneToCustomer = new Map<string, string>()
     for (const cr of contactRows ?? []) {
-      const r = cr as { customer_id: string; email: string | null }
+      const r = cr as { customer_id: string; email: string | null; phone: string | null }
       const em = r.email?.trim().toLowerCase()
       if (em && !emailToCustomer.has(em)) emailToCustomer.set(em, r.customer_id)
+      const phone = r.phone ? normPhone(r.phone) : ""
+      if (phone && !phoneToCustomer.has(phone)) phoneToCustomer.set(phone, r.customer_id)
+    }
+
+    const { data: locationRows } = await supabase
+      .from("customer_locations")
+      .select("customer_id, address_line1, city, state, postal_code")
+      .eq("organization_id", organizationId)
+      .eq("is_archived", false)
+
+    const addressToCustomer = new Map<string, string>()
+    for (const lr of locationRows ?? []) {
+      const r = lr as {
+        customer_id: string
+        address_line1: string
+        city: string
+        state: string
+        postal_code: string
+      }
+      const key = normAddress([r.address_line1, r.city, r.state, r.postal_code])
+      if (key && !addressToCustomer.has(key)) addressToCustomer.set(key, r.customer_id)
     }
 
     for (const row of rows) {
@@ -73,17 +114,28 @@ export async function computeImportProjection(
         resolveMapped(row, columnMapping, "company_name") ||
         resolveMapped(row, columnMapping, "contact_full_name")
       const cEmail = resolveMapped(row, columnMapping, "contact_email")
-      if (!company && !cEmail.trim()) {
+      if (!company || !isValidEmail(cEmail)) {
         z.willFail += 1
         continue
       }
-      if (!company) company = cEmail.split("@")[0] || "x"
       const ext = resolveMapped(row, columnMapping, "external_code")?.trim() || null
+      const cPhone = resolveMapped(row, columnMapping, "contact_phone")
+      if (!isValidPhone(cPhone)) {
+        z.willFail += 1
+        continue
+      }
+      const a1 = resolveMapped(row, columnMapping, "address_line1") || resolveMapped(row, columnMapping, "service_address_line1")
+      const city = resolveMapped(row, columnMapping, "city") || resolveMapped(row, columnMapping, "service_city")
+      const state = resolveMapped(row, columnMapping, "state") || resolveMapped(row, columnMapping, "service_state")
+      const postal = resolveMapped(row, columnMapping, "postal_code") || resolveMapped(row, columnMapping, "service_postal_code")
+      const addressKey = a1 && city && state && postal ? normAddress([a1, city, state, postal]) : ""
 
       const match =
         (ext && byCode.has(ext.toLowerCase())) ||
         byName.has(normName(company)) ||
-        (cEmail.trim() && emailToCustomer.has(cEmail.trim().toLowerCase()))
+        (cEmail.trim() && emailToCustomer.has(cEmail.trim().toLowerCase())) ||
+        (cPhone.trim() && phoneToCustomer.has(normPhone(cPhone))) ||
+        (addressKey && addressToCustomer.has(addressKey))
 
       if (match) {
         if (strategy === "skip_duplicates") z.willSkip += 1

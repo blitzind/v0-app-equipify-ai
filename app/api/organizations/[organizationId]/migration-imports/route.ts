@@ -4,7 +4,7 @@ import {
   MIGRATION_IMPORT_MAX_ROWS,
   ORGANIZATION_IMPORTS_BUCKET,
 } from "@/lib/migration-imports/constants"
-import { parseCsvText } from "@/lib/migration-imports/parse-csv"
+import { parseTabularUpload } from "@/lib/migration-imports/parse-tabular-upload"
 import { suggestColumnMapping } from "@/lib/migration-imports/map-columns"
 import { computeImportProjection } from "@/lib/migration-imports/import-projection"
 import { buildPreview } from "@/lib/migration-imports/types"
@@ -44,7 +44,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("organization_import_jobs")
     .select(
-      "id, kind, source_system, status, file_name, row_count, processed_count, success_count, error_count, skipped_count, updated_count, strategy, active_run_id, cancel_requested_at, created_at, completed_at, user_message",
+      "id, kind, source_system, status, file_name, row_count, processed_count, success_count, error_count, skipped_count, updated_count, strategy, active_run_id, cancel_requested_at, created_by, created_at, started_at, completed_at, user_message, validation_summary",
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
@@ -63,8 +63,26 @@ export async function GET(
     return NextResponse.json({ error: "query_failed", message: error.message }, { status: 500 })
   }
 
+  const uploaderIds = Array.from(
+    new Set((data ?? []).map((row) => (row as { created_by?: string | null }).created_by).filter(Boolean) as string[]),
+  )
+  const uploaderNames = new Map<string, string>()
+  if (uploaderIds.length > 0) {
+    const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", uploaderIds)
+    for (const profile of profiles ?? []) {
+      const p = profile as { id: string; full_name: string | null; email: string | null }
+      uploaderNames.set(p.id, p.full_name?.trim() || p.email?.trim() || p.id.slice(0, 8))
+    }
+  }
+
   const jobs = (data ?? []).map((row: Record<string, unknown>) => {
     const id = String(row.id ?? "")
+    const startedAt = typeof row.started_at === "string" ? row.started_at : null
+    const completedAt = typeof row.completed_at === "string" ? row.completed_at : null
+    const durationMs =
+      startedAt && completedAt ? Math.max(0, new Date(completedAt).getTime() - new Date(startedAt).getTime()) : null
+    const validationSummary = (row.validation_summary ?? {}) as Record<string, unknown>
+    const createdBy = typeof row.created_by === "string" ? row.created_by : null
     return {
       jobId: id,
       importRef: id.replace(/-/g, "").slice(0, 8).toUpperCase(),
@@ -81,8 +99,11 @@ export async function GET(
       strategy: row.strategy,
       active_run_id: row.active_run_id,
       cancel_requested_at: row.cancel_requested_at,
+      uploaded_by: createdBy ? uploaderNames.get(createdBy) ?? createdBy.slice(0, 8) : null,
       created_at: row.created_at,
       completed_at: row.completed_at,
+      source_type: validationSummary.sourceType ?? null,
+      processing_duration_ms: durationMs,
       user_message: row.user_message,
     }
   })
@@ -108,6 +129,8 @@ export async function POST(
   let kindRaw = "customer"
   let sourceSystem: string | null = null
   let mappingOverride: Record<string, string> | null = null
+  let worksheetName: string | null = null
+  let inspectOnly = false
   let file: File | null = null
   let textBody: string | null = null
 
@@ -122,6 +145,9 @@ export async function POST(
     kindRaw = typeof k === "string" ? k : "customer"
     const src = form.get("sourceSystem")
     sourceSystem = typeof src === "string" && src.trim() ? src.trim() : null
+    const worksheet = form.get("worksheetName")
+    worksheetName = typeof worksheet === "string" && worksheet.trim() ? worksheet.trim() : null
+    inspectOnly = form.get("inspectOnly") === "true"
     const mapField = form.get("columnMapping")
     if (typeof mapField === "string" && mapField.trim()) {
       try {
@@ -196,31 +222,64 @@ export async function POST(
 
   let buffer: Buffer
   let fileName = "upload.csv"
+  let mimeType = "text/csv"
 
   if (file) {
     if (file.size > MIGRATION_IMPORT_MAX_BYTES) {
       return NextResponse.json({ error: "file_too_large", message: "File exceeds 30MB limit." }, { status: 400 })
     }
     fileName = file.name || "upload.csv"
+    mimeType = file.type || "application/octet-stream"
     buffer = Buffer.from(await file.arrayBuffer())
   } else if (textBody) {
     buffer = Buffer.from(textBody, "utf8")
   } else {
     return NextResponse.json(
-      { error: "missing_file", message: "Attach a CSV file (or send JSON with text for small fixtures)." },
+      { error: "missing_file", message: "Attach a CSV or XLSX file (or send JSON with text for small fixtures)." },
       { status: 400 },
     )
   }
 
-  const text = buffer.toString("utf8")
-  const parsedFull = parseCsvText(text, MIGRATION_IMPORT_MAX_ROWS + 1)
+  if (inspectOnly) {
+    const parsedInspection = parseTabularUpload({
+      buffer,
+      fileName,
+      mimeType,
+      maxRows: MIGRATION_IMPORT_MAX_ROWS + 1,
+      worksheetName,
+    })
+    return NextResponse.json({
+      ok: true,
+      fileName,
+      fileSize: buffer.byteLength,
+      sourceType: parsedInspection.sourceType,
+      worksheets: parsedInspection.worksheets,
+      selectedWorksheet: parsedInspection.selectedWorksheet,
+      detectedColumns: parsedInspection.detectedColumns,
+      rowCountEstimate: parsedInspection.rowCountEstimate,
+      sampleValues: Object.fromEntries(
+        parsedInspection.headers.map((header) => [
+          header,
+          parsedInspection.rows.find((row) => row[header]?.trim())?.[header] ?? "",
+        ]),
+      ),
+    })
+  }
+
+  const parsedFull = parseTabularUpload({
+    buffer,
+    fileName,
+    mimeType,
+    maxRows: MIGRATION_IMPORT_MAX_ROWS + 1,
+    worksheetName,
+  })
   const truncated = parsedFull.rows.length > MIGRATION_IMPORT_MAX_ROWS
   const rows = truncated ? parsedFull.rows.slice(0, MIGRATION_IMPORT_MAX_ROWS) : parsedFull.rows
   const parsed = { headers: parsedFull.headers, rows }
 
   if (parsedFull.headers.length === 0 || rows.length === 0) {
     return NextResponse.json(
-      { error: "empty_file", message: "No data rows found in CSV." },
+      { error: "empty_file", message: "No data rows found in the selected file or worksheet." },
       { status: 400 },
     )
   }
@@ -265,6 +324,12 @@ export async function POST(
         headers: parsedFull.headers,
         truncated,
         sample: previewResult.sampleRows.slice(0, 15),
+        sourceType: parsedFull.sourceType,
+        worksheets: parsedFull.worksheets,
+        selectedWorksheet: parsedFull.selectedWorksheet,
+        detectedColumns: parsedFull.detectedColumns,
+        fileSizeBytes: buffer.byteLength,
+        rowCountEstimate: parsedFull.rowCountEstimate,
       },
       validation_summary: {
         ...previewResult.summary,
@@ -272,6 +337,8 @@ export async function POST(
         unresolvedRefs: previewResult.unresolvedRefs.length,
         truncated,
         projection,
+        sourceType: parsedFull.sourceType,
+        selectedWorksheet: parsedFull.selectedWorksheet,
       },
       row_count: rows.length,
       success_count: 0,
@@ -286,8 +353,9 @@ export async function POST(
 
   const jobId = (jobIns as { id: string }).id
   const storagePath = `${organizationId}/${jobId}.csv`
+  const normalizedBuffer = Buffer.from(parsedFull.normalizedCsv, "utf8")
 
-  const { error: upErr } = await svc.storage.from(ORGANIZATION_IMPORTS_BUCKET).upload(storagePath, buffer, {
+  const { error: upErr } = await svc.storage.from(ORGANIZATION_IMPORTS_BUCKET).upload(storagePath, normalizedBuffer, {
     contentType: "text/csv",
     upsert: true,
   })
@@ -307,6 +375,16 @@ export async function POST(
     columnMapping: column_mapping,
     preview: previewForClient,
     rowCount: rows.length,
+    fileName,
+    fileSize: buffer.byteLength,
+    sourceType: parsedFull.sourceType,
+    worksheets: parsedFull.worksheets,
+    selectedWorksheet: parsedFull.selectedWorksheet,
+    detectedColumns: parsedFull.detectedColumns,
+    sampleValues: Object.fromEntries(
+      parsedFull.headers.map((header) => [header, rows.find((row) => row[header]?.trim())?.[header] ?? ""]),
+    ),
+    rowCountEstimate: parsedFull.rowCountEstimate,
     truncated,
   })
 }

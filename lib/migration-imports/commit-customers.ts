@@ -6,6 +6,29 @@ function normName(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+function normPhone(s: string) {
+  return s.replace(/\D/g, "")
+}
+
+function normAddress(parts: string[]) {
+  return parts.map((part) => normName(part)).filter(Boolean).join("|")
+}
+
+function isValidEmail(s: string) {
+  if (!s.trim()) return true
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+}
+
+function isValidPhone(s: string) {
+  if (!s.trim()) return true
+  const digits = normPhone(s)
+  return digits.length >= 7 && digits.length <= 15
+}
+
+function tooLong(value: string, max: number) {
+  return value.length > max
+}
+
 type CustomerRow = {
   id: string
   company_name: string
@@ -38,14 +61,36 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
 
   const { data: contactRows } = await supabase
     .from("customer_contacts")
-    .select("customer_id, email")
+    .select("customer_id, email, phone")
     .eq("organization_id", organizationId)
 
   const emailToCustomer = new Map<string, string>()
+  const phoneToCustomer = new Map<string, string>()
   for (const cr of contactRows ?? []) {
-    const r = cr as { customer_id: string; email: string | null }
+    const r = cr as { customer_id: string; email: string | null; phone: string | null }
     const em = r.email?.trim().toLowerCase()
     if (em && !emailToCustomer.has(em)) emailToCustomer.set(em, r.customer_id)
+    const phone = r.phone ? normPhone(r.phone) : ""
+    if (phone && !phoneToCustomer.has(phone)) phoneToCustomer.set(phone, r.customer_id)
+  }
+
+  const { data: locationRows } = await supabase
+    .from("customer_locations")
+    .select("customer_id, address_line1, city, state, postal_code")
+    .eq("organization_id", organizationId)
+    .eq("is_archived", false)
+
+  const addressToCustomer = new Map<string, string>()
+  for (const lr of locationRows ?? []) {
+    const r = lr as {
+      customer_id: string
+      address_line1: string
+      city: string
+      state: string
+      postal_code: string
+    }
+    const key = normAddress([r.address_line1, r.city, r.state, r.postal_code])
+    if (key && !addressToCustomer.has(key)) addressToCustomer.set(key, r.customer_id)
   }
 
   const outcomes: RowOutcome[] = []
@@ -58,6 +103,8 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
     company: string,
     ext: string | null,
     contactEmail: string,
+    contactPhone: string,
+    addressKey: string,
   ): { id: string; label: string } | null {
     if (ext && byCode.has(ext.toLowerCase())) {
       const id = byCode.get(ext.toLowerCase())!
@@ -75,6 +122,17 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       const row = customersById.get(id)
       return { id, label: row?.company_name?.trim() || em }
     }
+    const phone = normPhone(contactPhone)
+    if (phone && phoneToCustomer.has(phone)) {
+      const id = phoneToCustomer.get(phone)!
+      const row = customersById.get(id)
+      return { id, label: row?.company_name?.trim() || phone }
+    }
+    if (addressKey && addressToCustomer.has(addressKey)) {
+      const id = addressToCustomer.get(addressKey)!
+      const row = customersById.get(id)
+      return { id, label: row?.company_name?.trim() || "matching address" }
+    }
     return null
   }
 
@@ -86,38 +144,84 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       resolveMapped(row, columnMapping, "company_name") ||
       resolveMapped(row, columnMapping, "contact_full_name")
     const cEmail = resolveMapped(row, columnMapping, "contact_email")
-    if (!company && !cEmail.trim()) {
+    if (!company) {
       errorCount += 1
       outcomes.push({
         rowIndex,
         status: "error",
         codes: ["missing_company"],
-        message: "Company name or contact email required.",
+        message: "Customer name is required.",
       })
       continue
     }
-    if (!company) {
-      company = cEmail.split("@")[0] || "Imported account"
+    if (!isValidEmail(cEmail)) {
+      errorCount += 1
+      outcomes.push({
+        rowIndex,
+        status: "error",
+        codes: ["invalid_email"],
+        message: "Contact email is not a valid email address.",
+      })
+      continue
     }
 
     const extRaw = resolveMapped(row, columnMapping, "external_code")
     const ext = extRaw?.trim() || null
+    const cPhone = resolveMapped(row, columnMapping, "contact_phone")
+    if (!isValidPhone(cPhone)) {
+      errorCount += 1
+      outcomes.push({
+        rowIndex,
+        status: "error",
+        codes: ["invalid_phone"],
+        message: "Phone number format is invalid.",
+      })
+      continue
+    }
+
+    const a1 = resolveMapped(row, columnMapping, "address_line1") || resolveMapped(row, columnMapping, "service_address_line1")
+    const city = resolveMapped(row, columnMapping, "city") || resolveMapped(row, columnMapping, "service_city")
+    const state = resolveMapped(row, columnMapping, "state") || resolveMapped(row, columnMapping, "service_state")
+    const postal = resolveMapped(row, columnMapping, "postal_code") || resolveMapped(row, columnMapping, "service_postal_code")
+    const addressKey = a1 && city && state && postal ? normAddress([a1, city, state, postal]) : ""
+    const oversizedFields = [
+      tooLong(company, 200) ? "company_name" : null,
+      ext && tooLong(ext, 120) ? "external_code" : null,
+      tooLong(cEmail, 254) ? "contact_email" : null,
+      tooLong(cPhone, 60) ? "contact_phone" : null,
+      tooLong(resolveMapped(row, columnMapping, "notes"), 8000) ? "notes" : null,
+      tooLong(resolveMapped(row, columnMapping, "tax_id"), 120) ? "tax_id" : null,
+      tooLong(resolveMapped(row, columnMapping, "po_requirements"), 1000) ? "po_requirements" : null,
+      tooLong(resolveMapped(row, columnMapping, "legacy_source_ids"), 1000) ? "legacy_source_ids" : null,
+    ].filter(Boolean)
+    if (oversizedFields.length > 0) {
+      errorCount += 1
+      outcomes.push({
+        rowIndex,
+        status: "error",
+        codes: ["oversized_fields"],
+        message: `Fields exceed import limits: ${oversizedFields.join(", ")}.`,
+      })
+      continue
+    }
 
     const notesParts: string[] = []
     const notesBase = resolveMapped(row, columnMapping, "notes")
     if (notesBase) notesParts.push(notesBase)
+    const taxId = resolveMapped(row, columnMapping, "tax_id")
+    if (taxId) notesParts.push(`Tax ID (imported): ${taxId}`)
+    const poRequirements = resolveMapped(row, columnMapping, "po_requirements")
+    if (poRequirements) notesParts.push(`PO requirements (imported): ${poRequirements}`)
+    const legacySourceIds = resolveMapped(row, columnMapping, "legacy_source_ids")
+    if (legacySourceIds) notesParts.push(`Legacy source IDs (imported): ${legacySourceIds}`)
     const tags = resolveMapped(row, columnMapping, "tags")
     if (tags) notesParts.push(`Tags (imported): ${tags}`)
-    const parentExt = resolveMapped(row, columnMapping, "parent_external_code")
-    if (parentExt) {
-      notesParts.push(`Legacy parent account reference: ${parentExt.trim()}`)
-    }
     const importNotes = notesParts.length ? notesParts.join("\n\n") : null
 
     const statusRaw = resolveMapped(row, columnMapping, "status").toLowerCase()
     const csvStatus = statusRaw === "inactive" ? "inactive" : "active"
 
-    const match = findMatch(company, ext, cEmail)
+    const match = findMatch(company, ext, cEmail, cPhone, addressKey)
 
     if (match) {
       const cur = customersById.get(match.id)!
@@ -207,7 +311,6 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       }
 
       const cName = resolveMapped(row, columnMapping, "contact_full_name")
-      const cPhone = resolveMapped(row, columnMapping, "contact_phone")
       if (cName || cEmail || cPhone) {
         const { data: primaries } = await supabase
           .from("customer_contacts")
@@ -266,10 +369,6 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         }
       }
 
-      const a1 = resolveMapped(row, columnMapping, "address_line1")
-      const city = resolveMapped(row, columnMapping, "city")
-      const state = resolveMapped(row, columnMapping, "state")
-      const postal = resolveMapped(row, columnMapping, "postal_code")
       if (a1 && city && state && postal) {
         const locName =
           resolveMapped(row, columnMapping, "location_name").trim() || "Primary service location"
@@ -287,7 +386,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
             .update({
               name: locName,
               address_line1: a1,
-              address_line2: resolveMapped(row, columnMapping, "address_line2") || null,
+              address_line2: resolveMapped(row, columnMapping, "address_line2") || resolveMapped(row, columnMapping, "service_address_line2") || null,
               city,
               state,
               postal_code: postal,
@@ -301,7 +400,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
             customer_id: match.id,
             name: locName,
             address_line1: a1,
-            address_line2: resolveMapped(row, columnMapping, "address_line2") || null,
+            address_line2: resolveMapped(row, columnMapping, "address_line2") || resolveMapped(row, columnMapping, "service_address_line2") || null,
             city,
             state,
             postal_code: postal,
@@ -376,13 +475,12 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
     if (cEmail.trim()) {
       emailToCustomer.set(cEmail.trim().toLowerCase(), customerId)
     }
+    if (cPhone.trim()) {
+      phoneToCustomer.set(normPhone(cPhone), customerId)
+    }
 
-    const a1 = resolveMapped(row, columnMapping, "address_line1")
-    const a2 = resolveMapped(row, columnMapping, "address_line2")
-    const city = resolveMapped(row, columnMapping, "city")
-    const st = resolveMapped(row, columnMapping, "state")
-    const postal = resolveMapped(row, columnMapping, "postal_code")
-    if (a1 && city && st && postal) {
+    const a2 = resolveMapped(row, columnMapping, "address_line2") || resolveMapped(row, columnMapping, "service_address_line2")
+    if (a1 && city && state && postal) {
       const locName =
         resolveMapped(row, columnMapping, "location_name").trim() || "Primary service location"
       const { error: lErr } = await supabase.from("customer_locations").insert({
@@ -392,7 +490,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         address_line1: a1,
         address_line2: a2 || null,
         city,
-        state: st,
+        state,
         postal_code: postal,
         phone: resolveMapped(row, columnMapping, "contact_phone") || null,
         contact_person: resolveMapped(row, columnMapping, "contact_full_name") || null,
@@ -405,6 +503,8 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
           .update({ notes: np.filter(Boolean).join("\n\n") })
           .eq("id", customerId)
           .eq("organization_id", organizationId)
+      } else if (addressKey) {
+        addressToCustomer.set(addressKey, customerId)
       }
     }
 
