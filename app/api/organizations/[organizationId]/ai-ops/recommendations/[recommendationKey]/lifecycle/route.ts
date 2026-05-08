@@ -3,7 +3,7 @@ import { z } from "zod"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { normalizeOrgMemberRole } from "@/lib/permissions/model"
 import {
   upsertLifecycleState,
   insertRecommendationEvent,

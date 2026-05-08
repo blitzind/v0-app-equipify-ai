@@ -153,7 +153,7 @@ export function AiOpsDigestCard() {
           })
         )}
         <p className="text-[10px] text-muted-foreground pt-1 leading-snug">
-          Daily email + Slack digest hooks coming soon. See <code className="text-[10px]">docs/AI_OPS_PHASE2.md</code>.
+          Schedule the daily digest from <Link href="/settings/notifications" className="underline underline-offset-2">notification settings</Link>.
         </p>
       </CardContent>
     </Card>

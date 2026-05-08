@@ -349,17 +349,21 @@ const certReleasePending: RuleDescriptor = {
         confidence: "deterministic",
         title: `Certificate awaiting portal release`,
         explanation: `Created ${days}d ago. Verify the calibration data and release it to the customer portal so they can download the document.`,
-        entity: wo
-          ? {
-              type: "work_order",
-              id: wo,
-              label: "Work order",
-              href: `/work-orders?open=${encodeURIComponent(wo)}`,
-            }
-          : null,
-        actions: [
-          { type: "view_work_order", label: "Open work order", href: `/work-orders?open=${encodeURIComponent(wo)}` },
-        ],
+        entity: {
+          type: "calibration_record",
+          id,
+          label: wo ? "Work order certificate" : "Certificate",
+          href: wo ? `/work-orders?open=${encodeURIComponent(wo)}` : `/work-orders`,
+        },
+        actions: wo
+          ? [
+              {
+                type: "view_work_order",
+                label: "Open work order",
+                href: `/work-orders?open=${encodeURIComponent(wo)}`,
+              },
+            ]
+          : [],
         anchorIso: created,
         metric: { label: "Pending", value: `${days}d` },
       }
