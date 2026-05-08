@@ -19,7 +19,7 @@ import {
   WORK_ORDER_ATTACHMENTS_BUCKET,
   signedUrlForAttachmentPath,
 } from "@/lib/work-orders/work-order-tab-data"
-import { releaseStatusForVisibility } from "@/lib/attachments/document-attachments"
+import { releaseStatusForVisibility, type AttachmentVisibilityScope } from "@/lib/attachments/document-attachments"
 
 export type CertificateAttachmentCategory = "external_calibration" | "supplementary"
 
@@ -36,6 +36,13 @@ export type CertificateAttachment = {
   notes: string | null
   uploadedAt: string
   uploadedBy: string | null
+  documentAttachmentId: string | null
+  visibilityScope: AttachmentVisibilityScope | null
+  portalReleaseStatus: string | null
+  title: string | null
+  issueDate: string | null
+  expiresAt: string | null
+  invoiceId: string | null
 }
 
 /** Mirrors the table column set for client-side selects. */
@@ -105,7 +112,64 @@ function mapRow(r: Row): CertificateAttachment {
     notes: r.notes,
     uploadedAt: r.uploaded_at,
     uploadedBy: r.uploaded_by,
+    documentAttachmentId: null,
+    visibilityScope: null,
+    portalReleaseStatus: null,
+    title: null,
+    issueDate: null,
+    expiresAt: null,
+    invoiceId: null,
   }
+}
+
+type DocumentRegistryRow = {
+  id: string
+  storage_path: string
+  visibility_scope: AttachmentVisibilityScope
+  portal_release_status: string
+  metadata_json: unknown
+}
+
+function metadataObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function enrichWithDocumentRegistry(
+  attachments: CertificateAttachment[],
+  documentRows: DocumentRegistryRow[],
+): CertificateAttachment[] {
+  const byPath = new Map(documentRows.map((row) => [row.storage_path, row]))
+  return attachments.map((attachment) => {
+    const doc = byPath.get(attachment.storagePath)
+    if (!doc) return attachment
+    const metadata = metadataObject(doc.metadata_json)
+    return {
+      ...attachment,
+      documentAttachmentId: doc.id,
+      visibilityScope: doc.visibility_scope,
+      portalReleaseStatus: doc.portal_release_status,
+      title: typeof metadata.certificate_title === "string" ? metadata.certificate_title : null,
+      issueDate: typeof metadata.issue_date === "string" ? metadata.issue_date : null,
+      expiresAt: typeof metadata.expires_at === "string" ? metadata.expires_at : null,
+      invoiceId: typeof metadata.invoice_id === "string" ? metadata.invoice_id : null,
+    }
+  })
+}
+
+async function addDocumentRegistryMetadata(
+  supabase: SupabaseClient,
+  organizationId: string,
+  attachments: CertificateAttachment[],
+): Promise<CertificateAttachment[]> {
+  const paths = [...new Set(attachments.map((a) => a.storagePath).filter(Boolean))]
+  if (paths.length === 0) return attachments
+  const { data } = await supabase
+    .from("org_document_attachments")
+    .select("id, storage_path, visibility_scope, portal_release_status, metadata_json")
+    .eq("organization_id", organizationId)
+    .in("storage_path", paths)
+    .is("deleted_at", null)
+  return enrichWithDocumentRegistry(attachments, (data ?? []) as DocumentRegistryRow[])
 }
 
 export async function listCertificateAttachmentsForWorkOrder(
@@ -124,7 +188,7 @@ export async function listCertificateAttachmentsForWorkOrder(
     if (missingCertificateAttachmentsTable(error)) return []
     throw new Error(error.message)
   }
-  return ((data ?? []) as Row[]).map(mapRow)
+  return addDocumentRegistryMetadata(supabase, organizationId, ((data ?? []) as Row[]).map(mapRow))
 }
 
 export async function listCertificateAttachmentsForRecord(
@@ -143,7 +207,7 @@ export async function listCertificateAttachmentsForRecord(
     if (missingCertificateAttachmentsTable(error)) return []
     throw new Error(error.message)
   }
-  return ((data ?? []) as Row[]).map(mapRow)
+  return addDocumentRegistryMetadata(supabase, organizationId, ((data ?? []) as Row[]).map(mapRow))
 }
 
 export async function uploadCertificateAttachment(
@@ -156,6 +220,11 @@ export async function uploadCertificateAttachment(
     category?: CertificateAttachmentCategory
     file: File
     notes?: string | null
+    title?: string | null
+    issueDate?: string | null
+    expiresAt?: string | null
+    visibilityScope?: AttachmentVisibilityScope
+    invoiceId?: string | null
   },
 ): Promise<CertificateAttachment> {
   const errMsg = validateCertificateAttachmentFile(args.file)
@@ -211,32 +280,48 @@ export async function uploadCertificateAttachment(
     throw new Error(error.message)
   }
 
-  // Also register the upload in the unified document registry. This keeps the
-  // existing certificate attachment flow intact while making external PDFs
-  // discoverable from invoice/work-order/equipment document surfaces.
-  await supabase.from("org_document_attachments").insert({
-    organization_id: args.organizationId,
-    attachment_type: args.category === "external_calibration" ? "external_certificate" : "document",
-    storage_bucket: WORK_ORDER_ATTACHMENTS_BUCKET,
-    storage_path: storagePath,
-    file_name: args.file.name,
-    mime_type: args.file.type || "application/octet-stream",
-    file_size_bytes: args.file.size,
-    uploaded_by: user.id,
-    visibility_scope: "pending_release",
-    related_entity_type: args.calibrationRecordId ? "calibration_record" : "work_order",
-    related_entity_id: args.calibrationRecordId ?? args.workOrderId,
-    portal_visible: false,
-    portal_release_status: releaseStatusForVisibility("pending_release"),
-    source_system: "certificate_upload",
-    metadata_json: {
-      work_order_id: args.workOrderId,
-      equipment_id: args.equipmentId ?? null,
-      certificate_attachment_id: (data as Row).id,
-    },
-  })
+  const visibilityScope = args.visibilityScope ?? "pending_release"
+  const metadata = {
+    source: "certificate_upload",
+    work_order_id: args.workOrderId,
+    equipment_id: args.equipmentId ?? null,
+    calibration_record_id: args.calibrationRecordId ?? null,
+    invoice_id: args.invoiceId?.trim() || null,
+    certificate_attachment_id: (data as Row).id,
+    certificate_title: args.title?.trim() || null,
+    issue_date: args.issueDate?.trim() || null,
+    expires_at: args.expiresAt?.trim() || null,
+  }
+  const { data: existingDoc } = await supabase
+    .from("org_document_attachments")
+    .select("id")
+    .eq("organization_id", args.organizationId)
+    .eq("storage_bucket", WORK_ORDER_ATTACHMENTS_BUCKET)
+    .eq("storage_path", storagePath)
+    .is("deleted_at", null)
+    .maybeSingle()
 
-  return mapRow(data as Row)
+  if (!existingDoc) {
+    await supabase.from("org_document_attachments").insert({
+      organization_id: args.organizationId,
+      attachment_type: args.category === "external_calibration" ? "external_certificate" : "document",
+      storage_bucket: WORK_ORDER_ATTACHMENTS_BUCKET,
+      storage_path: storagePath,
+      file_name: args.title?.trim() || args.file.name,
+      mime_type: args.file.type || "application/octet-stream",
+      file_size_bytes: args.file.size,
+      uploaded_by: user.id,
+      visibility_scope: visibilityScope,
+      related_entity_type: args.calibrationRecordId ? "calibration_record" : "work_order",
+      related_entity_id: args.calibrationRecordId ?? args.workOrderId,
+      portal_visible: visibilityScope !== "internal",
+      portal_release_status: releaseStatusForVisibility(visibilityScope),
+      source_system: "certificate_upload",
+      metadata_json: metadata,
+    })
+  }
+
+  return (await addDocumentRegistryMetadata(supabase, args.organizationId, [mapRow(data as Row)]))[0]!
 }
 
 export async function deleteCertificateAttachment(
@@ -265,6 +350,13 @@ export async function deleteCertificateAttachment(
   if (delErr) throw new Error(delErr.message)
 
   if (storagePath) {
+    await supabase
+      .from("org_document_attachments")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("organization_id", organizationId)
+      .eq("storage_bucket", WORK_ORDER_ATTACHMENTS_BUCKET)
+      .eq("storage_path", storagePath)
+      .is("deleted_at", null)
     await supabase.storage.from(WORK_ORDER_ATTACHMENTS_BUCKET).remove([storagePath])
   }
 }

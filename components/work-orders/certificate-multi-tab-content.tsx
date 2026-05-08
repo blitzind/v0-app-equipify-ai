@@ -58,6 +58,8 @@ type PortalRulesState = {
   linkedPaid: boolean
 }
 
+type LinkedInvoiceOption = { id: string; label: string }
+
 export type CertificateMultiTabContentProps = {
   organizationId: string | null | undefined
   workOrder: WorkOrder
@@ -118,6 +120,7 @@ export function CertificateMultiTabContent({
   const [savingAssetId, setSavingAssetId] = useState<string | null>(null)
   const [releasingAssetId, setReleasingAssetId] = useState<string | null>(null)
   const [portalRules, setPortalRules] = useState<PortalRulesState | null>(null)
+  const [linkedInvoiceOptions, setLinkedInvoiceOptions] = useState<LinkedInvoiceOption[]>([])
   const [storedTechSignatureUrl, setStoredTechSignatureUrl] = useState<string | null>(null)
   const touchedRef = useRef<Record<string, Set<string>>>({})
 
@@ -137,6 +140,7 @@ export function CertificateMultiTabContent({
       setTemplates([])
       setSlotStates({})
       setPortalRules(null)
+      setLinkedInvoiceOptions([])
       return
     }
     let cancelled = false
@@ -169,6 +173,12 @@ export function CertificateMultiTabContent({
           hasLinked: linkedInvoices.length > 0,
           linkedPaid: allLinkedInvoicesPaid(linkedInvoices),
         })
+        setLinkedInvoiceOptions(
+          linkedInvoices.map((invoice) => ({
+            id: invoice.id,
+            label: `Invoice ${invoice.id.slice(0, 8)} · ${invoice.status}`,
+          })),
+        )
 
         const { count: woCalRecordCount, error: woCalCountErr } = await supabase
           .from("calibration_records")
@@ -573,7 +583,9 @@ export function CertificateMultiTabContent({
                         workOrderId={workOrder.id}
                         equipmentId={asset.id}
                         calibrationRecordId={st.recordId ?? null}
-                        canManage={orgPermissions.canReleaseCertificatesToPortal}
+                        linkedInvoices={linkedInvoiceOptions}
+                        canManage={orgPermissions.canUploadCertificateAttachments}
+                        canReleaseToPortal={orgPermissions.canReleaseCertificatesToPortal}
                       />
                     }
                   />

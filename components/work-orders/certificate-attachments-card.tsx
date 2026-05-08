@@ -13,11 +13,16 @@
  */
 
 import * as React from "react"
-import { FileText, Loader2, Paperclip, Trash2, Upload } from "lucide-react"
+import { FileText, Loader2, Paperclip, Shield, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import {
+  releaseStatusForVisibility,
+  visibilityLabel,
+  type AttachmentVisibilityScope,
+} from "@/lib/attachments/document-attachments"
 import {
   CERT_ATTACH_MAX_BYTES,
   deleteCertificateAttachment,
@@ -39,9 +44,18 @@ export type CertificateAttachmentsCardProps = {
   calibrationRecordId?: string | null
   /** Default upload category. */
   defaultCategory?: CertificateAttachmentCategory
+  linkedInvoices?: Array<{ id: string; label: string }>
   canManage?: boolean
+  canReleaseToPortal?: boolean
   className?: string
 }
+
+const VISIBILITY_OPTIONS: Array<{ value: AttachmentVisibilityScope; label: string }> = [
+  { value: "internal", label: "Internal only" },
+  { value: "pending_release", label: "Pending release" },
+  { value: "released_manual", label: "Released manually" },
+  { value: "released_after_payment", label: "Released after payment" },
+]
 
 function fmtDate(iso: string): string {
   if (!iso) return "—"
@@ -60,7 +74,9 @@ export function CertificateAttachmentsCard({
   equipmentId = null,
   calibrationRecordId = null,
   defaultCategory = "external_calibration",
+  linkedInvoices = [],
   canManage = true,
+  canReleaseToPortal = canManage,
   className,
 }: CertificateAttachmentsCardProps) {
   const { toast } = useToast()
@@ -68,6 +84,12 @@ export function CertificateAttachmentsCard({
   const [loading, setLoading] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
   const [openingId, setOpeningId] = React.useState<string | null>(null)
+  const [title, setTitle] = React.useState("")
+  const [issueDate, setIssueDate] = React.useState("")
+  const [expiresAt, setExpiresAt] = React.useState("")
+  const [notes, setNotes] = React.useState("")
+  const [visibility, setVisibility] = React.useState<AttachmentVisibilityScope>("pending_release")
+  const [invoiceId, setInvoiceId] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const refresh = React.useCallback(async () => {
@@ -121,8 +143,18 @@ export function CertificateAttachmentsCard({
         calibrationRecordId,
         category: defaultCategory,
         file,
+        title: title.trim() || null,
+        issueDate: issueDate || null,
+        expiresAt: expiresAt || null,
+        visibilityScope: visibility,
+        invoiceId: invoiceId || null,
+        notes: notes.trim() || null,
       })
       toast({ title: "Attachment uploaded" })
+      setTitle("")
+      setIssueDate("")
+      setExpiresAt("")
+      setNotes("")
       await refresh()
     } catch (err) {
       toast({
@@ -176,6 +208,34 @@ export function CertificateAttachmentsCard({
     }
   }
 
+  async function handleVisibility(att: CertificateAttachment, next: AttachmentVisibilityScope) {
+    if (!canManage || !att.documentAttachmentId) return
+    setBusy(true)
+    const supabase = createBrowserSupabaseClient()
+    try {
+      const { error } = await supabase
+        .from("org_document_attachments")
+        .update({
+          visibility_scope: next,
+          portal_visible: next !== "internal",
+          portal_release_status: releaseStatusForVisibility(next),
+        })
+        .eq("organization_id", organizationId)
+        .eq("id", att.documentAttachmentId)
+      if (error) throw new Error(error.message)
+      toast({ title: "Certificate visibility updated" })
+      await refresh()
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: err instanceof Error ? err.message : "Please retry.",
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className={cn("rounded-xl border border-border bg-card p-4 space-y-3", className)}>
       <div className="flex items-start justify-between gap-3">
@@ -211,6 +271,69 @@ export function CertificateAttachmentsCard({
         ) : null}
       </div>
 
+      {canManage ? (
+        <div className="rounded-lg border border-border bg-muted/15 p-3 space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Certificate label/title (optional)"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            />
+            {canReleaseToPortal ? (
+              <select
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as AttachmentVisibilityScope)}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+              >
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground">
+                Pending release
+              </div>
+            )}
+            <input
+              type="date"
+              value={issueDate}
+              onChange={(e) => setIssueDate(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+              title="Issue date"
+            />
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+              title="Expiration / next due date"
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select
+              value={invoiceId}
+              onChange={(e) => setInvoiceId(e.target.value)}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            >
+              <option value="">No invoice link</option>
+              {linkedInvoices.map((invoice) => (
+                <option key={invoice.id} value={invoice.id}>{invoice.label}</option>
+              ))}
+            </select>
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Upload does not require a certificate template. Portal-visible files still follow release and customer-scope checks.
+          </p>
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="text-xs text-muted-foreground py-2">Loading attachments…</p>
       ) : visible.length === 0 ? (
@@ -233,13 +356,44 @@ export function CertificateAttachmentsCard({
                   {att.fileName}
                 </button>
                 <p className="text-[10px] text-muted-foreground truncate">
-                  {att.category === "external_calibration" ? "External calibration" : "Supplementary"}
+                  {att.title?.trim() || (att.category === "external_calibration" ? "External calibration" : "Supplementary")}
                   <span className="mx-1">·</span>
                   {formatAttachmentSize(att.fileSizeBytes)}
                   <span className="mx-1">·</span>
                   Uploaded {fmtDate(att.uploadedAt)}
+                  {att.issueDate ? (
+                    <>
+                      <span className="mx-1">·</span>
+                      Issued {fmtDate(att.issueDate)}
+                    </>
+                  ) : null}
+                  {att.invoiceId ? (
+                    <>
+                      <span className="mx-1">·</span>
+                      Invoice linked
+                    </>
+                  ) : null}
                 </p>
               </div>
+              {att.visibilityScope ? (
+                canReleaseToPortal && att.documentAttachmentId ? (
+                  <select
+                    value={att.visibilityScope}
+                    onChange={(e) => void handleVisibility(att, e.target.value as AttachmentVisibilityScope)}
+                    className="hidden rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground sm:block"
+                    title={visibilityLabel(att.visibilityScope)}
+                    disabled={busy}
+                  >
+                    {VISIBILITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="hidden items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground sm:inline-flex">
+                    <Shield className="h-3 w-3" /> {visibilityLabel(att.visibilityScope)}
+                  </span>
+                )
+              ) : null}
               {openingId === att.id ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
               ) : null}

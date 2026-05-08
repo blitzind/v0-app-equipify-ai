@@ -430,7 +430,12 @@ export function CertificateTabContent({
 
       {!selectedTemplate ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/10 py-10 text-center">
-          <p className="text-sm text-muted-foreground">Select a certificate template to begin.</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            Generate a certificate from a template or upload an external certificate PDF.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/80">
+            Uploaded PDFs do not require template entry and can be prepared for portal release.
+          </p>
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card p-4 space-y-4">

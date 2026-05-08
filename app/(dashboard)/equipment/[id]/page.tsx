@@ -775,6 +775,11 @@ export default function EquipmentDetailPage() {
     }
 
     for (const doc of documentRows) {
+      const docMetadata =
+        doc.metadata_json && typeof doc.metadata_json === "object" && !Array.isArray(doc.metadata_json)
+          ? (doc.metadata_json as Record<string, unknown>)
+          : {}
+      if (typeof docMetadata.certificate_attachment_id === "string") continue
       const relatedWo =
         doc.related_entity_type === "work_order"
           ? woById.get(doc.related_entity_id)

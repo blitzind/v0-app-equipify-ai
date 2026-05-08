@@ -46,6 +46,13 @@ import { CertificatePanel } from "@/components/certificates/certificate-panel"
 import { InvoicePortalCertificatePanel } from "@/components/invoices/invoice-portal-certificate-panel"
 import { InvoiceSourcePanel } from "@/components/invoices/invoice-source-panel"
 import { DocumentAttachmentsPanel } from "@/components/attachments/document-attachments-panel"
+import {
+  formatAttachmentSize,
+  listCertificateAttachmentsForWorkOrder,
+  signedUrlForCertificateAttachment,
+  type CertificateAttachment,
+} from "@/lib/certificates/certificate-attachments"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 import { formatTaxBasisLabel, formatTaxModeLabel } from "@/lib/billing/tax-framework"
 import {
@@ -1297,6 +1304,7 @@ function FilesTab({ invoice }: { invoice: AdminInvoice }) {
         description="Attach certificate PDFs, signed paperwork, service reports, or internal invoice documents."
         defaultAttachmentType="external_certificate"
       />
+      <InvoiceLinkedCertificatesPanel invoice={invoice} />
       {invoice.equipmentId ? (
         <CertificatePanel
           equipmentId={invoice.equipmentId}
@@ -1312,6 +1320,114 @@ function FilesTab({ invoice }: { invoice: AdminInvoice }) {
           <p className="text-xs text-muted-foreground/60 mt-1">Upload certificates and documents to attach to this invoice.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+function InvoiceLinkedCertificatesPanel({ invoice }: { invoice: AdminInvoice }) {
+  const activeOrg = useActiveOrganization()
+  const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
+  const workOrderIds = useMemo(
+    () => [...new Set([...(invoice.linkedWorkOrderIds ?? []), invoice.workOrderId].filter(Boolean))],
+    [invoice.linkedWorkOrderIds, invoice.workOrderId],
+  )
+  const [items, setItems] = useState<Array<CertificateAttachment & { sourceWorkOrderId: string }>>([])
+  const [loading, setLoading] = useState(false)
+  const [openingId, setOpeningId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!orgId || workOrderIds.length === 0) {
+      setItems([])
+      return () => {
+        cancelled = true
+      }
+    }
+    setLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const loaded: Array<CertificateAttachment & { sourceWorkOrderId: string }> = []
+      for (const workOrderId of workOrderIds) {
+        const rows = await listCertificateAttachmentsForWorkOrder(supabase, { organizationId: orgId, workOrderId }).catch(
+          () => [] as CertificateAttachment[],
+        )
+        loaded.push(...rows.map((row) => ({ ...row, sourceWorkOrderId: workOrderId })))
+      }
+      if (cancelled) return
+      const seen = new Set<string>()
+      setItems(loaded.filter((item) => {
+        if (seen.has(item.id)) return false
+        seen.add(item.id)
+        return true
+      }))
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, workOrderIds])
+
+  async function openAttachment(item: CertificateAttachment) {
+    setOpeningId(item.id)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const url = await signedUrlForCertificateAttachment(supabase, item.storagePath)
+      if (url) window.open(url, "_blank", "noopener,noreferrer")
+    } finally {
+      setOpeningId(null)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Linked work order certificates</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Uploaded external certificates connected through this invoice’s linked work orders or calibration records.
+          </p>
+        </div>
+        <FileSignature className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 px-3 py-5 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading certificates...
+          </div>
+        ) : items.length === 0 ? (
+          <div className="px-3 py-5 text-center">
+            <p className="text-xs font-medium text-muted-foreground">No linked certificate uploads yet</p>
+            <p className="mt-1 text-[11px] text-muted-foreground/70">
+              Upload certificates on the work order certificate tab or attach a certificate PDF directly above.
+            </p>
+          </div>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 bg-background px-3 py-2.5">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-foreground">{item.title?.trim() || item.fileName}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {item.category === "external_calibration" ? "External certificate" : "Certificate file"} ·{" "}
+                  {formatAttachmentSize(item.fileSizeBytes)} · WO {item.sourceWorkOrderId.slice(0, 8)}
+                  {item.portalReleaseStatus ? ` · ${item.portalReleaseStatus.replace(/_/g, " ")}` : ""}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                disabled={openingId === item.id}
+                onClick={() => void openAttachment(item)}
+                aria-label={`Open ${item.fileName}`}
+              >
+                {openingId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }

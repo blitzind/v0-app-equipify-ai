@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:32:45.048Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:40:53.968Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -107,9 +107,11 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Certificates (calibration)
 - **Routes:** \`/calibration-templates\` (nav label “Certificates”), WO certificate tabs.
-- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), PDF/HTML output.
-- **Status:** MVP complete; portal exposes certificates API.
-- **Gaps:** Attachments, customer release rules, technician signature workflows.
+- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, and external certificate PDF uploads.
+- **Status:** MVP complete; portal exposes certificates API and released certificate attachments.
+- **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, and invoice metadata.
+- **Tables:** \`calibration_templates\`, \`calibration_records\`, \`certificate_attachments\`, and unified \`org_document_attachments\`.
+- **Gaps:** Technician signature workflow refinements.
 
 ### Quotes
 - **Route:** \`/quotes\`
@@ -119,7 +121,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Invoices
 - **Route:** \`/invoices\`
-- **Purpose:** Invoicing, send email routes, QuickBooks export when connected.
+- **Purpose:** Invoicing, send email routes, QuickBooks export when connected, and invoice-linked document/certificate visibility.
 - **Tables:** \`org_invoices\` family.
 - **Gaps:** Payment allocation vs QB; automatic due dates; jurisdiction tax.
 

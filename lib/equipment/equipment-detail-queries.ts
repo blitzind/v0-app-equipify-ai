@@ -328,6 +328,7 @@ export type EquipmentDocumentAttachmentRow = {
   related_entity_type: string
   related_entity_id: string
   portal_release_status: string
+  metadata_json: unknown
 }
 
 export async function fetchDocumentAttachmentsForEquipmentHistory(
@@ -346,7 +347,7 @@ export async function fetchDocumentAttachmentsForEquipmentHistory(
   for (const target of targets) {
     const { data, error } = await supabase
       .from("org_document_attachments")
-      .select("id, attachment_type, file_name, uploaded_at, related_entity_type, related_entity_id, portal_release_status")
+      .select("id, attachment_type, file_name, uploaded_at, related_entity_type, related_entity_id, portal_release_status, metadata_json")
       .eq("organization_id", organizationId)
       .eq("related_entity_type", target.type)
       .in("related_entity_id", target.ids)
