@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -262,6 +263,9 @@ export default function NotificationsPage() {
           <span className="text-xs text-muted-foreground">(your local time)</span>
         </div>
       </div>
+
+      {/* AI Ops daily digest (Phase 3 — internal staff only) */}
+      <AiOpsDigestSettingsCard />
 
       {/* Link to automations */}
       <div className="rounded-lg border border-dashed border-border bg-secondary/30 px-5 py-4">

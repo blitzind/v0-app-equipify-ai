@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 151,
-  sqlMigrations: 103,
+  apiRouteHandlers: 156,
+  sqlMigrations: 104,
   dashboardPages: 56,
-  componentsTsx: 196,
-  libTsFiles: 307,
+  componentsTsx: 198,
+  libTsFiles: 310,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,17 +17,18 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **151** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **103** |
+| API route handlers (\`app/api/**/route.ts\`) | **156** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **104** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **56** |
-| \`components/**/*.tsx\` | **196** |
-| \`lib/**/*.ts\` | **307** |
+| \`components/**/*.tsx\` | **198** |
+| \`lib/**/*.ts\` | **310** |
 
 ### Vercel crons
 
 - \`/api/cron/maintenance-due\` — cron: \`0 6 * * *\`
 - \`/api/cron/process-ai-jobs\` — cron: \`* * * * *\`
 - \`/api/cron/process-import-runs\` — cron: \`*/5 * * * *\`
+- \`/api/cron/ai-ops-digest\` — cron: \`0 * * * *\`
 
 ### API routes (relative to \`app/api\`)
 
@@ -36,6 +37,7 @@ archived/restore/route.ts
 archived/route.ts
 billing/checkout/route.ts
 certificates/import-template/route.ts
+cron/ai-ops-digest/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
@@ -62,6 +64,10 @@ organizations/[organizationId]/ai-assistants/[assistantId]/enqueue/route.ts
 organizations/[organizationId]/ai-assistants/[assistantId]/run/route.ts
 organizations/[organizationId]/ai-assistants/route.ts
 organizations/[organizationId]/ai-jobs/[jobId]/route.ts
+organizations/[organizationId]/ai-ops/digest/preview/route.ts
+organizations/[organizationId]/ai-ops/digest/runs/route.ts
+organizations/[organizationId]/ai-ops/digest/send/route.ts
+organizations/[organizationId]/ai-ops/digest/settings/route.ts
 organizations/[organizationId]/ai-ops/dismissals/route.ts
 organizations/[organizationId]/ai-ops/outcomes/route.ts
 organizations/[organizationId]/ai-ops/recommendations/[recommendationKey]/narrate/route.ts

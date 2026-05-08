@@ -106,30 +106,18 @@ export function AiOpsPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-border bg-card px-4 sm:px-6 py-4 sm:py-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl border border-violet-500/30 bg-violet-500/[0.08] flex items-center justify-center shrink-0">
-              <Bot className="h-5 w-5 text-violet-600 dark:text-violet-400" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight">AI Operations</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                Practical next actions derived from your prospects, work orders, invoices,
-                inventory, automations, and communications. Read-only — Equipify never
-                changes records or sends messages on your behalf from here.
-              </p>
-            </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 rounded-xl border border-violet-500/30 bg-violet-500/[0.08] flex items-center justify-center shrink-0">
+            <Bot className="h-5 w-5 text-violet-600 dark:text-violet-400" aria-hidden />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRefreshKey((k) => k + 1)}
-            disabled={loading}
-            className="gap-1.5 shrink-0"
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Refresh
-          </Button>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold tracking-tight">AI Operations</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
+              Practical next actions derived from your prospects, work orders, invoices,
+              inventory, automations, and communications. Read-only — Equipify never
+              changes records or sends messages on your behalf from here.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -181,21 +169,42 @@ export function AiOpsPage() {
         </div>
       </div>
 
-      {summary && summary.total > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="-mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="uppercase tracking-wide">By category</span>
-          {Object.entries(summary.byCategory).map(([cat, n]) => {
-            const Icon = CATEGORY_ICON[cat as RecommendationCategory]
-            return (
-              <Badge key={cat} variant="outline" className="gap-1 normal-case">
-                <Icon className="h-3 w-3" aria-hidden />
-                {CATEGORY_LABEL[cat as RecommendationCategory]}
-                <span className="font-semibold text-foreground">{n}</span>
-              </Badge>
-            )
-          })}
+          {summary && summary.total > 0 ? (
+            Object.entries(summary.byCategory).map(([cat, n]) => {
+              const Icon = CATEGORY_ICON[cat as RecommendationCategory]
+              return (
+                <Badge key={cat} variant="outline" className="gap-1 normal-case">
+                  <Icon className="h-3 w-3" aria-hidden />
+                  {CATEGORY_LABEL[cat as RecommendationCategory]}
+                  <span className="font-semibold text-foreground">{n}</span>
+                </Badge>
+              )
+            })
+          ) : (
+            <span className="italic">No active recommendations</span>
+          )}
         </div>
-      ) : null}
+
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loading}
+            className="gap-1.5 h-8"
+          >
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            )}
+            Refresh
+          </Button>
+        </div>
+      </div>
 
       {error ? (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>

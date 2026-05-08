@@ -35,6 +35,7 @@ import { AiExplainPanel } from "./ai-explain-panel"
 import { DraftFollowupDialog } from "./draft-followup-dialog"
 import { buildAutomationSuggestion, suggestionUrl } from "./automation-suggestion"
 import { logAiOpsOutcome } from "./log-outcome"
+import { MarkHandledButton } from "./mark-handled-button"
 
 const PRIORITY_RIBBON: Record<Recommendation["priority"], string> = {
   high: "before:bg-red-500",
@@ -237,6 +238,9 @@ export function RecommendationCard({
               <Link href={a.href ?? "#"}>{a.label}</Link>
             </Button>
           ))}
+          {organizationId ? (
+            <MarkHandledButton rec={rec} organizationId={organizationId} />
+          ) : null}
         </div>
       </div>
 
