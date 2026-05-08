@@ -104,8 +104,8 @@ const NAV_GROUPS: NavGroup[] = [
     id: "financial",
     label: "Financial",
     items: [
-      { label: "Quotes", href: "/quotes", icon: FileText, anyOf: ["canViewBilling"] },
-      { label: "Invoices", href: "/invoices", icon: Receipt, anyOf: ["canViewBilling"] },
+      { label: "Quotes", href: "/quotes", icon: FileText, anyOf: ["canViewQuotes", "canEditQuotes"] },
+      { label: "Invoices", href: "/invoices", icon: Receipt, anyOf: ["canViewBilling", "canEditInvoices"] },
       { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, anyOf: ["canViewBilling"] },
       { label: "Vendors", href: "/vendors", icon: Store, anyOf: ["canViewBilling"] },
     ],

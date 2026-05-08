@@ -15,6 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import {
+  getEffectiveOrgPermissions,
   getOrgPermissionsForRole,
   hasOrgPermission,
   normalizeOrgMemberRole,
@@ -66,7 +67,7 @@ export async function requireOrgPermission(
 
   const { data: mem, error: memErr } = await supabase
     .from("organization_members")
-    .select("role")
+    .select("role, permission_profile, permissions_json")
     .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .eq("status", "active")
@@ -78,7 +79,11 @@ export async function requireOrgPermission(
 
   const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
   const role = normalizeOrgMemberRole(rawRole)
-  const permissions = getOrgPermissionsForRole(role)
+  const permissions = getEffectiveOrgPermissions({
+    role,
+    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
+    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+  })
 
   if (!platformAdmin) {
     if (!rawRole) {
@@ -136,7 +141,7 @@ export async function requireAnyOrgPermission(
 
   const { data: mem, error: memErr } = await supabase
     .from("organization_members")
-    .select("role")
+    .select("role, permission_profile, permissions_json")
     .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .eq("status", "active")
@@ -148,7 +153,11 @@ export async function requireAnyOrgPermission(
 
   const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
   const role = normalizeOrgMemberRole(rawRole)
-  const permissions = getOrgPermissionsForRole(role)
+  const permissions = getEffectiveOrgPermissions({
+    role,
+    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
+    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+  })
 
   if (!platformAdmin) {
     if (!rawRole) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { computeReportAnalytics } from "@/lib/reporting/compute-analytics"
-import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
 
 export const runtime = "nodejs"
 
@@ -34,7 +34,7 @@ export async function GET(
   if (!platformAdmin) {
     const { data: mem } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("role, permission_profile, permissions_json")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")
@@ -42,9 +42,11 @@ export async function GET(
     if (!mem) {
       return jsonError("Forbidden.", 403)
     }
-    const reportPerms = getOrgPermissionsForRole(
-      normalizeOrgMemberRole((mem as { role?: string }).role),
-    )
+    const reportPerms = getEffectiveOrgPermissions({
+      role: normalizeOrgMemberRole((mem as { role?: string }).role),
+      permissionProfile: (mem as { permission_profile?: string | null }).permission_profile ?? null,
+      permissionsJson: (mem as { permissions_json?: unknown }).permissions_json ?? null,
+    })
     if (!reportPerms.canViewOperationalReports && !reportPerms.canViewFinancialReports) {
       return jsonError("Insufficient permissions.", 403)
     }

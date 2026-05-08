@@ -37,6 +37,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MEMBERSHIP_ROLES, type MembershipRole } from "@/lib/team/membership"
 import type { TechnicianSkillTagOption } from "@/lib/technicians/skill-tags"
+import {
+  COMMERCIAL_PERMISSION_PROFILES,
+  getEffectiveOrgPermissions,
+  normalizePermissionProfile,
+  type CommercialPermissionProfile,
+  type OrgPermissions,
+} from "@/lib/permissions/model"
 
 // ─── Role definitions (DB roles) ──────────────────────────────────────────────
 
@@ -63,9 +70,19 @@ const INVITE_ROLES: { value: MembershipRole; label: string }[] = [
   { value: "viewer", label: ROLE_LABEL.viewer },
 ]
 
+const PROFILE_OPTIONS: Array<{ value: CommercialPermissionProfile | ""; label: string }> = [
+  { value: "", label: "Use role default" },
+  ...Object.entries(COMMERCIAL_PERMISSION_PROFILES).map(([value, profile]) => ({
+    value: value as CommercialPermissionProfile,
+    label: profile.label,
+  })),
+]
+
 type TeamMemberRow = {
   userId: string
   role: string
+  permissionProfile: string | null
+  effectivePermissions?: OrgPermissions
   status: string
   createdAt: string
   updatedAt: string | null
@@ -121,6 +138,30 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
+function permissionHighlights(perms: OrgPermissions): string[] {
+  const out: string[] = []
+  if (perms.canEditInvoices || perms.canApproveInvoices) out.push("Billing")
+  if (perms.canEditQuotes || perms.canManageProspects) out.push("Sales")
+  if (perms.canManageDispatch) out.push("Dispatch")
+  if (perms.canEditWorkOrders) out.push("Work orders")
+  if (perms.canReleaseCertificatesToPortal || perms.canUploadCertificateAttachments) out.push("Certificates")
+  if (perms.canManageWorkspaceSettings || perms.canManagePortalSettings) out.push("Settings")
+  if (perms.canViewFinancialReports) out.push("Financial reports")
+  return out.length ? out.slice(0, 5) : ["Limited view"]
+}
+
+function ProfileLabel({ profile }: { profile: string | null }) {
+  const normalized = normalizePermissionProfile(profile)
+  if (!normalized) {
+    return <span className="text-[11px] text-muted-foreground">Role default</span>
+  }
+  return (
+    <span className="text-[11px] font-medium text-foreground">
+      {COMMERCIAL_PERMISSION_PROFILES[normalized].label}
+    </span>
+  )
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { color: string; bg: string; label: string }> = {
     active: { color: "#15803d", bg: "#f0fdf4", label: "Active" },
@@ -166,6 +207,7 @@ export default function TeamPage() {
   const [editEmail, setEditEmail] = useState("")
   const [editPhone, setEditPhone] = useState("")
   const [editRole, setEditRole] = useState<MembershipRole>("tech")
+  const [editPermissionProfile, setEditPermissionProfile] = useState<CommercialPermissionProfile | "">("")
   const [editStatus, setEditStatus] = useState<"active" | "suspended">("active")
   const [editSaving, setEditSaving] = useState(false)
   const [editAvatarUploading, setEditAvatarUploading] = useState(false)
@@ -273,6 +315,7 @@ export default function TeamPage() {
     setEditEmail(m.email ?? "")
     setEditPhone(m.phone ?? "")
     setEditRole(isMembershipRoleString(m.role) ? m.role : "tech")
+    setEditPermissionProfile(normalizePermissionProfile(m.permissionProfile) ?? "")
     setEditStatus(m.status === "suspended" ? "suspended" : "active")
     setMenuOpen(null)
   }
@@ -292,6 +335,7 @@ export default function TeamPage() {
         email: emailT,
         phone: editPhone.trim(),
         role: editRole,
+        permissionProfile: editPermissionProfile || null,
       }
       if (editMember.status !== "invited") {
         body.status = editStatus
@@ -417,7 +461,10 @@ export default function TeamPage() {
     }
   }
 
-  async function patchMember(userId: string, body: { role?: MembershipRole; status?: "active" | "suspended" }) {
+  async function patchMember(
+    userId: string,
+    body: { role?: MembershipRole; status?: "active" | "suspended"; permissionProfile?: CommercialPermissionProfile | null },
+  ) {
     if (!organizationId) return { ok: false as const }
     try {
       const res = await fetch(`/api/team/members/${encodeURIComponent(userId)}`, {
@@ -439,7 +486,7 @@ export default function TeamPage() {
   }
 
   async function changeRole(userId: string, role: MembershipRole) {
-    const r = await patchMember(userId, { role })
+    const r = await patchMember(userId, { role, permissionProfile: null })
     if (r.ok && !r.unchanged) pushToast({ title: "Role updated" })
     setMenuOpen(null)
   }
@@ -663,7 +710,7 @@ export default function TeamPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-secondary/30 dark:bg-card">
-                  {["Member", "Role", "Status", "Joined", ""].map((h) => (
+                  {["Member", "Role", "Permission profile", "Access preview", "Status", "Joined", ""].map((h) => (
                     <th key={h} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">
                       {h}
                     </th>
@@ -708,6 +755,27 @@ export default function TeamPage() {
                       </td>
                       <td className="px-6 py-3">
                         <RoleBadge role={user.role} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <ProfileLabel profile={user.permissionProfile} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {permissionHighlights(
+                            user.effectivePermissions ??
+                              getEffectiveOrgPermissions({
+                                role: isMembershipRoleString(user.role) ? user.role : "viewer",
+                                permissionProfile: user.permissionProfile,
+                              }),
+                          ).map((item) => (
+                            <span
+                              key={item}
+                              className="rounded-full border border-border bg-secondary/40 px-2 py-0.5 text-[10px] text-muted-foreground"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-6 py-3">
                         <StatusBadge status={user.status} />
@@ -1086,6 +1154,27 @@ export default function TeamPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="team-edit-profile">Permission profile</Label>
+                  <select
+                    id="team-edit-profile"
+                    className="input-base w-full"
+                    value={editPermissionProfile}
+                    onChange={(e) => setEditPermissionProfile(e.target.value as CommercialPermissionProfile | "")}
+                    disabled={editSaving}
+                  >
+                    {PROFILE_OPTIONS.map((p) => (
+                      <option key={p.value || "role-default"} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    {editPermissionProfile
+                      ? COMMERCIAL_PERMISSION_PROFILES[editPermissionProfile].description
+                      : "Uses the default permissions for the selected DB role."}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="team-edit-status">Status</Label>
                   {editMember.status === "invited" ? (
                     <p className="text-xs text-muted-foreground rounded-md border border-border px-3 py-2 bg-secondary/30">
@@ -1104,6 +1193,28 @@ export default function TeamPage() {
                     </select>
                   )}
                 </div>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Access preview
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {permissionHighlights(
+                    getEffectiveOrgPermissions({
+                      role: editRole,
+                      permissionProfile: editPermissionProfile || null,
+                    }),
+                  ).map((item) => (
+                    <span key={item} className="rounded-full bg-background border border-border px-2 py-0.5 text-[10px]">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                {(editRole !== editMember.role || (editPermissionProfile || null) !== (normalizePermissionProfile(editMember.permissionProfile) ?? null)) ? (
+                  <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+                    Changing role or profile may immediately reduce this user&apos;s access after save.
+                  </p>
+                ) : null}
               </div>
             </div>
           )}

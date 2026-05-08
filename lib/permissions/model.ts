@@ -4,6 +4,14 @@
  */
 
 export type OrgMemberRole = "owner" | "admin" | "manager" | "tech" | "viewer"
+export type CommercialPermissionProfile =
+  | "owner"
+  | "admin"
+  | "operations_manager"
+  | "technician"
+  | "billing"
+  | "sales"
+  | "viewer"
 
 /** Typed capability flags used across UI + API helpers. */
 export type OrgPermissions = {
@@ -134,6 +142,35 @@ const NONE: OrgPermissions = {
 export function normalizeOrgMemberRole(raw: string | null | undefined): OrgMemberRole | null {
   const r = raw?.trim().toLowerCase()
   if (r === "owner" || r === "admin" || r === "manager" || r === "tech" || r === "viewer") {
+    return r
+  }
+  return null
+}
+
+export const COMMERCIAL_PERMISSION_PROFILES: Record<
+  CommercialPermissionProfile,
+  { label: string; mappedRole: OrgMemberRole; description: string }
+> = {
+  owner: { label: "Owner", mappedRole: "owner", description: "Full workspace, billing, security, and operational control." },
+  admin: { label: "Admin", mappedRole: "admin", description: "Full operational access without ownership transfer semantics." },
+  operations_manager: { label: "Operations Manager", mappedRole: "manager", description: "Dispatch, technicians, work orders, inventory, certificates, quotes, and invoices." },
+  technician: { label: "Technician", mappedRole: "tech", description: "Assigned field work, service updates, signatures, photos/docs, and allowed certificates." },
+  billing: { label: "Billing", mappedRole: "viewer", description: "Customer context, work summaries, invoices, quotes, payments, and billing operations." },
+  sales: { label: "Sales / Prospects", mappedRole: "viewer", description: "Prospects, customer handoff, and quote workflow without operations settings." },
+  viewer: { label: "Viewer", mappedRole: "viewer", description: "Limited read-only access without operational or financial mutations." },
+}
+
+export function normalizePermissionProfile(raw: string | null | undefined): CommercialPermissionProfile | null {
+  const r = raw?.trim().toLowerCase()
+  if (
+    r === "owner" ||
+    r === "admin" ||
+    r === "operations_manager" ||
+    r === "technician" ||
+    r === "billing" ||
+    r === "sales" ||
+    r === "viewer"
+  ) {
     return r
   }
   return null
@@ -300,4 +337,63 @@ export function hasOrgPermission(
   key: keyof OrgPermissions,
 ): boolean {
   return Boolean(perms[key])
+}
+
+export function getOrgPermissionsForProfile(profile: CommercialPermissionProfile): OrgPermissions {
+  if (profile === "billing") {
+    return {
+      ...getOrgPermissionsForRole("viewer"),
+      canViewBilling: true,
+      canViewFinancials: true,
+      canEditInvoices: true,
+      canApproveInvoices: true,
+      canViewQuotes: true,
+      canEditQuotes: false,
+      canViewOperationalReports: false,
+      canViewFinancialReports: false,
+      canManageProspects: false,
+      canManageSettings: false,
+      canManageWorkspaceSettings: false,
+      canViewInsights: false,
+    }
+  }
+  if (profile === "sales") {
+    return {
+      ...getOrgPermissionsForRole("viewer"),
+      canViewBilling: false,
+      canViewFinancials: false,
+      canEditInvoices: false,
+      canApproveInvoices: false,
+      canViewQuotes: true,
+      canEditQuotes: true,
+      canManageProspects: true,
+      canViewOperationalReports: false,
+      canViewFinancialReports: false,
+      canViewInsights: false,
+      canManageSettings: false,
+      canManageWorkspaceSettings: false,
+    }
+  }
+  if (profile === "operations_manager") return getOrgPermissionsForRole("manager")
+  if (profile === "technician") return getOrgPermissionsForRole("tech")
+  return getOrgPermissionsForRole(COMMERCIAL_PERMISSION_PROFILES[profile].mappedRole)
+}
+
+export function getEffectiveOrgPermissions(args: {
+  role: OrgMemberRole | null
+  permissionProfile?: CommercialPermissionProfile | string | null
+  permissionsJson?: unknown
+}): OrgPermissions {
+  const profile = normalizePermissionProfile(args.permissionProfile)
+  const base = profile ? getOrgPermissionsForProfile(profile) : getOrgPermissionsForRole(args.role)
+  if (!args.permissionsJson || typeof args.permissionsJson !== "object" || Array.isArray(args.permissionsJson)) {
+    return base
+  }
+  const next = { ...base }
+  for (const [key, value] of Object.entries(args.permissionsJson as Record<string, unknown>)) {
+    if (key in next && typeof value === "boolean") {
+      ;(next as Record<string, boolean>)[key] = value
+    }
+  }
+  return next
 }

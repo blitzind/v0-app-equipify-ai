@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
 
     const { data: memberRows, error: mErr } = await admin
       .from("organization_members")
-      .select("user_id, role, status, created_at, invited_by, updated_at")
+      .select("user_id, role, status, permission_profile, permissions_json, created_at, invited_by, updated_at")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: true })
 
@@ -93,6 +94,13 @@ export async function GET(request: Request) {
       return {
         userId: row.user_id as string,
         role: row.role as string,
+        permissionProfile: (row as { permission_profile?: string | null }).permission_profile ?? null,
+        permissionsJson: (row as { permissions_json?: unknown }).permissions_json ?? {},
+        effectivePermissions: getEffectiveOrgPermissions({
+          role: normalizeOrgMemberRole(row.role as string),
+          permissionProfile: (row as { permission_profile?: string | null }).permission_profile ?? null,
+          permissionsJson: (row as { permissions_json?: unknown }).permissions_json ?? {},
+        }),
         status: row.status as string,
         createdAt: row.created_at as string,
         updatedAt: row.updated_at as string | null,

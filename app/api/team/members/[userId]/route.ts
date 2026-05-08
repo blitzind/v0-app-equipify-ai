@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { countActiveOwners, isMembershipRole, type MembershipRole } from "@/lib/team/membership"
+import { normalizePermissionProfile } from "@/lib/permissions/model"
 import { insertTeamAuditEvent } from "@/lib/team-audit"
 import { removeAvatarObjectIfInBucket } from "@/lib/profile/avatar-storage"
 
@@ -21,6 +22,8 @@ type PatchBody = {
   phone?: string | null
   /** Remove avatar image from storage and clear `profiles.avatar_url` */
   clearAvatar?: boolean
+  permissionProfile?: string | null
+  permissionsJson?: unknown
 }
 
 function jsonError(code: string, message: string, status: number) {
@@ -31,7 +34,7 @@ async function loadTargetMembership(organizationId: string, targetUserId: string
   const admin = createServiceRoleSupabaseClient()
   const { data, error } = await admin
     .from("organization_members")
-    .select("user_id, role, status")
+    .select("user_id, role, status, permission_profile, permissions_json")
     .eq("organization_id", organizationId)
     .eq("user_id", targetUserId)
     .maybeSingle()
@@ -61,6 +64,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
   const roleRaw = typeof body.role === "string" ? body.role.trim().toLowerCase() : undefined
   const statusRaw = typeof body.status === "string" ? body.status.trim().toLowerCase() : undefined
+  const profileRaw =
+    typeof body.permissionProfile === "string"
+      ? body.permissionProfile.trim().toLowerCase()
+      : body.permissionProfile === null
+        ? null
+        : undefined
+  const profile = profileRaw === undefined ? undefined : normalizePermissionProfile(profileRaw)
 
   const hasFullName = "fullName" in body
   const hasEmail = "email" in body
@@ -73,8 +83,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
   const hasProfileFields = hasFullName || hasEmail || hasPhone || clearAvatar
 
-  if (roleRaw === undefined && statusRaw === undefined && !hasProfileFields) {
-    return jsonError("invalid_body", "Provide role, status, profile fields, or clearAvatar.", 400)
+  if (roleRaw === undefined && statusRaw === undefined && profileRaw === undefined && body.permissionsJson === undefined && !hasProfileFields) {
+    return jsonError("invalid_body", "Provide role, status, permission profile, profile fields, or clearAvatar.", 400)
   }
 
   if (roleRaw !== undefined && !isMembershipRole(roleRaw)) {
@@ -83,6 +93,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
   if (statusRaw !== undefined && statusRaw !== "active" && statusRaw !== "suspended") {
     return jsonError("invalid_status", "Status must be active or suspended.", 400)
+  }
+  if (profileRaw !== undefined && profileRaw !== null && !profile) {
+    return jsonError("invalid_permission_profile", "Invalid permission profile.", 400)
+  }
+  if (
+    body.permissionsJson !== undefined &&
+    (body.permissionsJson === null || typeof body.permissionsJson !== "object" || Array.isArray(body.permissionsJson))
+  ) {
+    return jsonError("invalid_permissions", "Permission overrides must be an object.", 400)
   }
 
   if (hasEmail && emailVal !== undefined && emailVal.length > 0 && !EMAIL_RE.test(emailVal)) {
@@ -166,12 +185,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     }
   }
 
-  const patch: Record<string, string> = {}
+  const patch: Record<string, unknown> = {}
   if (newRole !== undefined && newRole !== targetRole) {
     patch.role = newRole
   }
   if (newStatus !== undefined && newStatus !== targetStatus) {
     patch.status = newStatus
+  }
+  if (profileRaw !== undefined) {
+    patch.permission_profile = profileRaw === null ? null : profile
+  }
+  if (body.permissionsJson !== undefined) {
+    patch.permissions_json = body.permissionsJson
   }
 
   const membershipChanged = Object.keys(patch).length > 0

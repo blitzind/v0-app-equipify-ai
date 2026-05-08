@@ -240,8 +240,8 @@ export const ROLE_BEHAVIOR_SUMMARY: Record<
   owner: "Full access — workspace, billing, settings, and every operational module.",
   admin: "Full access except for transferring ownership.",
   manager:
-    "Manages day-to-day operations: dispatch, technicians, quotes, invoices, certificates, and inventory. Cannot edit subscription billing or security policies.",
-  tech: "Field-only — view assigned work, update work orders, consume parts, and upload certificate attachments. Cannot see invoice or quote pricing.",
+    "Operations Manager default: dispatch, technicians, quotes, invoices, certificates, and inventory. Cannot edit subscription billing or security policies.",
+  tech: "Technician default: assigned field work, service updates, parts usage, signatures/photos/docs, and certificate uploads where permitted. Cannot see invoice or quote pricing.",
   viewer:
-    "Read-only — sees customers, equipment, work orders, dispatch, and operational reports. Cannot edit invoices, quotes, or settings.",
+    "Limited viewer default: read-only workspace access with no invoice, quote, or settings mutations. Billing and Sales profiles can be layered on this DB role.",
 }

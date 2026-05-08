@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T22:46:43.210Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T23:09:55.005Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -240,9 +240,9 @@ ${MCG_SCAN_SECTION}
 
 ## Permissions and Roles Status
 - **Database roles:** \`owner\`, \`admin\`, \`manager\`, \`tech\`, \`viewer\` on \`organization_members\`.
-- **Server enforcement:** Membership checks on APIs; RLS; some routes require owner/admin (e.g. branding uploads).
-- **UI:** Team settings reflect DB roles; a static permissions matrix page is informational; demo **TenantProvider** \`can()\` helpers can diverge from live membership — treat **server checks + RLS** as source of truth.
-- **Needed:** Product-level “billing-only” / “sales” style roles aligned with DB; optional migration from viewer/manager semantics to commercial role names.
+- **Commercial profiles:** Optional \`organization_members.permission_profile\` overlays support Owner, Admin, Operations Manager, Technician, Billing, Sales / Prospects, and Viewer without replacing the DB role enum. \`permissions_json\` stores optional boolean capability overrides for application/API guards.
+- **Server enforcement:** RLS remains the tenant boundary; APIs use \`requireOrgPermission\` / \`getEffectiveOrgPermissions\` for capability checks. Sensitive areas such as certificate release, reports, attachment mutation, billing/settings, imports, and team management should gate mutations through capabilities.
+- **UI:** Team settings show DB role, optional permission profile, and an access preview; Settings → Permissions is generated from the shared capability map. Demo **TenantProvider** \`can()\` helpers can still diverge from live membership — treat **server checks + RLS** as source of truth.
 
 ## UI/UX Standards
 - **Brand:** Primary blue (\`--primary\`, \`--status-info\` ~ **#0f7ae5**); **CTA orange** \`--cta\` **#f59f1c** for primary filled actions; **AI accent** aligns with brand blue (\`--ai-purple\`).

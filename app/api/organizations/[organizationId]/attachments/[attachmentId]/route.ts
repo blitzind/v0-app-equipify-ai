@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import {
   ATTACHMENT_VISIBILITY_SCOPES,
   DOCUMENT_ATTACHMENT_SELECT,
@@ -13,8 +14,6 @@ export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const WRITE_ROLES = new Set(["owner", "admin", "manager", "tech"])
 
 async function requireOrgAccess(organizationId: string, write = false) {
   const supabase = await createServerSupabaseClient()
@@ -29,13 +28,18 @@ async function requireOrgAccess(organizationId: string, write = false) {
   if (!platformAdmin) {
     const { data: mem, error } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("role, permission_profile, permissions_json")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")
       .maybeSingle()
     const role = (mem as { role?: string | null } | null)?.role ?? null
-    if (error || !role || (write && !WRITE_ROLES.has(role))) {
+    const permissions = getEffectiveOrgPermissions({
+      role: normalizeOrgMemberRole(role),
+      permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
+      permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+    })
+    if (error || !role || (write && !permissions.canUploadCertificateAttachments && !permissions.canReleaseCertificatesToPortal)) {
       return { error: NextResponse.json({ error: "forbidden", message: "You do not have access to this workspace." }, { status: 403 }) }
     }
   }

@@ -8,7 +8,10 @@ import {
   type CapabilityMetadata,
 } from "@/lib/permissions/capabilities"
 import {
+  COMMERCIAL_PERMISSION_PROFILES,
   getOrgPermissionsForRole,
+  getOrgPermissionsForProfile,
+  type CommercialPermissionProfile,
   type OrgMemberRole,
   type OrgPermissionKey,
   type OrgPermissions,
@@ -18,6 +21,7 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 type LiveRole = OrgMemberRole
 
 const ROLES: LiveRole[] = ["owner", "admin", "manager", "tech", "viewer"]
+const PROFILES: CommercialPermissionProfile[] = ["owner", "admin", "operations_manager", "technician", "billing", "sales", "viewer"]
 
 const ROLE_META: Record<
   LiveRole,
@@ -154,6 +158,10 @@ export default function PermissionsPage() {
             across <span className="font-medium">{ROLES.length}</span> built-in
             roles.
           </p>
+          <p className="text-[11px] text-muted-foreground/80">
+            Commercial profiles such as Billing and Sales layer application/API capability checks over existing DB roles.
+            Supabase RLS still uses the broad DB role as the tenant boundary.
+          </p>
           {viewerStatus === "ready" && viewerRole ? (
             <p className="text-[11px] text-muted-foreground/80">
               Your role: <span className="font-medium">{ROLE_META[viewerRole].label}</span> —
@@ -197,11 +205,41 @@ export default function PermissionsPage() {
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">
+            Commercial permission profiles
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Profiles are optional overlays stored on team members. They do not replace the DB role enum.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
+          {PROFILES.map((profile) => {
+            const meta = COMMERCIAL_PERMISSION_PROFILES[profile]
+            const perms = getOrgPermissionsForProfile(profile)
+            const enabled = Object.values(perms).filter(Boolean).length
+            return (
+              <div key={profile} className="rounded-lg border border-border bg-secondary/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">{meta.label}</p>
+                  <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
+                    DB role: {ROLE_META[meta.mappedRole].label}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{meta.description}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">{enabled} capabilities enabled by default.</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground">
             Role permissions matrix
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             A read-only overview of every capability the system enforces. Custom
-            per-user overrides are not yet available.
+            profile overlays are applied from Team settings and checked by API guards.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -271,11 +309,11 @@ export default function PermissionsPage() {
         <div>
           <p className="text-sm font-medium">How permissions are applied</p>
           <p className="text-xs mt-0.5">
-            Role assignments above (managed in{" "}
+            Role assignments and permission profiles above (managed in{" "}
             <a href="/settings/team" className="underline font-medium">
               Team settings
             </a>
-            ) are the source of truth and are enforced by both UI gates and API guards.
+            ) feed the shared permission helper used by UI gates and API guards. RLS still enforces tenant membership and DB-role boundaries.
           </p>
         </div>
       </div>

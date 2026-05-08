@@ -12,9 +12,12 @@ import {
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
+  getEffectiveOrgPermissions,
   getOrgPermissionsForRole,
   hasOrgPermission,
   normalizeOrgMemberRole,
+  normalizePermissionProfile,
+  type CommercialPermissionProfile,
   type OrgMemberRole,
   type OrgPermissionKey,
   type OrgPermissions,
@@ -26,6 +29,7 @@ type OrgPermissionsContextValue = {
   status: Status
   role: OrgMemberRole | null
   rawRole: string | null
+  permissionProfile: CommercialPermissionProfile | null
   permissions: OrgPermissions
   has: (key: OrgPermissionKey) => boolean
   refresh: () => Promise<void>
@@ -37,6 +41,7 @@ const DEFAULT_VALUE: OrgPermissionsContextValue = {
   status: "loading",
   role: null,
   rawRole: null,
+  permissionProfile: null,
   permissions: getOrgPermissionsForRole(null),
   has: () => false,
   refresh: async () => {},
@@ -46,11 +51,15 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const [loadStatus, setLoadStatus] = useState<Status>("loading")
   const [rawRole, setRawRole] = useState<string | null>(null)
+  const [rawProfile, setRawProfile] = useState<string | null>(null)
+  const [permissionsJson, setPermissionsJson] = useState<unknown>(null)
 
   const load = useCallback(async () => {
     if (orgStatus !== "ready" || !organizationId) {
       setLoadStatus("no_org")
       setRawRole(null)
+      setRawProfile(null)
+      setPermissionsJson(null)
       return
     }
 
@@ -61,20 +70,25 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
     } = await supabase.auth.getUser()
     if (!user) {
       setRawRole(null)
+      setRawProfile(null)
+      setPermissionsJson(null)
       setLoadStatus("ready")
       return
     }
 
     const { data } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("role, permission_profile, permissions_json")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")
       .maybeSingle()
 
     const r = (data as { role?: string } | null)?.role?.trim() ?? null
+    const p = (data as { permission_profile?: string | null } | null)?.permission_profile?.trim() ?? null
     setRawRole(r)
+    setRawProfile(p)
+    setPermissionsJson((data as { permissions_json?: unknown } | null)?.permissions_json ?? null)
     setLoadStatus("ready")
   }, [orgStatus, organizationId])
 
@@ -83,8 +97,17 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
   }, [load])
 
   const role = useMemo(() => normalizeOrgMemberRole(rawRole), [rawRole])
+  const permissionProfile = useMemo(() => normalizePermissionProfile(rawProfile), [rawProfile])
 
-  const permissions = useMemo(() => getOrgPermissionsForRole(role), [role])
+  const permissions = useMemo(
+    () =>
+      getEffectiveOrgPermissions({
+        role,
+        permissionProfile,
+        permissionsJson,
+      }),
+    [role, permissionProfile, permissionsJson],
+  )
 
   const has = useCallback(
     (key: OrgPermissionKey) => hasOrgPermission(permissions, key),
@@ -96,11 +119,12 @@ export function OrgPermissionsProvider({ children }: { children: ReactNode }) {
       status: loadStatus,
       role,
       rawRole,
+      permissionProfile,
       permissions,
       has,
       refresh: load,
     }),
-    [loadStatus, role, rawRole, permissions, has, load],
+    [loadStatus, role, rawRole, permissionProfile, permissions, has, load],
   )
 
   return <OrgPermissionsContext.Provider value={value}>{children}</OrgPermissionsContext.Provider>
