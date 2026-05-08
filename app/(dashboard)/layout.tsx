@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState } from "react"
+import dynamic from "next/dynamic"
+import React, { useEffect, useState } from "react"
 import Link from "next/link"
 import { AppSidebar, SidebarContext } from "@/components/app-sidebar"
 import { PageShell } from "@/components/page-shell"
@@ -20,9 +21,18 @@ import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
-import { AidenChatLauncher } from "@/components/aiden/aiden-chat-launcher"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
+
+const AidenChatLauncher = dynamic(
+  () => import("@/components/aiden/aiden-chat-launcher").then((mod) => mod.AidenChatLauncher),
+  { ssr: false },
+)
+
+function debugDashboardShell(details: Record<string, unknown>) {
+  if (process.env.NEXT_PUBLIC_DEBUG_NAV !== "true" && process.env.NODE_ENV !== "development") return
+  console.info("[equipify:shell]", details)
+}
 
 // ─── Impersonation banner ─────────────────────────────────────────────────────
 
@@ -55,6 +65,10 @@ function ImpersonationBanner() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    debugDashboardShell({ event: "Dashboard shell mounted" })
+  }, [])
 
   return (
     <AdminProvider>

@@ -26,9 +26,14 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href)
 }
 
-function allowed(perms: OrgPermissions, anyOf?: (keyof OrgPermissions)[]) {
+function allowed(perms: OrgPermissions | null | undefined, anyOf?: (keyof OrgPermissions)[]) {
   if (!anyOf?.length) return true
-  return anyOf.some((key) => perms[key])
+  if (!perms) return true
+  try {
+    return anyOf.some((key) => Boolean(perms[key]))
+  } catch {
+    return true
+  }
 }
 
 function debugMobileNavResolution(details: Record<string, unknown>) {
@@ -120,14 +125,15 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
     }
   }
 
-  const items: { icon: React.ElementType; label: string; action: QuickAddAction; anyOf?: (keyof OrgPermissions)[] }[] = [
+  const filteredItems = [
     { icon: UserPlus,      label: "Add Customer",    action: "new-customer", anyOf: ["canManageProspects", "canViewBilling"] },
     { icon: Wrench,        label: "Add Equipment",   action: "new-equipment", anyOf: ["canViewAllWorkOrders"] },
     { icon: CalendarPlus,  label: "Schedule Service", action: "schedule-service", anyOf: ["canManageDispatch"] },
     { icon: ClipboardPlus, label: "New Work Order",  action: "new-work-order", anyOf: ["canViewAllWorkOrders", "canManageDispatch"] },
     { icon: FilePlus,      label: "Create Quote",    action: "new-quote", anyOf: ["canEditQuotes"] },
     { icon: ReceiptText,   label: "Create Invoice",  action: "new-invoice", anyOf: ["canEditInvoices"] },
-  ].filter((item) => allowed(navPermissions, item.anyOf))
+  ] satisfies { icon: React.ElementType; label: string; action: QuickAddAction; anyOf?: (keyof OrgPermissions)[] }[]
+  const items = filteredItems.filter((item) => allowed(navPermissions, item.anyOf))
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -172,7 +178,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
   debugMobileNavResolution({ surface: "more", role, status })
 
-  const items: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
+  const allItems: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
     { icon: HardHat, label: "Today", href: "/technicians/today", anyOf: ["canUseTechnicianWorkspace"] },
     { icon: Wrench, label: "Equipment", href: "/equipment", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
     { icon: ClipboardList, label: "Work Orders", href: "/work-orders", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
@@ -183,7 +189,17 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     { icon: BarChart3, label: "Reports", href: "/reports", anyOf: ["canViewOperationalReports", "canViewFinancialReports"] },
     { icon: Sparkles, label: "Insights", href: "/insights", anyOf: ["canViewInsights"] },
     { icon: Settings, label: "Settings", href: "/settings/workspace", anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"] },
-  ].filter((item) => allowed(navPermissions, item.anyOf))
+  ]
+  const filteredItems = allItems.filter((item) => allowed(navPermissions, item.anyOf))
+  const items = filteredItems.length > 0
+    ? filteredItems
+    : [
+        { icon: Users, label: "Customers", href: "/customers" },
+        { icon: Wrench, label: "Equipment", href: "/equipment" },
+        { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
+        { icon: CalendarClock, label: "Service Schedule", href: "/service-schedule" },
+        { icon: Settings, label: "Settings", href: "/settings/workspace" },
+      ]
 
   return (
     <BottomSheet open={open} onClose={onClose}>

@@ -17,6 +17,7 @@ import {
   Bell,
   Warehouse,
   UserPlus,
+  Settings,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -155,14 +156,34 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
+const FALLBACK_NAV_GROUPS: NavGroup[] = [
+  {
+    id: "fallback-core",
+    label: "Navigation",
+    items: [
+      { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "Customers", href: "/customers", icon: Users },
+      { label: "Equipment", href: "/equipment", icon: Wrench },
+      { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
+      { label: "Service Schedule", href: "/service-schedule", icon: CalendarClock },
+      { label: "Settings", href: "/settings/workspace", icon: Settings },
+    ],
+  },
+]
+
 function navItemAllowed(
   item: NavItem,
-  perms: OrgPermissions,
+  perms: OrgPermissions | null | undefined,
 ): boolean {
   // Coming-soon placeholders always render so the user can see roadmap items.
   if (item.comingSoon) return true
   if (!item.anyOf?.length) return true
-  return item.anyOf.some((k) => perms[k])
+  if (!perms) return true
+  try {
+    return item.anyOf.some((k) => Boolean(perms[k]))
+  } catch {
+    return true
+  }
 }
 
 function debugNavResolution(details: Record<string, unknown>) {
@@ -254,6 +275,16 @@ function SidebarBody({
   const orgPickerLoading = orgStatus === "loading" || switching
   const showOrgSwitcher = organizations.length > 1
 
+  useEffect(() => {
+    debugNavResolution({
+      event: "Sidebar mounted",
+      role,
+      permissionsStatus,
+      organizationStatus: orgStatus,
+      organizationId: organizationId ?? null,
+    })
+  }, [role, permissionsStatus, orgStatus, organizationId])
+
   function toggleWorkspaceMenu() {
     if (!showOrgSwitcher) return
     setWsMenuOpen((v) => !v)
@@ -266,17 +297,23 @@ function SidebarBody({
         status: permissionsStatus,
         permissions,
       })
+      debugNavResolution({
+        event: "Nav items before filter",
+        groupCount: NAV_GROUPS.length,
+        itemCount: NAV_GROUPS.reduce((sum, group) => sum + group.items.length, 0),
+        role,
+        permissionsStatus,
+        organizationStatus: orgStatus,
+      })
       const groups = NAV_GROUPS.map((group) => ({
         ...group,
         items: group.items.filter((item) => navItemAllowed(item, navPermissions)),
       })).filter((group) => group.items.length > 0)
       debugNavResolution({
-        role,
-        permissionsStatus,
-        organizationStatus: orgStatus,
+        event: "Nav items after filter",
         visibleGroups: groups.map((group) => ({ id: group.id, itemCount: group.items.length })),
       })
-      return groups
+      return groups.length > 0 ? groups : FALLBACK_NAV_GROUPS
     },
     [permissions, role, permissionsStatus, orgStatus],
   )
@@ -289,6 +326,18 @@ function SidebarBody({
   useEffect(() => {
     setCollapsedGroups(readCollapsedGroups())
   }, [])
+
+  useEffect(() => {
+    setCollapsedGroups((prev) => {
+      if (visibleGroups.length === 0) return prev
+      const allVisibleGroupsCollapsed = visibleGroups.every((group) => prev.has(group.id))
+      if (!allVisibleGroupsCollapsed) return prev
+      const next = new Set<string>()
+      writeCollapsedGroups(next)
+      debugNavResolution({ event: "Expanded all nav groups because all visible groups were collapsed" })
+      return next
+    })
+  }, [visibleGroups])
 
   // Auto-expand the group that owns the active route so the active row is
   // never hidden behind a collapsed header.
