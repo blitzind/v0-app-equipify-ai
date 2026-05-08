@@ -43,6 +43,7 @@ export type DispatchWo = {
   scheduled_on: string | null
   scheduled_time: string | null
   assigned_user_id: string | null
+  assigned_technician_id?: string | null
   customer_id: string
   customerName: string
   work_order_number?: number | null

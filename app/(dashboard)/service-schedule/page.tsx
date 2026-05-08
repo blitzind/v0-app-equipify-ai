@@ -1,6 +1,19 @@
 "use client"
 
 import { useState, useMemo, useEffect, Suspense } from "react"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  closestCorners,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
@@ -26,7 +39,15 @@ import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filt
 import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overview"
 import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
-import { startOfWeekMonday, toYmd } from "@/lib/dispatch/board-utils"
+import {
+  DND,
+  DISPATCH_SLOT_COUNT,
+  formatSlotLabel,
+  slotIndexToTimeHhMm,
+  startOfWeekMonday,
+  timeToSlotIndex,
+  toYmd,
+} from "@/lib/dispatch/board-utils"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
@@ -1073,6 +1094,7 @@ function mapDbRowToDispatchWoRow(r: DbScheduledWoRow, mini: boolean): DispatchWo
     scheduled_on: r.scheduled_on,
     scheduled_time: r.scheduled_time,
     assigned_user_id: r.assigned_user_id,
+    assigned_technician_id: r.assigned_technician_id ?? null,
     customer_id: r.customer_id,
     equipment_id: r.equipment_id,
     priority: r.priority ?? "normal",
@@ -1321,6 +1343,212 @@ function UnassignedWorkLane({
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function assignedScheduleKey(wo: DispatchWo): string | null {
+  return wo.assigned_technician_id ?? wo.assigned_user_id ?? null
+}
+
+function DraggableScheduleCard({
+  row,
+  compact = false,
+}: {
+  row: ScheduledWoRowView
+  compact?: boolean
+}) {
+  const wo = row.wo
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: DND.wo(wo.id),
+    data: { woId: wo.id },
+  })
+  const style = transform ? { transform: `translate3d(${transform.x}px,${transform.y}px,0)` } : undefined
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="touch-none select-none">
+      <ScheduleDragCard row={row} compact={compact} dragging={isDragging} />
+    </div>
+  )
+}
+
+function ScheduleDragCard({
+  row,
+  compact = false,
+  dragging = false,
+  overlay = false,
+}: {
+  row: ScheduledWoRowView
+  compact?: boolean
+  dragging?: boolean
+  overlay?: boolean
+}) {
+  const wo = row.wo
+  const state = deriveDispatchState({
+    status: wo.status,
+    customerId: wo.customer_id,
+    scheduledOn: wo.scheduled_on,
+    scheduledTime: wo.scheduled_time,
+    assignedUserId: wo.assigned_user_id,
+    assignedTechnicianId: wo.assigned_technician_id,
+  })
+  return (
+    <div
+      className={cn(
+        "rounded-md border bg-card px-2 py-1.5 text-left shadow-sm",
+        "cursor-grab active:cursor-grabbing",
+        wo.priority === "critical" || wo.priority === "high"
+          ? "border-[color:var(--status-warning)]/40 bg-[color:var(--status-warning)]/10"
+          : "border-border",
+        dragging && "opacity-40",
+        overlay && "w-64 shadow-xl ring-2 ring-primary/30",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-mono text-[10px] text-primary">
+          {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
+        </span>
+        <Badge variant="outline" className="text-[9px]">
+          {formatWoStatusLabel(wo.status)}
+        </Badge>
+      </div>
+      <p className={cn("mt-0.5 font-medium text-foreground", compact ? "line-clamp-1 text-[11px]" : "line-clamp-2 text-xs")}>
+        {wo.customerName}
+      </p>
+      <p className="truncate text-[10px] text-muted-foreground">
+        {formatScheduleTimeHm(wo.scheduled_time) || "No time"} · {row.location || wo.serviceLocationLabel || "No location"}
+      </p>
+      {!compact && state.dispatchIncomplete ? (
+        <p className="mt-1 text-[10px] text-[color:var(--status-warning)]">Dispatch incomplete</p>
+      ) : null}
+    </div>
+  )
+}
+
+function ScheduleDropCell({
+  technicianId,
+  slotIdx,
+  children,
+}: {
+  technicianId: string
+  slotIdx: number
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: DND.cell(technicianId, slotIdx) })
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "min-h-[58px] border-b border-l border-border/50 p-1 transition-colors",
+        isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+      )}
+    >
+      <div className="flex flex-col gap-1">{children}</div>
+    </div>
+  )
+}
+
+function DragScheduleBoard({
+  date,
+  technicians,
+  rows,
+  unassignedRows,
+  activeRow,
+  onDragStart,
+  onDragEnd,
+}: {
+  date: string
+  technicians: ScheduleTechnicianOption[]
+  rows: ScheduledWoRowView[]
+  unassignedRows: ScheduledWoRowView[]
+  activeRow: ScheduledWoRowView | null
+  onDragStart: (event: DragStartEvent) => void
+  onDragEnd: (event: DragEndEvent) => void
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+  )
+  const dayRows = rows.filter((row) => row.wo.scheduled_on === date)
+  const rowsBySlot = new Map<string, ScheduledWoRowView[]>()
+  for (const row of dayRows) {
+    const techId = assignedScheduleKey(row.wo)
+    if (!techId) continue
+    const key = `${techId}@@${timeToSlotIndex(row.wo.scheduled_time)}`
+    const list = rowsBySlot.get(key) ?? []
+    list.push(row)
+    rowsBySlot.set(key, list)
+  }
+
+  if (technicians.length === 0) return null
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
+      <Card className="border border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            Drag schedule for {date}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-normal pt-0.5">
+            Drag an unassigned job or scheduled block onto a technician time slot. Quick assignment remains available below.
+          </p>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-3">
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-2">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">Unassigned queue</p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {unassignedRows.slice(0, 6).map((row) => (
+                <DraggableScheduleCard key={row.wo.id} row={row} compact />
+              ))}
+              {unassignedRows.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No matching unassigned work.</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <div
+              className="grid min-w-[760px]"
+              style={{ gridTemplateColumns: `70px repeat(${technicians.length}, minmax(160px, 1fr))` }}
+            >
+              <div className="border-b border-border bg-muted/40 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Time
+              </div>
+              {technicians.map((tech) => (
+                <div key={tech.id} className="border-b border-l border-border bg-muted/40 px-2 py-2">
+                  <p className="truncate text-xs font-semibold text-foreground">{tech.label}</p>
+                </div>
+              ))}
+              {Array.from({ length: DISPATCH_SLOT_COUNT }, (_, slotIdx) => (
+                <Fragment key={slotIdx}>
+                  <div className="border-b border-border/60 bg-muted/10 px-2 py-2 text-[10px] text-muted-foreground">
+                    {formatSlotLabel(slotIdx)}
+                  </div>
+                  {technicians.map((tech) => {
+                    const list = rowsBySlot.get(`${tech.id}@@${slotIdx}`) ?? []
+                    return (
+                      <ScheduleDropCell key={`${tech.id}-${slotIdx}`} technicianId={tech.id} slotIdx={slotIdx}>
+                        {list.map((row) => (
+                          <DraggableScheduleCard key={row.wo.id} row={row} compact />
+                        ))}
+                      </ScheduleDropCell>
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <DragOverlay dropAnimation={null}>
+        {activeRow ? <ScheduleDragCard row={activeRow} overlay /> : null}
+      </DragOverlay>
+    </DndContext>
   )
 }
 
@@ -1713,6 +1941,7 @@ function ServiceSchedulePageInner() {
   const [unassignedSearch, setUnassignedSearch] = useState("")
   const [unassignedFilter, setUnassignedFilter] = useState<"all" | "needs_assignment" | "needs_scheduling" | "overdue" | "open_only">("all")
   const [assigningWoId, setAssigningWoId] = useState<string | null>(null)
+  const [activeDragRow, setActiveDragRow] = useState<ScheduledWoRowView | null>(null)
   const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
   const [scheduledWoRefresh, setScheduledWoRefresh] = useState(0)
 
@@ -2236,18 +2465,74 @@ function ServiceSchedulePageInner() {
       .eq("organization_id", organizationId)
       .eq("id", args.wo.id)
     setAssigningWoId(null)
-    if (error) return
+    if (error) {
+      window.alert(`Could not update schedule: ${error.message}`)
+      return
+    }
 
     const techLabel = assignTechnicians.find((tech) => tech.id === args.technicianId)?.label ?? "Technician"
+    const previousTechnicianId = assignedScheduleKey(args.wo)
+    const technicianChanged = previousTechnicianId !== args.technicianId
+    const scheduleChanged =
+      args.wo.scheduled_on !== args.scheduledOn ||
+      (args.wo.scheduled_time ?? null) !== (args.scheduledTime ?? null)
     void emitSchedulingEvent({
       organizationId,
       workOrderId: args.wo.id,
-      eventType: "reassign",
+      eventType: technicianChanged ? "reassign" : "reschedule",
       severity: "info",
       message: `Assigned to ${techLabel} for ${args.scheduledOn}${args.scheduledTime ? ` at ${args.scheduledTime}` : ""}.`,
-      metadata: { source: "service_schedule.unassigned_lane" },
+      metadata: {
+        source: "service_schedule.drag_or_quick_assign",
+        previousTechnicianId,
+        nextTechnicianId: args.technicianId,
+        previousScheduledOn: args.wo.scheduled_on,
+        previousScheduledTime: args.wo.scheduled_time,
+        nextScheduledOn: args.scheduledOn,
+        nextScheduledTime: args.scheduledTime,
+        scheduleChanged,
+      },
     })
     setScheduledWoRefresh((n) => n + 1)
+  }
+
+  function handleScheduleDragStart(event: DragStartEvent) {
+    const woId = DND.parseWo(String(event.active.id))
+    if (!woId) return
+    setActiveDragRow(
+      [...scheduledWoRows, ...unassignedWoRows].find((row) => row.wo.id === woId) ?? null,
+    )
+  }
+
+  async function handleScheduleDragEnd(event: DragEndEvent) {
+    const active = activeDragRow
+    setActiveDragRow(null)
+    const woId = DND.parseWo(String(event.active.id))
+    const overId = event.over?.id != null ? String(event.over.id) : null
+    const cell = overId ? DND.parseCell(overId) : null
+    if (!woId || !cell || !active) return
+    if (active.wo.status === "completed" || active.wo.status === "invoiced") {
+      window.alert("This work order is already completed or invoiced. You can still edit it from the work-order drawer if needed.")
+      return
+    }
+    const scheduledTime = slotIndexToTimeHhMm(cell.slotIdx)
+    const overlaps = scheduledWoRows.filter((row) => {
+      if (row.wo.id === woId) return false
+      if (assignedScheduleKey(row.wo) !== cell.techId) return false
+      return row.wo.scheduled_on === scheduleSelectedYmd && timeToSlotIndex(row.wo.scheduled_time) === cell.slotIdx
+    })
+    if (overlaps.length > 0) {
+      const ok = window.confirm(
+        `${assignTechnicians.find((tech) => tech.id === cell.techId)?.label ?? "This technician"} already has ${overlaps.length} item${overlaps.length === 1 ? "" : "s"} in that slot. Schedule here anyway?`,
+      )
+      if (!ok) return
+    }
+    await handleQuickAssignWork({
+      wo: active.wo,
+      technicianId: cell.techId,
+      scheduledOn: scheduleSelectedYmd,
+      scheduledTime,
+    })
   }
 
   return (
@@ -2482,6 +2767,15 @@ function ServiceSchedulePageInner() {
               }}
             />
           ) : null}
+          <DragScheduleBoard
+            date={scheduleSelectedYmd}
+            technicians={assignTechnicians}
+            rows={filteredScheduledWoRows}
+            unassignedRows={filteredUnassignedWoRows}
+            activeRow={activeDragRow}
+            onDragStart={handleScheduleDragStart}
+            onDragEnd={(event) => void handleScheduleDragEnd(event)}
+          />
           <UnassignedWorkLane
             rows={filteredUnassignedWoRows}
             loading={scheduledWoLoading}
