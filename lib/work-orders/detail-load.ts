@@ -616,7 +616,7 @@ export async function loadWorkOrderDetailForOrg(
   }
 
   const equipmentAssets = await fetchWorkOrderEquipmentAssets(supabase, organizationId, resolvedWorkOrderId, {
-    equipmentId: w.equipment_id,
+    equipmentId: w.equipment_id ?? "",
     typeDb: w.type,
     priorityDb: w.priority,
   })

@@ -128,7 +128,7 @@ type DbWorkOrderRow = {
   id: string
   work_order_number?: number | null
   customer_id: string
-  equipment_id: string
+  equipment_id: string | null
   title: string
   status: string
   priority: string
@@ -795,7 +795,7 @@ function WorkOrdersPageInner() {
 
       const list = rows as DbWorkOrderRow[]
       const customerIds = [...new Set(list.map((r) => r.customer_id))]
-      const equipmentIds = [...new Set(list.map((r) => r.equipment_id))]
+      const equipmentIds = [...new Set(list.map((r) => r.equipment_id).filter((id): id is string => Boolean(id)))]
       const assigneeIds = [
         ...new Set(list.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
       ]
@@ -889,27 +889,27 @@ function WorkOrdersPageInner() {
       }
 
       const mapped: WorkOrder[] = list.map((row) => {
-        const eq = equipmentMap.get(row.equipment_id)
+        const eq = row.equipment_id ? equipmentMap.get(row.equipment_id) : undefined
         const techId = row.assigned_user_id ?? "unassigned"
         const tp = row.assigned_user_id ? profileMap.get(row.assigned_user_id) : undefined
         const techName = row.assigned_user_id ? (tp?.label ?? "Unknown") : "Unassigned"
 
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
-              id: row.equipment_id,
+              id: row.equipment_id ?? "",
               name: eq.name,
               equipment_code: eq.equipment_code,
               serial_number: eq.serial_number,
               category: eq.category,
             })
-          : "Equipment"
+          : "Service visit"
 
         return {
           id: row.id,
           workOrderNumber: row.work_order_number ?? undefined,
           customerId: row.customer_id,
           customerName: customerMap.get(row.customer_id) ?? "Unknown Customer",
-          equipmentId: row.equipment_id,
+          equipmentId: row.equipment_id ?? "",
           equipmentName,
           location: eq?.location ?? "",
           type: mapDbType(row.type),

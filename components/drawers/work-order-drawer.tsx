@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -79,6 +79,7 @@ import {
   PackageSearch,
   History,
   UserPlus,
+  ChevronDown,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { useTenant } from "@/lib/tenant-store"
@@ -259,8 +260,42 @@ function EditTextarea({ value, onChange, placeholder, rows = 3 }: {
   )
 }
 
+function DrawerCompactSection({
+  title,
+  subtitle,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C]">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-foreground">{title}</span>
+          {subtitle ? <span className="block truncate text-[11px] text-muted-foreground">{subtitle}</span> : null}
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      {open ? <div className="border-t border-border px-3 py-3 dark:border-[#25324C]">{children}</div> : null}
+    </div>
+  )
+}
+
 function EditRow({ label, view, editing, children }: {
-  label: string; view: React.ReactNode; editing: boolean; children: React.ReactNode
+  label: string; view: ReactNode; editing: boolean; children: ReactNode
 }) {
   return editing ? (
     <div className="flex items-start gap-4 py-1.5 border-b border-border/50 last:border-0">
@@ -1526,6 +1561,98 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     archivedAt: wo.isArchived ? "archived" : null,
   })
 
+  const drawerOverviewLeadSlot = !editing ? (
+    <div className="space-y-3">
+      {dispatchState.dispatchIncomplete ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Still in dispatch queue</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {dispatchState.needsAssignment ? "Needs technician assignment. " : ""}
+              {dispatchState.needsScheduling ? "Needs scheduled date/time. " : ""}
+              Current state: {dispatchState.label}.
+            </p>
+          </div>
+          {woCanEdit && !wo.isArchived ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setAssignDialogOpen(true)}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Assign technician
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {operationalDrawerBadges.length > 0 ? (
+        <div className="rounded-xl border border-border bg-muted/20 px-3 py-2.5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Operational signals
+          </p>
+          <OperationalBadgeRow badges={operationalDrawerBadges} cap={6} />
+        </div>
+      ) : null}
+
+      {billingProfile?.poRequiredBeforeService ? (
+        <div className="flex items-start gap-2 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2 text-[11px] text-[color:var(--status-warning)]">
+          <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <div>
+            <p className="font-semibold text-foreground">PO required before service</p>
+            <p>
+              {billingProfile.billingName} requires a PO before work begins.
+              {billingProfile.defaultPoNumber ? ` Default PO: ${billingProfile.defaultPoNumber}.` : ""}
+            </p>
+            {billingProfile.invoiceInstructions ? (
+              <p className="mt-1 text-muted-foreground">{billingProfile.invoiceInstructions}</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <DrawerCompactSection
+        title="Invoicing"
+        subtitle={readyToInvoice ? "Ready to invoice" : linkedInvoices.length > 0 ? `${linkedInvoices.length} linked invoice${linkedInvoices.length === 1 ? "" : "s"}` : "No linked invoices yet"}
+        defaultOpen={readyToInvoice}
+      >
+        <LinkedInvoicesSummary
+          invoices={linkedInvoices}
+          canCreateInvoice={woCanEdit && !wo.isArchived}
+          onCreateInvoice={handleCreateInvoiceAction}
+          billingProfile={billingProfile}
+          readyToInvoice={readyToInvoice}
+        />
+      </DrawerCompactSection>
+
+      <DrawerCompactSection
+        title="Scheduling activity"
+        subtitle="Assignment, drag/drop, and conflict history"
+      >
+        <SchedulingEventsCard workOrderId={wo.id} refreshKey={schedulingEventsRefresh} />
+      </DrawerCompactSection>
+
+      <DrawerCompactSection
+        title="Recent communications"
+        subtitle="Confirmations, summary emails, automations, and reminders"
+      >
+        <RecentCommunicationsCard
+          entityType="work_order"
+          entityId={wo.id}
+          limit={4}
+          title="Recent communications"
+          description="Confirmations, summary emails, automation runs, and reminders for this work order."
+        />
+      </DrawerCompactSection>
+
+      {drawerServiceTimelineOpen && serviceTimelineEvents.length > 0 ? (
+        <ServiceLifecycleTimeline title="Service timeline" events={serviceTimelineEvents} />
+      ) : null}
+    </div>
+  ) : undefined
+
   async function sendWorkOrderSummaryEmail() {
     if (!wo || !activeOrgId) return
     const to = woSummaryEmailTo.trim()
@@ -1893,97 +2020,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </div>
           )}
 
-          {!editing && dispatchState.dispatchIncomplete ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2">
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Still in dispatch queue</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {dispatchState.needsAssignment ? "Needs technician assignment. " : ""}
-                    {dispatchState.needsScheduling ? "Needs scheduled date/time. " : ""}
-                    Current state: {dispatchState.label}.
-                  </p>
-                </div>
-                {woCanEdit && !wo.isArchived ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5 text-xs"
-                    onClick={() => setAssignDialogOpen(true)}
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    Assign technician
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {!editing && operationalDrawerBadges.length > 0 ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Operational signals
-              </p>
-              <OperationalBadgeRow badges={operationalDrawerBadges} cap={8} />
-            </div>
-          ) : null}
-
-          {!editing && billingProfile?.poRequiredBeforeService ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <div className="flex items-start gap-2 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2 text-[11px] text-[color:var(--status-warning)]">
-                <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                <div>
-                  <p className="font-semibold text-foreground">PO required before service</p>
-                  <p>
-                    {billingProfile.billingName} requires a PO before work begins.
-                    {billingProfile.defaultPoNumber ? ` Default PO: ${billingProfile.defaultPoNumber}.` : ""}
-                  </p>
-                  {billingProfile.invoiceInstructions ? (
-                    <p className="mt-1 text-muted-foreground">{billingProfile.invoiceInstructions}</p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Invoicing Phase 2 — Linked invoices status */}
-          {!editing && wo ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <LinkedInvoicesSummary
-                invoices={linkedInvoices}
-                canCreateInvoice={woCanEdit && !wo.isArchived}
-                onCreateInvoice={handleCreateInvoiceAction}
-                billingProfile={billingProfile}
-                readyToInvoice={readyToInvoice}
-              />
-            </div>
-          ) : null}
-
-          {!editing && wo ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <SchedulingEventsCard workOrderId={wo.id} refreshKey={schedulingEventsRefresh} />
-            </div>
-          ) : null}
-
-          {!editing && wo ? (
-            <div className="shrink-0 border-b border-border px-5 py-3">
-              <RecentCommunicationsCard
-                entityType="work_order"
-                entityId={wo.id}
-                limit={4}
-                title="Recent communications"
-                description="Confirmations, summary emails, automation runs, and reminders for this work order."
-              />
-            </div>
-          ) : null}
-
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden min-w-0">
-          {!editing && drawerServiceTimelineOpen && serviceTimelineEvents.length > 0 ? (
-            <div className="shrink-0 border-b border-border px-5 py-3 max-h-[min(42vh,26rem)] overflow-y-auto overscroll-contain">
-              <ServiceLifecycleTimeline title="Service timeline" events={serviceTimelineEvents} />
-            </div>
-          ) : null}
           <WorkOrderDetailExperience
             layout="drawer"
             workOrder={displayWo ?? wo}
@@ -1992,6 +2029,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             onInternalNotesChange={setNotesInternal}
             planServices={planServices}
             activityItems={buildWorkOrderActivityItems(wo)}
+            overviewLeadSlot={drawerOverviewLeadSlot}
             problemReported={problemReportedDraft}
             onProblemReportedChange={setProblemReportedDraft}
             problemReportedInlineEditable={!wo.isArchived}
