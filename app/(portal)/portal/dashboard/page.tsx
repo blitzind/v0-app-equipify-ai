@@ -68,6 +68,16 @@ type DashboardPayload = {
   formatters: { currency: { outstandingLabel: string } }
 }
 
+type RecentDocument = {
+  key: string
+  kind: string
+  title: string
+  occurredAt: string
+  statusLabel: string
+  downloadPath: string | null
+  viewPath: string | null
+}
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -185,6 +195,7 @@ function QuickAction({
 export default function PortalDashboardPage() {
   const { bootstrap } = usePortalSession()
   const [data, setData] = useState<DashboardPayload | null>(null)
+  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -195,6 +206,20 @@ export default function PortalDashboardPage() {
       })
       .then(setData)
       .catch(() => setLoadError("Unable to load dashboard data."))
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/portal/documents")
+      .then((r) => (r.ok ? (r.json() as Promise<{ items: RecentDocument[] }>) : null))
+      .then((payload) => {
+        if (!payload) return
+        setRecentDocuments(
+          payload.items
+            .filter((item) => item.downloadPath || item.viewPath)
+            .slice(0, 4),
+        )
+      })
+      .catch(() => setRecentDocuments([]))
   }, [])
 
   const greetingName = bootstrap?.displayName?.split(/\s+/)[0] ?? "there"
@@ -488,6 +513,47 @@ export default function PortalDashboardPage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </div>
+
+          <div className="portal-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+                Recent Documents
+              </h3>
+              <Link href="/portal/documents" className="text-xs font-medium" style={{ color: "var(--portal-accent)" }}>
+                View all
+              </Link>
+            </div>
+            <div className="space-y-2.5">
+              {recentDocuments.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+                  No released documents yet.
+                </p>
+              ) : null}
+              {recentDocuments.map((doc) => {
+                const href = doc.downloadPath ?? doc.viewPath ?? "/portal/documents"
+                return (
+                  <Link
+                    key={doc.key}
+                    href={href}
+                    className="flex items-center justify-between gap-3 rounded-md px-1 py-1 -mx-1 hover:bg-[--portal-surface-2] transition-colors"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <FileText size={14} className="shrink-0" style={{ color: "var(--portal-accent)" }} />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium" style={{ color: "var(--portal-foreground)" }}>
+                          {doc.title}
+                        </p>
+                        <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
+                          {fmtDate(doc.occurredAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={doc.statusLabel} />
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ import {
 
 type DocumentKind =
   | "invoice"
+  | "quote"
   | "certificate"
   | "work_order_summary"
   | "certificate_attachment"
@@ -49,12 +50,15 @@ type DocItem = {
   viewPath: string | null
   downloadPath: string | null
   statusLabel: string
+  fileSizeBytes: number | null
   /** Phase 2 chip — populated only for non-root accounts under rollup. */
   accountLabel: string | null
   meta: {
     invoiceNumber: string | null
+    quoteNumber: string | null
     workOrderNumber: number | null
     workOrderDisplay: string | null
+    searchText: string | null
   }
 }
 
@@ -70,7 +74,7 @@ type Payload = {
   }
 }
 
-type KindFilter = "all" | DocumentKind
+type TypeFilter = "all" | "certificates" | "invoices" | "quotes" | "work_orders" | "equipment_docs" | "other"
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", {
@@ -82,6 +86,7 @@ function fmtDate(d: string) {
 
 const KIND_LABEL: Record<DocumentKind, string> = {
   invoice: "Invoices",
+  quote: "Quotes",
   certificate: "Certificates",
   work_order_summary: "Service summaries",
   certificate_attachment: "Uploaded documents",
@@ -90,20 +95,60 @@ const KIND_LABEL: Record<DocumentKind, string> = {
 
 const KIND_ICON: Record<DocumentKind, React.ElementType> = {
   invoice: Receipt,
+  quote: FileText,
   certificate: ShieldCheck,
   work_order_summary: Wrench,
   certificate_attachment: FileText,
   attachment: FileText,
 }
 
-const KIND_FILTERS: Array<{ id: KindFilter; label: string }> = [
-  { id: "all", label: "All documents" },
-  { id: "invoice", label: "Invoices" },
-  { id: "certificate", label: "Certificates" },
-  { id: "work_order_summary", label: "Service summaries" },
-  { id: "certificate_attachment", label: "Uploaded documents" },
-  { id: "attachment", label: "Attached files" },
+const TYPE_FILTERS: Array<{ id: TypeFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "certificates", label: "Certificates" },
+  { id: "invoices", label: "Invoices" },
+  { id: "quotes", label: "Quotes" },
+  { id: "work_orders", label: "Work orders" },
+  { id: "equipment_docs", label: "Equipment docs" },
+  { id: "other", label: "Other" },
 ]
+
+function docTypeFilter(doc: DocItem): Exclude<TypeFilter, "all"> {
+  if (doc.kind === "certificate" || doc.kind === "certificate_attachment") return "certificates"
+  if (doc.kind === "invoice") return "invoices"
+  if (doc.kind === "quote") return "quotes"
+  if (doc.kind === "work_order_summary") return "work_orders"
+  if (doc.kind === "attachment" && doc.equipmentLabel) return "equipment_docs"
+  return "other"
+}
+
+function countForType(data: Payload | null, type: TypeFilter): number {
+  if (!data) return 0
+  if (type === "all") return data.items.length
+  return data.items.filter((item) => docTypeFilter(item) === type).length
+}
+
+function fmtFileSize(bytes: number | null): string | null {
+  if (!bytes || bytes <= 0) return null
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function singularKindLabel(kind: DocumentKind): string {
+  switch (kind) {
+    case "invoice":
+      return "Invoice"
+    case "quote":
+      return "Quote"
+    case "certificate":
+      return "Certificate"
+    case "work_order_summary":
+      return "Service summary"
+    case "certificate_attachment":
+      return "Uploaded certificate"
+    case "attachment":
+      return "File"
+  }
+}
 
 function StatusPill({ avail, label }: { avail: Availability; label: string }) {
   const styles =
@@ -142,6 +187,7 @@ function StatusPill({ avail, label }: { avail: Availability; label: string }) {
 
 function DocRow({ doc }: { doc: DocItem }) {
   const Icon = KIND_ICON[doc.kind]
+  const fileSize = fmtFileSize(doc.fileSizeBytes)
   return (
     <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
@@ -200,10 +246,14 @@ function DocRow({ doc }: { doc: DocItem }) {
           ) : null}
           <p className="mt-1 text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
             {[
+              singularKindLabel(doc.kind),
               doc.equipmentLabel ?? null,
               doc.locationLabel ?? null,
               fmtDate(doc.occurredAt),
               doc.meta.workOrderDisplay,
+              doc.meta.invoiceNumber ? `Invoice ${doc.meta.invoiceNumber}` : null,
+              doc.meta.quoteNumber ? `Quote ${doc.meta.quoteNumber}` : null,
+              fileSize,
             ]
               .filter((x): x is string => Boolean(x))
               .join(" · ")}
@@ -271,7 +321,7 @@ export default function PortalDocumentsPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [query, setQuery] = useState("")
-  const [kindFilter, setKindFilter] = useState<KindFilter>("all")
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
   const [equipmentFilter, setEquipmentFilter] = useState<string>("all")
   const [accountFilter, setAccountFilter] = useState<string>("all")
   const [availableOnly, setAvailableOnly] = useState(false)
@@ -296,7 +346,7 @@ export default function PortalDocumentsPage() {
     const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null
     const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null
     return data.items.filter((d) => {
-      if (kindFilter !== "all" && d.kind !== kindFilter) return false
+      if (typeFilter !== "all" && docTypeFilter(d) !== typeFilter) return false
       if (availableOnly && d.availability !== "available") return false
       if (equipmentFilter !== "all" && d.equipmentLabel !== equipmentFilter) return false
       if (accountFilter !== "all" && (d.accountLabel ?? "__root__") !== accountFilter) {
@@ -313,7 +363,9 @@ export default function PortalDocumentsPage() {
           d.locationLabel ?? "",
           d.accountLabel ?? "",
           d.meta.invoiceNumber ?? "",
+          d.meta.quoteNumber ?? "",
           d.meta.workOrderDisplay ?? "",
+          d.meta.searchText ?? "",
         ]
           .join(" ")
           .toLowerCase()
@@ -324,7 +376,7 @@ export default function PortalDocumentsPage() {
   }, [
     data,
     query,
-    kindFilter,
+    typeFilter,
     availableOnly,
     equipmentFilter,
     accountFilter,
@@ -355,7 +407,7 @@ export default function PortalDocumentsPage() {
     availableOnly
 
   function clearFilters() {
-    setKindFilter("all")
+    setTypeFilter("all")
     setEquipmentFilter("all")
     setAccountFilter("all")
     setAvailableOnly(false)
@@ -398,13 +450,14 @@ export default function PortalDocumentsPage() {
             [
               ["Invoices", data.countsByKind.invoice ?? 0, Receipt],
               ["Certificates", data.countsByKind.certificate ?? 0, ShieldCheck],
+              ["Quotes", data.countsByKind.quote ?? 0, FileText],
               [
-                "Service summaries",
+                "Service docs",
                 data.countsByKind.work_order_summary ?? 0,
                 Wrench,
               ],
               [
-                "Uploaded",
+                "Other files",
                 (data.countsByKind.certificate_attachment ?? 0) + (data.countsByKind.attachment ?? 0),
                 FileText,
               ],
@@ -543,31 +596,29 @@ export default function PortalDocumentsPage() {
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {KIND_FILTERS.map((k) => (
+          {TYPE_FILTERS.map((k) => (
             <button
               key={k.id}
               type="button"
-              onClick={() => setKindFilter(k.id)}
+              onClick={() => setTypeFilter(k.id)}
               className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
                 borderColor:
-                  kindFilter === k.id
+                  typeFilter === k.id
                     ? "var(--portal-accent)"
                     : "var(--portal-border-light)",
                 background:
-                  kindFilter === k.id
+                  typeFilter === k.id
                     ? "var(--portal-accent-muted)"
                     : "transparent",
                 color:
-                  kindFilter === k.id
+                  typeFilter === k.id
                     ? "var(--portal-accent-text)"
                     : "var(--portal-nav-text)",
               }}
             >
               {k.label}
-              {k.id !== "all" && data
-                ? ` · ${data.countsByKind[k.id as DocumentKind] ?? 0}`
-                : ""}
+              {data ? ` · ${countForType(data, k.id)}` : ""}
             </button>
           ))}
         </div>
@@ -666,7 +717,7 @@ export default function PortalDocumentsPage() {
           </div>
         ) : null}
 
-        {anyAdvancedActive || query || kindFilter !== "all" ? (
+        {anyAdvancedActive || query || typeFilter !== "all" ? (
           <button
             type="button"
             onClick={clearFilters}
@@ -734,7 +785,7 @@ export default function PortalDocumentsPage() {
 
       {!loading && !loadError && filtered.length > 0 ? (
         <div className="space-y-6">
-          {(["invoice", "certificate", "work_order_summary", "certificate_attachment", "attachment"] as DocumentKind[]).map(
+          {(["invoice", "quote", "certificate", "work_order_summary", "certificate_attachment", "attachment"] as DocumentKind[]).map(
             (kind) => {
               const list = grouped[kind]
               if (!list || list.length === 0) return null
@@ -784,6 +835,15 @@ export default function PortalDocumentsPage() {
                         style={{ color: "var(--portal-accent)" }}
                       >
                         Invoice list <ChevronRight size={11} />
+                      </Link>
+                    ) : null}
+                    {kind === "quote" ? (
+                      <Link
+                        href="/portal/quotes"
+                        className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium"
+                        style={{ color: "var(--portal-accent)" }}
+                      >
+                        Quote list <ChevronRight size={11} />
                       </Link>
                     ) : null}
                     {kind === "work_order_summary" ? (

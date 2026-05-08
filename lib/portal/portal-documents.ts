@@ -26,11 +26,12 @@ import {
   type PortalCertificateItem,
 } from "@/lib/portal/portal-certificate-items"
 import { fetchInvoicesLinkedToWorkOrdersBatch } from "@/lib/portal/work-order-invoices"
-import { mapInvoiceStatus, mapWorkOrderStatus } from "@/lib/portal/display-mappers"
+import { mapInvoiceStatus, mapQuoteStatus, mapWorkOrderStatus } from "@/lib/portal/display-mappers"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 export type PortalDocumentKind =
   | "invoice"
+  | "quote"
   | "certificate"
   | "work_order_summary"
   | "certificate_attachment"
@@ -78,6 +79,8 @@ export type PortalDocumentItem = {
   downloadPath: string | null
   /** Status pill text (e.g. "Paid", "Awaiting payment"). */
   statusLabel: string
+  /** File size when the source is an uploaded file. */
+  fileSizeBytes: number | null
   /**
    * Phase 2: rollup-only label naming the customer/account the document
    * belongs to. Populated only when consolidated visibility is in effect
@@ -89,8 +92,10 @@ export type PortalDocumentItem = {
   /** Lightweight metadata for filtering. Never includes raw UUIDs. */
   meta: {
     invoiceNumber: string | null
+    quoteNumber: string | null
     workOrderNumber: number | null
     workOrderDisplay: string | null
+    searchText: string | null
   }
 }
 
@@ -117,6 +122,7 @@ export type PortalDocumentsResult = {
 
 const EMPTY_KIND_COUNTS: Record<PortalDocumentKind, number> = {
   invoice: 0,
+  quote: 0,
   certificate: 0,
   work_order_summary: 0,
   certificate_attachment: 0,
@@ -216,13 +222,16 @@ function certificateToDocument(
           : availability === "awaiting_release"
             ? "Awaiting release"
             : "Not yet available",
+    fileSizeBytes: null,
     accountLabel: context.accountLabel,
     meta: {
       invoiceNumber: context.blockedByInvoice?.number ?? null,
+      quoteNumber: null,
       workOrderNumber: null,
       workOrderDisplay: c.workOrderId
         ? getWorkOrderDisplay({ id: c.workOrderId, workOrderNumber: null })
         : null,
+      searchText: null,
     },
   }
 }
@@ -295,6 +304,18 @@ export async function buildPortalDocuments(
 
   if (invErr) throw new Error(invErr.message)
 
+  // ─── Quotes ──────────────────────────────────────────────────────────────
+  const { data: quoteRows, error: quoteErr } = await svc
+    .from("org_quotes")
+    .select("id, quote_number, title, amount_cents, status, created_at, customer_id")
+    .eq("organization_id", organizationId)
+    .in("customer_id", customerIds)
+    .neq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(300)
+
+  if (quoteErr) throw new Error(quoteErr.message)
+
   // ─── Work orders (for both summaries + certificate aggregation) ─────────
   const { data: woRows, error: woErr } = await svc
     .from("work_orders")
@@ -322,7 +343,7 @@ export async function buildPortalDocuments(
   if (equipIds.size > 0) {
     const { data: eqs } = await svc
       .from("equipment")
-      .select("id, name, location_label, customer_id")
+      .select("id, name, location_label, customer_id, equipment_code, serial_number")
       .eq("organization_id", organizationId)
       .in("id", [...equipIds])
     for (const e of (eqs ?? []) as Array<{
@@ -330,8 +351,15 @@ export async function buildPortalDocuments(
       name: string | null
       location_label: string | null
       customer_id: string | null
+      equipment_code?: string | null
+      serial_number?: string | null
     }>) {
-      equipmentLabelById.set(e.id, (e.name ?? "").trim() || "Equipment")
+      const details = [
+        (e.name ?? "").trim() || "Equipment",
+        e.equipment_code?.trim() ? `Asset ${e.equipment_code.trim()}` : null,
+        e.serial_number?.trim() ? `Serial ${e.serial_number.trim()}` : null,
+      ]
+      equipmentLabelById.set(e.id, details.filter(Boolean).join(" · "))
       locationLabelById.set(e.id, (e.location_label ?? null) || null)
       equipmentCustomerById.set(e.id, e.customer_id ?? null)
     }
@@ -384,11 +412,50 @@ export async function buildPortalDocuments(
       // Phase 1: no PDF download yet. The detail page is the document.
       downloadPath: null,
       statusLabel,
+      fileSizeBytes: null,
       accountLabel: chipFor(r.customer_id),
       meta: {
         invoiceNumber: number,
+        quoteNumber: null,
         workOrderNumber: null,
         workOrderDisplay: null,
+        searchText: [number, r.title, eqLabel, eid ? locationLabelById.get(eid) : null].filter(Boolean).join(" "),
+      },
+    })
+  }
+
+  // ─── Quotes ─────────────────────────────────────────────────────────────
+  for (const r of (quoteRows ?? []) as Array<{
+    id: string
+    quote_number: string | null
+    title: string | null
+    status: string
+    created_at: string
+    customer_id: string | null
+  }>) {
+    const number = r.quote_number?.trim() || null
+    items.push({
+      key: `quote:${r.id}`,
+      kind: "quote",
+      title: number ? `Quote ${number}` : r.title?.trim() || "Quote",
+      subtitle: r.title?.trim() || null,
+      occurredAt: r.created_at,
+      equipmentLabel: null,
+      locationLabel: null,
+      availability: "available",
+      availabilityReason: "Ready to view.",
+      blockedByInvoice: null,
+      viewPath: "/portal/quotes",
+      downloadPath: null,
+      statusLabel: mapQuoteStatus(r.status),
+      fileSizeBytes: null,
+      accountLabel: chipFor(r.customer_id),
+      meta: {
+        invoiceNumber: null,
+        quoteNumber: number,
+        workOrderNumber: null,
+        workOrderDisplay: null,
+        searchText: [number, r.title].filter(Boolean).join(" "),
       },
     })
   }
@@ -435,11 +502,14 @@ export async function buildPortalDocuments(
       viewPath: "/portal/work-orders",
       downloadPath: null,
       statusLabel: mapWorkOrderStatus(w.status),
+      fileSizeBytes: null,
       accountLabel: chipFor(w.customer_id),
       meta: {
         invoiceNumber: null,
+        quoteNumber: null,
         workOrderNumber: w.work_order_number ?? null,
         workOrderDisplay: display,
+        searchText: [display, w.title, eqLabel, eid ? locationLabelById.get(eid) : null].filter(Boolean).join(" "),
       },
     })
   }
@@ -657,13 +727,16 @@ export async function buildPortalDocuments(
                 : availability === "awaiting_release"
                   ? "Awaiting release"
                   : "Not yet available",
+          fileSizeBytes: row.file_size_bytes ?? null,
           accountLabel: chipFor(attachmentCustomerId),
           meta: {
             invoiceNumber: parentBlockedByInvoice?.number ?? null,
+            quoteNumber: null,
             workOrderNumber: null,
             workOrderDisplay: row.work_order_id
               ? getWorkOrderDisplay({ id: row.work_order_id, workOrderNumber: null })
               : null,
+            searchText: [row.file_name, eqLabel, locationLabel, parentBlockedByInvoice?.number].filter(Boolean).join(" "),
           },
         })
       }
@@ -752,11 +825,14 @@ export async function buildPortalDocuments(
               : "/portal/documents",
         downloadPath: `/api/portal/attachments/${row.id}/download`,
         statusLabel: "Available",
+        fileSizeBytes: row.file_size_bytes ?? null,
         accountLabel: chipFor(customerId),
         meta: {
           invoiceNumber: invCtx?.number ?? null,
+          quoteNumber: null,
           workOrderNumber: null,
           workOrderDisplay: woDisplay,
+          searchText: [row.file_name, equipmentLabel, locationLabel, invCtx?.number, woDisplay].filter(Boolean).join(" "),
         },
       })
     }
