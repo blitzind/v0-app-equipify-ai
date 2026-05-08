@@ -52,12 +52,27 @@ export type OrgInvoiceRow = {
   archived_by?: string | null
   archive_reason?: string | null
   portal_certificate_release_override?: string | null
+  billing_customer_id?: string | null
+  billing_name?: string | null
+  billing_contact_name?: string | null
+  billing_contact_email?: string | null
+  billing_contact_phone?: string | null
+  billing_address_line1?: string | null
+  billing_address_line2?: string | null
+  billing_city?: string | null
+  billing_state?: string | null
+  billing_postal_code?: string | null
+  billing_country?: string | null
+  po_number?: string | null
+  invoice_instructions?: string | null
 }
 
 export type LineItemJson = {
   description: string
   qty: number
   unit: number
+  /** Optional internal trace for generated lines, e.g. work_order:labor. */
+  source_ref?: string
   /** When present, ties the line back to a reusable catalog template for usage reporting. */
   catalog_item_id?: string
   /** Snapshot fields copied from catalog at line creation; later catalog edits do not change stored quotes/invoices. */
@@ -80,6 +95,8 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
       qty: typeof o.qty === "number" ? o.qty : Number(o.qty) || 0,
       unit: typeof o.unit === "number" ? o.unit : Number(o.unit) || 0,
     }
+    const sourceRef = o.source_ref
+    if (typeof sourceRef === "string" && sourceRef.trim()) row.source_ref = sourceRef.trim()
     if (typeof cid === "string" && cid.trim()) row.catalog_item_id = cid.trim()
     const sku = o.sku
     const itemType = o.item_type
@@ -235,5 +252,18 @@ export function mapOrgInvoiceToAdmin(
     termsCode: row.terms_code ?? null,
     termsCustomDays: row.terms_custom_days ?? null,
     portalCertificateReleaseOverride: row.portal_certificate_release_override ?? null,
+    billingCustomerId: row.billing_customer_id ?? null,
+    billingName: row.billing_name ?? null,
+    billingContactName: row.billing_contact_name ?? null,
+    billingContactEmail: row.billing_contact_email ?? null,
+    billingContactPhone: row.billing_contact_phone ?? null,
+    billingAddressLine1: row.billing_address_line1 ?? null,
+    billingAddressLine2: row.billing_address_line2 ?? null,
+    billingCity: row.billing_city ?? null,
+    billingState: row.billing_state ?? null,
+    billingPostalCode: row.billing_postal_code ?? null,
+    billingCountry: row.billing_country ?? null,
+    poNumber: row.po_number ?? null,
+    invoiceInstructions: row.invoice_instructions ?? null,
   }
 }

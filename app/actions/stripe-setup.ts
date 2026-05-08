@@ -1,6 +1,6 @@
 "use server"
 
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { resolveActiveOrganizationForUser } from "@/lib/billing/resolve-active-organization"
@@ -49,6 +49,7 @@ export async function createSetupIntent(): Promise<{ clientSecret: string | null
   if (!process.env.STRIPE_SECRET_KEY?.trim()) {
     return { clientSecret: null, error: "Stripe is not configured." }
   }
+  const stripe = getStripe()
 
   const supabase = await createServerSupabaseClient()
   const {

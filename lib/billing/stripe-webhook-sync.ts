@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import type { PlanId } from "@/lib/plans"
 import { normalizePlanIdForPersistence } from "@/lib/billing/plan-id"
 import {
@@ -249,6 +249,7 @@ export async function updateOrganizationSubscriptionByOrgId(
 async function retrieveSubscription(subId: string): Promise<Stripe.Subscription> {
   const id = normalizeStripeIdColumn(subId)
   if (!id) throw new Error("Missing subscription id")
+  const stripe = getStripe()
   return stripe.subscriptions.retrieve(id, {
     expand: ["items.data.price"],
   })

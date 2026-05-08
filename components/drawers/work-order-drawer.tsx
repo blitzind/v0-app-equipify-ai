@@ -102,6 +102,10 @@ import {
   composeUnassignMessage,
   emitSchedulingEvent,
 } from "@/lib/dispatch/scheduling-events-client"
+import {
+  resolveCustomerBillingProfile,
+  type CustomerBillingProfile,
+} from "@/lib/customers/billing-profile"
 
 let toastCounter = 0
 
@@ -353,12 +357,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [addEquipmentOpen, setAddEquipmentOpen] = useState(false)
   const [completionCertSlots, setCompletionCertSlots] = useState<CompletionCertificateSlot[]>([])
   const [linkedInvoices, setLinkedInvoices] = useState<AdminInvoice[]>([])
+  const [billingProfile, setBillingProfile] = useState<CustomerBillingProfile | null>(null)
   /** Phase 4: bumping this triggers the SchedulingEventsCard to re-fetch — used after we emit an event from this drawer. */
   const [schedulingEventsRefresh, setSchedulingEventsRefresh] = useState(0)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
       setWo(null)
+      setBillingProfile(null)
       return
     }
 
@@ -403,6 +409,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     }
     if (!res.ok) {
       setWo(null)
+      setBillingProfile(null)
       setLoading(false)
       return
     }
@@ -418,6 +425,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setUsesPartsLineItems(res.data.usesPartsLineItems)
     setUsesTasksTable(res.data.usesTasksTable)
     setEquipmentAssets(res.data.equipmentAssets ?? [])
+    const profile = await resolveCustomerBillingProfile(supabase, {
+      organizationId: orgId,
+      customerId: res.data.workOrder.customerId,
+    }).catch(() => null)
+    setBillingProfile(profile)
     const partsSnap = cloneParts(res.data.workOrder.repairLog.partsUsed)
     setTabParts(partsSnap)
     setSavedParts(partsSnap)
@@ -1502,6 +1514,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   const showPostComplete =
     wo.status === "Completed" || wo.status === "Completed Pending Signature"
+  const readyToInvoice = showPostComplete && linkedInvoices.filter((i) => !i.isArchived).length === 0
 
   async function sendWorkOrderSummaryEmail() {
     if (!wo || !activeOrgId) return
@@ -1623,6 +1636,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             {wo.isArchived ? (
               <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border shrink-0">
                 Archived
+              </Badge>
+            ) : null}
+            {readyToInvoice ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-semibold border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] shrink-0"
+              >
+                Ready to invoice
               </Badge>
             ) : null}
           </div>
@@ -1863,10 +1884,34 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </div>
           ) : null}
 
+          {!editing && billingProfile?.poRequiredBeforeService ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <div className="flex items-start gap-2 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2 text-[11px] text-[color:var(--status-warning)]">
+                <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <div>
+                  <p className="font-semibold text-foreground">PO required before service</p>
+                  <p>
+                    {billingProfile.billingName} requires a PO before work begins.
+                    {billingProfile.defaultPoNumber ? ` Default PO: ${billingProfile.defaultPoNumber}.` : ""}
+                  </p>
+                  {billingProfile.invoiceInstructions ? (
+                    <p className="mt-1 text-muted-foreground">{billingProfile.invoiceInstructions}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Invoicing Phase 2 — Linked invoices status */}
           {!editing && wo ? (
             <div className="shrink-0 border-b border-border px-5 py-3">
-              <LinkedInvoicesSummary invoices={linkedInvoices} />
+              <LinkedInvoicesSummary
+                invoices={linkedInvoices}
+                canCreateInvoice={woCanEdit && !wo.isArchived}
+                onCreateInvoice={handleCreateInvoiceAction}
+                billingProfile={billingProfile}
+                readyToInvoice={readyToInvoice}
+              />
             </div>
           ) : null}
 

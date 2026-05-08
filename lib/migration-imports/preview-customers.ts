@@ -36,6 +36,13 @@ function oversized(field: string, value: string, max: number): PreviewIssue | nu
   }
 }
 
+function truthyImportValue(value: string): boolean {
+  const v = value.trim().toLowerCase()
+  if (!v) return false
+  if (["false", "no", "n", "0", "not required", "none"].includes(v)) return false
+  return ["true", "yes", "y", "1", "required", "required before invoice", "required before service"].includes(v) || v.includes("required")
+}
+
 export async function buildCustomerPreview(
   ctx: ImportEngineContext,
 ): Promise<PreviewResult> {
@@ -47,14 +54,14 @@ export async function buildCustomerPreview(
     .eq("organization_id", organizationId)
     .is("archived_at", null)
 
-  const byCode = new Map<string, { name: string }>()
-  const byName = new Map<string, { code: string | null }>()
+  const byCode = new Map<string, { id: string; name: string }>()
+  const byName = new Map<string, { id: string; code: string | null; name: string }>()
   for (const c of existing ?? []) {
-    const r = c as { company_name: string; external_code: string | null }
+    const r = c as { id: string; company_name: string; external_code: string | null }
     if (r.external_code?.trim()) {
-      byCode.set(r.external_code.trim().toLowerCase(), { name: r.company_name })
+      byCode.set(r.external_code.trim().toLowerCase(), { id: r.id, name: r.company_name })
     }
-    byName.set(normName(r.company_name), { code: r.external_code })
+    byName.set(normName(r.company_name), { id: r.id, code: r.external_code, name: r.company_name })
   }
 
   const { data: contacts } = await supabase
@@ -253,6 +260,19 @@ export async function buildCustomerPreview(
       }
     }
 
+    const poRequired =
+      truthyImportValue(resolveMapped(row, columnMapping, "po_required")) ||
+      truthyImportValue(resolveMapped(row, columnMapping, "po_requirements"))
+    const invoiceInstructions = resolveMapped(row, columnMapping, "invoice_instructions")
+    if (poRequired && !invoiceInstructions.trim()) {
+      issues.push({
+        rowIndex,
+        severity: "warning",
+        code: "po_required_without_invoice_instructions",
+        message: "PO is marked required, but no invoice instructions are mapped for this customer.",
+      })
+    }
+
     const maxChecks = [
       oversized("company_name", company, 200),
       oversized("external_code", ext, 120),
@@ -261,6 +281,10 @@ export async function buildCustomerPreview(
       oversized("notes", resolveMapped(row, columnMapping, "notes"), 8000),
       oversized("tax_id", resolveMapped(row, columnMapping, "tax_id"), 120),
       oversized("po_requirements", resolveMapped(row, columnMapping, "po_requirements"), 1000),
+      oversized("billing_name", resolveMapped(row, columnMapping, "billing_name"), 200),
+      oversized("billing_contact_email", resolveMapped(row, columnMapping, "billing_contact_email"), 254),
+      oversized("default_po_number", resolveMapped(row, columnMapping, "default_po_number"), 120),
+      oversized("invoice_instructions", resolveMapped(row, columnMapping, "invoice_instructions"), 4000),
       oversized("legacy_source_ids", resolveMapped(row, columnMapping, "legacy_source_ids"), 1000),
     ]
     for (const issue of maxChecks) {
@@ -270,13 +294,27 @@ export async function buildCustomerPreview(
     const parentExt = resolveMapped(row, columnMapping, "parent_external_code")
     const parentCompany = resolveMapped(row, columnMapping, "parent_company_name")
     if (parentExt || parentCompany) {
+      const parentMatch =
+        (parentExt ? byCode.get(parentExt.trim().toLowerCase()) : null) ||
+        (parentCompany ? byName.get(normName(parentCompany)) : null) ||
+        null
       issues.push({
         rowIndex,
         severity: "warning",
-        code: "hierarchy_preserved",
+        code: parentMatch && ctx.options.linkChildrenToExistingParents ? "parent_link_ready" : "hierarchy_preserved",
         message:
-          "Hierarchy-related values are preserved in the import audit snapshot for future parent/child support.",
+          parentMatch && ctx.options.linkChildrenToExistingParents
+            ? `Will link to parent account ${parentMatch.name} if the row is imported or updated.`
+            : parentMatch
+              ? `Parent account ${parentMatch.name} matched. Enable parent linking to connect this child during import.`
+              : "Hierarchy-related values are preserved in the import audit snapshot; no existing parent account was matched.",
       })
+      if (!parentMatch) {
+        unresolvedRefs.push({
+          rowIndex,
+          message: `Parent account not found${parentExt ? ` for external code ${parentExt}` : ""}${parentCompany ? ` (${parentCompany})` : ""}.`,
+        })
+      }
     }
 
     const hasError = issues.some((x) => x.severity === "error")

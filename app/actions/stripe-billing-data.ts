@@ -1,7 +1,7 @@
 "use server"
 
 import type Stripe from "stripe"
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import { resolveActiveOrganizationForUser } from "@/lib/billing/resolve-active-organization"
 import { getOrganizationSubscription, normalizeStripeIdColumn } from "@/lib/billing/subscriptions"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
@@ -77,6 +77,8 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
       invoices: [],
     }
   }
+
+  const stripe = getStripe()
 
   const supabase = await createServerSupabaseClient()
   const {

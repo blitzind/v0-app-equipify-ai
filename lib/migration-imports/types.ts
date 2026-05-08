@@ -28,6 +28,8 @@ export type DuplicateStrategy = "skip_duplicates" | "fail_on_duplicate"
 export type MigrationCommitOptions = {
   strategy?: MigrationImportStrategy
   duplicateStrategy?: DuplicateStrategy
+  /** Customer imports: when true, safely link child rows to existing same-org parent customers. */
+  linkChildrenToExistingParents?: boolean
   /** When true, invoice inserts skip QuickBooks auto-sync side effects (historical rows). */
   skipQuickBooksInvoiceSync?: boolean
 }

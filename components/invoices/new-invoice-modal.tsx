@@ -8,12 +8,16 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
-import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
+import { formatWorkOrderDisplay, getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import {
   loadCustomerHierarchy,
   type CustomerHierarchySummary,
 } from "@/lib/customers/hierarchy"
+import {
+  resolveCustomerBillingProfile,
+  type CustomerBillingProfile,
+} from "@/lib/customers/billing-profile"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { AddEquipmentModal } from "@/components/equipment/add-equipment-modal"
@@ -28,6 +32,7 @@ import {
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
+import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 
 function quoteOptionLabel(q: AdminQuote) {
   const num = q.quoteNumber?.trim()
@@ -109,6 +114,7 @@ interface LineItem {
   description: string
   qty: string
   unit: string
+  sourceRef?: string
   catalogItemId?: string
   skuSnapshot?: string
   itemTypeSnapshot?: string
@@ -134,6 +140,16 @@ type EquipmentOption = {
   category: string | null
 }
 type WorkOrderOption = { id: string; work_order_number?: number | null; title: string }
+
+type WorkOrderInvoicePrefill = {
+  id: string
+  display: string
+  title: string
+  serviceDate: string | null
+  technicianName: string | null
+  locationLabel: string | null
+  hadPricedItems: boolean
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -181,6 +197,8 @@ export function NewInvoiceModal({
 
   const [customerId, setCustomerId] = useState("")
   const [customerHierarchy, setCustomerHierarchy] = useState<CustomerHierarchySummary | null>(null)
+  const [billingProfile, setBillingProfile] = useState<CustomerBillingProfile | null>(null)
+  const [workOrderPrefill, setWorkOrderPrefill] = useState<WorkOrderInvoicePrefill | null>(null)
   const [workOrderId, setWorkOrderId] = useState("")
   const [quoteId, setQuoteId] = useState("")
   const [equipmentId, setEquipmentId] = useState("")
@@ -202,6 +220,7 @@ export function NewInvoiceModal({
   const [linkedCertReleasedCount, setLinkedCertReleasedCount] = useState<number | null>(null)
   const [notes, setNotes] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
+  const [poNumber, setPoNumber] = useState("")
   const [calibrationRecordId, setCalibrationRecordId] = useState("")
   const [status, setStatus] = useState<InvoiceStatus>("Draft")
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -249,6 +268,7 @@ export function NewInvoiceModal({
       setLinkedCertReleasedCount(null)
       setCustomerTermsDefault(null)
       setOrgTermsDefault(null)
+      setWorkOrderPrefill(null)
       if (!hasPrefill) {
         setCustomerId("")
         setWorkOrderId("")
@@ -260,6 +280,7 @@ export function NewInvoiceModal({
         setTax("")
         setNotes("")
         setInternalNotes("")
+        setPoNumber("")
         setStatus("Draft")
       }
       if (prefilledCatalogItem?.catalogItemId && !initialWorkOrderId && !initialCalibrationRecordId) {
@@ -350,16 +371,110 @@ export function NewInvoiceModal({
     void (async () => {
       const { data: wo, error } = await supabase
         .from("work_orders")
-        .select("id, customer_id, equipment_id, title")
+        .select("id, work_order_number, customer_id, equipment_id, title, scheduled_on, completed_at, assigned_user_id, assigned_technician_id, total_labor_cents, total_parts_cents, repair_log")
         .eq("organization_id", organizationId)
         .eq("id", initialWorkOrderId)
         .maybeSingle()
       if (cancelled || error || !wo) return
-      const row = wo as { id: string; customer_id: string; equipment_id: string | null; title: string }
+      const row = wo as {
+        id: string
+        work_order_number?: number | null
+        customer_id: string
+        equipment_id: string | null
+        title: string
+        scheduled_on: string | null
+        completed_at: string | null
+        assigned_user_id: string | null
+        assigned_technician_id?: string | null
+        total_labor_cents: number | null
+        total_parts_cents: number | null
+        repair_log: unknown
+      }
+      const [lineRes, techRes, profileRes, equipmentRes] = await Promise.all([
+        supabase
+          .from("work_order_line_items")
+          .select("id, description, quantity, unit_cost_cents, catalog_item_id")
+          .eq("organization_id", organizationId)
+          .eq("work_order_id", row.id)
+          .order("created_at", { ascending: true }),
+        row.assigned_technician_id
+          ? supabase
+              .from("technicians")
+              .select("full_name")
+              .eq("organization_id", organizationId)
+              .eq("id", row.assigned_technician_id)
+              .maybeSingle()
+          : row.assigned_user_id
+            ? supabase.from("profiles").select("full_name, email").eq("id", row.assigned_user_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+        resolveCustomerBillingProfile(supabase, { organizationId, customerId: row.customer_id }).catch(() => null),
+        row.equipment_id
+          ? supabase
+              .from("equipment")
+              .select("location_label")
+              .eq("organization_id", organizationId)
+              .eq("id", row.equipment_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      if (cancelled) return
       setCustomerId(row.customer_id)
       if (row.equipment_id) setEquipmentId(row.equipment_id)
       setWorkOrderId(row.id)
-      setTitle((prev) => (prev.trim() ? prev : `Invoice — ${row.title.trim() || "Work order"}`))
+      const display = getWorkOrderDisplay({ id: row.id, workOrderNumber: row.work_order_number ?? undefined })
+      setTitle((prev) => (prev.trim() ? prev : `Invoice — ${display}`))
+      const serviceDate = row.completed_at ?? row.scheduled_on ?? null
+      const techData = techRes.data as { full_name?: string | null; email?: string | null } | null
+      const technicianName = techData?.full_name?.trim() || techData?.email?.trim() || null
+      const equipmentData = equipmentRes.data as { location_label?: string | null } | null
+      const billing = profileRes as CustomerBillingProfile | null
+      if (billing?.defaultPoNumber) setPoNumber((prev) => prev || billing.defaultPoNumber || "")
+      const repairLog = parseRepairLog(row.repair_log)
+      const pricedLines = (lineRes.data ?? []) as Array<{
+        id: string
+        description: string
+        quantity: string | number
+        unit_cost_cents: number | null
+        catalog_item_id?: string | null
+      }>
+      const generated: LineItem[] = pricedLines
+        .filter((li) => li.description?.trim())
+        .map((li) => ({
+          id: crypto.randomUUID(),
+          description: `${li.description.trim()} (${display})`,
+          qty: String(typeof li.quantity === "number" ? li.quantity : Number.parseFloat(String(li.quantity)) || 1),
+          unit: String((li.unit_cost_cents ?? 0) / 100),
+          sourceRef: `work_order_line_item:${li.id}`,
+          catalogItemId: li.catalog_item_id ?? undefined,
+        }))
+      if (generated.length === 0 && repairLog.laborHours > 0 && (row.total_labor_cents ?? 0) > 0) {
+        generated.push({
+          id: crypto.randomUUID(),
+          description: `Labor — ${display}`,
+          qty: String(repairLog.laborHours),
+          unit: String((row.total_labor_cents ?? 0) / 100 / repairLog.laborHours),
+          sourceRef: `work_order:${row.id}:labor`,
+        })
+      }
+      if (generated.length === 0) {
+        generated.push({
+          id: crypto.randomUUID(),
+          description: `Service visit — ${display}${row.title.trim() ? ` — ${row.title.trim()}` : ""}`,
+          qty: "1",
+          unit: "0",
+          sourceRef: `work_order:${row.id}`,
+        })
+      }
+      setLineItems(generated)
+      setWorkOrderPrefill({
+        id: row.id,
+        display,
+        title: row.title.trim() || "Service visit",
+        serviceDate,
+        technicianName,
+        locationLabel: equipmentData?.location_label?.trim() || null,
+        hadPricedItems: generated.some((li) => (parseFloat(li.unit) || 0) > 0),
+      })
     })()
     return () => {
       cancelled = true
@@ -445,6 +560,7 @@ export function NewInvoiceModal({
   useEffect(() => {
     if (!open || !organizationId || !customerId) {
       setCustomerHierarchy(null)
+      setBillingProfile(null)
       return
     }
     let cancelled = false
@@ -454,8 +570,14 @@ export function NewInvoiceModal({
         organizationId,
         customerId,
       }).catch(() => null)
+      const profile = await resolveCustomerBillingProfile(supabase, {
+        organizationId,
+        customerId,
+      }).catch(() => null)
       if (cancelled) return
       setCustomerHierarchy(summary)
+      setBillingProfile(profile)
+      if (profile?.defaultPoNumber) setPoNumber((prev) => prev || profile.defaultPoNumber || "")
     })()
     return () => {
       cancelled = true
@@ -600,8 +722,8 @@ export function NewInvoiceModal({
     if (!title.trim()) errs.title = "Invoice title is required."
     if (!issuedAt) errs.issuedAt = "Issue date is required."
     if (!dueDate) errs.dueDate = "Due date is required."
-    const hasItem = lineItems.some((li) => li.description.trim() && (parseFloat(li.unit) || 0) > 0)
-    if (!hasItem) errs.lineItems = "At least one line item with a description and price is required."
+    const hasItem = lineItems.some((li) => li.description.trim())
+    if (!hasItem) errs.lineItems = "At least one line item with a description is required."
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -621,6 +743,7 @@ export function NewInvoiceModal({
           description: string
           qty: number
           unit: number
+          source_ref?: string
           catalog_item_id?: string
           sku?: string
           item_type?: string
@@ -634,6 +757,7 @@ export function NewInvoiceModal({
         if (li.skuSnapshot) row.sku = li.skuSnapshot
         if (li.itemTypeSnapshot) row.item_type = li.itemTypeSnapshot
         if (li.unitLabelSnapshot) row.unit_label = li.unitLabelSnapshot
+        if (li.sourceRef) row.source_ref = li.sourceRef
         return row
       })
     const { id, error: saveError } = await addInvoiceFromPayload({
@@ -653,6 +777,19 @@ export function NewInvoiceModal({
       internalNotes: internalNotes.trim() ? internalNotes.trim() : null,
       termsCode,
       termsCustomDays: termsCode === "custom" ? termsCustomDays : null,
+      billingCustomerId: billingProfile?.billingCustomerId ?? null,
+      billingName: billingProfile?.billingName ?? null,
+      billingContactName: billingProfile?.billingContactName ?? null,
+      billingContactEmail: billingProfile?.billingContactEmail ?? null,
+      billingContactPhone: billingProfile?.billingContactPhone ?? null,
+      billingAddressLine1: billingProfile?.addressLine1 ?? null,
+      billingAddressLine2: billingProfile?.addressLine2 ?? null,
+      billingCity: billingProfile?.city ?? null,
+      billingState: billingProfile?.state ?? null,
+      billingPostalCode: billingProfile?.postalCode ?? null,
+      billingCountry: billingProfile?.country ?? null,
+      poNumber: poNumber.trim() || null,
+      invoiceInstructions: billingProfile?.invoiceInstructions ?? null,
     })
     setSubmitting(false)
     if (saveError) {
@@ -846,6 +983,18 @@ export function NewInvoiceModal({
                       .
                     </p>
                   ) : null}
+                  {workOrderPrefill ? (
+                    <div className="mt-2 rounded-md border border-border bg-muted/25 px-2 py-1.5 text-[11px] text-muted-foreground">
+                      <p className="font-semibold text-foreground">{workOrderPrefill.display} · {workOrderPrefill.title}</p>
+                      <p>
+                        {[
+                          workOrderPrefill.serviceDate ? `Service ${new Date(workOrderPrefill.serviceDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : null,
+                          workOrderPrefill.technicianName,
+                          workOrderPrefill.locationLabel,
+                        ].filter(Boolean).join(" · ") || "Service context linked to this invoice."}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <Label>Related Quote</Label>
@@ -896,6 +1045,11 @@ export function NewInvoiceModal({
                     </button>
                   </div>
                 </div>
+                {workOrderPrefill && !workOrderPrefill.hadPricedItems ? (
+                  <div className="mb-3 rounded-md border border-dashed border-border bg-muted/25 px-3 py-2 text-[11px] text-muted-foreground">
+                    This work order did not have priced labor or parts, so a draft service line was added at $0. Edit pricing here only if you intend to invoice it.
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-[1fr_60px_90px_80px_32px] gap-2 mb-1.5 px-0.5">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
@@ -1082,6 +1236,56 @@ export function NewInvoiceModal({
                   </FieldSelect>
                 </div>
               </div>
+
+              {billingProfile ? (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">Billing &amp; PO</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {billingProfile.inheritedFromParent
+                          ? `Using parent billing from ${billingProfile.billingCustomerName}.`
+                          : "Using this customer's billing settings."}
+                      </p>
+                    </div>
+                    {billingProfile.poRequiredBeforeInvoice && !poNumber.trim() ? (
+                      <span className="rounded-full border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--status-warning)]">
+                        PO needed
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label>PO number</Label>
+                      <FieldInput
+                        value={poNumber}
+                        onChange={(e) => setPoNumber(e.target.value)}
+                        placeholder={billingProfile.poRequired ? "Required by customer" : "Optional"}
+                      />
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      <p className="font-medium text-foreground">{billingProfile.billingName}</p>
+                      <p>
+                        {[billingProfile.addressLine1, billingProfile.city, billingProfile.state, billingProfile.postalCode]
+                          .filter(Boolean)
+                          .join(", ") || "No billing address on file."}
+                      </p>
+                    </div>
+                  </div>
+                  {billingProfile.poRequiredBeforeInvoice && !poNumber.trim() ? (
+                    <div className="flex items-start gap-2 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                      <span>This customer requires a PO before invoicing. You can still save a draft.</span>
+                    </div>
+                  ) : null}
+                  {billingProfile.invoiceInstructions ? (
+                    <div className="rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-foreground">Invoice instructions:</span>{" "}
+                      {billingProfile.invoiceInstructions}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div>
                 <Label>Notes</Label>

@@ -2481,15 +2481,26 @@ export default function CustomerDetailPage() {
               : null
           }
           initialBilling={{
+            billingName: hierarchySummary.billingAddress.billingName,
             sameAsService: hierarchySummary.billingAddress.inheritsFromDefaultLocation,
             attention: hierarchySummary.billingAddress.attention,
+            contactName: hierarchySummary.billingAddress.contactName,
             email: hierarchySummary.billingAddress.email,
+            phone: hierarchySummary.billingAddress.phone,
             line1: hierarchySummary.billingAddress.line1,
             line2: hierarchySummary.billingAddress.line2,
             city: hierarchySummary.billingAddress.city,
             state: hierarchySummary.billingAddress.state,
             postalCode: hierarchySummary.billingAddress.postalCode,
+            country: hierarchySummary.billingAddress.country,
             notes: hierarchySummary.billingAddress.notes,
+            behavior: hierarchySummary.billingAddress.behavior,
+            poRequired: hierarchySummary.billingAddress.poRequired,
+            poRequiredBeforeService: hierarchySummary.billingAddress.poRequiredBeforeService,
+            poRequiredBeforeInvoice: hierarchySummary.billingAddress.poRequiredBeforeInvoice,
+            defaultPoNumber: hierarchySummary.billingAddress.defaultPoNumber,
+            invoiceInstructions: hierarchySummary.billingAddress.invoiceInstructions,
+            invoiceDeliveryPreference: hierarchySummary.billingAddress.invoiceDeliveryPreference,
           }}
         />
       ) : null}

@@ -40,18 +40,29 @@ export type ServiceAddress = {
 }
 
 export type BillingAddress = {
+  billingName: string | null
   /** True when the operational billing address is inherited from the default service location. */
   inheritsFromDefaultLocation: boolean
   /** Optional "Attn:" line. */
   attention: string | null
+  contactName: string | null
   /** Billing recipient email (separate from primary contact). */
   email: string | null
+  phone: string | null
   line1: string
   line2: string | null
   city: string
   state: string
   postalCode: string
+  country: string | null
   notes: string | null
+  behavior: "own_billing" | "parent_billing" | "custom" | null
+  poRequired: boolean
+  poRequiredBeforeService: boolean
+  poRequiredBeforeInvoice: boolean
+  defaultPoNumber: string | null
+  invoiceInstructions: string | null
+  invoiceDeliveryPreference: string | null
 }
 
 export type CustomerHierarchySummary = {
@@ -93,13 +104,24 @@ type CustomerHierarchyRow = {
   parent_customer_id: string | null
   billing_address_same_as_service: boolean | null
   billing_attention: string | null
+  billing_name: string | null
+  billing_contact_name: string | null
   billing_email: string | null
+  billing_contact_phone: string | null
   billing_address_line1: string | null
   billing_address_line2: string | null
   billing_city: string | null
   billing_state: string | null
   billing_postal_code: string | null
+  billing_country: string | null
   billing_notes: string | null
+  billing_behavior: "own_billing" | "parent_billing" | "custom" | null
+  po_required: boolean | null
+  po_number_required_before_service: boolean | null
+  po_number_required_before_invoice: boolean | null
+  default_po_number: string | null
+  invoice_delivery_preference: string | null
+  invoice_instructions: string | null
 }
 
 type LegacyCustomerRow = {
@@ -122,8 +144,9 @@ type DefaultLocationRow = {
 
 const CUSTOMER_HIERARCHY_SELECT =
   "id, organization_id, company_name, status, archived_at, " +
-  "parent_customer_id, billing_address_same_as_service, billing_attention, billing_email, " +
-  "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_notes"
+  "parent_customer_id, billing_address_same_as_service, billing_name, billing_attention, billing_contact_name, billing_email, billing_contact_phone, " +
+  "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, billing_notes, " +
+  "billing_behavior, po_required, po_number_required_before_service, po_number_required_before_invoice, default_po_number, invoice_delivery_preference, invoice_instructions"
 
 const CUSTOMER_LITE_SELECT = "id, organization_id, company_name, status, archived_at"
 
@@ -174,15 +197,26 @@ function deriveBillingAddress(
   if (inherits) {
     return {
       address: {
+        billingName: row?.billing_name?.trim() || null,
         inheritsFromDefaultLocation: true,
         attention: row?.billing_attention?.trim() || null,
+        contactName: row?.billing_contact_name?.trim() || null,
         email: row?.billing_email?.trim() || null,
+        phone: row?.billing_contact_phone?.trim() || null,
         line1: defaultService?.line1 ?? "",
         line2: defaultService?.line2 ?? null,
         city: defaultService?.city ?? "",
         state: defaultService?.state ?? "",
         postalCode: defaultService?.postalCode ?? "",
+        country: row?.billing_country?.trim() || null,
         notes: row?.billing_notes?.trim() || null,
+        behavior: row?.billing_behavior ?? null,
+        poRequired: Boolean(row?.po_required),
+        poRequiredBeforeService: Boolean(row?.po_number_required_before_service),
+        poRequiredBeforeInvoice: Boolean(row?.po_number_required_before_invoice),
+        defaultPoNumber: row?.default_po_number?.trim() || null,
+        invoiceInstructions: row?.invoice_instructions?.trim() || null,
+        invoiceDeliveryPreference: row?.invoice_delivery_preference?.trim() || null,
       },
       missing: !defaultService || !defaultService.line1?.trim() || !defaultService.city?.trim(),
     }
@@ -192,15 +226,26 @@ function deriveBillingAddress(
   const city = row?.billing_city?.trim() ?? ""
   return {
     address: {
+      billingName: row?.billing_name?.trim() || null,
       inheritsFromDefaultLocation: false,
       attention: row?.billing_attention?.trim() || null,
+      contactName: row?.billing_contact_name?.trim() || null,
       email: row?.billing_email?.trim() || null,
+      phone: row?.billing_contact_phone?.trim() || null,
       line1,
       line2: row?.billing_address_line2?.trim() || null,
       city,
       state: row?.billing_state?.trim() ?? "",
       postalCode: row?.billing_postal_code?.trim() ?? "",
+      country: row?.billing_country?.trim() || null,
       notes: row?.billing_notes?.trim() || null,
+      behavior: row?.billing_behavior ?? null,
+      poRequired: Boolean(row?.po_required),
+      poRequiredBeforeService: Boolean(row?.po_number_required_before_service),
+      poRequiredBeforeInvoice: Boolean(row?.po_number_required_before_invoice),
+      defaultPoNumber: row?.default_po_number?.trim() || null,
+      invoiceInstructions: row?.invoice_instructions?.trim() || null,
+      invoiceDeliveryPreference: row?.invoice_delivery_preference?.trim() || null,
     },
     missing: !line1 || !city,
   }
@@ -249,14 +294,25 @@ export async function loadCustomerHierarchy(
       archived_at: legacy.archived_at,
       parent_customer_id: null,
       billing_address_same_as_service: true,
+      billing_name: null,
       billing_attention: null,
+      billing_contact_name: null,
       billing_email: null,
+      billing_contact_phone: null,
       billing_address_line1: null,
       billing_address_line2: null,
       billing_city: null,
       billing_state: null,
       billing_postal_code: null,
+      billing_country: null,
       billing_notes: null,
+      billing_behavior: null,
+      po_required: null,
+      po_number_required_before_service: null,
+      po_number_required_before_invoice: null,
+      default_po_number: null,
+      invoice_delivery_preference: null,
+      invoice_instructions: null,
     }
   } else if (fullRes.error || !fullRes.data) {
     return null

@@ -237,6 +237,7 @@ export async function startAsyncImportRun(input: StartRunInput): Promise<{ run: 
   const options: MigrationCommitOptions = {
     strategy: input.options?.strategy,
     duplicateStrategy: input.options?.duplicateStrategy,
+    linkChildrenToExistingParents: input.options?.linkChildrenToExistingParents,
     skipQuickBooksInvoiceSync: true,
   }
   const strategy = resolveImportStrategy(options)

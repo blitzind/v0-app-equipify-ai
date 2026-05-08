@@ -1,6 +1,6 @@
 "use server"
 
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import type { PlanId } from "@/lib/plans"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
@@ -84,6 +84,13 @@ export async function createCheckoutSession(
   planId: PlanId,
   billingCycle: "monthly" | "annual",
 ): Promise<{ clientSecret: string | null; error?: string }> {
+  let stripe: ReturnType<typeof getStripe>
+  try {
+    stripe = getStripe()
+  } catch (e) {
+    return { clientSecret: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+  }
+
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
     admin = createServiceRoleSupabaseClient()
@@ -229,6 +236,12 @@ export async function createCheckoutSession(
 
 export async function createPortalSession(): Promise<{ url: string | null; error?: string }> {
   const origin = (await headers()).get("origin") ?? "http://localhost:3000"
+  let stripe: ReturnType<typeof getStripe>
+  try {
+    stripe = getStripe()
+  } catch (e) {
+    return { url: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+  }
 
   const supabase = await createServerSupabaseClient()
   const {

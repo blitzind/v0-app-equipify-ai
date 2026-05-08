@@ -80,6 +80,7 @@ export async function POST(
   const options: MigrationCommitOptions = {
     strategy: body.options?.strategy,
     duplicateStrategy: body.options?.duplicateStrategy,
+    linkChildrenToExistingParents: body.options?.linkChildrenToExistingParents,
     skipQuickBooksInvoiceSync: true,
   }
   const strategy = resolveImportStrategy(options)

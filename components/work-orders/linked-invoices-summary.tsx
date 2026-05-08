@@ -13,9 +13,11 @@ import * as React from "react"
 import Link from "next/link"
 import { CheckCircle2, Clock, FileText, Receipt } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
+import type { CustomerBillingProfile } from "@/lib/customers/billing-profile"
 
 const STATUS_TONE: Record<InvoiceStatus, string> = {
   Draft: "bg-secondary/40 text-foreground border-border",
@@ -40,12 +42,20 @@ function fmtDate(d: string | null | undefined): string {
 export type LinkedInvoicesSummaryProps = {
   invoices: AdminInvoice[]
   loading?: boolean
+  canCreateInvoice?: boolean
+  onCreateInvoice?: () => void
+  billingProfile?: CustomerBillingProfile | null
+  readyToInvoice?: boolean
   className?: string
 }
 
 export function LinkedInvoicesSummary({
   invoices,
   loading = false,
+  canCreateInvoice = false,
+  onCreateInvoice,
+  billingProfile,
+  readyToInvoice = false,
   className,
 }: LinkedInvoicesSummaryProps) {
   const list = React.useMemo(
@@ -70,11 +80,29 @@ export function LinkedInvoicesSummary({
 
   if (list.length === 0) {
     return (
-      <div className={cn("rounded-xl border border-border bg-card p-4 space-y-2", className)}>
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-          <Receipt className="w-3 h-3" /> Linked invoices
-        </p>
-        <p className="text-xs text-muted-foreground">No invoice has been created from this work order yet.</p>
+      <div className={cn("rounded-xl border border-border bg-card p-4 space-y-3", className)}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <Receipt className="w-3 h-3" /> Invoicing
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {readyToInvoice ? "Ready to invoice — no linked invoice yet." : "Not invoiced yet."}
+            </p>
+          </div>
+          {canCreateInvoice && onCreateInvoice ? (
+            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={onCreateInvoice}>
+              <Receipt className="w-3.5 h-3.5" />
+              Create invoice
+            </Button>
+          ) : null}
+        </div>
+        {billingProfile?.poRequiredBeforeInvoice ? (
+          <div className="rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
+            PO required before invoicing.
+            {billingProfile.defaultPoNumber ? ` Default PO: ${billingProfile.defaultPoNumber}.` : " Add a PO number before sending."}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -84,7 +112,7 @@ export function LinkedInvoicesSummary({
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-            <Receipt className="w-3 h-3" /> Linked invoices
+            <Receipt className="w-3 h-3" /> Invoicing
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {list.length} invoice{list.length === 1 ? "" : "s"} · Total {fmtCurrency(totalCents / 100)}
@@ -92,6 +120,12 @@ export function LinkedInvoicesSummary({
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
+          {canCreateInvoice && onCreateInvoice ? (
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[11px]" onClick={onCreateInvoice}>
+              <Receipt className="w-3 h-3" />
+              Add invoice
+            </Button>
+          ) : null}
           {overdueCount > 0 ? (
             <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">
               {overdueCount} overdue

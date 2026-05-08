@@ -88,6 +88,16 @@ const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "contact_full_name", label: "Primary contact name" },
   { field: "contact_email", label: "Primary contact email" },
   { field: "contact_phone", label: "Primary contact phone" },
+  { field: "billing_name", label: "Billing name" },
+  { field: "billing_contact_name", label: "Billing contact name" },
+  { field: "billing_contact_email", label: "Billing contact email" },
+  { field: "billing_contact_phone", label: "Billing contact phone" },
+  { field: "billing_address_line_1", label: "Billing address line 1" },
+  { field: "billing_address_line_2", label: "Billing address line 2" },
+  { field: "billing_city", label: "Billing city" },
+  { field: "billing_state", label: "Billing state" },
+  { field: "billing_postal_code", label: "Billing ZIP" },
+  { field: "billing_country", label: "Billing country" },
   { field: "address_line1", label: "Billing address line 1" },
   { field: "address_line2", label: "Billing address line 2" },
   { field: "city", label: "Billing city" },
@@ -104,6 +114,10 @@ const CUSTOMER_MAPPING_FIELDS: CustomerMappingField[] = [
   { field: "location_group", label: "Location group" },
   { field: "notes", label: "Notes" },
   { field: "po_requirements", label: "PO requirements" },
+  { field: "po_required", label: "PO required" },
+  { field: "default_po_number", label: "Default PO number" },
+  { field: "invoice_instructions", label: "Invoice instructions" },
+  { field: "billing_behavior", label: "Billing behavior" },
   { field: "tax_id", label: "Tax ID" },
   { field: "legacy_source_ids", label: "Legacy source ID" },
   { field: "parent_external_code", label: "Parent external code", description: "Preserved for future hierarchy support." },
@@ -145,6 +159,7 @@ export function CsvImportFlow({
   const [previewMeta, setPreviewMeta] = useState<{ rowCount: number; truncated: boolean } | null>(null)
   const [commitResult, setCommitResult] = useState<CommitJson | null>(null)
   const [strategy, setStrategy] = useState<MigrationImportStrategy>("skip_duplicates")
+  const [linkChildrenToExistingParents, setLinkChildrenToExistingParents] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [asyncMode, setAsyncMode] = useState(false)
   const [asyncRun, setAsyncRun] = useState<AsyncRun | null>(null)
@@ -273,7 +288,7 @@ export function CsvImportFlow({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnMapping: mapping, options: { strategy } }),
+          body: JSON.stringify({ columnMapping: mapping, options: { strategy, linkChildrenToExistingParents } }),
         },
       )
       const json = (await res.json()) as { preview?: PreviewResult; message?: string }
@@ -288,7 +303,7 @@ export function CsvImportFlow({
     } finally {
       setBusy(false)
     }
-  }, [organizationId, jobId, columnMappingText, strategy, toast])
+  }, [organizationId, jobId, columnMappingText, strategy, linkChildrenToExistingParents, toast])
 
   const runCommit = useCallback(async () => {
     if (!organizationId || !jobId) return
@@ -308,7 +323,7 @@ export function CsvImportFlow({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             columnMapping: mapping,
-            options: { strategy },
+            options: { strategy, linkChildrenToExistingParents },
           }),
         },
       )
@@ -329,7 +344,7 @@ export function CsvImportFlow({
       setBusy(false)
       setConfirmOpen(false)
     }
-  }, [organizationId, jobId, columnMappingText, strategy, toast])
+  }, [organizationId, jobId, columnMappingText, strategy, linkChildrenToExistingParents, toast])
 
   const runAsyncAction = useCallback(
     async (action: "start" | "tick" | "cancel") => {
@@ -350,7 +365,7 @@ export function CsvImportFlow({
           body: JSON.stringify({
             action,
             columnMapping: mapping,
-            options: { strategy },
+            options: { strategy, linkChildrenToExistingParents },
           }),
         },
       )
@@ -361,7 +376,7 @@ export function CsvImportFlow({
       }
       return json
     },
-    [organizationId, jobId, columnMappingText, strategy, toast],
+    [organizationId, jobId, columnMappingText, strategy, linkChildrenToExistingParents, toast],
   )
 
   const startAsyncRun = useCallback(async () => {
@@ -779,7 +794,18 @@ export function CsvImportFlow({
               ) : null}
               {parsedColumnMapping.parent_external_code || parsedColumnMapping.parent_company_name || parsedColumnMapping.location_group ? (
                 <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-sm text-sky-800 dark:text-sky-200">
-                  Hierarchy and site grouping fields are preserved in import row snapshots for future hierarchy support. This phase does not create parent/child relationships.
+                  <p>
+                    Hierarchy and site grouping fields are preserved in import row snapshots. Enable parent linking below to connect children to existing parent accounts when there is a safe match.
+                  </p>
+                  <label className="mt-2 flex items-start gap-2 text-xs text-sky-900 dark:text-sky-100">
+                    <input
+                      type="checkbox"
+                      checked={linkChildrenToExistingParents}
+                      onChange={(event) => setLinkChildrenToExistingParents(event.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+                    />
+                    <span>Link children to existing parents when matched by parent external code or parent company name.</span>
+                  </label>
                 </div>
               ) : null}
               <div className="rounded-md border border-border overflow-hidden">

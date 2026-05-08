@@ -105,11 +105,11 @@ export function InvoiceSourcePanel({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-            <ClipboardList className="w-3 h-3" /> Service source
+            <ClipboardList className="w-3 h-3" /> Linked service work
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {hasWorkOrders
-              ? `Originated from ${workOrders.length} service visit${workOrders.length === 1 ? "" : "s"}.`
+              ? `Linked to ${workOrders.length} service visit${workOrders.length === 1 ? "" : "s"}.`
               : "Standalone invoice — not linked to a service visit."}
           </p>
         </div>

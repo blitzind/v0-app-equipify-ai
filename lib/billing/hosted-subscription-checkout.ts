@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { PlanId } from "@/lib/plans"
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import {
   priceIdForPlan,
@@ -89,6 +89,13 @@ export async function createHostedSubscriptionCheckout(params: {
   /** When true, do not send Stripe trial days (e.g. platform-admin “convert to paid”). */
   skipTrial?: boolean
 }): Promise<HostedSubscriptionCheckoutResult> {
+  let stripe: ReturnType<typeof getStripe>
+  try {
+    stripe = getStripe()
+  } catch (e) {
+    return { url: null, error: e instanceof Error ? e.message : "Stripe is not configured." }
+  }
+
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
     admin = createServiceRoleSupabaseClient()

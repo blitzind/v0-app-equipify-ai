@@ -87,6 +87,17 @@ function daysOverdue(dueDate: string): number {
   return Math.max(0, Math.floor(diff / 86_400_000))
 }
 
+function invoiceBillingAddressLine(invoice: AdminInvoice): string {
+  return [
+    invoice.billingAddressLine1,
+    invoice.billingAddressLine2,
+    [invoice.billingCity, invoice.billingState, invoice.billingPostalCode].filter(Boolean).join(" "),
+    invoice.billingCountry,
+  ]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(", ")
+}
+
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<InvoiceStatus, { className: string }> = {
@@ -403,13 +414,23 @@ function InvoicePreview({
         <div className="px-8 py-5 grid grid-cols-2 gap-6 border-b border-gray-100">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Bill To</p>
-            <p className="text-xs font-semibold text-gray-900">{invoice.customerName}</p>
+            <p className="text-xs font-semibold text-gray-900">{invoice.billingName || invoice.customerName}</p>
+            {invoiceBillingAddressLine(invoice) ? (
+              <p className="text-[10px] text-gray-500 mt-0.5">{invoiceBillingAddressLine(invoice)}</p>
+            ) : null}
             {settings.showCustomerEmail && (
-              <p className="text-[10px] text-gray-500 mt-0.5">ap@{invoice.customerName.toLowerCase().replace(/\s+/g, "")}.example.com</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                {invoice.billingContactEmail || `ap@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.example.com`}
+              </p>
             )}
             {settings.showCustomerPhone && (
-              <p className="text-[10px] text-gray-500">(555) 010-{invoice.customerId.slice(-4)}</p>
+              <p className="text-[10px] text-gray-500">
+                {invoice.billingContactPhone || `(555) 010-${invoice.customerId.slice(-4)}`}
+              </p>
             )}
+            {invoice.poNumber ? (
+              <p className="text-[10px] text-gray-500 mt-0.5">PO: {invoice.poNumber}</p>
+            ) : null}
           </div>
           {settings.showServiceAddress && (
             <div>
@@ -1093,6 +1114,25 @@ function InfoTab({
         {showFinancials && invoice.paidDate && (
           <Row label="Paid On" value={<span className="text-[color:var(--status-success)] font-semibold">{fmtDate(invoice.paidDate)}</span>} />
         )}
+        {!editing && (invoice.billingName || invoiceBillingAddressLine(invoice) || invoice.poNumber || invoice.invoiceInstructions) ? (
+          <Row
+            label="Billing"
+            value={
+              <div className="space-y-1 text-xs">
+                <p className="font-medium text-foreground">{invoice.billingName || invoice.customerName}</p>
+                {invoiceBillingAddressLine(invoice) ? (
+                  <p className="text-muted-foreground">{invoiceBillingAddressLine(invoice)}</p>
+                ) : null}
+                {invoice.poNumber ? <p className="text-muted-foreground">PO: {invoice.poNumber}</p> : null}
+                {invoice.invoiceInstructions ? (
+                  <p className="rounded-md border border-border bg-muted/20 px-2 py-1 text-muted-foreground">
+                    {invoice.invoiceInstructions}
+                  </p>
+                ) : null}
+              </div>
+            }
+          />
+        ) : null}
         <Row label="Created By" value={invoice.createdBy} />
       </Section>
 

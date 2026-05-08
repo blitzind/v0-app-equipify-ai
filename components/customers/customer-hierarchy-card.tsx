@@ -333,6 +333,27 @@ export function CustomerHierarchyCard({
               Email: <span className="font-medium text-foreground">{billingAddress.email}</span>
             </p>
           ) : null}
+          {billingAddress.poRequired || billingAddress.poRequiredBeforeService || billingAddress.poRequiredBeforeInvoice ? (
+            <div className="mt-2 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
+              <p className="font-semibold text-foreground">PO requirements</p>
+              <p>
+                {[
+                  billingAddress.poRequired ? "PO required" : null,
+                  billingAddress.poRequiredBeforeService ? "before service" : null,
+                  billingAddress.poRequiredBeforeInvoice ? "before invoice" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {billingAddress.defaultPoNumber ? ` · Default ${billingAddress.defaultPoNumber}` : ""}
+              </p>
+            </div>
+          ) : null}
+          {billingAddress.invoiceInstructions ? (
+            <p className="mt-2 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Invoice instructions:</span>{" "}
+              {billingAddress.invoiceInstructions}
+            </p>
+          ) : null}
           {billingAddressMissing ? (
             <div className="mt-2 flex items-start gap-1.5 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />

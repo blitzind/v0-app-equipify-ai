@@ -447,9 +447,25 @@ export async function insertOrgInvoice(
     /** DB terms_code — drives due dates & QB alignment */
     termsCode?: string | null
     termsCustomDays?: number | null
+    billingCustomerId?: string | null
+    billingName?: string | null
+    billingContactName?: string | null
+    billingContactEmail?: string | null
+    billingContactPhone?: string | null
+    billingAddressLine1?: string | null
+    billingAddressLine2?: string | null
+    billingCity?: string | null
+    billingState?: string | null
+    billingPostalCode?: string | null
+    billingCountry?: string | null
+    poNumber?: string | null
+    invoiceInstructions?: string | null
   },
 ): Promise<{ id?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const insertRow: Record<string, unknown> = {
     organization_id: payload.organizationId,
@@ -471,6 +487,19 @@ export async function insertOrgInvoice(
   }
   if (payload.termsCode !== undefined) insertRow.terms_code = payload.termsCode
   if (payload.termsCustomDays !== undefined) insertRow.terms_custom_days = payload.termsCustomDays
+  if (payload.billingCustomerId !== undefined) insertRow.billing_customer_id = payload.billingCustomerId
+  if (payload.billingName !== undefined) insertRow.billing_name = payload.billingName?.trim() || null
+  if (payload.billingContactName !== undefined) insertRow.billing_contact_name = payload.billingContactName?.trim() || null
+  if (payload.billingContactEmail !== undefined) insertRow.billing_contact_email = payload.billingContactEmail?.trim() || null
+  if (payload.billingContactPhone !== undefined) insertRow.billing_contact_phone = payload.billingContactPhone?.trim() || null
+  if (payload.billingAddressLine1 !== undefined) insertRow.billing_address_line1 = payload.billingAddressLine1?.trim() || null
+  if (payload.billingAddressLine2 !== undefined) insertRow.billing_address_line2 = payload.billingAddressLine2?.trim() || null
+  if (payload.billingCity !== undefined) insertRow.billing_city = payload.billingCity?.trim() || null
+  if (payload.billingState !== undefined) insertRow.billing_state = payload.billingState?.trim() || null
+  if (payload.billingPostalCode !== undefined) insertRow.billing_postal_code = payload.billingPostalCode?.trim() || null
+  if (payload.billingCountry !== undefined) insertRow.billing_country = payload.billingCountry?.trim() || null
+  if (payload.poNumber !== undefined) insertRow.po_number = payload.poNumber?.trim() || null
+  if (payload.invoiceInstructions !== undefined) insertRow.invoice_instructions = payload.invoiceInstructions?.trim() || null
 
   const { data, error } = await supabase.from("org_invoices").insert(insertRow).select("id").maybeSingle()
 
@@ -482,6 +511,8 @@ export async function insertOrgInvoice(
         organization_id: payload.organizationId,
         invoice_id: id,
         work_order_id: payload.workOrderId,
+        linked_by: user?.id ?? null,
+        linked_at: new Date().toISOString(),
         sort_order: 0,
       })
       if (linkErr && !String(linkErr.message).includes("duplicate")) {

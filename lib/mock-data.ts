@@ -1572,6 +1572,7 @@ export interface AdminQuote {
     description: string
     qty: number
     unit: number
+    source_ref?: string
     catalog_item_id?: string
     sku?: string
     item_type?: string
@@ -1782,6 +1783,19 @@ export interface AdminInvoice {
   termsCustomDays?: number | null
   /** org_invoices.portal_certificate_release_override — portal certificate policy only. */
   portalCertificateReleaseOverride?: string | null
+  billingCustomerId?: string | null
+  billingName?: string | null
+  billingContactName?: string | null
+  billingContactEmail?: string | null
+  billingContactPhone?: string | null
+  billingAddressLine1?: string | null
+  billingAddressLine2?: string | null
+  billingCity?: string | null
+  billingState?: string | null
+  billingPostalCode?: string | null
+  billingCountry?: string | null
+  poNumber?: string | null
+  invoiceInstructions?: string | null
 }
 
 export const adminInvoices: AdminInvoice[] = [

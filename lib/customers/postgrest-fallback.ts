@@ -3,14 +3,25 @@ import type { PostgrestError } from "@supabase/supabase-js"
 const HIERARCHY_KEYS = [
   "parent_customer_id",
   "billing_address_same_as_service",
+  "billing_name",
   "billing_attention",
+  "billing_contact_name",
   "billing_email",
+  "billing_contact_phone",
   "billing_address_line1",
   "billing_address_line2",
   "billing_city",
   "billing_state",
   "billing_postal_code",
+  "billing_country",
   "billing_notes",
+  "billing_behavior",
+  "po_required",
+  "po_number_required_before_service",
+  "po_number_required_before_invoice",
+  "default_po_number",
+  "invoice_delivery_preference",
+  "invoice_instructions",
 ] as const
 
 /**

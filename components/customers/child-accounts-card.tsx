@@ -28,6 +28,7 @@ type ChildRow = {
   locationCount: number
   equipmentCount: number
   openWorkOrderCount: number
+  recentInvoiceCount: number
 }
 
 type Props = {
@@ -93,7 +94,9 @@ export function ChildAccountsCard({
       }
 
       // Bulk-fetch counts in parallel. Each query is RLS-safe.
-      const [locRes, eqRes, woRes] = await Promise.all([
+      const since = new Date()
+      since.setMonth(since.getMonth() - 12)
+      const [locRes, eqRes, woRes, invRes] = await Promise.all([
         supabase
           .from("customer_locations")
           .select("customer_id")
@@ -113,6 +116,12 @@ export function ChildAccountsCard({
           .in("customer_id", childIds)
           .is("archived_at", null)
           .in("status", OPEN_WO_STATUSES as unknown as string[]),
+        supabase
+          .from("org_invoices")
+          .select("customer_id")
+          .eq("organization_id", organizationId)
+          .in("customer_id", childIds)
+          .gte("issued_at", since.toISOString().slice(0, 10)),
       ])
 
       if (cancelled) return
@@ -120,6 +129,7 @@ export function ChildAccountsCard({
       const locMap = new Map<string, number>()
       const eqMap = new Map<string, number>()
       const woMap = new Map<string, number>()
+      const invMap = new Map<string, number>()
 
       for (const r of (locRes.data ?? []) as Array<{ customer_id: string }>) {
         locMap.set(r.customer_id, (locMap.get(r.customer_id) ?? 0) + 1)
@@ -130,6 +140,9 @@ export function ChildAccountsCard({
       for (const r of (woRes.data ?? []) as Array<{ customer_id: string; status: string }>) {
         woMap.set(r.customer_id, (woMap.get(r.customer_id) ?? 0) + 1)
       }
+      for (const r of (invRes.data ?? []) as Array<{ customer_id: string }>) {
+        invMap.set(r.customer_id, (invMap.get(r.customer_id) ?? 0) + 1)
+      }
 
       const mapped: ChildRow[] = children.map((c) => ({
         id: c.id,
@@ -138,6 +151,7 @@ export function ChildAccountsCard({
         locationCount: locMap.get(c.id) ?? 0,
         equipmentCount: eqMap.get(c.id) ?? 0,
         openWorkOrderCount: woMap.get(c.id) ?? 0,
+        recentInvoiceCount: invMap.get(c.id) ?? 0,
       }))
 
       setRows(mapped)
@@ -211,6 +225,8 @@ export function ChildAccountsCard({
                     >
                       {row.openWorkOrderCount} open WO{row.openWorkOrderCount === 1 ? "" : "s"}
                     </span>
+                    {" · "}
+                    {row.recentInvoiceCount} recent invoice{row.recentInvoiceCount === 1 ? "" : "s"}
                   </p>
                 </div>
                 {row.status === "inactive" ? (

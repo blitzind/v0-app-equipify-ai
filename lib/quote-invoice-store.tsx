@@ -77,6 +77,19 @@ interface QuoteInvoiceContextValue {
     /** org_invoices.terms_code — Net 30 default applied server-side if omitted */
     termsCode?: string | null
     termsCustomDays?: number | null
+    billingCustomerId?: string | null
+    billingName?: string | null
+    billingContactName?: string | null
+    billingContactEmail?: string | null
+    billingContactPhone?: string | null
+    billingAddressLine1?: string | null
+    billingAddressLine2?: string | null
+    billingCity?: string | null
+    billingState?: string | null
+    billingPostalCode?: string | null
+    billingCountry?: string | null
+    poNumber?: string | null
+    invoiceInstructions?: string | null
   }) => Promise<{ id?: string; error?: string }>
   updateInvoice: (id: string, patch: Parameters<typeof updateOrgInvoice>[3]) => Promise<{ error?: string }>
   archiveInvoice: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>

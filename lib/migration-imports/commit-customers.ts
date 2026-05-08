@@ -29,12 +29,44 @@ function tooLong(value: string, max: number) {
   return value.length > max
 }
 
+function truthyImportValue(value: string): boolean | null {
+  const v = value.trim().toLowerCase()
+  if (!v) return null
+  if (["true", "yes", "y", "1", "required", "required before invoice", "required before service"].includes(v)) return true
+  if (["false", "no", "n", "0", "not required", "none"].includes(v)) return false
+  return true
+}
+
+function normalizeBillingBehavior(value: string): "own_billing" | "parent_billing" | "custom" | null {
+  const v = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")
+  if (!v) return null
+  if (["parent_billing", "uses_parent_billing", "parent", "bill_to_parent"].includes(v)) return "parent_billing"
+  if (["custom", "custom_billing"].includes(v)) return "custom"
+  if (["own_billing", "own", "independent", "bills_independently"].includes(v)) return "own_billing"
+  return null
+}
+
 type CustomerRow = {
   id: string
   company_name: string
   external_code: string | null
   notes: string | null
   status: string
+  parent_customer_id: string | null
+  billing_name: string | null
+  billing_contact_name: string | null
+  billing_email: string | null
+  billing_contact_phone: string | null
+  billing_address_line1: string | null
+  billing_address_line2: string | null
+  billing_city: string | null
+  billing_state: string | null
+  billing_postal_code: string | null
+  billing_country: string | null
+  po_required: boolean | null
+  default_po_number: string | null
+  invoice_instructions: string | null
+  billing_behavior: string | null
 }
 
 export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitResult> {
@@ -43,7 +75,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
 
   const { data: existing } = await supabase
     .from("customers")
-    .select("id, company_name, external_code, notes, status")
+    .select("id, company_name, external_code, notes, status, parent_customer_id, billing_name, billing_contact_name, billing_email, billing_contact_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, po_required, default_po_number, invoice_instructions, billing_behavior")
     .eq("organization_id", organizationId)
     .is("archived_at", null)
 
@@ -136,6 +168,74 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
     return null
   }
 
+  function findParent(row: Record<string, string>, childName: string): { id: string; label: string } | null {
+    if (!ctx.options.linkChildrenToExistingParents) return null
+    const parentExt = resolveMapped(row, columnMapping, "parent_external_code").trim()
+    const parentCompany = resolveMapped(row, columnMapping, "parent_company_name").trim()
+    const parentId =
+      (parentExt ? byCode.get(parentExt.toLowerCase()) : null) ||
+      (parentCompany ? byName.get(normName(parentCompany)) : null) ||
+      null
+    if (!parentId) return null
+    const parent = customersById.get(parentId)
+    if (!parent || normName(parent.company_name) === normName(childName)) return null
+    return { id: parentId, label: parent.company_name }
+  }
+
+  function addBillingPatch(
+    patch: Record<string, unknown>,
+    values: {
+      billing_name: string
+      billing_contact_name: string
+      billing_email: string
+      billing_contact_phone: string
+      billing_address_line1: string
+      billing_address_line2: string
+      billing_city: string
+      billing_state: string
+      billing_postal_code: string
+      billing_country: string
+      default_po_number: string
+      invoice_instructions: string
+      billing_behavior: "own_billing" | "parent_billing" | "custom" | null
+      po_required: boolean | null
+    },
+    current?: CustomerRow,
+  ) {
+    const setText = (field: keyof CustomerRow, value: string) => {
+      const trimmed = value.trim()
+      if (!trimmed) return
+      if (strategy === "update_existing" || !current || !String(current[field] ?? "").trim()) {
+        patch[field] = trimmed
+      }
+    }
+    setText("billing_name", values.billing_name)
+    setText("billing_contact_name", values.billing_contact_name)
+    setText("billing_email", values.billing_email)
+    setText("billing_contact_phone", values.billing_contact_phone)
+    setText("billing_address_line1", values.billing_address_line1)
+    setText("billing_address_line2", values.billing_address_line2)
+    setText("billing_city", values.billing_city)
+    setText("billing_state", values.billing_state)
+    setText("billing_postal_code", values.billing_postal_code)
+    setText("billing_country", values.billing_country)
+    setText("default_po_number", values.default_po_number)
+    setText("invoice_instructions", values.invoice_instructions)
+    if (values.billing_behavior && (strategy === "update_existing" || !current || !current.billing_behavior)) {
+      patch.billing_behavior = values.billing_behavior
+    }
+    if (values.po_required !== null && (strategy === "update_existing" || !current || current.po_required === null)) {
+      patch.po_required = values.po_required
+      if (values.po_required) patch.po_number_required_before_invoice = true
+    }
+    if (
+      (values.billing_address_line1 || values.billing_city || values.billing_state || values.billing_postal_code) &&
+      (strategy === "update_existing" || !current || current.billing_address_line1 === null)
+    ) {
+      patch.billing_address_same_as_service = false
+    }
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const rowIndex = i + 1
@@ -220,8 +320,33 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
 
     const statusRaw = resolveMapped(row, columnMapping, "status").toLowerCase()
     const csvStatus = statusRaw === "inactive" ? "inactive" : "active"
+    const billingValues = {
+      billing_name: resolveMapped(row, columnMapping, "billing_name"),
+      billing_contact_name: resolveMapped(row, columnMapping, "billing_contact_name"),
+      billing_email: resolveMapped(row, columnMapping, "billing_contact_email"),
+      billing_contact_phone: resolveMapped(row, columnMapping, "billing_contact_phone"),
+      billing_address_line1:
+        resolveMapped(row, columnMapping, "billing_address_line_1") ||
+        resolveMapped(row, columnMapping, "address_line1"),
+      billing_address_line2:
+        resolveMapped(row, columnMapping, "billing_address_line_2") ||
+        resolveMapped(row, columnMapping, "address_line2"),
+      billing_city: resolveMapped(row, columnMapping, "billing_city") || resolveMapped(row, columnMapping, "city"),
+      billing_state: resolveMapped(row, columnMapping, "billing_state") || resolveMapped(row, columnMapping, "state"),
+      billing_postal_code:
+        resolveMapped(row, columnMapping, "billing_postal_code") ||
+        resolveMapped(row, columnMapping, "postal_code"),
+      billing_country: resolveMapped(row, columnMapping, "billing_country") || resolveMapped(row, columnMapping, "country"),
+      default_po_number: resolveMapped(row, columnMapping, "default_po_number"),
+      invoice_instructions: resolveMapped(row, columnMapping, "invoice_instructions"),
+      billing_behavior: normalizeBillingBehavior(resolveMapped(row, columnMapping, "billing_behavior")),
+      po_required:
+        truthyImportValue(resolveMapped(row, columnMapping, "po_required")) ??
+        truthyImportValue(resolveMapped(row, columnMapping, "po_requirements")),
+    }
 
     const match = findMatch(company, ext, cEmail, cPhone, addressKey)
+    const parentMatch = findParent(row, company)
 
     if (match) {
       const cur = customersById.get(match.id)!
@@ -259,11 +384,15 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         if (ext != null) patch.external_code = ext
         if (importNotes != null) patch.notes = importNotes
         patch.status = csvStatus
+        if (parentMatch && parentMatch.id !== match.id) patch.parent_customer_id = parentMatch.id
+        addBillingPatch(patch, billingValues, cur)
       } else {
         // update_empty_fields
         if (ext && !(cur.external_code?.trim())) patch.external_code = ext
         if (importNotes && !(cur.notes?.trim())) patch.notes = importNotes
         if (csvStatus === "inactive" && cur.status === "active") patch.status = csvStatus
+        if (parentMatch && parentMatch.id !== match.id && !cur.parent_customer_id) patch.parent_customer_id = parentMatch.id
+        addBillingPatch(patch, billingValues, cur)
       }
 
       let rowTouched = false
@@ -296,6 +425,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
             external_code: (patch.external_code as string) ?? cur.external_code,
             notes: (patch.notes as string) ?? cur.notes,
             status: (patch.status as string) ?? cur.status,
+            parent_customer_id: (patch.parent_customer_id as string) ?? cur.parent_customer_id,
           })
         } else {
           customersById.set(match.id, {
@@ -303,6 +433,7 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
             external_code: (patch.external_code as string) ?? cur.external_code,
             notes: (patch.notes as string) ?? cur.notes,
             status: (patch.status as string) ?? cur.status,
+            parent_customer_id: (patch.parent_customer_id as string) ?? cur.parent_customer_id,
           })
         }
         if (patch.external_code && ext) {
@@ -417,8 +548,8 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         outcomes.push({
           rowIndex,
           status: "updated",
-          codes: [],
-          message: null,
+          codes: patch.parent_customer_id ? ["parent_linked"] : [],
+          message: patch.parent_customer_id ? `Linked to parent account ${parentMatch?.label}.` : null,
           entityKind: "customer",
           entityId: match.id,
           matchedLabel: label,
@@ -445,6 +576,23 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
         external_code: ext,
         notes: importNotes,
         status: csvStatus,
+        parent_customer_id: parentMatch?.id ?? null,
+        billing_name: billingValues.billing_name.trim() || null,
+        billing_contact_name: billingValues.billing_contact_name.trim() || null,
+        billing_email: billingValues.billing_email.trim() || null,
+        billing_contact_phone: billingValues.billing_contact_phone.trim() || null,
+        billing_address_same_as_service: !billingValues.billing_address_line1.trim(),
+        billing_address_line1: billingValues.billing_address_line1.trim() || null,
+        billing_address_line2: billingValues.billing_address_line2.trim() || null,
+        billing_city: billingValues.billing_city.trim() || null,
+        billing_state: billingValues.billing_state.trim() || null,
+        billing_postal_code: billingValues.billing_postal_code.trim() || null,
+        billing_country: billingValues.billing_country.trim() || null,
+        po_required: billingValues.po_required,
+        po_number_required_before_invoice: billingValues.po_required ? true : null,
+        default_po_number: billingValues.default_po_number.trim() || null,
+        invoice_instructions: billingValues.invoice_instructions.trim() || null,
+        billing_behavior: billingValues.billing_behavior,
         created_by: userId,
       })
       .select("id")
@@ -468,6 +616,21 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
       external_code: ext,
       notes: importNotes,
       status: csvStatus,
+      parent_customer_id: parentMatch?.id ?? null,
+      billing_name: billingValues.billing_name.trim() || null,
+      billing_contact_name: billingValues.billing_contact_name.trim() || null,
+      billing_email: billingValues.billing_email.trim() || null,
+      billing_contact_phone: billingValues.billing_contact_phone.trim() || null,
+      billing_address_line1: billingValues.billing_address_line1.trim() || null,
+      billing_address_line2: billingValues.billing_address_line2.trim() || null,
+      billing_city: billingValues.billing_city.trim() || null,
+      billing_state: billingValues.billing_state.trim() || null,
+      billing_postal_code: billingValues.billing_postal_code.trim() || null,
+      billing_country: billingValues.billing_country.trim() || null,
+      po_required: billingValues.po_required,
+      default_po_number: billingValues.default_po_number.trim() || null,
+      invoice_instructions: billingValues.invoice_instructions.trim() || null,
+      billing_behavior: billingValues.billing_behavior,
     }
     customersById.set(customerId, newRow)
     if (ext) byCode.set(ext.toLowerCase(), customerId)
@@ -526,8 +689,8 @@ export async function commitCustomers(ctx: ImportEngineContext): Promise<CommitR
     outcomes.push({
       rowIndex,
       status: "imported",
-      codes: [],
-      message: null,
+      codes: parentMatch ? ["parent_linked"] : [],
+      message: parentMatch ? `Linked to parent account ${parentMatch.label}.` : null,
       entityKind: "customer",
       entityId: customerId,
       matchedLabel: company.trim(),

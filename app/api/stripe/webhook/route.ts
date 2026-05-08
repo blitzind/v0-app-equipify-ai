@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type Stripe from "stripe"
-import { stripe } from "@/lib/stripe"
+import { getStripe } from "@/lib/stripe"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import {
   dispatchStripeWebhookEvent,
@@ -52,8 +52,13 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event
   try {
+    const stripe = getStripe()
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("STRIPE_SECRET_KEY")) {
+      console.error("[stripe-webhook]", e.message)
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 })
+    }
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
