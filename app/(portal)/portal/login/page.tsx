@@ -7,7 +7,6 @@ import { ArrowRight, KeyRound, Mail, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
-import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 
 /**
  * Hex used by the main app sidebar (`components/app-sidebar.tsx` line ~396).
@@ -159,7 +158,7 @@ function PortalLoginInner() {
       >
         {/* ── Brand header (matches main app sidebar #0F172A) ───────────────── */}
         <div
-          className="flex flex-col items-center justify-center gap-3 px-8 py-9 sm:py-10"
+          className="flex flex-col items-center justify-center gap-3 px-8 py-10 sm:py-11"
           style={{ background: APP_SIDEBAR_BG }}
         >
           {brandLoading ? (
@@ -177,18 +176,17 @@ function PortalLoginInner() {
                 <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-2">
                   <ShieldCheck size={11} className="text-white/70" aria-hidden />
                   <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
-                    Customer Portal
+                    Secure invite access
                   </span>
                 </div>
               }
             />
           ) : (
             <>
-              <p className="text-center text-lg font-semibold text-white tracking-tight px-2">
+              <p className="text-center text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-snug px-2 max-w-[min(22rem,92vw)] text-balance">
                 Customer Portal
               </p>
-              <ProvidedByEquipify variant="onDark" />
-              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-1">
                 <ShieldCheck size={11} className="text-white/70" aria-hidden />
                 <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
                   Secure invite access
