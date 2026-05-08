@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import Link from "next/link"
 import {
   useEquipmentTypes,
   type EquipmentType,
@@ -12,7 +13,7 @@ import {
   Flame, CircuitBoard, ArrowUpDown, Wrench, Settings, Wind,
   Gauge, Lightbulb, Radio, Cpu, Server, ShieldCheck,
   AlertTriangle, Power, PcCase, Plus, Pencil, Trash2,
-  Check, X, GripVertical, Package,
+  Check, X, GripVertical, Package, BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -419,6 +420,20 @@ export default function EquipmentTypesPage() {
             <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Equipment type reporting</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            See work orders, linked revenue, calibration volume, open issues, and top customers by equipment type.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/reports" className="gap-1.5">
+            <BarChart3 size={13} /> Open report
+          </Link>
+        </Button>
       </div>
 
       {/* Default types */}

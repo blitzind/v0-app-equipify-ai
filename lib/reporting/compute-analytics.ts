@@ -6,6 +6,7 @@ import type {
   CustomerRevenueRow,
   EquipmentCategoryRow,
   EquipmentDueMonthPoint,
+  EquipmentTypePerformanceRow,
   MaintenanceComplianceSlice,
   OverdueInvoiceRow,
   RepeatRepairAnalyticRow,
@@ -77,6 +78,24 @@ type WoRow = {
   total_parts_cents: number | null
 }
 
+type EquipmentReportRow = {
+  id: string
+  customer_id: string
+  category: string | null
+  subcategory?: string | null
+  next_due_at: string | null
+  next_calibration_due_at?: string | null
+  last_service_at: string | null
+}
+
+function resolveEquipmentTypeLabel(row: Pick<EquipmentReportRow, "category" | "subcategory">): string {
+  const category = row.category?.trim()
+  if (category) return category
+  const subcategory = row.subcategory?.trim()
+  if (subcategory) return subcategory
+  return "Uncategorized"
+}
+
 function applyWorkOrderScope(
   supabase: SupabaseClient,
   organizationId: string,
@@ -102,6 +121,7 @@ export async function computeReportAnalytics(
     customerId: string | null
     technicianId: string | null
     equipmentCategory: string | null
+    workOrderStatus?: string | null
   },
 ): Promise<ReportAnalyticsResponse> {
   const { from, to } = params
@@ -113,12 +133,14 @@ export async function computeReportAnalytics(
   if (params.equipmentCategory && params.equipmentCategory.trim() && params.equipmentCategory !== "all") {
     const { data: eqCat } = await supabase
       .from("equipment")
-      .select("id")
+      .select("id, category, subcategory")
       .eq("organization_id", organizationId)
       .is("archived_at", null)
-      .ilike("category", params.equipmentCategory.trim())
 
-    equipmentFilterIds = (eqCat ?? []).map((r: { id: string }) => r.id)
+    const wanted = params.equipmentCategory.trim()
+    equipmentFilterIds = ((eqCat ?? []) as Array<{ id: string; category: string | null; subcategory: string | null }>)
+      .filter((r) => resolveEquipmentTypeLabel(r).toLowerCase() === wanted.toLowerCase())
+      .map((r) => r.id)
     if (equipmentFilterIds.length === 0) {
       return emptyResponse(from, to)
     }
@@ -129,6 +151,7 @@ export async function computeReportAnalytics(
     technicianId: params.technicianId,
     equipmentFilterIds,
   }
+  const statusFilter = params.workOrderStatus && params.workOrderStatus !== "all" ? params.workOrderStatus : null
 
   const ninetyLookbackFrom = addDays(to, -90)
 
@@ -145,12 +168,13 @@ export async function computeReportAnalytics(
     pmWoRes,
     custAllRes,
   ] = await Promise.all([
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select(
+    (async () => {
+      let q = applyWorkOrderScope(supabase, organizationId, scope).select(
         "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
       )
-      .gte("created_at", fromStart)
-      .lte("created_at", toEnd),
+      if (statusFilter) q = q.eq("status", statusFilter)
+      return await q.gte("created_at", fromStart).lte("created_at", toEnd)
+    })(),
     applyWorkOrderScope(supabase, organizationId, scope)
       .select(
         "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
@@ -237,7 +261,7 @@ export async function computeReportAnalytics(
     supabase.from("customers").select("id, company_name").eq("organization_id", organizationId),
   ])
 
-  const woCreated = (woCreatedRes.data ?? []) as WoRow[]
+  let woCreated = (woCreatedRes.data ?? []) as WoRow[]
   const woRev = (woRevRes.data ?? []) as WoRow[]
   const woCycle = (woCycleRes.data ?? []) as Array<{
     id: string
@@ -247,6 +271,34 @@ export async function computeReportAnalytics(
     status: string
   }>
   const openPipelineCount = openPipelineRes.count ?? 0
+
+  if (equipmentFilterIds?.length) {
+    const { data: joinScopeRows } = await supabase
+      .from("work_order_equipment")
+      .select("work_order_id")
+      .eq("organization_id", organizationId)
+      .in("equipment_id", equipmentFilterIds)
+    const joinedWoIds = [
+      ...new Set(((joinScopeRows ?? []) as Array<{ work_order_id: string }>).map((row) => row.work_order_id)),
+    ].filter((workOrderId) => !woCreated.some((wo) => wo.id === workOrderId))
+    if (joinedWoIds.length > 0) {
+      let extraWoQuery = supabase
+        .from("work_orders")
+        .select(
+          "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
+        )
+        .eq("organization_id", organizationId)
+        .in("id", joinedWoIds)
+        .is("archived_at", null)
+        .gte("created_at", fromStart)
+        .lte("created_at", toEnd)
+      if (params.customerId) extraWoQuery = extraWoQuery.eq("customer_id", params.customerId)
+      if (params.technicianId) extraWoQuery = extraWoQuery.eq("assigned_user_id", params.technicianId)
+      if (statusFilter) extraWoQuery = extraWoQuery.eq("status", statusFilter)
+      const { data: extraWoRows } = await extraWoQuery
+      woCreated = [...woCreated, ...((extraWoRows ?? []) as WoRow[])]
+    }
+  }
 
   /** Completed / closed jobs with activity in the selected window (updated_at). */
   const workOrdersCompletedCount = woCycle.length
@@ -342,6 +394,252 @@ export async function computeReportAnalytics(
   const customerMap = new Map(
     ((custAllRes.data ?? []) as Array<{ id: string; company_name: string }>).map((c) => [c.id, c.company_name]),
   )
+
+  let equipmentScopeQ = supabase
+    .from("equipment")
+    .select("id, customer_id, category, subcategory, next_due_at, next_calibration_due_at, last_service_at")
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+  if (params.customerId) equipmentScopeQ = equipmentScopeQ.eq("customer_id", params.customerId)
+  if (equipmentFilterIds) equipmentScopeQ = equipmentScopeQ.in("id", equipmentFilterIds)
+  const { data: equipmentScopeData } = await equipmentScopeQ
+  const equipmentRows = (equipmentScopeData ?? []) as EquipmentReportRow[]
+  const equipmentById = new Map(equipmentRows.map((row) => [row.id, row]))
+  const equipmentTypeById = new Map(equipmentRows.map((row) => [row.id, resolveEquipmentTypeLabel(row)]))
+
+  type TypeAgg = {
+    equipmentIds: Set<string>
+    workOrderIds: Set<string>
+    completedWorkOrderIds: Set<string>
+    openWorkOrderIds: Set<string>
+    calibrationIds: Set<string>
+    invoiceIds: Set<string>
+    linkedRevenueCents: number
+    lastServiceDate: string | null
+    nextDueEquipmentIds: Set<string>
+    customers: Map<string, { equipmentIds: Set<string>; workOrderIds: Set<string>; revenueCents: number }>
+  }
+  const typeAgg = new Map<string, TypeAgg>()
+  const ensureTypeAgg = (equipmentType: string): TypeAgg => {
+    const existing = typeAgg.get(equipmentType)
+    if (existing) return existing
+    const next: TypeAgg = {
+      equipmentIds: new Set(),
+      workOrderIds: new Set(),
+      completedWorkOrderIds: new Set(),
+      openWorkOrderIds: new Set(),
+      calibrationIds: new Set(),
+      invoiceIds: new Set(),
+      linkedRevenueCents: 0,
+      lastServiceDate: null,
+      nextDueEquipmentIds: new Set(),
+      customers: new Map(),
+    }
+    typeAgg.set(equipmentType, next)
+    return next
+  }
+  const bumpCustomerForType = (equipmentType: string, customerId: string, patch: { equipmentId?: string; workOrderId?: string; revenueCents?: number }) => {
+    const agg = ensureTypeAgg(equipmentType)
+    const cur = agg.customers.get(customerId) ?? {
+      equipmentIds: new Set<string>(),
+      workOrderIds: new Set<string>(),
+      revenueCents: 0,
+    }
+    if (patch.equipmentId) cur.equipmentIds.add(patch.equipmentId)
+    if (patch.workOrderId) cur.workOrderIds.add(patch.workOrderId)
+    cur.revenueCents += patch.revenueCents ?? 0
+    agg.customers.set(customerId, cur)
+  }
+
+  for (const eq of equipmentRows) {
+    const equipmentType = resolveEquipmentTypeLabel(eq)
+    const agg = ensureTypeAgg(equipmentType)
+    agg.equipmentIds.add(eq.id)
+    if (eq.last_service_at && (!agg.lastServiceDate || eq.last_service_at > agg.lastServiceDate)) {
+      agg.lastServiceDate = eq.last_service_at
+    }
+    const nextDates = [eq.next_due_at, eq.next_calibration_due_at].filter((date): date is string => Boolean(date))
+    if (nextDates.some((date) => date >= from && date <= to)) agg.nextDueEquipmentIds.add(eq.id)
+    bumpCustomerForType(equipmentType, eq.customer_id, { equipmentId: eq.id })
+  }
+
+  const woCreatedIds = woCreated.map((w) => w.id)
+  const assetsByWorkOrder = new Map<string, Set<string>>()
+  for (const wo of woCreated) {
+    if (wo.equipment_id) assetsByWorkOrder.set(wo.id, new Set([wo.equipment_id]))
+  }
+  if (woCreatedIds.length > 0) {
+    const { data: joinRows } = await supabase
+      .from("work_order_equipment")
+      .select("work_order_id, equipment_id")
+      .eq("organization_id", organizationId)
+      .in("work_order_id", woCreatedIds)
+    for (const row of (joinRows ?? []) as Array<{ work_order_id: string; equipment_id: string }>) {
+      const set = assetsByWorkOrder.get(row.work_order_id) ?? new Set<string>()
+      set.add(row.equipment_id)
+      assetsByWorkOrder.set(row.work_order_id, set)
+    }
+  }
+
+  const openStatuses = new Set(["open", "scheduled", "in_progress"])
+  const completedStatuses = new Set(["completed", "invoiced", "completed_pending_signature"])
+  for (const wo of woCreated) {
+    const equipmentTypesForWo = new Set<string>()
+    for (const equipmentId of assetsByWorkOrder.get(wo.id) ?? []) {
+      const equipmentType = equipmentTypeById.get(equipmentId)
+      const eq = equipmentById.get(equipmentId)
+      if (!equipmentType || !eq) continue
+      equipmentTypesForWo.add(equipmentType)
+      bumpCustomerForType(equipmentType, eq.customer_id, { equipmentId, workOrderId: wo.id })
+    }
+    for (const equipmentType of equipmentTypesForWo) {
+      const agg = ensureTypeAgg(equipmentType)
+      agg.workOrderIds.add(wo.id)
+      if (completedStatuses.has(wo.status)) agg.completedWorkOrderIds.add(wo.id)
+      if (openStatuses.has(wo.status)) agg.openWorkOrderIds.add(wo.id)
+      if (wo.completed_at && (!agg.lastServiceDate || wo.completed_at > agg.lastServiceDate)) {
+        agg.lastServiceDate = wo.completed_at
+      }
+    }
+  }
+
+  if (equipmentRows.length > 0) {
+    const equipmentIds = equipmentRows.map((eq) => eq.id)
+    const { data: calibrationRows } = await supabase
+      .from("calibration_records")
+      .select("id, equipment_id, created_at")
+      .eq("organization_id", organizationId)
+      .in("equipment_id", equipmentIds)
+      .gte("created_at", fromStart)
+      .lte("created_at", toEnd)
+    for (const row of (calibrationRows ?? []) as Array<{ id: string; equipment_id: string; created_at: string }>) {
+      const equipmentType = equipmentTypeById.get(row.equipment_id)
+      if (!equipmentType) continue
+      const agg = ensureTypeAgg(equipmentType)
+      agg.calibrationIds.add(row.id)
+      if (!agg.lastServiceDate || row.created_at > agg.lastServiceDate) agg.lastServiceDate = row.created_at
+    }
+  }
+
+  const { data: invoiceRowsForTypes } = await supabase
+    .from("org_invoices")
+    .select("id, amount_cents, issued_at, equipment_id, work_order_id, customer_id")
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .gte("issued_at", from)
+    .lte("issued_at", to)
+
+  const invoicesForTypes = (invoiceRowsForTypes ?? []) as Array<{
+    id: string
+    amount_cents: number | null
+    issued_at: string | null
+    equipment_id: string | null
+    work_order_id: string | null
+    customer_id: string
+  }>
+  const invoiceIds = invoicesForTypes.map((invoice) => invoice.id)
+  const linkedWorkOrderIdsByInvoice = new Map<string, Set<string>>()
+  for (const invoice of invoicesForTypes) {
+    if (invoice.work_order_id) linkedWorkOrderIdsByInvoice.set(invoice.id, new Set([invoice.work_order_id]))
+  }
+  if (invoiceIds.length > 0) {
+    const { data: invoiceLinks } = await supabase
+      .from("invoice_work_order_links")
+      .select("invoice_id, work_order_id")
+      .eq("organization_id", organizationId)
+      .in("invoice_id", invoiceIds)
+    for (const link of (invoiceLinks ?? []) as Array<{ invoice_id: string; work_order_id: string }>) {
+      const set = linkedWorkOrderIdsByInvoice.get(link.invoice_id) ?? new Set<string>()
+      set.add(link.work_order_id)
+      linkedWorkOrderIdsByInvoice.set(link.invoice_id, set)
+    }
+  }
+
+  const invoiceWorkOrderIds = [...new Set([...linkedWorkOrderIdsByInvoice.values()].flatMap((set) => [...set]))]
+  const invoiceWoAssets = new Map<string, Set<string>>()
+  if (invoiceWorkOrderIds.length > 0) {
+    const [{ data: invoiceWoRows }, { data: invoiceWoJoinRows }] = await Promise.all([
+      supabase
+        .from("work_orders")
+        .select("id, equipment_id, customer_id, assigned_user_id")
+        .eq("organization_id", organizationId)
+        .in("id", invoiceWorkOrderIds)
+        .is("archived_at", null),
+      supabase
+        .from("work_order_equipment")
+        .select("work_order_id, equipment_id")
+        .eq("organization_id", organizationId)
+        .in("work_order_id", invoiceWorkOrderIds),
+    ])
+    for (const wo of (invoiceWoRows ?? []) as Array<{ id: string; equipment_id: string | null; customer_id: string; assigned_user_id: string | null }>) {
+      if (params.customerId && wo.customer_id !== params.customerId) continue
+      if (params.technicianId && wo.assigned_user_id !== params.technicianId) continue
+      if (wo.equipment_id) invoiceWoAssets.set(wo.id, new Set([wo.equipment_id]))
+    }
+    for (const link of (invoiceWoJoinRows ?? []) as Array<{ work_order_id: string; equipment_id: string }>) {
+      const set = invoiceWoAssets.get(link.work_order_id) ?? new Set<string>()
+      set.add(link.equipment_id)
+      invoiceWoAssets.set(link.work_order_id, set)
+    }
+  }
+
+  for (const invoice of invoicesForTypes) {
+    if (params.customerId && invoice.customer_id !== params.customerId) continue
+    const invoiceEquipmentTypes = new Set<string>()
+    const invoiceEquipmentCustomers = new Map<string, string>()
+    if (invoice.equipment_id && equipmentTypeById.has(invoice.equipment_id)) {
+      invoiceEquipmentTypes.add(equipmentTypeById.get(invoice.equipment_id)!)
+      const eq = equipmentById.get(invoice.equipment_id)
+      if (eq) invoiceEquipmentCustomers.set(equipmentTypeById.get(invoice.equipment_id)!, eq.customer_id)
+    } else {
+      for (const workOrderId of linkedWorkOrderIdsByInvoice.get(invoice.id) ?? []) {
+        for (const equipmentId of invoiceWoAssets.get(workOrderId) ?? []) {
+          const equipmentType = equipmentTypeById.get(equipmentId)
+          const eq = equipmentById.get(equipmentId)
+          if (!equipmentType || !eq) continue
+          invoiceEquipmentTypes.add(equipmentType)
+          invoiceEquipmentCustomers.set(equipmentType, eq.customer_id)
+        }
+      }
+    }
+    if (invoiceEquipmentTypes.size === 0) continue
+    const allocatedCents = Math.round((invoice.amount_cents ?? 0) / invoiceEquipmentTypes.size)
+    for (const equipmentType of invoiceEquipmentTypes) {
+      const agg = ensureTypeAgg(equipmentType)
+      agg.invoiceIds.add(invoice.id)
+      agg.linkedRevenueCents += allocatedCents
+      const customerForType = invoiceEquipmentCustomers.get(equipmentType) ?? invoice.customer_id
+      bumpCustomerForType(equipmentType, customerForType, { revenueCents: allocatedCents })
+    }
+  }
+
+  const equipmentTypePerformance: EquipmentTypePerformanceRow[] = [...typeAgg.entries()]
+    .map(([equipmentType, agg]) => ({
+      equipmentType,
+      equipmentCount: agg.equipmentIds.size,
+      workOrderCount: agg.workOrderIds.size,
+      completedWorkOrderCount: agg.completedWorkOrderIds.size,
+      openWorkOrderCount: agg.openWorkOrderIds.size,
+      calibrationCount: agg.calibrationIds.size,
+      invoiceCount: agg.invoiceIds.size,
+      linkedRevenueCents: agg.linkedRevenueCents,
+      unlinkedRevenueCents: 0,
+      averageRevenuePerWorkOrderCents:
+        agg.workOrderIds.size > 0 ? Math.round(agg.linkedRevenueCents / agg.workOrderIds.size) : null,
+      lastServiceDate: agg.lastServiceDate,
+      nextDueCount: agg.nextDueEquipmentIds.size,
+      topCustomers: [...agg.customers.entries()]
+        .map(([customerId, c]) => ({
+          customerId,
+          customerName: customerMap.get(customerId) ?? "Customer",
+          equipmentCount: c.equipmentIds.size,
+          workOrderCount: c.workOrderIds.size,
+          revenueCents: c.revenueCents,
+        }))
+        .sort((a, b) => b.revenueCents - a.revenueCents || b.workOrderCount - a.workOrderCount || b.equipmentCount - a.equipmentCount)
+        .slice(0, 5),
+    }))
+    .sort((a, b) => b.linkedRevenueCents - a.linkedRevenueCents || b.workOrderCount - a.workOrderCount || b.equipmentCount - a.equipmentCount)
 
   const custRev = new Map<string, { cents: number; n: number }>()
   for (const w of woRev) {
@@ -586,6 +884,7 @@ export async function computeReportAnalytics(
     technicians,
     topCustomers,
     equipmentByCategory,
+    equipmentTypePerformance,
     maintenanceMix,
     warrantiesExpiring,
     overdueInvoices,
@@ -620,6 +919,7 @@ function emptyResponse(from: string, to: string): ReportAnalyticsResponse {
     technicians: [],
     topCustomers: [],
     equipmentByCategory: [],
+    equipmentTypePerformance: [],
     maintenanceMix: [],
     warrantiesExpiring: [],
     overdueInvoices: [],

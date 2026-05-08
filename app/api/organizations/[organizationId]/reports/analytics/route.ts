@@ -63,6 +63,7 @@ export async function GET(
   const customerId = sp.get("customerId")
   const technicianId = sp.get("technicianId")
   const equipmentCategory = sp.get("equipmentCategory")
+  const workOrderStatus = sp.get("workOrderStatus")
 
   try {
     const payload = await computeReportAnalytics(supabase, organizationId, {
@@ -71,6 +72,7 @@ export async function GET(
       customerId: customerId && customerId !== "all" ? customerId : null,
       technicianId: technicianId && technicianId !== "all" ? technicianId : null,
       equipmentCategory: equipmentCategory && equipmentCategory !== "all" ? equipmentCategory : null,
+      workOrderStatus: workOrderStatus && workOrderStatus !== "all" ? workOrderStatus : null,
     })
     return NextResponse.json(payload)
   } catch (e) {

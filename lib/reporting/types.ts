@@ -46,6 +46,30 @@ export type EquipmentCategoryRow = {
   touchesPerAsset: number | null
 }
 
+export type EquipmentTypeCustomerRow = {
+  customerId: string
+  customerName: string
+  equipmentCount: number
+  workOrderCount: number
+  revenueCents: number
+}
+
+export type EquipmentTypePerformanceRow = {
+  equipmentType: string
+  equipmentCount: number
+  workOrderCount: number
+  completedWorkOrderCount: number
+  openWorkOrderCount: number
+  calibrationCount: number
+  invoiceCount: number
+  linkedRevenueCents: number
+  unlinkedRevenueCents: number
+  averageRevenuePerWorkOrderCents: number | null
+  lastServiceDate: string | null
+  nextDueCount: number
+  topCustomers: EquipmentTypeCustomerRow[]
+}
+
 export type MaintenanceComplianceSlice = {
   label: string
   count: number
@@ -90,6 +114,7 @@ export type ReportAnalyticsResponse = {
   technicians: TechnicianPerfRow[]
   topCustomers: CustomerRevenueRow[]
   equipmentByCategory: EquipmentCategoryRow[]
+  equipmentTypePerformance: EquipmentTypePerformanceRow[]
   maintenanceMix: MaintenanceComplianceSlice[]
   warrantiesExpiring: WarrantyExpiryRow[]
   overdueInvoices: OverdueInvoiceRow[]

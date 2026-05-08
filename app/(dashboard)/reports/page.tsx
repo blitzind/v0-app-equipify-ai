@@ -32,6 +32,14 @@ const woByTypeFallback = [
 ]
 
 const DATE_RANGES = ["Last 30 days", "Last 60 days", "Last 90 days", "Last 6 months", "Last 12 months", "Custom"] as const
+const WO_STATUS_OPTIONS = [
+  { value: "all", label: "All WO statuses" },
+  { value: "open", label: "Open" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+  { value: "invoiced", label: "Invoiced" },
+] as const
 
 type SavedPreset = {
   id: string
@@ -42,6 +50,7 @@ type SavedPreset = {
   customerId: string
   technicianId: string
   equipmentCategory: string
+  workOrderStatus: string
   savedAt: string
 }
 
@@ -71,6 +80,10 @@ function fmtFull$(n: number) {
 
 function fmtUsdFromCents(cents: number) {
   return fmtFull$(Math.round(cents / 100))
+}
+
+function equipmentTypeLabel(row: { category?: string | null; subcategory?: string | null }) {
+  return row.category?.trim() || row.subcategory?.trim() || "Uncategorized"
 }
 
 function RevenueTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number }>; label?: string }) {
@@ -159,6 +172,35 @@ function reportToCsvRows(a: ReportAnalyticsResponse): string[][] {
       String(Math.round(r.amountCents / 100)),
       String(r.daysOverdue),
     ]),
+    [],
+    [
+      "equipment_type",
+      "equipment_count",
+      "work_order_count",
+      "completed_work_order_count",
+      "open_work_order_count",
+      "calibration_count",
+      "invoice_count",
+      "linked_revenue_total",
+      "average_revenue_per_work_order",
+      "last_service_date",
+      "next_due_count",
+      "top_customers",
+    ],
+    ...a.equipmentTypePerformance.map((r) => [
+      r.equipmentType,
+      String(r.equipmentCount),
+      String(r.workOrderCount),
+      String(r.completedWorkOrderCount),
+      String(r.openWorkOrderCount),
+      String(r.calibrationCount),
+      String(r.invoiceCount),
+      String(Math.round(r.linkedRevenueCents / 100)),
+      r.averageRevenuePerWorkOrderCents != null ? String(Math.round(r.averageRevenuePerWorkOrderCents / 100)) : "—",
+      r.lastServiceDate ?? "—",
+      String(r.nextDueCount),
+      r.topCustomers.map((c) => `${c.customerName} (${c.workOrderCount} WO)`).join("; "),
+    ]),
   ]
   return rows
 }
@@ -177,6 +219,7 @@ export default function ReportsPage() {
   const [customerId, setCustomerId] = useState<string>("all")
   const [technicianId, setTechnicianId] = useState<string>("all")
   const [equipmentCategory, setEquipmentCategory] = useState<string>("all")
+  const [workOrderStatus, setWorkOrderStatus] = useState<string>("all")
 
   const [customerOptions, setCustomerOptions] = useState<Array<{ id: string; company_name: string }>>([])
   const [technicianOptions, setTechnicianOptions] = useState<Array<{ id: string; label: string }>>([])
@@ -236,7 +279,7 @@ export default function ReportsPage() {
           .eq("organization_id", orgId)
           .eq("status", "active")
           .in("role", ["owner", "admin", "manager", "tech"]),
-        supabase.from("equipment").select("category").eq("organization_id", orgId).is("archived_at", null),
+        supabase.from("equipment").select("category, subcategory").eq("organization_id", orgId).is("archived_at", null),
       ])
 
       if (cancelled) return
@@ -259,9 +302,8 @@ export default function ReportsPage() {
       setTechnicianOptions(techOpts.sort((a, b) => a.label.localeCompare(b.label)))
 
       const cats = new Set<string>()
-      for (const r of (eqCatRows ?? []) as Array<{ category: string | null }>) {
-        const c = (r.category ?? "").trim()
-        if (c) cats.add(c)
+      for (const r of (eqCatRows ?? []) as Array<{ category: string | null; subcategory: string | null }>) {
+        cats.add(equipmentTypeLabel(r))
       }
       setCategoryOptions([...cats].sort((a, b) => a.localeCompare(b)))
     })()
@@ -285,6 +327,7 @@ export default function ReportsPage() {
         customerId,
         technicianId,
         equipmentCategory,
+        workOrderStatus,
       })
       const res = await fetch(`/api/organizations/${orgId}/reports/analytics?${qs}`)
       if (!res.ok) {
@@ -299,7 +342,7 @@ export default function ReportsPage() {
     } finally {
       setAnalyticsLoading(false)
     }
-  }, [orgId, from, to, customerId, technicianId, equipmentCategory])
+  }, [orgId, from, to, customerId, technicianId, equipmentCategory, workOrderStatus])
 
   useEffect(() => {
     void fetchAnalytics()
@@ -340,12 +383,14 @@ export default function ReportsPage() {
   const hasActiveFilters =
     customerId !== "all" ||
     technicianId !== "all" ||
-    equipmentCategory !== "all"
+    equipmentCategory !== "all" ||
+    workOrderStatus !== "all"
 
   function clearFilters() {
     setCustomerId("all")
     setTechnicianId("all")
     setEquipmentCategory("all")
+    setWorkOrderStatus("all")
   }
 
   function saveCurrentPreset() {
@@ -359,6 +404,7 @@ export default function ReportsPage() {
       customerId,
       technicianId,
       equipmentCategory,
+      workOrderStatus,
       savedAt: new Date().toISOString(),
     }
     const merged = [...presets, next]
@@ -374,6 +420,7 @@ export default function ReportsPage() {
     setCustomerId(p.customerId)
     setTechnicianId(p.technicianId)
     setEquipmentCategory(p.equipmentCategory)
+    setWorkOrderStatus(p.workOrderStatus ?? "all")
   }
 
   function deletePreset(id: string) {
@@ -576,6 +623,14 @@ export default function ReportsPage() {
     return analytics.equipmentPmDueByMonth
   }, [analytics])
 
+  const equipmentTypeRows = useMemo(() => analytics?.equipmentTypePerformance ?? [], [analytics])
+  const equipmentTypeLeaders = useMemo(() => {
+    const byRevenue = equipmentTypeRows[0]
+    const byWork = [...equipmentTypeRows].sort((a, b) => b.workOrderCount - a.workOrderCount)[0]
+    const byCalibration = [...equipmentTypeRows].sort((a, b) => b.calibrationCount - a.calibrationCount)[0]
+    return { byRevenue, byWork, byCalibration }
+  }, [equipmentTypeRows])
+
   const repeatDisplay = useMemo(() => {
     if (analytics?.repeatRepairs?.length) {
       return analytics.repeatRepairs.map((r) => ({
@@ -722,6 +777,21 @@ export default function ReportsPage() {
                 {categoryOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+            </div>
+
+            <div className="relative">
+              <select
+                value={workOrderStatus}
+                onChange={(e) => setWorkOrderStatus(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs font-medium bg-secondary border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer max-w-[180px]"
+              >
+                {WO_STATUS_OPTIONS.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
                   </option>
                 ))}
               </select>
@@ -1054,6 +1124,97 @@ export default function ReportsPage() {
             </div>
           </Section>
         </div>
+
+        {/* ── Equipment Type Reporting ── */}
+        <Section
+          title="Equipment Type Performance"
+          sub="Revenue is counted only when invoices are linked directly to equipment or through linked work orders. Multi-type invoices are allocated evenly across linked types."
+          action={
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-border">
+              {equipmentTypeRows.length} types
+            </span>
+          }
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  label: "Revenue leader",
+                  value: equipmentTypeLeaders.byRevenue?.equipmentType ?? "—",
+                  sub: equipmentTypeLeaders.byRevenue ? fmtUsdFromCents(equipmentTypeLeaders.byRevenue.linkedRevenueCents) : "No linked revenue",
+                },
+                {
+                  label: "Most service demand",
+                  value: equipmentTypeLeaders.byWork?.equipmentType ?? "—",
+                  sub: equipmentTypeLeaders.byWork ? `${equipmentTypeLeaders.byWork.workOrderCount} work orders` : "No linked work",
+                },
+                {
+                  label: "Calibration volume",
+                  value: equipmentTypeLeaders.byCalibration?.equipmentType ?? "—",
+                  sub: equipmentTypeLeaders.byCalibration ? `${equipmentTypeLeaders.byCalibration.calibrationCount} certificates` : "No certificates",
+                },
+              ].map((card) => (
+                <div key={card.label} className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{card.label}</p>
+                  <p className="mt-1 text-sm font-bold text-foreground truncate">{card.value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{card.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs min-w-[980px]">
+                <thead>
+                  <tr className="border-b border-border ds-table-header-row-subtle">
+                    <th className="text-left text-muted-foreground font-medium pb-2 pr-3">Equipment type</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Assets</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">WOs</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Completed</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Open</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Cal / certs</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Invoices</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Linked revenue</th>
+                    <th className="text-right text-muted-foreground font-medium pb-2 pr-3">Avg / WO</th>
+                    <th className="text-left text-muted-foreground font-medium pb-2">Top customers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipmentTypeRows.map((row) => (
+                    <tr key={row.equipmentType} className="border-b border-border/50 last:border-0">
+                      <td className="py-2.5 pr-3 font-semibold text-foreground">{row.equipmentType}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.equipmentCount}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.workOrderCount}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.completedWorkOrderCount}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.openWorkOrderCount}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.calibrationCount}</td>
+                      <td className="py-2.5 pr-3 text-right">{row.invoiceCount}</td>
+                      <td className="py-2.5 pr-3 text-right font-bold text-foreground">{fmtUsdFromCents(row.linkedRevenueCents)}</td>
+                      <td className="py-2.5 pr-3 text-right">
+                        {row.averageRevenuePerWorkOrderCents != null ? fmtUsdFromCents(row.averageRevenuePerWorkOrderCents) : "—"}
+                      </td>
+                      <td className="py-2.5 text-muted-foreground">
+                        {row.topCustomers.length > 0
+                          ? row.topCustomers.slice(0, 3).map((c) => `${c.customerName} (${c.workOrderCount} WO)`).join(", ")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {equipmentTypeRows.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="py-8 text-center text-muted-foreground">
+                        No equipment-linked activity in this window for the current filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              Unlinked invoices are intentionally excluded from equipment-type revenue so the report does not overstate category performance.
+            </p>
+          </div>
+        </Section>
 
         {/* ── Equipment Intelligence (Phase 2) ── */}
         <EquipmentCategoryBreakdownCard

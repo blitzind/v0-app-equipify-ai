@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:11:29.373Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:32:45.048Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -141,9 +141,10 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Reports
 - **Route:** \`/reports\`
-- **Purpose:** Analytics exports / reporting UI.
+- **Purpose:** Analytics exports / reporting UI, including equipment-type/category performance.
 - **Status:** Implemented with org analytics API support.
-- **Gaps:** Deeper equipment-type reporting.
+- **Key UI:** Equipment type report rows show equipment counts, work/order volume, linked revenue, calibration volume, open issues, next-due counts, and top customers by type.
+- **Gaps:** Future SQL/materialized reporting views for very large tenants.
 
 ### Insights & AI Assistants
 - **Routes:** \`/insights\`, \`/ai-assistants\`
@@ -264,7 +265,7 @@ Roadmap informed by product direction (keep sequencing flexible):
 - **Service-to-invoice** linkage hardening
 - Automatic **terms-based due dates**
 - **US jurisdiction / location-based tax** logic
-- **Equipment-type reporting** and portal-facing equipment history
+- Portal-facing equipment history
 - **Certificate attachments** and customer **release rules**
 - **Technician signature** handling
 - Customer **portal document** access
