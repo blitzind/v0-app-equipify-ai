@@ -4,9 +4,10 @@ import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRight, KeyRound, Mail, ShieldCheck } from "lucide-react"
-import { BrandLogo } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
+import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 
 /**
  * Hex used by the main app sidebar (`components/app-sidebar.tsx` line ~396).
@@ -14,6 +15,9 @@ import { Input } from "@/components/ui/input"
  * when the marketing site / portal-bg tokens shift.
  */
 const APP_SIDEBAR_BG = "#0F172A"
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const NOTICE_COPY: Record<string, string> = {
   no_staff_portal:
@@ -37,6 +41,36 @@ function PortalLoginInner() {
   const [manualToken, setManualToken] = useState("")
   const [showTokenForm, setShowTokenForm] = useState(false)
   const [configStatus, setConfigStatus] = useState<ConfigStatus>({ kind: "ok" })
+  const [loginBrand, setLoginBrand] = useState<{ organizationName: string; logoUrl: string | null } | null>(null)
+  const [brandLoading, setBrandLoading] = useState(false)
+
+  const orgIdParam = searchParams.get("organizationId")?.trim() ?? ""
+
+  useEffect(() => {
+    if (!orgIdParam || !UUID_RE.test(orgIdParam)) {
+      setLoginBrand(null)
+      setBrandLoading(false)
+      return
+    }
+    let cancelled = false
+    setBrandLoading(true)
+    void fetch(`/api/portal/public-branding?organizationId=${encodeURIComponent(orgIdParam)}`)
+      .then(async (r) => {
+        if (!r.ok) return null
+        return r.json() as Promise<{ organizationName?: string; logoUrl?: string | null }>
+      })
+      .then((j) => {
+        if (cancelled || !j?.organizationName) return
+        setLoginBrand({ organizationName: j.organizationName, logoUrl: j.logoUrl ?? null })
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBrandLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [orgIdParam])
 
   const isProd = useMemo(() => process.env.NODE_ENV === "production", [])
 
@@ -125,20 +159,43 @@ function PortalLoginInner() {
       >
         {/* ── Brand header (matches main app sidebar #0F172A) ───────────────── */}
         <div
-          className="flex flex-col items-center justify-center gap-4 px-8 py-9 sm:py-10"
+          className="flex flex-col items-center justify-center gap-3 px-8 py-9 sm:py-10"
           style={{ background: APP_SIDEBAR_BG }}
         >
-          <BrandLogo
-            priority
-            sizes="(min-width: 640px) 220px, 180px"
-            className="h-10 sm:h-11 w-auto select-none"
-          />
-          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-            <ShieldCheck size={11} className="text-white/70" aria-hidden />
-            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
-              Customer Portal
-            </span>
-          </div>
+          {brandLoading ? (
+            <p className="text-sm text-white/70" aria-live="polite">
+              Loading branding…
+            </p>
+          ) : loginBrand ? (
+            <PortalWorkspaceBrand
+              organizationName={loginBrand.organizationName}
+              logoUrl={loginBrand.logoUrl}
+              size="hero"
+              equipifyVariant="onDark"
+              heroOnDark
+              footerSlot={
+                <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-2">
+                  <ShieldCheck size={11} className="text-white/70" aria-hidden />
+                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
+                    Customer Portal
+                  </span>
+                </div>
+              }
+            />
+          ) : (
+            <>
+              <p className="text-center text-lg font-semibold text-white tracking-tight px-2">
+                Customer Portal
+              </p>
+              <ProvidedByEquipify variant="onDark" />
+              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                <ShieldCheck size={11} className="text-white/70" aria-hidden />
+                <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
+                  Secure invite access
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Card body ────────────────────────────────────────────────────── */}
@@ -365,7 +422,9 @@ function PortalLoginInner() {
             color: "var(--portal-nav-text)",
           }}
         >
-          <span>Secure sign-in by Equipify</span>
+          <span className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
+            Invite-based access · Powered by Equipify
+          </span>
           <Link
             href="/login"
             className="font-medium underline-offset-4 hover:underline"

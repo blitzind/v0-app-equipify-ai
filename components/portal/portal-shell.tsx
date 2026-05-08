@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { BrandLogoOnLight } from "@/components/brand-logo"
+import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
 import { usePortalSession } from "@/components/portal/portal-session-context"
 
 const NAV_ITEMS = [
@@ -93,10 +93,25 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         className="sticky top-0 z-40 border-b"
         style={{ background: "var(--portal-surface)", borderColor: "var(--portal-border)" }}
       >
-        <div className="max-w-screen-xl mx-auto px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-6">
-            <Link href="/portal/dashboard" className="flex items-center mr-2 shrink-0">
-              <BrandLogoOnLight logoClassName="h-6 sm:h-7" />
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between gap-y-3 py-2 min-h-14">
+          <div className="flex items-start md:items-center gap-4 md:gap-6 min-w-0 flex-1">
+            <Link href="/portal/dashboard" className="flex shrink-0 min-w-0 max-w-[min(280px,46vw)] md:max-w-[320px]">
+              {loading ? (
+                <span className="text-sm font-medium" style={{ color: "var(--portal-nav-text)" }}>
+                  Loading…
+                </span>
+              ) : error || !bootstrap ? (
+                <span className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+                  Portal
+                </span>
+              ) : (
+                <PortalWorkspaceBrand
+                  organizationName={bootstrap.organizationName}
+                  logoUrl={bootstrap.workspaceLogoUrl}
+                  size="compact"
+                  equipifyVariant="onLight"
+                />
+              )}
             </Link>
 
             <nav className="hidden md:flex items-center gap-0.5">

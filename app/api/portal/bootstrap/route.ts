@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { pickPreferredDocumentLogoUrl } from "@/lib/organization/document-branding"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 
 export const runtime = "nodejs"
@@ -13,7 +14,11 @@ export async function GET() {
   const { svc, portalUser } = ctx
 
   const [{ data: org }, { data: customer }] = await Promise.all([
-    svc.from("organizations").select("name").eq("id", portalUser.organization_id).maybeSingle(),
+    svc
+      .from("organizations")
+      .select("name, logo_url, document_logo_url")
+      .eq("id", portalUser.organization_id)
+      .maybeSingle(),
     svc
       .from("customers")
       .select("company_name")
@@ -34,6 +39,12 @@ export async function GET() {
     .map((p) => p[0]!.toUpperCase())
     .join("") || "?"
 
+  const orgRow = org as { name?: string; logo_url?: string | null; document_logo_url?: string | null } | null
+  const workspaceLogoUrl = pickPreferredDocumentLogoUrl(
+    orgRow?.document_logo_url ?? null,
+    orgRow?.logo_url ?? null,
+  )
+
   return NextResponse.json({
     portalUserId: portalUser.id,
     organizationId: portalUser.organization_id,
@@ -41,7 +52,8 @@ export async function GET() {
     email: portalUser.email,
     displayName,
     initials,
-    organizationName: (org as { name?: string } | null)?.name ?? "Organization",
+    organizationName: orgRow?.name?.trim() || "Organization",
+    workspaceLogoUrl,
     customerCompanyName: (customer as { company_name?: string } | null)?.company_name ?? "Customer",
     features: {
       onlinePayments: false,

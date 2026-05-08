@@ -9,6 +9,9 @@ export function PortalRoot({ children }: { children: React.ReactNode }) {
   if (pathname === "/portal/login") {
     return <>{children}</>
   }
+  if (pathname === "/portal/preview" || pathname?.startsWith("/portal/preview/")) {
+    return <>{children}</>
+  }
 
   return (
     <PortalSessionProvider>

@@ -10,6 +10,8 @@ export type PortalBootstrap = {
   displayName: string
   initials: string
   organizationName: string
+  /** Workspace branding — document logo preferred, then app logo */
+  workspaceLogoUrl: string | null
   customerCompanyName: string
   features: { onlinePayments: boolean }
 }

@@ -11,6 +11,8 @@ export async function portalAuthGate(request: NextRequest): Promise<NextResponse
   const pathname = request.nextUrl.pathname
   if (!pathname.startsWith("/portal")) return undefined
   if (pathname === "/portal/login") return undefined
+  /** Staff preview uses dashboard auth in the route handler — never the customer portal cookie. */
+  if (pathname === "/portal/preview" || pathname.startsWith("/portal/preview/")) return undefined
 
   const secret = getPortalSessionSecret()
   if (!secret) {
