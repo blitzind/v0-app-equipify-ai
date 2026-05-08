@@ -13,6 +13,7 @@ import {
   type AidenChatMessage,
 } from "@/lib/aiden/aiden-response-rules"
 import { runAiTask } from "@/lib/ai/server"
+import { getAidenActionAvailability } from "@/lib/permissions/aiden-actions"
 import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { AiChatMessage } from "@/lib/ai/types"
@@ -76,7 +77,7 @@ function buildUserContext(args: {
     args.formattedContext,
     "",
     "Answer the user's latest Equipify help question using this context and the user's permissions.",
-    "Return JSON with: message, answer, steps, relatedRoutes, actions, permissionNote, limitation, unresolved, howToMode.",
+    "Return JSON with: message, answer, classification, steps, relatedRoutes, actions, proposedAction, featureRequestDraft, permissionNote, limitation, unresolved, howToMode.",
   ].join("\n")
 }
 
@@ -152,7 +153,11 @@ export async function POST(
     permissions,
     clientContext: withLegacyContext(parsed.data),
   })
-  const formattedContext = formatAidenContextForPrompt(pageContext)
+  const aidenActions = await getAidenActionAvailability({ supabase, organizationId })
+  const formattedContext = formatAidenContextForPrompt({
+    ...pageContext,
+    aidenActions,
+  } as typeof pageContext & { aidenActions: typeof aidenActions })
 
   const result = await runAiTask({
     task: "aiden_help",
@@ -189,6 +194,17 @@ export async function POST(
     answerText: result.output.answer,
     relatedRoutes: result.output.relatedRoutes,
   })
+
+  if (result.output.proposedAction?.type) {
+    await supabase.from("aiden_action_logs").insert({
+      organization_id: organizationId,
+      user_id: user.id,
+      action_type: result.output.proposedAction.type,
+      status: "proposed",
+      request_payload: result.output.proposedAction,
+      result_payload: {},
+    })
+  }
 
   return NextResponse.json({
     ok: true,

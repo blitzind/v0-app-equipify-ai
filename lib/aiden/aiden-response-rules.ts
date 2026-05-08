@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { AidenProposedActionSchema } from "@/lib/aiden/actions/types"
 
 export const AIDEN_CHAT_MESSAGE_ROLES = ["user", "assistant"] as const
 export type AidenChatMessageRole = (typeof AIDEN_CHAT_MESSAGE_ROLES)[number]
@@ -39,6 +40,7 @@ export const AidenAnswerSchema = z
     steps: z.array(z.string().trim().min(1)).max(8).default([]),
     relatedRoutes: z.array(z.string().trim().min(1)).max(6).default([]),
     actions: z.array(AidenAnswerActionSchema).max(4).default([]),
+    proposedAction: AidenProposedActionSchema.optional().nullable().default(null),
     featureRequestDraft: AidenFeatureRequestDraftSchema.optional().nullable().default(null),
     permissionNote: z.string().trim().nullable().default(null),
     limitation: z.string().trim().nullable().default(null),

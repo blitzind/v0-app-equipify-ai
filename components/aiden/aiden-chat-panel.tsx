@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
-import { AlertCircle, Bot, Clock3, ExternalLink, Loader2, Send, User } from "lucide-react"
+import { AlertCircle, Bot, CheckCircle2, Clock3, ExternalLink, Loader2, Send, User, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -110,6 +110,9 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [submittingFeatureRequestId, setSubmittingFeatureRequestId] = useState<string | null>(null)
   const [submittedFeatureRequests, setSubmittedFeatureRequests] = useState<Record<string, string>>({})
+  const [executingActionId, setExecutingActionId] = useState<string | null>(null)
+  const [completedActions, setCompletedActions] = useState<Record<string, { message: string; href?: string }>>({})
+  const [canceledActions, setCanceledActions] = useState<Record<string, boolean>>({})
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -231,6 +234,56 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     }
   }
 
+  async function executeAidenAction(message: ChatMessage) {
+    const proposedAction = message.answer?.proposedAction
+    if (!proposedAction || !organizationId || executingActionId) return
+
+    setExecutingActionId(message.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/actions/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposedAction, confirmed: true }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        result?: { message?: string; href?: string }
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? data.error ?? "AIden could not complete this action.")
+      }
+      setCompletedActions((prev) => ({
+        ...prev,
+        [message.id]: {
+          message: data.result?.message ?? "AIden action completed.",
+          href: data.result?.href,
+        },
+      }))
+      toast({
+        title: "AIden action completed",
+        description: data.result?.message ?? "The confirmed action was completed.",
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AIden could not complete this action.")
+    } finally {
+      setExecutingActionId(null)
+    }
+  }
+
+  async function cancelAidenAction(message: ChatMessage) {
+    const proposedAction = message.answer?.proposedAction
+    setCanceledActions((prev) => ({ ...prev, [message.id]: true }))
+    if (!proposedAction || !organizationId) return
+    await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/actions/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposedAction, confirmed: false }),
+    }).catch(() => undefined)
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     void sendMessage(input)
@@ -305,6 +358,81 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                           </Link>
                         </Button>
                       ))}
+                    </div>
+                  ) : null}
+                  {message.answer?.proposedAction ? (
+                    <div className="mt-3 rounded-xl border border-sky-200 bg-white p-3 text-xs text-slate-700 shadow-xs dark:border-sky-900 dark:bg-slate-950 dark:text-slate-200">
+                      <div className="flex items-start gap-2">
+                        <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600 dark:bg-sky-950">
+                          <Bot size={13} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900 dark:text-white">
+                            {message.answer.proposedAction.title}
+                          </p>
+                          <p className="mt-1 text-muted-foreground">{message.answer.proposedAction.summary}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-lg bg-muted/40 p-2">
+                        <p className="mb-1 font-medium">Preview</p>
+                        <dl className="grid gap-1">
+                          {Object.entries(message.answer.proposedAction.previewData).slice(0, 8).map(([key, value]) => (
+                            <div key={key} className="grid grid-cols-[8rem_1fr] gap-2">
+                              <dt className="truncate text-muted-foreground">{key}</dt>
+                              <dd className="truncate font-medium">
+                                {typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+                                  ? String(value)
+                                  : JSON.stringify(value)}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                      {completedActions[message.id] ? (
+                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                          <p className="flex items-center gap-1 font-medium">
+                            <CheckCircle2 className="size-3.5" />
+                            {completedActions[message.id].message}
+                          </p>
+                          {completedActions[message.id].href ? (
+                            <Link href={completedActions[message.id].href!} className="mt-1 inline-flex items-center gap-1 underline" onClick={() => onOpenChange(false)}>
+                              Open result <ExternalLink className="size-3" />
+                            </Link>
+                          ) : null}
+                        </div>
+                      ) : canceledActions[message.id] ? (
+                        <p className="mt-3 flex items-center gap-1 text-muted-foreground">
+                          <XCircle className="size-3.5" />
+                          Action canceled.
+                        </p>
+                      ) : (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 bg-[#f59f1c] px-2 text-xs text-slate-950 hover:bg-[#e89113]"
+                            disabled={executingActionId === message.id}
+                            onClick={() => void executeAidenAction(message)}
+                          >
+                            {executingActionId === message.id ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
+                            Confirm & Create
+                          </Button>
+                          <button
+                            type="button"
+                            className="h-7 rounded-md px-2 text-xs text-muted-foreground hover:bg-secondary"
+                            onClick={() => setInput(`Edit this action: ${message.answer?.proposedAction?.summary ?? ""}`)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="h-7 rounded-md px-2 text-xs text-muted-foreground hover:bg-secondary"
+                            onClick={() => void cancelAidenAction(message)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                   {message.answer?.relatedRoutes.length ? (

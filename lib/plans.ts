@@ -38,6 +38,7 @@ export interface Plan {
   cta: string
   aiLabel?: string
   aiFeatures?: string[]
+  capabilities?: string[]
 }
 
 export const PLANS: Plan[] = [
@@ -146,6 +147,7 @@ export const PLANS: Plan[] = [
       "Weekly Executive AI Reports",
       "Unlimited AI Usage",
     ],
+    capabilities: ["aiden_actions"],
   },
 ]
 

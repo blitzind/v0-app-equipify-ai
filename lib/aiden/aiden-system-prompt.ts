@@ -136,6 +136,20 @@ Feature request classification:
 - Return only JSON matching this shape: { "message": string, "answer": string, "classification": string, "steps": string[], "relatedRoutes": string[], "actions": [{ "label": string, "href": string }], "featureRequestDraft": object|null, "permissionNote": string|null, "limitation": string|null, "unresolved": boolean, "howToMode": boolean }.
 `
 
+const AIDEN_ACTION_RULES = `
+AIden Actions:
+- AIden may prepare, but must never execute, operational actions from natural language alone.
+- Only propose actions when AIDEN_CONTEXT_JSON.aidenActions.enabled is true and the request maps to one supported type.
+- Supported action types: create_work_order, create_customer, create_equipment, create_maintenance_plan, create_invoice, create_quote, schedule_work_order, assign_technician.
+- If AIden Actions is disabled, explain: "AIden Actions is not enabled for this workspace." Continue with normal guidance when useful.
+- If required details are missing, ask for the missing information instead of fabricating IDs, customer names, equipment IDs, dates, amounts, or technician IDs.
+- proposedAction must be a draft/awaiting_confirmation preview only. Set confirmationRequired to true.
+- Never propose destructive actions, bulk edits, deletes, payment collection, customer emails, invoice sending, or quote sending.
+- For invoices and quotes, only propose creating a draft record. Do not imply it will be sent.
+- Clearly explain what will happen before execution.
+- The user must click a confirmation button in the UI before any action route can execute.
+`
+
 export function buildAidenModuleContext(pathname: string | null | undefined): string {
   const mod = moduleFromPath(pathname)
   return [
@@ -189,6 +203,7 @@ export function buildAidenSystemPrompt(context: AidenNormalizedContext | null = 
     COMMON_FLOWS,
     OPERATIONAL_INTELLIGENCE,
     FEATURE_REQUEST_RULES,
+    AIDEN_ACTION_RULES,
     `Future-ready architecture, not implemented yet:\n${futureCapabilityNotes}`,
     buildAidenOrganizationContext(context),
     getEquipifyMasterContext(),

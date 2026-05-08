@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 171,
-  sqlMigrations: 119,
+  apiRouteHandlers: 173,
+  sqlMigrations: 120,
   dashboardPages: 57,
   componentsTsx: 206,
-  libTsFiles: 333,
+  libTsFiles: 336,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **171** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **119** |
+| API route handlers (\`app/api/**/route.ts\`) | **173** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **120** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **57** |
 | \`components/**/*.tsx\` | **206** |
-| \`lib/**/*.ts\` | **333** |
+| \`lib/**/*.ts\` | **336** |
 
 ### Vercel crons
 
@@ -77,6 +77,7 @@ organizations/[organizationId]/ai-ops/recommendations/[recommendationKey]/narrat
 organizations/[organizationId]/ai-ops/recommendations/[recommendationKey]/timeline/route.ts
 organizations/[organizationId]/ai-ops/recommendations/route.ts
 organizations/[organizationId]/ai-usage/route.ts
+organizations/[organizationId]/aiden/actions/execute/route.ts
 organizations/[organizationId]/aiden/chat/route.ts
 organizations/[organizationId]/aiden/feature-requests/route.ts
 organizations/[organizationId]/attachments/[attachmentId]/route.ts
@@ -162,6 +163,7 @@ organizations/[organizationId]/workspace/logo/route.ts
 organizations/[organizationId]/workspace/route.ts
 platform/accounts/[organizationId]/archive/route.ts
 platform/accounts/[organizationId]/discount/route.ts
+platform/accounts/[organizationId]/features/route.ts
 platform/accounts/[organizationId]/members/route.ts
 platform/accounts/[organizationId]/plan/route.ts
 platform/accounts/[organizationId]/reactivate/route.ts
