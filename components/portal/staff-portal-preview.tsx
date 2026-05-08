@@ -266,16 +266,13 @@ export function StaffPortalPreview({
       </main>
 
       <footer
-        className="mt-auto border-t py-7 px-4 sm:px-6 flex flex-col items-center justify-center gap-1"
+        className="mt-auto border-t px-4 py-3 sm:px-6 flex items-center justify-center"
         style={{
           borderColor: "rgba(255, 255, 255, 0.06)",
           background: "#0F172A",
         }}
       >
         <ProvidedByEquipify variant="onDark" size="lg" />
-        <p className="text-[11px] text-white/45 text-center">
-          Customer portal experience powered by Equipify.
-        </p>
       </footer>
     </div>
   )
