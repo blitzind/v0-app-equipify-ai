@@ -161,7 +161,7 @@ export default function PortalSettingsPage() {
   const [domainVerified] = useState(false)
 
   const [certificateReleaseMode, setCertificateReleaseMode] = useState<
-    "immediate_release" | "release_on_payment" | "manual_release"
+    "immediate_release" | "release_on_payment" | "manual_release" | "internal_only"
   >("immediate_release")
   const [certificateReleaseLoading, setCertificateReleaseLoading] = useState(true)
 
@@ -198,7 +198,7 @@ export default function PortalSettingsPage() {
         }
         if (cancelled) return
         const m = data.portal_certificate_release_mode
-        if (m === "immediate_release" || m === "release_on_payment" || m === "manual_release") {
+        if (m === "immediate_release" || m === "release_on_payment" || m === "manual_release" || m === "internal_only") {
           setCertificateReleaseMode(m)
         }
       } finally {
@@ -443,7 +443,7 @@ export default function PortalSettingsPage() {
               value={certificateReleaseMode}
               onChange={(e) =>
                 setCertificateReleaseMode(
-                  e.target.value as "immediate_release" | "release_on_payment" | "manual_release",
+                  e.target.value as "immediate_release" | "release_on_payment" | "manual_release" | "internal_only",
                 )
               }
               disabled={certificateReleaseLoading || orgStatus !== "ready" || !organizationId?.trim()}

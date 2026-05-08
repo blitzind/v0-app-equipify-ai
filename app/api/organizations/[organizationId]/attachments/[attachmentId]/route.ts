@@ -90,12 +90,26 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_request", message: "Unsupported visibility state." }, { status: 400 })
   }
 
+  const releaseStatus = releaseStatusForVisibility(visibilityRaw)
+  const now = new Date().toISOString()
   const { data, error } = await gate.svc
     .from("org_document_attachments")
     .update({
       visibility_scope: visibilityRaw,
       portal_visible: visibilityRaw !== "internal",
-      portal_release_status: releaseStatusForVisibility(visibilityRaw),
+      portal_release_status: releaseStatus,
+      released_at: releaseStatus === "released" ? now : null,
+      released_by: releaseStatus === "released" ? gate.userId : null,
+      revoked_at: releaseStatus === "internal" ? now : null,
+      revoked_by: releaseStatus === "internal" ? gate.userId : null,
+      withheld_reason:
+        releaseStatus === "internal"
+          ? "Internal only"
+          : releaseStatus === "withheld_invoice_unpaid"
+            ? "Invoice unpaid"
+            : releaseStatus === "pending"
+              ? "Manual release required"
+              : null,
     })
     .eq("organization_id", organizationId)
     .eq("id", attachmentId)

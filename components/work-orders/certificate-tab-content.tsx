@@ -67,6 +67,7 @@ type CertificateTabContentProps = {
   staffPortalLines?: Array<{ tone: "neutral" | "info" | "warning" | "success"; text: string }>
   portalReleasedAt?: string | null
   onReleaseToPortal?: () => void | Promise<void>
+  onRevokePortal?: () => void | Promise<void>
   releaseToPortalBusy?: boolean
   /** Optional slot rendered above the template fields — used for the cert attachments card. */
   attachmentsSlot?: React.ReactNode
@@ -123,6 +124,7 @@ export function CertificateTabContent({
   attachmentsSlot,
   portalReleasedAt,
   onReleaseToPortal,
+  onRevokePortal,
   releaseToPortalBusy = false,
 }: CertificateTabContentProps) {
   const { toast } = useToast()
@@ -366,6 +368,7 @@ export function CertificateTabContent({
 
       {(staffPortalLines?.length ||
         onReleaseToPortal ||
+        onRevokePortal ||
         (portalReleasedAt && portalReleasedAt.trim())) ? (
         <div className="rounded-xl border border-border bg-muted/15 p-4 space-y-3">
           <div className="flex items-start gap-2">
@@ -420,6 +423,18 @@ export function CertificateTabContent({
                 <span className="text-[11px] text-[color:var(--status-success)]">
                   Released to portal for customer access (manual rule satisfied).
                 </span>
+              ) : null}
+              {portalReleasedAt?.trim() && onRevokePortal ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  disabled={releaseToPortalBusy}
+                  onClick={() => void onRevokePortal()}
+                >
+                  Revoke access
+                </Button>
               ) : null}
             </div>
           ) : null}

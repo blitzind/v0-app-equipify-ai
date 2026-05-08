@@ -23,6 +23,7 @@ import {
   visibilityLabel,
   type AttachmentVisibilityScope,
 } from "@/lib/attachments/document-attachments"
+import type { CertificateReleaseMode } from "@/lib/portal/certificate-release"
 import {
   CERT_ATTACH_MAX_BYTES,
   deleteCertificateAttachment,
@@ -44,7 +45,14 @@ export type CertificateAttachmentsCardProps = {
   calibrationRecordId?: string | null
   /** Default upload category. */
   defaultCategory?: CertificateAttachmentCategory
-  linkedInvoices?: Array<{ id: string; label: string }>
+  linkedInvoices?: Array<{
+    id: string
+    label: string
+    status?: string
+    releaseOverride?: CertificateReleaseMode | null
+  }>
+  releaseModeSnapshot?: CertificateReleaseMode | string | null
+  defaultVisibility?: AttachmentVisibilityScope
   canManage?: boolean
   canReleaseToPortal?: boolean
   className?: string
@@ -56,6 +64,18 @@ const VISIBILITY_OPTIONS: Array<{ value: AttachmentVisibilityScope; label: strin
   { value: "released_manual", label: "Released manually" },
   { value: "released_after_payment", label: "Released after payment" },
 ]
+
+function visibilityForReleaseMode(
+  mode: CertificateReleaseMode | string | null | undefined,
+  linkedInvoiceStatus?: string | null,
+): AttachmentVisibilityScope {
+  if (mode === "immediate_release") return "portal_visible"
+  if (mode === "release_on_payment") {
+    return linkedInvoiceStatus === "paid" ? "portal_visible" : "released_after_payment"
+  }
+  if (mode === "internal_only") return "internal"
+  return "pending_release"
+}
 
 function fmtDate(iso: string): string {
   if (!iso) return "—"
@@ -75,6 +95,8 @@ export function CertificateAttachmentsCard({
   calibrationRecordId = null,
   defaultCategory = "external_calibration",
   linkedInvoices = [],
+  releaseModeSnapshot = null,
+  defaultVisibility = "pending_release",
   canManage = true,
   canReleaseToPortal = canManage,
   className,
@@ -88,9 +110,14 @@ export function CertificateAttachmentsCard({
   const [issueDate, setIssueDate] = React.useState("")
   const [expiresAt, setExpiresAt] = React.useState("")
   const [notes, setNotes] = React.useState("")
-  const [visibility, setVisibility] = React.useState<AttachmentVisibilityScope>("pending_release")
+  const [visibility, setVisibility] = React.useState<AttachmentVisibilityScope>(defaultVisibility)
   const [invoiceId, setInvoiceId] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const selectedInvoice = React.useMemo(
+    () => linkedInvoices.find((invoice) => invoice.id === invoiceId) ?? null,
+    [invoiceId, linkedInvoices],
+  )
+  const uploadReleaseMode = selectedInvoice?.releaseOverride ?? releaseModeSnapshot
 
   const refresh = React.useCallback(async () => {
     if (!organizationId || !workOrderId) {
@@ -124,6 +151,20 @@ export function CertificateAttachmentsCard({
     return items.filter((a) => !a.equipmentId || a.equipmentId === equipmentId)
   }, [items, equipmentId])
 
+  React.useEffect(() => {
+    setVisibility(defaultVisibility)
+  }, [defaultVisibility])
+
+  function handleInvoiceChange(nextInvoiceId: string) {
+    setInvoiceId(nextInvoiceId)
+    const invoice = linkedInvoices.find((item) => item.id === nextInvoiceId) ?? null
+    setVisibility(
+      invoice?.releaseOverride
+        ? visibilityForReleaseMode(invoice.releaseOverride, invoice.status ?? null)
+        : defaultVisibility,
+    )
+  }
+
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ""
@@ -148,6 +189,7 @@ export function CertificateAttachmentsCard({
         expiresAt: expiresAt || null,
         visibilityScope: visibility,
         invoiceId: invoiceId || null,
+        releaseModeSnapshot: uploadReleaseMode,
         notes: notes.trim() || null,
       })
       toast({ title: "Attachment uploaded" })
@@ -155,6 +197,7 @@ export function CertificateAttachmentsCard({
       setIssueDate("")
       setExpiresAt("")
       setNotes("")
+      setVisibility(defaultVisibility)
       await refresh()
     } catch (err) {
       toast({
@@ -219,6 +262,16 @@ export function CertificateAttachmentsCard({
           visibility_scope: next,
           portal_visible: next !== "internal",
           portal_release_status: releaseStatusForVisibility(next),
+          released_at: releaseStatusForVisibility(next) === "released" ? new Date().toISOString() : null,
+          revoked_at: next === "internal" ? new Date().toISOString() : null,
+          withheld_reason:
+            next === "internal"
+              ? "Internal only"
+              : next === "released_after_payment"
+                ? "Invoice unpaid"
+                : next === "pending_release"
+                  ? "Manual release required"
+                  : null,
         })
         .eq("organization_id", organizationId)
         .eq("id", att.documentAttachmentId)
@@ -313,7 +366,7 @@ export function CertificateAttachmentsCard({
           <div className="grid gap-2 sm:grid-cols-2">
             <select
               value={invoiceId}
-              onChange={(e) => setInvoiceId(e.target.value)}
+              onChange={(e) => handleInvoiceChange(e.target.value)}
               className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
             >
               <option value="">No invoice link</option>
@@ -329,7 +382,8 @@ export function CertificateAttachmentsCard({
             />
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Upload does not require a certificate template. Portal-visible files still follow release and customer-scope checks.
+            Uploads use the customer certificate rule by default. An invoice rule only applies when the selected invoice has
+            an explicit override.
           </p>
         </div>
       ) : null}

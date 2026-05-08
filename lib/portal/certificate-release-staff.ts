@@ -3,9 +3,10 @@ import { normalizeReleaseMode, resolveEffectiveCertificateReleaseMode } from "@/
 
 /** Human-readable labels for settings dropdowns (staff UI). */
 export const CERTIFICATE_RELEASE_OPTIONS = [
-  { value: "immediate_release" as const, label: "Immediate release", helper: "Customers can download certificates as soon as they exist." },
-  { value: "release_on_payment" as const, label: "Release after invoice payment", helper: "Certificate stays locked until linked invoices are paid." },
-  { value: "manual_release" as const, label: "Manual release", helper: "Staff must explicitly release each certificate to the portal." },
+  { value: "immediate_release" as const, label: "Release immediately", helper: "Customers can download portal-visible certificates as soon as they exist." },
+  { value: "release_on_payment" as const, label: "Release after invoice is paid", helper: "Certificate stays locked until linked invoices are paid." },
+  { value: "manual_release" as const, label: "Manual release only", helper: "Staff must explicitly release each certificate to the portal." },
+  { value: "internal_only" as const, label: "Internal only", helper: "Certificates are withheld from the portal unless the customer rule is changed." },
 ] as const
 
 export const CUSTOMER_CERT_RELEASE_OPTIONS = [
@@ -14,13 +15,26 @@ export const CUSTOMER_CERT_RELEASE_OPTIONS = [
 ]
 
 export const INVOICE_CERT_RELEASE_OPTIONS = [
-  { value: "" as const, label: "Use customer / organization rule", helper: "No per-invoice override." },
+  {
+    value: "" as const,
+    label: "No invoice override",
+    helper: "Customer settings control certificate release by default. Use this only when this invoice needs a different rule.",
+  },
   ...CERTIFICATE_RELEASE_OPTIONS.map((o) => ({ value: o.value, label: o.label, helper: o.helper })),
 ]
 
 export function modeLabel(mode: CertificateReleaseMode | null | undefined): string {
   const m = normalizeReleaseMode(mode ?? undefined)
-  return CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === m)?.label ?? "Immediate release"
+  return CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === m)?.label ?? "Manual release only"
+}
+
+export function isCertificateReleaseMode(raw: string | null | undefined): raw is CertificateReleaseMode {
+  return (
+    raw === "immediate_release" ||
+    raw === "release_on_payment" ||
+    raw === "manual_release" ||
+    raw === "internal_only"
+  )
 }
 
 /** Which setting wins first for staff tooltip (invoice > customer > org). */
@@ -34,15 +48,11 @@ export function describeEffectiveReleaseRuleSource(args: {
     customerMode: args.customerMode,
     invoiceOverrides: [args.invoiceOverride],
   })
-  if (args.invoiceOverride === "immediate_release" || args.invoiceOverride === "release_on_payment" || args.invoiceOverride === "manual_release") {
+  if (isCertificateReleaseMode(args.invoiceOverride)) {
     return `Effective rule: ${modeLabel(eff)} (this invoice overrides customer and organization defaults).`
   }
-  if (
-    args.customerMode === "immediate_release" ||
-    args.customerMode === "release_on_payment" ||
-    args.customerMode === "manual_release"
-  ) {
-    return `Effective rule: ${modeLabel(eff)} (customer override).`
+  if (isCertificateReleaseMode(args.customerMode)) {
+    return `Effective rule: ${modeLabel(eff)} (customer setting).`
   }
   return `Effective rule: ${modeLabel(eff)} (organization default).`
 }
@@ -82,8 +92,8 @@ export function staffPortalCertificateBullets(args: {
   } else if (eff === "release_on_payment") {
     if (!args.hasLinkedInvoices) {
       lines.push({
-        tone: "info",
-        text: "Portal: no invoice linked yet — certificate may be visible until an invoice is tied to this job.",
+        tone: "warning",
+        text: "Portal: pending manual review until an invoice is linked.",
       })
     } else if (args.invoicesAllPaid) {
       lines.push({ tone: "success", text: "Portal: linked invoices are paid — certificate access unlocked." })
@@ -93,7 +103,7 @@ export function staffPortalCertificateBullets(args: {
         text: "Portal: locked until linked invoice(s) are paid.",
       })
     }
-  } else {
+  } else if (eff === "manual_release") {
     if (args.portalReleasedAt?.trim()) {
       const d = new Date(args.portalReleasedAt).toLocaleString(undefined, {
         month: "short",
@@ -109,6 +119,11 @@ export function staffPortalCertificateBullets(args: {
         text: "Portal: locked until a team member releases this certificate.",
       })
     }
+  } else {
+    lines.push({
+      tone: "warning",
+      text: "Portal: internal only for this customer.",
+    })
   }
 
   return lines

@@ -65,7 +65,7 @@ export function CustomerPortalCertificateRuleCard({
 
   const customerOverride = (() => {
     const m = (customerMode ?? "").trim()
-    if (m === "immediate_release" || m === "release_on_payment" || m === "manual_release") {
+    if (m === "immediate_release" || m === "release_on_payment" || m === "manual_release" || m === "internal_only") {
       return m as CertificateReleaseMode
     }
     return null
@@ -82,7 +82,9 @@ export function CustomerPortalCertificateRuleCard({
       ? CheckCircle2
       : effectiveMode === "release_on_payment"
         ? Clock
-        : ShieldCheck
+      : effectiveMode === "manual_release"
+        ? ShieldCheck
+        : Info
 
   return (
     <div
@@ -122,7 +124,7 @@ export function CustomerPortalCertificateRuleCard({
           <p className="flex items-start gap-1.5">
             <Info className="w-3 h-3 mt-0.5 shrink-0" aria-hidden />
             <span>
-              Override active. Workspace default is{" "}
+              Customer setting active. Workspace default is{" "}
               <span className="text-foreground font-medium">{orgDefaultLabel}</span>. Switch this customer to “Use organization default”
               in their edit panel to inherit the workspace policy.
             </span>

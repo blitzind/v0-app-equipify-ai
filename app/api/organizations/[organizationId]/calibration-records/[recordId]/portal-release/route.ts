@@ -46,10 +46,49 @@ export async function POST(
 
   const { error } = await supabase
     .from("calibration_records")
-    .update({ portal_released_at: now })
+    .update({
+      portal_released_at: now,
+      portal_released_by: gate.userId,
+      portal_revoked_at: null,
+      portal_revoked_by: null,
+      portal_withheld_reason: null,
+    })
     .eq("id", recordId)
     .eq("organization_id", organizationId)
 
   if (error) return jsonError(error.message, 500)
   return NextResponse.json({ ok: true, portal_released_at: now })
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ organizationId: string; recordId: string }> },
+) {
+  const { organizationId, recordId } = await context.params
+  if (!UUID_RE.test(organizationId) || !UUID_RE.test(recordId)) {
+    return jsonError("Invalid id.", 400)
+  }
+
+  const gate = await requireOrgPermission(
+    organizationId,
+    "canReleaseCertificatesToPortal",
+  )
+  if ("error" in gate) return gate.error
+  const { supabase } = gate
+
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from("calibration_records")
+    .update({
+      portal_released_at: null,
+      portal_released_by: null,
+      portal_revoked_at: now,
+      portal_revoked_by: gate.userId,
+      portal_withheld_reason: "Revoked by staff",
+    })
+    .eq("id", recordId)
+    .eq("organization_id", organizationId)
+
+  if (error) return jsonError(error.message, 500)
+  return NextResponse.json({ ok: true, portal_revoked_at: now })
 }

@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T21:40:53.968Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T22:09:11.006Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -107,10 +107,10 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Certificates (calibration)
 - **Routes:** \`/calibration-templates\` (nav label “Certificates”), WO certificate tabs.
-- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, and external certificate PDF uploads.
+- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, external certificate PDF uploads, and portal release policy.
 - **Status:** MVP complete; portal exposes certificates API and released certificate attachments.
-- **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, and invoice metadata.
-- **Tables:** \`calibration_templates\`, \`calibration_records\`, \`certificate_attachments\`, and unified \`org_document_attachments\`.
+- **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, invoice metadata, release/revoke controls, and withheld reasons.
+- **Tables:** \`calibration_templates\`, \`calibration_records\`, \`certificate_attachments\`, and unified \`org_document_attachments\` release metadata.
 - **Gaps:** Technician signature workflow refinements.
 
 ### Quotes

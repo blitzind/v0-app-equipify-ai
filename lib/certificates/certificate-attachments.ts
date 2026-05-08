@@ -225,6 +225,7 @@ export async function uploadCertificateAttachment(
     expiresAt?: string | null
     visibilityScope?: AttachmentVisibilityScope
     invoiceId?: string | null
+    releaseModeSnapshot?: string | null
   },
 ): Promise<CertificateAttachment> {
   const errMsg = validateCertificateAttachmentFile(args.file)
@@ -281,6 +282,25 @@ export async function uploadCertificateAttachment(
   }
 
   const visibilityScope = args.visibilityScope ?? "pending_release"
+  const { data: woContext } = await supabase
+    .from("work_orders")
+    .select("customer_id")
+    .eq("organization_id", args.organizationId)
+    .eq("id", args.workOrderId)
+    .maybeSingle()
+  const linkedCustomerId = (woContext as { customer_id?: string | null } | null)?.customer_id ?? null
+  const portalReleaseStatus = releaseStatusForVisibility(visibilityScope)
+  const releasedAt = portalReleaseStatus === "released" ? new Date().toISOString() : null
+  const withheldReason =
+    portalReleaseStatus === "internal"
+      ? "Internal only"
+      : portalReleaseStatus === "withheld_invoice_unpaid"
+        ? args.invoiceId?.trim()
+          ? "Invoice unpaid"
+          : "Missing linked invoice"
+        : portalReleaseStatus === "pending"
+          ? "Manual release required"
+          : null
   const metadata = {
     source: "certificate_upload",
     work_order_id: args.workOrderId,
@@ -291,6 +311,8 @@ export async function uploadCertificateAttachment(
     certificate_title: args.title?.trim() || null,
     issue_date: args.issueDate?.trim() || null,
     expires_at: args.expiresAt?.trim() || null,
+    release_mode_snapshot: args.releaseModeSnapshot?.trim() || null,
+    withheld_reason: withheldReason,
   }
   const { data: existingDoc } = await supabase
     .from("org_document_attachments")
@@ -315,9 +337,16 @@ export async function uploadCertificateAttachment(
       related_entity_type: args.calibrationRecordId ? "calibration_record" : "work_order",
       related_entity_id: args.calibrationRecordId ?? args.workOrderId,
       portal_visible: visibilityScope !== "internal",
-      portal_release_status: releaseStatusForVisibility(visibilityScope),
+      portal_release_status: portalReleaseStatus,
       source_system: "certificate_upload",
       metadata_json: metadata,
+      release_mode_snapshot: args.releaseModeSnapshot?.trim() || null,
+      released_at: releasedAt,
+      released_by: releasedAt ? user.id : null,
+      withheld_reason: withheldReason,
+      linked_invoice_id: args.invoiceId?.trim() || null,
+      linked_work_order_id: args.workOrderId,
+      linked_customer_id: linkedCustomerId,
     })
   }
 

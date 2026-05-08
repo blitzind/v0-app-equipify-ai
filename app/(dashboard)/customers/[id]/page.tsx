@@ -132,7 +132,7 @@ type CustomerContract = {
   value: number
 }
 
-type CustomerPortalCertMode = "" | "immediate_release" | "release_on_payment" | "manual_release"
+type CustomerPortalCertMode = "" | "immediate_release" | "release_on_payment" | "manual_release" | "internal_only"
 
 type CustomerPortalConsolidatedMode = "" | "true" | "false"
 
@@ -174,6 +174,8 @@ type CustomerDetail = {
   isArchived: boolean
   /** null = use organization default */
   portalCertificateReleaseMode: string | null
+  certificateReleaseNotes: string | null
+  certificateReleaseOverrideReason: string | null
   /** null = inherit workspace default for consolidated portal document rollup (Phase 2). */
   portalConsolidatedDocumentsEnabled: boolean | null
   /** null = use organization default for invoice terms (Phase 2). */
@@ -430,6 +432,8 @@ export default function CustomerDetailPage() {
     status: "Active" as CustomerStatus,
     notes: "",
     portalCertificateRelease: "" as CustomerPortalCertMode,
+    certificateReleaseNotes: "",
+    certificateReleaseOverrideReason: "",
     portalConsolidatedDocuments: "" as CustomerPortalConsolidatedMode,
     /** Empty string = use organization default (Phase 2). */
     defaultInvoiceTermsCode: "",
@@ -519,9 +523,9 @@ export default function CustomerDetailPage() {
 
       const customerSelectAttempts = [
         // Includes Phase 2 consolidated docs column when migration applied.
-        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, default_invoice_terms_code, portal_consolidated_documents_enabled",
+        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, certificate_release_notes, certificate_release_override_reason, default_invoice_terms_code, portal_consolidated_documents_enabled",
         // Phase 2 includes default_invoice_terms_code (added in service_lifecycle_phase1).
-        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, default_invoice_terms_code",
+        "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode, certificate_release_notes, certificate_release_override_reason, default_invoice_terms_code",
         // Schema-drift fallback for environments missing the Phase 1 column.
         "id, company_name, status, joined_at, notes, archived_at, portal_certificate_release_mode",
       ]
@@ -615,6 +619,8 @@ export default function CustomerDetailPage() {
         notes: string | null
         archived_at: string | null
         portal_certificate_release_mode?: string | null
+        certificate_release_notes?: string | null
+        certificate_release_override_reason?: string | null
         default_invoice_terms_code?: string | null
         portal_consolidated_documents_enabled?: boolean | null
       }
@@ -636,9 +642,12 @@ export default function CustomerDetailPage() {
         portalCertificateReleaseMode:
           custPortalMode === "immediate_release" ||
           custPortalMode === "release_on_payment" ||
-          custPortalMode === "manual_release"
+          custPortalMode === "manual_release" ||
+          custPortalMode === "internal_only"
             ? custPortalMode
             : null,
+        certificateReleaseNotes: customerRowTyped.certificate_release_notes ?? null,
+        certificateReleaseOverrideReason: customerRowTyped.certificate_release_override_reason ?? null,
         portalConsolidatedDocumentsEnabled: custConsolidated,
         defaultInvoiceTermsCode: custTermsCode || null,
         contacts: contactsTyped.map((c) => ({
@@ -684,9 +693,12 @@ export default function CustomerDetailPage() {
           portalCertificateRelease:
             mapped.portalCertificateReleaseMode === "immediate_release" ||
             mapped.portalCertificateReleaseMode === "release_on_payment" ||
-            mapped.portalCertificateReleaseMode === "manual_release"
+            mapped.portalCertificateReleaseMode === "manual_release" ||
+            mapped.portalCertificateReleaseMode === "internal_only"
               ? mapped.portalCertificateReleaseMode
               : "",
+          certificateReleaseNotes: mapped.certificateReleaseNotes ?? "",
+          certificateReleaseOverrideReason: mapped.certificateReleaseOverrideReason ?? "",
           portalConsolidatedDocuments:
             mapped.portalConsolidatedDocumentsEnabled === true
               ? "true"
@@ -1174,6 +1186,8 @@ export default function CustomerDetailPage() {
           body: JSON.stringify({
             portal_certificate_release_mode:
               editForm.portalCertificateRelease === "" ? null : editForm.portalCertificateRelease,
+            certificate_release_notes: editForm.certificateReleaseNotes,
+            certificate_release_override_reason: editForm.certificateReleaseOverrideReason,
           }),
         },
       )
@@ -1211,7 +1225,8 @@ export default function CustomerDetailPage() {
       const nextPortal =
         prBody.portal_certificate_release_mode === "immediate_release" ||
         prBody.portal_certificate_release_mode === "release_on_payment" ||
-        prBody.portal_certificate_release_mode === "manual_release"
+        prBody.portal_certificate_release_mode === "manual_release" ||
+        prBody.portal_certificate_release_mode === "internal_only"
           ? prBody.portal_certificate_release_mode
           : null
 
@@ -1228,6 +1243,8 @@ export default function CustomerDetailPage() {
               status: editForm.status,
               notes: editForm.notes.trim(),
               portalCertificateReleaseMode: nextPortal,
+              certificateReleaseNotes: editForm.certificateReleaseNotes.trim() || null,
+              certificateReleaseOverrideReason: editForm.certificateReleaseOverrideReason.trim() || null,
               portalConsolidatedDocumentsEnabled: nextConsolidated,
               defaultInvoiceTermsCode: validTermsCode,
             }
@@ -1643,9 +1660,12 @@ export default function CustomerDetailPage() {
                       portalCertificateRelease:
                         customer.portalCertificateReleaseMode === "immediate_release" ||
                         customer.portalCertificateReleaseMode === "release_on_payment" ||
-                        customer.portalCertificateReleaseMode === "manual_release"
+                        customer.portalCertificateReleaseMode === "manual_release" ||
+                        customer.portalCertificateReleaseMode === "internal_only"
                           ? customer.portalCertificateReleaseMode
                           : "",
+                      certificateReleaseNotes: customer.certificateReleaseNotes ?? "",
+                      certificateReleaseOverrideReason: customer.certificateReleaseOverrideReason ?? "",
                       portalConsolidatedDocuments:
                         customer.portalConsolidatedDocumentsEnabled === true
                           ? "true"
@@ -2578,6 +2598,31 @@ export default function CustomerDetailPage() {
                       ?.helper
                   }
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Release override reason
+                  </label>
+                  <input
+                    value={editForm.certificateReleaseOverrideReason}
+                    onChange={(e) => setEditForm((f) => ({ ...f, certificateReleaseOverrideReason: e.target.value }))}
+                    placeholder="Why this customer differs from default"
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">
+                    Release notes
+                  </label>
+                  <input
+                    value={editForm.certificateReleaseNotes}
+                    onChange={(e) => setEditForm((f) => ({ ...f, certificateReleaseNotes: e.target.value }))}
+                    placeholder="Internal certificate release notes"
+                    className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
               </div>
 
               <div>

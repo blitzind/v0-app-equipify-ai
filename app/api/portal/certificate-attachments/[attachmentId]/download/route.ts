@@ -88,6 +88,24 @@ export async function GET(
     )
   }
 
+  const { data: registryRow } = await svc
+    .from("org_document_attachments")
+    .select("portal_visible, portal_release_status")
+    .eq("organization_id", orgId)
+    .eq("storage_path", att.storage_path)
+    .is("deleted_at", null)
+    .maybeSingle()
+  const registry = registryRow as { portal_visible?: boolean | null; portal_release_status?: string | null } | null
+  if (registry && (!registry.portal_visible || registry.portal_release_status !== "released")) {
+    return NextResponse.json(
+      {
+        error: "attachment_locked",
+        message: "This attachment is not yet available for download.",
+      },
+      { status: 403 },
+    )
+  }
+
   // Verify the work order belongs to a customer in the portal session's scope.
   const { data: wo } = await svc
     .from("work_orders")

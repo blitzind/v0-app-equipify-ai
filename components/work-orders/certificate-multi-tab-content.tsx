@@ -17,7 +17,14 @@ import {
   allLinkedInvoicesPaid,
   fetchInvoicesLinkedToWorkOrder,
 } from "@/lib/portal/work-order-invoices"
-import { staffPortalCertificateBullets } from "@/lib/portal/certificate-release-staff"
+import {
+  isCertificateReleaseMode,
+  staffPortalCertificateBullets,
+} from "@/lib/portal/certificate-release-staff"
+import {
+  resolveEffectiveCertificateReleaseMode,
+  type CertificateReleaseMode,
+} from "@/lib/portal/certificate-release"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import {
   buildCertificatePrefillContextForEquipment,
@@ -58,7 +65,12 @@ type PortalRulesState = {
   linkedPaid: boolean
 }
 
-type LinkedInvoiceOption = { id: string; label: string }
+type LinkedInvoiceOption = {
+  id: string
+  label: string
+  status: string
+  releaseOverride: CertificateReleaseMode | null
+}
 
 export type CertificateMultiTabContentProps = {
   organizationId: string | null | undefined
@@ -177,6 +189,10 @@ export function CertificateMultiTabContent({
           linkedInvoices.map((invoice) => ({
             id: invoice.id,
             label: `Invoice ${invoice.id.slice(0, 8)} · ${invoice.status}`,
+            status: invoice.status,
+            releaseOverride: isCertificateReleaseMode(invoice.portal_certificate_release_override)
+              ? invoice.portal_certificate_release_override
+              : null,
           })),
         )
 
@@ -428,6 +444,41 @@ export function CertificateMultiTabContent({
     }
   }
 
+  async function handleRevokePortal(assetId: string) {
+    const st = slotStates[assetId]
+    const rid = st?.recordId?.trim()
+    if (!orgId || !rid) return
+    setReleasingAssetId(assetId)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/calibration-records/${encodeURIComponent(rid)}/portal-release`,
+        { method: "DELETE" },
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not revoke certificate",
+          description: data.error ?? "Request failed.",
+        })
+        return
+      }
+      setSlotStates((prev) => ({
+        ...prev,
+        [assetId]: {
+          ...prev[assetId],
+          portalReleasedAt: null,
+        },
+      }))
+      toast({
+        title: "Portal access revoked",
+        description: "Customers can no longer download this generated certificate.",
+      })
+    } finally {
+      setReleasingAssetId(null)
+    }
+  }
+
   const summary = useMemo(() => {
     if (equipmentAssets.length === 0) return "No equipment on this work order."
     return `${equipmentAssets.length} certificate${equipmentAssets.length === 1 ? "" : "s"} — one card per asset. Use Print / PDF or HTML after selecting a template.`
@@ -469,6 +520,23 @@ export function CertificateMultiTabContent({
                 hasLinkedInvoices: portalRules.hasLinked,
               })
             : []
+          const effectiveReleaseMode = portalRules
+            ? resolveEffectiveCertificateReleaseMode({
+                organizationMode: portalRules.orgMode,
+                customerMode: portalRules.custMode,
+                invoiceOverrides: [null],
+              })
+            : "manual_release"
+          const defaultAttachmentVisibility =
+            effectiveReleaseMode === "immediate_release"
+              ? "portal_visible"
+              : effectiveReleaseMode === "release_on_payment"
+                ? portalRules?.hasLinked && portalRules.linkedPaid
+                  ? "portal_visible"
+                  : "released_after_payment"
+                : effectiveReleaseMode === "internal_only"
+                  ? "internal"
+                  : "pending_release"
 
           return (
             <div
@@ -576,6 +644,11 @@ export function CertificateMultiTabContent({
                         ? () => void handleReleaseToPortal(asset.id)
                         : undefined
                     }
+                    onRevokePortal={
+                      orgPermissions.canReleaseCertificatesToPortal && st.recordId?.trim()
+                        ? () => void handleRevokePortal(asset.id)
+                        : undefined
+                    }
                     releaseToPortalBusy={releasingAssetId === asset.id}
                     attachmentsSlot={
                       <CertificateAttachmentsCard
@@ -584,6 +657,8 @@ export function CertificateMultiTabContent({
                         equipmentId={asset.id}
                         calibrationRecordId={st.recordId ?? null}
                         linkedInvoices={linkedInvoiceOptions}
+                        releaseModeSnapshot={effectiveReleaseMode}
+                        defaultVisibility={defaultAttachmentVisibility}
                         canManage={orgPermissions.canUploadCertificateAttachments}
                         canReleaseToPortal={orgPermissions.canReleaseCertificatesToPortal}
                       />

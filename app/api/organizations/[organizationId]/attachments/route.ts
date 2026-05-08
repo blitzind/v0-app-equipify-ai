@@ -112,6 +112,7 @@ export async function POST(request: Request, context: { params: Promise<{ organi
   const attachmentType = ATTACHMENT_TYPES.has(attachmentTypeRaw) ? attachmentTypeRaw : "document"
   const visibilityScope = ATTACHMENT_VISIBILITY_SCOPES.has(visibilityRaw) ? visibilityRaw : "internal"
   const portalReleaseStatus = releaseStatusForVisibility(visibilityScope)
+  const now = new Date().toISOString()
   const mime = (file.type || "application/octet-stream").toLowerCase()
   const safeName = sanitizeAttachmentFileName(file.name)
   const storagePath = `${organizationId}/documents/${entityType}/${entityId}/${crypto.randomUUID()}-${safeName}`
@@ -143,6 +144,16 @@ export async function POST(request: Request, context: { params: Promise<{ organi
       portal_visible: visibilityScope !== "internal",
       portal_release_status: portalReleaseStatus,
       source_system: sourceSystem || null,
+      released_at: portalReleaseStatus === "released" ? now : null,
+      released_by: portalReleaseStatus === "released" ? gate.userId : null,
+      withheld_reason:
+        portalReleaseStatus === "internal"
+          ? "Internal only"
+          : portalReleaseStatus === "withheld_invoice_unpaid"
+            ? "Invoice unpaid"
+            : portalReleaseStatus === "pending"
+              ? "Manual release required"
+              : null,
       metadata_json: {
         source: "unified_attachment_upload",
       },

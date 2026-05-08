@@ -57,10 +57,11 @@ export async function buildPortalCertificateItems(
     equipment_id: string | null
     template_id: string
     portal_released_at?: string | null
+    portal_revoked_at?: string | null
   }
 
   const selFull =
-    "id, created_at, work_order_id, equipment_id, template_id, portal_released_at"
+    "id, created_at, work_order_id, equipment_id, template_id, portal_released_at, portal_revoked_at"
   const selMini = "id, created_at, work_order_id, equipment_id, template_id"
 
   let q = svc
@@ -154,7 +155,14 @@ export async function buildPortalCertificateItems(
       customerMode: custMode,
       invoiceOverrides: overrides,
     })
-    const access = evaluateCertificatePortalAccess(effectiveMode, {
+    const access = c.portal_revoked_at?.trim()
+      ? {
+          unlocked: false,
+          reasonCode: "locked_manual",
+          reasonLabel: "Certificate access has been revoked.",
+          effectiveMode,
+        }
+      : evaluateCertificatePortalAccess(effectiveMode, {
       linkedInvoices: linked,
       portalReleasedAt: (c.portal_released_at as string | null) ?? null,
     })
@@ -193,11 +201,11 @@ export async function canPortalDownloadCertificate(
   customerId: string,
   recordId: string,
 ): Promise<boolean> {
-  let rec: { work_order_id: string; portal_released_at?: string | null } | null = null
+  let rec: { work_order_id: string; portal_released_at?: string | null; portal_revoked_at?: string | null } | null = null
 
   let r = await svc
     .from("calibration_records")
-    .select("work_order_id, portal_released_at")
+    .select("work_order_id, portal_released_at, portal_revoked_at")
     .eq("organization_id", organizationId)
     .eq("id", recordId)
     .maybeSingle()
@@ -212,7 +220,8 @@ export async function canPortalDownloadCertificate(
   }
 
   if (r.error || !r.data) return false
-  rec = r.data as { work_order_id: string; portal_released_at?: string | null }
+  rec = r.data as { work_order_id: string; portal_released_at?: string | null; portal_revoked_at?: string | null }
+  if (rec.portal_revoked_at?.trim()) return false
 
   const { data: wo } = await svc
     .from("work_orders")

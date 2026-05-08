@@ -29,10 +29,13 @@ export type AttachmentVisibilityScope =
 
 export type AttachmentReleaseStatus =
   | "internal"
+  | "pending"
   | "pending_release"
+  | "withheld_invoice_unpaid"
   | "released"
   | "released_after_payment"
   | "manual_hold"
+  | "revoked"
 
 export type DocumentAttachmentRow = {
   id: string
@@ -51,6 +54,16 @@ export type DocumentAttachmentRow = {
   portal_release_status: AttachmentReleaseStatus
   source_system: string | null
   metadata_json: unknown
+  release_mode_snapshot?: string | null
+  released_at?: string | null
+  released_by?: string | null
+  revoked_at?: string | null
+  revoked_by?: string | null
+  withheld_reason?: string | null
+  linked_invoice_id?: string | null
+  linked_work_order_id?: string | null
+  linked_customer_id?: string | null
+  release_notes?: string | null
 }
 
 export const DOCUMENT_ATTACHMENTS_BUCKET = WORK_ORDER_ATTACHMENTS_BUCKET
@@ -146,9 +159,9 @@ export function releaseStatusForVisibility(scope: AttachmentVisibilityScope): At
     case "released_manual":
       return "released"
     case "pending_release":
-      return "pending_release"
+      return "pending"
     case "released_after_payment":
-      return "released_after_payment"
+      return "withheld_invoice_unpaid"
     default:
       return "internal"
   }

@@ -5,7 +5,13 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import type { AdminInvoice } from "@/lib/mock-data"
 import { fetchInvoicesLinkedToWorkOrder } from "@/lib/portal/work-order-invoices"
 import { allLinkedInvoicesPaid } from "@/lib/portal/work-order-invoices"
-import { staffPortalCertificateBullets, INVOICE_CERT_RELEASE_OPTIONS } from "@/lib/portal/certificate-release-staff"
+import {
+  isCertificateReleaseMode,
+  modeLabel,
+  staffPortalCertificateBullets,
+  INVOICE_CERT_RELEASE_OPTIONS,
+} from "@/lib/portal/certificate-release-staff"
+import { resolveEffectiveCertificateReleaseMode } from "@/lib/portal/certificate-release"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Button } from "@/components/ui/button"
@@ -112,6 +118,14 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
     invoicesAllPaid: linkedPaid,
     hasLinkedInvoices: hasLinked,
   })
+  const invoiceOverride = isCertificateReleaseMode(invoice.portalCertificateReleaseOverride)
+    ? invoice.portalCertificateReleaseOverride
+    : null
+  const effectiveRule = resolveEffectiveCertificateReleaseMode({
+    organizationMode: orgMode,
+    customerMode: custMode,
+    invoiceOverrides: [invoiceOverride],
+  })
 
   async function saveOverride() {
     if (!organizationId) return
@@ -119,7 +133,7 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
     try {
       const raw = overrideLocal.trim()
       const portalCertificateReleaseOverride =
-        raw === "" ? null : raw === "immediate_release" || raw === "release_on_payment" || raw === "manual_release"
+        raw === "" ? null : raw === "immediate_release" || raw === "release_on_payment" || raw === "manual_release" || raw === "internal_only"
           ? raw
           : null
       const { error } = await updateInvoice(invoice.id, { portalCertificateReleaseOverride })
@@ -139,10 +153,11 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
   return (
     <div className="rounded-xl border border-border bg-muted/15 p-4 space-y-3">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Portal certificate access</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Certificate access override
+        </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Controls customer portal downloads for calibration certificates linked to this invoice context. Does not change
-          invoice totals or QuickBooks sync.
+          Customer settings control certificate release by default. Use this only when this invoice needs a different rule.
         </p>
       </div>
 
@@ -210,23 +225,54 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading portal rules…
         </p>
       ) : (
-        <ul className="space-y-1.5 border-t border-border pt-3">
-          {bullets.map((b, i) => (
-            <li
-              key={i}
-              className={cn(
-                "text-xs leading-snug",
-                b.tone === "warning" && "text-[color:var(--status-warning)]",
-                b.tone === "success" && "text-[color:var(--status-success)]",
-                b.tone === "info" && "text-[color:var(--status-info)]",
-                b.tone === "neutral" && "text-muted-foreground",
-              )}
-            >
-              {b.text}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3 border-t border-border pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+            <RuleLine label="Organization default" value={modeLabel(orgMode)} />
+            <RuleLine
+              label="Customer setting"
+              value={isCertificateReleaseMode(custMode) ? modeLabel(custMode) : "Use organization default"}
+            />
+            <RuleLine
+              label="Invoice override"
+              value={invoiceOverride ? modeLabel(invoiceOverride) : "None"}
+            />
+            <RuleLine label="Final effective rule" value={modeLabel(effectiveRule)} emphasized />
+          </div>
+          <ul className="space-y-1.5">
+            {bullets.map((b, i) => (
+              <li
+                key={i}
+                className={cn(
+                  "text-xs leading-snug",
+                  b.tone === "warning" && "text-[color:var(--status-warning)]",
+                  b.tone === "success" && "text-[color:var(--status-success)]",
+                  b.tone === "info" && "text-[color:var(--status-info)]",
+                  b.tone === "neutral" && "text-muted-foreground",
+                )}
+              >
+                {b.text}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
+    </div>
+  )
+}
+
+function RuleLine({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string
+  value: string
+  emphasized?: boolean
+}) {
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-0.5", emphasized ? "font-semibold text-foreground" : "text-foreground")}>{value}</p>
     </div>
   )
 }

@@ -5,6 +5,7 @@ export type CertificateReleaseMode =
   | "immediate_release"
   | "release_on_payment"
   | "manual_release"
+  | "internal_only"
 
 export type PortalCertAccess = {
   unlocked: boolean
@@ -14,6 +15,8 @@ export type PortalCertAccess = {
     | "paid"
     | "no_invoice_required"
     | "manual_released"
+    | "internal_only"
+    | "missing_invoice"
     | "locked_payment"
     | "locked_manual"
   /** Customer-facing explanation */
@@ -22,8 +25,20 @@ export type PortalCertAccess = {
 }
 
 export function normalizeReleaseMode(raw: string | null | undefined): CertificateReleaseMode {
-  if (raw === "release_on_payment" || raw === "manual_release") return raw
-  return "immediate_release"
+  if (raw === "immediate" || raw === "immediate_release") return "immediate_release"
+  if (raw === "after_invoice_paid" || raw === "release_on_payment") return "release_on_payment"
+  if (raw === "manual" || raw === "manual_release") return "manual_release"
+  if (raw === "internal_only") return "internal_only"
+  return "manual_release"
+}
+
+function isReleaseMode(raw: string | null | undefined): raw is CertificateReleaseMode {
+  return (
+    raw === "immediate_release" ||
+    raw === "release_on_payment" ||
+    raw === "manual_release" ||
+    raw === "internal_only"
+  )
 }
 
 export function resolveEffectiveCertificateReleaseMode(args: {
@@ -33,15 +48,11 @@ export function resolveEffectiveCertificateReleaseMode(args: {
   invoiceOverrides: Array<string | null | undefined>
 }): CertificateReleaseMode {
   for (const o of args.invoiceOverrides) {
-    if (o === "immediate_release" || o === "release_on_payment" || o === "manual_release") {
+    if (isReleaseMode(o)) {
       return o
     }
   }
-  if (
-    args.customerMode === "immediate_release" ||
-    args.customerMode === "release_on_payment" ||
-    args.customerMode === "manual_release"
-  ) {
+  if (isReleaseMode(args.customerMode)) {
     return args.customerMode
   }
   return normalizeReleaseMode(args.organizationMode)
@@ -59,6 +70,15 @@ export function evaluateCertificatePortalAccess(
       unlocked: true,
       reasonCode: "immediate",
       reasonLabel: "Certificate released immediately for your account.",
+      effectiveMode,
+    }
+  }
+
+  if (effectiveMode === "internal_only") {
+    return {
+      unlocked: false,
+      reasonCode: "internal_only",
+      reasonLabel: "Certificate is internal only.",
       effectiveMode,
     }
   }
@@ -84,9 +104,9 @@ export function evaluateCertificatePortalAccess(
   const paid = allLinkedInvoicesPaid(ctx.linkedInvoices)
   if (ctx.linkedInvoices.length === 0) {
     return {
-      unlocked: true,
-      reasonCode: "no_invoice_required",
-      reasonLabel: "No invoice is linked to this job yet — certificate is available.",
+      unlocked: false,
+      reasonCode: "missing_invoice",
+      reasonLabel: "Certificate pending review until an invoice is linked.",
       effectiveMode,
     }
   }
