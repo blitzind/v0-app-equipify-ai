@@ -1,15 +1,17 @@
 /**
  * AI Ops Phase 3 — digest runner.
+ * AI Ops Phase 4 — multi-destination dispatch (email + Slack + Teams).
  *
- * Builds the digest payload, sends the email via Resend, and writes
- * a row to `ai_ops_digest_runs`. Used by both the manual send route
- * and the cron worker — keeping send logic in one place ensures the
- * email format and audit trail stay consistent across triggers.
+ * Builds the digest payload, dispatches it to every enabled
+ * destination independently, and writes a single row to
+ * `ai_ops_digest_runs` capturing per-destination success/failure.
+ * Used by both the manual send route and the cron worker.
  *
- * **Strictly internal.** This runner never sends customer-facing
- * messages; the recipient list comes from
- * `ai_ops_digest_settings.recipients` (staff emails only). The
- * runner refuses to dispatch when no recipients are configured.
+ * **Strictly internal.** No destination is customer-facing:
+ *   - email recipients come from `ai_ops_digest_settings.recipients`
+ *     (staff emails only),
+ *   - Slack/Teams webhook URLs are operator-controlled internal
+ *     channels.
  */
 
 import "server-only"
@@ -25,14 +27,40 @@ import {
   type DigestPayload,
   type DigestSettingsRow,
 } from "./digest"
+import { sendSlackDigest } from "./slack-adapter"
+import { sendTeamsDigest } from "./teams-adapter"
 
 export type DigestRunStatus =
   | "queued"
   | "sent"
   | "skipped"
   | "failed"
+  | "partial"
   | "no_recipients"
   | "no_items"
+
+export type DestinationStatus =
+  | "sent"
+  | "failed"
+  | "skipped"
+  | "disabled"
+  | "not_configured"
+
+export type DestinationResult = {
+  status: DestinationStatus
+  errorCode: string | null
+  errorMessage: string | null
+  /** Email-specific. */
+  messageId?: string | null
+  /** Email-specific. */
+  recipientCount?: number
+}
+
+export type DestinationsResult = {
+  email: DestinationResult
+  slack: DestinationResult
+  teams: DestinationResult
+}
 
 export type RunDigestArgs = {
   supabase: SupabaseClient
@@ -41,7 +69,7 @@ export type RunDigestArgs = {
   triggeredBy?: string | null
   /** Optional override of the recipient list (e.g. "Send test to me"). */
   overrideRecipients?: string[]
-  /** When true, skips the Resend call but still records the run row. */
+  /** When true, skips every outbound call but still records the run row. */
   dryRun?: boolean
   /** When true, also returns the payload for in-app preview rendering. */
   returnPayload?: boolean
@@ -55,6 +83,7 @@ export type RunDigestResult = {
   itemsCount: number
   highCount: number
   recipients: string[]
+  destinations: DestinationsResult
   errorMessage?: string
   errorCode?: string
   /** Only populated when `returnPayload` is true. */
@@ -62,6 +91,12 @@ export type RunDigestResult = {
 }
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "")
+
+const DESTINATION_NOT_CONFIGURED: DestinationResult = {
+  status: "not_configured",
+  errorCode: null,
+  errorMessage: null,
+}
 
 export async function runDigestForOrganization(args: RunDigestArgs): Promise<RunDigestResult> {
   const now = args.now ?? new Date()
@@ -78,6 +113,7 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       itemsCount: 0,
       highCount: 0,
       recipients: [],
+      destinations: emptyDestinations(),
       errorMessage: orgRes.error?.message ?? "Organization not found.",
       errorCode: "org_not_found",
     }
@@ -99,6 +135,8 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       categories: [],
       slack_webhook_url: null,
       teams_webhook_url: null,
+      slack_enabled: false,
+      teams_enabled: false,
       skip_weekends: false,
       last_sent_at: null,
     }
@@ -118,8 +156,13 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
     now,
   })
 
-  // No recipients → record the run for visibility but do not send.
-  if (recipients.length === 0 && !args.dryRun) {
+  const slackEnabled = Boolean(settings.slack_enabled && settings.slack_webhook_url)
+  const teamsEnabled = Boolean(settings.teams_enabled && settings.teams_webhook_url)
+  const noEmail = recipients.length === 0
+  const noNonEmail = !slackEnabled && !teamsEnabled
+
+  // No destinations at all → record + bail.
+  if (noEmail && noNonEmail && !args.dryRun) {
     const runId = await insertRun(args.supabase, {
       organizationId: args.organizationId,
       triggeredBy: args.triggeredBy ?? null,
@@ -129,8 +172,9 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       recipients: [],
       providerMessageId: null,
       errorCode: "no_recipients",
-      errorMessage: "No internal recipients configured.",
+      errorMessage: "No internal recipients or webhook destinations configured.",
       sentAt: null,
+      destinations: emptyDestinations(),
     })
     return {
       status: "no_recipients",
@@ -138,6 +182,7 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       itemsCount: payload.totals.total,
       highCount: payload.totals.high,
       recipients: [],
+      destinations: emptyDestinations(),
       payload: args.returnPayload ? payload : undefined,
     }
   }
@@ -156,6 +201,7 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       errorCode: "no_items",
       errorMessage: "No items at or above the configured priority threshold.",
       sentAt: null,
+      destinations: emptyDestinations(),
     })
     return {
       status: "no_items",
@@ -163,109 +209,238 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
       itemsCount: 0,
       highCount: 0,
       recipients,
+      destinations: emptyDestinations(),
       payload: args.returnPayload ? payload : undefined,
     }
   }
 
   if (args.dryRun || args.triggerKind === "preview") {
-    // No DB write for previews — they are read-only.
     return {
       status: "skipped",
       runId: null,
       itemsCount: payload.totals.total,
       highCount: payload.totals.high,
       recipients,
+      destinations: emptyDestinations(),
       payload: args.returnPayload ? payload : undefined,
     }
   }
 
-  const email = renderAiOpsDigestEmail({ payload, appUrl: APP_URL })
-  const send = await sendEmail({
-    to: recipients,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
-  })
+  // Dispatch to every enabled destination in parallel; capture the
+  // result of each independently. A single failure must not block
+  // the others.
+  const [emailResult, slackResult, teamsResult] = await Promise.all([
+    dispatchEmail(payload, recipients),
+    slackEnabled
+      ? dispatchSlack(payload, settings.slack_webhook_url ?? "")
+      : Promise.resolve<DestinationResult>(
+          settings.slack_webhook_url
+            ? { status: "disabled", errorCode: null, errorMessage: null }
+            : DESTINATION_NOT_CONFIGURED,
+        ),
+    teamsEnabled
+      ? dispatchTeams(payload, settings.teams_webhook_url ?? "")
+      : Promise.resolve<DestinationResult>(
+          settings.teams_webhook_url
+            ? { status: "disabled", errorCode: null, errorMessage: null }
+            : DESTINATION_NOT_CONFIGURED,
+        ),
+  ])
 
-  if (!send.ok) {
-    const runId = await insertRun(args.supabase, {
-      organizationId: args.organizationId,
-      triggeredBy: args.triggeredBy ?? null,
-      triggerKind: args.triggerKind,
-      status: "failed",
-      payload,
-      recipients,
-      providerMessageId: null,
-      errorCode: send.code ?? "provider_error",
-      errorMessage: send.error,
-      sentAt: null,
-    })
-    return {
-      status: "failed",
-      runId,
-      itemsCount: payload.totals.total,
-      highCount: payload.totals.high,
-      recipients,
-      errorMessage: send.error,
-      errorCode: send.code,
-      payload: args.returnPayload ? payload : undefined,
-    }
+  const destinations: DestinationsResult = {
+    email: emailResult,
+    slack: slackResult,
+    teams: teamsResult,
   }
+  const overallStatus = aggregateStatus(destinations)
+  const sentAtIso = overallStatus === "failed" ? null : new Date(now).toISOString()
 
-  const sentAtIso = new Date(now).toISOString()
   const runId = await insertRun(args.supabase, {
     organizationId: args.organizationId,
     triggeredBy: args.triggeredBy ?? null,
     triggerKind: args.triggerKind,
-    status: "sent",
+    status: overallStatus,
     payload,
     recipients,
-    providerMessageId: send.id ?? null,
-    errorCode: null,
-    errorMessage: null,
+    providerMessageId: emailResult.messageId ?? null,
+    errorCode: collectErrorCode(destinations),
+    errorMessage: collectErrorMessage(destinations),
     sentAt: sentAtIso,
+    destinations,
   })
 
-  await args.supabase
-    .from("ai_ops_digest_settings")
-    .update({ last_sent_at: sentAtIso })
-    .eq("organization_id", args.organizationId)
+  if (sentAtIso) {
+    await args.supabase
+      .from("ai_ops_digest_settings")
+      .update({ last_sent_at: sentAtIso })
+      .eq("organization_id", args.organizationId)
+  }
 
-  // Audit row in `communication_events` so the org timeline shows
-  // an internal-only audit (channel = "system") of the digest. No
-  // customer is the recipient.
-  try {
-    await logCommunicationEvent(args.supabase, {
-      organizationId: args.organizationId,
-      channel: "system",
-      direction: "outbound",
-      eventType: "ai_ops_digest_sent",
-      title: `AI Ops digest sent · ${payload.totals.total} item${payload.totals.total === 1 ? "" : "s"}`,
-      summary: email.subject,
-      audience: "organization",
-      countsTowardUnread: false,
-      deliveryStatus: "sent",
-      recipientKind: "none",
-      provider: "resend",
-      metadata: {
-        trigger_kind: args.triggerKind,
-        recipient_count: recipients.length,
-        high_count: payload.totals.high,
-        items_count: payload.totals.total,
-      },
-      sentAt: sentAtIso,
-    })
-  } catch {
-    // Audit row failures must never break the digest send.
+  // Audit row in `communication_events` for the email branch only —
+  // Slack/Teams dispatches are already captured in `destinations_result`
+  // and don't need a duplicate communications row. Email keeps the
+  // existing audit behaviour from Phase 3.
+  if (emailResult.status === "sent" && sentAtIso) {
+    try {
+      const subject = renderAiOpsDigestEmail({ payload, appUrl: APP_URL }).subject
+      await logCommunicationEvent(args.supabase, {
+        organizationId: args.organizationId,
+        channel: "system",
+        direction: "outbound",
+        eventType: "ai_ops_digest_sent",
+        title: `AI Ops digest sent · ${payload.totals.total} item${payload.totals.total === 1 ? "" : "s"}`,
+        summary: subject,
+        audience: "organization",
+        countsTowardUnread: false,
+        deliveryStatus: "sent",
+        recipientKind: "none",
+        provider: "resend",
+        metadata: {
+          trigger_kind: args.triggerKind,
+          recipient_count: recipients.length,
+          high_count: payload.totals.high,
+          items_count: payload.totals.total,
+          slack_status: destinations.slack.status,
+          teams_status: destinations.teams.status,
+        },
+        sentAt: sentAtIso,
+      })
+    } catch {
+      // Audit row failures must never break the digest send.
+    }
   }
 
   return {
-    status: "sent",
+    status: overallStatus,
     runId,
     itemsCount: payload.totals.total,
     highCount: payload.totals.high,
     recipients,
+    destinations,
+    errorMessage: collectErrorMessage(destinations) ?? undefined,
+    errorCode: collectErrorCode(destinations) ?? undefined,
     payload: args.returnPayload ? payload : undefined,
+  }
+}
+
+async function dispatchEmail(
+  payload: DigestPayload,
+  recipients: string[],
+): Promise<DestinationResult> {
+  if (recipients.length === 0) return DESTINATION_NOT_CONFIGURED
+  try {
+    const email = renderAiOpsDigestEmail({ payload, appUrl: APP_URL })
+    const send = await sendEmail({
+      to: recipients,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    })
+    if (!send.ok) {
+      return {
+        status: "failed",
+        errorCode: send.code ?? "provider_error",
+        errorMessage: send.error,
+        recipientCount: recipients.length,
+      }
+    }
+    return {
+      status: "sent",
+      errorCode: null,
+      errorMessage: null,
+      messageId: send.id ?? null,
+      recipientCount: recipients.length,
+    }
+  } catch (e) {
+    return {
+      status: "failed",
+      errorCode: "exception",
+      errorMessage: e instanceof Error ? e.message : String(e),
+      recipientCount: recipients.length,
+    }
+  }
+}
+
+async function dispatchSlack(payload: DigestPayload, webhookUrl: string): Promise<DestinationResult> {
+  try {
+    const result = await sendSlackDigest({ webhookUrl, payload, appUrl: APP_URL })
+    if (!result.ok) {
+      return {
+        status: "failed",
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+      }
+    }
+    return { status: "sent", errorCode: null, errorMessage: null }
+  } catch (e) {
+    return {
+      status: "failed",
+      errorCode: "exception",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    }
+  }
+}
+
+async function dispatchTeams(payload: DigestPayload, webhookUrl: string): Promise<DestinationResult> {
+  try {
+    const result = await sendTeamsDigest({ webhookUrl, payload, appUrl: APP_URL })
+    if (!result.ok) {
+      return {
+        status: "failed",
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+      }
+    }
+    return { status: "sent", errorCode: null, errorMessage: null }
+  } catch (e) {
+    return {
+      status: "failed",
+      errorCode: "exception",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    }
+  }
+}
+
+function aggregateStatus(destinations: DestinationsResult): DigestRunStatus {
+  const buckets = [destinations.email, destinations.slack, destinations.teams]
+  const active = buckets.filter(
+    (d) => d.status !== "not_configured" && d.status !== "disabled",
+  )
+  if (active.length === 0) return "no_recipients"
+  const sent = active.filter((d) => d.status === "sent").length
+  const failed = active.filter((d) => d.status === "failed").length
+  if (sent === active.length) return "sent"
+  if (sent === 0) return "failed"
+  if (failed > 0) return "partial"
+  return "sent"
+}
+
+function collectErrorCode(destinations: DestinationsResult): string | null {
+  for (const d of [destinations.email, destinations.slack, destinations.teams]) {
+    if (d.status === "failed" && d.errorCode) return d.errorCode
+  }
+  return null
+}
+
+function collectErrorMessage(destinations: DestinationsResult): string | null {
+  const errors: string[] = []
+  if (destinations.email.status === "failed" && destinations.email.errorMessage) {
+    errors.push(`email: ${destinations.email.errorMessage}`)
+  }
+  if (destinations.slack.status === "failed" && destinations.slack.errorMessage) {
+    errors.push(`slack: ${destinations.slack.errorMessage}`)
+  }
+  if (destinations.teams.status === "failed" && destinations.teams.errorMessage) {
+    errors.push(`teams: ${destinations.teams.errorMessage}`)
+  }
+  return errors.length ? errors.join(" · ") : null
+}
+
+function emptyDestinations(): DestinationsResult {
+  return {
+    email: DESTINATION_NOT_CONFIGURED,
+    slack: DESTINATION_NOT_CONFIGURED,
+    teams: DESTINATION_NOT_CONFIGURED,
   }
 }
 
@@ -282,6 +457,7 @@ async function insertRun(
     errorCode: string | null
     errorMessage: string | null
     sentAt: string | null
+    destinations: DestinationsResult
   },
 ): Promise<string | null> {
   const { data, error } = await supabase
@@ -302,6 +478,7 @@ async function insertRun(
       error_message: args.errorMessage,
       categories: args.payload.byCategory.map((c) => c.category),
       sent_at: args.sentAt,
+      destinations_result: args.destinations,
     })
     .select("id")
     .maybeSingle()

@@ -14,6 +14,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { OrgPermissions } from "@/lib/permissions/model"
 import { RULES } from "./rules"
+import {
+  applyOutcomeAwareRanking,
+  computeCategoryAdjustments,
+  type CategoryAdjustments,
+} from "./ranking"
 import type {
   Recommendation,
   RecommendationCategory,
@@ -60,8 +65,15 @@ export async function generateRecommendations(args: {
   filter?: RecommendationFilter
   /** Defaults to `new Date()` — pass for tests. */
   now?: Date
+  /**
+   * AI Ops Phase 4 — when true, rerank items inside each priority
+   * bucket using the last 30 days of `ai_ops_outcomes`. Defaults to
+   * true. Set to false for tests / debugging.
+   */
+  outcomeAwareRanking?: boolean
 }): Promise<RecommendationsResponse> {
   const { supabase, organizationId, permissions, filter } = args
+  const useOutcomeRanking = args.outcomeAwareRanking !== false
   const now = args.now ?? new Date()
   const generatedAtIso = now.toISOString()
 
@@ -128,6 +140,25 @@ export async function generateRecommendations(args: {
     return 0
   })
 
+  // 5b. Phase 4 — outcome-aware reranking inside each priority
+  //     bucket. Strictly preserves priority ordering; only nudges
+  //     ties and items within the same bucket using last-30-day
+  //     outcome telemetry. Failures here must not affect the
+  //     deterministic baseline.
+  let categoryAdjustments: CategoryAdjustments = {}
+  if (useOutcomeRanking) {
+    try {
+      const { adjustments } = await computeCategoryAdjustments(supabase, organizationId, now)
+      categoryAdjustments = adjustments
+      if (Object.keys(adjustments).length > 0) {
+        items = applyOutcomeAwareRanking(items, adjustments)
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[ai-ops] outcome-aware ranking failed", e)
+    }
+  }
+
   // 6. Apply limit (UI defaults to 50).
   const limit = clampLimit(filter?.limit)
   if (items.length > limit) items = items.slice(0, limit)
@@ -149,6 +180,7 @@ export async function generateRecommendations(args: {
     summary,
     generatedAtIso,
     visibleCategories,
+    categoryAdjustments,
   }
 }
 

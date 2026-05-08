@@ -39,8 +39,10 @@ const patchSchema = z.object({
   sendHour: z.number().int().min(0).max(23).optional(),
   priorityThreshold: z.enum(["high", "medium", "low"] as [RecommendationPriority, ...RecommendationPriority[]]).optional(),
   categories: z.array(z.string()).max(20).optional(),
-  slackWebhookUrl: z.string().url().nullable().optional(),
-  teamsWebhookUrl: z.string().url().nullable().optional(),
+  slackWebhookUrl: z.string().url().max(512).nullable().optional(),
+  teamsWebhookUrl: z.string().url().max(512).nullable().optional(),
+  slackEnabled: z.boolean().optional(),
+  teamsEnabled: z.boolean().optional(),
   skipWeekends: z.boolean().optional(),
 })
 
@@ -120,7 +122,13 @@ export async function PATCH(
   if (data.categories !== undefined) upsert.categories = data.categories
   if (data.slackWebhookUrl !== undefined) upsert.slack_webhook_url = data.slackWebhookUrl
   if (data.teamsWebhookUrl !== undefined) upsert.teams_webhook_url = data.teamsWebhookUrl
+  if (data.slackEnabled !== undefined) upsert.slack_enabled = data.slackEnabled
+  if (data.teamsEnabled !== undefined) upsert.teams_enabled = data.teamsEnabled
   if (data.skipWeekends !== undefined) upsert.skip_weekends = data.skipWeekends
+
+  // Phase 4 safety: silently disable a destination if its webhook URL is cleared.
+  if (data.slackWebhookUrl === null) upsert.slack_enabled = false
+  if (data.teamsWebhookUrl === null) upsert.teams_enabled = false
 
   const { error } = await supabase
     .from("ai_ops_digest_settings")
@@ -140,10 +148,31 @@ function serialize(row: ReturnType<typeof defaultDigestSettings>) {
     timezone: row.timezone_snapshot,
     priorityThreshold: row.priority_threshold,
     categories: row.categories,
-    slackWebhookUrl: row.slack_webhook_url,
-    teamsWebhookUrl: row.teams_webhook_url,
+    /**
+     * Phase 4 — webhook URLs are masked once saved. The UI only
+     * needs to know that one is configured and what its host is so
+     * the admin can recognise it; the full URL stays server-side.
+     */
+    slackWebhookConfigured: Boolean(row.slack_webhook_url),
+    slackWebhookHint: maskWebhook(row.slack_webhook_url),
+    slackEnabled: row.slack_enabled,
+    teamsWebhookConfigured: Boolean(row.teams_webhook_url),
+    teamsWebhookHint: maskWebhook(row.teams_webhook_url),
+    teamsEnabled: row.teams_enabled,
     skipWeekends: row.skip_weekends,
     lastSentAt: row.last_sent_at,
+  }
+}
+
+function maskWebhook(url: string | null): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    const tail = parsed.pathname.split("/").filter(Boolean).slice(-1)[0] ?? ""
+    const lastFour = tail.slice(-4)
+    return `${parsed.host}/…/${"*".repeat(Math.max(0, tail.length - 4))}${lastFour}`
+  } catch {
+    return "configured"
   }
 }
 

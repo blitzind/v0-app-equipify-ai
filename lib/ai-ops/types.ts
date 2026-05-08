@@ -106,4 +106,12 @@ export type RecommendationsResponse = {
   generatedAtIso: string
   /** Categories the caller is permitted to see (post-permission filter). */
   visibleCategories: RecommendationCategory[]
+  /**
+   * AI Ops Phase 4 — outcome-aware ranking adjustments per category
+   * (range -0.4..+0.4). Useful for transparency in admin tooling;
+   * UI surfaces this only as a tooltip ("Boosted by past activity").
+   * Empty when fewer than the minimum sample threshold of outcomes
+   * has been recorded.
+   */
+  categoryAdjustments?: Partial<Record<RecommendationCategory, number>>
 }

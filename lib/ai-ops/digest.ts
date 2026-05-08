@@ -33,6 +33,9 @@ export type DigestSettingsRow = {
   categories: RecommendationCategory[]
   slack_webhook_url: string | null
   teams_webhook_url: string | null
+  /** Phase 4 — explicit enable toggles for non-email destinations. */
+  slack_enabled: boolean
+  teams_enabled: boolean
   skip_weekends: boolean
   last_sent_at: string | null
 }
@@ -85,7 +88,7 @@ export async function loadDigestSettings(
   const { data, error } = await supabase
     .from("ai_ops_digest_settings")
     .select(
-      "organization_id, enabled, recipients, send_hour, timezone_snapshot, priority_threshold, categories, slack_webhook_url, teams_webhook_url, skip_weekends, last_sent_at",
+      "organization_id, enabled, recipients, send_hour, timezone_snapshot, priority_threshold, categories, slack_webhook_url, teams_webhook_url, slack_enabled, teams_enabled, skip_weekends, last_sent_at",
     )
     .eq("organization_id", organizationId)
     .maybeSingle()
@@ -104,6 +107,8 @@ export function defaultDigestSettings(organizationId: string): DigestSettingsRow
     categories: [],
     slack_webhook_url: null,
     teams_webhook_url: null,
+    slack_enabled: false,
+    teams_enabled: false,
     skip_weekends: false,
     last_sent_at: null,
   }
@@ -131,6 +136,8 @@ export function normalizeSettingsRow(row: Record<string, unknown>): DigestSettin
     categories: categories as RecommendationCategory[],
     slack_webhook_url: typeof row.slack_webhook_url === "string" ? row.slack_webhook_url : null,
     teams_webhook_url: typeof row.teams_webhook_url === "string" ? row.teams_webhook_url : null,
+    slack_enabled: Boolean(row.slack_enabled),
+    teams_enabled: Boolean(row.teams_enabled),
     skip_weekends: Boolean(row.skip_weekends),
     last_sent_at: typeof row.last_sent_at === "string" ? row.last_sent_at : null,
   }

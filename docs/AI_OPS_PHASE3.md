@@ -1,5 +1,8 @@
 # AI Operational Assistant — Phase 3
 
+> **Phase 4 follow-up:** Slack/Teams delivery and outcome-aware ranking
+> are documented in [`AI_OPS_PHASE4.md`](./AI_OPS_PHASE4.md).
+
 Phase 3 turns AI Ops into a recurring operational command layer. A
 daily internal email digest summarises the highest-priority
 recommendations from the deterministic engine, and a "Mark as

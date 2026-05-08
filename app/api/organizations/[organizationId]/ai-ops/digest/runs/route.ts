@@ -46,7 +46,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("ai_ops_digest_runs")
     .select(
-      "id, trigger_kind, status, recipients, items_count, high_count, medium_count, low_count, summary, error_code, error_message, sent_at, created_at",
+      "id, trigger_kind, status, recipients, items_count, high_count, medium_count, low_count, summary, error_code, error_message, sent_at, created_at, destinations_result",
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
@@ -74,6 +74,10 @@ export async function GET(
         errorMessage: r.error_message,
         sentAt: r.sent_at,
         createdAt: r.created_at,
+        destinationsResult:
+          r.destinations_result && typeof r.destinations_result === "object"
+            ? r.destinations_result
+            : {},
       }
     }),
   })

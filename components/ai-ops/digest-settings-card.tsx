@@ -47,8 +47,13 @@ type DigestSettings = {
   timezone: string | null
   priorityThreshold: RecommendationPriority
   categories: RecommendationCategory[]
-  slackWebhookUrl: string | null
-  teamsWebhookUrl: string | null
+  /** Phase 4 — webhook URLs are masked once saved. */
+  slackWebhookConfigured: boolean
+  slackWebhookHint: string | null
+  slackEnabled: boolean
+  teamsWebhookConfigured: boolean
+  teamsWebhookHint: string | null
+  teamsEnabled: boolean
   skipWeekends: boolean
   lastSentAt: string | null
 }
@@ -58,6 +63,20 @@ type SettingsResponse = {
   settings: DigestSettings
   categoryOptions?: RecommendationCategory[]
   priorityOptions?: RecommendationPriority[]
+}
+
+type DigestPatchPayload = {
+  enabled?: boolean
+  recipients?: string[]
+  sendHour?: number
+  priorityThreshold?: RecommendationPriority
+  categories?: RecommendationCategory[]
+  /** Phase 4 — write-only; the GET response only echoes the masked hint. */
+  slackWebhookUrl?: string | null
+  teamsWebhookUrl?: string | null
+  slackEnabled?: boolean
+  teamsEnabled?: boolean
+  skipWeekends?: boolean
 }
 
 type RunRow = {
@@ -71,6 +90,11 @@ type RunRow = {
   errorMessage: string | null
   sentAt: string | null
   createdAt: string
+  destinationsResult?: {
+    email?: { status?: string }
+    slack?: { status?: string }
+    teams?: { status?: string }
+  }
 }
 
 const PRIORITY_LABEL: Record<RecommendationPriority, string> = {
@@ -161,7 +185,7 @@ export function AiOpsDigestSettingsCard() {
   }, [status, organizationId, fetchSettings, fetchRuns])
 
   const patch = useCallback(
-    async (next: Partial<DigestSettings>) => {
+    async (next: DigestPatchPayload) => {
       if (!organizationId || !canManage) return
       setSaving(true)
       try {
@@ -173,6 +197,8 @@ export function AiOpsDigestSettingsCard() {
         if (next.categories !== undefined) body.categories = next.categories
         if (next.slackWebhookUrl !== undefined) body.slackWebhookUrl = next.slackWebhookUrl
         if (next.teamsWebhookUrl !== undefined) body.teamsWebhookUrl = next.teamsWebhookUrl
+        if (next.slackEnabled !== undefined) body.slackEnabled = next.slackEnabled
+        if (next.teamsEnabled !== undefined) body.teamsEnabled = next.teamsEnabled
         if (next.skipWeekends !== undefined) body.skipWeekends = next.skipWeekends
         const res = await fetch(
           `/api/organizations/${encodeURIComponent(organizationId)}/ai-ops/digest/settings`,
@@ -549,49 +575,57 @@ export function AiOpsDigestSettingsCard() {
               </p>
             </div>
 
-            {/* Advanced delivery (Slack/Teams placeholder) */}
+            {/* Advanced delivery (Phase 4 — Slack + Teams) */}
             <div>
               <button
                 type="button"
                 onClick={() => setShowAdvancedDelivery((v) => !v)}
                 className="text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
-                {showAdvancedDelivery ? "Hide" : "Show"} additional delivery destinations
+                {showAdvancedDelivery ? "Hide" : "Show"} Slack &amp; Teams delivery
+                {(settings.slackEnabled || settings.teamsEnabled) ? (
+                  <Badge variant="outline" className="ml-2 text-[10px]">
+                    {[settings.slackEnabled && "Slack", settings.teamsEnabled && "Teams"]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Badge>
+                ) : null}
               </button>
               {showAdvancedDelivery ? (
-                <div className="mt-3 space-y-3 rounded-md border border-dashed border-border bg-muted/30 px-3 py-3">
-                  <div>
-                    <Label className="text-[11px] font-semibold mb-1 block">Slack webhook URL (optional)</Label>
-                    <Input
-                      type="url"
-                      placeholder="https://hooks.slack.com/services/..."
-                      defaultValue={settings.slackWebhookUrl ?? ""}
-                      onBlur={(e) => {
-                        const next = e.currentTarget.value.trim() || null
-                        if (next !== settings.slackWebhookUrl) void patch({ slackWebhookUrl: next })
-                      }}
-                      className="h-8 text-xs"
-                      disabled={!canManage}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] font-semibold mb-1 block">Teams webhook URL (optional)</Label>
-                    <Input
-                      type="url"
-                      placeholder="https://outlook.office.com/webhook/..."
-                      defaultValue={settings.teamsWebhookUrl ?? ""}
-                      onBlur={(e) => {
-                        const next = e.currentTarget.value.trim() || null
-                        if (next !== settings.teamsWebhookUrl) void patch({ teamsWebhookUrl: next })
-                      }}
-                      className="h-8 text-xs"
-                      disabled={!canManage}
-                    />
-                  </div>
+                <div className="mt-3 space-y-4 rounded-md border border-dashed border-border bg-muted/30 px-3 py-3">
                   <p className="text-[10px] text-muted-foreground leading-snug">
-                    Webhook delivery is queued for Phase 4. Today these fields are stored but
-                    only email is dispatched.
+                    Internal channels only. AI Ops will never post customer-facing messages
+                    to Slack or Teams. Webhook URLs are stored encrypted on the server and
+                    masked in the UI after save.
                   </p>
+
+                  <DestinationRow
+                    name="slack"
+                    label="Slack"
+                    placeholder="https://hooks.slack.com/services/T.../B.../..."
+                    enabled={settings.slackEnabled}
+                    configured={settings.slackWebhookConfigured}
+                    hint={settings.slackWebhookHint}
+                    canManage={canManage}
+                    organizationId={organizationId ?? ""}
+                    onUrlSubmit={(url) => void patch({ slackWebhookUrl: url, slackEnabled: url ? true : false })}
+                    onClear={() => void patch({ slackWebhookUrl: null, slackEnabled: false })}
+                    onToggle={(v) => void patch({ slackEnabled: v })}
+                  />
+
+                  <DestinationRow
+                    name="teams"
+                    label="Microsoft Teams"
+                    placeholder="https://outlook.office.com/webhook/..."
+                    enabled={settings.teamsEnabled}
+                    configured={settings.teamsWebhookConfigured}
+                    hint={settings.teamsWebhookHint}
+                    canManage={canManage}
+                    organizationId={organizationId ?? ""}
+                    onUrlSubmit={(url) => void patch({ teamsWebhookUrl: url, teamsEnabled: url ? true : false })}
+                    onClear={() => void patch({ teamsWebhookUrl: null, teamsEnabled: false })}
+                    onToggle={(v) => void patch({ teamsEnabled: v })}
+                  />
                 </div>
               ) : null}
             </div>
@@ -653,6 +687,7 @@ export function AiOpsDigestSettingsCard() {
                         className={cn(
                           "shrink-0 text-[10px]",
                           run.status === "sent" && "border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+                          run.status === "partial" && "border-amber-500/30 text-amber-700 dark:text-amber-300",
                           run.status === "failed" && "border-red-500/30 text-red-700 dark:text-red-300",
                           run.status === "no_items" && "border-amber-500/30 text-amber-700 dark:text-amber-300",
                           run.status === "no_recipients" && "border-amber-500/30 text-amber-700 dark:text-amber-300",
@@ -675,6 +710,32 @@ export function AiOpsDigestSettingsCard() {
                             </span>
                           ) : null}
                         </p>
+                        {run.destinationsResult ? (
+                          <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                            {(["email", "slack", "teams"] as const).map((d) => {
+                              const status = run.destinationsResult?.[d]?.status
+                              if (!status || status === "not_configured") return null
+                              return (
+                                <span
+                                  key={d}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded border px-1.5 py-0.5",
+                                    status === "sent" &&
+                                      "border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+                                    status === "failed" &&
+                                      "border-red-500/30 text-red-700 dark:text-red-300",
+                                    status === "disabled" &&
+                                      "border-border text-muted-foreground",
+                                    status === "skipped" &&
+                                      "border-border text-muted-foreground",
+                                  )}
+                                >
+                                  {d}: {status}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))
@@ -722,5 +783,209 @@ export function AiOpsDigestSettingsCardLazyHint() {
       Recipients only see the digest if your workspace has Resend configured. Ask an admin if
       delivery isn't working.
     </p>
+  )
+}
+
+function DestinationRow({
+  name,
+  label,
+  placeholder,
+  enabled,
+  configured,
+  hint,
+  canManage,
+  organizationId,
+  onUrlSubmit,
+  onClear,
+  onToggle,
+}: {
+  name: "slack" | "teams"
+  label: string
+  placeholder: string
+  enabled: boolean
+  configured: boolean
+  hint: string | null
+  canManage: boolean
+  organizationId: string
+  onUrlSubmit: (url: string) => void
+  onClear: () => void
+  onToggle: (v: boolean) => void
+}) {
+  const { toast } = useToast()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [testing, setTesting] = useState(false)
+
+  async function runTest() {
+    if (!organizationId) return
+    setTesting(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/ai-ops/digest/test-destination`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destination: name,
+            ...(draft.trim() ? { overrideWebhookUrl: draft.trim() } : {}),
+          }),
+        },
+      )
+      const body = (await res.json()) as { ok?: boolean; message?: string; error?: string }
+      if (!res.ok) throw new Error(body.message ?? body.error ?? "Test failed.")
+      toast({ title: `${label} test sent`, description: body.message })
+    } catch (e) {
+      toast({
+        title: `${label} test failed`,
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  function submitUrl() {
+    const value = draft.trim()
+    if (!value) {
+      toast({
+        title: "Enter a webhook URL first",
+        description: `Paste your ${label} incoming webhook URL.`,
+      })
+      return
+    }
+    onUrlSubmit(value)
+    setEditing(false)
+    setDraft("")
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-3 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold">{label}</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            {configured ? (
+              <>
+                Configured · <code className="text-[10px]">{hint ?? "saved"}</code>
+              </>
+            ) : (
+              <>Not configured</>
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => canManage && configured && onToggle(!enabled)}
+          disabled={!canManage || !configured}
+          className={cn(
+            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50",
+            enabled ? "bg-primary" : "bg-border",
+          )}
+          aria-label={`Toggle ${label} delivery`}
+          title={configured ? undefined : "Save a webhook URL first."}
+        >
+          <span
+            className={cn(
+              "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform",
+              enabled ? "translate-x-4" : "translate-x-0",
+            )}
+          />
+        </button>
+      </div>
+
+      {editing ? (
+        <div className="space-y-2">
+          <Input
+            type="url"
+            placeholder={placeholder}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="h-8 text-xs"
+            disabled={!canManage}
+            autoFocus
+          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              onClick={submitUrl}
+              disabled={!canManage}
+              className="h-7 text-xs"
+            >
+              Save webhook
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false)
+                setDraft("")
+              }}
+              className="h-7 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void runTest()}
+              disabled={!canManage || testing || !draft.trim()}
+              className="h-7 text-xs gap-1"
+            >
+              {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Send test
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {canManage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditing(true)
+                setDraft("")
+              }}
+              className="h-7 text-xs"
+            >
+              {configured ? "Replace webhook" : "Add webhook"}
+            </Button>
+          ) : null}
+          {configured ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void runTest()}
+              disabled={testing || !configured}
+              className="h-7 text-xs gap-1"
+              title="Sends a one-line test message to confirm the destination is wired correctly."
+            >
+              {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Send test
+            </Button>
+          ) : null}
+          {configured && canManage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onClear}
+              className="h-7 text-xs text-red-600 hover:text-red-700"
+            >
+              Remove
+            </Button>
+          ) : null}
+        </div>
+      )}
+    </div>
   )
 }
