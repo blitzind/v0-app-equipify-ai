@@ -27,8 +27,12 @@ import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overvi
 import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
 import { startOfWeekMonday, toYmd } from "@/lib/dispatch/board-utils"
+import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
+import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
+import { emitSchedulingEvent } from "@/lib/dispatch/scheduling-events-client"
 import { DRAWER_BACKDROP_Z, EQUIPIFY_SCRIM } from "@/components/detail-drawer"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import type { MaintenancePlan, WorkOrderType, WorkOrderPriority } from "@/lib/mock-data"
@@ -1029,6 +1033,7 @@ type DbScheduledWoRow = {
   scheduled_on: string
   scheduled_time: string | null
   assigned_user_id: string | null
+  assigned_technician_id?: string | null
   priority?: string | null
   type?: string | null
   billing_state?: string | null
@@ -1045,6 +1050,11 @@ type ScheduledWoRowView = {
   wo: DispatchWo
   equipmentName: string
   location: string
+}
+
+type ScheduleTechnicianOption = {
+  id: string
+  label: string
 }
 
 function scheduleInitialsFromName(name: string): string {
@@ -1209,6 +1219,187 @@ function ScheduledWorkOrdersSection({
           })}
       </CardContent>
     </Card>
+  )
+}
+
+function UnassignedWorkLane({
+  rows,
+  loading,
+  technicians,
+  search,
+  onSearchChange,
+  filter,
+  onFilterChange,
+  assigningWoId,
+  onQuickAssign,
+}: {
+  rows: ScheduledWoRowView[]
+  loading: boolean
+  technicians: ScheduleTechnicianOption[]
+  search: string
+  onSearchChange: (value: string) => void
+  filter: "all" | "needs_assignment" | "needs_scheduling" | "overdue" | "open_only"
+  onFilterChange: (value: "all" | "needs_assignment" | "needs_scheduling" | "overdue" | "open_only") => void
+  assigningWoId: string | null
+  onQuickAssign: (args: { wo: DispatchWo; technicianId: string | null; scheduledOn: string; scheduledTime: string | null }) => void
+}) {
+  return (
+    <Card className="border border-primary/20 bg-primary/[0.02]">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-primary" />
+              Unassigned work lane
+            </CardTitle>
+            <p className="text-xs text-muted-foreground font-normal pt-0.5">
+              Open work needing technician assignment, date, or time before dispatch.
+            </p>
+          </div>
+          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+            {rows.length} in queue
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        <div className="grid gap-2 sm:grid-cols-[1fr_180px]">
+          <input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search WO, customer, equipment, location..."
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          <select
+            value={filter}
+            onChange={(event) => onFilterChange(event.target.value as typeof filter)}
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="all">All unassigned</option>
+            <option value="needs_assignment">Needs assignment</option>
+            <option value="needs_scheduling">Needs date/time</option>
+            <option value="overdue">Overdue unscheduled</option>
+            <option value="open_only">Open only</option>
+          </select>
+        </div>
+
+        {loading ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Loading unassigned work...</p>
+        ) : rows.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-6 text-center">
+            <ClipboardList className="mx-auto h-7 w-7 text-muted-foreground/40" aria-hidden />
+            <p className="mt-2 text-sm font-medium text-foreground">No work waiting for dispatch</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Maintenance-generated work orders will appear here until assigned and scheduled.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {rows.slice(0, 12).map((row) => {
+              const wo = row.wo
+              const state = deriveDispatchState({
+                status: wo.status,
+                customerId: wo.customer_id,
+                scheduledOn: wo.scheduled_on,
+                scheduledTime: wo.scheduled_time,
+                assignedUserId: wo.assigned_user_id,
+              })
+              const defaultDate = wo.scheduled_on ?? toYmd(new Date())
+              return (
+                <UnassignedWorkCard
+                  key={wo.id}
+                  row={row}
+                  state={state}
+                  technicians={technicians}
+                  defaultDate={defaultDate}
+                  assigning={assigningWoId === wo.id}
+                  onQuickAssign={(args) => onQuickAssign({ wo, ...args })}
+                />
+              )
+            })}
+          </div>
+        )}
+        {!loading && rows.length > 12 ? (
+          <p className="text-xs text-muted-foreground">Showing first 12 of {rows.length}. Use search or filters to narrow the queue.</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+}
+
+function UnassignedWorkCard({
+  row,
+  state,
+  technicians,
+  defaultDate,
+  assigning,
+  onQuickAssign,
+}: {
+  row: ScheduledWoRowView
+  state: ReturnType<typeof deriveDispatchState>
+  technicians: ScheduleTechnicianOption[]
+  defaultDate: string
+  assigning: boolean
+  onQuickAssign: (args: { technicianId: string | null; scheduledOn: string; scheduledTime: string | null }) => void
+}) {
+  const wo = row.wo
+  const [technicianId, setTechnicianId] = useState("")
+  const [date, setDate] = useState(defaultDate)
+  const [time, setTime] = useState(formatScheduleTimeHm(wo.scheduled_time) || "08:00")
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link href={`/work-orders?workOrderId=${encodeURIComponent(wo.id)}`} className="font-mono text-[11px] text-primary hover:underline">
+              {formatWorkOrderDisplay(wo.work_order_number, wo.id)}
+            </Link>
+            <Badge variant="outline" className="text-[10px]">{formatWoStatusLabel(wo.status)}</Badge>
+            <Badge variant="outline" className="text-[10px]">{state.label}</Badge>
+          </div>
+          <p className="mt-1 truncate text-sm font-semibold text-foreground">{wo.customerName}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+            {row.location || wo.serviceLocationLabel || "Location not set"} · {row.equipmentName}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+            {state.readyToDispatch ? (
+              <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-primary">Ready to dispatch</span>
+            ) : null}
+            {state.needsAssignment ? (
+              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">Needs assignment</span>
+            ) : null}
+            {state.needsScheduling ? (
+              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">Needs date/time</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="shrink-0 text-right text-xs text-muted-foreground">
+          <p>{wo.priority ? `${formatWoStatusLabel(wo.priority)} priority` : "Normal priority"}</p>
+          <p>{wo.type ? formatWoStatusLabel(wo.type) : "Service"}</p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_130px_110px_auto]">
+        <select
+          value={technicianId}
+          onChange={(event) => setTechnicianId(event.target.value)}
+          className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+        >
+          <option value="">Select technician</option>
+          {technicians.map((tech) => (
+            <option key={tech.id} value={tech.id}>{tech.label}</option>
+          ))}
+        </select>
+        <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground" />
+        <input type="time" value={time} onChange={(event) => setTime(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground" />
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 text-xs"
+          disabled={assigning || !technicianId || !date}
+          onClick={() => onQuickAssign({ technicianId, scheduledOn: date, scheduledTime: time || null })}
+        >
+          {assigning ? "Saving..." : "Assign"}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -1517,6 +1708,11 @@ function ServiceSchedulePageInner() {
   const { plans, organizationId } = useMaintenancePlans()
 
   const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWoRowView[]>([])
+  const [unassignedWoRows, setUnassignedWoRows] = useState<ScheduledWoRowView[]>([])
+  const [assignTechnicians, setAssignTechnicians] = useState<ScheduleTechnicianOption[]>([])
+  const [unassignedSearch, setUnassignedSearch] = useState("")
+  const [unassignedFilter, setUnassignedFilter] = useState<"all" | "needs_assignment" | "needs_scheduling" | "overdue" | "open_only">("all")
+  const [assigningWoId, setAssigningWoId] = useState<string | null>(null)
   const [scheduledWoLoading, setScheduledWoLoading] = useState(true)
   const [scheduledWoRefresh, setScheduledWoRefresh] = useState(0)
 
@@ -1533,6 +1729,7 @@ function ServiceSchedulePageInner() {
       if (!user) {
         if (active) {
           setScheduledWoRows([])
+          setUnassignedWoRows([])
           setScheduledWoLoading(false)
         }
         return
@@ -1541,6 +1738,7 @@ function ServiceSchedulePageInner() {
       if (!organizationId) {
         if (active) {
           setScheduledWoRows([])
+          setUnassignedWoRows([])
           setScheduledWoLoading(false)
         }
         return
@@ -1549,58 +1747,101 @@ function ServiceSchedulePageInner() {
       const orgId = organizationId
 
       const selFull =
-        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
-      const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
+        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+      const selNoBilling = `${WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM}, assigned_technician_id`
       const selMini =
-        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id"
+        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id"
 
-      let mini = false
-      let woRes = await supabase
-        .from("work_orders")
-        .select(selFull)
-        .eq("organization_id", orgId)
-        .is("archived_at", null)
-        .not("scheduled_on", "is", null)
-        .order("scheduled_on", { ascending: true })
-        .order("scheduled_time", { ascending: true, nullsFirst: false })
-
-      if (woRes.error && missingOperationalBillingColumns(woRes.error)) {
-        woRes = await supabase
+      async function fetchScheduled() {
+        let mini = false
+        let res = await supabase
           .from("work_orders")
-          .select(selNoBilling)
+          .select(selFull)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .not("scheduled_on", "is", null)
           .order("scheduled_on", { ascending: true })
           .order("scheduled_time", { ascending: true, nullsFirst: false })
-      }
-      if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-        mini = true
-        woRes = await supabase
-          .from("work_orders")
-          .select(selMini)
-          .eq("organization_id", orgId)
-          .is("archived_at", null)
-          .not("scheduled_on", "is", null)
-          .order("scheduled_on", { ascending: true })
-          .order("scheduled_time", { ascending: true, nullsFirst: false })
+        if (res.error && missingOperationalBillingColumns(res.error)) {
+          res = await supabase
+            .from("work_orders")
+            .select(selNoBilling)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .not("scheduled_on", "is", null)
+            .order("scheduled_on", { ascending: true })
+            .order("scheduled_time", { ascending: true, nullsFirst: false })
+        }
+        if (res.error && missingWorkOrderNumberColumn(res.error)) {
+          mini = true
+          res = await supabase
+            .from("work_orders")
+            .select(selMini)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .not("scheduled_on", "is", null)
+            .order("scheduled_on", { ascending: true })
+            .order("scheduled_time", { ascending: true, nullsFirst: false })
+        }
+        return { data: res.data, error: res.error, mini }
       }
 
-      const { data: rows, error: woError } = woRes
+      async function fetchUnassigned() {
+        let mini = false
+        let res = await supabase
+          .from("work_orders")
+          .select(selFull)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", ["open", "scheduled", "in_progress"])
+          .or("assigned_user_id.is.null,assigned_technician_id.is.null,scheduled_on.is.null,scheduled_time.is.null")
+          .order("created_at", { ascending: false })
+          .limit(75)
+        if (res.error && missingOperationalBillingColumns(res.error)) {
+          res = await supabase
+            .from("work_orders")
+            .select(selNoBilling)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", ["open", "scheduled", "in_progress"])
+            .or("assigned_user_id.is.null,assigned_technician_id.is.null,scheduled_on.is.null,scheduled_time.is.null")
+            .order("created_at", { ascending: false })
+            .limit(75)
+        }
+        if (res.error && missingWorkOrderNumberColumn(res.error)) {
+          mini = true
+          res = await supabase
+            .from("work_orders")
+            .select(selMini)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", ["open", "scheduled", "in_progress"])
+            .or("assigned_user_id.is.null,assigned_technician_id.is.null,scheduled_on.is.null,scheduled_time.is.null")
+            .order("created_at", { ascending: false })
+            .limit(75)
+        }
+        return { data: res.data, error: res.error, mini }
+      }
+
+      const [scheduledRes, unassignedRes] = await Promise.all([fetchScheduled(), fetchUnassigned()])
+      const { data: rows, error: woError } = scheduledRes
 
       if (woError || !rows || !active) {
         if (active) {
           setScheduledWoRows([])
+          setUnassignedWoRows([])
           setScheduledWoLoading(false)
         }
         return
       }
 
       const list = rows as DbScheduledWoRow[]
-      const customerIds = [...new Set(list.map((r) => r.customer_id))]
-      const equipmentIds = [...new Set(list.map((r) => r.equipment_id))]
+      const unassignedList = (unassignedRes.error ? [] : (unassignedRes.data as DbScheduledWoRow[] | null) ?? [])
+      const combined = [...list, ...unassignedList.filter((row) => !list.some((scheduled) => scheduled.id === row.id))]
+      const customerIds = [...new Set(combined.map((r) => r.customer_id))]
+      const equipmentIds = [...new Set(combined.map((r) => r.equipment_id))]
       const assigneeIds = [
-        ...new Set(list.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
+        ...new Set(combined.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
       ]
 
       const customerMap = new Map<string, string>()
@@ -1671,7 +1912,7 @@ function ServiceSchedulePageInner() {
 
       if (!active) return
 
-      const dispatchRows = list.map((row) => mapDbRowToDispatchWoRow(row, mini))
+      const dispatchRows = combined.map((row) => mapDbRowToDispatchWoRow(row, scheduledRes.mini && unassignedRes.mini))
 
       const techByUserId = new Map<string, DispatchTech>()
       for (const id of assigneeIds) {
@@ -1686,7 +1927,7 @@ function ServiceSchedulePageInner() {
 
       const enriched = await enrichDispatchWorkOrders(supabase, orgId, dispatchRows, techByUserId, customerMap)
 
-      const mapped: ScheduledWoRowView[] = list.map((row, i) => {
+      const mappedAll: ScheduledWoRowView[] = combined.map((row, i) => {
         const eq = equipmentMap.get(row.equipment_id)
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
@@ -1704,7 +1945,22 @@ function ServiceSchedulePageInner() {
         }
       })
 
-      setScheduledWoRows(mapped)
+      const byId = new Map(mappedAll.map((row) => [row.wo.id, row]))
+      setScheduledWoRows(list.map((row) => byId.get(row.id)).filter((row): row is ScheduledWoRowView => Boolean(row)))
+      setUnassignedWoRows(unassignedList.map((row) => byId.get(row.id)).filter((row): row is ScheduledWoRowView => Boolean(row)))
+
+      const { data: techRows } = await supabase
+        .from("technicians")
+        .select("id, full_name")
+        .eq("organization_id", orgId)
+        .eq("operational_status", "active")
+        .order("full_name", { ascending: true })
+      setAssignTechnicians(
+        ((techRows as Array<{ id: string; full_name: string | null }> | null) ?? []).map((tech) => ({
+          id: tech.id,
+          label: tech.full_name?.trim() || "Technician",
+        })),
+      )
       setScheduledWoLoading(false)
     }
 
@@ -1816,6 +2072,38 @@ function ServiceSchedulePageInner() {
     return rows
   }, [scheduledWoRows, scheduleOpsFilter, scheduleStatusFilter, customerFilter, techFilter])
 
+  const filteredUnassignedWoRows = useMemo(() => {
+    const q = unassignedSearch.trim().toLowerCase()
+    return unassignedWoRows.filter((row) => {
+      const wo = row.wo
+      const state = deriveDispatchState({
+        status: wo.status,
+        customerId: wo.customer_id,
+        scheduledOn: wo.scheduled_on,
+        scheduledTime: wo.scheduled_time,
+        assignedUserId: wo.assigned_user_id,
+      })
+      if (unassignedFilter === "needs_assignment" && !state.needsAssignment) return false
+      if (unassignedFilter === "needs_scheduling" && !state.needsScheduling) return false
+      if (unassignedFilter === "overdue" && !state.overdueUnscheduled) return false
+      if (unassignedFilter === "open_only" && wo.status !== "open") return false
+      if (!q) return true
+      return [
+        formatWorkOrderDisplay(wo.work_order_number, wo.id),
+        wo.title,
+        wo.customerName,
+        row.equipmentName,
+        row.location,
+        wo.serviceLocationLabel ?? "",
+        wo.priority ?? "",
+        wo.type ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [unassignedWoRows, unassignedFilter, unassignedSearch])
+
   const scheduleStatusCounts = useMemo(() => {
     const opsFiltered = scheduledWoRows
       .filter((row) => filterDispatchRows([row.wo], scheduleOpsFilter).length > 0)
@@ -1923,6 +2211,43 @@ function ServiceSchedulePageInner() {
     })
     if (error) return
     setCreatedIds((prev) => new Set([...prev, plan.id]))
+    setScheduledWoRefresh((n) => n + 1)
+  }
+
+  async function handleQuickAssignWork(args: {
+    wo: DispatchWo
+    technicianId: string | null
+    scheduledOn: string
+    scheduledTime: string | null
+  }) {
+    if (!organizationId || !args.technicianId || !args.scheduledOn) return
+    setAssigningWoId(args.wo.id)
+    const supabase = createBrowserSupabaseClient()
+    const assignment = await workOrderAssignmentColumns(supabase, organizationId, args.technicianId)
+    const patch = buildSchedulePatch({
+      scheduledOn: args.scheduledOn,
+      scheduledTimeHhMm: args.scheduledTime,
+      assignment,
+      previousStatus: args.wo.status,
+    })
+    const { error } = await supabase
+      .from("work_orders")
+      .update(patch)
+      .eq("organization_id", organizationId)
+      .eq("id", args.wo.id)
+    setAssigningWoId(null)
+    if (error) return
+
+    const techLabel = assignTechnicians.find((tech) => tech.id === args.technicianId)?.label ?? "Technician"
+    void emitSchedulingEvent({
+      organizationId,
+      workOrderId: args.wo.id,
+      eventType: "reassign",
+      severity: "info",
+      message: `Assigned to ${techLabel} for ${args.scheduledOn}${args.scheduledTime ? ` at ${args.scheduledTime}` : ""}.`,
+      metadata: { source: "service_schedule.unassigned_lane" },
+    })
+    setScheduledWoRefresh((n) => n + 1)
   }
 
   return (
@@ -2157,6 +2482,17 @@ function ServiceSchedulePageInner() {
               }}
             />
           ) : null}
+          <UnassignedWorkLane
+            rows={filteredUnassignedWoRows}
+            loading={scheduledWoLoading}
+            technicians={assignTechnicians}
+            search={unassignedSearch}
+            onSearchChange={setUnassignedSearch}
+            filter={unassignedFilter}
+            onFilterChange={setUnassignedFilter}
+            assigningWoId={assigningWoId}
+            onQuickAssign={(args) => void handleQuickAssignWork(args)}
+          />
           <ScheduledWorkOrdersSection
             rows={filteredScheduledWoRows}
             loading={scheduledWoLoading}

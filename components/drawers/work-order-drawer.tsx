@@ -78,6 +78,7 @@ import {
   Loader2,
   PackageSearch,
   History,
+  UserPlus,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { useTenant } from "@/lib/tenant-store"
@@ -89,6 +90,7 @@ import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dial
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
+import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
@@ -1515,6 +1517,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const showPostComplete =
     wo.status === "Completed" || wo.status === "Completed Pending Signature"
   const readyToInvoice = showPostComplete && linkedInvoices.filter((i) => !i.isArchived).length === 0
+  const dispatchState = deriveDispatchState({
+    status: uiStatusToDb(wo.status),
+    customerId: wo.customerId,
+    scheduledOn: wo.scheduledDate,
+    scheduledTime: wo.scheduledTime,
+    assignedUserId: wo.technicianId === "unassigned" ? null : wo.technicianId,
+    archivedAt: wo.isArchived ? "archived" : null,
+  })
 
   async function sendWorkOrderSummaryEmail() {
     if (!wo || !activeOrgId) return
@@ -1633,6 +1643,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             <Badge variant="secondary" className={cn("text-xs border shrink-0", STATUS_STYLE[currentStatus])}>
               {currentStatus}
             </Badge>
+            {dispatchState.dispatchIncomplete ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-semibold border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] shrink-0"
+              >
+                Dispatch incomplete
+              </Badge>
+            ) : null}
             {wo.isArchived ? (
               <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border shrink-0">
                 Archived
@@ -1874,6 +1892,33 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               </DrawerSection>
             </div>
           )}
+
+          {!editing && dispatchState.dispatchIncomplete ? (
+            <div className="shrink-0 border-b border-border px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Still in dispatch queue</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {dispatchState.needsAssignment ? "Needs technician assignment. " : ""}
+                    {dispatchState.needsScheduling ? "Needs scheduled date/time. " : ""}
+                    Current state: {dispatchState.label}.
+                  </p>
+                </div>
+                {woCanEdit && !wo.isArchived ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => setAssignDialogOpen(true)}
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Assign technician
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {!editing && operationalDrawerBadges.length > 0 ? (
             <div className="shrink-0 border-b border-border px-5 py-3">
