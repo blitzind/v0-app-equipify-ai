@@ -101,6 +101,7 @@ import { Switch } from "@/components/ui/switch"
 import { MaintenancePlanDrawer } from "@/components/drawers/maintenance-plan-drawer"
 import { AppointmentActions } from "@/components/appointments/appointment-actions"
 import { ScheduleServiceDrawer } from "@/components/schedule-service-drawer"
+import { QuickAppointmentDialog } from "@/components/dispatch/quick-appointment-dialog"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1048,7 +1049,7 @@ type DbScheduledWoRow = {
   id: string
   work_order_number?: number | null
   customer_id: string
-  equipment_id: string
+  equipment_id: string | null
   title: string
   status: string
   scheduled_on: string
@@ -2068,7 +2069,7 @@ function ServiceSchedulePageInner() {
       const unassignedList = (unassignedRes.error ? [] : (unassignedRes.data as DbScheduledWoRow[] | null) ?? [])
       const combined = [...list, ...unassignedList.filter((row) => !list.some((scheduled) => scheduled.id === row.id))]
       const customerIds = [...new Set(combined.map((r) => r.customer_id))]
-      const equipmentIds = [...new Set(combined.map((r) => r.equipment_id))]
+      const equipmentIds = [...new Set(combined.map((r) => r.equipment_id).filter((id): id is string => Boolean(id)))]
       const assigneeIds = [
         ...new Set(combined.map((r) => r.assigned_user_id).filter((id): id is string => Boolean(id))),
       ]
@@ -2157,16 +2158,16 @@ function ServiceSchedulePageInner() {
       const enriched = await enrichDispatchWorkOrders(supabase, orgId, dispatchRows, techByUserId, customerMap)
 
       const mappedAll: ScheduledWoRowView[] = combined.map((row, i) => {
-        const eq = equipmentMap.get(row.equipment_id)
+        const eq = row.equipment_id ? equipmentMap.get(row.equipment_id) : undefined
         const equipmentName = eq
           ? getEquipmentDisplayPrimary({
-              id: row.equipment_id,
+              id: row.equipment_id ?? "",
               name: eq.name,
               equipment_code: eq.equipment_code,
               serial_number: eq.serial_number,
               category: eq.category,
             })
-          : "Equipment"
+          : "Service visit"
         return {
           wo: enriched[i]!,
           equipmentName,
@@ -2246,6 +2247,7 @@ function ServiceSchedulePageInner() {
   const [createdIds, setCreatedIds]       = useState<Set<string>>(new Set())
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen]   = useState(false)
+  const [quickAppointmentOpen, setQuickAppointmentOpen] = useState(false)
   const [reschedulePlan, setReschedulePlan] = useState<MaintenancePlan | null>(null)
 
   const searchParams = useSearchParams()
@@ -2624,11 +2626,16 @@ function ServiceSchedulePageInner() {
           ))}
         </div>
 
-        {/* Schedule Service CTA */}
-        <Button size="sm" className="gap-1.5 shrink-0 h-9" onClick={() => setScheduleOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Schedule Service
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" className="gap-1.5 shrink-0 h-9" onClick={() => setQuickAppointmentOpen(true)}>
+            <Plus className="w-4 h-4" />
+            New Appointment
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1.5 shrink-0 h-9" onClick={() => setScheduleOpen(true)}>
+            <Calendar className="w-4 h-4" />
+            Full Schedule
+          </Button>
+        </div>
       </div>
 
       {/* ── Secondary Toolbar (filters + date nav for list view) ──────────── */}
@@ -2898,6 +2905,16 @@ function ServiceSchedulePageInner() {
         open={scheduleOpen}
         onClose={() => setScheduleOpen(false)}
         onScheduled={() => setScheduledWoRefresh((n) => n + 1)}
+      />
+      <QuickAppointmentDialog
+        open={quickAppointmentOpen}
+        onClose={() => setQuickAppointmentOpen(false)}
+        defaultDate={scheduleSelectedYmd}
+        defaultTimeHhMm={null}
+        defaultTechnicianId={null}
+        technicians={assignTechnicians}
+        existingWorkOrders={scheduledWoRows.map((row) => row.wo)}
+        onCreated={() => setScheduledWoRefresh((n) => n + 1)}
       />
       {reschedulePlan && (
         <RescheduleModal plan={reschedulePlan} onClose={() => setReschedulePlan(null)} />

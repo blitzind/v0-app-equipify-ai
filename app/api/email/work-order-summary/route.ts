@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   type WoRow = {
     id: string
     customer_id: string
-    equipment_id: string
+    equipment_id: string | null
     title: string
     status: string
     completed_at: string | null
@@ -166,17 +166,19 @@ export async function POST(request: Request) {
       .eq("organization_id", organizationId)
       .eq("id", wo.customer_id)
       .maybeSingle(),
-    supabase
-      .from("equipment")
-      .select("name")
-      .eq("organization_id", organizationId)
-      .eq("id", wo.equipment_id)
-      .maybeSingle(),
+    wo.equipment_id
+      ? supabase
+          .from("equipment")
+          .select("name")
+          .eq("organization_id", organizationId)
+          .eq("id", wo.equipment_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
 
   const organizationName = (org as { name?: string } | null)?.name?.trim() || "Your service team"
   const customerName = (cust as { company_name?: string } | null)?.company_name?.trim() || "Customer"
-  const equipmentName = (equip as { name?: string } | null)?.name?.trim() || "Equipment"
+  const equipmentName = (equip as { name?: string } | null)?.name?.trim() || "Service visit"
 
   const woLabel = getWorkOrderDisplay({
     id: wo.id,

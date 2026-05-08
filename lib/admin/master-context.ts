@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T20:15:17.824Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T20:40:24.699Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -79,17 +79,17 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Work Orders
 - **Routes:** \`/work-orders\`, \`/work-orders/[id]\`
-- **Purpose:** Full WO lifecycle — scheduling, assignment, labor/parts, attachments, signatures, certificates linkage.
+- **Purpose:** Full WO lifecycle — quick mobile appointment creation, scheduling, assignment, labor/parts, attachments, signatures, certificates linkage.
 - **Status:** Implemented (large surface area).
 - **Key UI:** \`work-order-detail-experience\`, drawers, certificate tabs.
-- **Tables:** \`work_orders\` (+ many additive columns), related tasks/parts/attachments migrations.
-- **Gaps:** Service-to-invoice linkage polish, dispatch scheduling edge cases.
+- **Tables:** \`work_orders\` (+ many additive columns; \`equipment_id\` can be null for service visits), related tasks/parts/attachments migrations.
+- **Gaps:** Service-to-invoice linkage polish, deeper mobile field UX.
 
 ### Service Schedule
 - **Route:** \`/service-schedule\`
-- **Purpose:** Calendar-oriented upcoming maintenance / service view.
+- **Purpose:** Calendar-oriented upcoming maintenance / service view with unassigned lane, drag/drop scheduling, and quick appointment creation.
 - **Status:** Implemented.
-- **Gaps:** Filtering, unassigned work UX, tighter integration with dispatch.
+- **Gaps:** Advanced route optimization and notification polish.
 
 ### Maintenance Plans
 - **Routes:** \`/maintenance-plans\`, related dialogs.
@@ -181,7 +181,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 ## Current Workflow Map
 1. **Customer** record → **locations** & **contacts**.
 2. **Equipment** installed at customer/location context.
-3. **Work order** created (ad hoc or from **maintenance plan** / schedule).
+3. **Work order** created (ad hoc, quick appointment, or from **maintenance plan** / schedule).
 4. **Schedule / dispatch** assigns technician and time (\`scheduled_on\` / dispatch UI).
 5. Field completion → **certificate / calibration** data on WO when applicable; documents (PDF/HTML) from templates.
 6. **Invoice** (and **quote** earlier in sales flow); optional **QuickBooks** export + auto-sync.

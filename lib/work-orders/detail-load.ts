@@ -88,7 +88,7 @@ type WoRow = {
   work_order_number?: number | null
   organization_id: string
   customer_id: string
-  equipment_id: string
+  equipment_id: string | null
   title: string
   status: string
   priority: string
@@ -201,7 +201,7 @@ async function fetchWorkOrderEquipmentAssets(
   supabase: SupabaseClient,
   organizationId: string,
   workOrderId: string,
-  fallback: { equipmentId: string; typeDb: string; priorityDb: string },
+  fallback: { equipmentId: string | null; typeDb: string; priorityDb: string },
 ): Promise<WorkOrderEquipmentAsset[]> {
   const { data: joinRows, error: joinErr } = await supabase
     .from("work_order_equipment")
@@ -223,23 +223,27 @@ async function fetchWorkOrderEquipmentAssets(
       equipmentId: r.equipment_id,
       typeDb: (r.work_type ?? fallback.typeDb).trim() || fallback.typeDb,
       priorityDb: (r.priority ?? fallback.priorityDb).trim() || fallback.priorityDb,
-    })) ?? [
-      {
-        joinRowId: null,
-        equipmentId: fallback.equipmentId,
-        typeDb: fallback.typeDb,
-        priorityDb: fallback.priorityDb,
-      },
-    ]
+    })) ?? (fallback.equipmentId
+      ? [
+          {
+            joinRowId: null,
+            equipmentId: fallback.equipmentId,
+            typeDb: fallback.typeDb,
+            priorityDb: fallback.priorityDb,
+          },
+        ]
+      : [])
 
   const ids = [...new Set(slotRows.map((s) => s.equipmentId))]
 
   const [{ data: eqRows }, { data: certRows }, templates] = await Promise.all([
-    supabase
-      .from("equipment")
-      .select("id, name, equipment_code, serial_number, category, location_label, next_due_at, next_calibration_due_at")
-      .eq("organization_id", organizationId)
-      .in("id", ids),
+    ids.length > 0
+      ? supabase
+          .from("equipment")
+          .select("id, name, equipment_code, serial_number, category, location_label, next_due_at, next_calibration_due_at")
+          .eq("organization_id", organizationId)
+          .in("id", ids)
+      : Promise.resolve({ data: [] }),
     supabase
       .from("calibration_records")
       .select("id, equipment_id, template_id, values, created_at")
@@ -417,14 +421,16 @@ export async function loadWorkOrderDetailForOrg(
       .eq("id", w.customer_id)
       .eq("organization_id", organizationId)
       .maybeSingle(),
-    supabase
-      .from("equipment")
-      .select(
-        "name, location_label, equipment_code, serial_number, category, warranty_start_date, warranty_expiration_date, warranty_expires_at, next_due_at, next_calibration_due_at",
-      )
-      .eq("id", w.equipment_id)
-      .eq("organization_id", organizationId)
-      .maybeSingle(),
+    w.equipment_id
+      ? supabase
+          .from("equipment")
+          .select(
+            "name, location_label, equipment_code, serial_number, category, warranty_start_date, warranty_expiration_date, warranty_expires_at, next_due_at, next_calibration_due_at",
+          )
+          .eq("id", w.equipment_id)
+          .eq("organization_id", organizationId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     w.assigned_user_id
       ? supabase
           .from("profiles")
@@ -478,13 +484,13 @@ export async function loadWorkOrderDetailForOrg(
   } | null
   const equipmentName = eqRow
     ? getEquipmentDisplayPrimary({
-        id: w.equipment_id,
+        id: w.equipment_id ?? "",
         name: eqRow.name,
         equipment_code: eqRow.equipment_code,
         serial_number: eqRow.serial_number,
         category: eqRow.category,
       })
-    : "Equipment"
+    : "Service visit"
   const location = eqRow?.location_label ?? ""
   const warrantyStart = eqRow?.warranty_start_date ?? null
   const warrantyExp = eqRow?.warranty_expiration_date ?? eqRow?.warranty_expires_at ?? null

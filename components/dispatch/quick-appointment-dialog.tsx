@@ -65,7 +65,24 @@ import {
  * drawer remains available for richer flows (notifications, locations, etc.).
  */
 
-type CustomerOption = { id: string; company_name: string; billing_email: string | null }
+type CustomerOption = {
+  id: string
+  company_name: string
+  billing_email: string | null
+  po_required?: boolean | null
+  po_number_required_before_service?: boolean | null
+  invoice_instructions?: string | null
+  parent_customer_id?: string | null
+  child_count?: number
+  location_count?: number
+}
+type LocationOption = {
+  id: string
+  name: string | null
+  address_line1: string | null
+  city: string | null
+  state: string | null
+}
 type EquipmentOption = {
   id: string
   name: string
@@ -117,13 +134,17 @@ export function QuickAppointmentDialog({
   const { standardCreateEligibility } = useBillingAccess()
 
   const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [locations, setLocations] = useState<LocationOption[]>([])
   const [equipment, setEquipment] = useState<EquipmentOption[]>([])
   const [loadingRefs, setLoadingRefs] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const [customerId, setCustomerId] = useState("")
+  const [customerSearch, setCustomerSearch] = useState("")
+  const [locationId, setLocationId] = useState("")
   const [equipmentId, setEquipmentId] = useState("")
+  const [summary, setSummary] = useState("")
   const [serviceType, setServiceType] = useState<WorkOrderType>("Repair")
   const [priority, setPriority] = useState<WorkOrderPriority>("Normal")
   const [date, setDate] = useState<string>(defaultDate ?? todayYmd())
@@ -138,7 +159,9 @@ export function QuickAppointmentDialog({
   useEffect(() => {
     if (!open) return
     setCustomerId("")
+    setLocationId("")
     setEquipmentId("")
+    setSummary("")
     setServiceType("Repair")
     setPriority("Normal")
     setDate(defaultDate ?? todayYmd())
@@ -160,7 +183,7 @@ export function QuickAppointmentDialog({
       // to the legacy column set if the column doesn't exist on this org.
       let { data, error } = await supabase
         .from("customers")
-        .select("id, company_name, billing_email")
+        .select("id, company_name, billing_email, po_required, po_number_required_before_service, invoice_instructions, parent_customer_id")
         .eq("organization_id", organizationId)
         .eq("status", "active")
         .is("archived_at", null)
@@ -176,13 +199,55 @@ export function QuickAppointmentDialog({
         data = fallback.data as Array<{ id: string; company_name: string }> | null
       }
       if (cancelled) return
-      setCustomers(
-        ((data ?? []) as Array<{ id: string; company_name: string; billing_email?: string | null }>).map((c) => ({
+      const base = ((data ?? []) as Array<{
+        id: string
+        company_name: string
+        billing_email?: string | null
+        po_required?: boolean | null
+        po_number_required_before_service?: boolean | null
+        invoice_instructions?: string | null
+        parent_customer_id?: string | null
+      }>).map((c) => ({
           id: c.id,
           company_name: c.company_name,
           billing_email: (c.billing_email ?? null) || null,
-        })),
-      )
+          po_required: c.po_required ?? null,
+          po_number_required_before_service: c.po_number_required_before_service ?? null,
+          invoice_instructions: c.invoice_instructions ?? null,
+          parent_customer_id: c.parent_customer_id ?? null,
+          child_count: 0,
+          location_count: 0,
+        }))
+      if (base.length > 0) {
+        const ids = base.map((c) => c.id)
+        const [{ data: locRows }, { data: childRows }] = await Promise.all([
+          supabase
+            .from("customer_locations")
+            .select("customer_id")
+            .eq("organization_id", organizationId)
+            .is("archived_at", null)
+            .in("customer_id", ids),
+          supabase
+            .from("customers")
+            .select("parent_customer_id")
+            .eq("organization_id", organizationId)
+            .is("archived_at", null)
+            .in("parent_customer_id", ids),
+        ])
+        const locCounts = new Map<string, number>()
+        for (const row of (locRows ?? []) as Array<{ customer_id: string }>) {
+          locCounts.set(row.customer_id, (locCounts.get(row.customer_id) ?? 0) + 1)
+        }
+        const childCounts = new Map<string, number>()
+        for (const row of (childRows ?? []) as Array<{ parent_customer_id: string | null }>) {
+          if (row.parent_customer_id) childCounts.set(row.parent_customer_id, (childCounts.get(row.parent_customer_id) ?? 0) + 1)
+        }
+        for (const c of base) {
+          c.location_count = locCounts.get(c.id) ?? 0
+          c.child_count = childCounts.get(c.id) ?? 0
+        }
+      }
+      setCustomers(base)
       setLoadingRefs(false)
     })()
     return () => {
@@ -190,27 +255,52 @@ export function QuickAppointmentDialog({
     }
   }, [open, organizationId, orgStatus])
 
-  // Phase: Scheduling Field-Speed Polish — auto-select the only equipment
-  // option to remove a tap on the most common case (single asset per
-  // customer site). Never overrides an explicit pick.
   useEffect(() => {
-    if (!equipmentId && equipment.length === 1) {
-      setEquipmentId(equipment[0].id)
+    if (!locationId && locations.length === 1) {
+      setLocationId(locations[0].id)
     }
-  }, [equipment, equipmentId])
+  }, [locationId, locations])
 
   // Phase: Scheduling Field-Speed Polish — prefill confirmation recipient
   // from the selected customer's billing_email when available.
   useEffect(() => {
-    if (!customerId) return
-    const cust = customers.find((c) => c.id === customerId)
-    const email = cust?.billing_email?.trim() ?? ""
-    if (!email) return
-    setConfirmationEmail((prev) => (prev.trim() ? prev : email))
-  }, [customerId, customers])
+    if (!customerId || !organizationId) return
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const [{ data: locRows }, { data: contactRows }] = await Promise.all([
+        supabase
+          .from("customer_locations")
+          .select("id, name, address_line1, city, state")
+          .eq("organization_id", organizationId)
+          .eq("customer_id", customerId)
+          .is("archived_at", null)
+          .order("is_default", { ascending: false })
+          .order("name"),
+        supabase
+          .from("customer_contacts")
+          .select("email")
+          .eq("organization_id", organizationId)
+          .eq("customer_id", customerId)
+          .is("archived_at", null)
+          .order("is_primary", { ascending: false })
+          .limit(1),
+      ])
+      if (cancelled) return
+      setLocations((locRows as LocationOption[] | null) ?? [])
+      const cust = customers.find((c) => c.id === customerId)
+      const contactEmail = ((contactRows as Array<{ email: string | null }> | null) ?? [])[0]?.email?.trim() ?? ""
+      const email = contactEmail || cust?.billing_email?.trim() || ""
+      if (email) setConfirmationEmail((prev) => (prev.trim() ? prev : email))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customerId, customers, organizationId])
 
   useEffect(() => {
     if (!open || !organizationId || !customerId) {
+      setLocations([])
       setEquipment([])
       return
     }
@@ -233,18 +323,6 @@ export function QuickAppointmentDialog({
     }
   }, [open, organizationId, customerId])
 
-  const selectedEquipmentLabel = useMemo(() => {
-    const eq = equipment.find((e) => e.id === equipmentId)
-    if (!eq) return null
-    return getEquipmentDisplayPrimary({
-      id: eq.id,
-      name: eq.name,
-      equipment_code: eq.equipment_code,
-      serial_number: eq.serial_number,
-      category: eq.category,
-    })
-  }, [equipment, equipmentId])
-
   const selectedEquipmentLocation = useMemo(
     () => equipment.find((e) => e.id === equipmentId)?.location_label?.trim() ?? null,
     [equipment, equipmentId],
@@ -253,9 +331,7 @@ export function QuickAppointmentDialog({
   const canSubmit =
     !!organizationId &&
     !!customerId &&
-    !!equipmentId &&
-    !!date &&
-    !!timeHhMm &&
+    !!summary.trim() &&
     !submitting &&
     orgStatus === "ready"
 
@@ -313,15 +389,14 @@ export function QuickAppointmentDialog({
     const supabase = createBrowserSupabaseClient()
     const assign = await workOrderAssignmentColumns(supabase, organizationId, technicianId || null)
     const trimmedNotes = notes.trim()
-    const customer = customers.find((c) => c.id === customerId)
-    const eqLabel = selectedEquipmentLabel ?? "service"
-    const title = trimmedNotes
-      ? trimmedNotes.slice(0, 80)
-      : `${serviceType} — ${eqLabel}`
+    const trimmedSummary = summary.trim()
+    const location = locations.find((loc) => loc.id === locationId)
+    const hasSchedule = Boolean(technicianId && date && timeHhMm)
+    const title = trimmedSummary.slice(0, 160)
 
-    const status = assign.assigned_technician_id || assign.assigned_user_id ? "scheduled" : "open"
+    const status = hasSchedule && (assign.assigned_technician_id || assign.assigned_user_id) ? "scheduled" : "open"
     const repairLog = {
-      problemReported: trimmedNotes || title,
+      problemReported: title,
       diagnosis: "",
       partsUsed: [] as Array<unknown>,
       laborHours: 0,
@@ -337,16 +412,21 @@ export function QuickAppointmentDialog({
       .insert({
         organization_id: organizationId,
         customer_id: customerId,
-        equipment_id: equipmentId,
+        equipment_id: equipmentId || null,
         title,
         status,
         priority: uiPriorityToDb(priority),
         type: uiTypeToDb(serviceType),
-        scheduled_on: date,
-        scheduled_time: normalizeTimeForDb(timeHhMm),
+        scheduled_on: date || null,
+        scheduled_time: hasSchedule ? normalizeTimeForDb(timeHhMm) : null,
         ...assign,
-        notes: trimmedNotes || null,
-        problem_reported: trimmedNotes || title,
+        notes: [
+          trimmedNotes || null,
+          location
+            ? `Service location: ${[location.name, location.address_line1, location.city, location.state].filter(Boolean).join(", ")}`
+            : null,
+        ].filter(Boolean).join("\n\n") || null,
+        problem_reported: title,
         repair_log: repairLog,
       })
       .select("id")
@@ -392,8 +472,8 @@ export function QuickAppointmentDialog({
         eventType: "quick_add",
         severity: "info",
         message: composeQuickAddMessage({
-          scheduledOn: date,
-          scheduledTimeHhMm: timeHhMm || null,
+          scheduledOn: date || null,
+          scheduledTimeHhMm: hasSchedule ? timeHhMm : null,
           techLabel,
         }),
         metadata: {
@@ -452,10 +532,11 @@ export function QuickAppointmentDialog({
     standardCreateEligibility,
     technicianId,
     notes,
-    customers,
     customerId,
     equipmentId,
-    selectedEquipmentLabel,
+    summary,
+    locations,
+    locationId,
     serviceType,
     priority,
     date,
@@ -471,7 +552,12 @@ export function QuickAppointmentDialog({
 
   if (!open) return null
 
-  const selectedCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
+  const selectedCustomer = customers.find((c) => c.id === customerId)
+  const selectedCustomerName = selectedCustomer?.company_name ?? ""
+  const filteredCustomers = customers.filter((c) =>
+    c.company_name.toLowerCase().includes(customerSearch.trim().toLowerCase()),
+  )
+  const poBeforeService = Boolean(selectedCustomer?.po_required || selectedCustomer?.po_number_required_before_service)
 
   return (
     <div className={cn("fixed inset-0 flex items-center justify-center p-4", DRAWER_BACKDROP_Z)} aria-modal="true">
@@ -503,10 +589,17 @@ export function QuickAppointmentDialog({
             <Label className="text-xs font-medium">
               Customer <span className="text-destructive">*</span>
             </Label>
+            <Input
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              placeholder="Search customers..."
+              className="h-10 text-sm"
+            />
             <Select
               value={customerId}
               onValueChange={(v) => {
                 setCustomerId(v)
+                setLocationId("")
                 setEquipmentId("")
               }}
             >
@@ -514,9 +607,11 @@ export function QuickAppointmentDialog({
                 <SelectValue placeholder={loadingRefs ? "Loading…" : "Select customer…"} />
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start">
-                {customers.map((c) => (
+                {filteredCustomers.slice(0, 80).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.company_name}
+                    {c.parent_customer_id ? " · child/site" : c.child_count ? ` · ${c.child_count} sites` : ""}
+                    {c.location_count ? ` · ${c.location_count} locations` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -525,9 +620,48 @@ export function QuickAppointmentDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs font-medium">
-              Equipment <span className="text-destructive">*</span>
+              Service summary <span className="text-destructive">*</span>
             </Label>
-            <Select value={equipmentId} onValueChange={setEquipmentId} disabled={!customerId}>
+            <Input
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="e.g. Repair sterilizer alarm, annual PM, site visit"
+              className="h-10 text-sm"
+            />
+          </div>
+
+          {poBeforeService ? (
+            <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2 text-xs text-[color:var(--status-warning)]">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <p>
+                  PO required before service.
+                  {selectedCustomer?.invoice_instructions ? ` ${selectedCustomer.invoice_instructions}` : ""}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium">Location</Label>
+            <Select value={locationId || "__none__"} onValueChange={(v) => setLocationId(v === "__none__" ? "" : v)} disabled={!customerId}>
+              <SelectTrigger className="h-9 text-sm w-full">
+                <SelectValue placeholder={!customerId ? "Select customer first" : "Optional location"} />
+              </SelectTrigger>
+              <SelectContent position="popper" side="bottom" align="start">
+                <SelectItem value="__none__">No specific location</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {[loc.name, loc.address_line1, loc.city, loc.state].filter(Boolean).join(" · ") || "Customer location"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium">Equipment</Label>
+            <Select value={equipmentId || "__none__"} onValueChange={(v) => setEquipmentId(v === "__none__" ? "" : v)} disabled={!customerId}>
               <SelectTrigger className="h-9 text-sm w-full">
                 <SelectValue
                   placeholder={
@@ -535,11 +669,12 @@ export function QuickAppointmentDialog({
                       ? "Select customer first"
                       : equipment.length === 0
                         ? "No equipment for this customer"
-                        : "Select equipment…"
+                        : "Optional equipment…"
                   }
                 />
               </SelectTrigger>
               <SelectContent position="popper" side="bottom" align="start">
+                <SelectItem value="__none__">No specific equipment</SelectItem>
                 {equipment.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {getEquipmentDisplayPrimary({
@@ -671,15 +806,22 @@ export function QuickAppointmentDialog({
               </span>
             </label>
             {sendConfirmation ? (
-              <Input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                value={confirmationEmail}
-                onChange={(e) => setConfirmationEmail(e.target.value)}
-                placeholder="customer@example.com"
-                className="h-9 text-sm"
-              />
+              <>
+                <Input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={confirmationEmail}
+                  onChange={(e) => setConfirmationEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="h-9 text-sm"
+                />
+                {!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(confirmationEmail.trim()) ? (
+                  <p className="text-[11px] text-[color:var(--status-warning)]">
+                    Add a valid email to send confirmation. The appointment can still be created without sending.
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </div>
 
@@ -781,7 +923,7 @@ export function QuickAppointmentDialog({
             ) : (
               <Zap className="h-4 w-4" />
             )}
-            {sendConfirmation ? "Save & send" : "Create work order"}
+            {sendConfirmation ? "Create & send" : technicianId && date && timeHhMm ? "Create scheduled visit" : "Create unscheduled"}
           </Button>
         </div>
       </div>

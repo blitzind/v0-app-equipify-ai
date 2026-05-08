@@ -25,6 +25,7 @@ import type {
   RepairLog,
 } from "@/lib/mock-data"
 import { CreateWorkOrderModal } from "@/components/work-orders/create-work-order-modal"
+import { QuickAppointmentDialog } from "@/components/dispatch/quick-appointment-dialog"
 import { getWorkOrderDisplay, workOrderMatchesSearch, effectiveWorkOrderNumber } from "@/lib/work-orders/display"
 import {
   missingAssignedTechnicianColumn,
@@ -960,6 +961,8 @@ function WorkOrdersPageInner() {
     showRight: false,
   })
   const [createOpen, setCreateOpen] = useState(false)
+  const [quickAppointmentOpen, setQuickAppointmentOpen] = useState(false)
+  const [quickAppointmentTechnicians, setQuickAppointmentTechnicians] = useState<Array<{ id: string; label: string }>>([])
   const [createModalCustomerId, setCreateModalCustomerId] = useState<string | null>(null)
   const [createModalEquipmentId, setCreateModalEquipmentId] = useState<string | null>(null)
   const [createCatalogPartPrefill, setCreateCatalogPartPrefill] = useState<{
@@ -978,8 +981,35 @@ function WorkOrdersPageInner() {
   }
 
   useQuickAdd("new-work-order", () => {
-    openCreateWorkOrderModal(null, null)
+    setQuickAppointmentOpen(true)
   })
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !activeOrgId) {
+      setQuickAppointmentTechnicians([])
+      return
+    }
+    let active = true
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data } = await supabase
+        .from("technicians")
+        .select("id, full_name")
+        .eq("organization_id", activeOrgId)
+        .eq("active", true)
+        .order("full_name")
+      if (!active) return
+      setQuickAppointmentTechnicians(
+        ((data as Array<{ id: string; full_name: string | null }> | null) ?? []).map((tech) => ({
+          id: tech.id,
+          label: tech.full_name?.trim() || "Technician",
+        })),
+      )
+    })()
+    return () => {
+      active = false
+    }
+  }, [orgStatus, activeOrgId])
   const [selectedWoId, setSelectedWoId] = useState<string | null>(null)
   const [drawerInitialTab, setDrawerInitialTab] = useState<string | undefined>(undefined)
   const searchParams = useSearchParams()
@@ -1289,15 +1319,22 @@ function WorkOrdersPageInner() {
             ))}
           </div>
 
-          <Button
-            onClick={() => {
-              openCreateWorkOrderModal(null, null)
-            }}
-            className="gap-2 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            New Work Order
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setQuickAppointmentOpen(true)} className="gap-2 shrink-0">
+              <Plus className="w-4 h-4" />
+              New Appointment
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                openCreateWorkOrderModal(null, null)
+              }}
+              className="gap-2 shrink-0"
+            >
+              <Wrench className="w-4 h-4" />
+              Full Work Order
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1350,6 +1387,16 @@ function WorkOrdersPageInner() {
         onSuccess={() => setRefreshToken((v) => v + 1)}
       />
 
+      <QuickAppointmentDialog
+        open={quickAppointmentOpen}
+        onClose={() => setQuickAppointmentOpen(false)}
+        defaultDate={null}
+        defaultTimeHhMm={null}
+        defaultTechnicianId={null}
+        technicians={quickAppointmentTechnicians}
+        onCreated={() => setRefreshToken((v) => v + 1)}
+      />
+
       <WorkOrderDrawer
         workOrderId={selectedWoId}
         initialTab={drawerInitialTab}
@@ -1360,7 +1407,7 @@ function WorkOrdersPageInner() {
         onUpdated={() => setRefreshToken((v) => v + 1)}
       />
 
-      <QuickAddParamBridge action="new-work-order" onTrigger={() => openCreateWorkOrderModal(null, null)} />
+      <QuickAddParamBridge action="new-work-order" onTrigger={() => setQuickAppointmentOpen(true)} />
     </div>
   )
 }

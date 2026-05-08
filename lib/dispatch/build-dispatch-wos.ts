@@ -23,7 +23,7 @@ export type DispatchWoRow = {
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   customer_id: string
-  equipment_id: string
+  equipment_id: string | null
   priority: string | null
   type: string
   billing_state: string | null
