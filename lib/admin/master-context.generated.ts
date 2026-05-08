@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 164,
-  sqlMigrations: 111,
+  apiRouteHandlers: 166,
+  sqlMigrations: 112,
   dashboardPages: 56,
   componentsTsx: 203,
-  libTsFiles: 323,
+  libTsFiles: 324,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **164** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **111** |
+| API route handlers (\`app/api/**/route.ts\`) | **166** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **112** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **56** |
 | \`components/**/*.tsx\` | **203** |
-| \`lib/**/*.ts\` | **323** |
+| \`lib/**/*.ts\` | **324** |
 
 ### Vercel crons
 
@@ -127,6 +127,8 @@ organizations/[organizationId]/migration-imports/[jobId]/commit/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/export/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/preview/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/route.ts
+organizations/[organizationId]/migration-imports/quickbooks/commit/route.ts
+organizations/[organizationId]/migration-imports/quickbooks/preview/route.ts
 organizations/[organizationId]/migration-imports/route.ts
 organizations/[organizationId]/portal-invites/route.ts
 organizations/[organizationId]/portal/certificate-release-default/route.ts
