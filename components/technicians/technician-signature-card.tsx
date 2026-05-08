@@ -19,7 +19,7 @@
  */
 
 import * as React from "react"
-import { Loader2, PenLine, Trash2, Upload } from "lucide-react"
+import { CheckCircle2, Loader2, PenLine, ShieldCheck, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -189,8 +189,7 @@ export function TechnicianSignatureCard({
             <PenLine className="w-3 h-3" /> Stored signature
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Upload an existing signature image or draw a signature to save for certificates.
-            Auto-applied to calibration certificates when no fresh signature was captured on the visit.
+            Used on generated calibration certificates when no fresh visit signature was captured.
           </p>
         </div>
       </div>
@@ -199,35 +198,52 @@ export function TechnicianSignatureCard({
         <p className="text-xs text-muted-foreground py-2">Loading signature…</p>
       ) : hasSignature ? (
         <div className="flex flex-col sm:flex-row gap-3 items-start">
-          <div className="rounded-lg border border-border bg-background px-3 py-2 max-w-[260px]">
+          <div className="rounded-lg border border-border bg-background p-3 w-full sm:w-[280px] min-h-[96px] flex items-center justify-center">
             {/* Storage signed URLs are external; using <img> avoids a Next.js domain whitelist. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={signedUrl ?? ""}
               alt={`${technicianName} signature`}
-              className="max-h-20 object-contain"
+              className="max-h-24 max-w-full object-contain"
             />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-muted-foreground">Last updated {fmtUpdated(updatedAt)}.</p>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--status-success)]/35 bg-[color:var(--status-success)]/10 px-2 py-1 text-[11px] text-[color:var(--status-success)]">
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden />
+                Stored signature available
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                <ShieldCheck className="w-3.5 h-3.5" aria-hidden />
+                Used on certificates
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Source: technician profile. Last updated {fmtUpdated(updatedAt)}.
+            </p>
             {canManage ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="mt-2 gap-1.5 text-xs text-destructive hover:text-destructive"
-                onClick={() => void handleDelete()}
-                disabled={busy}
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Remove
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 text-xs text-destructive hover:text-destructive"
+                  onClick={() => void handleDelete()}
+                  disabled={busy}
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Remove
+                </Button>
+              </div>
             ) : null}
           </div>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground py-2">
-          No signature on file yet.
-        </p>
+        <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2">
+          <p className="text-xs font-medium text-[color:var(--status-warning)]">No stored signature available</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Certificates will use a fresh captured signature when present, otherwise a fallback label/unsigned state.
+          </p>
+        </div>
       )}
 
       {canManage ? (

@@ -25,6 +25,7 @@ import {
   resolveEffectiveCertificateReleaseMode,
   type CertificateReleaseMode,
 } from "@/lib/portal/certificate-release"
+import { resolveTechnicianSignatureState } from "@/lib/certificates/technician-signature"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import {
   buildCertificatePrefillContextForEquipment,
@@ -71,6 +72,9 @@ type LinkedInvoiceOption = {
   status: string
   releaseOverride: CertificateReleaseMode | null
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i
 
 export type CertificateMultiTabContentProps = {
   organizationId: string | null | undefined
@@ -133,7 +137,10 @@ export function CertificateMultiTabContent({
   const [releasingAssetId, setReleasingAssetId] = useState<string | null>(null)
   const [portalRules, setPortalRules] = useState<PortalRulesState | null>(null)
   const [linkedInvoiceOptions, setLinkedInvoiceOptions] = useState<LinkedInvoiceOption[]>([])
-  const [storedTechSignatureUrl, setStoredTechSignatureUrl] = useState<string | null>(null)
+  const [storedTechSignature, setStoredTechSignature] = useState<{
+    url: string | null
+    updatedAt: string | null
+  }>({ url: null, updatedAt: null })
   const touchedRef = useRef<Record<string, Set<string>>>({})
 
   const equipmentKey = equipmentAssets.map((a) => a.id).join(",")
@@ -289,7 +296,7 @@ export function CertificateMultiTabContent({
       // Live capture from the work order overrides the stored fallback.
       Boolean(workOrder.repairLog.signatureDataUrl?.trim())
     ) {
-      setStoredTechSignatureUrl(null)
+      setStoredTechSignature({ url: null, updatedAt: null })
       return () => {
         cancelled = true
       }
@@ -302,12 +309,12 @@ export function CertificateMultiTabContent({
       })
       if (cancelled) return
       if (!sig?.storagePath) {
-        setStoredTechSignatureUrl(null)
+        setStoredTechSignature({ url: null, updatedAt: sig?.updatedAt ?? null })
         return
       }
       const url = await signedUrlForTechnicianSignature(supabase, sig.storagePath)
       if (cancelled) return
-      setStoredTechSignatureUrl(url ?? null)
+      setStoredTechSignature({ url: url ?? null, updatedAt: sig.updatedAt ?? null })
     })()
     return () => {
       cancelled = true
@@ -382,6 +389,12 @@ export function CertificateMultiTabContent({
     setSavingAssetId(assetId)
     try {
       const snapshot = structuredClone(st.values)
+      const signatureState = resolveTechnicianSignatureState({
+        technicianName: workOrder.technicianName,
+        freshSignatureDataUrl: workOrder.repairLog.signatureDataUrl,
+        storedSignatureUrl: storedTechSignature.url,
+        storedSignatureUpdatedAt: storedTechSignature.updatedAt,
+      })
       const record = await createCalibrationRecord(
         supabase,
         orgId,
@@ -389,6 +402,12 @@ export function CertificateMultiTabContent({
         assetId,
         st.templateId,
         snapshot,
+        {
+          technicianSignatureSource: signatureState.source,
+          technicianSignatureTechnicianId:
+            workOrder.technicianId && UUID_RE.test(workOrder.technicianId) ? workOrder.technicianId : null,
+          technicianSignatureFallbackUsed: signatureState.fallbackUsed,
+        },
       )
       setSlotStates((prev) => ({
         ...prev,
@@ -508,6 +527,12 @@ export function CertificateMultiTabContent({
           const st = slotStates[asset.id]
           const tmpl = st ? templates.find((t) => t.id === st.templateId) ?? null : null
           const label = statusLabel(tmpl, st?.savedAt ?? null, st?.values ?? {})
+          const signatureState = resolveTechnicianSignatureState({
+            technicianName: workOrder.technicianName,
+            freshSignatureDataUrl: workOrder.repairLog.signatureDataUrl,
+            storedSignatureUrl: storedTechSignature.url,
+            storedSignatureUpdatedAt: storedTechSignature.updatedAt,
+          })
           const code = (asset.equipmentCode ?? "").trim() || "—"
           const sn = (asset.serialNumber ?? "").trim() || "—"
           const staffPortalLines = portalRules
@@ -629,11 +654,11 @@ export function CertificateMultiTabContent({
                     customerSignatureUrl={workOrder.customerSignaturePreviewUrl}
                     customerSignedBy={workOrder.repairLog.signedBy || null}
                     technicianSignatureDataUrl={
-                      workOrder.repairLog.signatureDataUrl?.startsWith("data") ||
-                      workOrder.repairLog.signatureDataUrl?.startsWith("http")
-                        ? workOrder.repairLog.signatureDataUrl
-                        : storedTechSignatureUrl
+                      signatureState.imageUrl
                     }
+                    technicianSignatureSource={signatureState.source}
+                    technicianSignatureFallbackUsed={signatureState.fallbackUsed}
+                    technicianSignatureStatus={signatureState}
                     completedAtLabel={workOrder.completedDate ? fmtShort(workOrder.completedDate) : null}
                     manageTemplatesHref="/calibration-templates"
                     showPrefillHelper={st.prefillNotice}

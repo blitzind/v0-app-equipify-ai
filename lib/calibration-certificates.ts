@@ -11,6 +11,10 @@ import {
   documentBrandingFromFields,
   getOrganizationDocumentBranding,
 } from "@/lib/organization/document-branding"
+import {
+  resolveTechnicianSignatureState,
+  type TechnicianSignatureSource,
+} from "@/lib/certificates/technician-signature"
 
 /**
  * Selects for `calibration_records`. The "full" select includes
@@ -30,7 +34,7 @@ import {
  *  - other DB error → propagated, list does not silently empty out
  */
 const CAL_RECORD_SELECT_FULL =
-  "id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at"
+  "id, organization_id, work_order_id, equipment_id, template_id, values, created_at, portal_released_at, technician_signature_source, technician_signature_technician_id, technician_signature_generated_at, technician_signature_fallback_used"
 const CAL_RECORD_SELECT_LEGACY =
   "id, organization_id, work_order_id, equipment_id, template_id, values, created_at"
 
@@ -43,6 +47,18 @@ function logPortalReleasedAtFallback(callsite: string, err: PostgrestError): voi
         `(${err.code ?? "no-code"}: ${err.message})`,
     )
   }
+}
+
+function missingOptionalCalibrationRecordColumn(err: PostgrestError): boolean {
+  if (missingPortalReleasedAtColumn(err)) return true
+  const message = (err.message ?? "").toLowerCase()
+  return (
+    err.code === "42703" &&
+    (message.includes("technician_signature_source") ||
+      message.includes("technician_signature_technician_id") ||
+      message.includes("technician_signature_generated_at") ||
+      message.includes("technician_signature_fallback_used"))
+  )
 }
 
 export type CalibrationFieldType =
@@ -91,6 +107,10 @@ export type CalibrationRecord = {
   createdAt: string
   /** When staff releases certificate under manual-release policy (portal). */
   portalReleasedAt?: string | null
+  technicianSignatureSource?: TechnicianSignatureSource | null
+  technicianSignatureTechnicianId?: string | null
+  technicianSignatureGeneratedAt?: string | null
+  technicianSignatureFallbackUsed?: boolean
 }
 
 type CalibrationTemplateRow = {
@@ -117,6 +137,10 @@ type CalibrationRecordRow = {
   values: unknown
   created_at: string
   portal_released_at?: string | null
+  technician_signature_source?: TechnicianSignatureSource | null
+  technician_signature_technician_id?: string | null
+  technician_signature_generated_at?: string | null
+  technician_signature_fallback_used?: boolean | null
 }
 
 export function defaultValueForField(type: CalibrationFieldType): string | number | boolean {
@@ -233,6 +257,10 @@ function mapRecordRow(row: CalibrationRecordRow): CalibrationRecord {
     values: row.values && typeof row.values === "object" ? (row.values as Record<string, unknown>) : {},
     createdAt: row.created_at,
     portalReleasedAt: row.portal_released_at ?? null,
+    technicianSignatureSource: row.technician_signature_source ?? null,
+    technicianSignatureTechnicianId: row.technician_signature_technician_id ?? null,
+    technicianSignatureGeneratedAt: row.technician_signature_generated_at ?? null,
+    technicianSignatureFallbackUsed: Boolean(row.technician_signature_fallback_used),
   }
 }
 
@@ -365,7 +393,7 @@ export async function loadLatestCalibrationRecordForEquipment(
 
   let { data, error } = await runSelect(CAL_RECORD_SELECT_FULL)
 
-  if (error && missingPortalReleasedAtColumn(error)) {
+  if (error && missingOptionalCalibrationRecordColumn(error)) {
     logPortalReleasedAtFallback("loadLatestCalibrationRecordForEquipment", error)
     const retry = await runSelect(CAL_RECORD_SELECT_LEGACY)
     error = retry.error
@@ -521,7 +549,7 @@ export async function listCompletedCertificatesForOrg(
   let recErr = firstAttempt.error
   let recordsRaw: Array<Record<string, unknown>> = (firstAttempt.data ?? []) as Array<Record<string, unknown>>
 
-  if (recErr && missingPortalReleasedAtColumn(recErr)) {
+  if (recErr && missingOptionalCalibrationRecordColumn(recErr)) {
     logPortalReleasedAtFallback("listCompletedCertificatesForOrg", recErr)
     const retry = await runListSelect(CAL_RECORD_SELECT_LEGACY)
     recErr = retry.error
@@ -713,7 +741,7 @@ export async function loadCompletedCertificateItemByRecordId(
 
   let { data: rec, error } = await runByIdSelect(CAL_RECORD_SELECT_FULL)
 
-  if (error && missingPortalReleasedAtColumn(error)) {
+  if (error && missingOptionalCalibrationRecordColumn(error)) {
     logPortalReleasedAtFallback("loadCompletedCertificateItemByRecordId", error)
     const retry = await runByIdSelect(CAL_RECORD_SELECT_LEGACY)
     error = retry.error
@@ -868,6 +896,13 @@ export async function buildCompletedCertificatePdfHtml(
       .createSignedUrl(item.technicianSignaturePath, 3600)
     if (signed?.signedUrl) techSig = signed.signedUrl
   }
+  const techSignatureState = resolveTechnicianSignatureState({
+    technicianName: item.technicianName,
+    freshSignatureDataUrl: item.repairLog.signatureDataUrl,
+    storedSignatureUrl:
+      techSig && !(sig && (sig.startsWith("data:") || sig.startsWith("http"))) ? techSig : null,
+  })
+  const techSignatureSource = techSignatureState.source
 
   const completedDate = item.workOrderCompletedAt
   const scheduledDate = item.workOrderScheduledOn
@@ -895,6 +930,8 @@ export async function buildCompletedCertificatePdfHtml(
         : undefined,
     technicianName: item.technicianName?.trim() || "Unassigned",
     technicianSignatureDataUrl: techSig,
+    technicianSignatureSource: techSignatureSource,
+    technicianSignatureFallbackUsed: techSignatureSource !== "fresh_capture",
     customerSignatureUrl,
     customerSignedBy: item.repairLog.signedBy?.trim() || null,
     technicianSignedDateLabel: item.repairLog.signedAt?.trim()
@@ -916,11 +953,16 @@ export async function createCalibrationRecord(
   equipmentId: string,
   templateId: string,
   values: Record<string, unknown>,
+  options?: {
+    technicianSignatureSource?: TechnicianSignatureSource | null
+    technicianSignatureTechnicianId?: string | null
+    technicianSignatureFallbackUsed?: boolean
+  },
 ): Promise<CalibrationRecord> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const insertPayload = {
+  const baseInsertPayload: Record<string, unknown> = {
     organization_id: organizationId,
     work_order_id: workOrderId,
     equipment_id: equipmentId,
@@ -928,15 +970,22 @@ export async function createCalibrationRecord(
     values,
     created_by: user?.id ?? null,
   }
+  const insertPayload: Record<string, unknown> = { ...baseInsertPayload }
+  if (options?.technicianSignatureSource) {
+    insertPayload.technician_signature_source = options.technicianSignatureSource
+    insertPayload.technician_signature_technician_id = options.technicianSignatureTechnicianId ?? null
+    insertPayload.technician_signature_generated_at = new Date().toISOString()
+    insertPayload.technician_signature_fallback_used = Boolean(options.technicianSignatureFallbackUsed)
+  }
 
   const runInsertSelect = (select: string) =>
     supabase.from("calibration_records").insert(insertPayload).select(select).single()
 
   let { data, error } = await runInsertSelect(CAL_RECORD_SELECT_FULL)
 
-  if (error && missingPortalReleasedAtColumn(error)) {
+  if (error && missingOptionalCalibrationRecordColumn(error)) {
     logPortalReleasedAtFallback("createCalibrationRecord", error)
-    const retry = await runInsertSelect(CAL_RECORD_SELECT_LEGACY)
+    const retry = await supabase.from("calibration_records").insert(baseInsertPayload).select(CAL_RECORD_SELECT_LEGACY).single()
     error = retry.error
     data = retry.data
       ? ({ ...(retry.data as Record<string, unknown>), portal_released_at: null } as typeof data)

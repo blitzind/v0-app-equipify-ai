@@ -5,6 +5,10 @@ import {
   documentBrandingFromFields,
   type OrganizationDocumentBranding,
 } from "@/lib/organization/document-branding"
+import {
+  technicianSignatureSourceLabel,
+  type TechnicianSignatureSource,
+} from "@/lib/certificates/technician-signature"
 
 function escapeHtml(s: string): string {
   return s
@@ -81,6 +85,8 @@ export type CertificatePdfModel = {
   values: Record<string, unknown>
   technicianName: string
   technicianSignatureDataUrl?: string | null
+  technicianSignatureSource?: TechnicianSignatureSource | null
+  technicianSignatureFallbackUsed?: boolean
   customerSignatureUrl?: string | null
   customerSignedBy?: string | null
   /** ISO or display date for technician signature line. */
@@ -148,10 +154,15 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
   const custDate = dashIfEmpty(model.customerSignedDateLabel?.trim() ?? "")
   const custName = dashIfEmpty(model.customerSignedBy?.trim() ?? "")
 
+  const techSignatureSource =
+    model.technicianSignatureSource ?? (model.technicianSignatureDataUrl ? "fresh_capture" : "generated_label")
   const techSigImg =
     model.technicianSignatureDataUrl && model.technicianSignatureDataUrl.length > 2
       ? `<img class="sig-img" src="${escapeHtml(model.technicianSignatureDataUrl)}" alt="" />`
-      : `<div class="sig-placeholder">Signature on file</div>`
+      : techSignatureSource === "unsigned"
+        ? `<div class="sig-placeholder muted">Unsigned</div>`
+        : `<div class="sig-placeholder">Signature on file</div>`
+  const techSigSourceLine = `<div class="sig-source">${escapeHtml(technicianSignatureSourceLabel(techSignatureSource))}</div>`
 
   const custSigImg =
     model.customerSignatureUrl && model.customerSignatureUrl.length > 2
@@ -406,6 +417,12 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       padding: 8px 0;
     }
     .sig-placeholder.muted { color: #888; }
+    .sig-source {
+      font-size: 9px;
+      color: #777;
+      margin-top: 3px;
+      line-height: 1.2;
+    }
     .sig-name {
       font-size: 12px;
       font-weight: 600;
@@ -518,7 +535,7 @@ export function buildCertificatePdfHtml(model: CertificatePdfModel): string {
       <div class="signatures">
         <div class="sig-col">
           <span class="sig-label-top">Technician Signature</span>
-          <div class="sig-line">${techSigImg}</div>
+          <div class="sig-line">${techSigImg}${techSigSourceLine}</div>
           <div class="sig-name">${escapeHtml(model.technicianName)}</div>
           <div class="sig-date">${escapeHtml(techDate)}</div>
         </div>

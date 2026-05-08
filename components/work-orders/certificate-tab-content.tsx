@@ -19,6 +19,11 @@ import {
   downloadCertificateHtmlFile,
   printCertificatePdfHtml,
 } from "@/lib/certificates/certificate-pdf-html"
+import {
+  technicianSignatureSourceLabel,
+  type TechnicianSignatureSource,
+  type TechnicianSignatureState,
+} from "@/lib/certificates/technician-signature"
 
 type CertificateTabContentProps = {
   templates: CalibrationTemplate[]
@@ -52,6 +57,9 @@ type CertificateTabContentProps = {
   customerSignedBy?: string | null
   /** Legacy repair_log technician signature image. */
   technicianSignatureDataUrl?: string | null
+  technicianSignatureSource?: TechnicianSignatureSource | null
+  technicianSignatureFallbackUsed?: boolean
+  technicianSignatureStatus?: TechnicianSignatureState | null
   completedAtLabel?: string | null
   manageTemplatesHref?: string
   /** When true, shows a subtle note that some fields were prefilled from the work order. */
@@ -113,6 +121,9 @@ export function CertificateTabContent({
   customerSignatureUrl,
   customerSignedBy,
   technicianSignatureDataUrl,
+  technicianSignatureSource,
+  technicianSignatureFallbackUsed = false,
+  technicianSignatureStatus,
   completedAtLabel,
   manageTemplatesHref,
   showPrefillHelper = false,
@@ -255,6 +266,8 @@ export function CertificateTabContent({
                     serviceDateLabel: serviceDateLabel ?? completedAtLabel ?? undefined,
                     technicianName: technicianName?.trim() || "Technician",
                     technicianSignatureDataUrl: technicianSignatureDataUrl ?? null,
+                    technicianSignatureSource: technicianSignatureSource ?? null,
+                    technicianSignatureFallbackUsed,
                     customerSignatureUrl: customerSignatureUrl ?? null,
                     customerSignedBy: customerSignedBy ?? null,
                     technicianSignedDateLabel: technicianSignedDateLabel ?? undefined,
@@ -308,6 +321,8 @@ export function CertificateTabContent({
                   serviceDateLabel: serviceDateLabel ?? completedAtLabel ?? undefined,
                   technicianName: technicianName?.trim() || "Technician",
                   technicianSignatureDataUrl: technicianSignatureDataUrl ?? null,
+                  technicianSignatureSource: technicianSignatureSource ?? null,
+                  technicianSignatureFallbackUsed,
                   customerSignatureUrl: customerSignatureUrl ?? null,
                   customerSignedBy: customerSignedBy ?? null,
                   technicianSignedDateLabel: technicianSignedDateLabel ?? undefined,
@@ -363,6 +378,37 @@ export function CertificateTabContent({
               Email certificate
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {technicianSignatureStatus ? (
+        <div
+          className={cn(
+            "rounded-xl border p-4 space-y-2",
+            technicianSignatureStatus.tone === "success"
+              ? "border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/10"
+              : "border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10",
+          )}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Technician signature
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex rounded-md border px-2 py-1 text-[11px] font-medium",
+                technicianSignatureStatus.tone === "success"
+                  ? "border-[color:var(--status-success)]/35 text-[color:var(--status-success)]"
+                  : "border-[color:var(--status-warning)]/35 text-[color:var(--status-warning)]",
+              )}
+            >
+              {technicianSignatureStatus.label}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Source: {technicianSignatureSourceLabel(technicianSignatureStatus.source)}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">{technicianSignatureStatus.helper}</p>
         </div>
       ) : null}
 

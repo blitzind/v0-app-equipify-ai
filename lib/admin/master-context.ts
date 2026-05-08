@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T22:09:11.006Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T22:18:43.699Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -101,17 +101,17 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Technicians
 - **Routes:** \`/technicians\`, \`/technicians/today\`, \`/technicians/daily\`
-- **Purpose:** Roster, organization-managed skill tags, certifications, field UX.
-- **Status:** Implemented (operational technician table + UI; skill tag options managed in Settings → Team).
+- **Purpose:** Roster, organization-managed skill tags, certifications, field UX, and stored technician signatures.
+- **Status:** Implemented (operational technician table + UI; skill tag options managed in Settings → Team; stored signatures can be uploaded/drawn/replaced).
 - **Gaps:** Permissions refinements for field-only users.
 
 ### Certificates (calibration)
 - **Routes:** \`/calibration-templates\` (nav label “Certificates”), WO certificate tabs.
-- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, external certificate PDF uploads, and portal release policy.
+- **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, external certificate PDF uploads, technician signature application, and portal release policy.
 - **Status:** MVP complete; portal exposes certificates API and released certificate attachments.
-- **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, invoice metadata, release/revoke controls, and withheld reasons.
+- **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, invoice metadata, release/revoke controls, signature status, and withheld reasons.
 - **Tables:** \`calibration_templates\`, \`calibration_records\`, \`certificate_attachments\`, and unified \`org_document_attachments\` release metadata.
-- **Gaps:** Technician signature workflow refinements.
+- **Gaps:** Optional last-used-on-certificate analytics for technician signatures.
 
 ### Quotes
 - **Route:** \`/quotes\`
@@ -225,8 +225,8 @@ ${MCG_SCAN_SECTION}
 - **Import:** APIs for template import commit / certificate template import routes.
 - **WO linkage:** \`calibration_records\` per work order; optional \`calibration_template_id\` on WO.
 - **Output:** HTML/PDF generation utilities (\`lib/calibration-certificates\`, document HTML helpers); branding uses workspace logos where configured.
-- **Signatures:** Customer signature capture exists on WO flows; technician signature / release rules still evolving.
-- **Gaps:** Attachment storage policies, customer release workflows, stronger signature audit trail.
+- **Signatures:** Customer signature capture exists on WO flows; generated certificates prefer fresh technician visit signatures, fall back to stored technician profile signatures, then show an explicit fallback/unsigned state.
+- **Gaps:** Attachment storage policy hardening and deeper signature usage analytics.
 
 ## Scheduling Status
 - **Service schedule & dispatch:** Dispatch board and service schedule pages; drawers for scheduling; WO \`scheduled_on\` / time fields.
@@ -269,7 +269,7 @@ Roadmap informed by product direction (keep sequencing flexible):
 - **US jurisdiction / location-based tax** logic
 - Portal-facing equipment history
 - **Certificate attachments** and customer **release rules**
-- **Technician signature** handling
+- **Technician signature** usage analytics
 - Customer **portal document** access
 - Historical migration from **QuickBooks / FieldPulse**
 - **Role and permission** controls (commercial roles vs DB enums)
