@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T23:09:55.005Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-08T23:33:38.056Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -101,9 +101,9 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Technicians
 - **Routes:** \`/technicians\`, \`/technicians/today\`, \`/technicians/daily\`
-- **Purpose:** Roster, organization-managed skill tags, certifications, field UX, and stored technician signatures.
-- **Status:** Implemented (operational technician table + UI; skill tag options managed in Settings → Team; stored signatures can be uploaded/drawn/replaced).
-- **Gaps:** Permissions refinements for field-only users.
+- **Purpose:** Roster, organization-managed skill tags, certifications, focused technician workspace, field UX, and stored technician signatures.
+- **Status:** Implemented (operational technician table + UI; skill tag options managed in Settings → Team; stored signatures can be uploaded/drawn/replaced). Technician profile users get a restricted dashboard/nav, assigned-work order and schedule views, and reduced billing/admin controls.
+- **Gaps:** Server-side RLS can be tightened further for assigned-only reads if the org wants hard DB-level technician isolation beyond application capability gates.
 
 ### Certificates (calibration)
 - **Routes:** \`/calibration-templates\` (nav label “Certificates”), WO certificate tabs.
@@ -149,9 +149,9 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Gaps:** Future SQL/materialized reporting views for very large tenants.
 
 ### Insights & AI Assistants
-- **Routes:** \`/insights\`, \`/ai-assistants\`
-- **Purpose:** AI insights generation; operational assistants; job queue processing.
-- **Status:** Implemented; cron processes AI jobs.
+- **Routes:** \`/insights\`, \`/ai-assistants\`; in-app AIden help chat via \`/api/organizations/[organizationId]/aiden/chat\`.
+- **Purpose:** AI insights generation; operational assistants; job queue processing; AIden provides step-by-step in-app product help grounded in this master context.
+- **Status:** Implemented; cron processes AI jobs; AIden is lightweight, session-only chat in the dashboard shell.
 - **Gaps:** Plan/budget gating UX; task coverage.
 
 ### Communications
@@ -242,6 +242,7 @@ ${MCG_SCAN_SECTION}
 - **Database roles:** \`owner\`, \`admin\`, \`manager\`, \`tech\`, \`viewer\` on \`organization_members\`.
 - **Commercial profiles:** Optional \`organization_members.permission_profile\` overlays support Owner, Admin, Operations Manager, Technician, Billing, Sales / Prospects, and Viewer without replacing the DB role enum. \`permissions_json\` stores optional boolean capability overrides for application/API guards.
 - **Server enforcement:** RLS remains the tenant boundary; APIs use \`requireOrgPermission\` / \`getEffectiveOrgPermissions\` for capability checks. Sensitive areas such as certificate release, reports, attachment mutation, billing/settings, imports, and team management should gate mutations through capabilities.
+- **Technician access:** Technician profile defaults include \`canUseTechnicianWorkspace\` and \`canViewAssignedWorkOrdersOnly\`; the dashboard, sidebar/mobile nav, work-order list, and schedule views prioritize assigned field work and hide financial/admin/dispatch controls unless additional capabilities are granted.
 - **UI:** Team settings show DB role, optional permission profile, and an access preview; Settings → Permissions is generated from the shared capability map. Demo **TenantProvider** \`can()\` helpers can still diverge from live membership — treat **server checks + RLS** as source of truth.
 
 ## UI/UX Standards

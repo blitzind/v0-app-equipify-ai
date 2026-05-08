@@ -15,6 +15,9 @@ export type CommercialPermissionProfile =
 
 /** Typed capability flags used across UI + API helpers. */
 export type OrgPermissions = {
+  canUseTechnicianWorkspace: boolean
+  canViewAllWorkOrders: boolean
+  canViewAssignedWorkOrdersOnly: boolean
   canViewBilling: boolean
   canEditOrgBilling: boolean
   canViewFinancialReports: boolean
@@ -104,6 +107,9 @@ export type OrgPermissions = {
 export type OrgPermissionKey = keyof OrgPermissions
 
 const NONE: OrgPermissions = {
+  canUseTechnicianWorkspace: false,
+  canViewAllWorkOrders: false,
+  canViewAssignedWorkOrdersOnly: false,
   canViewBilling: false,
   canEditOrgBilling: false,
   canViewFinancialReports: false,
@@ -184,6 +190,9 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
     case "admin":
       return {
         ...NONE,
+        canUseTechnicianWorkspace: false,
+        canViewAllWorkOrders: true,
+        canViewAssignedWorkOrdersOnly: false,
         canViewBilling: true,
         canEditOrgBilling: true,
         canViewFinancialReports: true,
@@ -221,6 +230,9 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
     case "manager":
       return {
         ...NONE,
+        canUseTechnicianWorkspace: false,
+        canViewAllWorkOrders: true,
+        canViewAssignedWorkOrdersOnly: false,
         canViewBilling: true,
         canEditOrgBilling: false,
         canViewFinancialReports: true,
@@ -258,6 +270,9 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
     case "tech":
       return {
         ...NONE,
+        canUseTechnicianWorkspace: true,
+        canViewAllWorkOrders: false,
+        canViewAssignedWorkOrdersOnly: true,
         canViewBilling: false,
         canEditOrgBilling: false,
         canViewFinancialReports: false,
@@ -294,6 +309,9 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
     case "viewer":
       return {
         ...NONE,
+        canUseTechnicianWorkspace: false,
+        canViewAllWorkOrders: true,
+        canViewAssignedWorkOrdersOnly: false,
         canViewBilling: true,
         canEditOrgBilling: false,
         canViewFinancialReports: false,
@@ -343,6 +361,9 @@ export function getOrgPermissionsForProfile(profile: CommercialPermissionProfile
   if (profile === "billing") {
     return {
       ...getOrgPermissionsForRole("viewer"),
+      canUseTechnicianWorkspace: false,
+      canViewAllWorkOrders: true,
+      canViewAssignedWorkOrdersOnly: false,
       canViewBilling: true,
       canViewFinancials: true,
       canEditInvoices: true,
@@ -360,6 +381,9 @@ export function getOrgPermissionsForProfile(profile: CommercialPermissionProfile
   if (profile === "sales") {
     return {
       ...getOrgPermissionsForRole("viewer"),
+      canUseTechnicianWorkspace: false,
+      canViewAllWorkOrders: false,
+      canViewAssignedWorkOrdersOnly: false,
       canViewBilling: false,
       canViewFinancials: false,
       canEditInvoices: false,

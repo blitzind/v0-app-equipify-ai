@@ -338,6 +338,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   // Phase 2 (Permissions): hide work-order mutation buttons for read-only roles.
   const { permissions: woOrgPermissions } = useOrgPermissions()
   const woCanEdit = woOrgPermissions.canEditWorkOrders
+  const woCanManageDispatch = woOrgPermissions.canManageDispatch
+  const woCanCreateInvoice = woOrgPermissions.canEditInvoices || woOrgPermissions.canApproveInvoices
   const [wo, setWo] = useState<WorkOrder | null>(null)
   const [dbNotes, setDbNotes] = useState("")
   const [photoGallery, setPhotoGallery] = useState<WorkOrderPhotoGalleryItem[]>([])
@@ -450,6 +452,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       setLoading(false)
       return
     }
+    if (
+      woOrgPermissions.canViewAssignedWorkOrdersOnly &&
+      !woOrgPermissions.canViewAllWorkOrders &&
+      res.data.workOrder.technicianId !== user.id
+    ) {
+      setWo(null)
+      setBillingProfile(null)
+      setLoading(false)
+      return
+    }
     setDbNotes(res.data.notes)
     setPlanServices(res.data.planServices)
     setWo(res.data.workOrder)
@@ -462,11 +474,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setUsesPartsLineItems(res.data.usesPartsLineItems)
     setUsesTasksTable(res.data.usesTasksTable)
     setEquipmentAssets(res.data.equipmentAssets ?? [])
-    const profile = await resolveCustomerBillingProfile(supabase, {
-      organizationId: orgId,
-      customerId: res.data.workOrder.customerId,
-    }).catch(() => null)
-    setBillingProfile(profile)
+    if (woOrgPermissions.canViewFinancials || woOrgPermissions.canViewBilling) {
+      const profile = await resolveCustomerBillingProfile(supabase, {
+        organizationId: orgId,
+        customerId: res.data.workOrder.customerId,
+      }).catch(() => null)
+      setBillingProfile(profile)
+    } else {
+      setBillingProfile(null)
+    }
     const partsSnap = cloneParts(res.data.workOrder.repairLog.partsUsed)
     setTabParts(partsSnap)
     setSavedParts(partsSnap)
@@ -480,7 +496,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setTabLaborHours(lh)
     setSavedLaborHours(lh)
     setLoading(false)
-  }, [workOrderId, activeOrgId, orgStatus])
+  }, [workOrderId, activeOrgId, orgStatus, woOrgPermissions])
 
   const partsDirty = useMemo(() => !partsEqual(tabParts, savedParts), [tabParts, savedParts])
 
@@ -1573,7 +1589,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
               Current state: {dispatchState.label}.
             </p>
           </div>
-          {woCanEdit && !wo.isArchived ? (
+          {woCanManageDispatch && !wo.isArchived ? (
             <Button
               type="button"
               size="sm"
@@ -1620,7 +1636,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       >
         <LinkedInvoicesSummary
           invoices={linkedInvoices}
-          canCreateInvoice={woCanEdit && !wo.isArchived}
+          canCreateInvoice={woCanCreateInvoice && !wo.isArchived}
           onCreateInvoice={handleCreateInvoiceAction}
           billingProfile={billingProfile}
           readyToInvoice={readyToInvoice}
@@ -1712,7 +1728,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             Collect Customer Signature
           </Button>
         ) : null}
-        {woCanEdit ? (
+        {woCanCreateInvoice ? (
           <>
             <Button type="button" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleCreateInvoiceAction()}>
               <Receipt className="w-3.5 h-3.5" />
@@ -1895,53 +1911,46 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                         avatarUrl={wo.technicianAvatarUrl}
                         size="sm"
                       />
-                      {wo.technicianId !== "unassigned" ? (
-                        <Link
-                          href={`/technicians?open=${wo.technicianId}`}
-                          className="text-primary hover:underline cursor-pointer font-medium truncate"
-                        >
-                          {wo.technicianName}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">{wo.technicianName}</span>
-                      )}
+                      <span className="text-muted-foreground">{wo.technicianName}</span>
                     </span>
                   }
-                  editing
+                  editing={woCanManageDispatch}
                 >
-                  <select
-                    value={draft.technicianId ?? wo.technicianId ?? "unassigned"}
-                    onChange={(e) => {
-                      const id = e.target.value
-                      if (id === "unassigned") {
+                  {woCanManageDispatch ? (
+                    <select
+                      value={draft.technicianId ?? wo.technicianId ?? "unassigned"}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        if (id === "unassigned") {
+                          setDraft((prev) => ({
+                            ...prev,
+                            technicianId: id,
+                            technicianName: "Unassigned",
+                            technicianAvatarUrl: null,
+                          }))
+                          return
+                        }
+                        const opt = technicianOptions.find((x) => x.id === id)
                         setDraft((prev) => ({
                           ...prev,
                           technicianId: id,
-                          technicianName: "Unassigned",
-                          technicianAvatarUrl: null,
+                          technicianName: opt?.label ?? "Unknown",
+                          technicianAvatarUrl: opt?.avatarUrl ?? null,
                         }))
-                        return
-                      }
-                      const opt = technicianOptions.find((x) => x.id === id)
-                      setDraft((prev) => ({
-                        ...prev,
-                        technicianId: id,
-                        technicianName: opt?.label ?? "Unknown",
-                        technicianAvatarUrl: opt?.avatarUrl ?? null,
-                      }))
-                    }}
-                    className={cn(
-                      DRAWER_FIELD_CLASS,
-                      "w-full cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
-                    )}
-                  >
-                    <option value="unassigned">Unassigned</option>
-                    {technicianOptions.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
+                      }}
+                      className={cn(
+                        DRAWER_FIELD_CLASS,
+                        "w-full cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
+                      )}
+                    >
+                      <option value="unassigned">Unassigned</option>
+                      {technicianOptions.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                 </EditRow>
                 <EditRow
                   label="Scheduled"
@@ -1958,7 +1967,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   </div>
                 </EditRow>
                 {wo.completedDate && <DrawerRow label="Completed" value={fmtDate(wo.completedDate)} />}
-                {wo.invoiceNumber && (
+                {wo.invoiceNumber && woOrgPermissions.canViewFinancials && (
                   <DrawerRow
                     label="Invoice"
                     value={
@@ -2263,7 +2272,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             partsPhotosEditable={!wo.isArchived}
             tasksEditable={!wo.isArchived}
             onEditWorkOrder={startEdit}
-            onAssignTechnician={() => setAssignDialogOpen(true)}
+            onAssignTechnician={() => {
+              if (woCanManageDispatch) setAssignDialogOpen(true)
+            }}
             onMarkComplete={() => setCloseOutOpen(true)}
             workflowHints={workflowHints}
             postCompletionActions={postCompletionActions}
@@ -2497,7 +2508,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       />
 
       <AssignTechnicianDialog
-        open={assignDialogOpen}
+        open={assignDialogOpen && woCanManageDispatch}
         onOpenChange={setAssignDialogOpen}
         options={technicianAssignOptions}
         currentTechnicianId={wo.technicianId}

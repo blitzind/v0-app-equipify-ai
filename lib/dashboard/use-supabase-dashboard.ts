@@ -279,7 +279,7 @@ export function buildOperationalInsights(input: {
   return insights
 }
 
-export function useSupabaseDashboard() {
+export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
   const activeOrg = useActiveOrganization()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -303,6 +303,11 @@ export function useSupabaseDashboard() {
   const [operationalInsights, setOperationalInsights] = useState<AiInsight[]>([])
 
   const load = useCallback(async () => {
+    if (options.disabled) {
+      setLoading(false)
+      setError(null)
+      return
+    }
     setLoading(true)
     setError(null)
     const supabase = createBrowserSupabaseClient()
@@ -834,7 +839,7 @@ export function useSupabaseDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length])
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, options.disabled])
 
   useEffect(() => {
     void load()

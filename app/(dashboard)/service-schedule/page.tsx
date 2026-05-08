@@ -17,6 +17,7 @@ import {
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -1935,6 +1936,9 @@ function CompactPlanAlert({
 
 function ServiceSchedulePageInner() {
   const { plans, organizationId } = useMaintenancePlans()
+  const { permissions } = useOrgPermissions()
+  const assignedOnlyView = permissions.canViewAssignedWorkOrdersOnly && !permissions.canViewAllWorkOrders
+  const canManageSchedule = permissions.canManageDispatch
 
   const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWoRowView[]>([])
   const [unassignedWoRows, setUnassignedWoRows] = useState<ScheduledWoRowView[]>([])
@@ -1988,6 +1992,15 @@ function ServiceSchedulePageInner() {
           .from("work_orders")
           .select(selFull)
           .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .not("scheduled_on", "is", null)
+          .order("scheduled_on", { ascending: true })
+          .order("scheduled_time", { ascending: true, nullsFirst: false })
+        if (assignedOnlyView) res = await supabase
+          .from("work_orders")
+          .select(selFull)
+          .eq("organization_id", orgId)
+          .eq("assigned_user_id", user.id)
           .is("archived_at", null)
           .not("scheduled_on", "is", null)
           .order("scheduled_on", { ascending: true })
@@ -2053,7 +2066,10 @@ function ServiceSchedulePageInner() {
         return { data: res.data, error: res.error, mini }
       }
 
-      const [scheduledRes, unassignedRes] = await Promise.all([fetchScheduled(), fetchUnassigned()])
+      const [scheduledRes, unassignedRes] = await Promise.all([
+        fetchScheduled(),
+        canManageSchedule ? fetchUnassigned() : Promise.resolve({ data: [] as DbScheduledWoRow[], error: null, mini: false }),
+      ])
       const { data: rows, error: woError } = scheduledRes
 
       if (woError || !rows || !active) {
@@ -2198,7 +2214,7 @@ function ServiceSchedulePageInner() {
     return () => {
       active = false
     }
-  }, [scheduledWoRefresh, organizationId])
+  }, [scheduledWoRefresh, organizationId, assignedOnlyView, canManageSchedule])
 
   // View state
   const [viewTab, setViewTab]             = useState<ViewTab>("list")
@@ -2626,16 +2642,18 @@ function ServiceSchedulePageInner() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button size="sm" className="gap-1.5 shrink-0 h-9" onClick={() => setQuickAppointmentOpen(true)}>
-            <Plus className="w-4 h-4" />
-            New Appointment
-          </Button>
-          <Button size="sm" variant="outline" className="gap-1.5 shrink-0 h-9" onClick={() => setScheduleOpen(true)}>
-            <Calendar className="w-4 h-4" />
-            Full Schedule
-          </Button>
-        </div>
+        {canManageSchedule ? (
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="gap-1.5 shrink-0 h-9" onClick={() => setQuickAppointmentOpen(true)}>
+              <Plus className="w-4 h-4" />
+              New Appointment
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 shrink-0 h-9" onClick={() => setScheduleOpen(true)}>
+              <Calendar className="w-4 h-4" />
+              Full Schedule
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* ── Secondary Toolbar (filters + date nav for list view) ──────────── */}
@@ -2729,7 +2747,7 @@ function ServiceSchedulePageInner() {
                   ["Tomorrow", scheduleKpi.dueTomorrow, "due_tomorrow"],
                   ["Next 7 days", scheduleKpi.dueNext7, "due_next_7"],
                   ["Overdue", scheduleKpi.overdue, "sched_past_due"],
-                  ["Unassigned 48h+", scheduleKpi.unassigned, "unassigned_aging"],
+                  ...(canManageSchedule ? ([["Unassigned 48h+", scheduleKpi.unassigned, "unassigned_aging"]] as const) : []),
                 ] as const
               ).map(([label, n, focus]) => (
                 <button
@@ -2774,26 +2792,37 @@ function ServiceSchedulePageInner() {
               }}
             />
           ) : null}
-          <DragScheduleBoard
-            date={scheduleSelectedYmd}
-            technicians={assignTechnicians}
-            rows={filteredScheduledWoRows}
-            unassignedRows={filteredUnassignedWoRows}
-            activeRow={activeDragRow}
-            onDragStart={handleScheduleDragStart}
-            onDragEnd={(event) => void handleScheduleDragEnd(event)}
-          />
-          <UnassignedWorkLane
-            rows={filteredUnassignedWoRows}
-            loading={scheduledWoLoading}
-            technicians={assignTechnicians}
-            search={unassignedSearch}
-            onSearchChange={setUnassignedSearch}
-            filter={unassignedFilter}
-            onFilterChange={setUnassignedFilter}
-            assigningWoId={assigningWoId}
-            onQuickAssign={(args) => void handleQuickAssignWork(args)}
-          />
+          {canManageSchedule ? (
+            <>
+              <DragScheduleBoard
+                date={scheduleSelectedYmd}
+                technicians={assignTechnicians}
+                rows={filteredScheduledWoRows}
+                unassignedRows={filteredUnassignedWoRows}
+                activeRow={activeDragRow}
+                onDragStart={handleScheduleDragStart}
+                onDragEnd={(event) => void handleScheduleDragEnd(event)}
+              />
+              <UnassignedWorkLane
+                rows={filteredUnassignedWoRows}
+                loading={scheduledWoLoading}
+                technicians={assignTechnicians}
+                search={unassignedSearch}
+                onSearchChange={setUnassignedSearch}
+                filter={unassignedFilter}
+                onFilterChange={setUnassignedFilter}
+                assigningWoId={assigningWoId}
+                onQuickAssign={(args) => void handleQuickAssignWork(args)}
+              />
+            </>
+          ) : (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+              <p className="font-medium text-foreground">My schedule</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Showing assigned appointments only. Dispatch queues and drag/drop scheduling are restricted to dispatchers and admins.
+              </p>
+            </div>
+          )}
           <ScheduledWorkOrdersSection
             rows={filteredScheduledWoRows}
             loading={scheduledWoLoading}

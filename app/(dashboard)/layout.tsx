@@ -20,6 +20,7 @@ import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
+import { AidenChatLauncher } from "@/components/aiden/aiden-chat-launcher"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
 
@@ -79,6 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <AppSidebar />
                             <DashboardWorkspaceShell>
                               <PageShell>{children}</PageShell>
+                              <AidenChatLauncher />
                             </DashboardWorkspaceShell>
                           </div>
                         </div>

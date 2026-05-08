@@ -14,6 +14,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -686,11 +687,13 @@ function CalendarView({ workOrders, onOpen }: { workOrders: WorkOrder[]; onOpen:
 
 function WorkOrdersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { standardCreateEligibility } = useBillingAccess()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [refreshToken, setRefreshToken] = useState(0)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
   const [workOrdersLoadError, setWorkOrdersLoadError] = useState<string | null>(null)
+  const assignedOnlyView = permissions.canViewAssignedWorkOrdersOnly && !permissions.canViewAllWorkOrders
 
   useEffect(() => {
     let active = true
@@ -731,13 +734,14 @@ function WorkOrdersPageInner() {
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
+        if (assignedOnlyView) q = q.eq("assigned_user_id", user.id)
         q = applyArchivedAtScope(q, archiveScope)
         return q
       }
 
       let includeNum = true
       let includeTech = true
-      let includeBilling = true
+      let includeBilling = permissions.canViewFinancials || permissions.canViewBilling
       let woRes = await runWorkOrdersQuery(includeNum, includeTech, includeBilling)
 
       for (;;) {
@@ -945,7 +949,7 @@ function WorkOrdersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope, assignedOnlyView, permissions.canViewBilling, permissions.canViewFinancials])
 
   const [view, setView] = useState<ViewMode>("kanban")
   const [search, setSearch] = useState("")
@@ -973,6 +977,7 @@ function WorkOrdersPageInner() {
   } | null>(null)
 
   function openCreateWorkOrderModal(customerId: string | null, equipmentId: string | null) {
+    if (assignedOnlyView) return
     if (blockCreateIfNotEligible(standardCreateEligibility)) return
     setCreateModalCustomerId(customerId)
     setCreateModalEquipmentId(equipmentId)
@@ -981,6 +986,7 @@ function WorkOrdersPageInner() {
   }
 
   useQuickAdd("new-work-order", () => {
+    if (assignedOnlyView) return
     setQuickAppointmentOpen(true)
   })
 
@@ -1088,6 +1094,10 @@ function WorkOrdersPageInner() {
     const cid = searchParams.get("customerId")
     const eid = searchParams.get("equipmentId")
     if (action === "new-work-order") {
+      if (assignedOnlyView) {
+        router.replace("/work-orders", { scroll: false })
+        return
+      }
       if (blockCreateIfNotEligible(standardCreateEligibility)) {
         router.replace("/work-orders", { scroll: false })
         return
@@ -1097,7 +1107,7 @@ function WorkOrdersPageInner() {
       setCreateOpen(true)
       router.replace("/work-orders", { scroll: false })
     }
-  }, [searchParams, router, standardCreateEligibility])
+  }, [searchParams, router, standardCreateEligibility, assignedOnlyView])
 
   useEffect(() => {
     const s = searchParams.get("status")
@@ -1125,7 +1135,7 @@ function WorkOrdersPageInner() {
     }
     if (statusFilter !== "all") list = list.filter((wo) => wo.status === statusFilter)
     if (priorityFilter !== "all") list = list.filter((wo) => wo.priority === priorityFilter)
-    if (techFilter !== "all") list = list.filter((wo) => wo.technicianId === techFilter)
+    if (!assignedOnlyView && techFilter !== "all") list = list.filter((wo) => wo.technicianId === techFilter)
 
     const priorityOrder: Record<WorkOrderPriority, number> = { Critical: 0, High: 1, Normal: 2, Low: 3 }
     list.sort((a, b) => {
@@ -1151,7 +1161,7 @@ function WorkOrdersPageInner() {
       return 0
     })
     return list
-  }, [workOrders, search, statusFilter, priorityFilter, techFilter, sortKey, sortDir])
+  }, [workOrders, search, statusFilter, priorityFilter, techFilter, sortKey, sortDir, assignedOnlyView])
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
@@ -1182,6 +1192,16 @@ function WorkOrdersPageInner() {
               output when errors persist after refresh.
             </span>
           ) : null}
+        </div>
+      ) : null}
+
+      {assignedOnlyView ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Technician view</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Showing work orders assigned to you. Dispatch queues, archived records, and company-wide job lists are restricted
+            to operations managers and admins.
+          </p>
         </div>
       ) : null}
 
@@ -1232,39 +1252,43 @@ function WorkOrdersPageInner() {
               </SelectContent>
             </Select>
 
-            <Select value={techFilter} onValueChange={setTechFilter}>
-              <SelectTrigger className="w-36 sm:w-44">
-                <SelectValue placeholder="Technician" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Technicians</SelectItem>
-                {allTechs.map((t) => (
-                  <SelectItem key={t.id} value={t.id} className="cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <TechnicianAvatar
-                        userId={t.id === "unassigned" ? "—" : t.id}
-                        name={t.name}
-                        initials={initialsFromTechName(t.name)}
-                        avatarUrl={t.avatarUrl}
-                        size="xs"
-                      />
-                      <span className="truncate">{t.name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!assignedOnlyView ? (
+              <Select value={techFilter} onValueChange={setTechFilter}>
+                <SelectTrigger className="w-36 sm:w-44">
+                  <SelectValue placeholder="Technician" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Technicians</SelectItem>
+                  {allTechs.map((t) => (
+                    <SelectItem key={t.id} value={t.id} className="cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <TechnicianAvatar
+                          userId={t.id === "unassigned" ? "—" : t.id}
+                          name={t.name}
+                          initials={initialsFromTechName(t.name)}
+                          avatarUrl={t.avatarUrl}
+                          size="xs"
+                        />
+                        <span className="truncate">{t.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
 
-            <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
-              <SelectTrigger className="w-[132px]">
-                <SelectValue placeholder="Records" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-                <SelectItem value="all">All</SelectItem>
-              </SelectContent>
-            </Select>
+            {!assignedOnlyView ? (
+              <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
+                <SelectTrigger className="w-[132px]">
+                  <SelectValue placeholder="Records" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : null}
 
             {view === "kanban" && kanbanLaneScroll.canScroll ? (
               <div className="flex shrink-0 items-center gap-1">
@@ -1319,6 +1343,7 @@ function WorkOrdersPageInner() {
             ))}
           </div>
 
+          {!assignedOnlyView ? (
           <div className="flex items-center gap-2">
             <Button onClick={() => setQuickAppointmentOpen(true)} className="gap-2 shrink-0">
               <Plus className="w-4 h-4" />
@@ -1335,6 +1360,7 @@ function WorkOrdersPageInner() {
               Full Work Order
             </Button>
           </div>
+          ) : null}
         </div>
       </div>
 

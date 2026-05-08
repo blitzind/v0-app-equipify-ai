@@ -45,6 +45,21 @@ export type CapabilityMetadata = {
  * (see `getCapabilityMetadata` below).
  */
 export const CAPABILITY_METADATA: Partial<Record<OrgPermissionKey, CapabilityMetadata>> = {
+  canUseTechnicianWorkspace: {
+    label: "Use technician workspace",
+    description: "Open the focused technician experience for assigned jobs, schedule, and field actions.",
+    surface: "work-orders",
+  },
+  canViewAllWorkOrders: {
+    label: "View all work orders",
+    description: "See organization-wide work order lists instead of only personal assignments.",
+    surface: "work-orders",
+  },
+  canViewAssignedWorkOrdersOnly: {
+    label: "View assigned work orders only",
+    description: "Limit work-order lists and technician views to jobs assigned to the signed-in user.",
+    surface: "work-orders",
+  },
   canViewBilling: {
     label: "View billing",
     description: "View invoice totals, balances, and billing-aware reports.",

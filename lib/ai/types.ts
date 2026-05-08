@@ -18,6 +18,7 @@ export type AiTaskId =
   | "classification"
   | "tagging"
   | "inventory_operations"
+  | "aiden_help"
 
 export type AiProviderId = "openai" | "anthropic" | "google"
 

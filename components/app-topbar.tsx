@@ -189,7 +189,7 @@ export function AppTopbar() {
       // Platform admin is determined server-side in /api/session/account-summary
       // (isPlatformAdminEmail); never show /admin to org-only users.
       if (link.href === "/admin") return isPlatformAdmin
-      if (link.href === "/communications") return permissions.canViewBilling
+      if (link.href === "/communications") return permissions.canViewCommunications
       if (link.href === "/settings/billing") return permissions.canViewBilling
       if (link.href === "/settings/integrations") return permissions.canManageIntegrations
       if (link.href === "/settings/security") return permissions.canManageSecuritySettings

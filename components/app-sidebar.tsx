@@ -61,18 +61,19 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
-      { label: "Dispatch", href: "/dispatch", icon: CalendarRange, anyOf: ["canViewDispatch"] },
+      { label: "Today", href: "/technicians/today", icon: HardHat, anyOf: ["canUseTechnicianWorkspace"] },
+      { label: "Dispatch", href: "/dispatch", icon: CalendarRange, anyOf: ["canManageDispatch"] },
       { label: "Schedule", href: "/service-schedule", icon: CalendarClock, anyOf: ["canViewDispatch"] },
-      { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
-      { label: "Maintenance", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon },
-      { label: "Technicians", href: "/technicians", icon: HardHat, anyOf: ["canViewTechnicians"] },
+      { label: "Work Orders", href: "/work-orders", icon: ClipboardList, anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
+      { label: "Maintenance", href: "/maintenance-plans", icon: MaintenancePlansLucideIcon, anyOf: ["canManageDispatch"] },
+      { label: "Technicians", href: "/technicians", icon: HardHat, anyOf: ["canManageTechnicians"] },
     ],
   },
   {
     id: "assets",
     label: "Assets",
     items: [
-      { label: "Equipment", href: "/equipment", icon: Wrench },
+      { label: "Equipment", href: "/equipment", icon: Wrench, anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
       {
         label: "Inventory",
         href: "/inventory",
@@ -92,12 +93,12 @@ const NAV_GROUPS: NavGroup[] = [
     id: "contacts",
     label: "Contacts",
     items: [
-      { label: "Customers", href: "/customers", icon: Users },
+      { label: "Customers", href: "/customers", icon: Users, anyOf: ["canViewAllWorkOrders", "canViewBilling", "canManageProspects"] },
       // Leads + Follow-Up Phase 1: pipeline lives at /prospects. Read access
       // matches RLS (org membership); editing/converting requires
       // `canManageProspects`, but we surface the link to all members so
       // viewers/techs can see the pipeline read-only.
-      { label: "Prospects", href: "/prospects", icon: UserPlus },
+      { label: "Prospects", href: "/prospects", icon: UserPlus, anyOf: ["canManageProspects"] },
     ],
   },
   {

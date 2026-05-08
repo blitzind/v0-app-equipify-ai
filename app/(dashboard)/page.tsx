@@ -24,6 +24,8 @@ import { OperationalInsightsWidget } from "@/components/dashboard/ai-insights-wi
 import { MaintenanceAutomationStats } from "@/components/dashboard/maintenance-automation-stats"
 import { ProspectFollowUpWidget } from "@/components/dashboard/prospect-follow-up-widget"
 import { AiOpsDigestCard } from "@/components/ai-ops/digest-card"
+import { TechnicianHome } from "@/components/dashboard/technician-home"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
 
 function formatUsdFromCents(cents: number): string {
@@ -32,6 +34,11 @@ function formatUsdFromCents(cents: number): string {
 }
 
 export default function DashboardPage() {
+  const { permissions } = useOrgPermissions()
+  const technicianFocused =
+    permissions.canUseTechnicianWorkspace &&
+    permissions.canViewAssignedWorkOrdersOnly &&
+    !permissions.canViewFinancials
   const {
     loading,
     error,
@@ -43,9 +50,13 @@ export default function DashboardPage() {
     revenueByMonth,
     workOrdersByStatus,
     operationalInsights,
-  } = useSupabaseDashboard()
+  } = useSupabaseDashboard({ disabled: technicianFocused })
 
   const monthlyRevenueLabel = formatUsdFromCents(stats.monthlyRevenueCents)
+
+  if (technicianFocused) {
+    return <TechnicianHome />
+  }
 
   return (
     <div className="flex flex-col gap-6">

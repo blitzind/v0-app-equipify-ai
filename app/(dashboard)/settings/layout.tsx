@@ -29,7 +29,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { label: "Sample data", href: "/settings/sample-data", icon: Database, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Migration center", href: "/settings/imports", icon: Upload, visible: (p) => p.canManageHistoricalImports },
   { label: "Team", href: "/settings/team", icon: Users, visible: (p) => p.canManageWorkspaceSettings },
-  { label: "Permissions", href: "/settings/permissions", icon: Lock },
+  { label: "Permissions", href: "/settings/permissions", icon: Lock, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, visible: (p) => p.canViewBilling },
   { label: "AI Usage", href: "/settings/ai-usage", icon: Sparkles, visible: (p) => p.canViewInsights },
   {

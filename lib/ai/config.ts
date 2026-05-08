@@ -56,6 +56,7 @@ function loadTaskOverrides(): Partial<Record<AiTaskId, string>> {
     "classification",
     "tagging",
     "inventory_operations",
+    "aiden_help",
   ]
   const out: Partial<Record<AiTaskId, string>> = {}
   for (const t of tasks) {

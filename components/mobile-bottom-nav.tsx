@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils"
 import { useQuickAddDispatch } from "@/lib/quick-add-context"
 import type { QuickAddAction } from "@/lib/quick-add-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import type { OrgPermissions } from "@/lib/permissions/model"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import {
   LayoutDashboard, CalendarClock, Users, MoreHorizontal, Plus,
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
-  Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart,
+  Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart, HardHat,
 } from "lucide-react"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
@@ -22,6 +24,11 @@ const ACCENT = "#f59f1c"
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/"
   return pathname.startsWith(href)
+}
+
+function allowed(perms: OrgPermissions, anyOf?: (keyof OrgPermissions)[]) {
+  if (!anyOf?.length) return true
+  return anyOf.some((key) => perms[key])
 }
 
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
@@ -68,6 +75,7 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const dispatch = useQuickAddDispatch()
   const router = useRouter()
   const pathname = usePathname()
+  const { permissions } = useOrgPermissions()
   const { standardCreateEligibility, equipmentCreateEligibility } = useBillingAccess()
 
   function fire(action: QuickAddAction) {
@@ -87,14 +95,14 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
     }
   }
 
-  const items: { icon: React.ElementType; label: string; action: QuickAddAction }[] = [
-    { icon: UserPlus,      label: "Add Customer",    action: "new-customer" },
-    { icon: Wrench,        label: "Add Equipment",   action: "new-equipment" },
-    { icon: CalendarPlus,  label: "Schedule Service", action: "schedule-service" },
-    { icon: ClipboardPlus, label: "New Work Order",  action: "new-work-order" },
-    { icon: FilePlus,      label: "Create Quote",    action: "new-quote" },
-    { icon: ReceiptText,   label: "Create Invoice",  action: "new-invoice" },
-  ]
+  const items: { icon: React.ElementType; label: string; action: QuickAddAction; anyOf?: (keyof OrgPermissions)[] }[] = [
+    { icon: UserPlus,      label: "Add Customer",    action: "new-customer", anyOf: ["canManageProspects", "canViewBilling"] },
+    { icon: Wrench,        label: "Add Equipment",   action: "new-equipment", anyOf: ["canViewAllWorkOrders"] },
+    { icon: CalendarPlus,  label: "Schedule Service", action: "schedule-service", anyOf: ["canManageDispatch"] },
+    { icon: ClipboardPlus, label: "New Work Order",  action: "new-work-order", anyOf: ["canViewAllWorkOrders", "canManageDispatch"] },
+    { icon: FilePlus,      label: "Create Quote",    action: "new-quote", anyOf: ["canEditQuotes"] },
+    { icon: ReceiptText,   label: "Create Invoice",  action: "new-invoice", anyOf: ["canEditInvoices"] },
+  ].filter((item) => allowed(permissions, item.anyOf))
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -135,18 +143,20 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
 
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
+  const { permissions } = useOrgPermissions()
 
-  const items: { icon: React.ElementType; label: string; href: string }[] = [
-    { icon: Wrench, label: "Equipment", href: "/equipment" },
-    { icon: ClipboardList, label: "Work Orders", href: "/work-orders" },
-    { icon: MaintenancePlansLucideIcon, label: "Maintenance", href: "/maintenance-plans" },
-    { icon: FileText, label: "Quotes", href: "/quotes" },
-    { icon: Receipt, label: "Invoices", href: "/invoices" },
-    { icon: ShoppingCart, label: "Purchase Orders", href: "/purchase-orders" },
-    { icon: BarChart3, label: "Reports", href: "/reports" },
-    { icon: Sparkles, label: "Insights", href: "/insights" },
-    { icon: Settings, label: "Settings", href: "/settings/workspace" },
-  ]
+  const items: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
+    { icon: HardHat, label: "Today", href: "/technicians/today", anyOf: ["canUseTechnicianWorkspace"] },
+    { icon: Wrench, label: "Equipment", href: "/equipment", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
+    { icon: ClipboardList, label: "Work Orders", href: "/work-orders", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
+    { icon: MaintenancePlansLucideIcon, label: "Maintenance", href: "/maintenance-plans", anyOf: ["canManageDispatch"] },
+    { icon: FileText, label: "Quotes", href: "/quotes", anyOf: ["canViewQuotes", "canEditQuotes"] },
+    { icon: Receipt, label: "Invoices", href: "/invoices", anyOf: ["canViewBilling", "canEditInvoices"] },
+    { icon: ShoppingCart, label: "Purchase Orders", href: "/purchase-orders", anyOf: ["canViewBilling"] },
+    { icon: BarChart3, label: "Reports", href: "/reports", anyOf: ["canViewOperationalReports", "canViewFinancialReports"] },
+    { icon: Sparkles, label: "Insights", href: "/insights", anyOf: ["canViewInsights"] },
+    { icon: Settings, label: "Settings", href: "/settings/workspace", anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"] },
+  ].filter((item) => allowed(permissions, item.anyOf))
 
   return (
     <BottomSheet open={open} onClose={onClose}>
@@ -190,14 +200,19 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const { permissions } = useOrgPermissions()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
 
   const navItems: ({ icon: React.ElementType; label: string; href: string } | null)[] = [
     { icon: LayoutDashboard, label: "Home",      href: "/" },
-    { icon: CalendarClock,   label: "Schedule",  href: "/service-schedule" },
+    permissions.canUseTechnicianWorkspace
+      ? { icon: HardHat, label: "Today", href: "/technicians/today" }
+      : { icon: CalendarClock,   label: "Schedule",  href: "/service-schedule" },
     null, // center FAB
-    { icon: Users,           label: "Customers", href: "/customers" },
+    permissions.canUseTechnicianWorkspace
+      ? { icon: ClipboardList, label: "Jobs", href: "/work-orders" }
+      : { icon: Users,           label: "Customers", href: "/customers" },
     { icon: MoreHorizontal,  label: "More",      href: "" },
   ]
 
