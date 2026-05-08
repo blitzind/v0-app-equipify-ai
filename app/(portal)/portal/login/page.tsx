@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRight, KeyRound, Mail, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
+import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 
 /**
  * Hex used by the main app sidebar (`components/app-sidebar.tsx` line ~396).
@@ -14,9 +14,6 @@ import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand
  * when the marketing site / portal-bg tokens shift.
  */
 const APP_SIDEBAR_BG = "#0F172A"
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const NOTICE_COPY: Record<string, string> = {
   no_staff_portal:
@@ -40,36 +37,6 @@ function PortalLoginInner() {
   const [manualToken, setManualToken] = useState("")
   const [showTokenForm, setShowTokenForm] = useState(false)
   const [configStatus, setConfigStatus] = useState<ConfigStatus>({ kind: "ok" })
-  const [loginBrand, setLoginBrand] = useState<{ organizationName: string; logoUrl: string | null } | null>(null)
-  const [brandLoading, setBrandLoading] = useState(false)
-
-  const orgIdParam = searchParams.get("organizationId")?.trim() ?? ""
-
-  useEffect(() => {
-    if (!orgIdParam || !UUID_RE.test(orgIdParam)) {
-      setLoginBrand(null)
-      setBrandLoading(false)
-      return
-    }
-    let cancelled = false
-    setBrandLoading(true)
-    void fetch(`/api/portal/public-branding?organizationId=${encodeURIComponent(orgIdParam)}`)
-      .then(async (r) => {
-        if (!r.ok) return null
-        return r.json() as Promise<{ organizationName?: string; logoUrl?: string | null }>
-      })
-      .then((j) => {
-        if (cancelled || !j?.organizationName) return
-        setLoginBrand({ organizationName: j.organizationName, logoUrl: j.logoUrl ?? null })
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setBrandLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [orgIdParam])
 
   const isProd = useMemo(() => process.env.NODE_ENV === "production", [])
 
@@ -156,44 +123,28 @@ function PortalLoginInner() {
         }}
         aria-labelledby="portal-login-heading"
       >
-        {/* ── Brand header (matches main app sidebar #0F172A) ───────────────── */}
+        {/* ── Brand header (matches main app sidebar #0F172A) ─────────────────
+              Hierarchy:
+                1. "Customer Portal" — primary heading
+                2. "Provided by" + Equipify wordmark — secondary attribution
+                3. Secure invite access badge — tertiary trust signal
+              Workspace logo intentionally not shown here so the sign-in surface
+              reads consistently for any tenant.
+        */}
         <div
           className="flex flex-col items-center justify-center gap-3 px-8 py-10 sm:py-11"
           style={{ background: APP_SIDEBAR_BG }}
         >
-          {brandLoading ? (
-            <p className="text-sm text-white/70" aria-live="polite">
-              Loading branding…
-            </p>
-          ) : loginBrand ? (
-            <PortalWorkspaceBrand
-              organizationName={loginBrand.organizationName}
-              logoUrl={loginBrand.logoUrl}
-              size="hero"
-              equipifyVariant="onDark"
-              heroOnDark
-              footerSlot={
-                <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-2">
-                  <ShieldCheck size={11} className="text-white/70" aria-hidden />
-                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
-                    Secure invite access
-                  </span>
-                </div>
-              }
-            />
-          ) : (
-            <>
-              <p className="text-center text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-snug px-2 max-w-[min(22rem,92vw)] text-balance">
-                Customer Portal
-              </p>
-              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-1">
-                <ShieldCheck size={11} className="text-white/70" aria-hidden />
-                <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
-                  Secure invite access
-                </span>
-              </div>
-            </>
-          )}
+          <p className="text-center text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-snug px-2 max-w-[min(22rem,92vw)] text-balance">
+            Customer Portal
+          </p>
+          <ProvidedByEquipify variant="onDark" size="lg" />
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 mt-1">
+            <ShieldCheck size={11} className="text-white/70" aria-hidden />
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/70">
+              Secure invite access
+            </span>
+          </div>
         </div>
 
         {/* ── Card body ────────────────────────────────────────────────────── */}

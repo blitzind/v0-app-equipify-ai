@@ -4,34 +4,52 @@ import { cn } from "@/lib/utils"
 import { BrandLogo } from "@/components/brand-logo"
 
 /**
- * Subtle secondary attribution — workspace/service provider remains primary.
+ * Tertiary attribution — workspace/service provider remains primary.
+ *
+ * Two sizes:
+ *  - `sm` (legacy compact): 12px wordmark for tight inline slots.
+ *  - `lg` (~3× sm): used on the portal sign-in card and the dark portal footer
+ *    band so the Equipify mark is readable. Default is `lg`.
  */
 export function ProvidedByEquipify({
   className,
   variant = "onDark",
+  size = "lg",
 }: {
   className?: string
-  /** Dark header (login top strip) vs light portal shell header */
+  /** Dark header (login strip / portal footer) vs light light-surface contexts */
   variant?: "onDark" | "onLight"
+  size?: "sm" | "lg"
 }) {
   const labelClass =
-    variant === "onDark" ? "text-white/55" : "text-[var(--portal-nav-text)]"
+    variant === "onDark" ? "text-white/65" : "text-[var(--portal-nav-text)]"
+
+  const labelSizeClass =
+    size === "lg"
+      ? "text-[11px] sm:text-[12px] font-medium uppercase tracking-[0.16em]"
+      : "text-[10px] font-medium uppercase tracking-[0.14em]"
+
+  const logoSizeClass =
+    size === "lg"
+      ? "h-9 sm:h-10 w-auto max-w-[200px] sm:max-w-[240px]"
+      : "h-3 w-auto max-w-[72px] sm:max-w-[84px]"
+
+  const logoSizes = size === "lg" ? "240px" : "84px"
 
   return (
     <div
       className={cn(
-        "flex items-center justify-center gap-1.5 flex-wrap",
+        "flex items-center justify-center flex-wrap",
+        size === "lg" ? "gap-2 sm:gap-2.5" : "gap-1.5",
         variant === "onLight" ? "pt-0.5" : "pt-1",
         className,
       )}
       aria-hidden={false}
     >
-      <span className={cn("text-[10px] font-medium uppercase tracking-[0.14em]", labelClass)}>
-        Provided by
-      </span>
+      <span className={cn(labelSizeClass, labelClass)}>Provided by</span>
       <BrandLogo
-        className="h-3 w-auto max-w-[72px] sm:max-w-[84px] object-contain object-left opacity-90"
-        sizes="84px"
+        className={cn(logoSizeClass, "object-contain object-left opacity-95")}
+        sizes={logoSizes}
       />
       <span className="sr-only">Equipify</span>
     </div>

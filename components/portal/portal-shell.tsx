@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
+import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { usePortalSession } from "@/components/portal/portal-session-context"
 
 const NAV_ITEMS = [
@@ -88,7 +89,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--portal-bg)" }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--portal-bg)" }}>
       <header
         className="sticky top-0 z-40 border-b"
         style={{ background: "var(--portal-surface)", borderColor: "var(--portal-border)" }}
@@ -184,7 +185,22 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="max-w-screen-xl mx-auto px-6 py-8">{children}</main>
+      <main className="max-w-screen-xl mx-auto px-6 py-8 w-full flex-1">{children}</main>
+
+      {/* Tertiary attribution band — matches main app navigation color (#0F172A).
+          Workspace branding remains primary in the header above. */}
+      <footer
+        className="mt-auto border-t py-7 px-4 sm:px-6 flex flex-col items-center justify-center gap-1"
+        style={{
+          borderColor: "rgba(255, 255, 255, 0.06)",
+          background: "#0F172A",
+        }}
+      >
+        <ProvidedByEquipify variant="onDark" size="lg" />
+        <p className="text-[11px] text-white/45 text-center">
+          Customer portal experience powered by Equipify.
+        </p>
+      </footer>
     </div>
   )
 }
