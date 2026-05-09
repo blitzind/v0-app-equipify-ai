@@ -364,21 +364,6 @@ const KanbanView = forwardRef<
     return () => ro.disconnect()
   }, [updateHScroll, columns])
 
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      if (el.scrollWidth <= el.clientWidth + 1) return
-      if (e.shiftKey) return
-      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
-      if (Math.abs(e.deltaY) < 1) return
-      e.preventDefault()
-      el.scrollLeft += e.deltaY
-    }
-    el.addEventListener("wheel", onWheel, { passive: false })
-    return () => el.removeEventListener("wheel", onWheel)
-  }, [columns])
-
   const laneScrollStepPx = useCallback(() => {
     const root = scrollRef.current
     if (!root) return 288 + KANBAN_LANE_GAP_PX
@@ -416,7 +401,7 @@ const KanbanView = forwardRef<
       <div
         ref={scrollRef}
         onScroll={updateHScroll}
-        className="flex gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth scroll-px-3 pb-4 [-webkit-overflow-scrolling:touch] scrollbar-none snap-x snap-mandatory lg:snap-none px-1 sm:px-0"
+        className="flex gap-4 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth scroll-px-3 pb-4 [-webkit-overflow-scrolling:touch] scrollbar-none snap-x snap-mandatory lg:snap-none touch-pan-x px-1 sm:px-0"
       >
         {columns.map(({ status, items }) => (
           <div

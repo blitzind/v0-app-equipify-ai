@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { GripVertical, Mail, Phone } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight, GripVertical, Mail, Phone } from "lucide-react"
 import {
   DndContext,
   DragOverlay,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/prospects/format"
 import { followUpBucketFor } from "@/lib/prospects/format"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 function resolveDropStage(
   overId: UniqueIdentifier | null | undefined,
@@ -203,7 +204,10 @@ function StageColumn({
         )
 
   return (
-    <div className="flex min-w-[min(100vw-2rem,280px)] max-w-[320px] shrink-0 flex-col rounded-xl border border-border bg-muted/20">
+    <div
+      data-pipeline-stage
+      className="flex min-w-[min(100vw-2rem,280px)] max-w-[320px] shrink-0 flex-col rounded-xl border border-border bg-muted/20"
+    >
       <div className="border-b border-border px-3 py-2.5">
         <p className="text-xs font-semibold leading-tight">{formatProspectStatus(stage)}</p>
         <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
@@ -248,6 +252,8 @@ export type ProspectPipelineBoardProps = {
   onPipelinePatch: (prospectId: string, status: ProspectStatus) => Promise<boolean>
 }
 
+const PIPELINE_GAP_PX = 12 // tailwind gap-3
+
 export function ProspectPipelineBoard({
   prospects,
   canManage,
@@ -255,6 +261,50 @@ export function ProspectPipelineBoard({
   onPipelinePatch,
 }: ProspectPipelineBoardProps) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [hScroll, setHScroll] = useState({ showLeft: false, showRight: false, canScroll: false })
+
+  const updateHScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    const maxScroll = Math.max(0, scrollWidth - clientWidth)
+    const canScroll = maxScroll > 4
+    setHScroll({
+      canScroll,
+      showLeft: canScroll && scrollLeft > 4,
+      showRight: canScroll && scrollLeft < maxScroll - 4,
+    })
+  }, [])
+
+  useEffect(() => {
+    updateHScroll()
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => updateHScroll())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updateHScroll, prospects])
+
+  const laneScrollStepPx = useCallback(() => {
+    const root = scrollRef.current
+    if (!root) return 280 + PIPELINE_GAP_PX
+    const lane = root.querySelector("[data-pipeline-stage]") as HTMLElement | null
+    if (lane) return lane.getBoundingClientRect().width + PIPELINE_GAP_PX
+    return Math.min(320, root.clientWidth * 0.85)
+  }, [])
+
+  const scrollPipeline = useCallback(
+    (dir: "left" | "right") => {
+      const el = scrollRef.current
+      if (!el) return
+      const step = laneScrollStepPx() * (dir === "left" ? -1 : 1)
+      el.scrollBy({ left: step, behavior: "smooth" })
+      window.requestAnimationFrame(updateHScroll)
+      window.setTimeout(updateHScroll, 380)
+    },
+    [laneScrollStepPx, updateHScroll],
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -306,7 +356,37 @@ export function ProspectPipelineBoard({
       onDragEnd={(e) => void handleDragEnd(e)}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-1 px-1 scroll-smooth touch-pan-x">
+      {hScroll.canScroll ? (
+        <div className="mb-2 hidden md:flex justify-end gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground disabled:opacity-40"
+            disabled={!hScroll.showLeft}
+            aria-label="Scroll pipeline left"
+            onClick={() => scrollPipeline("left")}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground disabled:opacity-40"
+            disabled={!hScroll.showRight}
+            aria-label="Scroll pipeline right"
+            onClick={() => scrollPipeline("right")}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : null}
+      <div
+        ref={scrollRef}
+        onScroll={updateHScroll}
+        className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-1 px-1 scroll-smooth touch-pan-x"
+      >
         {PIPELINE_STAGE_ORDER.map((stage) => (
           <StageColumn
             key={stage}
