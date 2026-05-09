@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { isLowStock } from "@/lib/inventory/format"
+import { isLowStock, isOutOfStock } from "@/lib/inventory/format"
 
 type StockRow = {
   id: string
@@ -89,6 +89,8 @@ export function InventoryVehicleStockSummary({
         reorder_point: r.reorder_point,
       }),
     ).length
+    const outCount = rows.filter((r) => isOutOfStock({ quantity_on_hand: Number(r.quantity_on_hand) })).length
+    const needsRestock = lowCount + outCount
     return {
       id: v.id,
       name: v.name,
@@ -96,14 +98,16 @@ export function InventoryVehicleStockSummary({
       skus,
       onHand,
       lowCount,
+      outCount,
+      needsRestock,
     }
   })
 
   // Sort vehicles that need restock first so dispatchers see the action
   // items before well-stocked vans.
   summarized.sort((a, b) => {
-    if (a.lowCount === b.lowCount) return a.name.localeCompare(b.name)
-    return b.lowCount - a.lowCount
+    if (a.needsRestock === b.needsRestock) return a.name.localeCompare(b.name)
+    return b.needsRestock - a.needsRestock
   })
 
   return (
@@ -113,7 +117,7 @@ export function InventoryVehicleStockSummary({
           <Truck className="w-4 h-4" /> Vehicle stock
         </CardTitle>
         <CardDescription className="text-xs">
-          Quick scan of every active van bin and the technician assigned to it.
+          Quick scan of van bins — low/out counts surface vans that may need restocking before dispatch.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0 overflow-x-auto">
@@ -124,13 +128,14 @@ export function InventoryVehicleStockSummary({
               <TableHead>Technician</TableHead>
               <TableHead className="text-right">SKUs</TableHead>
               <TableHead className="text-right">On hand</TableHead>
-              <TableHead className="text-right">Low stock</TableHead>
+              <TableHead className="text-right">Low</TableHead>
+              <TableHead className="text-right">Out</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {summarized.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-sm text-muted-foreground py-6 text-center">
+                <TableCell colSpan={6} className="text-sm text-muted-foreground py-6 text-center">
                   No vehicles tracked yet.
                 </TableCell>
               </TableRow>
@@ -147,6 +152,15 @@ export function InventoryVehicleStockSummary({
                   {v.lowCount > 0 ? (
                     <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-300">
                       {v.lowCount}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {v.outCount > 0 ? (
+                    <Badge variant="outline" className="border-rose-500/50 text-rose-700 dark:text-rose-300">
+                      {v.outCount}
                     </Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>

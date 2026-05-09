@@ -6,7 +6,9 @@ import {
 } from "@/lib/inventory/inventory-mutations"
 import { requireOrgInventoryWrite } from "@/lib/inventory/require-org-inventory-access"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { hasOrgPermission } from "@/lib/permissions/model"
 import { canAccessAssignedWorkResource } from "@/lib/permissions/technician-scope"
+import { resolveVehicleLocationIdForUser } from "@/lib/inventory/technician-truck"
 
 export const runtime = "nodejs"
 
@@ -91,6 +93,29 @@ export async function POST(
     .eq("id", locationId)
     .maybeSingle()
   if (!loc) return NextResponse.json({ message: "Location not found." }, { status: 404 })
+
+  // Field techs without full inventory management may only consume from their assigned van bin.
+  if (!hasOrgPermission(permissionGate.permissions, "canManageInventory")) {
+    const truckLoc = await resolveVehicleLocationIdForUser(gate.svc, organizationId, gate.userId)
+    if (!truckLoc) {
+      return NextResponse.json(
+        {
+          message:
+            "No vehicle stock location is assigned to your technician profile. Ask a manager to assign a van bin before consuming parts.",
+        },
+        { status: 400 },
+      )
+    }
+    if (locationId !== truckLoc) {
+      return NextResponse.json(
+        {
+          message:
+            "Your role can only consume parts from your assigned truck stock location.",
+        },
+        { status: 403 },
+      )
+    }
+  }
 
   const row = await ensureStockRow(gate.svc, organizationId, catalogItemId, locationId)
   if (row.quantity_on_hand < qty) {

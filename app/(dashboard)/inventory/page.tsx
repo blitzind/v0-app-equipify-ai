@@ -51,7 +51,7 @@ import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { InventoryOverviewKpis } from "@/components/inventory/inventory-overview-kpis"
 import { InventoryVehicleStockSummary } from "@/components/inventory/inventory-vehicle-stock-summary"
 import { InventoryRecentActivityCard } from "@/components/inventory/inventory-recent-activity-card"
-import { isLowStock } from "@/lib/inventory/format"
+import { isLowStock, stockTone } from "@/lib/inventory/format"
 
 const MANAGER_ROLES = new Set(["owner", "admin", "manager"])
 
@@ -73,6 +73,7 @@ type StockRow = {
   quantity_available: number
   reorder_point: number | null
   reorder_quantity: number | null
+  last_restocked_at?: string | null
   part_number: string | null
   item_name: string | null
   unit: string | null
@@ -147,6 +148,7 @@ export default function InventoryPage() {
   const canConsumeOnWorkOrder = Boolean(
     orgPerms.permissions.canConsumePartsOnWorkOrders || isPlatformAdmin,
   )
+  const canManageInventoryPerm = Boolean(orgPerms.permissions.canManageInventory || isPlatformAdmin)
 
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -367,6 +369,15 @@ export default function InventoryPage() {
 
   const [vanTech, setVanTech] = useState("")
   const [vanLoc, setVanLoc] = useState("")
+
+  const [stockTableFilter, setStockTableFilter] = useState<
+    "all" | "vehicle_only" | "vehicle_needs_restock"
+  >("all")
+  const [myVehicleLocId, setMyVehicleLocId] = useState<string | null>(null)
+
+  const [retCatalog, setRetCatalog] = useState("")
+  const [retWarehouse, setRetWarehouse] = useState("")
+  const [retQty, setRetQty] = useState("1")
 
   async function submitThresholds() {
     if (!canManage || !baseUrl) return

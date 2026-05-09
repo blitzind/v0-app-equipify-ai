@@ -1,10 +1,5 @@
-import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
-import {
-  applyStockPatch,
-  ensureStockRow,
-  insertLedger,
-} from "@/lib/inventory/inventory-mutations"
+import { executeInventoryTransfer } from "@/lib/inventory/execute-inventory-transfer"
 import { requireOrgInventoryWrite } from "@/lib/inventory/require-org-inventory-access"
 
 export const runtime = "nodejs"
@@ -70,54 +65,21 @@ export async function POST(
     if (!loc) return NextResponse.json({ message: `Location ${lid} not found.` }, { status: 404 })
   }
 
-  const fromRow = await ensureStockRow(gate.svc, organizationId, catalogItemId, fromId)
-  const available = fromRow.quantity_on_hand - fromRow.quantity_allocated
-  if (available < qty) {
-    return NextResponse.json({ message: "Insufficient available quantity at source location." }, { status: 409 })
+  try {
+    const { correlation_id } = await executeInventoryTransfer({
+      svc: gate.svc,
+      organizationId,
+      catalogItemId,
+      fromLocationId: fromId,
+      toLocationId: toId,
+      quantity: qty,
+      notes: body.notes ?? null,
+      createdByUserId: gate.userId,
+    })
+    return NextResponse.json({ ok: true, correlation_id })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Transfer failed."
+    const status = msg.includes("Insufficient") ? 409 : 400
+    return NextResponse.json({ message: msg }, { status })
   }
-
-  const nextFromOh = fromRow.quantity_on_hand - qty
-  await applyStockPatch(gate.svc, organizationId, fromRow.id, {
-    quantity_on_hand: nextFromOh,
-    quantity_allocated: fromRow.quantity_allocated,
-  })
-
-  const toRow = await ensureStockRow(gate.svc, organizationId, catalogItemId, toId)
-  const nextToOh = toRow.quantity_on_hand + qty
-  await applyStockPatch(gate.svc, organizationId, toRow.id, {
-    quantity_on_hand: nextToOh,
-    quantity_allocated: toRow.quantity_allocated,
-  })
-
-  const correlationId = randomUUID()
-
-  await insertLedger(gate.svc, {
-    organization_id: organizationId,
-    catalog_item_id: catalogItemId,
-    location_id: fromId,
-    transaction_type: "transfer_out",
-    quantity: qty,
-    delta_on_hand: -qty,
-    delta_allocated: 0,
-    correlation_id: correlationId,
-    counterparty_location_id: toId,
-    notes: body.notes ?? null,
-    created_by: gate.userId,
-  })
-
-  await insertLedger(gate.svc, {
-    organization_id: organizationId,
-    catalog_item_id: catalogItemId,
-    location_id: toId,
-    transaction_type: "transfer_in",
-    quantity: qty,
-    delta_on_hand: qty,
-    delta_allocated: 0,
-    correlation_id: correlationId,
-    counterparty_location_id: fromId,
-    notes: body.notes ?? null,
-    created_by: gate.userId,
-  })
-
-  return NextResponse.json({ ok: true, correlation_id: correlationId })
 }

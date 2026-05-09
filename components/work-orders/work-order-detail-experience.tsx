@@ -742,6 +742,8 @@ export interface WorkOrderDetailExperienceProps {
   /** Controlled tabs (e.g. confirm before leaving Parts tab with unsaved edits). Requires both. */
   tabsValue?: string
   onTabsValueChange?: (value: string) => void
+  /** Inserted above the parts toolbar / table (e.g. truck stock consumption). */
+  partsTabLeadSlot?: ReactNode
   /** Inserted above the parts table (e.g. save / revert bar in the drawer). */
   partsTabToolbar?: ReactNode
   /** Next to "Add Part" when parts are editable (e.g. Add from catalog). */
@@ -838,6 +840,7 @@ export function WorkOrderDetailExperience({
   layout = "page",
   tabsValue,
   onTabsValueChange,
+  partsTabLeadSlot,
   partsTabToolbar,
   partsTableExtraActions,
   tasksTabToolbar,
@@ -1799,7 +1802,8 @@ export function WorkOrderDetailExperience({
           </Card>
         </TabsContent>
 
-        <TabsContent value="parts" className="mt-0">
+        <TabsContent value="parts" className="mt-0 space-y-4">
+          {partsTabLeadSlot ? <div>{partsTabLeadSlot}</div> : null}
           {partsTabToolbar ? <div className="mb-3">{partsTabToolbar}</div> : null}
           <Section title="Parts / materials" icon={Package}>
             <PartsTable

@@ -62,6 +62,21 @@ export async function GET(
   const catMap = new Map((cats ?? []).map((c) => [c.id as string, c]))
   const locMap = new Map((locs ?? []).map((l) => [l.id as string, l]))
 
+  const { data: inboundTx } = await gate.svc
+    .from("inventory_transactions")
+    .select("catalog_item_id, location_id, created_at")
+    .eq("organization_id", organizationId)
+    .in("transaction_type", ["transfer_in", "receive"])
+    .order("created_at", { ascending: false })
+    .limit(6000)
+
+  const lastInbound = new Map<string, string>()
+  for (const t of inboundTx ?? []) {
+    const tr = t as { catalog_item_id?: string; location_id?: string; created_at?: string }
+    const k = `${tr.catalog_item_id}::${tr.location_id}`
+    if (!lastInbound.has(k) && tr.created_at) lastInbound.set(k, tr.created_at)
+  }
+
   const items = rows.map((raw) => {
     const row = raw as Record<string, unknown>
     const cat = catMap.get(row.catalog_item_id as string)
@@ -69,6 +84,7 @@ export async function GET(
     const onHand = Number(row.quantity_on_hand)
     const alloc = Number(row.quantity_allocated)
     const avail = onHand - alloc
+    const rk = `${row.catalog_item_id as string}::${row.location_id as string}`
     return {
       id: row.id,
       catalog_item_id: row.catalog_item_id,
@@ -79,6 +95,7 @@ export async function GET(
       reorder_point: row.reorder_point,
       reorder_quantity: row.reorder_quantity,
       updated_at: row.updated_at,
+      last_restocked_at: lastInbound.get(rk) ?? null,
       part_number: (cat?.part_number as string | undefined) ?? null,
       sku: (cat?.sku as string | undefined) ?? null,
       item_name: (cat?.name as string | undefined) ?? null,

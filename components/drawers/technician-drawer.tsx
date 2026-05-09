@@ -82,6 +82,7 @@ import {
   removeAvatarObjectIfInBucket,
 } from "@/lib/profile/avatar-storage"
 import { TechnicianSignatureCardForMember } from "@/components/technicians/technician-signature-card"
+import { TechnicianDrawerTruckStock } from "@/components/inventory/technician-drawer-truck-stock"
 
 let toastCounter = 0
 
@@ -1585,6 +1586,10 @@ export function TechnicianDrawer({
                   </ul>
                 )}
               </div>
+
+              {activeOrgId && techId ? (
+                <TechnicianDrawerTruckStock organizationId={activeOrgId} profileUserId={techId} />
+              ) : null}
             </>
           )}
 
