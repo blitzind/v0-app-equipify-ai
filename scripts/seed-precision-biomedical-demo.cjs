@@ -1006,6 +1006,94 @@ async function seedPrecisionExtendedRelations(supabase, {
 
   const insComm = await supabase.from("communication_events").insert(commRows)
   throwOnError(insComm, "insert communication_events")
+
+  // Phase 30 — service request intake demo rows (cleared by sample reset via is_sample).
+  const pbsCustomer = customerIds[0]
+  const { data: pbsEqPick } = await supabase
+    .from("equipment")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("customer_id", pbsCustomer)
+    .limit(1)
+    .maybeSingle()
+  const pbsEquipmentId = pbsEqPick?.id ?? null
+
+  const srSeed = [
+    {
+      organization_id: orgId,
+      customer_id: pbsCustomer,
+      equipment_id: pbsEquipmentId,
+      portal_user_id: null,
+      requester_name: "OR Bioengineering — Site Contact",
+      requester_email: "pbs-demo-intake@precision.seed",
+      requester_phone: "(559) 555-0142",
+      issue_summary: "Patient monitor fleet — alarm after isolated power transfer test",
+      description:
+        "Three bays in OR 12 reported identical ECG baseline wander after the quarterly isolated power exercise. Request PM review, lead set inspection, and firmware verification.",
+      urgency: "high",
+      preferred_service_window: "Tuesday–Thursday mornings (6–10 PT)",
+      attachments: [],
+      status: "new",
+      source: "internal",
+      assigned_to_user_id: null,
+      converted_work_order_id: null,
+      converted_customer_id: null,
+      converted_equipment_id: null,
+      internal_notes_log: [],
+      created_by_user_id: ownerId,
+      is_sample: true,
+    },
+    {
+      organization_id: orgId,
+      customer_id: customerIds[1] ?? pbsCustomer,
+      equipment_id: null,
+      portal_user_id: null,
+      requester_name: "Biomed Shop — Bench Tech",
+      requester_email: "pbs-bench@precision.seed",
+      requester_phone: null,
+      issue_summary: "Sterilizer cycle fault code F3 — intermittent",
+      description:
+        "F3 appears on chamber B during liquid cycles only. Drain strainer cleaned; need factory bulletin check and door seal measurement.",
+      urgency: "normal",
+      preferred_service_window: null,
+      attachments: [],
+      status: "reviewing",
+      source: "internal",
+      assigned_to_user_id: null,
+      converted_work_order_id: null,
+      converted_customer_id: null,
+      converted_equipment_id: null,
+      internal_notes_log: [],
+      created_by_user_id: ownerId,
+      is_sample: true,
+    },
+    {
+      organization_id: orgId,
+      customer_id: customerIds[2] ?? pbsCustomer,
+      equipment_id: null,
+      portal_user_id: null,
+      requester_name: "Facilities — HVAC callback",
+      requester_email: "pbs-facilities@precision.seed",
+      requester_phone: null,
+      issue_summary: "Clean room differential pressure trending low",
+      description:
+        "MAG suite ante-room DP alarmed twice this week. Filters changed 30 days ago; need verification against setpoints and magnehelic calibration date.",
+      urgency: "critical",
+      preferred_service_window: "After 5 PM weekdays",
+      attachments: [],
+      status: "needs_info",
+      source: "portal",
+      assigned_to_user_id: null,
+      converted_work_order_id: null,
+      converted_customer_id: null,
+      converted_equipment_id: null,
+      internal_notes_log: [],
+      created_by_user_id: ownerId,
+      is_sample: true,
+    },
+  ]
+  const insSr = await supabase.from("org_service_requests").insert(srSeed)
+  throwOnError(insSr, "insert org_service_requests precision seed")
 }
 
 /** Public app paths (Next.js `public/`) — must match `lib/mock-data` demo headshots. */

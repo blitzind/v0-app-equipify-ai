@@ -295,6 +295,10 @@ export function CommunicationsFeedPage() {
           Review automation suggestions in the{" "}
           <Link href="/communications/follow-ups" className="font-medium text-primary hover:underline">
             follow-up queue
+          </Link>{" "}
+          · Triage customer intake in{" "}
+          <Link href="/communications/service-requests" className="font-medium text-primary hover:underline">
+            service requests
           </Link>
           .
         </p>

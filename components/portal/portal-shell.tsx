@@ -15,6 +15,7 @@ import {
   Folder,
   UserCog,
   Bell,
+  Inbox,
   LogOut,
   ChevronDown,
   Settings,
@@ -33,6 +34,7 @@ import { usePortalSession } from "@/components/portal/portal-session-context"
 
 const NAV_ITEMS = [
   { href: "/portal/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/portal/service-requests", label: "Requests", icon: Inbox },
   { href: "/portal/equipment", label: "Equipment", icon: Wrench },
   { href: "/portal/work-orders", label: "Work Orders", icon: ClipboardList },
   { href: "/portal/maintenance", label: "Maintenance", icon: Calendar },

@@ -42,11 +42,13 @@ function RequestRepairPageInner() {
     setError(null)
     setBusy(true)
     try {
+      const firstLine = message.split("\n").map((l) => l.trim()).find(Boolean) ?? message
       const r = await fetch("/api/portal/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `[Priority: ${priority}] ${message}`,
+          issue_summary: firstLine.slice(0, 200),
+          description: message.trim(),
           equipmentId: equipmentId || null,
           urgency: priority,
         }),

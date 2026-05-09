@@ -29,7 +29,9 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { FollowUpAutomationSignals } from "@/components/dashboard/follow-up-automation-signals"
+import { ServiceRequestSignals } from "@/components/dashboard/service-request-signals"
 import { cn } from "@/lib/utils"
+import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
 
 function formatUsdFromCents(cents: number): string {
   const dollars = Math.round(cents / 100)
@@ -39,6 +41,7 @@ function formatUsdFromCents(cents: number): string {
 export default function DashboardPage() {
   const { organizationId: dashboardOrgId, status: dashboardOrgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const showServiceRequestSignals = canReadServiceRequestQueue(permissions)
   const technicianFocused =
     permissions.canUseTechnicianWorkspace &&
     permissions.canViewAssignedWorkOrdersOnly &&
@@ -68,6 +71,9 @@ export default function DashboardPage() {
       {dashboardOrgStatus === "ready" && dashboardOrgId ? (
         <>
           <FollowUpAutomationSignals organizationId={dashboardOrgId} />
+          {showServiceRequestSignals ?
+            <ServiceRequestSignals organizationId={dashboardOrgId} />
+          : null}
           <AidenOperationalInsightsCard organizationId={dashboardOrgId} moduleContext="dashboard" />
         </>
       ) : null}

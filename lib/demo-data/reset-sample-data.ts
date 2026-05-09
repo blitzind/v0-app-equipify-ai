@@ -31,6 +31,7 @@ export type ResetSampleSummary = {
   technicianCerts: number
   technicianNotes: number
   organizationMembers: number
+  serviceRequests: number
 }
 
 function countDeleted(res: { error: { message: string } | null; data: unknown }): number {
@@ -116,6 +117,7 @@ export async function resetSampleDataForOrganization(
     technicianCerts: 0,
     technicianNotes: 0,
     organizationMembers: 0,
+    serviceRequests: 0,
   }
 
   const [
@@ -130,6 +132,7 @@ export async function resetSampleDataForOrganization(
     { data: invoiceRows },
     { data: mpRows },
     { data: demoLocRows },
+    { data: serviceRequestRows },
   ] = await Promise.all([
     admin.from("organization_members").select("user_id").eq("organization_id", organizationId).eq("is_sample", true),
     admin.from("customers").select("id").eq("organization_id", organizationId).eq("is_sample", true),
@@ -146,6 +149,7 @@ export async function resetSampleDataForOrganization(
       .select("id")
       .eq("organization_id", organizationId)
       .like("code", DEMO_INVENTORY_LOCATION_CODE_PREFIX),
+    admin.from("org_service_requests").select("id").eq("organization_id", organizationId).eq("is_sample", true),
   ])
 
   const sampleUserIds = [...new Set((sampleMembers ?? []).map((r) => (r as { user_id: string }).user_id))]
@@ -159,6 +163,7 @@ export async function resetSampleDataForOrganization(
   const sampleInvoiceIds = (invoiceRows ?? []).map((r) => (r as { id: string }).id)
   const sampleMpIds = (mpRows ?? []).map((r) => (r as { id: string }).id)
   const demoLocationIds = (demoLocRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleServiceRequestIds = (serviceRequestRows ?? []).map((r) => (r as { id: string }).id)
 
   if (sampleUserIds.length > 0) {
     const tcRes = await admin
@@ -212,6 +217,21 @@ export async function resetSampleDataForOrganization(
     deleteCommunicationEventsByRelatedEntity(admin, organizationId, "prospect", sampleProspectIds),
   ])
   summary.communicationEvents += relatedTotal.reduce((a, n) => a + n, 0)
+
+  summary.communicationEvents += await deleteCommunicationEventsByRelatedEntity(
+    admin,
+    organizationId,
+    "service_request",
+    sampleServiceRequestIds,
+  )
+
+  const delServiceRequests = await admin
+    .from("org_service_requests")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.serviceRequests = countDeleted(delServiceRequests)
 
   const calRecRes = await admin
     .from("calibration_records")
