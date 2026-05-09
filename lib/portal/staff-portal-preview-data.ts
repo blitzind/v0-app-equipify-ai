@@ -10,6 +10,13 @@ import type { ServiceRequestStatus } from "@/lib/service-requests/types"
 
 export type StaffPortalPreviewCustomerSource = "sample" | "active"
 
+export type StaffPortalPreviewCustomerOption = {
+  id: string
+  companyName: string
+  source: StaffPortalPreviewCustomerSource
+  recordStatus: "active" | "inactive"
+}
+
 /** Mirrors org + customer portal defaults that affect documents / certificates (live portal uses the same rows). */
 export type StaffPortalPreviewWorkspaceContext = {
   effectiveCertificateReleaseMode: CertificateReleaseMode
@@ -19,7 +26,9 @@ export type StaffPortalPreviewWorkspaceContext = {
 }
 
 export type StaffPortalPreviewSnapshot = {
-  /** True when scoped to a real org customer (sample preferred, else first active). */
+  /** Customers available for the staff preview picker (non-archived). */
+  customerOptions: StaffPortalPreviewCustomerOption[]
+  /** True when scoped to a real org customer (URL param, or first available). */
   hasPreviewCustomer: boolean
   previewCustomer: {
     id: string
@@ -57,34 +66,17 @@ export type StaffPortalPreviewSnapshot = {
   showLayoutFallback: boolean
 }
 
-async function pickPreviewCustomer(
-  svc: SupabaseClient,
-  organizationId: string,
-): Promise<{
+const PREVIEW_CUSTOMER_LIST_LIMIT = 500
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function toCustomerOption(row: {
   id: string
-  companyName: string
-  source: StaffPortalPreviewCustomerSource
-  recordStatus: "active" | "inactive"
-} | null> {
-  const { data: rows, error } = await svc
-    .from("customers")
-    .select("id, company_name, is_sample, status")
-    .eq("organization_id", organizationId)
-    .eq("is_archived", false)
-    .is("archived_at", null)
-    .order("is_sample", { ascending: false })
-    .order("status", { ascending: true })
-    .order("joined_at", { ascending: true })
-    .limit(1)
-
-  if (error || !rows?.length) return null
-
-  const row = rows[0] as {
-    id: string
-    company_name: string
-    is_sample?: boolean | null
-    status?: string | null
-  }
+  company_name: string
+  is_sample?: boolean | null
+  status?: string | null
+}): StaffPortalPreviewCustomerOption | null {
   const name = String(row.company_name ?? "").trim()
   if (!row.id || !name) return null
 
@@ -98,30 +90,101 @@ async function pickPreviewCustomer(
   }
 }
 
+async function fetchPreviewCustomerOptions(
+  svc: SupabaseClient,
+  organizationId: string,
+): Promise<StaffPortalPreviewCustomerOption[]> {
+  const { data: rows, error } = await svc
+    .from("customers")
+    .select("id, company_name, is_sample, status")
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .order("is_sample", { ascending: false })
+    .order("status", { ascending: true })
+    .order("company_name", { ascending: true })
+    .limit(PREVIEW_CUSTOMER_LIST_LIMIT)
+
+  if (error || !rows?.length) return []
+
+  return (
+    rows as Array<{
+      id: string
+      company_name: string
+      is_sample?: boolean | null
+      status?: string | null
+    }>
+  )
+    .map(toCustomerOption)
+    .filter((x): x is StaffPortalPreviewCustomerOption => x != null)
+}
+
+/** Single customer verified for org + not archived (staff preview; no cross-org). */
+async function fetchCustomerOptionById(
+  svc: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+): Promise<StaffPortalPreviewCustomerOption | null> {
+  const { data: row, error } = await svc
+    .from("customers")
+    .select("id, company_name, is_sample, status")
+    .eq("organization_id", organizationId)
+    .eq("id", customerId)
+    .is("archived_at", null)
+    .maybeSingle()
+
+  if (error || !row) return null
+  return toCustomerOption(row as {
+    id: string
+    company_name: string
+    is_sample?: boolean | null
+    status?: string | null
+  })
+}
+
+function emptySnapshot(customerOptions: StaffPortalPreviewCustomerOption[]): StaffPortalPreviewSnapshot {
+  return {
+    customerOptions,
+    hasPreviewCustomer: false,
+    previewCustomer: null,
+    workspacePortalContext: null,
+    dashboard: null,
+    documentsAvailable: 0,
+    documentsListed: 0,
+    recentDocument: null,
+    openServiceRequests: 0,
+    recentServiceRequest: null,
+    equipmentSpotlight: null,
+    showLayoutFallback: true,
+  }
+}
+
 /**
  * Read-only snapshot for `/portal/preview` — caller must already verify staff org access.
  * Uses the same aggregations as the customer dashboard + document library scope resolver.
+ *
+ * @param opts.customerId When a valid UUID for a non-archived customer in this org, use it;
+ *   otherwise the first available customer is selected.
  */
 export async function loadStaffPortalPreviewSnapshot(
   svc: SupabaseClient,
   organizationId: string,
+  opts?: { customerId?: string | null },
 ): Promise<StaffPortalPreviewSnapshot> {
-  const previewCustomer = await pickPreviewCustomer(svc, organizationId)
+  const customerOptions = await fetchPreviewCustomerOptions(svc, organizationId)
+
+  const requestedRaw = opts?.customerId?.trim() ?? ""
+  const requestedId = UUID_RE.test(requestedRaw) ? requestedRaw : ""
+
+  let previewCustomer: StaffPortalPreviewSnapshot["previewCustomer"] = null
+  if (requestedId) {
+    previewCustomer = await fetchCustomerOptionById(svc, organizationId, requestedId)
+  }
+  if (!previewCustomer && customerOptions.length > 0) {
+    previewCustomer = customerOptions[0]!
+  }
 
   if (!previewCustomer) {
-    return {
-      hasPreviewCustomer: false,
-      previewCustomer: null,
-      workspacePortalContext: null,
-      dashboard: null,
-      documentsAvailable: 0,
-      documentsListed: 0,
-      recentDocument: null,
-      openServiceRequests: 0,
-      recentServiceRequest: null,
-      equipmentSpotlight: null,
-      showLayoutFallback: true,
-    }
+    return emptySnapshot(customerOptions)
   }
 
   const custId = previewCustomer.id
@@ -155,7 +218,7 @@ export async function loadStaffPortalPreviewSnapshot(
       .select("name, manufacturer, category, location_label, serial_number")
       .eq("organization_id", organizationId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -271,6 +334,7 @@ export async function loadStaffPortalPreviewSnapshot(
   const showLayoutFallback = !hasSignal
 
   return {
+    customerOptions,
     hasPreviewCustomer: true,
     previewCustomer,
     workspacePortalContext,

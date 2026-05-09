@@ -15,10 +15,12 @@ const PREVIEW_BRIDGE_ROLES = new Set(["owner", "admin", "manager"])
 export default async function PortalStaffPreviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ organizationId?: string }>
+  searchParams: Promise<{ organizationId?: string; customerId?: string }>
 }) {
   const sp = await searchParams
   const organizationId = sp.organizationId?.trim() ?? ""
+  const rawCustomerId = sp.customerId?.trim() ?? ""
+  const customerIdParam = UUID_RE.test(rawCustomerId) ? rawCustomerId : null
 
   if (!UUID_RE.test(organizationId)) {
     redirect("/settings/portal")
@@ -30,7 +32,11 @@ export default async function PortalStaffPreviewPage({
   } = await supabase.auth.getUser()
 
   if (!user?.email) {
-    redirect(`/login?next=${encodeURIComponent(`/portal/preview?organizationId=${organizationId}`)}`)
+    const nextPath =
+      customerIdParam ?
+        `/portal/preview?organizationId=${encodeURIComponent(organizationId)}&customerId=${encodeURIComponent(customerIdParam)}`
+      : `/portal/preview?organizationId=${encodeURIComponent(organizationId)}`
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`)
   }
 
   const rawRole = await getOrganizationMemberRole(supabase, user.id, organizationId)
@@ -65,7 +71,9 @@ export default async function PortalStaffPreviewPage({
    * are always filtered by `organizationId` — no portal session cookies, no cross-org reads.
    */
   const previewDb = createServiceRoleSupabaseClient()
-  const snapshot = await loadStaffPortalPreviewSnapshot(previewDb, organizationId)
+  const snapshot = await loadStaffPortalPreviewSnapshot(previewDb, organizationId, {
+    customerId: customerIdParam,
+  })
 
   const orgRow = org as {
     portal_certificate_release_mode?: string | null
@@ -74,6 +82,7 @@ export default async function PortalStaffPreviewPage({
 
   return (
     <StaffPortalPreview
+      organizationId={organizationId}
       organizationName={name}
       logoUrl={logoUrl}
       snapshot={snapshot}

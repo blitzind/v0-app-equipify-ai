@@ -37,7 +37,7 @@ export async function GET() {
     )
     .eq("organization_id", portalUser.organization_id)
     .in("customer_id", scope.customerIds)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(200)
 
@@ -49,7 +49,7 @@ export async function GET() {
       )
       .eq("organization_id", portalUser.organization_id)
       .in("customer_id", scope.customerIds)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(200)
     rows = fallback.data

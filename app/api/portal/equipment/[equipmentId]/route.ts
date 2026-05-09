@@ -39,7 +39,7 @@ export async function GET(
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .eq("id", equipmentId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .maybeSingle()
 
   if (eqRes.error) {
@@ -49,7 +49,7 @@ export async function GET(
       .eq("organization_id", portalUser.organization_id)
       .eq("customer_id", portalUser.customer_id)
       .eq("id", equipmentId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .maybeSingle()
   }
 
@@ -64,7 +64,7 @@ export async function GET(
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .eq("equipment_id", equipmentId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(25)
 

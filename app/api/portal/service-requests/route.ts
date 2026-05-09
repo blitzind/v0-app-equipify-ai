@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       .eq("organization_id", portalUser.organization_id)
       .eq("customer_id", portalUser.customer_id)
       .eq("id", body.equipmentId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .maybeSingle()
     if (eq) {
       equipmentId = (eq as { id: string }).id

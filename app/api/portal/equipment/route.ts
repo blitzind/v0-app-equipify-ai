@@ -16,7 +16,7 @@ export async function GET() {
     )
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .order("name", { ascending: true })
 
   if (error) {

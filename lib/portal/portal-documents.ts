@@ -324,7 +324,7 @@ export async function buildPortalDocuments(
     )
     .eq("organization_id", organizationId)
     .in("customer_id", customerIds)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
     .limit(400)
 

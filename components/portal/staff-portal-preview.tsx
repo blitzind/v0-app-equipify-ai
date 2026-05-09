@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
+import { StaffPortalPreviewCustomerPicker } from "@/components/portal/staff-portal-preview-customer-picker"
 import { modeLabel } from "@/lib/portal/certificate-release-staff"
 import { normalizeReleaseMode } from "@/lib/portal/certificate-release"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
@@ -165,11 +166,13 @@ function SectionCard({
 }
 
 export function StaffPortalPreview({
+  organizationId,
   organizationName,
   logoUrl,
   snapshot,
   organizationPortalDefaults,
 }: {
+  organizationId: string
   organizationName: string
   logoUrl: string | null
   snapshot: StaffPortalPreviewSnapshot
@@ -260,10 +263,10 @@ export function StaffPortalPreview({
           </div>
 
           <div
-            className="flex flex-wrap items-center justify-between gap-3 border-t pt-2 md:pt-3"
+            className="flex flex-col gap-3 border-t pt-2 md:pt-3 lg:flex-row lg:items-end lg:justify-between"
             style={{ borderColor: "var(--portal-border)" }}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-medium" style={{ color: "var(--portal-nav-text)" }}>
                 Previewing portal as
               </p>
@@ -277,43 +280,49 @@ export function StaffPortalPreview({
                     " — read-only staff view; customers still use invite sign-in."
                   : null}
                 </p>
-              : !snapshot.hasPreviewCustomer ?
+              : snapshot.customerOptions.length === 0 ?
                 <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
                   No customers in this workspace yet.
                 </p>
               : null}
             </div>
-            <div className="flex items-center gap-2 opacity-80">
-              <button
-                type="button"
-                className="relative flex h-8 w-8 items-center justify-center rounded-md"
-                style={{ color: "var(--portal-nav-icon)" }}
-                aria-label="Notifications (preview)"
-                title="Notifications appear here for signed-in customers."
-              >
-                <Bell size={16} />
-                <span
-                  className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
-                  style={{ background: "var(--portal-accent)" }}
-                />
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded-md px-2 py-1.5"
-                style={{ color: "var(--portal-nav-text)" }}
-                title="Profile and account settings require a customer portal session."
-              >
-                <span
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ background: "var(--portal-accent)" }}
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:shrink-0">
+              <StaffPortalPreviewCustomerPicker
+                organizationId={organizationId}
+                selectedCustomerId={snapshot.previewCustomer?.id ?? null}
+                options={snapshot.customerOptions}
+              />
+              <div className="flex items-center justify-end gap-2 opacity-80">
+                <button
+                  type="button"
+                  className="relative flex h-8 w-8 items-center justify-center rounded-md"
+                  style={{ color: "var(--portal-nav-icon)" }}
+                  aria-label="Notifications (preview)"
+                  title="Notifications appear here for signed-in customers."
                 >
-                  Pr
-                </span>
-                <span className="hidden text-left text-xs font-medium sm:block" style={{ color: "var(--portal-foreground)" }}>
-                  Preview user
-                </span>
-                <ChevronDown size={12} style={{ color: "var(--portal-nav-icon)" }} />
-              </button>
+                  <Bell size={16} />
+                  <span
+                    className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
+                    style={{ background: "var(--portal-accent)" }}
+                  />
+                </button>
+                <div
+                  className="hidden items-center gap-2 rounded-md px-2 py-1.5 sm:flex"
+                  style={{ color: "var(--portal-nav-text)" }}
+                  title="Profile and account settings require a customer portal session."
+                >
+                  <span
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white"
+                    style={{ background: "var(--portal-accent)" }}
+                  >
+                    Pr
+                  </span>
+                  <span className="text-left text-xs font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    Preview
+                  </span>
+                  <ChevronDown size={12} style={{ color: "var(--portal-nav-icon)" }} aria-hidden />
+                </div>
+              </div>
             </div>
           </div>
         </div>

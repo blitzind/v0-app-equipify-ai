@@ -115,13 +115,13 @@ export async function fetchPortalDashboardBundle(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false),
+      .is("archived_at", null),
     svc
       .from("equipment")
       .select("id, next_due_at")
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .not("next_due_at", "is", null)
       .limit(500),
     svc
@@ -129,14 +129,14 @@ export async function fetchPortalDashboardBundle(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["open", "scheduled", "in_progress"]),
     svc
       .from("work_orders")
       .select("id, work_order_number, title, status, type, scheduled_on, assigned_user_id, equipment_id")
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
     svc
@@ -170,7 +170,7 @@ export async function fetchPortalDashboardBundle(
       .select("id, name, status, next_due_date, interval_value, interval_unit, equipment_id")
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("status", "active")
       .order("next_due_date", { ascending: true, nullsFirst: false })
       .limit(4),
@@ -294,7 +294,7 @@ export async function fetchPortalDashboardBundle(
       )
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .not("scheduled_on", "is", null)
       .gte("scheduled_on", today)
       .not("status", "in", "(completed,completed_pending_signature,invoiced,canceled,cancelled)")
@@ -305,7 +305,7 @@ export async function fetchPortalDashboardBundle(
       .select("id, work_order_number, title, status, completed_at, scheduled_on, equipment_id")
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["completed", "completed_pending_signature", "invoiced"])
       .order("completed_at", { ascending: false, nullsFirst: false })
       .limit(1),

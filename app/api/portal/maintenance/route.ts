@@ -17,7 +17,7 @@ export async function GET() {
     .select("id, name, status, priority, next_due_date, interval_value, interval_unit, equipment_id")
     .eq("organization_id", orgId)
     .eq("customer_id", custId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .order("next_due_date", { ascending: true, nullsFirst: false })
 
   if (error) {
