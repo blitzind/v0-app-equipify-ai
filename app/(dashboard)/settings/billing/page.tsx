@@ -543,12 +543,15 @@ function BillingPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
-
-      {/* ── Invoicing Phase 3 — Workspace invoice defaults ─────────────────── */}
-      <WorkspaceInvoiceDefaultsCard
-        organizationId={orgStatus === "ready" ? organizationId : null}
-        canEdit={orgPermissions.canEditOrgBilling}
-      />
+      {/* Equipify account billing — distinct from customer invoice defaults below */}
+      <div className="rounded-lg border border-border bg-muted/15 px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">Equipify subscription & account billing</h2>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          Manage your workspace plan, Stripe payment method, and Equipify subscription invoices. Defaults for{" "}
+          <strong className="font-medium text-foreground/90">customer invoices</strong> you issue in the field are in{" "}
+          <span className="whitespace-nowrap">Invoice payment defaults</span> at the bottom of this page.
+        </p>
+      </div>
 
       {/* ── Current subscription ─────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -1222,6 +1225,12 @@ function BillingPageContent() {
           </div>
         )}
       </div>
+
+      {/* ── Workspace operational: customer invoice payment defaults (Invoicing Phase 3) ── */}
+      <WorkspaceInvoiceDefaultsCard
+        organizationId={orgStatus === "ready" ? organizationId : null}
+        canEdit={orgPermissions.canEditOrgBilling}
+      />
 
       {setupOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">

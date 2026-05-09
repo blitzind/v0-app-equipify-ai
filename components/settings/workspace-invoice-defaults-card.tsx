@@ -135,10 +135,10 @@ export function WorkspaceInvoiceDefaultsCard({
       }
     >
       <div className="px-6 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">Invoice defaults</h3>
+        <h3 className="text-sm font-semibold text-foreground">Invoice payment defaults</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Sets the workspace-wide payment terms for new invoices. Customers can override this on
-          their detail page.
+          Workspace-wide payment terms for <strong className="font-medium text-foreground/90">customer invoices</strong> you create
+          in Equipify — not your Equipify subscription billing above. Customers can override this on their record.
         </p>
       </div>
       <div className="px-6 py-5 space-y-3">

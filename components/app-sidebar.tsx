@@ -18,7 +18,6 @@ import {
   Bell,
   Warehouse,
   UserPlus,
-  Settings,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
@@ -155,30 +154,6 @@ const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
-  {
-    id: "system",
-    label: "System",
-    items: [
-      {
-        label: "Settings",
-        href: "/settings/workspace",
-        icon: Settings,
-        anyOf: ["canManageSettings", "canManageWorkspaceSettings", "canManagePortalSettings"],
-      },
-      {
-        label: "Integrations",
-        href: "/settings/integrations",
-        icon: Building2,
-        anyOf: ["canManageIntegrations"],
-      },
-      {
-        label: "Billing",
-        href: "/settings/billing",
-        icon: Receipt,
-        anyOf: ["canViewBilling", "canEditOrgBilling"],
-      },
-    ],
-  },
 ]
 
 const FALLBACK_NAV_GROUPS: NavGroup[] = [
@@ -191,7 +166,6 @@ const FALLBACK_NAV_GROUPS: NavGroup[] = [
       { label: "Equipment", href: "/equipment", icon: Wrench },
       { label: "Work Orders", href: "/work-orders", icon: ClipboardList },
       { label: "Service Schedule", href: "/service-schedule", icon: CalendarClock },
-      { label: "Settings", href: "/settings/workspace", icon: Settings },
     ],
   },
 ]
