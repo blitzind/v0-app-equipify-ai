@@ -283,11 +283,13 @@ export default function SampleDataSettingsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  This permanently removes rows flagged <span className="font-medium text-foreground">is_sample</span>{" "}
-                  for this workspace: customers, equipment, work orders, maintenance plans, quotes/invoices seeded as
-                  sample, and demo technician memberships created by the importer.
+                  This permanently removes demo-only rows for this workspace: customers, equipment, work orders,
+                  maintenance plans, prospects, catalog and inventory (including precision-demo locations under{" "}
+                  <span className="font-mono text-foreground">PBS-SEED-*</span>), sample vendors, quotes and invoices
+                  marked sample, demo communications (including timeline entries tagged in seed metadata), and demo
+                  technician memberships from the importer. Organization profile, subscriptions, non-sample users,
+                  billing, and workspace settings are preserved.
                 </p>
-                <p>Organization profile, subscriptions, billing, non-sample users, and settings are preserved.</p>
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">Confirmation phrase</label>
                   <Input

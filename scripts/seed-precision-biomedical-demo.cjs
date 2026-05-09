@@ -609,6 +609,7 @@ async function seedPrecisionExtendedRelations(supabase, {
       last_contacted_by_user_id: aid,
       next_action_owner_user_id: lid,
       created_by: ownerId,
+      is_sample: true,
     }
   })
   const insProspects = await supabase.from("prospects").insert(prospectPayload).select("id")

@@ -2,10 +2,23 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+const ID_CHUNK = 120
+
+/** Precision biomedical inventory locations from seed-precision-biomedical-demo.cjs */
+const DEMO_INVENTORY_LOCATION_CODE_PREFIX = "PBS-SEED-%"
+
 export type ResetSampleSummary = {
   organizationInvoices: number
   organizationQuotes: number
   organizationPurchaseOrders: number
+  communicationEvents: number
+  calibrationRecords: number
+  certificateAttachments: number
+  workOrderAttachments: number
+  inventoryTransactions: number
+  inventoryStock: number
+  technicianVehicleStock: number
+  demoInventoryLocations: number
   catalogItems: number
   calibrationTemplates: number
   techniciansOperational: number
@@ -13,14 +26,67 @@ export type ResetSampleSummary = {
   workOrders: number
   maintenancePlans: number
   equipment: number
+  prospects: number
   customers: number
   technicianCerts: number
   technicianNotes: number
   organizationMembers: number
 }
 
+function countDeleted(res: { error: { message: string } | null; data: unknown }): number {
+  if (res.error) throw new Error(res.error.message)
+  const rows = res.data
+  return Array.isArray(rows) ? rows.length : 0
+}
+
+async function deleteInIdChunks(
+  admin: SupabaseClient,
+  table: string,
+  organizationId: string,
+  column: string,
+  ids: string[],
+): Promise<number> {
+  if (ids.length === 0) return 0
+  let total = 0
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const slice = ids.slice(i, i + ID_CHUNK)
+    const res = await admin
+      .from(table)
+      .delete()
+      .eq("organization_id", organizationId)
+      .in(column, slice)
+      .select("id")
+    total += countDeleted(res)
+  }
+  return total
+}
+
+async function deleteCommunicationEventsByRelatedEntity(
+  admin: SupabaseClient,
+  organizationId: string,
+  relatedEntityType: string,
+  relatedIds: string[],
+): Promise<number> {
+  if (relatedIds.length === 0) return 0
+  let total = 0
+  for (let i = 0; i < relatedIds.length; i += ID_CHUNK) {
+    const slice = relatedIds.slice(i, i + ID_CHUNK)
+    const res = await admin
+      .from("communication_events")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("related_entity_type", relatedEntityType)
+      .in("related_entity_id", slice)
+      .select("id")
+    total += countDeleted(res)
+  }
+  return total
+}
+
 /**
- * Deletes only rows marked `is_sample = true`. Safe ordering respects composite FKs.
+ * Deletes only rows clearly marked as sample/demo (`is_sample`, seed metadata, or
+ * known demo inventory location codes). Scoped by `organization_id`. Ordering
+ * respects inventory → catalog and composite FKs.
  */
 export async function resetSampleDataForOrganization(
   admin: SupabaseClient,
@@ -30,6 +96,14 @@ export async function resetSampleDataForOrganization(
     organizationInvoices: 0,
     organizationQuotes: 0,
     organizationPurchaseOrders: 0,
+    communicationEvents: 0,
+    calibrationRecords: 0,
+    certificateAttachments: 0,
+    workOrderAttachments: 0,
+    inventoryTransactions: 0,
+    inventoryStock: 0,
+    technicianVehicleStock: 0,
+    demoInventoryLocations: 0,
     catalogItems: 0,
     calibrationTemplates: 0,
     techniciansOperational: 0,
@@ -37,19 +111,54 @@ export async function resetSampleDataForOrganization(
     workOrders: 0,
     maintenancePlans: 0,
     equipment: 0,
+    prospects: 0,
     customers: 0,
     technicianCerts: 0,
     technicianNotes: 0,
     organizationMembers: 0,
   }
 
-  const { data: sampleMembers } = await admin
-    .from("organization_members")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
+  const [
+    { data: sampleMembers },
+    { data: customerRows },
+    { data: woRows },
+    { data: equipmentRows },
+    { data: catalogRows },
+    { data: techRows },
+    { data: prospectRows },
+    { data: quoteRows },
+    { data: invoiceRows },
+    { data: mpRows },
+    { data: demoLocRows },
+  ] = await Promise.all([
+    admin.from("organization_members").select("user_id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("customers").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("work_orders").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("equipment").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("catalog_items").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("technicians").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("prospects").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("org_quotes").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("org_invoices").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin.from("maintenance_plans").select("id").eq("organization_id", organizationId).eq("is_sample", true),
+    admin
+      .from("inventory_locations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .like("code", DEMO_INVENTORY_LOCATION_CODE_PREFIX),
+  ])
 
   const sampleUserIds = [...new Set((sampleMembers ?? []).map((r) => (r as { user_id: string }).user_id))]
+  const sampleCustomerIds = (customerRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleWoIds = (woRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleEquipmentIds = (equipmentRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleCatalogIds = (catalogRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleTechIds = (techRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleProspectIds = (prospectRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleQuoteIds = (quoteRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleInvoiceIds = (invoiceRows ?? []).map((r) => (r as { id: string }).id)
+  const sampleMpIds = (mpRows ?? []).map((r) => (r as { id: string }).id)
+  const demoLocationIds = (demoLocRows ?? []).map((r) => (r as { id: string }).id)
 
   if (sampleUserIds.length > 0) {
     const tcRes = await admin
@@ -58,8 +167,7 @@ export async function resetSampleDataForOrganization(
       .eq("organization_id", organizationId)
       .in("technician_user_id", sampleUserIds)
       .select("id")
-    if (tcRes.error) throw new Error(tcRes.error.message)
-    summary.technicianCerts = tcRes.data?.length ?? 0
+    summary.technicianCerts = countDeleted(tcRes)
 
     const tnRes = await admin
       .from("technician_notes")
@@ -67,9 +175,67 @@ export async function resetSampleDataForOrganization(
       .eq("organization_id", organizationId)
       .in("technician_user_id", sampleUserIds)
       .select("id")
-    if (tnRes.error) throw new Error(tnRes.error.message)
-    summary.technicianNotes = tnRes.data?.length ?? 0
+    summary.technicianNotes = countDeleted(tnRes)
   }
+
+  const commDeletes = await Promise.all([
+    admin
+      .from("communication_events")
+      .delete()
+      .eq("organization_id", organizationId)
+      .contains("metadata", { pbs_demo_seed: true })
+      .select("id"),
+    admin
+      .from("communication_events")
+      .delete()
+      .eq("organization_id", organizationId)
+      .contains("metadata", { equipify_demo_seed: true })
+      .select("id"),
+  ])
+  summary.communicationEvents += commDeletes.reduce((a, r) => a + countDeleted(r), 0)
+
+  summary.communicationEvents += await deleteInIdChunks(
+    admin,
+    "communication_events",
+    organizationId,
+    "recipient_customer_id",
+    sampleCustomerIds,
+  )
+
+  const relatedTotal = await Promise.all([
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "work_order", sampleWoIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "customer", sampleCustomerIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "equipment", sampleEquipmentIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "quote", sampleQuoteIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "invoice", sampleInvoiceIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "maintenance_plan", sampleMpIds),
+    deleteCommunicationEventsByRelatedEntity(admin, organizationId, "prospect", sampleProspectIds),
+  ])
+  summary.communicationEvents += relatedTotal.reduce((a, n) => a + n, 0)
+
+  const calRecRes = await admin
+    .from("calibration_records")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.calibrationRecords = countDeleted(calRecRes)
+
+  summary.certificateAttachments = await deleteInIdChunks(
+    admin,
+    "certificate_attachments",
+    organizationId,
+    "work_order_id",
+    sampleWoIds,
+  )
+
+  summary.workOrderAttachments = await deleteInIdChunks(
+    admin,
+    "work_order_attachments",
+    organizationId,
+    "work_order_id",
+    sampleWoIds,
+  )
 
   const delInv = await admin
     .from("org_invoices")
@@ -77,8 +243,7 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delInv.error) throw new Error(delInv.error.message)
-  summary.organizationInvoices = delInv.data?.length ?? 0
+  summary.organizationInvoices = countDeleted(delInv)
 
   const delQt = await admin
     .from("org_quotes")
@@ -86,8 +251,7 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delQt.error) throw new Error(delQt.error.message)
-  summary.organizationQuotes = delQt.data?.length ?? 0
+  summary.organizationQuotes = countDeleted(delQt)
 
   const delPo = await admin
     .from("org_purchase_orders")
@@ -95,8 +259,76 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delPo.error) throw new Error(delPo.error.message)
-  summary.organizationPurchaseOrders = delPo.data?.length ?? 0
+  summary.organizationPurchaseOrders = countDeleted(delPo)
+
+  if (sampleCatalogIds.length > 0) {
+    summary.inventoryTransactions += await deleteInIdChunks(
+      admin,
+      "inventory_transactions",
+      organizationId,
+      "catalog_item_id",
+      sampleCatalogIds,
+    )
+    summary.inventoryStock += await deleteInIdChunks(admin, "inventory_stock", organizationId, "catalog_item_id", sampleCatalogIds)
+  }
+
+  if (demoLocationIds.length > 0) {
+    summary.inventoryTransactions += await deleteInIdChunks(
+      admin,
+      "inventory_transactions",
+      organizationId,
+      "location_id",
+      demoLocationIds,
+    )
+    summary.inventoryTransactions += await deleteInIdChunks(
+      admin,
+      "inventory_transactions",
+      organizationId,
+      "counterparty_location_id",
+      demoLocationIds,
+    )
+    summary.inventoryStock += await deleteInIdChunks(admin, "inventory_stock", organizationId, "location_id", demoLocationIds)
+  }
+
+  if (sampleWoIds.length > 0) {
+    for (let i = 0; i < sampleWoIds.length; i += ID_CHUNK) {
+      const slice = sampleWoIds.slice(i, i + ID_CHUNK)
+      const r = await admin
+        .from("inventory_transactions")
+        .delete()
+        .eq("organization_id", organizationId)
+        .in("work_order_id", slice)
+        .select("id")
+      summary.inventoryTransactions += countDeleted(r)
+    }
+  }
+
+  if (sampleTechIds.length > 0) {
+    summary.technicianVehicleStock += await deleteInIdChunks(
+      admin,
+      "technician_vehicle_stock",
+      organizationId,
+      "technician_id",
+      sampleTechIds,
+    )
+  }
+  if (demoLocationIds.length > 0) {
+    summary.technicianVehicleStock += await deleteInIdChunks(
+      admin,
+      "technician_vehicle_stock",
+      organizationId,
+      "inventory_location_id",
+      demoLocationIds,
+    )
+  }
+
+  summary.demoInventoryLocations = await deleteInIdChunks(
+    admin,
+    "inventory_locations",
+    organizationId,
+    "id",
+    demoLocationIds,
+  )
 
   const delCat = await admin
     .from("catalog_items")
@@ -104,53 +336,7 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delCat.error) throw new Error(delCat.error.message)
-  summary.catalogItems = delCat.data?.length ?? 0
-
-  const delTechOp = await admin
-    .from("technicians")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  if (delTechOp.error) throw new Error(delTechOp.error.message)
-  summary.techniciansOperational = delTechOp.data?.length ?? 0
-
-  const delWo = await admin
-    .from("work_orders")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  if (delWo.error) throw new Error(delWo.error.message)
-  summary.workOrders = delWo.data?.length ?? 0
-
-  const delTpl = await admin
-    .from("calibration_templates")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  if (delTpl.error) throw new Error(delTpl.error.message)
-  summary.calibrationTemplates = delTpl.data?.length ?? 0
-
-  const delMp = await admin
-    .from("maintenance_plans")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  if (delMp.error) throw new Error(delMp.error.message)
-  summary.maintenancePlans = delMp.data?.length ?? 0
-
-  const delEq = await admin
-    .from("equipment")
-    .delete()
-    .eq("organization_id", organizationId)
-    .eq("is_sample", true)
-    .select("id")
-  if (delEq.error) throw new Error(delEq.error.message)
-  summary.equipment = delEq.data?.length ?? 0
+  summary.catalogItems = countDeleted(delCat)
 
   const delVend = await admin
     .from("org_vendors")
@@ -158,8 +344,47 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delVend.error) throw new Error(delVend.error.message)
-  summary.orgVendors = delVend.data?.length ?? 0
+  summary.orgVendors = countDeleted(delVend)
+
+  const delWo = await admin
+    .from("work_orders")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.workOrders = countDeleted(delWo)
+
+  const delMp = await admin
+    .from("maintenance_plans")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.maintenancePlans = countDeleted(delMp)
+
+  const delTpl = await admin
+    .from("calibration_templates")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.calibrationTemplates = countDeleted(delTpl)
+
+  const delEq = await admin
+    .from("equipment")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.equipment = countDeleted(delEq)
+
+  const delProspects = await admin
+    .from("prospects")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.prospects = countDeleted(delProspects)
 
   const delCust = await admin
     .from("customers")
@@ -167,8 +392,7 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("id")
-  if (delCust.error) throw new Error(delCust.error.message)
-  summary.customers = delCust.data?.length ?? 0
+  summary.customers = countDeleted(delCust)
 
   const delOm = await admin
     .from("organization_members")
@@ -176,14 +400,28 @@ export async function resetSampleDataForOrganization(
     .eq("organization_id", organizationId)
     .eq("is_sample", true)
     .select("user_id")
-  if (delOm.error) throw new Error(delOm.error.message)
-  summary.organizationMembers = delOm.data?.length ?? 0
+  summary.organizationMembers = countDeleted(delOm)
 
-  const { error: clearIndustryErr } = await admin
+  const delTechOp = await admin
+    .from("technicians")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.techniciansOperational = countDeleted(delTechOp)
+
+  const { error: orgErr } = await admin
     .from("organizations")
-    .update({ demo_seed_industry: null, updated_at: new Date().toISOString() })
+    .update({
+      demo_seed_industry: null,
+      demo_seed_error: null,
+      demo_seed_status: "pending",
+      demo_seed_started_at: null,
+      demo_seed_completed_at: null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", organizationId)
-  if (clearIndustryErr) throw new Error(clearIndustryErr.message)
+  if (orgErr) throw new Error(orgErr.message)
 
   return { summary }
 }
