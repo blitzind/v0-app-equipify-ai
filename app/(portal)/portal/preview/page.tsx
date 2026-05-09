@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { StaffPortalPreview } from "@/components/portal/staff-portal-preview"
 import { pickPreferredDocumentLogoUrl } from "@/lib/organization/document-branding"
+import { loadStaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -53,5 +54,7 @@ export default async function PortalStaffPreviewPage({
     (org as { logo_url?: string | null }).logo_url,
   )
 
-  return <StaffPortalPreview organizationName={name} logoUrl={logoUrl} />
+  const snapshot = await loadStaffPortalPreviewSnapshot(supabase, organizationId)
+
+  return <StaffPortalPreview organizationName={name} logoUrl={logoUrl} snapshot={snapshot} />
 }
