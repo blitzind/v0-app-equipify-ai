@@ -70,6 +70,8 @@ export type ProspectRow = {
   last_contacted_at: string | null
   estimated_value_cents: number | null
   notes: string | null
+  /** Captured when status becomes lost (Phase 26). */
+  lost_reason: string | null
   converted_customer_id: string | null
   converted_at: string | null
   archived_at: string | null

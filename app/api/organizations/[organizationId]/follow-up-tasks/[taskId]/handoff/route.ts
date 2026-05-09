@@ -6,6 +6,7 @@ import type { FollowUpEntityType } from "@/lib/follow-up-automation/types"
 import type { RelatedEntityType } from "@/lib/notifications/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
+import { logProspectFollowUpAutomationReview } from "@/lib/prospects/follow-up-task-timeline"
 
 export const runtime = "nodejs"
 
@@ -119,6 +120,18 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
     eventType: "handoff",
     metadata: { task_id: taskId, communication_event_id: commId },
   })
+
+  if (task.entity_type === "prospect") {
+    await logProspectFollowUpAutomationReview({
+      supabase: gate.supabase,
+      organizationId,
+      prospectId: task.entity_id as string,
+      ruleKey: task.rule_key as string,
+      taskId,
+      action: "handoff",
+      userId: gate.userId,
+    })
+  }
 
   return NextResponse.json({ ok: true, communicationEventId: commId })
 }

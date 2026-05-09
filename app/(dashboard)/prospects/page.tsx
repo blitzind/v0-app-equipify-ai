@@ -26,6 +26,25 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { Button } from "@/components/ui/button"
@@ -134,6 +153,15 @@ function ProspectsPageInner() {
   const [activeProspect, setActiveProspect] = useState<ProspectListItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [assignees, setAssignees] = useState<AssigneeOption[]>([])
+
+  const [lostPrompt, setLostPrompt] = useState<{ prospectId: string } | null>(null)
+  const [lostReasonDraft, setLostReasonDraft] = useState("")
+  const [qualificationPrompt, setQualificationPrompt] = useState<{
+    prospectId: string
+    targetStatus: ProspectStatus
+  } | null>(null)
+  const [qualNotesDraft, setQualNotesDraft] = useState("")
+  const [qualValueDraft, setQualValueDraft] = useState("")
 
   const baseUrl = organizationId
     ? `/api/organizations/${encodeURIComponent(organizationId)}/prospects`
@@ -255,12 +283,27 @@ function ProspectsPageInner() {
     }
   }, [rows, statusKpis])
 
+  const stageAgeSummary = useMemo(() => {
+    const active = rows.filter((r) => !r.archived_at)
+    const openPipeline = active.filter((r) => ACTIVE_PROSPECT_STATUSES.includes(r.status))
+    const parts: string[] = []
+    for (const s of ACTIVE_PROSPECT_STATUSES) {
+      const inStage = openPipeline.filter((r) => r.status === s)
+      if (inStage.length === 0) continue
+      const ages = inStage.map((r) => daysSince(r.created_at)).filter((d): d is number => d != null)
+      if (ages.length === 0) continue
+      const avg = Math.round(ages.reduce((a, b) => a + b, 0) / ages.length)
+      parts.push(`${formatProspectStatus(s)} ${avg}d avg`)
+    }
+    return parts.join(" · ")
+  }, [rows])
+
   function openProspect(p: ProspectListItem) {
     setActiveProspect(p)
     setDrawerOpen(true)
   }
 
-  async function handlePipelinePatch(prospectId: string, status: ProspectStatus) {
+  async function submitProspectPatch(prospectId: string, body: Record<string, unknown>): Promise<boolean> {
     if (!organizationId || !canManage) return false
     try {
       const res = await fetch(
@@ -268,13 +311,22 @@ function ProspectsPageInner() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(body),
         },
       )
-      const j = (await res.json().catch(() => ({}))) as { message?: string }
+      const j = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
       if (!res.ok) {
+        if (j.error === "qualification_required" && typeof body.status === "string") {
+          setQualificationPrompt({
+            prospectId,
+            targetStatus: body.status as ProspectStatus,
+          })
+          setQualNotesDraft("")
+          setQualValueDraft("")
+          return false
+        }
         toast({
-          title: j.message ?? "Could not move card",
+          title: j.message ?? "Could not update prospect",
           variant: "destructive",
         })
         return false
@@ -282,8 +334,65 @@ function ProspectsPageInner() {
       void load()
       return true
     } catch {
-      toast({ title: "Could not move card", variant: "destructive" })
+      toast({ title: "Could not update prospect", variant: "destructive" })
       return false
+    }
+  }
+
+  async function handlePipelinePatch(prospectId: string, status: ProspectStatus) {
+    if (status === "lost") {
+      setLostPrompt({ prospectId })
+      setLostReasonDraft("")
+      return false
+    }
+    return submitProspectPatch(prospectId, { status })
+  }
+
+  async function confirmLostReason() {
+    if (!lostPrompt) return
+    const trimmed = lostReasonDraft.trim()
+    if (!trimmed) {
+      toast({ title: "Enter a short lost reason", variant: "destructive" })
+      return
+    }
+    const ok = await submitProspectPatch(lostPrompt.prospectId, {
+      status: "lost",
+      lost_reason: trimmed,
+    })
+    if (ok) {
+      setLostPrompt(null)
+      setLostReasonDraft("")
+    }
+  }
+
+  async function confirmQualification() {
+    if (!qualificationPrompt) return
+    const notes = qualNotesDraft.trim()
+    const raw = qualValueDraft.trim()
+    let estimated_value_cents: number | undefined
+    if (raw !== "") {
+      const n = Number.parseFloat(raw)
+      if (!Number.isFinite(n) || n < 0) {
+        toast({ title: "Estimated value must be a valid non-negative number.", variant: "destructive" })
+        return
+      }
+      estimated_value_cents = Math.round(n * 100)
+    }
+    if (!notes && estimated_value_cents == null) {
+      toast({
+        title: "Add notes or an estimated value",
+        variant: "destructive",
+      })
+      return
+    }
+    const patch: Record<string, unknown> = { status: qualificationPrompt.targetStatus }
+    if (notes) patch.notes = notes
+    if (estimated_value_cents != null) patch.estimated_value_cents = estimated_value_cents
+    const ok = await submitProspectPatch(qualificationPrompt.prospectId, patch)
+    if (ok) {
+      setQualificationPrompt(null)
+      setQualNotesDraft("")
+      setQualValueDraft("")
     }
   }
 
@@ -408,6 +517,12 @@ function ProspectsPageInner() {
           sub={`Open rows with a next step · ${operationalMetrics.overdueActive} overdue touches`}
         />
       </div>
+
+      {stageAgeSummary ? (
+        <p className="text-xs text-muted-foreground leading-relaxed px-0.5">
+          <span className="font-medium text-foreground">Avg age by open stage</span> — {stageAgeSummary}
+        </p>
+      ) : null}
 
       {/*
         Toolbar — single row on desktop, wraps cleanly on tablet/mobile.
@@ -539,6 +654,7 @@ function ProspectsPageInner() {
                 <TableHead>Status</TableHead>
                 <TableHead>Assigned</TableHead>
                 <TableHead>Next action</TableHead>
+                <TableHead>Last contact</TableHead>
                 <TableHead>Next follow-up</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="text-right">Estimated value</TableHead>
@@ -547,13 +663,13 @@ function ProspectsPageInner() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-sm text-muted-foreground py-8 text-center">
+                  <TableCell colSpan={9} className="text-sm text-muted-foreground py-8 text-center">
                     Loading prospects…
                   </TableCell>
                 </TableRow>
               ) : followUpFiltered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-7 sm:py-8 text-center align-middle">
+                  <TableCell colSpan={9} className="py-7 sm:py-8 text-center align-middle">
                     <EmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
                   </TableCell>
                 </TableRow>
@@ -612,6 +728,20 @@ function ProspectsPageInner() {
                       <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
                         {p.next_action_owner_label ?? "—"}
                       </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
+                        {p.last_contacted_at ? (
+                          <span className="block">
+                            {formatFollowUpStamp(p.last_contacted_at)}
+                            {p.last_contacted_by_label ? (
+                              <span className="block text-[10px] text-muted-foreground/90">
+                                {p.last_contacted_by_label}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
                       <TableCell className={cn("text-sm tabular-nums", followUpTone)}>
                         {p.next_follow_up_at ? formatFollowUpStamp(p.next_follow_up_at) : "—"}
                       </TableCell>
@@ -630,6 +760,99 @@ function ProspectsPageInner() {
         </div>
         )}
       </div>
+
+      <AlertDialog
+        open={lostPrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLostPrompt(null)
+            setLostReasonDraft("")
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as lost</AlertDialogTitle>
+            <AlertDialogDescription>
+              Record why this opportunity closed so your team can learn from it. This appears on the prospect timeline.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            value={lostReasonDraft}
+            onChange={(e) => setLostReasonDraft(e.target.value)}
+            placeholder="e.g. Chose another vendor, budget freeze, no response…"
+            className="min-h-[88px] resize-y"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <Button type="button" onClick={() => void confirmLostReason()}>
+              Save & move to Lost
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={qualificationPrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQualificationPrompt(null)
+            setQualNotesDraft("")
+            setQualValueDraft("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add qualification details</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Before moving to {qualificationPrompt ? formatProspectStatus(qualificationPrompt.targetStatus) : ""}, add an
+            estimated value or notes on the prospect.
+          </p>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="qual-est">Estimated value (USD)</Label>
+              <input
+                id="qual-est"
+                type="number"
+                min={0}
+                step="0.01"
+                value={qualValueDraft}
+                onChange={(e) => setQualValueDraft(e.target.value)}
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="qual-notes">Notes</Label>
+              <Textarea
+                id="qual-notes"
+                value={qualNotesDraft}
+                onChange={(e) => setQualNotesDraft(e.target.value)}
+                placeholder="Qualification context, scope, decision-makers…"
+                className="min-h-[88px] resize-y"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQualificationPrompt(null)
+                setQualNotesDraft("")
+                setQualValueDraft("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void confirmQualification()}>
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ProspectFormDialog
         open={createOpen}

@@ -6,6 +6,7 @@ import { resolveAiExecutionMode } from "@/lib/ai/execution-mode"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
+import { logProspectFollowUpAutomationReview } from "@/lib/prospects/follow-up-task-timeline"
 
 export const runtime = "nodejs"
 
@@ -129,6 +130,18 @@ export async function POST(request: Request, context: { params: Promise<{ organi
     eventType: "approved",
     metadata: { task_id: taskId, ai: Boolean(generateAi && cat?.aiDraftsEnabled) },
   })
+
+  if (task.entity_type === "prospect") {
+    await logProspectFollowUpAutomationReview({
+      supabase: gate.supabase,
+      organizationId,
+      prospectId: task.entity_id as string,
+      ruleKey: task.rule_key as string,
+      taskId,
+      action: "approved",
+      userId: gate.userId,
+    })
+  }
 
   return NextResponse.json({
     ok: true,

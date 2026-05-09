@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
 import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { logProspectFollowUpAutomationReview } from "@/lib/prospects/follow-up-task-timeline"
 
 export const runtime = "nodejs"
 
@@ -21,7 +22,7 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
 
   const { data: task, error: tErr } = await gate.supabase
     .from("follow_up_tasks")
-    .select("entity_type")
+    .select("entity_type, entity_id, rule_key")
     .eq("organization_id", organizationId)
     .eq("id", taskId)
     .maybeSingle()
@@ -53,6 +54,18 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
     eventType: "dismissed",
     metadata: { task_id: taskId },
   })
+
+  if (task.entity_type === "prospect") {
+    await logProspectFollowUpAutomationReview({
+      supabase: gate.supabase,
+      organizationId,
+      prospectId: task.entity_id as string,
+      ruleKey: task.rule_key as string,
+      taskId,
+      action: "dismissed",
+      userId: gate.userId,
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

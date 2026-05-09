@@ -46,4 +46,4 @@ export function optionalUuid(value: unknown): string | null | "invalid" {
 }
 
 export const PROSPECT_SELECT_COLUMNS =
-  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, converted_customer_id, converted_at, archived_at, assigned_to_user_id, last_contacted_by_user_id, next_action_owner_user_id, created_at, updated_at"
+  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, lost_reason, converted_customer_id, converted_at, archived_at, assigned_to_user_id, last_contacted_by_user_id, next_action_owner_user_id, created_at, updated_at"

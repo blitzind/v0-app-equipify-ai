@@ -100,6 +100,7 @@ function timelineEventKind(eventType: string): string {
     prospect_location_added: "Location",
     prospect_opportunity_tracked: "Opportunity task",
     prospect_converted: "Customer conversion",
+    prospect_follow_up_automation_review: "Automation follow-up review",
   }
   return map[eventType] ?? eventType.replace(/_/g, " ")
 }
@@ -360,6 +361,11 @@ export function ProspectDrawer({
             <Stat label="Estimated value" value={formatEstimatedValue(prospect.estimated_value_cents)} />
             <Stat label="Lead source" value={prospect.lead_source ?? "—"} />
             <Stat label="Created" value={formatDateOnly(prospect.created_at)} />
+            {prospect.status === "lost" && prospect.lost_reason ? (
+              <div className="sm:col-span-2">
+                <Stat label="Lost reason" value={prospect.lost_reason} />
+              </div>
+            ) : null}
           </div>
         </DrawerSection>
 

@@ -103,7 +103,8 @@ export async function evaluateFollowUpAutomationForOrganization(
         contact_email: string | null
       }
 
-      if (row.next_follow_up_at) {
+      const terminal = row.status === "won" || row.status === "lost"
+      if (row.next_follow_up_at && !terminal) {
         const due = Date.parse(row.next_follow_up_at)
         if (!Number.isNaN(due) && due < nowMs) {
           candidates.push({
@@ -112,17 +113,18 @@ export async function evaluateFollowUpAutomationForOrganization(
             rule_key: "prospect_followup_overdue",
             priority: "high",
             assigned_to_user_id: row.assigned_to_user_id,
-            scheduled_for: null,
+            scheduled_for: row.next_follow_up_at,
             metadata: {
               summary: `Follow-up overdue for ${row.company_name}`,
               prospect_company: row.company_name,
               prospect_status: row.status,
+              next_follow_up_at: row.next_follow_up_at,
             },
           })
         }
       }
 
-      if (row.status === "proposal_sent") {
+      if (row.status === "proposal_sent" && !terminal) {
         const anchor = row.last_contacted_at ?? row.updated_at
         if (anchor && Date.parse(anchor) < Date.now() - th.prospectProposalNoResponseDays * 86400000) {
           candidates.push({
@@ -141,7 +143,7 @@ export async function evaluateFollowUpAutomationForOrganization(
         }
       }
 
-      if (row.status === "nurture") {
+      if (row.status === "nurture" && !terminal) {
         if (Date.parse(row.updated_at) < Date.now() - th.prospectNurtureInactiveDays * 86400000) {
           candidates.push({
             entity_type: "prospect",

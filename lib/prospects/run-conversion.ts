@@ -54,6 +54,53 @@ type LocationPayload = {
   is_default?: boolean
 }
 
+/** Prefer linking an existing customer (same contact email, or exact company name) before inserting a duplicate. */
+async function findMatchingCustomerForProspect(args: {
+  supabase: SupabaseClient
+  organizationId: string
+  prospect: ProspectRow
+}): Promise<{ id: string; company_name: string } | null> {
+  const { supabase, organizationId, prospect } = args
+  const email = optionalString(prospect.contact_email, 200)?.toLowerCase().trim()
+  if (email) {
+    const { data: contacts } = await supabase
+      .from("customer_contacts")
+      .select("customer_id")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .ilike("email", email)
+      .limit(40)
+    const ids = [...new Set((contacts ?? []).map((c) => (c as { customer_id: string }).customer_id))]
+    if (ids.length === 1) {
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("id, company_name")
+        .eq("organization_id", organizationId)
+        .eq("id", ids[0])
+        .is("archived_at", null)
+        .maybeSingle()
+      if (cust?.id) return cust as { id: string; company_name: string }
+    }
+  }
+
+  const rawName = prospect.company_name.trim()
+  if (!rawName) return null
+  const norm = rawName.toLowerCase()
+  const { data: custs } = await supabase
+    .from("customers")
+    .select("id, company_name")
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .ilike("company_name", rawName)
+    .limit(40)
+
+  const exact = (custs ?? []).filter(
+    (c) => (c as { company_name: string }).company_name.trim().toLowerCase() === norm,
+  )
+  if (exact.length === 1) return exact[0] as { id: string; company_name: string }
+  return null
+}
+
 async function ensureCustomerForProspect(args: {
   supabase: SupabaseClient
   userId: string
@@ -80,6 +127,16 @@ async function ensureCustomerForProspect(args: {
         customerName: (existing as { company_name: string }).company_name,
         createdNew: false,
       }
+    }
+  }
+
+  const matched = await findMatchingCustomerForProspect({ supabase, organizationId, prospect })
+  if (matched) {
+    return {
+      ok: true,
+      customerId: matched.id,
+      customerName: matched.company_name,
+      createdNew: false,
     }
   }
 

@@ -62,6 +62,8 @@ export async function PATCH(
   if ("lead_source" in body) update.lead_source = optionalString(body.lead_source)
   if ("notes" in body) update.notes = optionalString(body.notes)
 
+  if ("lost_reason" in body) update.lost_reason = optionalString(body.lost_reason, 2000)
+
   if ("status" in body) {
     const status = typeof body.status === "string" ? body.status.toLowerCase() : ""
     if (!PROSPECT_STATUSES.includes(status as ProspectStatus)) {
@@ -69,6 +71,8 @@ export async function PATCH(
     }
     update.status = status
   }
+
+  const skipQualificationGuard = body.skip_qualification_guard === true
 
   if ("next_follow_up_at" in body) {
     const value = parseOptionalIso(body.next_follow_up_at)
@@ -106,14 +110,62 @@ export async function PATCH(
     return jsonError("No editable fields supplied.", 400)
   }
 
-  // Read current row first so we can detect a status delta and emit the
-  // workflow trigger / audit event after the update commits.
   const { data: previous } = await supabase
     .from("prospects")
-    .select("status, company_name")
+    .select("status, company_name, estimated_value_cents, notes, lost_reason")
     .eq("organization_id", organizationId)
     .eq("id", prospectId)
     .maybeSingle()
+
+  if (!previous) return jsonError("Prospect not found.", 404, "not_found")
+
+  const prevStatus = previous.status as ProspectStatus
+  const nextStatus = (update.status ?? prevStatus) as ProspectStatus
+
+  if (nextStatus === "lost" && prevStatus !== "lost") {
+    const fromUpdate =
+      typeof update.lost_reason === "string" ? update.lost_reason.trim() : ""
+    const fromBody = typeof body.lost_reason === "string" ? body.lost_reason.trim() : ""
+    const lr = (fromUpdate || fromBody).slice(0, 2000)
+    if (!lr) {
+      return jsonError(
+        "A lost reason is required when moving a prospect to Lost.",
+        400,
+        "lost_reason_required",
+      )
+    }
+    update.lost_reason = lr
+  }
+
+  if (
+    !skipQualificationGuard &&
+    update.status &&
+    (nextStatus === "qualified" || nextStatus === "proposal_sent") &&
+    prevStatus !== nextStatus
+  ) {
+    const mergedEst =
+      update.estimated_value_cents !== undefined
+        ? update.estimated_value_cents
+        : (previous.estimated_value_cents as number | null)
+    const mergedNotes =
+      update.notes !== undefined
+        ? (update.notes as string | null)
+        : ((previous.notes as string | null) ?? null)
+    const hasValue = mergedEst != null && mergedEst > 0
+    const hasNotes = Boolean(mergedNotes?.trim())
+    if (!hasValue && !hasNotes) {
+      return jsonError(
+        "Add an estimated value or notes on the prospect before moving to Qualified or Proposal sent.",
+        422,
+        "qualification_required",
+      )
+    }
+  }
+
+  if (nextStatus === "contacted" && prevStatus !== "contacted") {
+    update.last_contacted_at = new Date().toISOString()
+    update.last_contacted_by_user_id = userId
+  }
 
   const { data, error } = await supabase
     .from("prospects")
@@ -125,16 +177,21 @@ export async function PATCH(
 
   if (error || !data) return jsonError(error?.message ?? "Prospect not found.", 404, "not_found")
 
-  if (previous && update.status && previous.status !== update.status) {
+  if (update.status && prevStatus !== update.status) {
+    const lostMeta =
+      (update.status as ProspectStatus) === "lost" && typeof update.lost_reason === "string"
+        ? { lost_reason: update.lost_reason }
+        : {}
     await recordProspectStatusChange({
       supabase,
       organizationId,
       prospectId,
       companyName: (data as { company_name: string }).company_name ?? previous.company_name,
-      previousStatus: previous.status as ProspectStatus,
+      previousStatus: prevStatus,
       nextStatus: update.status as ProspectStatus,
       reason: "manual_edit",
       actorUserId: userId,
+      extraMetadata: Object.keys(lostMeta).length ? lostMeta : undefined,
     })
   }
 
