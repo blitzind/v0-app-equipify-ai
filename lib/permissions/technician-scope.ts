@@ -12,6 +12,12 @@ export type AssignedWorkScope = {
   equipmentIds: string[]
 }
 
+type ResourceScope = {
+  workOrderId?: string | null
+  customerId?: string | null
+  equipmentId?: string | null
+}
+
 export async function loadAssignedWorkScope(
   supabase: SupabaseClient,
   args: { organizationId: string; userId: string },
@@ -80,10 +86,115 @@ export async function loadAssignedWorkScope(
     if (row.equipment_id) equipmentIds.add(row.equipment_id)
   }
 
+  const assignedWorkOrderIds = [...workOrderIds]
+  if (assignedWorkOrderIds.length > 0) {
+    const { data: assetRows } = await supabase
+      .from("work_order_equipment")
+      .select("equipment_id")
+      .eq("organization_id", organizationId)
+      .in("work_order_id", assignedWorkOrderIds)
+
+    for (const row of (assetRows as Array<{ equipment_id?: string | null }> | null) ?? []) {
+      if (row.equipment_id) equipmentIds.add(row.equipment_id)
+    }
+  }
+
   return {
     technicianIds: [...technicianIds],
-    workOrderIds: [...workOrderIds],
+    workOrderIds: assignedWorkOrderIds,
     customerIds: [...customerIds],
     equipmentIds: [...equipmentIds],
+  }
+}
+
+export async function canAccessAssignedWorkResource(
+  supabase: SupabaseClient,
+  args: {
+    organizationId: string
+    userId: string
+    permissions: Pick<OrgPermissions, "canViewAssignedWorkOrdersOnly" | "canViewAllWorkOrders">
+    resource: ResourceScope
+  },
+): Promise<boolean> {
+  if (!isAssignedWorkOnly(args.permissions)) return true
+
+  const scope = await loadAssignedWorkScope(supabase, {
+    organizationId: args.organizationId,
+    userId: args.userId,
+  })
+
+  const { workOrderId, customerId, equipmentId } = args.resource
+  if (workOrderId && scope.workOrderIds.includes(workOrderId)) return true
+  if (customerId && scope.customerIds.includes(customerId)) return true
+  if (equipmentId && scope.equipmentIds.includes(equipmentId)) return true
+  return false
+}
+
+export async function canAccessAssignedAttachmentEntity(
+  supabase: SupabaseClient,
+  args: {
+    organizationId: string
+    userId: string
+    permissions: Pick<
+      OrgPermissions,
+      | "canViewAssignedWorkOrdersOnly"
+      | "canViewAllWorkOrders"
+      | "canViewFinancials"
+      | "canViewBilling"
+      | "canViewQuotes"
+    >
+    entityType: string
+    entityId: string
+  },
+): Promise<boolean> {
+  if (!isAssignedWorkOnly(args.permissions)) return true
+
+  switch (args.entityType) {
+    case "work_order":
+      return canAccessAssignedWorkResource(supabase, {
+        organizationId: args.organizationId,
+        userId: args.userId,
+        permissions: args.permissions,
+        resource: { workOrderId: args.entityId },
+      })
+    case "customer":
+      return canAccessAssignedWorkResource(supabase, {
+        organizationId: args.organizationId,
+        userId: args.userId,
+        permissions: args.permissions,
+        resource: { customerId: args.entityId },
+      })
+    case "equipment":
+      return canAccessAssignedWorkResource(supabase, {
+        organizationId: args.organizationId,
+        userId: args.userId,
+        permissions: args.permissions,
+        resource: { equipmentId: args.entityId },
+      })
+    case "calibration_record": {
+      const { data } = await supabase
+        .from("calibration_records")
+        .select("work_order_id, equipment_id")
+        .eq("organization_id", args.organizationId)
+        .eq("id", args.entityId)
+        .maybeSingle()
+      const row = data as { work_order_id?: string | null; equipment_id?: string | null } | null
+      if (!row) return false
+      return canAccessAssignedWorkResource(supabase, {
+        organizationId: args.organizationId,
+        userId: args.userId,
+        permissions: args.permissions,
+        resource: {
+          workOrderId: row.work_order_id ?? null,
+          equipmentId: row.equipment_id ?? null,
+        },
+      })
+    }
+    case "invoice":
+      return args.permissions.canViewFinancials || args.permissions.canViewBilling
+    case "quote":
+      return args.permissions.canViewQuotes
+    default:
+      return false
   }
 }

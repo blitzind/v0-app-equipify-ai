@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { LineItemJson } from "@/lib/org-quotes-invoices/map"
 import { requireOrgMemberRead } from "@/lib/catalog/require-org-catalog-write"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { maybeCatalogSchemaErrorResponse } from "@/lib/supabase/catalog-schema-errors"
 
 export const runtime = "nodejs"
@@ -37,6 +38,12 @@ export async function GET(
 
   const gate = await requireOrgMemberRead(organizationId)
   if ("error" in gate) return gate.error
+  const financialGate = await requireAnyOrgPermission(organizationId, [
+    "canViewFinancials",
+    "canViewBilling",
+    "canManageInventory",
+  ])
+  if ("error" in financialGate) return financialGate.error
 
   const { data: itemRow, error: itemErr } = await gate.svc
     .from("catalog_items")

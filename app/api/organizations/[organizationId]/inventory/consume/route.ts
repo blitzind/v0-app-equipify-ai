@@ -5,6 +5,8 @@ import {
   insertLedger,
 } from "@/lib/inventory/inventory-mutations"
 import { requireOrgInventoryWrite } from "@/lib/inventory/require-org-inventory-access"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { canAccessAssignedWorkResource } from "@/lib/permissions/technician-scope"
 
 export const runtime = "nodejs"
 
@@ -31,6 +33,8 @@ export async function POST(
     forbiddenMessage: "You don't have permission to consume parts on work orders.",
   })
   if ("error" in gate) return gate.error
+  const permissionGate = await requireOrgPermission(organizationId, "canConsumePartsOnWorkOrders")
+  if ("error" in permissionGate) return permissionGate.error
 
   let body: {
     work_order_id?: string
@@ -64,6 +68,13 @@ export async function POST(
     .eq("id", workOrderId)
     .maybeSingle()
   if (!wo) return NextResponse.json({ message: "Work order not found." }, { status: 404 })
+  const allowedWorkOrder = await canAccessAssignedWorkResource(gate.svc, {
+    organizationId,
+    userId: gate.userId,
+    permissions: permissionGate.permissions,
+    resource: { workOrderId },
+  })
+  if (!allowedWorkOrder) return NextResponse.json({ message: "Work order not found." }, { status: 404 })
 
   const { data: cat } = await gate.svc
     .from("catalog_items")

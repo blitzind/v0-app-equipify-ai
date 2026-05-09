@@ -8,6 +8,7 @@ import {
 import { isValidEmail } from "@/lib/email/format"
 import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { canAccessAssignedWorkResource } from "@/lib/permissions/technician-scope"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
@@ -155,6 +156,15 @@ export async function POST(request: Request) {
   const wo = woSel.data as WoRow | null
 
   if (woSel.error || !wo) {
+    return NextResponse.json({ error: "not_found", message: "Work order not found." }, { status: 404 })
+  }
+  const allowedWorkOrder = await canAccessAssignedWorkResource(supabase, {
+    organizationId,
+    userId: user.id,
+    permissions: capGate.permissions,
+    resource: { workOrderId },
+  })
+  if (!allowedWorkOrder) {
     return NextResponse.json({ error: "not_found", message: "Work order not found." }, { status: 404 })
   }
 

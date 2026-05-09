@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { canAccessAssignedWorkResource, isAssignedWorkOnly } from "@/lib/permissions/technician-scope"
 import {
   listSchedulingEventsForWorkOrder,
   recordSchedulingEvent,
@@ -56,6 +57,32 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { data: wo } = await supabase
+    .from("work_orders")
+    .select("id, organization_id")
+    .eq("id", workOrderId)
+    .maybeSingle()
+  const workOrder = wo as { id: string; organization_id: string } | null
+  if (!workOrder) {
+    return NextResponse.json({ error: "Work order not found" }, { status: 404 })
+  }
+
+  const capGate = await requireAnyOrgPermission(workOrder.organization_id, [
+    "canViewAllWorkOrders",
+    "canViewAssignedWorkOrdersOnly",
+    "canManageDispatch",
+  ])
+  if ("error" in capGate) return capGate.error
+  const allowedWorkOrder = await canAccessAssignedWorkResource(supabase, {
+    organizationId: workOrder.organization_id,
+    userId: user.id,
+    permissions: capGate.permissions,
+    resource: { workOrderId },
+  })
+  if (!allowedWorkOrder) {
+    return NextResponse.json({ error: "Work order not found" }, { status: 404 })
+  }
+
   const events = await listSchedulingEventsForWorkOrder(supabase, workOrderId, limit)
   return NextResponse.json({ events })
 }
@@ -94,6 +121,22 @@ export async function POST(request: NextRequest) {
   const eventType = (body.eventType ?? "note") as SchedulingEventType
   if (!ALLOWED_TYPES.has(eventType)) {
     return NextResponse.json({ error: "Invalid eventType" }, { status: 400 })
+  }
+  const assignedOnly = isAssignedWorkOnly(capGate.permissions)
+  const allowedWorkOrder = await canAccessAssignedWorkResource(supabase, {
+    organizationId,
+    userId: user.id,
+    permissions: capGate.permissions,
+    resource: { workOrderId },
+  })
+  if (!allowedWorkOrder) {
+    return NextResponse.json({ error: "Work order not found" }, { status: 404 })
+  }
+  if (assignedOnly && eventType !== "note") {
+    return NextResponse.json(
+      { error: "insufficient_permissions", message: "Technicians can add notes only on assigned schedule records." },
+      { status: 403 },
+    )
   }
   const severity = (body.severity ?? "info") as SchedulingEventSeverity
   if (!ALLOWED_SEVERITY.has(severity)) {

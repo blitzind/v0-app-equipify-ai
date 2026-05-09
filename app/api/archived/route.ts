@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { filterArchivedRows, fetchArchivedCenterRows } from "@/lib/archived-center/fetch-archived"
-import { gateArchivedCenterAccess } from "@/lib/archived-center/access"
+import { assertCanRestoreArchivedRecord, gateArchivedCenterAccess } from "@/lib/archived-center/access"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
@@ -19,6 +19,15 @@ export async function GET(request: Request) {
     const gate = await gateArchivedCenterAccess(supabase, user, organizationId)
     if (!gate.ok) {
       return NextResponse.json({ message: gate.message }, { status: gate.status })
+    }
+    const archiveGate = await assertCanRestoreArchivedRecord(
+      supabase,
+      gate.userId,
+      gate.organizationId,
+      gate.platformAdmin,
+    )
+    if (!archiveGate.ok) {
+      return NextResponse.json({ message: archiveGate.message }, { status: archiveGate.status })
     }
 
     let admin: ReturnType<typeof createServiceRoleSupabaseClient>

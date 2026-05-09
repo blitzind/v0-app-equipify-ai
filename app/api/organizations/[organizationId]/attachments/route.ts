@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
-import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { getEffectiveOrgPermissions, getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { canAccessAssignedAttachmentEntity } from "@/lib/permissions/technician-scope"
 import {
   ATTACHMENT_ENTITY_TYPES,
   ATTACHMENT_TYPES,
@@ -32,6 +33,7 @@ async function requireOrgAccess(organizationId: string, write = false) {
   }
 
   const platformAdmin = isPlatformAdminEmail(user.email)
+  let permissions = getOrgPermissionsForRole("owner")
   if (!platformAdmin) {
     const { data: mem, error } = await supabase
       .from("organization_members")
@@ -41,7 +43,7 @@ async function requireOrgAccess(organizationId: string, write = false) {
       .eq("status", "active")
       .maybeSingle()
     const role = (mem as { role?: string | null } | null)?.role ?? null
-    const permissions = getEffectiveOrgPermissions({
+    permissions = getEffectiveOrgPermissions({
       role: normalizeOrgMemberRole(role),
       permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
       permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
@@ -51,7 +53,7 @@ async function requireOrgAccess(organizationId: string, write = false) {
     }
   }
 
-  return { userId: user.id, svc: createServiceRoleSupabaseClient() }
+  return { userId: user.id, svc: createServiceRoleSupabaseClient(), permissions }
 }
 
 function validEntity(entityType: string | null, entityId: string | null) {
@@ -71,6 +73,16 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
   const entityId = url.searchParams.get("entityId")
   if (!validEntity(entityType, entityId)) {
     return NextResponse.json({ error: "invalid_request", message: "Provide a supported related entity." }, { status: 400 })
+  }
+  const allowed = await canAccessAssignedAttachmentEntity(gate.svc, {
+    organizationId,
+    userId: gate.userId,
+    permissions: gate.permissions,
+    entityType: entityType!,
+    entityId: entityId!,
+  })
+  if (!allowed) {
+    return NextResponse.json({ error: "not_found", message: "Attachments not found." }, { status: 404 })
   }
 
   const { data, error } = await gate.svc
@@ -104,6 +116,16 @@ export async function POST(request: Request, context: { params: Promise<{ organi
 
   if (!validEntity(entityType, entityId)) {
     return NextResponse.json({ error: "invalid_request", message: "Provide a supported related entity." }, { status: 400 })
+  }
+  const allowed = await canAccessAssignedAttachmentEntity(gate.svc, {
+    organizationId,
+    userId: gate.userId,
+    permissions: gate.permissions,
+    entityType,
+    entityId,
+  })
+  if (!allowed) {
+    return NextResponse.json({ error: "not_found", message: "Related record not found." }, { status: 404 })
   }
   if (!(file instanceof File) || file.size < 1) {
     return NextResponse.json({ error: "invalid_file", message: "Choose a file to upload." }, { status: 400 })

@@ -7,6 +7,7 @@ import {
   getAidenActionAvailability,
   getAidenActionMembership,
 } from "@/lib/permissions/aiden-actions"
+import { isAssignedWorkOnly } from "@/lib/permissions/technician-scope"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -80,6 +81,13 @@ export async function POST(
   })
   if (!permission.ok) {
     return jsonError("aiden_actions_denied", permission.message, 403)
+  }
+  if (isAssignedWorkOnly(membership.permissions)) {
+    return jsonError(
+      "aiden_actions_denied",
+      "AIden workflow actions that create, assign, schedule, or manage financial records are restricted for technician access.",
+      403,
+    )
   }
 
   const definition = getAidenActionDefinition(action.type)
