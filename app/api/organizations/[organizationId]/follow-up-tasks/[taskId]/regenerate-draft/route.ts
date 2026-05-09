@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { tryConsumeAiOperationSlot } from "@/lib/ai/operation-rate-limit"
 import { mergeFollowUpAutomationConfig } from "@/lib/follow-up-automation/merge-config"
 import { generateFollowUpAutomationDraft } from "@/lib/follow-up-automation/generate-draft"
 import { resolveDraftCategorySettings } from "@/lib/follow-up-automation/draft-category"
@@ -20,6 +22,16 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
 
   const gate = await requireOrgPermission(organizationId, "canManageCommunications")
   if ("error" in gate) return gate.error
+
+  try {
+    const admin = createServiceRoleSupabaseClient()
+    const rl = await tryConsumeAiOperationSlot(admin, organizationId, "follow_up_regenerate_draft")
+    if (!rl.allowed) {
+      return jsonError("Draft regeneration rate limit — try again in a minute.", 429)
+    }
+  } catch {
+    /* rate limit table optional — continue without blocking */
+  }
 
   const { data: task, error: tErr } = await gate.supabase
     .from("follow_up_tasks")

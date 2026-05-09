@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireFeatureAccess } from "@/lib/billing/server-guard"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { tryConsumeAiOperationSlot } from "@/lib/ai/operation-rate-limit"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { gatherOrgInsightsContext } from "@/lib/insights/gather-org-context"
 import {
@@ -58,6 +60,19 @@ export async function POST(request: Request) {
       { error: "feature_denied", message: featureGate.message },
       { status: featureGate.httpStatus },
     )
+  }
+
+  try {
+    const admin = createServiceRoleSupabaseClient()
+    const rl = await tryConsumeAiOperationSlot(admin, organizationId, "operational_insights_refresh")
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", message: "Insights refresh rate limit — try again shortly." },
+        { status: 429 },
+      )
+    }
+  } catch {
+    /* continue without rate limit if service role unavailable */
   }
 
   try {

@@ -134,6 +134,12 @@ export type AiRunMeta = {
   cacheHit?: boolean
   /** Trial simulation — callers must not persist side effects (e.g. pending workspace actions). */
   trialAiPreview?: boolean
+  /** Deterministic mock reuse bucket (`ai_cache`, mock trial signature). */
+  trialPreviewCacheHit?: boolean
+  /** Soft threshold — tenant UX references “included preview capacity”, not dollars. */
+  trialPreviewCapacityWarn?: boolean
+  /** Responses shorten after sustained preview volume — still schema-valid. */
+  trialPreviewAbbreviated?: boolean
 }
 
 export type AiTaskSuccess<T> = {
@@ -184,6 +190,8 @@ export type RunAiTaskOptions<T = string> = {
   skipExecutionModeMock?: boolean
   /** Platform-admin-only: force live providers when resolver allows (see `resolveAiExecutionMode`). */
   forceLiveAi?: boolean
+  /** Platform-admin-only: force simulated previews even if subscription is paid (internal QA). */
+  forceMockAi?: boolean
   /** Authenticated user email for admin-only force-live resolution. */
   actingUserEmail?: string | null
 }

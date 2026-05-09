@@ -13,8 +13,26 @@ import { priceListAiResponseSchema } from "@/lib/catalog/import-types"
 import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-schema"
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
+import { getIndustryLens } from "@/lib/ai/mock-industry-lens"
+import {
+  EMPTY_TRIAL_OPERATIONAL_SNAPSHOT,
+  type TrialOperationalSnapshot,
+} from "@/lib/ai/trial-operational-snapshot"
+import type { WorkspaceIndustryKey } from "@/lib/workspace-industry-registry"
 
 type MockFileTaskId = Extract<AiTaskId, "catalog_extraction" | "certificate_cleanup">
+
+export type MockStructuredOutputContext = {
+  organizationId: string
+  industryKey: WorkspaceIndustryKey | null
+  snapshot: TrialOperationalSnapshot
+  abbreviated?: boolean
+}
+
+function abbreviateText(text: string, maxChars: number, abbreviated: boolean): string {
+  if (!abbreviated || text.length <= maxChars) return text
+  return `${text.slice(0, maxChars).trimEnd()}…`
+}
 
 function estimateTokens(parts: string[]): number {
   const n = parts.reduce((acc, s) => acc + s.length, 0)
@@ -34,15 +52,16 @@ function pickUserSnippet(input: AiTaskInput): string {
   return text.slice(0, 800)
 }
 
-function mockAidenHelpAnswer(snippet: string): AidenSupportPhase2Answer {
+function mockAidenHelpAnswer(snippet: string, industryKey: WorkspaceIndustryKey | null): AidenSupportPhase2Answer {
   const topic = snippet.slice(0, 120).trim() || "your question"
+  const lens = getIndustryLens(industryKey)
   return {
     answer: [
       "Here is a concise preview of how AIden answers while your workspace is on a trial AI experience.",
       "",
-      `You asked about “${topic}”. In Equipify, start from the left navigation for the area you are working in, then use search or filters on that list to narrow records.`,
+      `You asked about “${topic}”. For ${lens.label} teams, Equipify ties equipment, work orders, and maintenance plans together — start from the left navigation and narrow lists with search or filters.`,
       "",
-      "During trial, guidance is preview-quality — verify critical steps against your internal procedures.",
+      `Preview angle for your vertical: ${lens.dispatchAngle}. Trial guidance stays illustrative — confirm procedures internally.`,
     ].join("\n"),
     message: "",
     classification: "supported_now",
@@ -83,11 +102,228 @@ function mockInsightsGeneration(): Record<string, unknown> {
   }
 }
 
+function buildInsightsFromWorkspaceStats(ctx?: MockStructuredOutputContext): Record<string, unknown> {
+  const snap = ctx?.snapshot ?? EMPTY_TRIAL_OPERATIONAL_SNAPSHOT
+  const lens = getIndustryLens(ctx?.industryKey ?? null)
+  const ab = Boolean(ctx?.abbreviated)
+  const insights: Array<Record<string, unknown>> = []
+
+  if (snap.openWorkOrders > 0) {
+    insights.push({
+      title: abbreviateText(`Active jobs — ${snap.openWorkOrders} open work orders`, 96, ab),
+      category: "operations",
+      severity: snap.agingScheduledWorkOrders > 0 ? "high" : "medium",
+      insight: abbreviateText(
+        `Your board currently shows ${snap.openWorkOrders} non-terminal work orders — preview signal based on records in Equipify (no inference).`,
+        240,
+        ab,
+      ),
+      recommendedAction: abbreviateText(
+        "Sort by scheduled date and confirm ownership for anything slipping past its window.",
+        160,
+        ab,
+      ),
+      relatedMetric: "open_work_orders",
+    })
+  }
+  if (snap.agingScheduledWorkOrders > 0) {
+    insights.push({
+      title: abbreviateText(`Scheduling hygiene — ${snap.agingScheduledWorkOrders} jobs past-due window`, 96, ab),
+      category: "operations",
+      severity: "high",
+      insight: abbreviateText(
+        "These jobs still appear active while their scheduled dates are older than seven days — rebaseline dates or close loops.",
+        220,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Review dispatch commitments with technicians and customers.", 140, ab),
+      relatedMetric: "aging_work_orders",
+    })
+  }
+  if (snap.staleProspects > 0) {
+    insights.push({
+      title: abbreviateText(`Pipeline — ${snap.staleProspects} prospects need follow-up`, 96, ab),
+      category: "customer",
+      severity: "medium",
+      insight: abbreviateText(
+        "Prospects without a future follow-up or overdue touches — preview counts only.",
+        200,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Assign owners and refresh next steps from the Prospects board.", 160, ab),
+    })
+  }
+  if (snap.calibrationDueSoonEquipment > 0) {
+    insights.push({
+      title: abbreviateText(`${lens.complianceHook} — ${snap.calibrationDueSoonEquipment} assets due soon`, 110, ab),
+      category: "maintenance",
+      severity: "medium",
+      insight: abbreviateText(
+        `Calibration or PM windows closing within ~7 days — typical for ${lens.label} workflows.`,
+        220,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Coordinate appointments before coverage lapses.", 140, ab),
+      relatedMetric: "calibration_due",
+    })
+  }
+  if (snap.maintenancePlansDueSoon > 0) {
+    insights.push({
+      title: abbreviateText(`Maintenance plans — ${snap.maintenancePlansDueSoon} visits approaching`, 110, ab),
+      category: "maintenance",
+      severity: "low",
+      insight: abbreviateText(
+        `Plans with next visits inside your horizon — aligns with ${lens.pmCadence}.`,
+        200,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Confirm parts and access windows with customers.", 140, ab),
+      relatedMetric: "maintenance_plans",
+    })
+  }
+  if (snap.overdueInvoiceCount > 0) {
+    insights.push({
+      title: abbreviateText(`Collections signal — ${snap.overdueInvoiceCount} invoices past due date`, 110, ab),
+      category: "revenue",
+      severity: "medium",
+      insight: abbreviateText(
+        "Counts unpaid invoices whose due dates passed — dollar totals stay in your billing workspace.",
+        200,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Align dispatch/comms owners with AR follow-up cadences.", 160, ab),
+      relatedMetric: "overdue_invoices",
+    })
+  }
+  if (snap.workOrdersScheduledThisWeek > 0) {
+    insights.push({
+      title: abbreviateText(`This week’s density — ${snap.workOrdersScheduledThisWeek} visits scheduled`, 110, ab),
+      category: "technician",
+      severity: "low",
+      insight: abbreviateText(
+        `Scheduling load snapshot for the rolling week — helpful when balancing ${lens.dispatchAngle}.`,
+        200,
+        ab,
+      ),
+      recommendedAction: abbreviateText("Watch travel corridors when stacking same-day jobs.", 140, ab),
+    })
+  }
+
+  if (insights.length === 0) {
+    return mockInsightsGeneration()
+  }
+
+  return {
+    summary: abbreviateText(
+      `Trial AI preview — counts below come straight from your Equipify workspace (${lens.label}). Upgrade for live narrative generation.`,
+      260,
+      ab,
+    ),
+    insights: insights.slice(0, 8),
+  }
+}
+
+function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutputContext): Record<string, unknown> {
+  const snap = ctx?.snapshot ?? EMPTY_TRIAL_OPERATIONAL_SNAPSHOT
+  const lens = getIndustryLens(ctx?.industryKey ?? null)
+  const ab = Boolean(ctx?.abbreviated)
+  const recs: Array<Record<string, unknown>> = []
+
+  if (snap.openWorkOrders > 0) {
+    recs.push({
+      title: abbreviateText(`Stabilize active workload (${snap.openWorkOrders})`, 90, ab),
+      severity: snap.agingScheduledWorkOrders > 0 ? "high" : "medium",
+      category: `${lens.label} operations`,
+      explanation: abbreviateText(
+        `Non-terminal work orders currently on the board — focus on ${lens.equipmentAngle}.`,
+        220,
+        ab,
+      ),
+      suggestedNextStep: abbreviateText("Run a dispatcher review from Service Schedule / Work Orders.", 160, ab),
+      relatedModule: "work_orders",
+      relatedRecordIds: [],
+    })
+  }
+  if (snap.staleProspects > 0) {
+    recs.push({
+      title: abbreviateText(`Pipeline hygiene (${snap.staleProspects} prospects)`, 90, ab),
+      severity: "medium",
+      category: "Growth",
+      explanation: abbreviateText("Prospects missing fresh follow-ups — preview counts only.", 200, ab),
+      suggestedNextStep: abbreviateText("Assign nurture owners from the Prospects table.", 140, ab),
+      relatedModule: "dashboard",
+      relatedRecordIds: [],
+    })
+  }
+  if (snap.calibrationDueSoonEquipment > 0) {
+    recs.push({
+      title: abbreviateText(`Calibration coverage (${snap.calibrationDueSoonEquipment})`, 90, ab),
+      severity: "high",
+      category: lens.label,
+      explanation: abbreviateText(
+        `Equipment rows approaching calibration targets — relevant for ${lens.complianceHook}.`,
+        220,
+        ab,
+      ),
+      suggestedNextStep: abbreviateText("Book technicians before customer audits slip.", 140, ab),
+      relatedModule: "equipment",
+      relatedRecordIds: [],
+    })
+  }
+  if (snap.overdueInvoiceCount > 0) {
+    recs.push({
+      title: abbreviateText(`AR alignment (${snap.overdueInvoiceCount} invoices)`, 90, ab),
+      severity: "medium",
+      category: "Financial hygiene",
+      explanation: abbreviateText(
+        "Past-due invoices remain open — review balances privately in Invoices (preview text hides dollar amounts).",
+        220,
+        ab,
+      ),
+      suggestedNextStep: abbreviateText("Pair technicians with billing owners on disputed jobs.", 160, ab),
+      relatedModule: "dashboard",
+      relatedRecordIds: [],
+    })
+  }
+
+  if (recs.length === 0) {
+    return {
+      overview: abbreviateText(
+        `Trial AI preview — ${lens.label} dashboards look healthier when dispatch, assets, and billing stay aligned.`,
+        220,
+        ab,
+      ),
+      recommendations: [
+        {
+          title: "Review aging quotes",
+          severity: "low",
+          category: "Sales hygiene",
+          explanation: "Stale quotes often need a nudge — preview suggestion.",
+          suggestedNextStep: "Filter quotes older than 14 days and assign owners.",
+          relatedModule: "dashboard",
+          relatedRecordIds: [],
+        },
+      ],
+    }
+  }
+
+  return {
+    overview: abbreviateText(
+      `Trial AI preview — recommendations combine ${lens.label} defaults with live counts from your workspace.`,
+      240,
+      ab,
+    ),
+    recommendations: recs.slice(0, 10),
+  }
+}
+
 export async function buildMockStructuredOutput<T>(params: {
   task: AiTaskId
   input: AiTaskInput
   schema?: z.ZodType<T>
   acceptResult?: (data: T, rawText: string) => boolean | Promise<boolean>
+  /** Industry + operational counts — populated by the router for mock trial orgs. */
+  context?: MockStructuredOutputContext
 }): Promise<{ output: T; rawText: string; promptTokens: number; completionTokens: number }> {
   const snippet = pickUserSnippet(params.input)
   const parts: string[] = [snippet]
@@ -96,7 +332,7 @@ export async function buildMockStructuredOutput<T>(params: {
 
   switch (params.task) {
     case "aiden_help": {
-      rawObj = mockAidenHelpAnswer(snippet)
+      rawObj = mockAidenHelpAnswer(snippet, params.context?.industryKey ?? null)
       break
     }
     case "aiden_customer_summary": {
@@ -132,21 +368,7 @@ export async function buildMockStructuredOutput<T>(params: {
       break
     }
     case "aiden_operational_recommendations": {
-      rawObj = {
-        overview:
-          "Trial AI preview — operational recommendations highlight patterns you might review this week.",
-        recommendations: [
-          {
-            title: "Review aging quotes",
-            severity: "low",
-            category: "Sales hygiene",
-            explanation: "Stale quotes often need a nudge — preview suggestion.",
-            suggestedNextStep: "Filter quotes older than 14 days and assign owners.",
-            relatedModule: "dashboard",
-            relatedRecordIds: [],
-          },
-        ],
-      }
+      rawObj = buildOperationalRecommendationsFromWorkspace(params.context)
       break
     }
     case "aiden_safe_action_prepare": {
@@ -168,7 +390,7 @@ export async function buildMockStructuredOutput<T>(params: {
       break
     }
     case "insights_generation":
-      rawObj = mockInsightsGeneration()
+      rawObj = buildInsightsFromWorkspaceStats(params.context)
       break
     case "classification":
       rawObj = {

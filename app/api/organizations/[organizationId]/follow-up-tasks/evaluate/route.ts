@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { tryConsumeAiOperationSlot } from "@/lib/ai/operation-rate-limit"
 import { evaluateFollowUpAutomationForOrganization } from "@/lib/follow-up-automation/evaluate"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
@@ -25,6 +26,11 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
     admin = createServiceRoleSupabaseClient()
   } catch {
     return jsonError("Server configuration error.", 503)
+  }
+
+  const rl = await tryConsumeAiOperationSlot(admin, organizationId, "follow_up_evaluate")
+  if (!rl.allowed) {
+    return jsonError("Automation evaluation rate limit — try again in a minute.", 429)
   }
 
   const result = await evaluateFollowUpAutomationForOrganization(admin, organizationId)

@@ -139,6 +139,15 @@ function StatCard({
   )
 }
 
+type ProfitabilityPayload = {
+  split?: {
+    mockTrial?: { requests?: number; tokensApprox?: number; estimatedCostUsd?: number }
+    livePaid?: { requests?: number; tokensApprox?: number; estimatedCostUsd?: number }
+  }
+  totals?: { estimatedProviderCostUsd?: number; tokensApprox?: number }
+  marginHint?: string
+}
+
 export function AiOperationsContent() {
   const [month, setMonth] = useState(() => {
     const d = new Date()
@@ -153,6 +162,7 @@ export function AiOperationsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<PlatformAccount[]>([])
+  const [profitability, setProfitability] = useState<ProfitabilityPayload | null>(null)
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -174,6 +184,19 @@ export function AiOperationsContent() {
     if (successFilter !== "all") p.set("success", successFilter)
     return p.toString()
   }, [month, organizationId, task, provider, model, successFilter])
+
+  const loadProfitability = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/platform/ai-profitability?month=${encodeURIComponent(month)}`, {
+        cache: "no-store",
+      })
+      const body = (await res.json()) as ProfitabilityPayload & { ok?: boolean }
+      if (res.ok && body.ok !== false) setProfitability(body)
+      else setProfitability(null)
+    } catch {
+      setProfitability(null)
+    }
+  }, [month])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -214,6 +237,10 @@ export function AiOperationsContent() {
   useEffect(() => {
     void load()
   }, [month, load])
+
+  useEffect(() => {
+    void loadProfitability()
+  }, [loadProfitability])
 
   const hints = data?.filterHints
   const orgOptions = useMemo(
@@ -258,6 +285,38 @@ export function AiOperationsContent() {
           </Button>
         </div>
       </div>
+
+      {profitability?.split ? (
+        <div className="rounded-xl border border-border bg-muted/15 p-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Internal profitability snapshot (same month, UTC)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">Preview (mock) traffic</p>
+              <p className="text-lg font-semibold tabular-nums">{profitability.split.mockTrial?.requests ?? 0}</p>
+              <p className="text-[11px] text-muted-foreground">
+                ~{(profitability.split.mockTrial?.tokensApprox ?? 0).toLocaleString()} tenant AI tokens
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">Live provider traffic</p>
+              <p className="text-lg font-semibold tabular-nums">{profitability.split.livePaid?.requests ?? 0}</p>
+              <p className="text-[11px] text-muted-foreground">
+                Est. provider cost {fmtUsd(profitability.split.livePaid?.estimatedCostUsd ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2">
+              <p className="text-[11px] text-muted-foreground">Combined est. provider cost</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtUsd(profitability.totals?.estimatedProviderCostUsd ?? 0)}</p>
+              <p className="text-[11px] text-muted-foreground">Stripe margin compares outside this view.</p>
+            </div>
+          </div>
+          {profitability.marginHint ? (
+            <p className="text-[11px] text-muted-foreground leading-snug">{profitability.marginHint}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : loading && !data ? <div className="flex items-center gap-2 text-muted-foreground py-16 justify-center"><Loader2 className="h-5 w-5 animate-spin" />Loading…</div> : null}
 

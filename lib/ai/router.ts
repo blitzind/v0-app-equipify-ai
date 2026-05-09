@@ -1,5 +1,6 @@
 import "server-only"
 
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { applyPrimaryModelRef } from "@/lib/ai/config"
 import { getTaskDefinition } from "@/lib/ai/tasks"
 import {
@@ -20,6 +21,13 @@ import { recordAiUsageLog, safeAiFailureReason, sumUsage } from "@/lib/ai/usage"
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { buildAiUsageOperationalMetadata } from "@/lib/ai/redaction"
 import { resolveAiExecutionMode } from "@/lib/ai/execution-mode"
+import { MOCK_TRIAL_CACHE_MODEL_SIGNATURE, mockTrialCacheTtlSeconds } from "@/lib/ai/trial-mock-cache-key"
+import { fetchOrganizationIndustryKey } from "@/lib/ai/org-ai-context"
+import {
+  EMPTY_TRIAL_OPERATIONAL_SNAPSHOT,
+  fetchTrialOperationalSnapshot,
+} from "@/lib/ai/trial-operational-snapshot"
+import { resolveTrialPreviewCapacity } from "@/lib/ai/trial-preview-capacity"
 import { buildMockStructuredOutput } from "@/lib/ai/mock-task-output"
 import { getProviderAdapter, isProviderAvailable } from "@/lib/ai/providers/index"
 import type {
@@ -98,6 +106,112 @@ async function tryRouterCacheHit<T>(params: {
       task: def.id,
       provider: primaryRef.provider,
       model: primaryRef.model,
+      skipUsageLog: Boolean(options.skipUsageLog),
+      usageMetadata: usagePromptMeta,
+    })
+  }
+
+  if (!options.schema) {
+    const text = row.response_text?.trim() ?? ""
+    if (!text) return null
+    await bumpHit()
+    return {
+      ok: true,
+      output: text as T,
+      rawText: text,
+      usage: zeroUsage,
+      meta: metaBase,
+    }
+  }
+
+  const rawJson = row.response_json != null ? JSON.stringify(row.response_json) : ""
+  if (!rawJson) return null
+
+  const schemaResult = await parseWithSchemaSafe(rawJson, options.schema)
+  if (!schemaResult.ok) return null
+
+  const data = schemaResult.data
+  let parsedForConfidence: unknown
+  try {
+    parsedForConfidence = parseJsonSafe(rawJson)
+  } catch {
+    parsedForConfidence = data as unknown
+  }
+
+  if (def.confidenceThreshold != null) {
+    const minConf = extractMinConfidence(parsedForConfidence)
+    if (minConf != null && minConf < def.confidenceThreshold) return null
+  }
+
+  if (options.acceptResult) {
+    const ok = await options.acceptResult(data, rawJson)
+    if (!ok) return null
+  }
+
+  await bumpHit()
+  return {
+    ok: true,
+    output: data,
+    rawText: rawJson,
+    usage: zeroUsage,
+    meta: metaBase,
+  }
+}
+
+async function tryMockTrialStructuredCacheHit<T>(params: {
+  def: AiTaskDefinition
+  options: RunAiTaskOptions<T>
+  started: number
+  usagePromptMeta?: Record<string, unknown>
+  orgId: string
+  messages: AiChatMessage[]
+}): Promise<AiTaskSuccess<T> | null> {
+  const { def, options, started, usagePromptMeta, orgId, messages } = params
+  if (options.skipCache || messagesHaveNonTextParts(messages)) return null
+
+  const msgsForHash = augmentForStructuredJson(def, messages)
+  const inputHash = computeInputHash({
+    taskId: def.id,
+    messagesCanonical: canonicalizeMessagesForCache(msgsForHash),
+    schemaVersion:
+      options.cacheSchemaVersion ??
+      (usagePromptMeta?.schemaVersion as string | undefined) ??
+      "default",
+    prompt: usagePromptMeta
+      ? {
+          promptId: usagePromptMeta.promptId as string,
+          promptVersion: usagePromptMeta.promptVersion as number,
+          schemaVersion: usagePromptMeta.schemaVersion as string,
+        }
+      : undefined,
+    extras: options.cacheKeyExtras,
+  })
+  const storageKey = computeStorageKey(orgId, def.id, inputHash, MOCK_TRIAL_CACHE_MODEL_SIGNATURE)
+
+  const row = await readAiCache({ storageKey, organizationId: orgId })
+  if (!row) return null
+
+  const zeroUsage = { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 }
+  const metaBase: AiRunMeta = {
+    task: def.id,
+    provider: "mock",
+    model: "simulated",
+    escalated: false,
+    escalationReasons: [],
+    attempts: 0,
+    durationMs: Date.now() - started,
+    cacheHit: true,
+    trialPreviewCacheHit: true,
+    trialAiPreview: def.id === "aiden_safe_action_prepare",
+  }
+
+  const bumpHit = async () => {
+    await recordCacheHitMeta({
+      storageKey,
+      organizationId: orgId,
+      task: def.id,
+      provider: "mock",
+      model: "simulated",
       skipUsageLog: Boolean(options.skipUsageLog),
       usageMetadata: usagePromptMeta,
     })
@@ -315,6 +429,7 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
       organizationId: orgIdForMode,
       actingUserEmail: options.actingUserEmail ?? null,
       forceLiveAi: options.forceLiveAi ?? false,
+      forceMockAi: options.forceMockAi ?? false,
     })
     if (resolved.mode === "disabled") {
       const durationMs = Date.now() - started
@@ -338,11 +453,57 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
 
     if (resolved.mode === "mock_trial") {
       try {
+        const cachedTrial = await tryMockTrialStructuredCacheHit<T>({
+          def,
+          options,
+          started,
+          usagePromptMeta,
+          orgId: orgIdForMode,
+          messages,
+        })
+        if (cachedTrial) return cachedTrial
+
+        let adminClient: ReturnType<typeof createServiceRoleSupabaseClient> | null = null
+        try {
+          adminClient = createServiceRoleSupabaseClient()
+        } catch {
+          adminClient = null
+        }
+
+        let capacityHints = {
+          warnIncludedCapacity: false,
+          abbreviatedPreview: false,
+          tokensTodayApprox: 0,
+        }
+        let industryKey: import("@/lib/workspace-industry-registry").WorkspaceIndustryKey | null = null
+        let snapshot = EMPTY_TRIAL_OPERATIONAL_SNAPSHOT
+
+        if (adminClient) {
+          const [cap, ind, snap] = await Promise.all([
+            resolveTrialPreviewCapacity(adminClient, orgIdForMode),
+            fetchOrganizationIndustryKey(adminClient, orgIdForMode),
+            fetchTrialOperationalSnapshot(adminClient, orgIdForMode),
+          ])
+          capacityHints = {
+            warnIncludedCapacity: cap.warnIncludedCapacity,
+            abbreviatedPreview: cap.abbreviatedPreview,
+            tokensTodayApprox: cap.tokensTodayApprox,
+          }
+          industryKey = ind
+          snapshot = snap
+        }
+
         const mock = await buildMockStructuredOutput<T>({
           task: def.id,
           input: options.input,
           schema: options.schema,
           acceptResult: options.acceptResult,
+          context: {
+            organizationId: orgIdForMode,
+            industryKey,
+            snapshot,
+            abbreviated: capacityHints.abbreviatedPreview,
+          },
         })
         const durationMs = Date.now() - started
         const trialAiPreview = def.id === "aiden_safe_action_prepare"
@@ -355,7 +516,55 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
           attempts: 1,
           durationMs,
           trialAiPreview,
+          trialPreviewCapacityWarn: capacityHints.warnIncludedCapacity,
+          trialPreviewAbbreviated: capacityHints.abbreviatedPreview,
         }
+
+        if (!options.skipCache && !messagesHaveNonTextParts(messages)) {
+          const msgsForHash = augmentForStructuredJson(def, messages)
+          const inputHash = computeInputHash({
+            taskId: def.id,
+            messagesCanonical: canonicalizeMessagesForCache(msgsForHash),
+            schemaVersion:
+              options.cacheSchemaVersion ??
+              (usagePromptMeta?.schemaVersion as string | undefined) ??
+              "default",
+            prompt: usagePromptMeta
+              ? {
+                  promptId: usagePromptMeta.promptId as string,
+                  promptVersion: usagePromptMeta.promptVersion as number,
+                  schemaVersion: usagePromptMeta.schemaVersion as string,
+                }
+              : undefined,
+            extras: options.cacheKeyExtras,
+          })
+          const storageKey = computeStorageKey(orgIdForMode, def.id, inputHash, MOCK_TRIAL_CACHE_MODEL_SIGNATURE)
+
+          let responseJson: unknown | null = null
+          let responseText: string | null = null
+          if (options.schema) {
+            try {
+              responseJson = JSON.parse(mock.rawText) as unknown
+            } catch {
+              responseJson = mock.output as unknown
+            }
+          } else {
+            responseText = typeof mock.output === "string" ? mock.output : mock.rawText
+          }
+
+          await writeAiCache({
+            organizationId: orgIdForMode,
+            storageKey,
+            task: def.id,
+            inputHash,
+            modelSignature: MOCK_TRIAL_CACHE_MODEL_SIGNATURE,
+            responseJson,
+            responseText,
+            confidenceScore: null,
+            ttlSeconds: mockTrialCacheTtlSeconds(),
+          })
+        }
+
         if (!options.skipUsageLog) {
           const usageMeta = buildAiUsageOperationalMetadata({
             task: def.id,
@@ -370,6 +579,9 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
             extras: {
               execution_mode: "mock_trial",
               real_cost_usd: 0,
+              trial_preview_capacity_warn: capacityHints.warnIncludedCapacity,
+              trial_preview_abbreviated: capacityHints.abbreviatedPreview,
+              trial_preview_tokens_today_approx: capacityHints.tokensTodayApprox,
             },
           })
           await recordAiUsageLog({

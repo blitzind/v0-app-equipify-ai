@@ -12,6 +12,11 @@ export type ResolveAiExecutionModeParams = {
   actingUserEmail?: string | null
   /** When true with a platform-admin email, forces live providers (internal testing). */
   forceLiveAi?: boolean
+  /**
+   * Platform-admin-only: force simulated previews even when subscription would normally use live AI.
+   * Mutually exclusive with forceLiveAi — force-live wins.
+   */
+  forceMockAi?: boolean
 }
 
 function parseUuidAllowlist(raw: string | undefined): Set<string> {
@@ -54,10 +59,11 @@ export async function resolveAiExecutionMode(
     return { mode: "mock_trial", subscription: sub }
   }
 
+  const actingEmail = params.actingUserEmail?.trim() ?? ""
+  const isPlatformAdmin = Boolean(actingEmail && isPlatformAdminEmail(actingEmail))
+
   const forceLive =
-    Boolean(params.forceLiveAi) &&
-    Boolean(params.actingUserEmail?.trim()) &&
-    isPlatformAdminEmail(params.actingUserEmail!.trim())
+    Boolean(params.forceLiveAi) && isPlatformAdmin
 
   if (forceLive) {
     const sub = await loadSubscription(params.organizationId)
@@ -68,6 +74,18 @@ export async function resolveAiExecutionMode(
   if (forceLiveOrgIds.has(params.organizationId.trim())) {
     const sub = await loadSubscription(params.organizationId)
     return { mode: "internal_test", subscription: sub }
+  }
+
+  const forceMockOrgIds = parseUuidAllowlist(process.env.AI_INTERNAL_MOCK_ORG_IDS)
+  if (forceMockOrgIds.has(params.organizationId.trim())) {
+    const sub = await loadSubscription(params.organizationId)
+    return { mode: "mock_trial", subscription: sub }
+  }
+
+  const forceMockByAdmin = Boolean(params.forceMockAi) && isPlatformAdmin
+  if (forceMockByAdmin) {
+    const sub = await loadSubscription(params.organizationId)
+    return { mode: "mock_trial", subscription: sub }
   }
 
   const subscription = await loadSubscription(params.organizationId)

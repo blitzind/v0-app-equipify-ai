@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 191,
-  sqlMigrations: 132,
+  apiRouteHandlers: 192,
+  sqlMigrations: 133,
   dashboardPages: 58,
   componentsTsx: 213,
-  libTsFiles: 377,
+  libTsFiles: 383,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **191** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **132** |
+| API route handlers (\`app/api/**/route.ts\`) | **192** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **133** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **58** |
 | \`components/**/*.tsx\` | **213** |
-| \`lib/**/*.ts\` | **377** |
+| \`lib/**/*.ts\` | **383** |
 
 ### Vercel crons
 
@@ -189,6 +189,7 @@ platform/accounts/[organizationId]/route.ts
 platform/accounts/route.ts
 platform/ai-alerts/[alertId]/route.ts
 platform/ai-operations/route.ts
+platform/ai-profitability/route.ts
 platform/analytics/route.ts
 platform/analytics/snapshot/route.ts
 platform/feature-requests/route.ts
