@@ -1,5 +1,6 @@
 import type { OrgPermissions } from "@/lib/permissions/model"
 import type { FollowUpTaskRow } from "@/lib/follow-up-automation/types"
+import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
 import { isMaintenanceReminderRuleKey } from "@/lib/follow-up-automation/maintenance-rules"
 
 export function filterFollowUpTasksForViewer(
@@ -8,7 +9,7 @@ export function filterFollowUpTasksForViewer(
   userId: string,
 ): FollowUpTaskRow[] {
   return rows.filter((r) => {
-    if (r.entity_type === "invoice" && !permissions.canViewFinancials) return false
+    if (r.entity_type === "invoice" && !canAccessInvoiceFollowUpTasks(permissions)) return false
 
     if (permissions.canViewAssignedWorkOrdersOnly) {
       const meta = r.metadata ?? {}

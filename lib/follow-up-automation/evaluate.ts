@@ -2,6 +2,12 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { mergeFollowUpAutomationConfig } from "@/lib/follow-up-automation/merge-config"
+import {
+  isInvoiceFollowUpEligibleStatus,
+  pickInvoiceFollowUpRuleKey,
+  priorityForInvoiceFollowUpRule,
+  signedDaysRelativeToDueDate,
+} from "@/lib/follow-up-automation/invoice-rules"
 import type { FollowUpEntityType, FollowUpRuleKey } from "@/lib/follow-up-automation/types"
 
 function todayUtcIsoDate(): string {
@@ -244,15 +250,15 @@ export async function evaluateFollowUpAutomationForOrganization(
     }
   }
 
-  /** Invoices */
+  /** Invoices — amounts never stored in queue metadata (drafts stay review-only). */
   if (cfg.categories.invoices.enabled) {
-    const th = cfg.thresholds
     const today = todayUtcIsoDate()
+    const th = cfg.thresholds
     const soonUntil = addDaysUtcIsoDate(th.invoiceDueSoonDays)
 
     const { data: invoices } = await admin
       .from("org_invoices")
-      .select("id, customer_id, title, status, due_date, amount_cents, is_sample")
+      .select("id, customer_id, title, status, due_date, invoice_number, issued_at, sent_at, is_sample")
       .eq("organization_id", organizationId)
       .eq("is_sample", false)
       .is("archived_at", null)
@@ -264,41 +270,89 @@ export async function evaluateFollowUpAutomationForOrganization(
         title: string
         status: string
         due_date: string | null
-        amount_cents: number
+        invoice_number: string | null
+        issued_at: string | null
+        sent_at: string | null
       }
       if (!row.due_date) continue
-      if (row.status === "paid" || row.status === "void" || row.status === "draft") continue
 
-      if (row.due_date < today && row.status !== "paid") {
+      const signed = signedDaysRelativeToDueDate(today, row.due_date)
+      const metaBase: Record<string, unknown> = {
+        invoice_title: row.title,
+        invoice_number: row.invoice_number,
+        due_date: row.due_date,
+        customer_id: row.customer_id,
+        issued_at: row.issued_at,
+        sent_at: row.sent_at,
+        days_overdue: signed > 0 ? signed : null,
+        days_until_due: signed < 0 ? -signed : signed === 0 ? 0 : null,
+      }
+
+      if (cfg.invoiceFollowUps.enabled) {
+        if (!isInvoiceFollowUpEligibleStatus(row.status)) continue
+        const invCfg = cfg.invoiceFollowUps
+        const ruleKey = pickInvoiceFollowUpRuleKey({
+          todayYmd: today,
+          dueYmd: row.due_date,
+          dueSoonDays: invCfg.dueSoonDays,
+          finalNoticeDays: invCfg.finalNoticeDays,
+        })
+        if (!ruleKey) continue
+
+        const summary =
+          ruleKey === "invoice_due_soon"
+            ? `Invoice due soon (${row.due_date}) — ${row.title}`
+            : signed > 0
+              ? `Invoice ${signed}d past due — ${row.title}`
+              : `Invoice follow-up — ${row.title}`
+
         candidates.push({
           entity_type: "invoice",
           entity_id: row.id,
-          rule_key: "invoice_overdue",
-          priority: "high",
-          assigned_to_user_id: null,
-          scheduled_for: null,
+          rule_key: ruleKey,
+          priority: priorityForInvoiceFollowUpRule(ruleKey),
+          assigned_to_user_id: invCfg.defaultAssigneeUserId,
+          scheduled_for:
+            ruleKey === "invoice_due_soon" && row.due_date ? `${row.due_date}T12:00:00.000Z` : null,
           metadata: {
-            summary: `Overdue invoice — ${row.title}`,
-            invoice_title: row.title,
-            due_date: row.due_date,
-            amount_cents: row.amount_cents,
+            ...metaBase,
+            summary,
           },
         })
-      } else if (row.due_date >= today && row.due_date <= soonUntil && (row.status === "sent" || row.status === "unpaid")) {
-        candidates.push({
-          entity_type: "invoice",
-          entity_id: row.id,
-          rule_key: "invoice_due_soon",
-          priority: "normal",
-          assigned_to_user_id: null,
-          scheduled_for: `${row.due_date}T12:00:00.000Z`,
-          metadata: {
-            summary: `Invoice due soon (${row.due_date}) — ${row.title}`,
-            invoice_title: row.title,
-            due_date: row.due_date,
-            amount_cents: row.amount_cents,
-          },
-        })
+      } else {
+        if (row.status === "paid" || row.status === "void" || row.status === "draft") continue
+
+        if (row.due_date < today && row.status !== "paid") {
+          candidates.push({
+            entity_type: "invoice",
+            entity_id: row.id,
+            rule_key: "invoice_overdue",
+            priority: "high",
+            assigned_to_user_id: null,
+            scheduled_for: null,
+            metadata: {
+              ...metaBase,
+              summary: `Overdue invoice — ${row.title}`,
+            },
+          })
+        } else if (
+          row.due_date >= today &&
+          row.due_date <= soonUntil &&
+          (row.status === "sent" || row.status === "unpaid")
+        ) {
+          candidates.push({
+            entity_type: "invoice",
+            entity_id: row.id,
+            rule_key: "invoice_due_soon",
+            priority: "normal",
+            assigned_to_user_id: null,
+            scheduled_for: `${row.due_date}T12:00:00.000Z`,
+            metadata: {
+              ...metaBase,
+              summary: `Invoice due soon (${row.due_date}) — ${row.title}`,
+            },
+          })
+        }
       }
     }
   }

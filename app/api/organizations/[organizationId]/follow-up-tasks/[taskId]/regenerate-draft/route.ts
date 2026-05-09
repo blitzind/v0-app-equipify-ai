@@ -6,6 +6,7 @@ import { generateFollowUpAutomationDraft } from "@/lib/follow-up-automation/gene
 import { resolveDraftCategorySettings } from "@/lib/follow-up-automation/draft-category"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
 
 export const runtime = "nodejs"
 
@@ -42,6 +43,9 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
 
   if (tErr) return jsonError(tErr.message, 500)
   if (!task) return jsonError("Task not found.", 404)
+  if (task.entity_type === "invoice" && !canAccessInvoiceFollowUpTasks(gate.permissions)) {
+    return jsonError("Billing or financial access is required to regenerate invoice drafts.", 403)
+  }
   if (task.status === "dismissed" || task.status === "sent") return jsonError("Task is closed.", 400)
 
   const { data: settingsRow } = await gate.supabase

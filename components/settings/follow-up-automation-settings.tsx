@@ -417,6 +417,158 @@ export function FollowUpAutomationSettingsSection() {
           </div>
         </div>
 
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Invoice follow-up</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Due-soon and overdue milestones queue review-only drafts (no automatic sending). Thresholds apply when
+                Invoices automation is enabled.
+              </p>
+            </div>
+            <Switch
+              checked={cfg.invoiceFollowUps.enabled}
+              onCheckedChange={(v) =>
+                setCfg({ ...cfg, invoiceFollowUps: { ...cfg.invoiceFollowUps, enabled: v } })
+              }
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 opacity-100">
+            <Label className="text-xs text-muted-foreground">AI drafts for invoice messages</Label>
+            <Switch
+              checked={cfg.invoiceFollowUps.aiDraftsEnabled}
+              disabled={!cfg.invoiceFollowUps.enabled}
+              onCheckedChange={(v) =>
+                setCfg({
+                  ...cfg,
+                  invoiceFollowUps: { ...cfg.invoiceFollowUps, aiDraftsEnabled: v },
+                })
+              }
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Due soon window (days before due)</Label>
+              <NumInput
+                id="inv1"
+                min={1}
+                max={90}
+                value={cfg.invoiceFollowUps.dueSoonDays}
+                disabled={!cfg.invoiceFollowUps.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    invoiceFollowUps: { ...cfg.invoiceFollowUps, dueSoonDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Final notice milestone (days past due)</Label>
+              <NumInput
+                id="inv2"
+                min={7}
+                max={365}
+                value={cfg.invoiceFollowUps.finalNoticeDays}
+                disabled={!cfg.invoiceFollowUps.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    invoiceFollowUps: { ...cfg.invoiceFollowUps, finalNoticeDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Overdue cadence (days, reserved)</Label>
+              <NumInput
+                id="inv3"
+                min={0}
+                max={90}
+                value={cfg.invoiceFollowUps.overdueCadenceDays}
+                disabled={!cfg.invoiceFollowUps.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    invoiceFollowUps: { ...cfg.invoiceFollowUps, overdueCadenceDays: n },
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Draft channels</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Email</span>
+                <Switch
+                  checked={cfg.invoiceFollowUps.draftChannels.includes("email")}
+                  disabled={!cfg.invoiceFollowUps.enabled}
+                  onCheckedChange={(on) => {
+                    const next = new Set(cfg.invoiceFollowUps.draftChannels)
+                    if (on) next.add("email")
+                    else next.delete("email")
+                    let channels = Array.from(next) as ("email" | "sms")[]
+                    if (channels.length === 0) channels = ["email"]
+                    setCfg({
+                      ...cfg,
+                      invoiceFollowUps: { ...cfg.invoiceFollowUps, draftChannels: channels },
+                    })
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">SMS</span>
+                <Switch
+                  checked={cfg.invoiceFollowUps.draftChannels.includes("sms")}
+                  disabled={!cfg.invoiceFollowUps.enabled}
+                  onCheckedChange={(on) => {
+                    const next = new Set(cfg.invoiceFollowUps.draftChannels)
+                    if (on) next.add("sms")
+                    else next.delete("sms")
+                    let channels = Array.from(next) as ("email" | "sms")[]
+                    if (channels.length === 0) channels = ["email"]
+                    setCfg({
+                      ...cfg,
+                      invoiceFollowUps: { ...cfg.invoiceFollowUps, draftChannels: channels },
+                    })
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 max-w-md">
+            <Label className="text-xs text-muted-foreground">Default assignee (optional)</Label>
+            <Select
+              disabled={!cfg.invoiceFollowUps.enabled}
+              value={cfg.invoiceFollowUps.defaultAssigneeUserId ?? "_none"}
+              onValueChange={(v) =>
+                setCfg({
+                  ...cfg,
+                  invoiceFollowUps: {
+                    ...cfg.invoiceFollowUps,
+                    defaultAssigneeUserId: v === "_none" ? null : v,
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">None</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div>
           <p className="text-sm font-medium text-foreground mb-3">Thresholds</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

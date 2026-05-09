@@ -3,6 +3,15 @@ import type { FollowUpAutomationConfig } from "@/lib/follow-up-automation/types"
 /** Conservative defaults — no autonomous sending; categories enabled but safe thresholds. */
 export const DEFAULT_FOLLOW_UP_AUTOMATION_CONFIG: FollowUpAutomationConfig = {
   version: 1,
+  invoiceFollowUps: {
+    enabled: true,
+    dueSoonDays: 5,
+    finalNoticeDays: 45,
+    overdueCadenceDays: 0,
+    defaultAssigneeUserId: null,
+    draftChannels: ["email"],
+    aiDraftsEnabled: true,
+  },
   maintenanceReminders: {
     enabled: true,
     dueSoonDays: 14,

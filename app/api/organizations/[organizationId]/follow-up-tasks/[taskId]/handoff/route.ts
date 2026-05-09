@@ -5,6 +5,7 @@ import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import type { FollowUpEntityType } from "@/lib/follow-up-automation/types"
 import type { RelatedEntityType } from "@/lib/notifications/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
 
 export const runtime = "nodejs"
 
@@ -50,6 +51,9 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
 
   if (tErr) return jsonError(tErr.message, 500)
   if (!task) return jsonError("Task not found.", 404)
+  if (task.entity_type === "invoice" && !canAccessInvoiceFollowUpTasks(gate.permissions)) {
+    return jsonError("Billing or financial access is required to hand off invoice follow-ups.", 403)
+  }
   if (task.status !== "approved") return jsonError("Approve and review the automation draft before handing off.", 400)
 
   const draft = task.draft_payload as { subject?: string; body?: string; channel?: string } | null

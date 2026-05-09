@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { filterFollowUpTasksForViewer } from "@/lib/follow-up-automation/filter-view"
+import { isInvoiceFollowUpRuleKey } from "@/lib/follow-up-automation/invoice-rules"
 import { isMaintenanceReminderRuleKey } from "@/lib/follow-up-automation/maintenance-rules"
 import type { FollowUpTaskRow } from "@/lib/follow-up-automation/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
@@ -48,6 +49,7 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
 
   let overdueReminders = 0
   let invoicePending = 0
+  let invoiceRemindersOverdue = 0
   let proposalFollowUps = 0
   let maintenanceRemindersPending = 0
   let maintenanceRemindersOverdue = 0
@@ -55,7 +57,11 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
 
   for (const r of filtered) {
     if (r.scheduled_for && Date.parse(r.scheduled_for) < now) overdueReminders++
-    if (r.entity_type === "invoice") invoicePending++
+    if (r.entity_type === "invoice") {
+      invoicePending++
+      const rk = typeof r.rule_key === "string" ? r.rule_key : ""
+      if (rk !== "invoice_due_soon" && isInvoiceFollowUpRuleKey(rk)) invoiceRemindersOverdue++
+    }
     if (r.rule_key === "prospect_proposal_no_response") proposalFollowUps++
 
     if (isMaintenanceFollowUpRow(r)) {
@@ -77,6 +83,7 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
     pendingTotal: filtered.length,
     overdueReminders,
     invoiceRemindersPending: invoicePending,
+    invoiceRemindersOverdue,
     proposalFollowUpsPending: proposalFollowUps,
     maintenanceRemindersPending,
     maintenanceRemindersOverdue,

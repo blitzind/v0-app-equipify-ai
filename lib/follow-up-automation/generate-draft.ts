@@ -28,6 +28,18 @@ Rules:
 
 /** Review-only drafts — intents steer tone without inventing dates or dollar amounts. */
 const RULE_INTENT: Partial<Record<string, string>> = {
+  invoice_due_soon:
+    "Friendly reminder that an invoice due date is approaching — professional, helpful tone; no payment links or dollar amounts unless supplied in context.",
+  invoice_overdue:
+    "Polite first reminder that an invoice appears unpaid past its due date — operational tone; no legal threats, collections language, or invented balances.",
+  invoice_overdue_7_days:
+    "Second courteous follow-up on an overdue invoice — emphasize coordination and resolving billing questions; stay neutral and customer-friendly.",
+  invoice_overdue_14_days:
+    "Further follow-up on an overdue invoice — remain professional; invite the customer to reach out if something looks wrong on their side.",
+  invoice_overdue_30_days:
+    "Stronger but still respectful overdue invoice follow-up — focus on closing the loop administratively; avoid intimidation or legal consequences.",
+  invoice_final_notice_candidate:
+    "Escalated administrative follow-up before internal escalation — clearly NOT a legal demand or collections notice unless configured elsewhere; no invented totals or due dates.",
   maintenance_plan_due_soon:
     "Customer-facing preventive maintenance reminder — offer to schedule or confirm the upcoming plan visit.",
   maintenance_plan_overdue:

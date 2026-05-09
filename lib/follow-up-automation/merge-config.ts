@@ -26,6 +26,10 @@ export function mergeFollowUpAutomationConfig(stored: unknown): FollowUpAutomati
       ...d.maintenanceReminders,
       ...(s.maintenanceReminders ?? {}),
     },
+    invoiceFollowUps: {
+      ...d.invoiceFollowUps,
+      ...(s.invoiceFollowUps ?? {}),
+    },
   }
   const parsed = followUpAutomationConfigSchema.safeParse(merged)
   return parsed.success ? parsed.data : followUpAutomationConfigSchema.parse(d)

@@ -1,4 +1,5 @@
 import type { FollowUpAutomationConfig } from "@/lib/follow-up-automation/types"
+import { isInvoiceFollowUpRuleKey } from "@/lib/follow-up-automation/invoice-rules"
 import { isMaintenanceReminderRuleKey } from "@/lib/follow-up-automation/maintenance-rules"
 
 export type DraftCategorySettings = {
@@ -19,6 +20,13 @@ export function resolveDraftCategorySettings(
     return {
       aiDraftsEnabled: mr.aiDraftsEnabled,
       channels: mr.draftChannels,
+    }
+  }
+  if (args.entityType === "invoice" && cfg.invoiceFollowUps.enabled && isInvoiceFollowUpRuleKey(args.ruleKey)) {
+    const inv = cfg.invoiceFollowUps
+    return {
+      aiDraftsEnabled: inv.aiDraftsEnabled,
+      channels: inv.draftChannels,
     }
   }
   switch (args.entityType) {

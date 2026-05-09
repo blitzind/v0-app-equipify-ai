@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
+import { canAccessInvoiceFollowUpTasks } from "@/lib/follow-up-automation/invoice-access"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
@@ -17,6 +18,19 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
 
   const gate = await requireOrgPermission(organizationId, "canManageCommunications")
   if ("error" in gate) return gate.error
+
+  const { data: task, error: tErr } = await gate.supabase
+    .from("follow_up_tasks")
+    .select("entity_type")
+    .eq("organization_id", organizationId)
+    .eq("id", taskId)
+    .maybeSingle()
+
+  if (tErr) return jsonError(tErr.message, 500)
+  if (!task) return jsonError("Task not found.", 404)
+  if (task.entity_type === "invoice" && !canAccessInvoiceFollowUpTasks(gate.permissions)) {
+    return jsonError("Billing or financial access is required to dismiss invoice follow-ups.", 403)
+  }
 
   const now = new Date().toISOString()
   const { error } = await gate.supabase
