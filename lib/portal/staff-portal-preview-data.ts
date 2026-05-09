@@ -1,4 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { modeLabel } from "@/lib/portal/certificate-release-staff"
+import type { CertificateReleaseMode } from "@/lib/portal/certificate-release"
+import { resolveEffectiveCertificateReleaseMode } from "@/lib/portal/certificate-release"
 import { buildPortalDocuments } from "@/lib/portal/portal-documents"
 import { resolvePortalDocumentScope } from "@/lib/portal/portal-document-scope"
 import { fetchPortalDashboardBundle, type PortalDashboardBundle } from "@/lib/portal/portal-dashboard-bundle"
@@ -7,6 +10,14 @@ import type { ServiceRequestStatus } from "@/lib/service-requests/types"
 
 export type StaffPortalPreviewCustomerSource = "sample" | "active"
 
+/** Mirrors org + customer portal defaults that affect documents / certificates (live portal uses the same rows). */
+export type StaffPortalPreviewWorkspaceContext = {
+  effectiveCertificateReleaseMode: CertificateReleaseMode
+  effectiveCertificateReleaseLabel: string
+  documentRollupEnabled: boolean
+  documentSchemaMigrationPending: boolean
+}
+
 export type StaffPortalPreviewSnapshot = {
   /** True when scoped to a real org customer (sample preferred, else first active). */
   hasPreviewCustomer: boolean
@@ -14,7 +25,11 @@ export type StaffPortalPreviewSnapshot = {
     id: string
     companyName: string
     source: StaffPortalPreviewCustomerSource
+    /** Row status — preview may fall back to inactive when no active customers exist. */
+    recordStatus: "active" | "inactive"
   } | null
+  /** Present when `hasPreviewCustomer`; aligns certificate + document scope with the customer portal. */
+  workspacePortalContext: StaffPortalPreviewWorkspaceContext | null
   dashboard: PortalDashboardBundle | null
   /** Portal document library: items the customer could see (release rules applied). */
   documentsAvailable: number
@@ -45,45 +60,42 @@ export type StaffPortalPreviewSnapshot = {
 async function pickPreviewCustomer(
   svc: SupabaseClient,
   organizationId: string,
-): Promise<{ id: string; companyName: string; source: StaffPortalPreviewCustomerSource } | null> {
-  const { data: sample } = await svc
+): Promise<{
+  id: string
+  companyName: string
+  source: StaffPortalPreviewCustomerSource
+  recordStatus: "active" | "inactive"
+} | null> {
+  const { data: rows, error } = await svc
     .from("customers")
-    .select("id, company_name")
+    .select("id, company_name, is_sample, status")
     .eq("organization_id", organizationId)
-    .eq("status", "active")
     .eq("is_archived", false)
-    .eq("is_sample", true)
+    .is("archived_at", null)
+    .order("is_sample", { ascending: false })
+    .order("status", { ascending: true })
     .order("joined_at", { ascending: true })
     .limit(1)
-    .maybeSingle()
 
-  if (sample?.id && sample.company_name) {
-    return {
-      id: sample.id as string,
-      companyName: String(sample.company_name).trim(),
-      source: "sample",
-    }
+  if (error || !rows?.length) return null
+
+  const row = rows[0] as {
+    id: string
+    company_name: string
+    is_sample?: boolean | null
+    status?: string | null
   }
+  const name = String(row.company_name ?? "").trim()
+  if (!row.id || !name) return null
 
-  const { data: anyCustomer } = await svc
-    .from("customers")
-    .select("id, company_name")
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .eq("is_archived", false)
-    .order("joined_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (anyCustomer?.id && anyCustomer.company_name) {
-    return {
-      id: anyCustomer.id as string,
-      companyName: String(anyCustomer.company_name).trim(),
-      source: "active",
-    }
+  const recordStatus: "active" | "inactive" = row.status === "inactive" ? "inactive" : "active"
+  const isSample = row.is_sample === true
+  return {
+    id: row.id,
+    companyName: name,
+    source: isSample ? "sample" : "active",
+    recordStatus,
   }
-
-  return null
 }
 
 /**
@@ -100,6 +112,7 @@ export async function loadStaffPortalPreviewSnapshot(
     return {
       hasPreviewCustomer: false,
       previewCustomer: null,
+      workspacePortalContext: null,
       dashboard: null,
       documentsAvailable: 0,
       documentsListed: 0,
@@ -119,6 +132,8 @@ export async function loadStaffPortalPreviewSnapshot(
     recentSrRes,
     equipSpotRes,
     docScope,
+    orgCertRes,
+    custCertRes,
   ] = await Promise.all([
     fetchPortalDashboardBundle(svc, organizationId, custId),
     svc
@@ -145,7 +160,31 @@ export async function loadStaffPortalPreviewSnapshot(
       .limit(1)
       .maybeSingle(),
     resolvePortalDocumentScope(svc, { organizationId, rootCustomerId: custId }),
+    svc.from("organizations").select("portal_certificate_release_mode").eq("id", organizationId).maybeSingle(),
+    svc
+      .from("customers")
+      .select("portal_certificate_release_mode")
+      .eq("organization_id", organizationId)
+      .eq("id", custId)
+      .maybeSingle(),
   ])
+
+  const orgCertMode = (orgCertRes.data as { portal_certificate_release_mode?: string | null } | null)
+    ?.portal_certificate_release_mode
+  const custCertMode = (custCertRes.data as { portal_certificate_release_mode?: string | null } | null)
+    ?.portal_certificate_release_mode
+  const effectiveCertificateReleaseMode = resolveEffectiveCertificateReleaseMode({
+    organizationMode: orgCertMode,
+    customerMode: custCertMode,
+    invoiceOverrides: [],
+  })
+
+  const workspacePortalContext: StaffPortalPreviewWorkspaceContext = {
+    effectiveCertificateReleaseMode,
+    effectiveCertificateReleaseLabel: modeLabel(effectiveCertificateReleaseMode),
+    documentRollupEnabled: docScope.rollupEnabled,
+    documentSchemaMigrationPending: docScope.schemaMigrationPending,
+  }
 
   let documentsAvailable = 0
   let documentsListed = 0
@@ -234,6 +273,7 @@ export async function loadStaffPortalPreviewSnapshot(
   return {
     hasPreviewCustomer: true,
     previewCustomer,
+    workspacePortalContext,
     dashboard,
     documentsAvailable,
     documentsListed,

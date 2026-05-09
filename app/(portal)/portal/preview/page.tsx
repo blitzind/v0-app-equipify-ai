@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { StaffPortalPreview } from "@/components/portal/staff-portal-preview"
@@ -40,7 +41,9 @@ export default async function PortalStaffPreviewPage({
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("name, logo_url, document_logo_url, status")
+    .select(
+      "name, logo_url, document_logo_url, status, portal_certificate_release_mode, portal_consolidated_documents_default",
+    )
     .eq("id", organizationId)
     .maybeSingle()
 
@@ -54,7 +57,30 @@ export default async function PortalStaffPreviewPage({
     (org as { logo_url?: string | null }).logo_url,
   )
 
-  const snapshot = await loadStaffPortalPreviewSnapshot(supabase, organizationId)
+  /**
+   * Preview reads org-scoped operational rows (customers, equipment, documents, etc.).
+   * Staff JWT + RLS can hide customers for users who also hold the `tech` role
+   * (`can_read_customer_for_role` requires WO linkage). After we verified
+   * owner/admin/manager access, use the service role only for read queries that
+   * are always filtered by `organizationId` — no portal session cookies, no cross-org reads.
+   */
+  const previewDb = createServiceRoleSupabaseClient()
+  const snapshot = await loadStaffPortalPreviewSnapshot(previewDb, organizationId)
 
-  return <StaffPortalPreview organizationName={name} logoUrl={logoUrl} snapshot={snapshot} />
+  const orgRow = org as {
+    portal_certificate_release_mode?: string | null
+    portal_consolidated_documents_default?: boolean | null
+  }
+
+  return (
+    <StaffPortalPreview
+      organizationName={name}
+      logoUrl={logoUrl}
+      snapshot={snapshot}
+      organizationPortalDefaults={{
+        portalCertificateReleaseMode: orgRow.portal_certificate_release_mode ?? null,
+        portalConsolidatedDocumentsDefault: orgRow.portal_consolidated_documents_default === true,
+      }}
+    />
+  )
 }

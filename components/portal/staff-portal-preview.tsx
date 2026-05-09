@@ -21,6 +21,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
+import { modeLabel } from "@/lib/portal/certificate-release-staff"
+import { normalizeReleaseMode } from "@/lib/portal/certificate-release"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
 import { cn } from "@/lib/utils"
 
@@ -166,10 +168,15 @@ export function StaffPortalPreview({
   organizationName,
   logoUrl,
   snapshot,
+  organizationPortalDefaults,
 }: {
   organizationName: string
   logoUrl: string | null
   snapshot: StaffPortalPreviewSnapshot
+  organizationPortalDefaults: {
+    portalCertificateReleaseMode: string | null
+    portalConsolidatedDocumentsDefault: boolean
+  }
 }) {
   const d = snapshot.dashboard
   const hasLive = snapshot.hasPreviewCustomer && d && !snapshot.showLayoutFallback
@@ -178,12 +185,12 @@ export function StaffPortalPreview({
     : snapshot.previewCustomer?.source === "sample" ? "Sample"
     : "Live"
   const customerLabel = snapshot.previewCustomer?.companyName ?? "Customer account"
+  const previewCust = snapshot.previewCustomer
   const sourceBadge =
-    snapshot.previewCustomer?.source === "sample" ?
-      "Sample customer"
-      : snapshot.previewCustomer?.source === "active" ?
-        "Active customer"
-      : null
+    previewCust?.source === "sample" ? "Sample customer"
+    : previewCust?.source === "active" && previewCust.recordStatus === "inactive" ? "Inactive customer"
+    : previewCust?.source === "active" ? "Active customer"
+    : null
 
   const stats = d?.stats
   const equipTotal = stats?.equipmentTotal ?? 0
@@ -263,18 +270,18 @@ export function StaffPortalPreview({
               <p className="truncate text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
                 {customerLabel}
               </p>
-              {sourceBadge ? (
+              {snapshot.hasPreviewCustomer && sourceBadge ?
                 <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
                   {sourceBadge}
-                  {snapshot.previewCustomer?.source === "active" ?
+                  {previewCust?.source === "active" ?
                     " — read-only staff view; customers still use invite sign-in."
                   : null}
                 </p>
-              ) : (
+              : !snapshot.hasPreviewCustomer ?
                 <p className="text-[11px]" style={{ color: "var(--portal-nav-text)" }}>
-                  No active customer in this workspace yet.
+                  No customers in this workspace yet.
                 </p>
-              )}
+              : null}
             </div>
             <div className="flex items-center gap-2 opacity-80">
               <button
@@ -334,15 +341,48 @@ export function StaffPortalPreview({
                 </>
               : snapshot.hasPreviewCustomer ?
                 <>
-                  This customer has little or no portal-visible activity yet. Summary cards show zeros; a short layout
-                  reference appears at the bottom. Seed sample data or add work to see a fuller preview.
+                  Previewing <strong>{customerLabel}</strong>
+                  {previewCust?.recordStatus === "inactive" ?
+                    " (inactive customer — no active customers were available)."
+                  : ""}
+                  . Sections below reflect current portal visibility rules; empty areas simply mean nothing is released
+                  to the portal for this account yet.
                 </>
               : <>
-                  There are no active customers in this workspace yet. Add customers or use Sample data in Settings to
-                  populate the portal experience.
+                  This workspace does not have any non-archived customers yet. Add a customer or seed sample data, then
+                  open preview again.
                 </>
               }
             </p>
+            {snapshot.workspacePortalContext ?
+              <ul className="mt-2 list-inside list-disc space-y-0.5 text-[12px]" style={{ color: "var(--portal-nav-text)" }}>
+                <li>
+                  <span className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    Certificates (effective for this customer):
+                  </span>{" "}
+                  {snapshot.workspacePortalContext.effectiveCertificateReleaseLabel}
+                  <span className="text-[11px] opacity-90">
+                    {" "}
+                    (org default:{" "}
+                    {modeLabel(normalizeReleaseMode(organizationPortalDefaults.portalCertificateReleaseMode))})
+                  </span>
+                </li>
+                <li>
+                  <span className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    Document library scope:
+                  </span>{" "}
+                  {snapshot.workspacePortalContext.documentSchemaMigrationPending ?
+                    "Schema update pending — preview uses single-customer scope."
+                  : snapshot.workspacePortalContext.documentRollupEnabled ?
+                    "Consolidated — parent account + linked sub-accounts (when configured)."
+                  : "This customer only."}{" "}
+                  <span className="text-[11px] opacity-90">
+                    (org default for new customers:{" "}
+                    {organizationPortalDefaults.portalConsolidatedDocumentsDefault ? "rollup on" : "rollup off"})
+                  </span>
+                </li>
+              </ul>
+            : null}
           </div>
         </div>
 
