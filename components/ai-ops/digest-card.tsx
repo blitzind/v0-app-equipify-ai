@@ -15,7 +15,7 @@ import Link from "next/link"
 import { ArrowRight, Bot, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
@@ -81,31 +81,38 @@ export function AiOpsDigestCard() {
 
   return (
     <Card className="border-violet-500/20 bg-gradient-to-b from-violet-500/[0.04] to-card">
-      <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="h-7 w-7 rounded-lg border border-violet-500/30 bg-violet-500/[0.10] flex items-center justify-center shrink-0">
-            <Sparkles className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <CardTitle className="text-sm flex items-center gap-2">
-              Today&apos;s focus
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide gap-1">
-                <Bot className="h-3 w-3" aria-hidden /> AI Ops
-              </Badge>
-            </CardTitle>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {stats?.total ? `${stats.total} active recommendations` : "Top 3 urgent next actions"}
-              {stats?.high ? ` · ${stats.high} high-priority` : ""}
-            </p>
+      <div className="px-6 pb-2 pt-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/[0.10]">
+              <Sparkles className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
+                Today&apos;s focus
+                <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-wide">
+                  <Bot className="h-3 w-3" aria-hidden /> AI Ops
+                </Badge>
+              </CardTitle>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {stats?.total ? `${stats.total} active recommendations` : "Top 3 urgent next actions"}
+                {stats?.high ? ` · ${stats.high} high-priority` : ""}
+              </p>
+            </div>
           </div>
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="h-7 w-fit shrink-0 gap-1 self-start text-xs"
+          >
+            <Link href="/ai-ops">
+              View all
+              <ArrowRight className="h-3 w-3" aria-hidden />
+            </Link>
+          </Button>
         </div>
-        <Button asChild variant="ghost" size="sm" className="h-7 gap-1 shrink-0 text-xs">
-          <Link href="/ai-ops">
-            View all
-            <ArrowRight className="h-3 w-3" aria-hidden />
-          </Link>
-        </Button>
-      </CardHeader>
+      </div>
       <CardContent className="pt-1 pb-3 space-y-1.5">
         {loading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground py-3 justify-center">
