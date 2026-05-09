@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { affectedRecordIdsForProposal } from "@/lib/aiden/safe-actions/affected-ids"
 import { buildSafeActionPreparePrompt } from "@/lib/aiden/safe-actions/prepare-prompt"
+import { validatePreparedProposalForPrepare } from "@/lib/aiden/safe-actions/resource-checks"
 import { resolveSafeActionsRequest } from "@/lib/aiden/safe-actions/request-context"
 import { SafeActionPrepareAnswerSchema } from "@/lib/aiden/safe-actions/schema"
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
@@ -74,6 +75,20 @@ export async function POST(
   }
 
   const proposal = aiResult.output
+
+  const guard = await validatePreparedProposalForPrepare({
+    supabase: ctx.supabase,
+    organizationId,
+    userId: ctx.userId,
+    permissions: ctx.permissions,
+    proposal,
+  })
+  if (!guard.ok) {
+    const status =
+      guard.code === "forbidden" || guard.code === "out_of_scope" ? 403 : 422
+    return jsonError(guard.code, guard.message, status)
+  }
+
   const affectedIds = affectedRecordIdsForProposal(proposal)
   const expiresAt = new Date(Date.now() + PENDING_TTL_MS).toISOString()
 

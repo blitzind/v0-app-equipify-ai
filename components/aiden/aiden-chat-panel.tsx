@@ -97,6 +97,22 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
 }
 
+/** Short outcome copy for the pending-action preview (Phase 7 clarity). */
+function safeActionOutcomeHint(actionType: string): string {
+  switch (actionType) {
+    case "create_follow_up_task":
+      return "Adds one checklist item on the work order. Nothing is emailed, invoiced, or scheduled."
+    case "create_internal_note":
+      return "Appends an internal note or staff-visible timeline entry only—no email or SMS."
+    case "create_reminder":
+      return "Creates an in-app reminder for your team. Customers are not contacted automatically."
+    case "create_communication_draft":
+      return "Saves an unsent draft in Communications. Confirming does not send messages."
+    default:
+      return "Runs once if you confirm. Nothing sends automatically."
+  }
+}
+
 function InlineMarkdown({ text }: { text: string }) {
   const parts = text.split(/(`[^`]+`)/g)
   return (
@@ -757,6 +773,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   <div>
                     <p className="text-sm font-semibold text-foreground">{pendingAction.title}</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{pendingAction.explanation}</p>
+                    <p className="mt-2 text-[11px] leading-snug text-foreground/90">{safeActionOutcomeHint(pendingAction.action_type)}</p>
                   </div>
                   <pre className="max-h-28 overflow-auto rounded-lg bg-muted/60 p-2 text-[10px] leading-snug text-muted-foreground">
                     {JSON.stringify(pendingAction.proposed_payload, null, 2)}

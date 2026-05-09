@@ -5,6 +5,7 @@ import { canAccessAssignedWorkResource } from "@/lib/permissions/technician-scop
 import type { OrgPermissions } from "@/lib/permissions/model"
 import type { SafeActionPrepareAnswer } from "@/lib/aiden/safe-actions/schema"
 import { parseRemindAtIso } from "@/lib/aiden/safe-actions/schema"
+import { assertCustomerInOrg, assertWorkOrderInOrg } from "@/lib/aiden/safe-actions/resource-checks"
 
 export type ExecuteSafeActionParams = {
   supabase: SupabaseClient
@@ -33,34 +34,6 @@ export async function executeSafeAction(params: ExecuteSafeActionParams): Promis
     default:
       return { ok: false, code: "unsupported_action", message: "Unsupported action type." }
   }
-}
-
-async function assertWorkOrderInOrg(
-  supabase: SupabaseClient,
-  organizationId: string,
-  workOrderId: string,
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("work_orders")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("id", workOrderId)
-    .maybeSingle()
-  return Boolean(data)
-}
-
-async function assertCustomerInOrg(
-  supabase: SupabaseClient,
-  organizationId: string,
-  customerId: string,
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("id", customerId)
-    .maybeSingle()
-  return Boolean(data)
 }
 
 async function executeFollowUpTask(args: ExecuteSafeActionParams): Promise<ExecuteSafeActionResult> {
