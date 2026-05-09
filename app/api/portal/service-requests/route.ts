@@ -15,6 +15,7 @@ type PostBody = {
   description?: string | null
   message?: string
   equipmentId?: string | null
+  customerLocationId?: string | null
   urgency?: string | null
   preferred_service_window?: string | null
 }
@@ -106,16 +107,59 @@ export async function POST(request: Request) {
   const { svc, portalUser } = ctx
 
   let equipmentId: string | null = null
+  let equipmentCustomerLocationId: string | null = null
   if (body.equipmentId && UUID_RE.test(String(body.equipmentId))) {
     const { data: eq } = await svc
       .from("equipment")
-      .select("id")
+      .select("id, customer_location_id")
       .eq("organization_id", portalUser.organization_id)
       .eq("customer_id", portalUser.customer_id)
       .eq("id", body.equipmentId)
       .eq("is_archived", false)
       .maybeSingle()
-    if (eq) equipmentId = (eq as { id: string }).id
+    if (eq) {
+      equipmentId = (eq as { id: string }).id
+      equipmentCustomerLocationId = (eq as { customer_location_id: string | null }).customer_location_id
+    }
+  }
+
+  let customerLocationId: string | null = null
+  const locCandidate =
+    typeof body.customerLocationId === "string" && UUID_RE.test(body.customerLocationId.trim()) ?
+      body.customerLocationId.trim()
+    : null
+  if (locCandidate) {
+    const { data: loc } = await svc
+      .from("customer_locations")
+      .select("id")
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("id", locCandidate)
+      .is("archived_at", null)
+      .maybeSingle()
+    if (loc) customerLocationId = locCandidate
+  }
+  if (!customerLocationId && equipmentCustomerLocationId && UUID_RE.test(equipmentCustomerLocationId)) {
+    const { data: locOk } = await svc
+      .from("customer_locations")
+      .select("id")
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("id", equipmentCustomerLocationId)
+      .is("archived_at", null)
+      .maybeSingle()
+    if (locOk) customerLocationId = equipmentCustomerLocationId
+  }
+  if (!customerLocationId) {
+    const { data: defLoc } = await svc
+      .from("customer_locations")
+      .select("id")
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("is_default", true)
+      .is("archived_at", null)
+      .maybeSingle()
+    customerLocationId = (defLoc as { id: string } | null)?.id ?? null
   }
 
   const urgency = mapUrgency(body.urgency ?? null)
@@ -127,7 +171,7 @@ export async function POST(request: Request) {
     .insert({
       organization_id: portalUser.organization_id,
       customer_id: portalUser.customer_id,
-      customer_location_id: null,
+      customer_location_id: customerLocationId,
       equipment_id: equipmentId,
       portal_user_id: portalUser.id,
       requester_name: portalUser.display_name,

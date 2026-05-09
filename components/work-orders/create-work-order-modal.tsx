@@ -36,6 +36,7 @@ import {
   DRAWER_FIELD_CLASS,
 } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
+import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 
 interface Props {
   open: boolean
@@ -64,7 +65,10 @@ type EquipmentOption = {
   equipment_code: string | null
   serial_number: string | null
   category: string | null
+  customer_location_id: string | null
 }
+
+type CustomerLocationPick = { id: string; label: string; is_default: boolean }
 type TechnicianOption = { id: string; label: string; avatarUrl?: string | null }
 
 type PerEquipmentJob = {
@@ -113,6 +117,8 @@ export function CreateWorkOrderModal({
   const [scheduledTime, setScheduledTime] = useState("08:00")
   const [description, setDescription] = useState("")
   const [problemReported, setProblemReported] = useState("")
+  const [customerLocations, setCustomerLocations] = useState<CustomerLocationPick[]>([])
+  const [workOrderLocationId, setWorkOrderLocationId] = useState("")
 
   useEffect(() => {
     if (!open) return
@@ -246,7 +252,7 @@ export function CreateWorkOrderModal({
       const supabase = createBrowserSupabaseClient()
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
-        .select("id, name, equipment_code, serial_number, category")
+        .select("id, name, equipment_code, serial_number, category, customer_location_id")
         .eq("organization_id", orgId)
         .eq("customer_id", custId)
         .eq("status", "active")
@@ -290,6 +296,74 @@ export function CreateWorkOrderModal({
       cancelled = true
     }
   }, [open, organizationId, customerId, initialEquipmentId, refreshEquipmentForCustomer])
+
+  useEffect(() => {
+    if (!open || !organizationId || !customerId) {
+      setCustomerLocations([])
+      setWorkOrderLocationId("")
+      return
+    }
+    let cancelled = false
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data, error } = await supabase
+        .from("customer_locations")
+        .select("id, name, address_line1, address_line2, city, state, postal_code, is_default")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", customerId)
+        .is("archived_at", null)
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true })
+      if (cancelled || error) {
+        if (!cancelled && error) setCustomerLocations([])
+        return
+      }
+      const rows =
+        (data ?? []) as Array<{
+          id: string
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          is_default: boolean | null
+        }>
+      setCustomerLocations(
+        rows.map((r) => ({
+          id: r.id,
+          is_default: Boolean(r.is_default),
+          label: formatCustomerLocationSelectLabel({
+            name: r.name,
+            address_line1: r.address_line1,
+            address_line2: r.address_line2,
+            city: r.city,
+            state: r.state,
+            postal_code: r.postal_code,
+          }),
+        })),
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, customerId])
+
+  useEffect(() => {
+    if (!open || customerLocations.length === 0) {
+      setWorkOrderLocationId("")
+      return
+    }
+    const primaryId = selectedEquipmentIds[0]
+    const eq = equipmentList.find((e) => e.id === primaryId)
+    const fromEq = eq?.customer_location_id
+    if (fromEq && customerLocations.some((l) => l.id === fromEq)) {
+      setWorkOrderLocationId(fromEq)
+      return
+    }
+    const def = customerLocations.find((l) => l.is_default)?.id ?? customerLocations[0]?.id ?? ""
+    setWorkOrderLocationId(def)
+  }, [open, customerLocations, selectedEquipmentIds, equipmentList])
 
   const selectedCustomerName = customers.find((c) => c.id === customerId)?.company_name ?? ""
 
@@ -361,6 +435,7 @@ export function CreateWorkOrderModal({
         scheduled_time: normalizeTimeForDb(scheduledTime),
         notes: null,
         problem_reported: problemText,
+        customer_location_id: workOrderLocationId.trim() || null,
         ...assign,
         repair_log: {
           problemReported: problemText,
@@ -435,6 +510,8 @@ export function CreateWorkOrderModal({
     setScheduledTime("08:00")
     setDescription("")
     setProblemReported("")
+    setWorkOrderLocationId("")
+    setCustomerLocations([])
     setSubmitError(null)
     setLoadError(null)
     onClose()
@@ -541,6 +618,33 @@ export function CreateWorkOrderModal({
                 </Select>
               </div>
             </DrawerSection>
+
+            {customerId && customerLocations.length > 0 && (
+              <DrawerSection title="Service site">
+                <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                  Defaults to the primary asset&apos;s site when available; adjust if this visit is for a different
+                  address.
+                </p>
+                <Select value={workOrderLocationId} onValueChange={setWorkOrderLocationId}>
+                  <SelectTrigger
+                    id="create-wo-location"
+                    className={cn(
+                      DRAWER_FIELD_CLASS,
+                      "w-full max-w-none h-auto min-h-9 rounded-md px-3 py-2 text-sm shadow-xs justify-between text-left whitespace-normal",
+                    )}
+                  >
+                    <SelectValue placeholder="Select service location" />
+                  </SelectTrigger>
+                  <SelectContent className="max-w-[min(100vw-2rem,520px)]">
+                    {customerLocations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id} className="whitespace-normal items-start py-2">
+                        {loc.is_default ? `${loc.label} (default service site)` : loc.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </DrawerSection>
+            )}
 
             <DrawerSection
               title="Equipment & job details"

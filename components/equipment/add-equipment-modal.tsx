@@ -11,6 +11,7 @@ import { CalendarPlus, CheckCircle2, X } from "lucide-react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
+import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 
 interface AddEquipmentModalProps {
   open: boolean
@@ -101,6 +102,7 @@ const INITIAL_FORM = {
   model: "",
   serialNumber: "",
   customerId: "",
+  serviceSiteId: "",
   location: "",
   installDate: "",
   warrantyExpiration: "",
@@ -140,6 +142,7 @@ export function AddEquipmentModal({
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [postSave, setPostSave] = useState<{ customerId: string; equipmentId: string } | null>(null)
+  const [serviceSiteOptions, setServiceSiteOptions] = useState<Array<{ id: string; label: string }>>([])
 
   useEffect(() => {
     if (!open || orgStatus !== "ready" || !activeOrgId) {
@@ -163,12 +166,65 @@ export function AddEquipmentModal({
   useEffect(() => {
     if (!open) return
     setPostSave(null)
+    setServiceSiteOptions([])
     setForm({
       ...INITIAL_FORM,
       ...(prefilledCustomerId ? { customerId: prefilledCustomerId } : {}),
     })
     setErrors({})
   }, [open, prefilledCustomerId])
+
+  useEffect(() => {
+    if (!open || orgStatus !== "ready" || !activeOrgId || !form.customerId) {
+      setServiceSiteOptions([])
+      return
+    }
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data, error } = await supabase
+        .from("customer_locations")
+        .select("id, name, address_line1, address_line2, city, state, postal_code, is_default")
+        .eq("organization_id", activeOrgId)
+        .eq("customer_id", form.customerId)
+        .is("archived_at", null)
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true })
+      if (error) {
+        setServiceSiteOptions([])
+        return
+      }
+      const rows =
+        (data ?? []) as Array<{
+          id: string
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          is_default: boolean | null
+        }>
+      const opts = rows.map((r) => ({
+        id: r.id,
+        label: formatCustomerLocationSelectLabel({
+          name: r.name,
+          address_line1: r.address_line1,
+          address_line2: r.address_line2,
+          city: r.city,
+          state: r.state,
+          postal_code: r.postal_code,
+        }),
+      }))
+      setServiceSiteOptions(opts)
+      setForm((prev) => {
+        if (opts.length === 0) return { ...prev, serviceSiteId: "" }
+        const stillValid = opts.some((o) => o.id === prev.serviceSiteId)
+        if (stillValid) return prev
+        const def = rows.find((r) => r.is_default)?.id ?? opts[0]?.id ?? ""
+        return { ...prev, serviceSiteId: def }
+      })
+    })()
+  }, [open, orgStatus, activeOrgId, form.customerId])
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -263,6 +319,7 @@ export function AddEquipmentModal({
           return Number.isFinite(n) && n > 0 ? n : null
         })(),
         location_label: form.location.trim() || null,
+        customer_location_id: form.serviceSiteId.trim() || null,
         notes: form.notes.trim() || null,
       })
       .select("id")
@@ -420,9 +477,28 @@ export function AddEquipmentModal({
             </div>
 
             {/* Row 4 */}
+            {form.customerId && serviceSiteOptions.length > 0 && (
+              <Field>
+                <Label>Service site</Label>
+                <Select
+                  value={form.serviceSiteId}
+                  onChange={(e) => set("serviceSiteId", e.target.value)}
+                >
+                  <option value="">Select site…</option>
+                  {serviceSiteOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Customer address on file. Use the field below for room, floor, or department.
+                </p>
+              </Field>
+            )}
             <Field>
-              <Label>Location</Label>
-              <Input placeholder="e.g. Rooftop, Building A" value={form.location} onChange={(e) => set("location", e.target.value)} />
+              <Label>Room / area label</Label>
+              <Input placeholder="e.g. ICU, Rooftop — Building A" value={form.location} onChange={(e) => set("location", e.target.value)} />
             </Field>
 
             {/* Dates row */}

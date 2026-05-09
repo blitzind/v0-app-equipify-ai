@@ -3,6 +3,7 @@ import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { findCustomersByRequesterIdentity } from "@/lib/service-requests/customer-dedupe"
 import { logServiceRequestTimeline } from "@/lib/service-requests/log-communication"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
+import { resolveCustomerLocationIdForWorkOrder } from "@/lib/customer-locations/resolve-for-work-order"
 
 export const runtime = "nodejs"
 
@@ -222,11 +223,24 @@ export async function POST(
     tasks: [],
   }
 
+  const srLocationId = (reqRow as { customer_location_id?: string | null }).customer_location_id ?? null
+  const resolvedLocationId = await resolveCustomerLocationIdForWorkOrder(
+    gate.supabase,
+    organizationId,
+    customerId,
+    {
+      explicit: body.customer_location_id,
+      equipmentId,
+      fallbackFromRequest: srLocationId,
+    },
+  )
+
   const { data: woIns, error: woErr } = await gate.supabase
     .from("work_orders")
     .insert({
       organization_id: organizationId,
       customer_id: customerId,
+      customer_location_id: resolvedLocationId,
       equipment_id: equipmentId,
       title,
       status: "open",

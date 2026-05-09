@@ -45,6 +45,7 @@ import {
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
+import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 
 let toastCounter = 0
 
@@ -345,6 +346,7 @@ type DbEquipmentRow = {
   last_service_at: string | null
   next_due_at: string | null
   location_label: string | null
+  customer_location_id: string | null
   notes: string | null
   archived_at: string | null
 }
@@ -404,6 +406,8 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [planLinkedWOs, setPlanLinkedWOs] = useState<PlanWoRow[]>([])
   const [planWoLoading, setPlanWoLoading] = useState(false)
+  const [customerLocationOptions, setCustomerLocationOptions] = useState<Array<{ id: string; label: string }>>([])
+  const [editCustomerLocationId, setEditCustomerLocationId] = useState("")
 
   const eqPlanIdsKey = useMemo(() => drawerPlans.map((p) => p.id).sort().join(","), [drawerPlans])
 
@@ -583,7 +587,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes, archived_at"
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, location_label, customer_location_id, notes, archived_at"
         )
         .eq("id", equipmentId)
         .eq("organization_id", orgId)
@@ -597,6 +601,41 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       }
 
       const equipmentRow = row as DbEquipmentRow
+
+      const { data: locData } = await supabase
+        .from("customer_locations")
+        .select("id, name, address_line1, address_line2, city, state, postal_code, is_default")
+        .eq("organization_id", orgId)
+        .eq("customer_id", equipmentRow.customer_id)
+        .is("archived_at", null)
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true })
+
+      const locRows =
+        (locData ?? []) as Array<{
+          id: string
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          is_default: boolean | null
+        }>
+      setCustomerLocationOptions(
+        locRows.map((r) => ({
+          id: r.id,
+          label: formatCustomerLocationSelectLabel({
+            name: r.name,
+            address_line1: r.address_line1,
+            address_line2: r.address_line2,
+            city: r.city,
+            state: r.state,
+            postal_code: r.postal_code,
+          }),
+        })),
+      )
+
       let customerName =
         (customerRows as DrawerCustomer[] | null)?.find((c) => c.id === equipmentRow.customer_id)?.company_name ?? null
       if (!customerName) {
@@ -628,6 +667,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
         status: mapDbStatusToUiStatus(equipmentRow.status),
         notes: equipmentRow.notes ?? "",
         location: equipmentRow.location_label ?? "",
+        serviceSiteId: equipmentRow.customer_location_id ?? null,
         photos: [],
         manuals: [],
         serviceHistory: [],
@@ -709,10 +749,15 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       lastServiceDate: eq.lastServiceDate, nextDueDate: eq.nextDueDate,
       status: eq.status, notes: eq.notes,
     })
+    setEditCustomerLocationId(eq.serviceSiteId ?? "")
     setEditing(true)
   }
 
-  function cancelEdit() { setEditing(false); setDraft({}) }
+  function cancelEdit() {
+    setEditing(false)
+    setDraft({})
+    setEditCustomerLocationId("")
+  }
 
   async function saveEdit() {
     if (!eq || !activeOrgId || eq.isArchived) return
@@ -731,6 +776,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       last_service_at: (draft.lastServiceDate ?? eq.lastServiceDate) || null,
       next_due_at: (draft.nextDueDate ?? eq.nextDueDate) || null,
       location_label: (draft.location ?? eq.location).trim() || null,
+      customer_location_id: editCustomerLocationId.trim() || null,
       notes: (draft.notes ?? eq.notes).trim() || null,
     }
 
@@ -747,6 +793,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
     setEditing(false)
     setDraft({})
+    setEditCustomerLocationId("")
     toast("Equipment updated successfully")
     await loadDrawerData()
     onUpdated?.()
@@ -1181,7 +1228,35 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                     tabIndex={-1}
                   />
                 </EditableRow>
-                <EditableRow label="Location" value={eq.location || "—"} editing={editing}>
+                {customerLocationOptions.length > 0 && (
+                  <EditableRow
+                    label="Service site"
+                    value={
+                      eq.serviceSiteId ?
+                        customerLocationOptions.find((o) => o.id === eq.serviceSiteId)?.label ?? "Linked site"
+                      : "—"
+                    }
+                    editing={editing}
+                  >
+                    <Select
+                      value={editCustomerLocationId ? editCustomerLocationId : "__none__"}
+                      onValueChange={(v) => setEditCustomerLocationId(v === "__none__" ? "" : v)}
+                    >
+                      <SelectTrigger size="sm" className={cn(drawerInputClass, "w-full min-h-9 h-auto py-2 whitespace-normal text-left")}>
+                        <SelectValue placeholder="Not linked" />
+                      </SelectTrigger>
+                      <SelectContent className="max-w-[min(100vw-2rem,480px)]">
+                        <SelectItem value="__none__">Not linked</SelectItem>
+                        {customerLocationOptions.map((o) => (
+                          <SelectItem key={o.id} value={o.id} className="whitespace-normal items-start py-2">
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </EditableRow>
+                )}
+                <EditableRow label="Room / area" value={eq.location || "—"} editing={editing}>
                   <Input
                     value={draft.location ?? ""}
                     onChange={(e) => setField("location", e.target.value)}

@@ -31,6 +31,7 @@ import { buildEquipmentLifecycleTimeline, sumInvoiceAmountCents } from "@/lib/li
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
+import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import {
   loadEquipmentSignalsByIds,
@@ -73,6 +74,7 @@ type DbEquipmentRow = {
   next_calibration_due_at: string | null
   calibration_interval_months: number | null
   location_label: string | null
+  customer_location_id: string | null
   notes: string | null
 }
 
@@ -270,6 +272,7 @@ function rowToEquipment(row: DbEquipmentRow, customerName: string): Equipment {
     status: mapDbStatusToUi(row.status),
     notes: row.notes ?? "",
     location: row.location_label ?? "",
+    serviceSiteId: row.customer_location_id ?? null,
     photos: [],
     manuals: [],
     serviceHistory: [],
@@ -389,12 +392,14 @@ export default function EquipmentDetailPage() {
   const [certificateAttachmentRows, setCertificateAttachmentRows] = useState<EquipmentCertificateAttachmentRow[]>([])
   const [techProfiles, setTechProfiles] = useState<Record<string, string>>({})
   const [signals, setSignals] = useState<EquipmentSignals | null>(null)
+  const [serviceSiteSummary, setServiceSiteSummary] = useState<string | null>(null)
   const [tab, setTab] = useState("overview")
   const [historyFilter, setHistoryFilter] = useState<EquipmentHistoryFilter>("all")
 
   const load = useCallback(async () => {
     if (!id) {
       setEq(null)
+      setServiceSiteSummary(null)
       setWorkOrders([])
       setPlans([])
       setInvoiceRows([])
@@ -413,6 +418,7 @@ export default function EquipmentDetailPage() {
       } = await supabase.auth.getUser()
       if (!user) {
         setEq(null)
+        setServiceSiteSummary(null)
         setWorkOrders([])
         setPlans([])
         setInvoiceRows([])
@@ -424,6 +430,7 @@ export default function EquipmentDetailPage() {
       }
       if (activeOrg.status !== "ready" || !activeOrg.organizationId) {
         setEq(null)
+        setServiceSiteSummary(null)
         return
       }
       const oid = activeOrg.organizationId
@@ -431,6 +438,7 @@ export default function EquipmentDetailPage() {
         const scope = await loadAssignedWorkScope(supabase, { organizationId: oid, userId: user.id })
         if (!scope.equipmentIds.includes(id)) {
           setEq(null)
+          setServiceSiteSummary(null)
           setWorkOrders([])
           setPlans([])
           setInvoiceRows([])
@@ -445,7 +453,7 @@ export default function EquipmentDetailPage() {
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, install_date, warranty_expires_at, warranty_expiration_date, last_service_at, next_due_at, next_calibration_due_at, calibration_interval_months, location_label, notes",
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, install_date, warranty_expires_at, warranty_expiration_date, last_service_at, next_due_at, next_calibration_due_at, calibration_interval_months, location_label, customer_location_id, notes",
         )
         .eq("id", id)
         .eq("organization_id", oid)
@@ -454,6 +462,7 @@ export default function EquipmentDetailPage() {
 
       if (error || !row) {
         setEq(null)
+        setServiceSiteSummary(null)
         setWorkOrders([])
         setPlans([])
         setInvoiceRows([])
@@ -474,6 +483,38 @@ export default function EquipmentDetailPage() {
 
       const customerName = (customerRow as { company_name: string } | null)?.company_name ?? "Customer"
       setEq(rowToEquipment(er, customerName))
+
+      if (er.customer_location_id) {
+        const { data: locRow } = await supabase
+          .from("customer_locations")
+          .select("name, address_line1, address_line2, city, state, postal_code")
+          .eq("organization_id", oid)
+          .eq("id", er.customer_location_id)
+          .is("archived_at", null)
+          .maybeSingle()
+        const lr = locRow as {
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+        } | null
+        setServiceSiteSummary(
+          lr ?
+            formatCustomerLocationSelectLabel({
+              name: lr.name,
+              address_line1: lr.address_line1,
+              address_line2: lr.address_line2,
+              city: lr.city,
+              state: lr.state,
+              postal_code: lr.postal_code,
+            })
+          : null,
+        )
+      } else {
+        setServiceSiteSummary(null)
+      }
 
       const { rows: woMerged, error: woErr } = await fetchWorkOrdersLinkedToEquipment(supabase, oid, er.id)
       const woList = (woErr ? [] : woMerged) as AssetWo[]
@@ -984,6 +1025,9 @@ export default function EquipmentDetailPage() {
                 )}
                 {eq.manufacturer ? ` · ${eq.manufacturer}` : ""}
               </p>
+              {serviceSiteSummary ?
+                <p className="text-xs text-muted-foreground mt-1.5 leading-snug max-w-2xl">{serviceSiteSummary}</p>
+              : null}
               <Badge variant="secondary" className={cn("text-xs border mt-3", STATUS_COLORS[eq.status])}>
                 {eq.status}
               </Badge>

@@ -45,6 +45,7 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 
 type SrRow = {
   id: string
@@ -54,6 +55,7 @@ type SrRow = {
   issue_summary: string
   description: string | null
   customer_id: string | null
+  customer_location_id?: string | null
   equipment_id: string | null
   requester_name: string | null
   requester_email: string | null
@@ -111,6 +113,9 @@ export default function ServiceRequestsQueuePage() {
   const [confirmConvert, setConfirmConvert] = useState(false)
   const [saveDraft, setSaveDraft] = useState(false)
   const [dedupeMatches, setDedupeMatches] = useState<Array<{ customer_id: string; company_name: string }>>([])
+  const [convertLocationId, setConvertLocationId] = useState("")
+  const [convertLocationOpts, setConvertLocationOpts] = useState<Array<{ id: string; label: string }>>([])
+  const [eqOpts, setEqOpts] = useState<Array<{ id: string; name: string; customer_location_id: string | null }>>([])
 
   const [newOpen, setNewOpen] = useState(false)
   const [newSummary, setNewSummary] = useState("")
@@ -191,8 +196,6 @@ export default function ServiceRequestsQueuePage() {
     }
   }, [convertOpen, detail?.id, detail?.customer_id, detail?.equipment_id, detail?.requester_email])
 
-  const [eqOpts, setEqOpts] = useState<Array<{ id: string; name: string }>>([])
-
   useEffect(() => {
     if (!organizationId || !customerId || customerId.length < 30) {
       setEqOpts([])
@@ -202,15 +205,90 @@ export default function ServiceRequestsQueuePage() {
     void (async () => {
       const { data } = await supabase
         .from("equipment")
-        .select("id, name")
+        .select("id, name, customer_location_id")
         .eq("organization_id", organizationId)
         .eq("customer_id", customerId)
         .eq("is_archived", false)
         .order("name", { ascending: true })
         .limit(100)
-      setEqOpts((data ?? []) as Array<{ id: string; name: string }>)
+      setEqOpts(
+        (data ?? []) as Array<{ id: string; name: string; customer_location_id: string | null }>,
+      )
     })()
   }, [organizationId, customerId])
+
+  useEffect(() => {
+    if (!organizationId || !customerId || customerId.length < 30) {
+      setConvertLocationOpts([])
+      return
+    }
+    const supabase = createBrowserSupabaseClient()
+    void (async () => {
+      const { data } = await supabase
+        .from("customer_locations")
+        .select("id, name, address_line1, address_line2, city, state, postal_code, is_default")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", customerId)
+        .is("archived_at", null)
+        .order("is_default", { ascending: false })
+        .order("name", { ascending: true })
+      const rows =
+        (data ?? []) as Array<{
+          id: string
+          name: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          is_default: boolean | null
+        }>
+      setConvertLocationOpts(
+        rows.map((r) => ({
+          id: r.id,
+          label: formatCustomerLocationSelectLabel({
+            name: r.name,
+            address_line1: r.address_line1,
+            address_line2: r.address_line2,
+            city: r.city,
+            state: r.state,
+            postal_code: r.postal_code,
+          }),
+        })),
+      )
+    })()
+  }, [organizationId, customerId])
+
+  useEffect(() => {
+    if (!convertOpen) {
+      setConvertLocationId("")
+      return
+    }
+    if (convertLocationOpts.length === 0) return
+
+    const valid = (id: string | null | undefined) =>
+      id && convertLocationOpts.some((o) => o.id === id) ? id : null
+
+    const fromSr = valid(detail?.customer_location_id)
+    if (fromSr) {
+      setConvertLocationId(fromSr)
+      return
+    }
+    const eq = eqOpts.find((e) => e.id === equipmentId)
+    const fromEq = valid(eq?.customer_location_id ?? null)
+    if (fromEq) {
+      setConvertLocationId(fromEq)
+      return
+    }
+    setConvertLocationId(convertLocationOpts[0]?.id ?? "")
+  }, [
+    convertOpen,
+    detail?.customer_location_id,
+    detail?.id,
+    equipmentId,
+    eqOpts,
+    convertLocationOpts,
+  ])
 
   if (!organizationId || orgStatus !== "ready") {
     return (
@@ -612,6 +690,23 @@ export default function ServiceRequestsQueuePage() {
                 </SelectContent>
               </Select>
             </div>
+            {convertLocationOpts.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Service location</Label>
+                <Select value={convertLocationId} onValueChange={setConvertLocationId}>
+                  <SelectTrigger className="h-auto min-h-9 py-2 whitespace-normal text-left">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent className="max-w-[min(100vw-2rem,520px)]">
+                    {convertLocationOpts.map((o) => (
+                      <SelectItem key={o.id} value={o.id} className="whitespace-normal items-start py-2">
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Work order title</Label>
               <Input value={woTitle} onChange={(e) => setWoTitle(e.target.value)} className="h-9" />
@@ -672,6 +767,7 @@ export default function ServiceRequestsQueuePage() {
                     confirm: true,
                     customer_id: customerId,
                     equipment_id: equipmentId || null,
+                    customer_location_id: convertLocationId || null,
                     work_order: {
                       title: woTitle,
                       priority: woPriority,

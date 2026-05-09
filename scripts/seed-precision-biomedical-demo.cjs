@@ -1294,8 +1294,12 @@ async function seedPrecisionMarketingTenant(supabase, { orgId, ownerId, techUser
     postal_code: row.zip,
     is_default: true,
   }))
-  const insLoc = await supabase.from("customer_locations").insert(locPayload)
+  const insLoc = await supabase.from("customer_locations").insert(locPayload).select("id, customer_id")
   throwOnError(insLoc, "insert customer_locations")
+  const defaultLocByCustomer = new Map()
+  for (const r of insLoc.data ?? []) {
+    defaultLocByCustomer.set(r.customer_id, r.id)
+  }
 
   const contactPayload = customerIds.map((row, idx) => {
     const contactName = row.company.includes("Dental") ? "Dr. Morgan Ellis" : "Clinical Engineering Manager"
@@ -1339,6 +1343,7 @@ async function seedPrecisionMarketingTenant(supabase, { orgId, ownerId, techUser
     equipmentPayload.push({
       organization_id: orgId,
       customer_id: cust.id,
+      customer_location_id: defaultLocByCustomer.get(cust.id) ?? null,
       equipment_code: code,
       name: tpl.model,
       manufacturer: tpl.mfr,
@@ -1535,6 +1540,7 @@ async function seedPrecisionMarketingTenant(supabase, { orgId, ownerId, techUser
         organization_id: orgId,
         customer_id: eq.customerId,
         equipment_id: eq.id,
+        customer_location_id: defaultLocByCustomer.get(eq.customerId) ?? null,
         title,
         status: st,
         priority: pr,
@@ -1580,6 +1586,7 @@ async function seedPrecisionMarketingTenant(supabase, { orgId, ownerId, techUser
         organization_id: orgId,
         customer_id: plan.customerId,
         equipment_id: plan.equipmentId,
+        customer_location_id: defaultLocByCustomer.get(plan.customerId) ?? null,
         title,
         status: "scheduled",
         priority: "normal",

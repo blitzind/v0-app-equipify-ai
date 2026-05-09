@@ -102,6 +102,8 @@ export interface Equipment {
   status: EquipmentStatus
   notes: string
   location: string
+  /** Optional `customer_locations.id` when the asset is tied to a multi-site service address. */
+  serviceSiteId?: string | null
   photos: string[]
   manuals: string[]
   serviceHistory: ServiceHistoryEntry[]

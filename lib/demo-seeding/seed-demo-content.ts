@@ -342,6 +342,28 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
     if (extraLocRows.length > 0) await args.supabase.from("customer_locations").insert(extraLocRows)
   }
 
+  const { data: allLocRows } = await args.supabase
+    .from("customer_locations")
+    .select("id, customer_id, is_default, name")
+    .eq("organization_id", args.organizationId)
+  const locsByCustomer = new Map<string, Array<{ id: string; is_default: boolean; name: string }>>()
+  for (const raw of allLocRows ?? []) {
+    const r = raw as { id: string; customer_id: string; is_default: boolean | null; name: string }
+    const arr = locsByCustomer.get(r.customer_id) ?? []
+    arr.push({ id: r.id, is_default: Boolean(r.is_default), name: r.name })
+    locsByCustomer.set(r.customer_id, arr)
+  }
+  for (const arr of locsByCustomer.values()) {
+    arr.sort(
+      (a, b) => Number(b.is_default) - Number(a.is_default) || a.name.localeCompare(b.name),
+    )
+  }
+  function customerLocationIdForSeedIndex(customerId: string, i: number): string | null {
+    const arr = locsByCustomer.get(customerId)
+    if (!arr || arr.length === 0) return null
+    return arr[i % arr.length]!.id
+  }
+
   const contacts = customerRows.map((c, i) => ({
     organization_id: args.organizationId,
     customer_id: customerIndex.get(c.external_code)!,
@@ -382,13 +404,15 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
 
   const equipmentRows = Array.from({ length: equipmentTarget }, (_, i) => {
     const code = `DEMO-C${String((i % customerTarget) + 1).padStart(2, "0")}`
+    const custId = customerIndex.get(code)!
     const type = pick(profile.equipmentAssetTypes, i)
     const st = eqStatusCycle[i % eqStatusCycle.length]
     const warrantyEnd = addDays(new Date(), 90 + (i % 400))
     const underWarrantyNote = i % 6 === 0 && st === "active"
     return {
       organization_id: args.organizationId,
-      customer_id: customerIndex.get(code)!,
+      customer_id: custId,
+      customer_location_id: customerLocationIdForSeedIndex(custId, i),
       equipment_code: `DEMO-E${String(i + 1).padStart(3, "0")}`,
       name: type.name,
       manufacturer: type.manufacturer,
@@ -422,11 +446,21 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   const { data: equipment, error: eqErr } = await args.supabase
     .from("equipment")
     .insert(equipmentRows)
-    .select("id, equipment_code, customer_id")
+    .select("id, equipment_code, customer_id, customer_location_id")
   if (eqErr) throw new Error(eqErr.message)
 
-  const equipmentIndex = new Map<string, { id: string; customer_id: string }>()
-  for (const e of equipment ?? []) equipmentIndex.set(e.equipment_code, { id: e.id, customer_id: e.customer_id })
+  const equipmentIndex = new Map<
+    string,
+    { id: string; customer_id: string; customer_location_id: string | null }
+  >()
+  for (const e of equipment ?? []) {
+    const row = e as { id: string; equipment_code: string; customer_id: string; customer_location_id: string | null }
+    equipmentIndex.set(row.equipment_code, {
+      id: row.id,
+      customer_id: row.customer_id,
+      customer_location_id: row.customer_location_id,
+    })
+  }
 
   const techSeeded = await seedTechnicianAuthMembers({
     supabase: args.supabase,
@@ -467,6 +501,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
       organization_id: args.organizationId,
       customer_id: eq.customer_id,
       equipment_id: eq.id,
+      customer_location_id: eq.customer_location_id,
       title: pick(profile.workOrderTitleExamples, i),
       status,
       priority: pick(["low", "normal", "normal", "high", "critical"], i),

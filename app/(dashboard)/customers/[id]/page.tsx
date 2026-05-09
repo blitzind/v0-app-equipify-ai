@@ -7,6 +7,7 @@ import type { Equipment, EquipmentStatus } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -82,6 +83,7 @@ import {
 import { loadCustomerRollupTree } from "@/lib/customers/consolidated-rollup"
 import { ParentAccountCard } from "@/components/customers/parent-account-card"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
+import { normalizeAddressFingerprint } from "@/lib/customer-locations/format"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -273,6 +275,7 @@ function equipmentRowToUi(row: {
   next_due_at: string | null
   next_calibration_due_at: string | null
   location_label: string | null
+  customer_location_id: string | null
   install_date: string | null
   warranty_expires_at: string | null
   last_service_at: string | null
@@ -302,6 +305,7 @@ function equipmentRowToUi(row: {
     status: statusMap[row.status] ?? "Active",
     notes: row.notes ?? "",
     location: row.location_label ?? "",
+    serviceSiteId: row.customer_location_id ?? null,
     photos: [],
     manuals: [],
     serviceHistory: [],
@@ -318,6 +322,8 @@ type CustomerWoListRow = {
   completed_at: string | null
   total_labor_cents: number
   total_parts_cents: number
+  customer_location_id: string | null
+  equipment_id: string | null
 }
 
 type ActivityEntry = {
@@ -366,7 +372,15 @@ function ActivityTimeline({ items }: { items: ActivityEntry[] }) {
   )
 }
 
-function EquipmentRow({ eq, customerName }: { eq: Equipment; customerName?: string }) {
+function EquipmentRow({
+  eq,
+  customerName,
+  serviceSiteLabel,
+}: {
+  eq: Equipment
+  customerName?: string
+  serviceSiteLabel?: string | null
+}) {
   const daysToDue = Math.ceil(
     (new Date(eq.nextDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
@@ -410,7 +424,18 @@ function EquipmentRow({ eq, customerName }: { eq: Equipment; customerName?: stri
           <p className={cn("text-xs font-medium", dueSoon ? "text-[color:var(--status-warning)]" : "text-muted-foreground")}>
             {daysToDue < 0 ? "Overdue" : daysToDue === 0 ? "Due today" : `Due in ${daysToDue}d`}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{eq.location}</p>
+          <div className="text-xs text-muted-foreground mt-0.5 text-right max-w-[200px]">
+            {serviceSiteLabel ?
+              <p className="truncate" title={serviceSiteLabel}>
+                {serviceSiteLabel}
+              </p>
+            : null}
+            {eq.location ?
+              <p className="truncate">{eq.location}</p>
+            : !serviceSiteLabel ?
+              <p>—</p>
+            : null}
+          </div>
         </div>
         <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
       </div>
@@ -500,6 +525,79 @@ export default function CustomerDetailPage() {
     useState<InvoiceAgingSummary | null>(null)
   const [invoiceAgingLoading, setInvoiceAgingLoading] = useState(false)
   const [invoiceAgingChildCount, setInvoiceAgingChildCount] = useState(0)
+  const [locationSearch, setLocationSearch] = useState("")
+  const [equipmentSiteFilter, setEquipmentSiteFilter] = useState<string>("all")
+  const [workOrderSiteFilter, setWorkOrderSiteFilter] = useState<string>("all")
+
+  const locationLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    if (!customer) return m
+    for (const l of customer.locations) {
+      m.set(l.id, `${l.name} — ${l.city}, ${l.state}`)
+    }
+    return m
+  }, [customer])
+
+  const locationMetrics = useMemo(() => {
+    const m: Record<string, { equipment: number; workOrders: number; openWorkOrders: number }> = {}
+    if (!customer) return m
+    for (const loc of customer.locations) {
+      m[loc.id] = { equipment: 0, workOrders: 0, openWorkOrders: 0 }
+    }
+    for (const eq of customerEquipment) {
+      const sid = eq.serviceSiteId ?? null
+      if (sid && m[sid]) m[sid].equipment += 1
+    }
+    const woSite = (wo: CustomerWoListRow) => {
+      if (wo.customer_location_id) return wo.customer_location_id
+      if (wo.equipment_id) {
+        const eq = customerEquipment.find((e) => e.id === wo.equipment_id)
+        return eq?.serviceSiteId ?? null
+      }
+      return null
+    }
+    for (const wo of customerWorkOrders) {
+      const sid = woSite(wo)
+      if (!sid || !m[sid]) continue
+      m[sid].workOrders += 1
+      if (wo.status !== "completed" && wo.status !== "invoiced") m[sid].openWorkOrders += 1
+    }
+    return m
+  }, [customer, customerEquipment, customerWorkOrders])
+
+  const visibleLocations = useMemo(() => {
+    if (!customer) return []
+    const q = locationSearch.trim().toLowerCase()
+    if (!q) return customer.locations
+    return customer.locations.filter((l) => {
+      const blob = [l.name, l.address, l.addressLine2, l.city, l.state, l.zip].join(" ").toLowerCase()
+      return blob.includes(q)
+    })
+  }, [customer, locationSearch])
+
+  const filteredEquipment = useMemo(() => {
+    if (equipmentSiteFilter === "all") return customerEquipment
+    if (equipmentSiteFilter === "unassigned") {
+      return customerEquipment.filter((e) => !e.serviceSiteId)
+    }
+    return customerEquipment.filter((e) => e.serviceSiteId === equipmentSiteFilter)
+  }, [customerEquipment, equipmentSiteFilter])
+
+  const filteredWorkOrders = useMemo(() => {
+    if (workOrderSiteFilter === "all") return customerWorkOrders
+    const woSite = (wo: CustomerWoListRow) => {
+      if (wo.customer_location_id) return wo.customer_location_id
+      if (wo.equipment_id) {
+        const eq = customerEquipment.find((e) => e.id === wo.equipment_id)
+        return eq?.serviceSiteId ?? null
+      }
+      return null
+    }
+    if (workOrderSiteFilter === "unassigned") {
+      return customerWorkOrders.filter((w) => !woSite(w))
+    }
+    return customerWorkOrders.filter((w) => woSite(w) === workOrderSiteFilter)
+  }, [customerWorkOrders, customerEquipment, workOrderSiteFilter])
 
   useEffect(() => {
     let active = true
@@ -584,7 +682,9 @@ export default function CustomerDetailPage() {
             .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
             .eq("customer_id", id)
             .eq("organization_id", orgId)
-            .is("archived_at", null),
+            .is("archived_at", null)
+            .order("is_default", { ascending: false })
+            .order("name", { ascending: true }),
           supabase
             .from("customer_contracts")
             .select("id, name, contract_type, start_date, end_date, value_cents")
@@ -902,7 +1002,7 @@ export default function CustomerDetailPage() {
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
         .select(
-          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, install_date, warranty_expires_at, last_service_at, notes, created_at",
+          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, customer_location_id, install_date, warranty_expires_at, last_service_at, notes, created_at",
         )
         .eq("organization_id", customer.organizationId)
         .eq("customer_id", customer.id)
@@ -1396,6 +1496,32 @@ export default function CustomerDetailPage() {
       return
     }
 
+    const addrFingerprint = normalizeAddressFingerprint({
+      address_line1: locationForm.address_line1,
+      address_line2: locationForm.address_line2,
+      city: locationForm.city,
+      state: locationForm.state,
+      postal_code: locationForm.postal_code,
+    })
+    const duplicateAddress = customer.locations.some((l) => {
+      if (editingLocationId && l.id === editingLocationId) return false
+      return (
+        normalizeAddressFingerprint({
+          address_line1: l.address,
+          address_line2: l.addressLine2,
+          city: l.city,
+          state: l.state,
+          postal_code: l.zip,
+        }) === addrFingerprint
+      )
+    })
+    if (duplicateAddress) {
+      const ok = window.confirm(
+        "Another service site for this customer already matches this address. Save anyway if this is intentional (for example, a distinct suite or building name)?",
+      )
+      if (!ok) return
+    }
+
     setLocationSaving(true)
     try {
       const body = {
@@ -1439,6 +1565,32 @@ export default function CustomerDetailPage() {
 
     setLocationError("")
     const supabase = createBrowserSupabaseClient()
+
+    const { count: eqDep } = await supabase
+      .from("equipment")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", customer.organizationId)
+      .eq("customer_id", customer.id)
+      .eq("customer_location_id", locationId)
+      .is("archived_at", null)
+
+    const { count: woDep } = await supabase
+      .from("work_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", customer.organizationId)
+      .eq("customer_id", customer.id)
+      .eq("customer_location_id", locationId)
+      .is("archived_at", null)
+
+    const nEq = eqDep ?? 0
+    const nWo = woDep ?? 0
+    if (nEq + nWo > 0) {
+      const ok = window.confirm(
+        `This site is referenced by ${nEq} equipment row(s) and ${nWo} work order(s) with an explicit site link. Archive it anyway? Historical records stay intact; prefer archive over delete when sites are in use.`,
+      )
+      if (!ok) return
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -2064,12 +2216,28 @@ export default function CustomerDetailPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground font-normal">
-                    Sites where work happens. The default site is used as the bill-to
-                    fallback when no explicit billing address is set.
+                    Service / dispatch addresses for this account. Billing terms and tax defaults live on the customer
+                    record; the default service site is a common bill-to fallback when billing matches service.
                   </p>
+                  {customer.locations.length > 0 && (
+                    <div className="pt-2">
+                      <Input
+                        placeholder="Search sites by name or address…"
+                        value={locationSearch}
+                        onChange={(e) => setLocationSearch(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
-                  {customer.locations.map((loc) => (
+                  {visibleLocations.map((loc) => {
+                    const metrics = locationMetrics[loc.id] ?? {
+                      equipment: 0,
+                      workOrders: 0,
+                      openWorkOrders: 0,
+                    }
+                    return (
                     <div
                       key={loc.id}
                       className="flex items-start gap-3 pb-3 border-b border-border last:pb-0 last:border-0"
@@ -2080,15 +2248,22 @@ export default function CustomerDetailPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-foreground">{loc.name}</p>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                            Service site
+                          </span>
                           {loc.isDefault && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                              Default
+                              Primary default
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {loc.address}
                           {loc.addressLine2 ? `, ${loc.addressLine2}` : ""}, {loc.city}, {loc.state} {loc.zip}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                          {metrics.equipment} equipment · {metrics.workOrders} work orders
+                          {metrics.openWorkOrders > 0 ? ` · ${metrics.openWorkOrders} open` : ""}
                         </p>
                         {(loc.contactPerson || loc.phone) && (
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -2097,7 +2272,7 @@ export default function CustomerDetailPage() {
                             {loc.phone ? `Phone: ${loc.phone}` : ""}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
                           <button
                             type="button"
                             onClick={() => openEditLocationModal(loc)}
@@ -2112,12 +2287,42 @@ export default function CustomerDetailPage() {
                           >
                             Archive
                           </button>
+                          <Link
+                            href={`/work-orders?action=new-work-order&customerId=${encodeURIComponent(customer.id)}`}
+                            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            New work order
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEquipmentSiteFilter(loc.id)
+                              setActiveTab("equipment")
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            View equipment
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWorkOrderSiteFilter(loc.id)
+                              setActiveTab("work-orders")
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            View work orders
+                          </button>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   {customer.locations.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">No locations on file.</p>
+                  )}
+                  {customer.locations.length > 0 && visibleLocations.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No sites match your search.</p>
                   )}
                 </CardContent>
               </Card>
@@ -2183,15 +2388,57 @@ export default function CustomerDetailPage() {
             <p className="text-sm text-muted-foreground text-center py-10">No equipment on file for this customer.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {customerEquipment.map((eq) => (
-                <EquipmentRow key={eq.id} eq={eq} customerName={customer?.company} />
-              ))}
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <span className="text-xs text-muted-foreground">Site</span>
+                <select
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm min-w-[200px]"
+                  value={equipmentSiteFilter}
+                  onChange={(e) => setEquipmentSiteFilter(e.target.value)}
+                >
+                  <option value="all">All service sites</option>
+                  <option value="unassigned">No linked site</option>
+                  {(customer?.locations ?? []).map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {filteredEquipment.length === 0 ?
+                <p className="text-sm text-muted-foreground text-center py-8">No equipment for this site filter.</p>
+              : filteredEquipment.map((eq) => (
+                <EquipmentRow
+                  key={eq.id}
+                  eq={eq}
+                  customerName={customer?.company}
+                  serviceSiteLabel={eq.serviceSiteId ? locationLabelById.get(eq.serviceSiteId) ?? null : null}
+                />
+              ))
+              }
             </div>
           )}
         </TabsContent>
 
         {/* Work Orders tab */}
         <TabsContent value="work-orders" className="mt-4">
+          {customerWorkOrders.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-xs text-muted-foreground">Site</span>
+              <select
+                className="h-9 rounded-md border border-border bg-background px-2 text-sm min-w-[200px]"
+                value={workOrderSiteFilter}
+                onChange={(e) => setWorkOrderSiteFilter(e.target.value)}
+              >
+                <option value="all">All service sites</option>
+                <option value="unassigned">Unassigned / inherited only</option>
+                {(customer?.locations ?? []).map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {customerWorkOrders.length === 0 ? (
             <Card className="border border-dashed border-border">
               <CardContent className="py-12 text-center">
@@ -2206,6 +2453,8 @@ export default function CustomerDetailPage() {
                 </Button>
               </CardContent>
             </Card>
+          ) : filteredWorkOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10">No work orders for this site filter.</p>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <table className="w-full text-sm">
@@ -2220,6 +2469,9 @@ export default function CustomerDetailPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Type
                     </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Site
+                    </th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Revenue
                     </th>
@@ -2227,7 +2479,7 @@ export default function CustomerDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {customerWorkOrders.map((wo) => (
+                  {filteredWorkOrders.map((wo) => (
                     <tr key={wo.id} className="bg-card ds-hover-list-row-sm">
                       <td className="px-4 py-3">
                         <p className="text-xs font-mono text-primary">
@@ -2244,6 +2496,22 @@ export default function CustomerDetailPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{woDbTypeLabel(wo.type)}</td>
+                      <td className="px-4 py-3 text-muted-foreground max-w-[220px]">
+                        {(() => {
+                          const sid =
+                            wo.customer_location_id ??
+                            (wo.equipment_id ?
+                              customerEquipment.find((e) => e.id === wo.equipment_id)?.serviceSiteId
+                            : null)
+                          if (!sid) return <span className="text-xs">—</span>
+                          const lbl = locationLabelById.get(sid)
+                          return (
+                            <span className="text-xs line-clamp-2" title={lbl ?? sid}>
+                              {lbl ?? "Site"}
+                            </span>
+                          )
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-right tabular-nums text-foreground">
                         {wo.status === "completed" || wo.status === "invoiced"
                           ? fmtCurrencyCents((wo.total_labor_cents ?? 0) + (wo.total_parts_cents ?? 0))

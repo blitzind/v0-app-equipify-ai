@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 type EqOpt = { id: string; name: string }
+type LocOpt = { id: string; label: string; is_default: boolean }
 
 const PRIORITY_OPTIONS = [
   { value: "Low", label: "Low" },
@@ -21,6 +22,8 @@ function RequestRepairPageInner() {
   const preEquipment = searchParams.get("equipment")?.trim() ?? ""
 
   const [equipmentOptions, setEquipmentOptions] = useState<EqOpt[]>([])
+  const [locationOptions, setLocationOptions] = useState<LocOpt[]>([])
+  const [locationId, setLocationId] = useState("")
   const [submitted, setSubmitted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +37,18 @@ function RequestRepairPageInner() {
       .then((r) => r.json())
       .then((j: { items?: Array<{ id: string; name: string }> }) => {
         setEquipmentOptions((j.items ?? []).map((e) => ({ id: e.id, name: e.name })))
+      })
+    fetch("/api/portal/locations")
+      .then((r) => r.json())
+      .then((j: { items?: LocOpt[] }) => {
+        const items = j.items ?? []
+        setLocationOptions(items)
+        const def = items.find((x) => x.is_default)?.id ?? items[0]?.id ?? ""
+        setLocationId(def)
+      })
+      .catch(() => {
+        setLocationOptions([])
+        setLocationId("")
       })
   }, [])
 
@@ -50,6 +65,7 @@ function RequestRepairPageInner() {
           issue_summary: firstLine.slice(0, 200),
           description: message.trim(),
           equipmentId: equipmentId || null,
+          customerLocationId: locationId || null,
           urgency: priority,
         }),
       })
@@ -117,6 +133,27 @@ function RequestRepairPageInner() {
       </div>
 
       <form onSubmit={submit} className="portal-card p-6 space-y-5">
+        {locationOptions.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium" style={{ color: "var(--portal-foreground)" }}>
+              Service location
+            </label>
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm leading-snug"
+              style={{ borderColor: "var(--portal-border)", background: "var(--portal-surface)" }}
+            >
+              {locationOptions.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.label}
+                  {loc.is_default ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <label className="text-xs font-medium" style={{ color: "var(--portal-foreground)" }}>
             Equipment (optional)
