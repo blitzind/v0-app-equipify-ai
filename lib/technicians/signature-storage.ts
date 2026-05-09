@@ -11,7 +11,8 @@
  *
  * Strict rules:
  *   - tenant-scoped via `organization_id`
- *   - upload requires authenticated user (RLS enforces manager+ role)
+ *   - upload/update requires authenticated user; RLS allows manager+ on any row,
+ *     or DB-role technicians only on their own linked `technicians` row + signature paths
  *   - non-throwing fallbacks for legacy DBs missing the Phase 2 column
  */
 
