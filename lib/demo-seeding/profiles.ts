@@ -1,19 +1,21 @@
-export const INDUSTRY_KEYS = [
-  "medical_equipment",
-  "hvac_r",
-  "electrical",
-  "plumbing",
-  "garage_door",
-  "locksmith",
-  "property_management",
-  "appliance_repair",
-  "commercial_equipment",
-  "fire_security",
-  "septic",
-  "av_installation",
-] as const
+import {
+  WORKSPACE_INDUSTRY_DEFINITIONS,
+  WORKSPACE_INDUSTRY_KEYS,
+  type WorkspaceIndustryKey,
+  type WorkspaceIndustryDefinition,
+  type WorkspaceEquipmentExample,
+} from "@/lib/workspace-industry-registry"
 
-export type DemoIndustryKey = (typeof INDUSTRY_KEYS)[number]
+/**
+ * Canonical industry keys for workspace onboarding, org.industry, and demo seed routing.
+ * Aliased as `DemoIndustryKey` for historical imports (`lib/demo-seeding/*`).
+ */
+export const INDUSTRY_KEYS = WORKSPACE_INDUSTRY_KEYS
+
+/** @deprecated Prefer `WorkspaceIndustryKey`; kept for seed modules and settings UI imports */
+export type DemoIndustryKey = WorkspaceIndustryKey
+
+export type { WorkspaceIndustryKey }
 
 type MaintenancePlanExample = {
   name: string
@@ -29,7 +31,7 @@ type DashboardMetricTargets = {
 }
 
 export type DemoIndustryProfile = {
-  industry: DemoIndustryKey
+  industry: WorkspaceIndustryKey
   demoCompanyName: string
   customerTypes: string[]
   equipmentAssetTypes: Array<{ name: string; category: string; manufacturer: string }>
@@ -39,8 +41,34 @@ export type DemoIndustryProfile = {
   dashboardMetricTargets: DashboardMetricTargets
 }
 
+function maintenancePlansFromNames(names: string[]): MaintenancePlanExample[] {
+  return names.map((name, i) => ({
+    name,
+    intervalValue: i % 2 === 0 ? 1 : 3,
+    intervalUnit: "month" as const,
+  }))
+}
+
+function starterProfileFromDefinition(def: WorkspaceIndustryDefinition): DemoIndustryProfile {
+  const names =
+    def.defaultMaintenancePlanExampleNames.length > 0
+      ? def.defaultMaintenancePlanExampleNames
+      : ["Monthly PM inspection", "Quarterly operational audit"]
+  return {
+    industry: def.key,
+    demoCompanyName: def.suggestedDemoCompanyName,
+    customerTypes: def.defaultCustomerTypes,
+    equipmentAssetTypes: def.defaultEquipmentExamples as WorkspaceEquipmentExample[],
+    workOrderTitleExamples: def.defaultWorkOrderExamples,
+    maintenancePlanExamples: maintenancePlansFromNames(names),
+    technicianSpecialties: def.defaultTechnicianSkillTags,
+    dashboardMetricTargets: { customers: 22, equipment: 56, workOrders: 34, maintenancePlans: 22 },
+  }
+}
+
+/** Rich biomedical profile — overrides registry placeholders for `biomedical_medical_equipment` */
 const MEDICAL_PROFILE: DemoIndustryProfile = {
-  industry: "medical_equipment",
+  industry: "biomedical_medical_equipment",
   demoCompanyName: "Precision Biomedical Services",
   customerTypes: [
     "Valley Regional Hospital",
@@ -122,168 +150,81 @@ const MEDICAL_PROFILE: DemoIndustryProfile = {
   dashboardMetricTargets: { customers: 25, equipment: 68, workOrders: 150, maintenancePlans: 22 },
 }
 
-function starterProfile(
-  industry: DemoIndustryKey,
-  demoCompanyName: string,
-  customerTypes: string[],
-  equipmentAssetTypes: DemoIndustryProfile["equipmentAssetTypes"],
-  workOrders: string[],
-  maintenancePlans: string[],
-  specialties: string[],
-): DemoIndustryProfile {
-  return {
-    industry,
-    demoCompanyName,
-    customerTypes,
-    equipmentAssetTypes,
-    workOrderTitleExamples: workOrders,
-    maintenancePlanExamples: maintenancePlans.map((name, i) => ({
-      name,
-      intervalValue: i % 2 === 0 ? 1 : 3,
-      intervalUnit: i % 2 === 0 ? "month" : "month",
-    })),
-    technicianSpecialties: specialties,
-    dashboardMetricTargets: { customers: 22, equipment: 56, workOrders: 34, maintenancePlans: 22 },
+function buildDemoProfiles(): Record<WorkspaceIndustryKey, DemoIndustryProfile> {
+  const out = {} as Record<WorkspaceIndustryKey, DemoIndustryProfile>
+  for (const key of WORKSPACE_INDUSTRY_KEYS) {
+    if (key === "biomedical_medical_equipment") {
+      out[key] = MEDICAL_PROFILE
+    } else {
+      out[key] = starterProfileFromDefinition(WORKSPACE_INDUSTRY_DEFINITIONS[key])
+    }
   }
+  return out
 }
 
-export const DEMO_INDUSTRY_PROFILES: Record<DemoIndustryKey, DemoIndustryProfile> = {
-  medical_equipment: MEDICAL_PROFILE,
-  hvac_r: starterProfile(
-    "hvac_r",
-    "Apex HVAC-R Services",
-    ["Commercial Office Buildings", "Retail Stores", "Medical Offices", "Restaurants", "Warehouses"],
-    [
-      { name: "RTU-12 Rooftop Unit", category: "HVAC", manufacturer: "Carrier" },
-      { name: "Walk-In Cooler Condensing Unit", category: "Refrigeration", manufacturer: "Copeland" },
-    ],
-    ["RTU compressor short-cycling", "Low suction pressure diagnosis", "Preventive coil cleaning"],
-    ["Quarterly RTU PM", "Monthly Refrigeration Inspection"],
-    ["HVAC Diagnostics", "Refrigeration", "Controls"],
-  ),
-  electrical: starterProfile(
-    "electrical",
-    "VoltEdge Electrical Services",
-    ["Property Managers", "Retail Chains", "Industrial Facilities", "Office Campuses"],
-    [{ name: "Main Distribution Panel", category: "Power Distribution", manufacturer: "Square D" }],
-    ["Breaker trip investigation", "Lighting circuit retrofit", "Panel thermal hotspot correction"],
-    ["Annual Panel PM", "Monthly Emergency Lighting Test"],
-    ["Power Quality", "Service Panels", "Lighting Systems"],
-  ),
-  plumbing: starterProfile(
-    "plumbing",
-    "FlowGuard Plumbing & Drain",
-    ["Apartment Communities", "Restaurants", "Hospitals", "Schools"],
-    [{ name: "Booster Pump Station", category: "Pump Systems", manufacturer: "Grundfos" }],
-    ["Recurring drain backup", "Water heater combustion fault", "Leak isolation and repair"],
-    ["Quarterly Backflow Test", "Monthly Pump PM"],
-    ["Hydronic Systems", "Drain Cleaning", "Backflow"],
-  ),
-  garage_door: starterProfile(
-    "garage_door",
-    "Overhead Access Pros",
-    ["Distribution Centers", "Auto Dealerships", "Municipal Facilities"],
-    [{ name: "High-Speed Roll-Up Door", category: "Door Systems", manufacturer: "Rytec" }],
-    ["Door operator limit failure", "Safety sensor alignment", "Spring tension correction"],
-    ["Monthly Door Safety Inspection", "Quarterly Operator PM"],
-    ["Door Operators", "Safety Systems", "Mechanical Repairs"],
-  ),
-  locksmith: starterProfile(
-    "locksmith",
-    "SecureKey Commercial Locksmith",
-    ["Office Towers", "Retail Franchises", "Healthcare Campuses"],
-    [{ name: "Electronic Access Controller", category: "Access Control", manufacturer: "HID" }],
-    ["Master keying reconfiguration", "Door strike intermittent unlock", "Credential reader replacement"],
-    ["Quarterly Access Control Audit", "Semi-Annual Door Hardware PM"],
-    ["Access Control", "Master Key Systems", "Door Hardware"],
-  ),
-  property_management: starterProfile(
-    "property_management",
-    "Northline Property Operations",
-    ["Class A Offices", "Mixed-Use Buildings", "Multifamily Communities"],
-    [{ name: "Building Mechanical Plant", category: "Facility Assets", manufacturer: "Various" }],
-    ["Tenant comfort complaint dispatch", "Preventive inspection backlog clearance", "Life safety corrective action"],
-    ["Monthly Building PM", "Quarterly Safety Compliance Review"],
-    ["Facilities Operations", "Tenant Response", "Preventive Programs"],
-  ),
-  appliance_repair: starterProfile(
-    "appliance_repair",
-    "HomeCore Appliance Service",
-    ["Residential Homeowners", "Property Turnovers", "Warranty Partners"],
-    [{ name: "Front-Load Washer", category: "Laundry", manufacturer: "Whirlpool" }],
-    ["Refrigerator no-cool diagnosis", "Dishwasher leak repair", "Dryer thermal fuse replacement"],
-    ["Quarterly Rental Appliance Check", "Annual Warranty Tune-Up"],
-    ["Laundry Systems", "Refrigeration Appliances", "Kitchen Appliances"],
-  ),
-  commercial_equipment: starterProfile(
-    "commercial_equipment",
-    "Summit Commercial Equipment Services",
-    ["Food Service Chains", "Warehouses", "Production Facilities", "Retail Sites"],
-    [{ name: "Commercial Reach-In Freezer", category: "Commercial Equipment", manufacturer: "True" }],
-    ["Compressor replacement", "Control board fault", "Equipment performance baseline check"],
-    ["Monthly Equipment PM", "Quarterly Operational Audit"],
-    ["Commercial Equipment", "Electrical Diagnostics", "Preventive Maintenance"],
-  ),
-  fire_security: starterProfile(
-    "fire_security",
-    "ShieldPoint Fire & Security",
-    ["Schools", "Healthcare Facilities", "Office Parks", "Industrial Campuses"],
-    [{ name: "Addressable Fire Alarm Panel", category: "Fire Safety", manufacturer: "Notifier" }],
-    ["False alarm point investigation", "Access panel communication fault", "Door hardware fail-safe test"],
-    ["Monthly Fire Panel Inspection", "Quarterly Access Control Test"],
-    ["Fire Alarm Systems", "Access Control", "Life Safety Compliance"],
-  ),
-  septic: starterProfile(
-    "septic",
-    "ClearFlow Septic Services",
-    ["Residential Properties", "Rural Commercial Sites", "Campgrounds"],
-    [{ name: "Lift Station Pump", category: "Wastewater", manufacturer: "Zoeller" }],
-    ["High-water alarm response", "Pump failure replacement", "Drainfield performance assessment"],
-    ["Quarterly Septic Inspection", "Monthly Pump Station PM"],
-    ["Wastewater Systems", "Pumping Equipment", "Field Diagnostics"],
-  ),
-  av_installation: starterProfile(
-    "av_installation",
-    "SignalWorks AV Integration",
-    ["Corporate Offices", "Education Campuses", "Hospitality Venues"],
-    [{ name: "Conference Room DSP Rack", category: "Audio Visual", manufacturer: "QSC" }],
-    ["Audio drop-out troubleshooting", "Control system firmware update", "Display alignment and calibration"],
-    ["Quarterly AV Health Check", "Monthly Meeting Room QA"],
-    ["AV Systems", "Control Programming", "Networked Media"],
-  ),
+/**
+ * Demo bundle profiles keyed by canonical workspace industry.
+ * New verticals without bespoke content use registry-derived lightweight defaults so seed never fails.
+ */
+export const DEMO_INDUSTRY_PROFILES: Record<WorkspaceIndustryKey, DemoIndustryProfile> = buildDemoProfiles()
+
+/**
+ * Merge registry aliases with legacy stored/query-string keys so existing org rows normalize safely.
+ * Unknown values resolve to `commercial_equipment`.
+ */
+function buildAliasMap(): Record<string, WorkspaceIndustryKey> {
+  const map: Record<string, WorkspaceIndustryKey> = {}
+
+  for (const key of WORKSPACE_INDUSTRY_KEYS) {
+    map[key] = key
+    const def = WORKSPACE_INDUSTRY_DEFINITIONS[key]
+    for (const a of def.aliases) {
+      const norm = a.trim().toLowerCase().replace(/-/g, "_")
+      map[norm] = key
+    }
+  }
+
+  // Legacy keys present in DB / older URLs before canonical registry (Phase B)
+  Object.assign(map, {
+    medical_equipment: "biomedical_medical_equipment",
+    commercial_equipment: "commercial_equipment",
+    hvac_r: "hvac_r",
+    garage_door: "garage_door",
+    property_management: "property_management",
+    appliance_repair: "appliance_repair",
+    fire_security: "fire_security",
+    av_installation: "av_installation",
+    /** Former umbrella — maps to dedicated key */
+    equipment_service: "equipment_service_repair",
+    "equipment-service": "equipment_service_repair",
+  })
+
+  return map
 }
 
-const INDUSTRY_ALIASES: Record<string, DemoIndustryKey> = {
-  medical_equipment: "medical_equipment",
-  "medical-equipment": "medical_equipment",
-  hvac_r: "hvac_r",
-  "hvac-r": "hvac_r",
-  electrical: "electrical",
-  plumbing: "plumbing",
-  garage_door: "garage_door",
-  "garage-door": "garage_door",
-  locksmith: "locksmith",
-  property_management: "property_management",
-  "property-management": "property_management",
-  appliance_repair: "appliance_repair",
-  "appliance-repair": "appliance_repair",
-  commercial_equipment: "commercial_equipment",
-  "equipment-service": "commercial_equipment",
-  fire_security: "fire_security",
-  septic: "septic",
-  av_installation: "av_installation",
-}
+const INDUSTRY_ALIAS_MAP = buildAliasMap()
 
-export function normalizeIndustryKey(value: string | null | undefined): DemoIndustryKey {
+export function normalizeIndustryKey(value: string | null | undefined): WorkspaceIndustryKey {
   if (!value) return "commercial_equipment"
-  const normalized = value.trim().toLowerCase()
-  return INDUSTRY_ALIASES[normalized] ?? "commercial_equipment"
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_")
+  return INDUSTRY_ALIAS_MAP[normalized] ?? "commercial_equipment"
 }
 
-/** Labels for sample-data import UI (profile bundle title / sector label). */
-export function demoIndustrySelectOptions(): { value: DemoIndustryKey; label: string }[] {
-  return INDUSTRY_KEYS.map((k) => ({
+/** Dropdown labels for onboarding / Settings → Sample data (human-readable sector titles) */
+export function workspaceIndustrySelectOptions(): { value: WorkspaceIndustryKey; label: string }[] {
+  return WORKSPACE_INDUSTRY_KEYS.map((k) => ({
     value: k,
-    label: DEMO_INDUSTRY_PROFILES[k].demoCompanyName,
+    label: WORKSPACE_INDUSTRY_DEFINITIONS[k].label,
   }))
+}
+
+/** @deprecated Use `workspaceIndustrySelectOptions` — kept for API/demo-data */
+export function demoIndustrySelectOptions(): { value: WorkspaceIndustryKey; label: string }[] {
+  return workspaceIndustrySelectOptions()
+}
+
+/** Setup paragraph on onboarding workspace step */
+export function getIndustrySetupCopy(key: string): string {
+  const k = normalizeIndustryKey(key)
+  return WORKSPACE_INDUSTRY_DEFINITIONS[k].sampleSetupCopy
 }

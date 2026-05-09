@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
-import type { DemoIndustryKey } from "@/lib/demo-seeding/profiles"
+import { normalizeIndustryKey, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
 
 const RESET_CONFIRM = "RESET_SAMPLE_DATA"
 
@@ -94,10 +94,9 @@ export default function SampleDataSettingsPage() {
       setDemoSeedIndustry(json.demoSeedIndustry ?? null)
       setIndustryOptions(json.industryOptions ?? [])
       const keys = (json.industryOptions ?? []).map((o) => o.value)
+      const normalizedSeed = json.demoSeedIndustry ? normalizeIndustryKey(json.demoSeedIndustry) : null
       const preferred =
-        (json.demoSeedIndustry && keys.includes(json.demoSeedIndustry as DemoIndustryKey)
-          ? json.demoSeedIndustry
-          : keys[0]) ?? "commercial_equipment"
+        (normalizedSeed && keys.includes(normalizedSeed) ? normalizedSeed : keys[0]) ?? "commercial_equipment"
       setSelectedIndustry(preferred as DemoIndustryKey)
     } finally {
       setStatusLoading(false)
@@ -110,8 +109,9 @@ export default function SampleDataSettingsPage() {
 
   const currentIndustryLabel = useMemo(() => {
     if (!demoSeedIndustry) return null
-    const row = industryOptions.find((o) => o.value === demoSeedIndustry)
-    return row?.label ?? demoSeedIndustry.replace(/_/g, " ")
+    const nk = normalizeIndustryKey(demoSeedIndustry)
+    const row = industryOptions.find((o) => o.value === nk)
+    return row?.label ?? nk.replace(/_/g, " ")
   }, [demoSeedIndustry, industryOptions])
 
   async function handleImport() {

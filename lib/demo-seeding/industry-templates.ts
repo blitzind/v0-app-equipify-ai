@@ -10,8 +10,9 @@ import type { DemoIndustryKey } from "@/lib/demo-seeding/profiles"
  * `is_sample = true` during onboarding so admins can see the shape of an
  * industry-specific workflow without committing to it.
  *
- * Designed as an additive mapping foundation — adding a new industry or
- * extending an existing template only requires editing this file.
+ * Canonical keys live in `lib/workspace-industry-registry.ts`. This file maps
+ * each key to templates; missing keys at runtime fall back to commercial_equipment
+ * templates inside `getStarterTemplatesForIndustry`.
  */
 
 export type IndustryTemplateField = {
@@ -138,18 +139,57 @@ const COMMERCIAL_EQUIP_PM_FIELDS: IndustryTemplateField[] = [
   { id: "n_doc", type: "notes", label: "Findings" },
 ]
 
+const MEP_ROUND_FIELDS: IndustryTemplateField[] = [
+  { id: "sh_mep", type: "section_heading", label: "MEP combined rounds" },
+  { id: "pf_elec", type: "pass_fail", label: "Electrical rooms secure / labeled", required: true },
+  { id: "pf_mech", type: "pass_fail", label: "Mechanical assets within normal range" },
+  { id: "pf_plumb", type: "pass_fail", label: "Plumbing leaks / domestic pressure OK" },
+  { id: "n_doc", type: "notes", label: "Cross-trade notes" },
+]
+
+const BIOMEDICAL_TEMPLATE_SEEDS: IndustryTemplateSeed[] = [
+  {
+    name: "Electrical Safety & Leakage (IEC 60601-1)",
+    equipmentCategoryId: "Patient Monitoring",
+    fields: ELECTRICAL_SAFETY_FIELDS,
+  },
+  {
+    name: "Infusion / Pump PM & Alarm Verification",
+    equipmentCategoryId: "Infusion",
+    fields: PUMP_PM_FIELDS,
+  },
+]
+
+const commercialTemplates: IndustryTemplateSeed[] = [
+  {
+    name: "Equipment Monthly PM Checklist",
+    equipmentCategoryId: "Commercial Equipment",
+    fields: COMMERCIAL_EQUIP_PM_FIELDS,
+  },
+  {
+    name: "Operational Audit",
+    equipmentCategoryId: "Commercial Equipment",
+    fields: COMMERCIAL_EQUIP_PM_FIELDS,
+  },
+]
+
 const TEMPLATES_BY_INDUSTRY: Record<DemoIndustryKey, IndustryTemplateSeed[]> = {
-  medical_equipment: [
-    { name: "Electrical Safety & Leakage (IEC 60601-1)", equipmentCategoryId: "Patient Monitoring", fields: ELECTRICAL_SAFETY_FIELDS },
-    { name: "Infusion / Pump PM & Alarm Verification", equipmentCategoryId: "Infusion", fields: PUMP_PM_FIELDS },
-  ],
+  biomedical_medical_equipment: BIOMEDICAL_TEMPLATE_SEEDS,
   hvac_r: [
     { name: "RTU Quarterly PM Checklist", equipmentCategoryId: "HVAC", fields: HVAC_PM_FIELDS },
     { name: "Refrigeration Operational Baseline", equipmentCategoryId: "Refrigeration", fields: HVAC_PM_FIELDS },
   ],
   electrical: [
-    { name: "Distribution Panel Annual PM", equipmentCategoryId: "Power Distribution", fields: ELECTRICAL_PANEL_FIELDS },
-    { name: "Emergency Lighting Monthly Test", equipmentCategoryId: "Lighting", fields: ELECTRICAL_PANEL_FIELDS },
+    {
+      name: "Distribution Panel Annual PM",
+      equipmentCategoryId: "Power Distribution",
+      fields: ELECTRICAL_PANEL_FIELDS,
+    },
+    {
+      name: "Emergency Lighting Monthly Test",
+      equipmentCategoryId: "Lighting",
+      fields: ELECTRICAL_PANEL_FIELDS,
+    },
   ],
   plumbing: [
     { name: "Backflow Annual Test Record", equipmentCategoryId: "Backflow", fields: BACKFLOW_FIELDS },
@@ -164,17 +204,22 @@ const TEMPLATES_BY_INDUSTRY: Record<DemoIndustryKey, IndustryTemplateSeed[]> = {
     { name: "Door Hardware Semi-Annual PM", equipmentCategoryId: "Door Hardware", fields: ACCESS_CONTROL_FIELDS },
   ],
   property_management: [
-    { name: "Monthly Building Walk Inspection", equipmentCategoryId: "Facility Assets", fields: PROPERTY_INSPECTION_FIELDS },
-    { name: "Quarterly Compliance Review", equipmentCategoryId: "Compliance", fields: PROPERTY_INSPECTION_FIELDS },
+    {
+      name: "Monthly Building Walk Inspection",
+      equipmentCategoryId: "Facility Assets",
+      fields: PROPERTY_INSPECTION_FIELDS,
+    },
+    {
+      name: "Quarterly Compliance Review",
+      equipmentCategoryId: "Compliance",
+      fields: PROPERTY_INSPECTION_FIELDS,
+    },
   ],
   appliance_repair: [
     { name: "Appliance Service Visit Form", equipmentCategoryId: "Laundry", fields: APPLIANCE_INSPECTION_FIELDS },
     { name: "Annual Warranty Tune-Up", equipmentCategoryId: "Appliances", fields: APPLIANCE_INSPECTION_FIELDS },
   ],
-  commercial_equipment: [
-    { name: "Equipment Monthly PM Checklist", equipmentCategoryId: "Commercial Equipment", fields: COMMERCIAL_EQUIP_PM_FIELDS },
-    { name: "Operational Audit", equipmentCategoryId: "Commercial Equipment", fields: COMMERCIAL_EQUIP_PM_FIELDS },
-  ],
+  commercial_equipment: commercialTemplates,
   fire_security: [
     { name: "Fire Panel Monthly Inspection", equipmentCategoryId: "Fire Safety", fields: FIRE_PANEL_FIELDS },
     { name: "Access Control Quarterly Test", equipmentCategoryId: "Access Control", fields: ACCESS_CONTROL_FIELDS },
@@ -187,6 +232,13 @@ const TEMPLATES_BY_INDUSTRY: Record<DemoIndustryKey, IndustryTemplateSeed[]> = {
     { name: "AV Quarterly Health Check", equipmentCategoryId: "Audio Visual", fields: AV_QA_FIELDS },
     { name: "Meeting Room Monthly QA", equipmentCategoryId: "Audio Visual", fields: AV_QA_FIELDS },
   ],
+  mep: [
+    { name: "MEP Monthly Combined Rounds", equipmentCategoryId: "MEP", fields: MEP_ROUND_FIELDS },
+    { name: "Electrical Room Quarterly Inspection", equipmentCategoryId: "Electrical", fields: ELECTRICAL_PANEL_FIELDS },
+  ],
+  field_service: commercialTemplates,
+  equipment_service_repair: commercialTemplates,
+  specialty_contractors: commercialTemplates,
 }
 
 export function getStarterTemplatesForIndustry(industry: DemoIndustryKey): IndustryTemplateSeed[] {

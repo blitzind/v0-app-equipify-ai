@@ -17,26 +17,14 @@ import {
   parseOnboardingText,
 } from "@/lib/onboarding-intent"
 import {
-  INDUSTRY_KEYS,
   normalizeIndustryKey,
-  type DemoIndustryKey,
+  workspaceIndustrySelectOptions,
+  getIndustrySetupCopy,
 } from "@/lib/demo-seeding/profiles"
 
 const STEPS = ["Your account", "Workspace", "Choose a plan"]
-const INDUSTRY_OPTIONS: Array<{ value: DemoIndustryKey; label: string }> = [
-  { value: "medical_equipment", label: "Medical Equipment" },
-  { value: "hvac_r", label: "HVAC-R" },
-  { value: "electrical", label: "Electrical" },
-  { value: "plumbing", label: "Plumbing" },
-  { value: "garage_door", label: "Garage Door" },
-  { value: "locksmith", label: "Locksmith" },
-  { value: "property_management", label: "Property Management" },
-  { value: "appliance_repair", label: "Appliance Repair" },
-  { value: "commercial_equipment", label: "Commercial Equipment" },
-  { value: "fire_security", label: "Fire & Security" },
-  { value: "septic", label: "Septic" },
-  { value: "av_installation", label: "AV Installation" },
-]
+/** Central registry — labels and keys from `lib/workspace-industry-registry.ts` */
+const INDUSTRY_OPTIONS = workspaceIndustrySelectOptions()
 const TEAM_SIZE_OPTIONS = ["1-3", "4-10", "11-25", "26-50", "51-100", "100+"] as const
 const CURRENT_SYSTEM_OPTIONS = [
   "Spreadsheets / Paper",
@@ -58,19 +46,6 @@ type InviteContext = {
   organizationId: string
   role: string
   expiresAt: string
-}
-
-function getIndustrySetupCopy(industry: string) {
-  switch (industry) {
-    case "medical_equipment":
-      return "We’ll set up equipment tracking, calibration reminders, and service history for medical equipment teams."
-    case "hvac_r":
-      return "We’ll prepare service schedules, equipment history, and recurring maintenance workflows for HVAC-R teams."
-    case "plumbing":
-      return "We’ll organize customers, equipment, work orders, and recurring service reminders for plumbing teams."
-    default:
-      return "We’ll tailor your workspace around your equipment, service jobs, and team workflow."
-  }
 }
 
 function OnboardingPageContent() {
@@ -497,7 +472,7 @@ function OnboardingPageContent() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry</label>
                       <select
-                        value={INDUSTRY_KEYS.includes(form.industry as DemoIndustryKey) ? form.industry : "commercial_equipment"}
+                        value={normalizeIndustryKey(form.industry)}
                         onChange={(e) => setField("industry", normalizeIndustryKey(e.target.value))}
                         className="portal-select"
                       >

@@ -260,7 +260,7 @@ function completedAtFor(status: string, i: number): string | null {
 
 export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<ExecuteDemoSeedResult> {
   const profile = DEMO_INDUSTRY_PROFILES[args.industry]
-  const rich = args.industry === "medical_equipment"
+  const rich = args.industry === "biomedical_medical_equipment"
 
   const customerTarget = Math.max(profile.dashboardMetricTargets.customers, rich ? 25 : 20)
   const equipmentTarget = Math.max(profile.dashboardMetricTargets.equipment, rich ? 68 : 50)
