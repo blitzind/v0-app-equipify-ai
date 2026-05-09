@@ -15,6 +15,8 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
+import { RestrictedNotice } from "@/components/permissions/restricted-notice"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
   ShoppingCart, CheckCircle2, Clock, Truck, XCircle, AlertTriangle, Building2, Trash2,
@@ -97,6 +99,7 @@ type VendorRow = {
 function PurchaseOrdersPageInner() {
   const { orders, loading, error, addOrder } = usePurchaseOrders()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { standardCreateEligibility } = useBillingAccess()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -313,6 +316,18 @@ function PurchaseOrdersPageInner() {
     if (createError) return
     setCreateOpen(false)
     if (id) setSelectedId(id)
+  }
+
+  if (!permissions.canViewFinancials && !permissions.canViewBilling) {
+    return (
+      <div className="flex flex-col gap-5">
+        <RestrictedNotice
+          capability="canViewFinancials"
+          title="Purchase orders are restricted for your role"
+          body="Your role doesn't include access to vendor purchasing or cost history. Ask an owner, admin, or manager if you need purchasing access."
+        />
+      </div>
+    )
   }
 
   return (

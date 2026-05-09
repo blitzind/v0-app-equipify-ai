@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useQuickAdd, QuickAddParamBridge } from "@/lib/quick-add-context"
@@ -693,7 +694,7 @@ function WorkOrdersPageInner() {
   const [refreshToken, setRefreshToken] = useState(0)
   const [archiveScope, setArchiveScope] = useState<RecordArchiveVisibility>("active")
   const [workOrdersLoadError, setWorkOrdersLoadError] = useState<string | null>(null)
-  const assignedOnlyView = permissions.canViewAssignedWorkOrdersOnly && !permissions.canViewAllWorkOrders
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
 
   useEffect(() => {
     let active = true
@@ -721,6 +722,9 @@ function WorkOrdersPageInner() {
       }
 
       const orgId = activeOrgId
+      const assignedScope = assignedOnlyView
+        ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+        : null
 
       async function runWorkOrdersQuery(includeNum: boolean, includeTech: boolean, includeBilling: boolean) {
         let q = supabase
@@ -734,7 +738,11 @@ function WorkOrdersPageInner() {
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
-        if (assignedOnlyView) q = q.eq("assigned_user_id", user.id)
+        if (assignedOnlyView) {
+          const scopedIds = assignedScope?.workOrderIds ?? []
+          if (scopedIds.length === 0) q = q.eq("id", "__none__")
+          else q = q.in("id", scopedIds)
+        }
         q = applyArchivedAtScope(q, archiveScope)
         return q
       }

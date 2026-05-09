@@ -9,6 +9,8 @@ import { AIScanModal } from "@/components/equipment/ai-scan-modal"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { Badge } from "@/components/ui/badge"
@@ -263,7 +265,10 @@ function EquipmentCard({ eq, signals, selected, onSelect, onOpen }: {
 
 function EquipmentPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { equipmentCreateEligibility } = useBillingAccess()
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
+  const canManageEquipmentRecords = !assignedOnlyView
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [signalsMap, setSignalsMap] = useState<Map<string, EquipmentSignals>>(() => new Map())
   const [refreshToken, setRefreshToken] = useState(0)
@@ -287,22 +292,26 @@ function EquipmentPageInner() {
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
-      setSelectedEquipmentId(openId)
-      setArchiveScope("all")
+      if (!assignedOnlyView) {
+        setSelectedEquipmentId(openId)
+        setArchiveScope("all")
+      }
       router.replace("/equipment", { scroll: false })
     }
-  }, [searchParams, router])
+  }, [searchParams, router, assignedOnlyView])
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addEquipmentPrefillCustomerId, setAddEquipmentPrefillCustomerId] = useState<string | null>(null)
   const [scanModalOpen, setScanModalOpen] = useState(false)
 
   function openAddEquipmentModal(prefillCustomerId: string | null) {
+    if (!canManageEquipmentRecords) return
     if (blockCreateIfNotEligible(equipmentCreateEligibility)) return
     setAddEquipmentPrefillCustomerId(prefillCustomerId)
     setAddModalOpen(true)
   }
 
   function openScanModal() {
+    if (!canManageEquipmentRecords) return
     if (blockCreateIfNotEligible(equipmentCreateEligibility)) return
     setScanModalOpen(true)
   }
@@ -352,6 +361,18 @@ function EquipmentPageInner() {
 
       const orgId = activeOrgId
       if (active) setQueryError(null)
+      const assignedScope = assignedOnlyView
+        ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+        : null
+      const scopedEquipmentIds = assignedScope?.equipmentIds ?? []
+
+      if (assignedOnlyView && scopedEquipmentIds.length === 0) {
+        if (active) {
+          setEquipment([])
+          setQueryError(null)
+        }
+        return
+      }
 
       let eqQuery = supabase
         .from("equipment")
@@ -359,7 +380,8 @@ function EquipmentPageInner() {
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
-      eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
+      if (assignedOnlyView) eqQuery = eqQuery.in("id", scopedEquipmentIds).is("archived_at", null)
+      else eqQuery = applyArchivedAtScope(eqQuery, archiveScope)
 
       const firstRes = await eqQuery
       let equipmentError = firstRes.error
@@ -374,7 +396,8 @@ function EquipmentPageInner() {
           .select(EQUIPMENT_PAGE_SELECT_LEGACY)
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false })
-        legacyQ = applyArchivedAtScope(legacyQ, archiveScope)
+        if (assignedOnlyView) legacyQ = legacyQ.in("id", scopedEquipmentIds).is("archived_at", null)
+        else legacyQ = applyArchivedAtScope(legacyQ, archiveScope)
         const legacyRes = await legacyQ
         equipmentError = legacyRes.error
         equipmentRows = (legacyRes.data as DbEquipmentRow[] | null) ?? null
@@ -457,7 +480,7 @@ function EquipmentPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope, assignedOnlyView])
 
   useEffect(() => {
     let active = true
@@ -582,6 +605,14 @@ function EquipmentPageInner() {
       ) : null}
 
       {/* Toolbar */}
+      {assignedOnlyView ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Technician equipment view</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Showing equipment tied to your assigned active work orders. Equipment creation, archived records, bulk assignment, and removal are restricted to admins and managers.
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -631,6 +662,7 @@ function EquipmentPageInner() {
             </SelectContent>
           </Select>
 
+          {canManageEquipmentRecords ? (
           <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
             <SelectTrigger className="w-[132px]">
               <SelectValue placeholder="Records" />
@@ -641,10 +673,12 @@ function EquipmentPageInner() {
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
           </Select>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          {canManageEquipmentRecords ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="gap-2 shrink-0 cursor-pointer">
@@ -680,11 +714,12 @@ function EquipmentPageInner() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          ) : null}
         </div>
       </div>
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
+      {canManageEquipmentRecords && selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary/10 border border-primary/20">
           <span className="text-sm font-medium text-primary">{selected.size} selected</span>
           <div className="flex items-center gap-2 ml-auto">
@@ -717,6 +752,7 @@ function EquipmentPageInner() {
           <Table>
             <TableHeader>
               <TableRow className="ds-table-header-row h-12">
+                {canManageEquipmentRecords ? (
                 <TableHead className="w-12 min-w-12 px-0">
                   <div className="flex h-full w-full items-center justify-center">
                     <Checkbox
@@ -727,6 +763,7 @@ function EquipmentPageInner() {
                     />
                   </div>
                 </TableHead>
+                ) : null}
                 <TableHead>
                   <button onClick={() => toggleSort("model")} className="ds-btn-sort">
                     Model <SortIcon col="model" />
@@ -759,7 +796,7 @@ function EquipmentPageInner() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
+                  <TableCell colSpan={canManageEquipmentRecords ? 8 : 7} className="text-center py-12 text-muted-foreground text-sm">
                     No equipment matches your filters.
                   </TableCell>
                 </TableRow>
@@ -773,6 +810,7 @@ function EquipmentPageInner() {
                     )}
                     onClick={() => setSelectedEquipmentId(eq.id)}
                   >
+                    {canManageEquipmentRecords ? (
                     <TableCell
                       className="w-12 min-w-12 px-0 align-middle"
                       onClick={(e) => { e.stopPropagation(); toggleSelect(eq.id) }}
@@ -785,6 +823,7 @@ function EquipmentPageInner() {
                         />
                       </div>
                     </TableCell>
+                    ) : null}
                     <TableCell className="pl-4">
                       <div className="flex flex-col justify-center gap-1">
                         <span className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">

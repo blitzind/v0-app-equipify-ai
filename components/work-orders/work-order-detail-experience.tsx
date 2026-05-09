@@ -727,6 +727,8 @@ export interface WorkOrderDetailExperienceProps {
   onMarkComplete: () => void | Promise<void>
   quoteHref: string
   onInvoicePlaceholder: () => void
+  canCreateQuote?: boolean
+  canCreateInvoice?: boolean
   onPrint?: () => void
   onArchive?: () => void
   /** Optional link to full page (drawer) */
@@ -826,6 +828,8 @@ export function WorkOrderDetailExperience({
   onMarkComplete,
   quoteHref,
   onInvoicePlaceholder,
+  canCreateQuote = true,
+  canCreateInvoice = true,
   onPrint,
   onArchive,
   fullPageHref,
@@ -1036,12 +1040,15 @@ export function WorkOrderDetailExperience({
                   Complete Work Order
                 </Button>
               )}
+              {canCreateQuote ? (
               <Button size="sm" variant={qaVariant} className={qaBtnClass} asChild>
                 <Link href={quoteHref}>
                   <FileText className="w-3.5 h-3.5" />
                   Create quote
                 </Link>
               </Button>
+              ) : null}
+              {canCreateInvoice ? (
               <Button
                 size="sm"
                 variant={qaVariant}
@@ -1053,6 +1060,7 @@ export function WorkOrderDetailExperience({
                 <Receipt className="w-3.5 h-3.5" />
                 Create invoice
               </Button>
+              ) : null}
               {onPrint && (
                 <Button size="sm" variant={qaVariant} className={qaBtnClass} type="button" onClick={onPrint}>
                   <Printer className="w-3.5 h-3.5" />
@@ -1345,12 +1353,15 @@ export function WorkOrderDetailExperience({
                         Complete Work Order
                       </Button>
                     )}
+                    {canCreateQuote ? (
                     <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" asChild>
                       <Link href={quoteHref}>
                         <FileText className="w-3.5 h-3.5" />
                         Create quote
                       </Link>
                     </Button>
+                    ) : null}
+                    {canCreateInvoice ? (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -1362,6 +1373,7 @@ export function WorkOrderDetailExperience({
                       <Receipt className="w-3.5 h-3.5" />
                       Create invoice
                     </Button>
+                    ) : null}
                     {onPrint && (
                       <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs shadow-sm" type="button" onClick={onPrint}>
                         <Printer className="w-3.5 h-3.5" />

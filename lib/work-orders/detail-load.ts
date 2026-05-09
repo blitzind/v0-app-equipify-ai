@@ -633,6 +633,7 @@ export async function loadWorkOrderDetailForOrg(
     status: mapDbStatus(w.status),
     priority: mapDbPriority(w.priority),
     technicianId: techId,
+    assignedUserId: w.assigned_user_id,
     technicianName: techName,
     technicianAvatarUrl: tr?.avatar_url?.trim() || (w.assigned_user_id ? ap?.avatar_url?.trim() || null : null),
     scheduledDate: w.scheduled_on ?? "",

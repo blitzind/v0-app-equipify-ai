@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils"
 import type { Equipment } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -370,6 +372,10 @@ export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>()
   const id = typeof params.id === "string" ? params.id : ""
   const activeOrg = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
+  const canManageEquipmentRecords = !assignedOnlyView
+  const canViewEquipmentFinancials = permissions.canViewFinancials || permissions.canViewBilling || permissions.canViewQuotes
 
   const [loading, setLoading] = useState(true)
   const [eq, setEq] = useState<Equipment | null>(null)
@@ -421,6 +427,20 @@ export default function EquipmentDetailPage() {
         return
       }
       const oid = activeOrg.organizationId
+      if (assignedOnlyView) {
+        const scope = await loadAssignedWorkScope(supabase, { organizationId: oid, userId: user.id })
+        if (!scope.equipmentIds.includes(id)) {
+          setEq(null)
+          setWorkOrders([])
+          setPlans([])
+          setInvoiceRows([])
+          setCertificateLines([])
+          setDocumentRows([])
+          setCertificateAttachmentRows([])
+          setTechProfiles({})
+          return
+        }
+      }
 
       const { data: row, error } = await supabase
         .from("equipment")
@@ -541,7 +561,7 @@ export default function EquipmentDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id, activeOrg.status, activeOrg.organizationId])
+  }, [id, activeOrg.status, activeOrg.organizationId, assignedOnlyView])
 
   useEffect(() => {
     let cancelled = false
@@ -568,6 +588,11 @@ export default function EquipmentDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (assignedOnlyView && tab === "plans") setTab("overview")
+    if (!canViewEquipmentFinancials && tab === "quotes") setTab("overview")
+  }, [assignedOnlyView, canViewEquipmentFinancials, tab])
 
   const openWOs = useMemo(
     () => workOrders.filter((w) => w.status !== "completed" && w.status !== "invoiced"),
@@ -973,6 +998,7 @@ export default function EquipmentDetailPage() {
             </div>
           </div>
 
+          {canManageEquipmentRecords ? (
           <div className="mt-6 pt-6 border-t border-border">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</p>
             <div className="flex flex-wrap gap-2">
@@ -993,6 +1019,13 @@ export default function EquipmentDetailPage() {
               </Button>
             </div>
           </div>
+          ) : (
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                Technician access is read-only for equipment management. Open assigned work orders to update job workflow details.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1061,12 +1094,16 @@ export default function EquipmentDetailPage() {
           <TabsTrigger value="service" className="text-xs sm:text-sm gap-1.5">
             <Wrench className="w-3.5 h-3.5" /> Service ({workOrders.length})
           </TabsTrigger>
-          <TabsTrigger value="plans" className="text-xs sm:text-sm gap-1.5">
-            <Calendar className="w-3.5 h-3.5" /> Plans ({plans.length})
-          </TabsTrigger>
-          <TabsTrigger value="quotes" className="text-xs sm:text-sm gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> Quotes
-          </TabsTrigger>
+          {!assignedOnlyView ? (
+            <TabsTrigger value="plans" className="text-xs sm:text-sm gap-1.5">
+              <Calendar className="w-3.5 h-3.5" /> Plans ({plans.length})
+            </TabsTrigger>
+          ) : null}
+          {canViewEquipmentFinancials ? (
+            <TabsTrigger value="quotes" className="text-xs sm:text-sm gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Quotes
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="warranty" className="text-xs sm:text-sm gap-1.5">
             <Shield className="w-3.5 h-3.5" /> Warranty
           </TabsTrigger>
@@ -1079,6 +1116,7 @@ export default function EquipmentDetailPage() {
           <ServiceLifecycleTimeline title="Equipment timeline" events={equipmentLifecycleEvents} />
 
           <div className="grid md:grid-cols-2 gap-4">
+            {canViewEquipmentFinancials ? (
             <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1091,6 +1129,7 @@ export default function EquipmentDetailPage() {
                 </p>
               </CardContent>
             </Card>
+            ) : null}
             <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1137,7 +1176,7 @@ export default function EquipmentDetailPage() {
             </CardContent>
           </Card>
 
-          {invoiceRows.length > 0 ? (
+          {canViewEquipmentFinancials && invoiceRows.length > 0 ? (
             <Card className="border-border">
               <CardContent className="p-5 space-y-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Invoices</p>
@@ -1195,7 +1234,7 @@ export default function EquipmentDetailPage() {
             {[
               { label: "Total events", value: workOrders.length },
               { label: "Repairs", value: workOrders.filter((w) => (w.type ?? "").toLowerCase() === "repair").length },
-              { label: "Total cost", value: fmtCurrency(totalServiceCost) },
+              ...(canViewEquipmentFinancials ? [{ label: "Total cost", value: fmtCurrency(totalServiceCost) }] : []),
             ].map((s) => (
               <div key={s.label} className="bg-muted/30 border border-border rounded-lg p-3 text-center">
                 <p className="text-lg font-bold text-foreground">{s.value}</p>

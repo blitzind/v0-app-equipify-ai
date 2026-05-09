@@ -511,6 +511,8 @@ export interface WorkOrder {
   status: WorkOrderStatus
   priority: WorkOrderPriority
   technicianId: string
+  /** Auth user id assigned to the work order, distinct from optional technicians table id. */
+  assignedUserId?: string | null
   technicianName: string
   /** Public profile photo URL from `profiles.avatar_url` when assigned user has one. */
   technicianAvatarUrl?: string | null

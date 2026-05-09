@@ -8,6 +8,8 @@ import { AddCustomerModal } from "@/components/customers/add-customer-modal"
 import { applyArchivedAtScope } from "@/lib/archive-scope"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { useCustomers } from "@/lib/customer-store"
@@ -231,12 +233,15 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
 function CustomersPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { standardCreateEligibility } = useBillingAccess()
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
   const [customers, setCustomers] = useState<Customer[]>([])
   const { customers: drawerCustomers, addCustomer } = useCustomers()
   const [refreshToken, setRefreshToken] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false)
   function openNewCustomerModal() {
+    if (assignedOnlyView) return
     if (blockCreateIfNotEligible(standardCreateEligibility)) return
     setShowAddModal(true)
   }
@@ -271,6 +276,15 @@ function CustomersPageInner() {
       }
 
       const orgId = activeOrgId
+      const assignedScope = assignedOnlyView
+        ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+        : null
+      const scopedCustomerIds = assignedScope?.customerIds ?? []
+
+      if (assignedOnlyView && scopedCustomerIds.length === 0) {
+        if (active) setCustomers([])
+        return
+      }
 
       let custQuery = supabase
         .from("customers")
@@ -278,7 +292,8 @@ function CustomersPageInner() {
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
 
-      custQuery = applyArchivedAtScope(custQuery, archiveScope)
+      if (assignedOnlyView) custQuery = custQuery.in("id", scopedCustomerIds).is("archived_at", null)
+      else custQuery = applyArchivedAtScope(custQuery, archiveScope)
 
       const { data, error } = await custQuery
 
@@ -415,7 +430,7 @@ function CustomersPageInner() {
     return () => {
       active = false
     }
-  }, [refreshToken, orgStatus, activeOrgId, archiveScope])
+  }, [refreshToken, orgStatus, activeOrgId, archiveScope, assignedOnlyView])
 
   // Phase 1: optional ?parent=<id> filter to scope the list to a parent's
   // sub-accounts (deep-linked from the customer hierarchy card). The id is a
@@ -427,15 +442,17 @@ function CustomersPageInner() {
   useEffect(() => {
     const openId = searchParams.get("open")
     if (openId) {
-      setSelectedCustomerId(openId)
-      setArchiveScope("all")
+      if (!assignedOnlyView) {
+        setSelectedCustomerId(openId)
+        setArchiveScope("all")
+      }
       router.replace("/customers", { scroll: false })
     }
     const parentId = searchParams.get("parent")
     if (parentId) {
       setParentFilterId(parentId)
     }
-  }, [searchParams, router])
+  }, [searchParams, router, assignedOnlyView])
 
   const parentFilterCompany = useMemo(() => {
     if (!parentFilterId) return null
@@ -552,6 +569,14 @@ function CustomersPageInner() {
   return (
     <div className="flex flex-col gap-6">
       {/* Toolbar */}
+      {assignedOnlyView ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Technician customer view</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Showing customers tied to your assigned active work orders. Customer creation, archived records, and account hierarchy management stay available to admins and managers.
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -575,6 +600,7 @@ function CustomersPageInner() {
           </SelectContent>
         </Select>
 
+        {!assignedOnlyView ? (
         <Select value={archiveScope} onValueChange={(v) => setArchiveScope(v as RecordArchiveVisibility)}>
           <SelectTrigger className="w-[132px]">
             <SelectValue placeholder="Records" />
@@ -585,8 +611,10 @@ function CustomersPageInner() {
             <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
+        ) : null}
 
         {/* Phase 2: hierarchy scope filter. */}
+        {!assignedOnlyView ? (
         <Select
           value={hierarchyScope}
           onValueChange={(v) => setHierarchyScope(v as HierarchyScope)}
@@ -601,14 +629,17 @@ function CustomersPageInner() {
             <SelectItem value="standalone">Stand-alone</SelectItem>
           </SelectContent>
         </Select>
+        ) : null}
 
         <div className="flex items-center gap-2 ml-auto shrink-0">
           <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          {!assignedOnlyView ? (
           <Button size="sm" className="gap-2 cursor-pointer" onClick={() => openNewCustomerModal()}>
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Customer</span>
             <span className="sm:hidden">Add</span>
           </Button>
+          ) : null}
         </div>
       </div>
 

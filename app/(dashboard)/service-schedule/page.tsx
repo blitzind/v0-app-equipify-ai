@@ -18,6 +18,7 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -1937,7 +1938,7 @@ function CompactPlanAlert({
 function ServiceSchedulePageInner() {
   const { plans, organizationId } = useMaintenancePlans()
   const { permissions } = useOrgPermissions()
-  const assignedOnlyView = permissions.canViewAssignedWorkOrdersOnly && !permissions.canViewAllWorkOrders
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageSchedule = permissions.canManageDispatch
 
   const [scheduledWoRows, setScheduledWoRows] = useState<ScheduledWoRowView[]>([])
@@ -1979,6 +1980,10 @@ function ServiceSchedulePageInner() {
       }
 
       const orgId = organizationId
+      const assignedScope = assignedOnlyView
+        ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+        : null
+      const assignedWorkOrderIds = assignedScope?.workOrderIds ?? []
 
       const selFull =
         "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
@@ -1988,41 +1993,50 @@ function ServiceSchedulePageInner() {
 
       async function fetchScheduled() {
         let mini = false
-        let res = await supabase
+        let fullQuery = supabase
           .from("work_orders")
           .select(selFull)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .not("scheduled_on", "is", null)
-          .order("scheduled_on", { ascending: true })
-          .order("scheduled_time", { ascending: true, nullsFirst: false })
-        if (assignedOnlyView) res = await supabase
-          .from("work_orders")
-          .select(selFull)
-          .eq("organization_id", orgId)
-          .eq("assigned_user_id", user.id)
-          .is("archived_at", null)
-          .not("scheduled_on", "is", null)
+        if (assignedOnlyView) {
+          fullQuery = assignedWorkOrderIds.length > 0
+            ? fullQuery.in("id", assignedWorkOrderIds)
+            : fullQuery.eq("id", "__none__")
+        }
+        let res = await fullQuery
           .order("scheduled_on", { ascending: true })
           .order("scheduled_time", { ascending: true, nullsFirst: false })
         if (res.error && missingOperationalBillingColumns(res.error)) {
-          res = await supabase
+          let noBillingQuery = supabase
             .from("work_orders")
             .select(selNoBilling)
             .eq("organization_id", orgId)
             .is("archived_at", null)
             .not("scheduled_on", "is", null)
+          if (assignedOnlyView) {
+            noBillingQuery = assignedWorkOrderIds.length > 0
+              ? noBillingQuery.in("id", assignedWorkOrderIds)
+              : noBillingQuery.eq("id", "__none__")
+          }
+          res = await noBillingQuery
             .order("scheduled_on", { ascending: true })
             .order("scheduled_time", { ascending: true, nullsFirst: false })
         }
         if (res.error && missingWorkOrderNumberColumn(res.error)) {
           mini = true
-          res = await supabase
+          let miniQuery = supabase
             .from("work_orders")
             .select(selMini)
             .eq("organization_id", orgId)
             .is("archived_at", null)
             .not("scheduled_on", "is", null)
+          if (assignedOnlyView) {
+            miniQuery = assignedWorkOrderIds.length > 0
+              ? miniQuery.in("id", assignedWorkOrderIds)
+              : miniQuery.eq("id", "__none__")
+          }
+          res = await miniQuery
             .order("scheduled_on", { ascending: true })
             .order("scheduled_time", { ascending: true, nullsFirst: false })
         }
@@ -2556,21 +2570,31 @@ function ServiceSchedulePageInner() {
   return (
     <div className="flex flex-col gap-5">
 
-      {/* Alert banners — compact, expandable summaries (replaces inline plan-name paragraphs). */}
-      <CompactPlanAlert
-        tone="danger"
-        plans={overduePlans}
-        onOpenPlan={setSelectedPlanId}
-        onCreateWo={handleCreateWo}
-        createdIds={createdIds}
-      />
-      <CompactPlanAlert
-        tone="warning"
-        plans={criticalSoon}
-        onOpenPlan={setSelectedPlanId}
-        onCreateWo={handleCreateWo}
-        createdIds={createdIds}
-      />
+      {assignedOnlyView ? (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Technician schedule</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Showing assigned scheduled jobs only. Maintenance-plan queues, team scheduling, and reassignment tools are restricted to dispatchers and admins.
+          </p>
+        </div>
+      ) : (
+        <>
+          <CompactPlanAlert
+            tone="danger"
+            plans={overduePlans}
+            onOpenPlan={setSelectedPlanId}
+            onCreateWo={handleCreateWo}
+            createdIds={createdIds}
+          />
+          <CompactPlanAlert
+            tone="warning"
+            plans={criticalSoon}
+            onOpenPlan={setSelectedPlanId}
+            onCreateWo={handleCreateWo}
+            createdIds={createdIds}
+          />
+        </>
+      )}
 
       {/* ── View Tabs + My/Team Toggle ─────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -2621,6 +2645,7 @@ function ServiceSchedulePageInner() {
         <span className="flex-1" />
 
         {/* My / Team toggle */}
+        {!assignedOnlyView ? (
         <div className="flex items-center gap-1 p-1 rounded-lg bg-muted border border-border">
           {([
             { id: "my",   label: "My Schedule",   Icon: User },
@@ -2641,6 +2666,7 @@ function ServiceSchedulePageInner() {
             </button>
           ))}
         </div>
+        ) : null}
 
         {canManageSchedule ? (
           <div className="flex items-center gap-2">
@@ -2674,7 +2700,7 @@ function ServiceSchedulePageInner() {
           </SelectContent>
         </Select>
 
-        {teamScope === "team" && (
+        {!assignedOnlyView && teamScope === "team" && (
           <Select value={techFilter} onValueChange={setTechFilter}>
             <SelectTrigger className="h-9 w-44 text-sm shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -2831,7 +2857,7 @@ function ServiceSchedulePageInner() {
 
           {viewTab === "list" && (
             <>
-              {monthKeys.map((key) => {
+              {!assignedOnlyView && monthKeys.map((key) => {
                 const monthPlans = grouped[key]
                 if (!monthPlans?.length) return null
                 return (
@@ -2847,7 +2873,7 @@ function ServiceSchedulePageInner() {
                   />
                 )
               })}
-              {totalVisible === 0 && (
+              {!assignedOnlyView && totalVisible === 0 && (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                   <Calendar className="w-10 h-10 text-muted-foreground/30 mb-3" />
                   <p className="text-sm font-medium text-muted-foreground">No services scheduled in this window.</p>
@@ -2857,7 +2883,7 @@ function ServiceSchedulePageInner() {
             </>
           )}
 
-          {viewTab === "calendar" && (
+          {!assignedOnlyView && viewTab === "calendar" && (
             <CalendarView
               plans={filteredPlans}
               calSub={calSub}
@@ -2870,7 +2896,7 @@ function ServiceSchedulePageInner() {
             />
           )}
 
-          {viewTab === "map" && (
+          {!assignedOnlyView && viewTab === "map" && (
             <MapView
               plans={filteredPlans}
               onOpenPlan={setSelectedPlanId}
@@ -2885,7 +2911,7 @@ function ServiceSchedulePageInner() {
         <div className="w-full lg:w-72 shrink-0 flex flex-col gap-4 lg:sticky lg:top-0">
 
           {/* Summary card — only in list view */}
-          {viewTab === "list" && (
+          {!assignedOnlyView && viewTab === "list" && (
             <Card className="border border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -2921,10 +2947,10 @@ function ServiceSchedulePageInner() {
           )}
 
           {/* AI Smart Scheduling */}
-          <SmartSchedulingPanel plans={filteredPlans} />
+          {!assignedOnlyView ? <SmartSchedulingPanel plans={filteredPlans} /> : null}
 
           {/* Notification timeline */}
-          <NotificationTimeline plans={plans} />
+          {!assignedOnlyView ? <NotificationTimeline plans={plans} /> : null}
         </div>
       </div>
 

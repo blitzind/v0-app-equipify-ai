@@ -45,6 +45,7 @@ import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-or
 import { useToast } from "@/hooks/use-toast"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import type { Part, RepairLog, WorkOrder, WorkOrderStatus, WorkOrderPriority, WorkOrderType } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -452,15 +453,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       setLoading(false)
       return
     }
-    if (
-      woOrgPermissions.canViewAssignedWorkOrdersOnly &&
-      !woOrgPermissions.canViewAllWorkOrders &&
-      res.data.workOrder.technicianId !== user.id
-    ) {
-      setWo(null)
-      setBillingProfile(null)
-      setLoading(false)
-      return
+    if (woOrgPermissions.canViewAssignedWorkOrdersOnly && !woOrgPermissions.canViewAllWorkOrders) {
+      const assignedScope = await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+      if (res.data.workOrder.assignedUserId !== user.id && !assignedScope.workOrderIds.includes(res.data.workOrder.id)) {
+        setWo(null)
+        setBillingProfile(null)
+        setLoading(false)
+        return
+      }
     }
     setDbNotes(res.data.notes)
     setPlanServices(res.data.planServices)
@@ -2280,6 +2280,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             postCompletionActions={postCompletionActions}
             quoteHref={quoteHref}
             onInvoicePlaceholder={() => handleCreateInvoiceAction()}
+            canCreateQuote={woOrgPermissions.canEditQuotes}
+            canCreateInvoice={woCanCreateInvoice}
             onPrint={() => void handlePrintWorkOrderSummary()}
             onArchive={
               canArchiveRestore

@@ -33,6 +33,8 @@ import {
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -419,7 +421,11 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { canArchiveRestore } = useOrgArchivePermissions()
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
+  const canManageCustomerRecords = !assignedOnlyView
+  const canViewCustomerFinancials = permissions.canViewFinancials || permissions.canViewBilling
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -520,6 +526,16 @@ export default function CustomerDetailPage() {
       }
 
       const orgId = activeOrgId
+      if (assignedOnlyView) {
+        const scope = await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+        if (!scope.customerIds.includes(id)) {
+          if (active) {
+            setCustomer(null)
+            setLoading(false)
+          }
+          return
+        }
+      }
 
       const customerSelectAttempts = [
         // Includes Phase 2 consolidated docs column when migration applied.
@@ -716,7 +732,16 @@ export default function CustomerDetailPage() {
     return () => {
       active = false
     }
-  }, [id, refreshToken, orgStatus, activeOrgId])
+  }, [id, refreshToken, orgStatus, activeOrgId, assignedOnlyView])
+
+  useEffect(() => {
+    if (!canViewCustomerFinancials && (activeTab === "quotes" || activeTab === "billing")) {
+      setActiveTab("overview")
+    }
+    if (assignedOnlyView && activeTab === "maintenance-plans") {
+      setActiveTab("overview")
+    }
+  }, [activeTab, assignedOnlyView, canViewCustomerFinancials])
 
   // Hierarchy + billing/service summary (Phase 1) — non-blocking.
   useEffect(() => {
@@ -772,7 +797,7 @@ export default function CustomerDetailPage() {
   // rollup when this account has sub-accounts).
   useEffect(() => {
     let cancelled = false
-    if (!customer) {
+    if (!customer || !canViewCustomerFinancials) {
       setInvoiceAgingSelf(null)
       setInvoiceAgingConsolidated(null)
       setInvoiceAgingChildCount(0)
@@ -817,7 +842,7 @@ export default function CustomerDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [customer, hierarchySummary, refreshToken])
+  }, [customer, hierarchySummary, refreshToken, canViewCustomerFinancials])
 
   // Equipment Intelligence Phase 2 — category breakdown for this customer.
   // For parent accounts we expand to the full rollup tree (self + descendants);
@@ -1647,7 +1672,7 @@ export default function CustomerDetailPage() {
               </div>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
-              {!customer.isArchived ? (
+              {canManageCustomerRecords && !customer.isArchived ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1680,7 +1705,7 @@ export default function CustomerDetailPage() {
                   Edit
                 </Button>
               ) : null}
-              {canArchiveRestore ? (
+              {canManageCustomerRecords && canArchiveRestore ? (
                 customer.isArchived ? (
                   <Button variant="outline" size="sm" onClick={() => void handleRestoreCustomer()} disabled={archiving}>
                     {archiving ? "Restoring..." : "Restore"}
@@ -1694,7 +1719,7 @@ export default function CustomerDetailPage() {
             </div>
           </div>
 
-          {!customer.isArchived ? (
+          {canManageCustomerRecords && !customer.isArchived ? (
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick actions</p>
               <div className="flex flex-wrap gap-2">
@@ -1732,6 +1757,12 @@ export default function CustomerDetailPage() {
                 </Button>
               </div>
             </div>
+          ) : !canManageCustomerRecords ? (
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                Technician access is read-only for customer account management. Open assigned work orders to update job workflow details.
+              </p>
+            </div>
           ) : (
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-xs text-muted-foreground">
@@ -1762,20 +1793,26 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="work-orders" className="text-xs sm:text-sm">
             Work Orders ({customerWorkOrders.length})
           </TabsTrigger>
-          <TabsTrigger value="quotes" className="text-xs sm:text-sm">
-            Quotes
-          </TabsTrigger>
-          <TabsTrigger value="billing" className="text-xs sm:text-sm">
-            Billing
-            {invoiceAgingSelf && invoiceAgingSelf.overdueCount > 0 ? (
-              <span className="ml-1.5 inline-flex items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 px-1.5 text-[10px] font-semibold text-destructive">
-                {invoiceAgingSelf.overdueCount}
-              </span>
-            ) : null}
-          </TabsTrigger>
-          <TabsTrigger value="maintenance-plans" className="text-xs sm:text-sm">
-            Maintenance Plans ({customerPlans.length})
-          </TabsTrigger>
+          {canViewCustomerFinancials ? (
+            <>
+              <TabsTrigger value="quotes" className="text-xs sm:text-sm">
+                Quotes
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="text-xs sm:text-sm">
+                Billing
+                {invoiceAgingSelf && invoiceAgingSelf.overdueCount > 0 ? (
+                  <span className="ml-1.5 inline-flex items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 px-1.5 text-[10px] font-semibold text-destructive">
+                    {invoiceAgingSelf.overdueCount}
+                  </span>
+                ) : null}
+              </TabsTrigger>
+            </>
+          ) : null}
+          {!assignedOnlyView ? (
+            <TabsTrigger value="maintenance-plans" className="text-xs sm:text-sm">
+              Maintenance Plans ({customerPlans.length})
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="communications" className="text-xs sm:text-sm gap-1">
             <MessageSquare className="w-3.5 h-3.5 shrink-0" />
             Communications
@@ -1797,14 +1834,14 @@ export default function CustomerDetailPage() {
           ) : null}
 
           {/* Phase 2: Portal certificate release clarity */}
-          {activeOrgId ? (
+          {canManageCustomerRecords && activeOrgId ? (
             <CustomerPortalCertificateRuleCard
               organizationId={activeOrgId}
               customerMode={customer.portalCertificateReleaseMode}
             />
           ) : null}
 
-          {activeOrgId ? (
+          {canManageCustomerRecords && activeOrgId ? (
             <CustomerPortalConsolidatedDocsCard
               organizationId={activeOrgId}
               customerOverride={customer.portalConsolidatedDocumentsEnabled}
@@ -1812,7 +1849,7 @@ export default function CustomerDetailPage() {
           ) : null}
 
           {/* Invoicing Phase 2: Customer billing terms clarity */}
-          {activeOrgId ? (
+          {canViewCustomerFinancials && activeOrgId ? (
             <CustomerBillingTermsCard
               organizationId={activeOrgId}
               customerTermsCode={customer.defaultInvoiceTermsCode}
@@ -1866,17 +1903,21 @@ export default function CustomerDetailPage() {
                   sub: "PM coverage",
                   kpiVariant: "maintenance-plans" as const,
                 },
-                {
-                  label: "Lifetime Revenue",
-                  value: lifetimeRevenueCents > 0 ? fmtCurrencyCents(lifetimeRevenueCents) : "—",
-                  sub:
-                    lifetimeRevenueCents > 0
-                      ? "Completed & invoiced labor + parts"
-                      : "No completed / invoiced revenue yet",
-                  icon: DollarSign,
-                  accent: "text-[color:var(--status-info)]",
-                  bg: "bg-[color:var(--status-info)]/10",
-                },
+                ...(canViewCustomerFinancials
+                  ? [
+                      {
+                        label: "Lifetime Revenue",
+                        value: lifetimeRevenueCents > 0 ? fmtCurrencyCents(lifetimeRevenueCents) : "—",
+                        sub:
+                          lifetimeRevenueCents > 0
+                            ? "Completed & invoiced labor + parts"
+                            : "No completed / invoiced revenue yet",
+                        icon: DollarSign,
+                        accent: "text-[color:var(--status-info)]",
+                        bg: "bg-[color:var(--status-info)]/10",
+                      } satisfies CustomerOverviewKpi,
+                    ]
+                  : []),
               ] satisfies CustomerOverviewKpi[]
             ).map((kpi) => (
               <div
