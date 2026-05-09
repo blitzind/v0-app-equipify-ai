@@ -20,7 +20,6 @@ import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
 import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
-import { AidenDeployLayoutProbe } from "@/components/deploy-debug-probes"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
@@ -84,7 +83,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <EquipmentTypeProvider>
                       <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
                         <div className="flex flex-col h-dvh overflow-hidden bg-background">
-                          <AidenDeployLayoutProbe />
                           <ImpersonationBanner />
                           <BillingWarningBanner />
                           <div className="flex flex-1 min-h-0 overflow-hidden">

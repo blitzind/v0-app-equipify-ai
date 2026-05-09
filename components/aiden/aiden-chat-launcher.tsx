@@ -11,24 +11,12 @@ const AidenChatPanel = dynamic(
   { ssr: false },
 )
 
-/** Build-time flag: set NEXT_PUBLIC_AIDEN_LAUNCHER_DEBUG=true to verify dashboard layout render path in prod. */
-const LAUNCHER_DEBUG = process.env.NEXT_PUBLIC_AIDEN_LAUNCHER_DEBUG === "true"
-
 /** Floating launcher — not tied to sidebar/RBAC; does not depend on org loading or plan. */
 export function AidenChatLauncher() {
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      {LAUNCHER_DEBUG ? (
-        <button
-          type="button"
-          className="fixed bottom-24 right-6 z-[9999] rounded-md bg-red-500 p-4 font-medium text-white shadow-lg"
-          aria-label="AIden launcher layout probe (NEXT_PUBLIC_AIDEN_LAUNCHER_DEBUG)"
-        >
-          AIden Test
-        </button>
-      ) : null}
       {/*
         z-[95]: above mobile bottom nav (z-[80]/[91]), below Sheet/drawer stacks (z-[100]+).
         bottom-24 on small screens clears the fixed nav + FAB (matches PageShell pb-24); lg+ uses compact inset.

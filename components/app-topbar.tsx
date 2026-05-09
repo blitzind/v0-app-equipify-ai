@@ -39,7 +39,6 @@ import {
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { communicationEventPresentation } from "@/lib/notifications/event-icons"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
-import { AidenDeployTopbarBadge } from "@/components/deploy-debug-probes"
 
 type FeedPreview = {
   id: string
@@ -286,8 +285,6 @@ export function AppTopbar() {
       </Link>
 
       {/* Search — desktop only (sm+), hidden on mobile */}
-      <AidenDeployTopbarBadge />
-
       <div
         className={cn(
           "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 bg-background",
