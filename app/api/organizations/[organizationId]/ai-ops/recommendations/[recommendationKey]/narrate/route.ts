@@ -5,7 +5,14 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { runAiTask } from "@/lib/ai/server"
+import { getEffectivePlanId } from "@/lib/billing/effective-plan"
+import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
+import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { generateRecommendations } from "@/lib/ai-ops/engine"
+import {
+  isAssignedWorkOnly,
+  loadAssignedWorkScope,
+} from "@/lib/permissions/technician-scope"
 import {
   AI_OPS_NARRATION_SCHEMA_VERSION,
   AI_OPS_NARRATION_SYSTEM_PROMPT,
@@ -71,6 +78,15 @@ export async function POST(
     return jsonError("AI narration requires insights access.", 403, "forbidden")
   }
 
+  const assignedWorkOnly = isAssignedWorkOnly(permissions)
+  let assignedScope = null as Awaited<ReturnType<typeof loadAssignedWorkScope>> | null
+  if (assignedWorkOnly) {
+    assignedScope = await loadAssignedWorkScope(supabase, {
+      organizationId,
+      userId: user.id,
+    })
+  }
+
   // Re-derive the recommendation server-side. This guarantees the
   // payload sent to the LLM matches the deterministic engine and
   // cannot be tampered with from the client.
@@ -78,7 +94,10 @@ export async function POST(
     supabase,
     organizationId,
     permissions,
-    filter: { limit: 100 },
+    userId: user.id,
+    assignedScope,
+    assignedWorkOnly,
+    filter: { limit: 100, recommendationKey: key },
   })
   const target = response.items.find((i) => i.key === key)
   if (!target) {
@@ -92,6 +111,11 @@ export async function POST(
   // 1. Cache lookup (24h TTL on `updated_at`).
   const cached = await readNarration(supabase, organizationId, key)
   if (cached && Date.now() - new Date(cached.updated_at).getTime() < CACHE_TTL_MS) {
+    void recordInsightInteractionUsage(supabase, organizationId, user.id, target, {
+      cached: true,
+      promptTokens: 0,
+      completionTokens: 0,
+    })
     return NextResponse.json({
       ok: true,
       cached: true,
@@ -160,6 +184,12 @@ export async function POST(
   }
 
   const payload = result.output as NarrationPayload
+
+  void recordInsightInteractionUsage(supabase, organizationId, user.id, target, {
+    cached: false,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+  })
 
   // 3. Persist to cache (best-effort; we always return the response
   //    even if the cache write fails).
@@ -247,6 +277,40 @@ async function writeNarration(
     },
     { onConflict: "organization_id,recommendation_key,schema_version" },
   )
+}
+
+async function recordInsightInteractionUsage(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  organizationId: string,
+  userId: string,
+  target: Recommendation,
+  usage: {
+    cached: boolean
+    promptTokens: number
+    completionTokens: number
+  },
+): Promise<void> {
+  try {
+    const subscription = await getOrganizationSubscription(supabase, organizationId)
+    const planTier = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
+    void recordAidenUsageEvent({
+      organizationId,
+      userId,
+      featureKey: "operational_insight_interaction",
+      planTier,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      metadata: {
+        rule_id: target.ruleId,
+        insight_theme: target.insightTheme ?? null,
+        recommendation_key: target.key,
+        narration_cached: usage.cached,
+        kind: "explain",
+      },
+    })
+  } catch {
+    /* best-effort usage */
+  }
 }
 
 function buildFallbackNarration(rec: Recommendation): NarrationPayload {

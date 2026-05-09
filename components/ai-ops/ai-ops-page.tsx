@@ -10,6 +10,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { cn } from "@/lib/utils"
 import type {
+  InsightTheme,
   Recommendation,
   RecommendationCategory,
   RecommendationPriority,
@@ -18,8 +19,10 @@ import type {
 import { RecommendationCard } from "./recommendation-card"
 import { AiOpsCommandCenterDrawer } from "./command-center-drawer"
 import {
+  ALL_INSIGHT_THEMES_ORDERED,
   CATEGORY_ICON,
   CATEGORY_LABEL,
+  INSIGHT_THEME_LABEL,
 } from "./category-meta"
 
 const ALL_CATEGORIES: RecommendationCategory[] = [
@@ -53,6 +56,7 @@ export function AiOpsPage() {
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<"all" | RecommendationCategory>("all")
   const [priority, setPriority] = useState<"all" | RecommendationPriority>("all")
+  const [insightTheme, setInsightTheme] = useState<"all" | InsightTheme>("all")
   const [refreshKey, setRefreshKey] = useState(0)
   const [commandRec, setCommandRec] = useState<Recommendation | null>(null)
 
@@ -64,6 +68,7 @@ export function AiOpsPage() {
       const params = new URLSearchParams()
       if (category !== "all") params.set("category", category)
       if (priority !== "all") params.set("priority", priority)
+      if (insightTheme !== "all") params.set("insightTheme", insightTheme)
       if (search.trim()) params.set("search", search.trim())
       params.set("limit", "100")
       const res = await fetch(
@@ -78,7 +83,7 @@ export function AiOpsPage() {
     } finally {
       setLoading(false)
     }
-  }, [organizationId, orgStatus, category, priority, search])
+  }, [organizationId, orgStatus, category, priority, insightTheme, search])
 
   useEffect(() => {
     void fetchRecs()
@@ -92,6 +97,11 @@ export function AiOpsPage() {
         ? data.visibleCategories
         : (ALL_CATEGORIES.filter((c) => isCategoryVisible(c, permissions)) as RecommendationCategory[]),
     [data?.visibleCategories, permissions],
+  )
+
+  const visibleInsightThemes = useMemo(
+    () => ALL_INSIGHT_THEMES_ORDERED.filter((t) => isInsightThemeVisible(t, permissions)),
+    [permissions],
   )
 
   function handleDismissed(key: string) {
@@ -166,6 +176,19 @@ export function AiOpsPage() {
               {ALL_PRIORITIES.map((p) => (
                 <SelectItem key={p} value={p}>
                   {p[0]!.toUpperCase() + p.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={insightTheme} onValueChange={(v) => setInsightTheme(v as typeof insightTheme)}>
+            <SelectTrigger className="h-9 w-full sm:w-[13rem] text-sm">
+              <SelectValue placeholder="Insight theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All insight themes</SelectItem>
+              {visibleInsightThemes.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {INSIGHT_THEME_LABEL[t]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -264,14 +287,22 @@ function recomputeSummary(items: Recommendation[]) {
   return summary
 }
 
+function isInsightThemeVisible(
+  t: InsightTheme,
+  perms: ReturnType<typeof useOrgPermissions>["permissions"],
+): boolean {
+  if (t === "collections_risk") return Boolean(perms.canViewFinancials || perms.canViewBilling)
+  return true
+}
+
 function isCategoryVisible(c: RecommendationCategory, perms: ReturnType<typeof useOrgPermissions>["permissions"]): boolean {
   switch (c) {
     case "prospect":
       return Boolean(perms.canManageProspects)
     case "financial":
-      return Boolean(perms.canViewFinancials)
+      return Boolean(perms.canViewFinancials || perms.canViewBilling)
     case "communications":
-      return Boolean(perms.canManageCommunications)
+      return Boolean(perms.canViewCommunications || perms.canManageCommunications)
     case "inventory":
       return Boolean(perms.canManageInventory)
     case "certificate":

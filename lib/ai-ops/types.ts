@@ -19,6 +19,25 @@ export type RecommendationCategory =
   | "automation"
   | "maintenance"
 
+/**
+ * Phase 27 — opportunity / risk taxonomy (orthogonal to UI category buckets).
+ * Used for filtering and AIden prompts; merged with rule output in the ai-ops engine enrichment pass.
+ */
+export type InsightTheme =
+  | "revenue_opportunity"
+  | "customer_retention_risk"
+  | "follow_up_risk"
+  | "repeat_repair"
+  | "maintenance_upsell"
+  | "warranty_window"
+  | "collections_risk"
+  | "capacity_risk"
+  | "inventory_risk"
+  | "communications_risk"
+  | "automation_health"
+  | "certificate_release"
+  | "dispatch_backlog"
+
 export type RecommendationPriority = "high" | "medium" | "low"
 
 /** Confidence is a soft display label only — Phase 1 is rule-based. */
@@ -41,6 +60,9 @@ export type RecommendedAction = {
     | "draft_followup"
     | "open_communications_filtered"
     | "create_automation_suggestion"
+    /** Org-level navigation — never mutates data. */
+    | "view_work_orders_board"
+    | "view_maintenance_plans"
   label: string
   href?: string
 }
@@ -81,6 +103,18 @@ export type Recommendation = {
   metric: { label: string; value: string } | null
   /** Surface only the rule that produced it; useful for filters/debug. */
   ruleId: string
+  /** Phase 27 — opportunity/risk theme for filters & dashboards. */
+  insightTheme?: InsightTheme
+  /** Short signals that triggered the rule (safe, non-PII). */
+  sourceSignals?: string[]
+  /** One-line operator hint — never auto-executed. */
+  suggestedNextStep?: string
+  /** 0–100 display score derived from priority when not supplied. */
+  confidenceScore?: number
+  /** Safe impact hint (no invented currency unless rule supplies). */
+  estimatedImpact?: { label: string; value: string } | null
+  /** UI label for originating area (Prospects, Invoices, …). */
+  sourceModule?: string
   /**
    * Phase 5 — optional overlay fields joined in the API layer (not from
    * the deterministic engine).
@@ -108,6 +142,7 @@ export type RecommendationScoreBreakdownEntry = {
 export type RecommendationFilter = {
   categories?: RecommendationCategory[]
   priorities?: RecommendationPriority[]
+  insightThemes?: InsightTheme[]
   /** When false, dismissed/snoozed items are still excluded (default false). */
   includeDismissed?: boolean
   search?: string

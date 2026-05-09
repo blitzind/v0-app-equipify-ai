@@ -241,6 +241,8 @@ function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutput
       ),
       suggestedNextStep: abbreviateText("Run a dispatcher review from Service Schedule / Work Orders.", 160, ab),
       relatedModule: "work_orders",
+      insightTheme: "dispatch_backlog",
+      sourceSignals: [`open_work_orders:${snap.openWorkOrders}`],
       relatedRecordIds: [],
     })
   }
@@ -252,6 +254,8 @@ function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutput
       explanation: abbreviateText("Prospects missing fresh follow-ups — preview counts only.", 200, ab),
       suggestedNextStep: abbreviateText("Assign nurture owners from the Prospects table.", 140, ab),
       relatedModule: "dashboard",
+      insightTheme: "revenue_opportunity",
+      sourceSignals: [`stale_prospects:${snap.staleProspects}`],
       relatedRecordIds: [],
     })
   }
@@ -267,6 +271,8 @@ function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutput
       ),
       suggestedNextStep: abbreviateText("Book technicians before customer audits slip.", 140, ab),
       relatedModule: "equipment",
+      insightTheme: "maintenance_upsell",
+      sourceSignals: [`calibration_due_soon:${snap.calibrationDueSoonEquipment}`],
       relatedRecordIds: [],
     })
   }
@@ -282,6 +288,8 @@ function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutput
       ),
       suggestedNextStep: abbreviateText("Pair technicians with billing owners on disputed jobs.", 160, ab),
       relatedModule: "dashboard",
+      insightTheme: "collections_risk",
+      sourceSignals: [`overdue_invoices:${snap.overdueInvoiceCount}`],
       relatedRecordIds: [],
     })
   }
@@ -301,6 +309,8 @@ function buildOperationalRecommendationsFromWorkspace(ctx?: MockStructuredOutput
           explanation: "Stale quotes often need a nudge — preview suggestion.",
           suggestedNextStep: "Filter quotes older than 14 days and assign owners.",
           relatedModule: "dashboard",
+          insightTheme: "revenue_opportunity",
+          sourceSignals: ["quotes_aging_preview"],
           relatedRecordIds: [],
         },
       ],

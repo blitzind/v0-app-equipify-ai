@@ -13,13 +13,17 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { OrgPermissions } from "@/lib/permissions/model"
-import { RULES } from "./rules"
+import type { AssignedWorkScope } from "@/lib/permissions/technician-scope"
+import { filterRecommendationsForAssignedScope } from "./assigned-scope-filter"
+import { enrichOperationalInsight } from "./insight-enrichment"
+import { RULES, type RuleDescriptor } from "./rules"
 import {
   applyOutcomeAwareRanking,
   computeCategoryAdjustments,
   type CategoryAdjustments,
 } from "./ranking"
 import type {
+  InsightTheme,
   Recommendation,
   RecommendationCategory,
   RecommendationFilter,
@@ -58,6 +62,14 @@ function isDismissalActive(row: DismissalRow, nowIso: string): boolean {
   return row.snoozed_until > nowIso
 }
 
+function ruleVisibleToCaller(r: RuleDescriptor, permissions: OrgPermissions): boolean {
+  if (r.requiresAnyPermission?.length) {
+    return r.requiresAnyPermission.some((k) => Boolean(permissions[k]))
+  }
+  if (r.requiresPermission) return Boolean(permissions[r.requiresPermission])
+  return true
+}
+
 export async function generateRecommendations(args: {
   supabase: SupabaseClient
   organizationId: string
@@ -71,6 +83,11 @@ export async function generateRecommendations(args: {
    * true. Set to false for tests / debugging.
    */
   outcomeAwareRanking?: boolean
+  /** Phase 27 — technicians scoped to assigned work only */
+  assignedScope?: AssignedWorkScope | null
+  assignedWorkOnly?: boolean
+  /** Pass-through for rules that need viewer-scoped counts / queues */
+  userId?: string
 }): Promise<RecommendationsResponse> {
   const { supabase, organizationId, permissions, filter } = args
   const useOutcomeRanking = args.outcomeAwareRanking !== false
@@ -78,9 +95,7 @@ export async function generateRecommendations(args: {
   const generatedAtIso = now.toISOString()
 
   // 1. Determine which rules the caller can see at all.
-  const visibleRules = RULES.filter((r) =>
-    r.requiresPermission ? Boolean(permissions[r.requiresPermission]) : true,
-  )
+  const visibleRules = RULES.filter((r) => ruleVisibleToCaller(r, permissions))
   const visibleCategories = [
     ...new Set(visibleRules.map((r) => r.category)),
   ] as RecommendationCategory[]
@@ -90,7 +105,13 @@ export async function generateRecommendations(args: {
   const ruleResults = await Promise.all(
     visibleRules.map((r) =>
       r
-        .fn({ supabase, organizationId, permissions, now })
+        .fn({
+          supabase,
+          organizationId,
+          permissions,
+          now,
+          userId: args.userId,
+        })
         .catch((e: unknown) => {
            
           console.warn(`[ai-ops] rule ${r.id} failed`, e)
@@ -98,9 +119,25 @@ export async function generateRecommendations(args: {
         }),
     ),
   )
-  let items = ruleResults.flat()
+  let items = ruleResults.flat().map(enrichOperationalInsight)
 
-  // 3. Apply filters from the caller (search/category/priority).
+  if (args.assignedWorkOnly) {
+    items = filterRecommendationsForAssignedScope(
+      items,
+      args.assignedScope ?? {
+        technicianIds: [],
+        workOrderIds: [],
+        customerIds: [],
+        equipmentIds: [],
+      },
+    )
+  }
+
+  // 3. Apply filters from the caller (search/category/priority/insight theme).
+  if (filter?.insightThemes?.length) {
+    const allowed = new Set<InsightTheme>(filter.insightThemes)
+    items = items.filter((i) => i.insightTheme && allowed.has(i.insightTheme))
+  }
   if (filter?.categories?.length) {
     const allowed = new Set(filter.categories)
     items = items.filter((i) => allowed.has(i.category))

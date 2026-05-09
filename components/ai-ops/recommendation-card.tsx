@@ -28,7 +28,7 @@ import type { Recommendation } from "@/lib/ai-ops/types"
 import {
   CATEGORY_ICON,
   CATEGORY_LABEL,
-  PRIORITY_BADGE,
+  INSIGHT_THEME_LABEL,
   PRIORITY_ICON,
   PRIORITY_LABEL,
 } from "./category-meta"
@@ -145,6 +145,11 @@ export function RecommendationCard({
               <Badge variant="outline" className="text-[10px]">
                 {CATEGORY_LABEL[rec.category]}
               </Badge>
+              {rec.insightTheme ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {INSIGHT_THEME_LABEL[rec.insightTheme]}
+                </Badge>
+              ) : null}
               {rec.confidence === "deterministic" ? (
                 <Badge variant="outline" className="text-[10px] text-muted-foreground">
                   Rule-based
@@ -188,6 +193,39 @@ export function RecommendationCard({
             </DropdownMenu>
           ) : null}
         </header>
+
+        {(rec.sourceModule || rec.confidenceScore != null || rec.suggestedNextStep || rec.sourceSignals?.length) ? (
+          <div className="rounded-md border border-border/70 bg-muted/15 px-2.5 py-1.5 space-y-1">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              {rec.sourceModule ? (
+                <span>
+                  <span className="uppercase tracking-wide text-[9px]">Source</span>{" "}
+                  <span className="text-foreground/90">{rec.sourceModule}</span>
+                </span>
+              ) : null}
+              {rec.confidenceScore != null ? (
+                <span className="tabular-nums">
+                  <span className="uppercase tracking-wide text-[9px]">Confidence</span>{" "}
+                  <span className="text-foreground/90">{rec.confidenceScore}</span>
+                </span>
+              ) : null}
+            </div>
+            {rec.suggestedNextStep ? (
+              <p className="text-[11px] text-foreground/90 leading-snug">
+                <span className="text-muted-foreground">Suggested next step:</span> {rec.suggestedNextStep}
+              </p>
+            ) : null}
+            {rec.sourceSignals?.length ? (
+              <p
+                className="text-[10px] text-muted-foreground font-mono truncate"
+                title={rec.sourceSignals.join(" · ")}
+              >
+                Signals: {rec.sourceSignals.slice(0, 4).join(" · ")}
+                {rec.sourceSignals.length > 4 ? "…" : ""}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <p className="text-xs text-muted-foreground leading-relaxed">
           {rec.explanation}

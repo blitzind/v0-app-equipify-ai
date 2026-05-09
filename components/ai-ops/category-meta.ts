@@ -19,9 +19,43 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type {
+  InsightTheme,
   RecommendationCategory,
   RecommendationPriority,
 } from "@/lib/ai-ops/types"
+
+export const INSIGHT_THEME_LABEL: Record<InsightTheme, string> = {
+  revenue_opportunity: "Revenue opportunity",
+  customer_retention_risk: "Retention risk",
+  follow_up_risk: "Follow-up risk",
+  repeat_repair: "Repeat repair",
+  maintenance_upsell: "Maintenance upsell",
+  warranty_window: "Warranty window",
+  collections_risk: "Collections risk",
+  capacity_risk: "Capacity risk",
+  inventory_risk: "Inventory risk",
+  communications_risk: "Communications risk",
+  automation_health: "Automation health",
+  certificate_release: "Certificate release",
+  dispatch_backlog: "Dispatch backlog",
+}
+
+/** Stable filter ordering for AI Ops insight theme dropdowns. */
+export const ALL_INSIGHT_THEMES_ORDERED: InsightTheme[] = [
+  "revenue_opportunity",
+  "collections_risk",
+  "follow_up_risk",
+  "dispatch_backlog",
+  "capacity_risk",
+  "repeat_repair",
+  "maintenance_upsell",
+  "warranty_window",
+  "inventory_risk",
+  "communications_risk",
+  "automation_health",
+  "certificate_release",
+  "customer_retention_risk",
+]
 
 export const CATEGORY_ICON: Record<RecommendationCategory, LucideIcon> = {
   prospect: UserPlus,

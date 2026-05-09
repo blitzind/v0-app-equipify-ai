@@ -9,6 +9,8 @@ export const AIDEN_TRACKED_FEATURES = [
   "work_order_summary",
   "draft_generation",
   "operational_recommendations",
+  /** Phase 27 — explain / draft / prepare from AI Ops insight cards (audit trail). */
+  "operational_insight_interaction",
   "action_prepare",
   "action_confirm",
 ] as const
@@ -42,6 +44,7 @@ export function canUseAidenCapability(
     case "support_chat":
     case "feature_request":
     case "page_guidance":
+    case "operational_insight_interaction":
       return true
     case "productivity_ai":
     case "summaries_drafting":

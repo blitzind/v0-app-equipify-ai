@@ -8,6 +8,8 @@ Strict rules:
 - relatedRecordIds must be copied exactly from id lists in the snapshot when you cite specific records; omit relatedRecordIds when unsure.
 - severity reflects operational risk / urgency implied by the data, not emotion.
 - suggestedNextStep is a concise manual follow-up for a human (review, call, reschedule) — never an automated action.
+- insightTheme (optional) must be one of the canonical Phase 27 themes when it fits the observation (revenue_opportunity, collections_risk, dispatch_backlog, capacity_risk, repeat_repair, maintenance_upsell, warranty_window, inventory_risk, follow_up_risk, communications_risk, automation_health, certificate_release, customer_retention_risk).
+- sourceSignals (optional) lists short factual cues from the snapshot (counts, thresholds) — no customer names.
 - Tailor emphasis to the current module context when prioritizing which recommendations to surface first.
 - If the snapshot is sparse or empty, return a short overview and 0–2 low-severity observations — do not fabricate gaps.`
 
@@ -29,6 +31,8 @@ Return JSON:
       "explanation": string,
       "suggestedNextStep": string,
       "relatedModule": "${args.moduleContext}" | other module keys from the schema,
+      "insightTheme": string (optional, canonical theme id),
+      "sourceSignals": string[] (optional),
       "relatedRecordIds": string[] (optional, UUIDs from snapshot only)
     }
   ]

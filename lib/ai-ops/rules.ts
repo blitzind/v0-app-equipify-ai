@@ -19,11 +19,15 @@ import type {
   RecommendationPriority,
 } from "./types"
 import type { OrgPermissions } from "@/lib/permissions/model"
+import { filterFollowUpTasksForViewer } from "@/lib/follow-up-automation/filter-view"
+import type { FollowUpTaskRow } from "@/lib/follow-up-automation/types"
 
 export type RuleContext = {
   supabase: SupabaseClient
   organizationId: string
   permissions: OrgPermissions
+  /** Caller auth user — used for scoped queue counts (assigned technicians). */
+  userId?: string
   /** UTC `Date` used for "now" — passed in for testability. */
   now: Date
 }
@@ -40,6 +44,11 @@ export type RuleDescriptor = {
    * we don't 403 the entire dashboard.
    */
   requiresPermission: keyof OrgPermissions | null
+  /**
+   * If set, user needs **any** of these permissions (OR). Takes precedence
+   * over `requiresPermission` when present (Phase 27 — billing viewers).
+   */
+  requiresAnyPermission?: (keyof OrgPermissions)[]
   fn: RuleFn
 }
 
@@ -142,7 +151,8 @@ const staleProspect: RuleDescriptor = {
 const overdueInvoice: RuleDescriptor = {
   id: "overdue_invoice",
   category: "financial",
-  requiresPermission: "canViewFinancials",
+  requiresPermission: null,
+  requiresAnyPermission: ["canViewFinancials", "canViewBilling"],
   fn: async ({ supabase, organizationId, now }) => {
     const today = dateToday(now)
     const { data, error } = await supabase
@@ -625,6 +635,269 @@ const maintenanceDueSoon: RuleDescriptor = {
   },
 }
 
+// ─── Follow-up queue backlog (scoped for assigned technicians) ───────────────
+
+const followUpQueuePressure: RuleDescriptor = {
+  id: "follow_up_queue_pressure",
+  category: "communications",
+  requiresPermission: "canViewCommunications",
+  fn: async ({ supabase, organizationId, permissions, userId }) => {
+    const { data, error } = await supabase
+      .from("follow_up_tasks")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .in("status", ["pending", "approved"])
+      .order("created_at", { ascending: false })
+      .limit(400)
+
+    if (error || !data) return []
+    let rows = data as FollowUpTaskRow[]
+    if (userId) {
+      rows = filterFollowUpTasksForViewer(rows, permissions, userId)
+    }
+    const count = rows.length
+    if (count < 4) return []
+
+    const priority: RecommendationPriority =
+      count >= 15 ? "high" : count >= 8 ? "medium" : "low"
+
+    return [
+      {
+        key: `follow_up_queue_pressure:${organizationId}`,
+        ruleId: "follow_up_queue_pressure",
+        category: "communications",
+        priority,
+        confidence: "deterministic",
+        title: `${count} follow-up tasks need review`,
+        explanation:
+          "Pending or approved items in the follow-up queue need human review before anything sends.",
+        entity: null,
+        actions: [
+          {
+            type: "view_communications",
+            label: "Open follow-up queue",
+            href: `/communications/follow-ups`,
+          },
+        ],
+        anchorIso: null,
+        metric: { label: "Open tasks", value: String(count) },
+        insightTheme: "follow_up_risk",
+        sourceSignals: [`follow_up_tasks_open:${count}`],
+        suggestedNextStep:
+          "Review the queue, approve drafts you trust, or dismiss stale suggestions.",
+        sourceModule: "Communications",
+      },
+    ]
+  },
+}
+
+// ─── Warranty window (equipment) ───────────────────────────────────────────
+
+const warrantyExpiringWindow: RuleDescriptor = {
+  id: "warranty_expiring_window",
+  category: "equipment",
+  requiresPermission: null,
+  fn: async ({ supabase, organizationId, now }) => {
+    const today = dateToday(now)
+    const horizon = dateDaysFromNow(now, 21)
+    const { data, error } = await supabase
+      .from("equipment")
+      .select("id, name, equipment_code, warranty_expiration_date, warranty_expires_at, customer_id")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .limit(250)
+
+    if (error || !data) return []
+    const rows = data
+      .filter((row) => {
+        const end =
+          (row.warranty_expiration_date as string | null) ??
+          (row.warranty_expires_at as string | null) ??
+          null
+        if (!end) return false
+        return end >= today && end <= horizon
+      })
+      .slice(0, RULE_LIMIT)
+
+    return rows.map((row): Recommendation => {
+      const id = row.id as string
+      const label = ((row.name as string) || (row.equipment_code as string) || "Equipment").slice(
+        0,
+        80,
+      )
+      const end =
+        (row.warranty_expiration_date as string | null) ??
+        (row.warranty_expires_at as string | null) ??
+        ""
+      const days = Math.max(0, diffDays(new Date(`${end}T00:00:00Z`), now))
+      return {
+        key: `warranty_expiring_window:${id}`,
+        ruleId: "warranty_expiring_window",
+        category: "equipment",
+        priority: days <= 7 ? "high" : days <= 14 ? "medium" : "low",
+        confidence: "deterministic",
+        title: `Warranty ending soon on ${label}`,
+        explanation: `Coverage ends ${end} (${days}d). Offer renewal, extended PM, or replacement planning before it lapses.`,
+        entity: {
+          type: "equipment",
+          id,
+          label,
+          href: `/equipment/${encodeURIComponent(id)}`,
+        },
+        actions: [
+          {
+            type: "view_equipment",
+            label: "Open equipment",
+            href: `/equipment/${encodeURIComponent(id)}`,
+          },
+        ],
+        anchorIso: `${end}T00:00:00Z`,
+        metric: { label: "Ends", value: end },
+        insightTheme: "warranty_window",
+        sourceSignals: [`warranty_end:${end}`],
+        suggestedNextStep:
+          "Contact the customer with renewal or PM options before coverage ends.",
+        sourceModule: "Equipment",
+      }
+    })
+  },
+}
+
+// ─── Technician capacity vs unscheduled backlog ────────────────────────────────
+
+const techCapacityPressure: RuleDescriptor = {
+  id: "tech_capacity_pressure",
+  category: "dispatch",
+  requiresPermission: null,
+  fn: async ({ supabase, organizationId }) => {
+    const { count: techCount, error: e1 } = await supabase
+      .from("technicians")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("operational_status", "active")
+
+    const { count: backlog, error: e2 } = await supabase
+      .from("work_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("is_archived", false)
+      .in("status", ["open"])
+      .is("scheduled_on", null)
+
+    if (e1 || e2 || techCount == null || backlog == null) return []
+    if (techCount < 1) return []
+    const pressure = backlog / techCount
+    if (backlog < 8 && pressure < 6) return []
+
+    const priority: RecommendationPriority =
+      pressure >= 10 || backlog >= 25 ? "high" : "medium"
+
+    return [
+      {
+        key: `tech_capacity_pressure:${organizationId}`,
+        ruleId: "tech_capacity_pressure",
+        category: "dispatch",
+        priority,
+        confidence: "deterministic",
+        title: `Dispatch backlog may exceed technician capacity`,
+        explanation: `${backlog} open work orders have no scheduled date across ${techCount} active technician${
+          techCount === 1 ? "" : "s"
+        } (~${pressure.toFixed(1)} unscheduled WO per tech). Consider hiring, overtime, or reprioritizing.`,
+        entity: null,
+        actions: [
+          { type: "view_work_orders_board", label: "Open work orders", href: `/work-orders` },
+        ],
+        anchorIso: null,
+        metric: { label: "Unscheduled / tech", value: `${pressure.toFixed(1)}` },
+        insightTheme: "capacity_risk",
+        sourceSignals: [`open_unscheduled:${backlog}`, `active_technicians:${techCount}`],
+        suggestedNextStep: "Rebalance the schedule or add capacity before SLAs slip.",
+        sourceModule: "Dispatch",
+      },
+    ]
+  },
+}
+
+// ─── Calibration due without maintenance plan (upsell / gap) ─────────────────
+
+const maintenancePlanGap: RuleDescriptor = {
+  id: "maintenance_plan_gap",
+  category: "maintenance",
+  requiresPermission: null,
+  fn: async ({ supabase, organizationId, now }) => {
+    const start = dateDaysFromNow(now, 8)
+    const end = dateDaysFromNow(now, 30)
+    const { data: equip, error } = await supabase
+      .from("equipment")
+      .select("id, name, equipment_code, customer_id, next_calibration_due_at")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .gte("next_calibration_due_at", start)
+      .lte("next_calibration_due_at", end)
+      .order("next_calibration_due_at", { ascending: true })
+      .limit(40)
+
+    if (error || !equip?.length) return []
+    const ids = equip.map((e) => e.id as string)
+    const { data: plans } = await supabase
+      .from("maintenance_plans")
+      .select("equipment_id")
+      .eq("organization_id", organizationId)
+      .in("equipment_id", ids)
+      .eq("status", "active")
+      .eq("is_archived", false)
+
+    const covered = new Set((plans ?? []).map((p) => p.equipment_id as string))
+
+    return equip
+      .filter((e) => !covered.has(e.id as string))
+      .slice(0, RULE_LIMIT)
+      .map((row): Recommendation => {
+        const id = row.id as string
+        const due = row.next_calibration_due_at as string
+        const label = ((row.name as string) || (row.equipment_code as string) || "Equipment").slice(
+          0,
+          80,
+        )
+        const days = Math.max(0, diffDays(new Date(`${due}T00:00:00Z`), now))
+        return {
+          key: `maintenance_plan_gap:${id}`,
+          ruleId: "maintenance_plan_gap",
+          category: "maintenance",
+          priority: days <= 14 ? "medium" : "low",
+          confidence: "deterministic",
+          title: `No PM plan for equipment due soon`,
+          explanation: `${label} has calibration due ${due} but no active maintenance plan. Attach a plan or book service to avoid gaps.`,
+          entity: {
+            type: "equipment",
+            id,
+            label,
+            href: `/equipment/${encodeURIComponent(id)}`,
+          },
+          actions: [
+            {
+              type: "view_equipment",
+              label: "Open equipment",
+              href: `/equipment/${encodeURIComponent(id)}`,
+            },
+            {
+              type: "view_maintenance_plans",
+              label: "Maintenance plans",
+              href: `/maintenance-plans`,
+            },
+          ],
+          anchorIso: `${due}T00:00:00Z`,
+          metric: { label: "Due", value: due },
+          insightTheme: "maintenance_upsell",
+          sourceSignals: [`next_calibration_due:${due}`, "no_active_maintenance_plan"],
+          suggestedNextStep:
+            "Create or attach a preventive maintenance plan before the due date.",
+          sourceModule: "Maintenance",
+        }
+      })
+  },
+}
+
 export const RULES: RuleDescriptor[] = [
   staleProspect,
   overdueInvoice,
@@ -635,4 +908,8 @@ export const RULES: RuleDescriptor[] = [
   failedCommunications,
   automationFailureBurst,
   maintenanceDueSoon,
+  followUpQueuePressure,
+  warrantyExpiringWindow,
+  techCapacityPressure,
+  maintenancePlanGap,
 ]

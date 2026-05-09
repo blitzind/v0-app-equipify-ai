@@ -5,10 +5,15 @@ import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { generateRecommendations } from "@/lib/ai-ops/engine"
 import type {
+  InsightTheme,
   RecommendationCategory,
   RecommendationPriority,
   RecommendationSummary,
 } from "@/lib/ai-ops/types"
+import {
+  isAssignedWorkOnly,
+  loadAssignedWorkScope,
+} from "@/lib/permissions/technician-scope"
 import { loadLifecycleMap } from "@/lib/ai-ops/lifecycle-db"
 import { applyLifecycleScoresAndSort } from "@/lib/ai-ops/apply-command-layer"
 
@@ -30,6 +35,22 @@ const VALID_CATEGORIES: RecommendationCategory[] = [
 ]
 const VALID_PRIORITIES: RecommendationPriority[] = ["high", "medium", "low"]
 
+const VALID_INSIGHT_THEMES: InsightTheme[] = [
+  "revenue_opportunity",
+  "customer_retention_risk",
+  "follow_up_risk",
+  "repeat_repair",
+  "maintenance_upsell",
+  "warranty_window",
+  "collections_risk",
+  "capacity_risk",
+  "inventory_risk",
+  "communications_risk",
+  "automation_health",
+  "certificate_release",
+  "dispatch_backlog",
+]
+
 function jsonError(message: string, status: number, code = "error") {
   return NextResponse.json({ error: code, message }, { status })
 }
@@ -47,6 +68,7 @@ function jsonError(message: string, status: number, code = "error") {
  *   - `search=...` (optional)
  *   - `limit=1..100` (default 50)
  *   - `includeDismissed=true` (admin debug, default false)
+ *   - `insightTheme=revenue_opportunity,dispatch_backlog,...` (csv, Phase 27)
  */
 export async function GET(
   request: NextRequest,
@@ -72,6 +94,7 @@ export async function GET(
   const url = request.nextUrl
   const categoriesParam = url.searchParams.get("category")
   const priorityParam = url.searchParams.get("priority")
+  const insightThemeParam = url.searchParams.get("insightTheme")
   const search = url.searchParams.get("search") ?? undefined
   const limitRaw = url.searchParams.get("limit")
   const includeDismissed = url.searchParams.get("includeDismissed") === "true"
@@ -84,16 +107,33 @@ export async function GET(
     priorityParam,
     VALID_PRIORITIES as readonly string[],
   )
+  const insightThemes = parseCsv<InsightTheme>(
+    insightThemeParam,
+    VALID_INSIGHT_THEMES as readonly string[],
+  )
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined
+
+  const assignedWorkOnly = isAssignedWorkOnly(permissions)
+  let assignedScope = null as Awaited<ReturnType<typeof loadAssignedWorkScope>> | null
+  if (assignedWorkOnly) {
+    assignedScope = await loadAssignedWorkScope(supabase, {
+      organizationId,
+      userId: user.id,
+    })
+  }
   const engineLimit = Math.min(Math.max(limit ?? 50, 1), 100)
 
   const response = await generateRecommendations({
     supabase,
     organizationId,
     permissions,
+    userId: user.id,
+    assignedScope,
+    assignedWorkOnly,
     filter: {
       categories: categories.length ? categories : undefined,
       priorities: priorities.length ? priorities : undefined,
+      insightThemes: insightThemes.length ? insightThemes : undefined,
       search,
       limit: Math.min(engineLimit * 2, 100),
       includeDismissed,

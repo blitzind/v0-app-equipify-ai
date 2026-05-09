@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { getEffectivePlanId } from "@/lib/billing/effective-plan"
+import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
 import { runAiTask } from "@/lib/ai/server"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { formatProspectStatus } from "@/lib/prospects/format"
@@ -53,12 +56,27 @@ const TIMELINE_LIMIT = 5
  *   - Plan/budget gating handled internally by `runAiTask`.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; prospectId: string }> },
 ) {
   const { organizationId, prospectId } = await context.params
   if (!UUID_RE.test(organizationId) || !UUID_RE.test(prospectId)) {
     return jsonError("Invalid id.", 400)
+  }
+
+  const rawBody = await request.json().catch(() => null)
+  let aiOpsRecommendationKey: string | null = null
+  if (
+    rawBody &&
+    typeof rawBody === "object" &&
+    "aiOpsRecommendationKey" in rawBody &&
+    typeof (rawBody as { aiOpsRecommendationKey?: unknown }).aiOpsRecommendationKey === "string"
+  ) {
+    aiOpsRecommendationKey = (rawBody as { aiOpsRecommendationKey: string }).aiOpsRecommendationKey.trim().slice(
+      0,
+      220,
+    )
+    if (!aiOpsRecommendationKey.length) aiOpsRecommendationKey = null
   }
 
   const gate = await requireOrgPermission(organizationId, "canManageProspects")
@@ -132,6 +150,7 @@ export async function POST(
   })
 
   let draft: { subject: string; body: string }
+  let draftUsage: { promptTokens: number; completionTokens: number } | null = null
   try {
     const result = await runAiTask({
       task: "customer_email",
@@ -176,6 +195,10 @@ export async function POST(
     }
 
     draft = result.output
+    draftUsage = {
+      promptTokens: result.usage.promptTokens,
+      completionTokens: result.usage.completionTokens,
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: "generation_failed", message }, { status: 500 })
@@ -205,6 +228,28 @@ export async function POST(
     sentAt: new Date().toISOString(),
     createdBy: userId,
   })
+
+  if (aiOpsRecommendationKey) {
+    try {
+      const subscription = await getOrganizationSubscription(supabase, organizationId)
+      const planTier = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
+      void recordAidenUsageEvent({
+        organizationId,
+        userId,
+        featureKey: "operational_insight_interaction",
+        planTier,
+        promptTokens: draftUsage?.promptTokens ?? 0,
+        completionTokens: draftUsage?.completionTokens ?? 0,
+        metadata: {
+          kind: "draft_followup",
+          recommendation_key: aiOpsRecommendationKey,
+          prospect_id: prospectId,
+        },
+      })
+    } catch {
+      /* best-effort */
+    }
+  }
 
   return NextResponse.json({ ok: true, subject: draft.subject, body: draft.body })
 }

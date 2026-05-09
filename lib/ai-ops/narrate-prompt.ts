@@ -46,9 +46,24 @@ export function buildAiOpsNarrationUserPrompt(rec: Recommendation): string {
   const lines: string[] = []
   lines.push(`Category: ${rec.category}`)
   lines.push(`Rule: ${rec.ruleId}`)
+  if (rec.insightTheme) {
+    lines.push(`Insight theme: ${rec.insightTheme}`)
+  }
+  if (rec.sourceModule) {
+    lines.push(`Source module: ${rec.sourceModule}`)
+  }
   lines.push(`Priority: ${rec.priority}`)
+  if (typeof rec.confidenceScore === "number") {
+    lines.push(`Confidence score (0-100): ${rec.confidenceScore}`)
+  }
   lines.push(`Title: ${rec.title}`)
   lines.push(`Deterministic explanation: ${rec.explanation}`)
+  if (rec.suggestedNextStep) {
+    lines.push(`Suggested next step (operator hint): ${rec.suggestedNextStep}`)
+  }
+  if (rec.sourceSignals?.length) {
+    lines.push(`Signals: ${rec.sourceSignals.join(", ")}`)
+  }
   if (rec.entity?.label) {
     lines.push(`Affected record: ${rec.entity.type} "${rec.entity.label}"`)
   }
