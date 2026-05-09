@@ -23,6 +23,7 @@ import { SidebarContext } from "@/components/app-sidebar"
 import { BrandLogo } from "@/components/brand-logo"
 import { useTenant } from "@/lib/tenant-store"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import { planBadgeFromWorkspace } from "@/lib/plan-display"
 import { useAdmin } from "@/lib/admin-store"
 import { useActiveOrganizationOptional } from "@/lib/active-organization-context"
@@ -74,6 +75,16 @@ const LAUNCHER_LINKS = [
   { icon: ShieldCheck, label: "Platform Admin", href: "/admin" },
 ]
 
+function resolveLauncherNavPermissions(args: {
+  role: OrgMemberRole | null
+  status: "loading" | "ready" | "no_org"
+}): OrgPermissions {
+  // Keep topbar/account navigation on stable DB role defaults for the Phase 20
+  // retry. Commercial profile overlays should not remove settings links.
+  if (args.status !== "ready" || !args.role) return getOrgPermissionsForRole("owner")
+  return getOrgPermissionsForRole(args.role)
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AppTopbar() {
@@ -84,7 +95,7 @@ export function AppTopbar() {
   const activeOrgOpt = useActiveOrganizationOptional()
   const [orgRoleLabel, setOrgRoleLabel] = useState<string | null>(null)
   const { workspace } = useTenant()
-  const { permissions } = useOrgPermissions()
+  const { role, status: permissionsStatus } = useOrgPermissions()
   const planBadge = planBadgeFromWorkspace(workspace)
   const subscriptionChrome =
     workspace.organizationSubscription === undefined
@@ -185,19 +196,20 @@ export function AppTopbar() {
   }, [activeOrgOpt?.organizationId])
 
   const launcherLinks = useMemo(() => {
+    const navPermissions = resolveLauncherNavPermissions({ role, status: permissionsStatus })
     return LAUNCHER_LINKS.filter((link) => {
       // Platform admin is determined server-side in /api/session/account-summary
       // (isPlatformAdminEmail); never show /admin to org-only users.
       if (link.href === "/admin") return isPlatformAdmin
-      if (link.href === "/communications") return permissions.canViewCommunications
-      if (link.href === "/settings/billing") return permissions.canViewBilling
-      if (link.href === "/settings/integrations") return permissions.canManageIntegrations
-      if (link.href === "/settings/security") return permissions.canManageSecuritySettings
-      if (link.href === "/settings/team") return permissions.canManageWorkspaceSettings
-      if (link.href === "/settings/notifications") return permissions.canManageWorkspaceSettings
+      if (link.href === "/communications") return navPermissions.canViewCommunications
+      if (link.href === "/settings/billing") return navPermissions.canViewBilling
+      if (link.href === "/settings/integrations") return navPermissions.canManageIntegrations
+      if (link.href === "/settings/security") return navPermissions.canManageSecuritySettings
+      if (link.href === "/settings/team") return navPermissions.canManageWorkspaceSettings
+      if (link.href === "/settings/notifications") return navPermissions.canManageWorkspaceSettings
       return true
     })
-  }, [isPlatformAdmin, permissions])
+  }, [isPlatformAdmin, role, permissionsStatus])
 
   async function handleNotifClick(n: FeedPreview) {
     const orgId = activeOrgOpt?.organizationId

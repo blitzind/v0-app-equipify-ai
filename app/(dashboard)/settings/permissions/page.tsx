@@ -150,17 +150,17 @@ export default function PermissionsPage() {
         <div className="space-y-1">
           <p className="text-sm font-medium">Live capability map</p>
           <p className="text-xs leading-relaxed">
-            This matrix is generated from the role-based permission model used
-            by the app. UI gates and API guards both consult the same map, so
-            anything you see here is what the system actually enforces. Showing
+            This matrix is generated from the staged role-based permission model.
+            It is available for previews and targeted guards, but main and
+            settings navigation intentionally still use DB role defaults in this retry. Showing
             {" "}
             <span className="font-medium">{totalCapabilities}</span> capabilities
             across <span className="font-medium">{ROLES.length}</span> built-in
             roles.
           </p>
           <p className="text-[11px] text-muted-foreground/80">
-            Commercial profiles such as Billing and Sales layer application/API capability checks over existing DB roles.
-            Supabase RLS still uses the broad DB role as the tenant boundary.
+            Commercial profiles such as Billing and Sales are stored as optional overlays over existing DB roles.
+            Supabase RLS and navigation still use the broad DB role as the stable tenant boundary.
           </p>
           {viewerStatus === "ready" && viewerRole ? (
             <p className="text-[11px] text-muted-foreground/80">

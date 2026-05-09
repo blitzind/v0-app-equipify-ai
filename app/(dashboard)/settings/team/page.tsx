@@ -710,7 +710,7 @@ export default function TeamPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-secondary/30 dark:bg-card">
-                  {["Member", "Role", "Permission profile", "Access preview", "Status", "Joined", ""].map((h) => (
+                  {["Member", "Role", "Permission profile", "Staged access preview", "Status", "Joined", ""].map((h) => (
                     <th key={h} className="text-left px-6 py-3 text-xs font-medium text-muted-foreground">
                       {h}
                     </th>
@@ -1172,6 +1172,7 @@ export default function TeamPage() {
                     {editPermissionProfile
                       ? COMMERCIAL_PERMISSION_PROFILES[editPermissionProfile].description
                       : "Uses the default permissions for the selected DB role."}
+                    {" "}Navigation currently remains based on the DB role while this RBAC foundation is staged.
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -1196,7 +1197,7 @@ export default function TeamPage() {
               </div>
               <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Access preview
+                  Staged access preview
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {permissionHighlights(
@@ -1212,7 +1213,7 @@ export default function TeamPage() {
                 </div>
                 {(editRole !== editMember.role || (editPermissionProfile || null) !== (normalizePermissionProfile(editMember.permissionProfile) ?? null)) ? (
                   <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
-                    Changing role or profile may immediately reduce this user&apos;s access after save.
+                    Changing the DB role may immediately change navigation. Profile overlays are staged for capability checks and do not drive navigation in this pass.
                   </p>
                 ) : null}
               </div>

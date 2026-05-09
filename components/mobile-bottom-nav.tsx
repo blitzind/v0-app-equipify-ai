@@ -41,25 +41,20 @@ function debugMobileNavResolution(details: Record<string, unknown>) {
   console.info("[equipify:mobile-nav]", details)
 }
 
-function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
-  return role === "owner" || role === "admin" || role === "manager"
-}
-
 function resolveMobileNavPermissions(args: {
   role: OrgMemberRole | null
   status: "loading" | "ready" | "no_org"
-  permissions: OrgPermissions
 }): OrgPermissions {
-  if (isPrivilegedNavRole(args.role)) {
-    return getOrgPermissionsForRole(args.role)
-  }
+  // Phase 20 retry: mobile navigation uses stable DB role defaults only.
+  // Commercial profile overlays stay available for previews/API helpers, but
+  // must not hide nav during loading or refresh.
   if (args.status !== "ready") {
     return getOrgPermissionsForRole("owner")
   }
   if (!args.role) {
     return getOrgPermissionsForRole("owner")
   }
-  return args.permissions
+  return getOrgPermissionsForRole(args.role)
 }
 
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
@@ -106,9 +101,9 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const dispatch = useQuickAddDispatch()
   const router = useRouter()
   const pathname = usePathname()
-  const { permissions, role, status } = useOrgPermissions()
+  const { role, status } = useOrgPermissions()
   const { standardCreateEligibility, equipmentCreateEligibility } = useBillingAccess()
-  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  const navPermissions = resolveMobileNavPermissions({ role, status })
   debugMobileNavResolution({ surface: "quick-add", role, status })
 
   function fire(action: QuickAddAction) {
@@ -177,8 +172,8 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
 
 function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
-  const { permissions, role, status } = useOrgPermissions()
-  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  const { role, status } = useOrgPermissions()
+  const navPermissions = resolveMobileNavPermissions({ role, status })
   debugMobileNavResolution({ surface: "more", role, status })
 
   const allItems: { icon: React.ElementType; label: string; href: string; anyOf?: (keyof OrgPermissions)[] }[] = [
@@ -246,8 +241,8 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 export function MobileBottomNav() {
   const pathname = usePathname()
-  const { permissions, role, status } = useOrgPermissions()
-  const navPermissions = resolveMobileNavPermissions({ role, status, permissions })
+  const { role, status } = useOrgPermissions()
+  const navPermissions = resolveMobileNavPermissions({ role, status })
   debugMobileNavResolution({
     surface: "bottom-nav",
     role,

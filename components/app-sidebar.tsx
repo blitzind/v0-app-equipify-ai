@@ -220,14 +220,9 @@ function shouldRenderNavDebugPanel(): boolean {
   return process.env.NEXT_PUBLIC_DEBUG_NAV === "true"
 }
 
-function isPrivilegedNavRole(role: OrgMemberRole | null): role is "owner" | "admin" | "manager" {
-  return role === "owner" || role === "admin" || role === "manager"
-}
-
 function resolveNavPermissions(args: {
   role: OrgMemberRole | null
   status: "loading" | "ready" | "no_org"
-  permissions: OrgPermissions
   platformAdmin: boolean
   impersonating: boolean
 }): OrgPermissions {
@@ -235,27 +230,18 @@ function resolveNavPermissions(args: {
     return getOrgPermissionsForRole("owner")
   }
 
-  // Navigation should not let a commercial profile overlay accidentally hide
-  // the owner/admin/manager workspace. Page/API permission checks still use the
-  // effective capability set as the source of truth for mutations.
-  if (isPrivilegedNavRole(args.role)) {
-    return getOrgPermissionsForRole(args.role)
-  }
-
-  // While membership permissions are resolving, keep the shell useful instead
-  // of rendering an almost-empty sidebar from the deny-all fallback.
+  // Phase 20 retry: navigation intentionally uses the stable DB role defaults,
+  // not commercial profile overlays. Future Phase 20B can add scoped nav
+  // filtering once loading and owner/admin/manager behavior are covered.
   if (args.status !== "ready") {
     return getOrgPermissionsForRole("owner")
   }
 
-  // If membership lookup returned ready but no role, the shell should not
-  // collapse to a one-link sidebar. This commonly happens for platform-admin
-  // impersonation or transient membership resolution gaps.
   if (!args.role) {
     return getOrgPermissionsForRole("owner")
   }
 
-  return args.permissions
+  return getOrgPermissionsForRole(args.role)
 }
 
 function enabledPermissionKeys(perms: OrgPermissions): string[] {
@@ -316,7 +302,7 @@ function SidebarBody({
 }) {
   const pathname = usePathname()
   const { workspace } = useTenant()
-  const { permissions, role, status: permissionsStatus } = useOrgPermissions()
+  const { role, status: permissionsStatus } = useOrgPermissions()
   const { isPlatformAdmin, impersonation, sessionIdentityLoading } = useAdmin()
   const { organizations, organizationId, switchOrganization, status: orgStatus, switching } =
     useActiveOrganization()
@@ -345,7 +331,6 @@ function SidebarBody({
       const navPermissions = resolveNavPermissions({
         role,
         status: permissionsStatus,
-        permissions,
         platformAdmin: isPlatformAdmin || sessionIdentityLoading,
         impersonating: impersonation.active,
       })
@@ -400,7 +385,6 @@ function SidebarBody({
       }
     },
     [
-      permissions,
       role,
       permissionsStatus,
       orgStatus,

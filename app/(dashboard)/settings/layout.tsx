@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import type { OrgPermissions } from "@/lib/permissions/model"
+import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import {
   User, Building2, Users, CreditCard, Bell,
   Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload, Sparkles,
@@ -58,10 +58,22 @@ const NAV_ITEMS: SettingsNavItem[] = [
   },
 ]
 
+function resolveSettingsNavPermissions(args: {
+  role: OrgMemberRole | null
+  status: "loading" | "ready" | "no_org"
+}): OrgPermissions {
+  // Phase 20 retry: settings navigation stays on DB role defaults and fails
+  // open while membership loads. Profile overlays are intentionally not used
+  // here so owner/admin/manager settings nav cannot disappear on refresh.
+  if (args.status !== "ready" || !args.role) return getOrgPermissionsForRole("owner")
+  return getOrgPermissionsForRole(args.role)
+}
+
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { permissions } = useOrgPermissions()
-  const visibleNav = NAV_ITEMS.filter((item) => !item.visible || item.visible(permissions))
+  const { role, status } = useOrgPermissions()
+  const navPermissions = resolveSettingsNavPermissions({ role, status })
+  const visibleNav = NAV_ITEMS.filter((item) => !item.visible || item.visible(navPermissions))
 
   return (
     <div className="flex flex-col gap-0 md:gap-5">
