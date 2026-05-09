@@ -30,6 +30,7 @@ import {
 } from "@/lib/work-orders/work-order-completion"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderInventoryUsageCard } from "@/components/inventory/work-order-inventory-usage-card"
+import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import {
   WorkOrderCloseOutDialog,
@@ -2082,6 +2083,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             onPartsChange={setTabParts}
             tabsValue={drawerTab}
             onTabsValueChange={handleDrawerTabChange}
+            partsTabLeadSlot={
+              orgStatus === "ready" && activeOrgId && wo.id ? (
+                <WorkOrderTruckConsumeCard organizationId={activeOrgId} workOrderId={wo.id} />
+              ) : null
+            }
             partsTabToolbar={
               <div className="flex flex-col gap-2">
                 {partsDirty ? (

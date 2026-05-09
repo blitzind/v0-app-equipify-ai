@@ -38,7 +38,6 @@ export function WorkOrderTruckConsumeCard({
   const { toast } = useToast()
   const { permissions } = useOrgPermissions()
   const canConsume = Boolean(permissions.canConsumePartsOnWorkOrders)
-  const mayManageInventory = Boolean(permissions.canManageInventory)
 
   const baseUrl = `/api/organizations/${encodeURIComponent(organizationId)}`
 
@@ -130,7 +129,8 @@ export function WorkOrderTruckConsumeCard({
           Truck stock consumption
         </CardTitle>
         <CardDescription className="text-xs">
-          Records inventory usage against this work order from {mayManageInventory ? "a location you select on the Inventory page" : "your assigned van bin"}. Repair log line items stay independent — add parts there for customer-facing totals if needed.
+          Records inventory usage against this work order from your assigned van bin (technicians) — managers can pick any location on{" "}
+          <span className="font-medium text-foreground">Inventory → Consumption &amp; history</span>. Repair log line items stay independent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

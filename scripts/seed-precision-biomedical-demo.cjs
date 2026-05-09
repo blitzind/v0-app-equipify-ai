@@ -724,6 +724,76 @@ async function seedPrecisionExtendedRelations(supabase, {
   const insStock = await supabase.from("inventory_stock").insert(stockRows)
   throwOnError(insStock, "insert inventory_stock")
 
+  // Phase 28 — operational technicians ↔ van bins (technician_vehicle_stock + location technician_id).
+  const { data: omTechRows } = await supabase
+    .from("organization_members")
+    .select("membership_id, user_id")
+    .eq("organization_id", orgId)
+    .eq("role", "tech")
+    .in("user_id", techUserIds)
+
+  const vanPairs = [
+    { locationId: locVan1, label: "Van 04" },
+    { locationId: locVan2, label: "Van 07" },
+  ]
+
+  let ti = 0
+  for (const om of omTechRows ?? []) {
+    const membershipId = om.membership_id
+    const uid = om.user_id
+    if (!membershipId || !uid) continue
+
+    let techDbId = null
+    const existingTech = await supabase
+      .from("technicians")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("membership_id", membershipId)
+      .maybeSingle()
+    throwOnError(existingTech, "select technicians for van seed")
+    if (existingTech.data?.id) {
+      techDbId = existingTech.data.id
+    } else {
+      const prof = await supabase.from("profiles").select("full_name, email").eq("id", uid).maybeSingle()
+      throwOnError(prof, "profiles for technician seed")
+      const nm = prof.data?.full_name?.trim() || "Field Technician"
+      const created = await supabase
+        .from("technicians")
+        .insert({
+          organization_id: orgId,
+          membership_id: membershipId,
+          full_name: nm,
+          email: prof.data?.email ?? null,
+          operational_status: "active",
+          is_sample: true,
+        })
+        .select("id")
+        .single()
+      throwOnError(created, "insert technicians van seed")
+      techDbId = created.data?.id ?? null
+    }
+
+    if (!techDbId) continue
+    const van = vanPairs[ti % vanPairs.length]
+    ti += 1
+
+    const tagLoc = await supabase
+      .from("inventory_locations")
+      .update({ technician_id: techDbId })
+      .eq("organization_id", orgId)
+      .eq("id", van.locationId)
+    throwOnError(tagLoc, "inventory_locations technician_id van seed")
+
+    await supabase.from("technician_vehicle_stock").delete().eq("organization_id", orgId).eq("technician_id", techDbId)
+
+    const vsIns = await supabase.from("technician_vehicle_stock").insert({
+      organization_id: orgId,
+      technician_id: techDbId,
+      inventory_location_id: van.locationId,
+    })
+    throwOnError(vsIns, "technician_vehicle_stock precision seed")
+  }
+
   const completedWos = seededWorkOrders.filter((w) => w.status === "completed" || w.status === "invoiced")
   const openWos = seededWorkOrders.filter((w) => ["open", "scheduled", "in_progress"].includes(w.status))
 

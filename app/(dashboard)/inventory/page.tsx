@@ -424,6 +424,54 @@ export default function InventoryPage() {
     }
   }
 
+  const warehouseStagingLocations = useMemo(
+    () =>
+      locations.filter(
+        (l) => l.is_active && (l.location_type === "warehouse" || l.location_type === "staging"),
+      ),
+    [locations],
+  )
+
+  const filteredStockRows = useMemo(() => {
+    return stock.filter((r) => {
+      const loc = locations.find((l) => l.id === r.location_id)
+      const isVehicle = loc?.location_type === "vehicle"
+      if (stockTableFilter === "vehicle_only") return Boolean(isVehicle)
+      if (stockTableFilter === "vehicle_needs_restock") {
+        if (!isVehicle) return false
+        const tone = stockTone({
+          quantity_on_hand: Number(r.quantity_on_hand),
+          quantity_available: Number(r.quantity_available),
+          reorder_point: r.reorder_point,
+        })
+        return tone !== "ok"
+      }
+      return true
+    })
+  }, [stock, locations, stockTableFilter])
+
+  useEffect(() => {
+    if (!organizationId || status !== "ready" || !baseUrl) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`${baseUrl}/inventory/my-vehicle-location`, { cache: "no-store" })
+        const body = (await res.json().catch(() => ({}))) as { inventory_location_id?: string | null }
+        if (!cancelled) setMyVehicleLocId(body.inventory_location_id ?? null)
+      } catch {
+        if (!cancelled) setMyVehicleLocId(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, status, baseUrl])
+
+  useEffect(() => {
+    if (!myVehicleLocId) return
+    setConLoc((prev) => (prev.trim() ? prev : myVehicleLocId))
+  }, [myVehicleLocId])
+
   if (!organizationId || status !== "ready") {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
@@ -555,13 +603,31 @@ export default function InventoryPage() {
           />
 
           <Card className={INV_CARD_CLASS}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Package className="w-4 h-4" /> On-hand by location
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Parts linked to catalog items. Available = on hand − allocated.
-              </CardDescription>
+            <CardHeader className="pb-2 gap-3 flex flex-col sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1 min-w-0">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Package className="w-4 h-4" /> On-hand by location
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Parts linked to catalog items. Available = on hand − allocated. Filter to truck stock or vans that
+                  need restock.
+                </CardDescription>
+              </div>
+              <Select
+                value={stockTableFilter}
+                onValueChange={(v) =>
+                  setStockTableFilter(v as "all" | "vehicle_only" | "vehicle_needs_restock")
+                }
+              >
+                <SelectTrigger className="h-9 w-full sm:w-[220px] text-xs shrink-0">
+                  <SelectValue placeholder="Filter…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All locations</SelectItem>
+                  <SelectItem value="vehicle_only">Vehicle / truck stock only</SelectItem>
+                  <SelectItem value="vehicle_needs_restock">Truck — low or out</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="pt-0 overflow-x-auto">
               <Table>
@@ -569,30 +635,42 @@ export default function InventoryPage() {
                   <TableRow>
                     <TableHead>Part</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Level</TableHead>
                     <TableHead className="text-right">On hand</TableHead>
                     <TableHead className="text-right">Allocated</TableHead>
                     <TableHead className="text-right">Available</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Last inbound</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stock.length === 0 && (
+                  {filteredStockRows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-muted-foreground py-8 text-center">
-                        No stock rows yet. Receive or adjust stock to create balances.
+                      <TableCell colSpan={7} className="text-sm text-muted-foreground py-8 text-center">
+                        {stock.length === 0
+                          ? "No stock rows yet. Receive or adjust stock to create balances."
+                          : "No rows match this filter."}
                       </TableCell>
                     </TableRow>
                   )}
-                  {stock.map((r) => {
+                  {filteredStockRows.map((r) => {
                     const loc = locations.find((l) => l.id === r.location_id)
                     const isVehicle = loc?.location_type === "vehicle"
                     const techName = isVehicle
                       ? vehicleAssignments.find((a) => a.inventory_location_id === r.location_id)
                           ?.technician_name ?? null
                       : null
-                    const low = isLowStock({
+                    const tone = stockTone({
+                      quantity_on_hand: Number(r.quantity_on_hand),
                       quantity_available: Number(r.quantity_available),
                       reorder_point: r.reorder_point,
                     })
+                    const toneLabel = tone === "out" ? "Out" : tone === "low" ? "Low" : "OK"
+                    const toneClass =
+                      tone === "out"
+                        ? "border-rose-500/50 text-rose-700 dark:text-rose-300"
+                        : tone === "low"
+                          ? "border-amber-500/50 text-amber-700 dark:text-amber-300"
+                          : "border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
                     return (
                       <TableRow key={r.id}>
                         <TableCell className="text-sm">
@@ -613,19 +691,25 @@ export default function InventoryPage() {
                                 {techName ?? "Vehicle"}
                               </Badge>
                             ) : null}
-                            {low ? (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-700 dark:text-amber-300"
-                              >
-                                Low
-                              </Badge>
-                            ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline" className={cn("text-[10px] tabular-nums", toneClass)}>
+                            {toneLabel}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{r.quantity_on_hand}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.quantity_allocated}</TableCell>
                         <TableCell className="text-right tabular-nums">{r.quantity_available}</TableCell>
+                        <TableCell className="text-right text-[11px] text-muted-foreground whitespace-nowrap">
+                          {r.last_restocked_at
+                            ? new Date(r.last_restocked_at).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </TableCell>
                       </TableRow>
                     )
                   })}
@@ -1224,6 +1308,100 @@ export default function InventoryPage() {
               </Table>
             </CardContent>
           </Card>
+
+          {canConsumeOnWorkOrder && !canManageInventoryPerm && myVehicleLocId ? (
+            <Card className={INV_CARD_CLASS}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Return parts to warehouse</CardTitle>
+                <CardDescription className="text-xs">
+                  Move quantity from your assigned van bin back to a storeroom or staging shelf (same ledger as a
+                  transfer). Managers can use <strong>Transfers</strong> for any locations.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className={INV_FORM_GROUP}>
+                <div className={INV_FORM_ROW}>
+                  <div className={cn(INV_FIELD, "sm:basis-[15rem]")}>
+                    <Label className="text-xs">Part</Label>
+                    <Select value={retCatalog} onValueChange={setRetCatalog}>
+                      <SelectTrigger className="h-9 w-full text-xs">
+                        <SelectValue placeholder="Select stocked line…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stock
+                          .filter(
+                            (s) =>
+                              s.location_id === myVehicleLocId && Number(s.quantity_on_hand) > 0,
+                          )
+                          .map((s) => (
+                            <SelectItem key={s.catalog_item_id} value={s.catalog_item_id}>
+                              {(s.item_name ?? s.part_number ?? "—").slice(0, 48)} ({Number(s.quantity_on_hand)}{" "}
+                              on hand)
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className={cn(INV_FIELD, "sm:basis-[14rem]")}>
+                    <Label className="text-xs">Destination</Label>
+                    <Select value={retWarehouse} onValueChange={setRetWarehouse}>
+                      <SelectTrigger className="h-9 w-full text-xs">
+                        <SelectValue placeholder="Warehouse / staging…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouseStagingLocations.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.name} ({l.location_type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className={cn(INV_FIELD, "sm:basis-[6rem]")}>
+                    <Label className="text-xs">Qty</Label>
+                    <Input
+                      value={retQty}
+                      onChange={(e) => setRetQty(e.target.value)}
+                      className="h-9 text-xs"
+                      inputMode="decimal"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className={INV_SUBMIT_CLASS}
+                    disabled={
+                      !retCatalog ||
+                      !retWarehouse ||
+                      !Number.isFinite(Number(retQty)) ||
+                      Number(retQty) <= 0
+                    }
+                    onClick={async () => {
+                      if (!baseUrl || !myVehicleLocId) return
+                      try {
+                        await postJson(`${baseUrl}/inventory/truck-transfer`, {
+                          catalog_item_id: retCatalog,
+                          from_location_id: myVehicleLocId,
+                          to_location_id: retWarehouse,
+                          quantity: Number(retQty),
+                          notes: "Technician return to warehouse",
+                        })
+                        toast({ title: "Transfer recorded", description: "Stock moved off your truck." })
+                        setRetQty("1")
+                        void load()
+                      } catch (e) {
+                        toast({
+                          title: e instanceof Error ? e.message : "Failed",
+                          variant: "destructive",
+                        })
+                      }
+                    }}
+                  >
+                    Return stock
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </TabsContent>
       </Tabs>
 
