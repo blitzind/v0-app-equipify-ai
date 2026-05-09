@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
-import { AlertCircle, Bot, Clock3, Loader2, Send, User } from "lucide-react"
+import { AlertCircle, Bot, Clock3, Loader2, MessageSquarePlus, Send, User } from "lucide-react"
 import { AidenWordmark } from "@/components/aiden/aiden-wordmark"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +15,14 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { AidenFeatureRequestFlow, type AidenFrFormValues } from "@/components/aiden/aiden-feature-request-flow"
 import { moduleFromPath } from "@/lib/aiden/module-context"
+import {
+  clearAidenChatSession,
+  loadAidenChatSession,
+  messagesFromPayload,
+  serializeAidenChatSession,
+} from "@/lib/aiden/aiden-chat-session-storage"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import type { AidenChatMessage, AidenFeatureRequestDraft } from "@/lib/aiden/aiden-response-rules"
@@ -27,6 +34,18 @@ type ChatMessage = {
   content: string
   answer?: AidenSupportPhase2Answer
   createdAt: Date
+}
+
+const WELCOME_CONTENT =
+  "Hi — I'm AIden, here to help you use Equipify. Ask how to create work orders, manage certificates, billing, the portal, equipment, or anything in the app. I explain steps — I can't perform actions for you. If something isn't built yet, you can submit a feature request from here."
+
+function createWelcomeMessage(): ChatMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: WELCOME_CONTENT,
+    createdAt: new Date(),
+  }
 }
 
 type AidenChatPanelProps = {
@@ -116,15 +135,12 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const currentModule = useMemo(() => moduleFromPath(pathname), [pathname])
   const quickPrompts = useMemo(() => currentModule.quickPrompts.slice(0, 4), [currentModule])
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hi — I'm AIden, here to help you use Equipify. Ask how to create work orders, manage certificates, billing, the portal, equipment, or anything in the app. I explain steps — I can't perform actions for you. If something isn't built yet, you can submit a feature request from here.",
-      createdAt: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [sessionReady, setSessionReady] = useState(false)
+  const sessionStartedAtRef = useRef<Date>(new Date())
+  const messagesRef = useRef<ChatMessage[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +149,75 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [frOpen, setFrOpen] = useState(false)
   const [frNonce, setFrNonce] = useState(0)
   const [frInitial, setFrInitial] = useState<AidenFrFormValues>(() => defaultFrValues(""))
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  /** Restore from localStorage when the panel mounts (launcher unmounts panel when closed). */
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    setSessionReady(false)
+
+    ;(async () => {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const uid = user?.id ?? null
+      if (!cancelled) setUserId(uid)
+
+      if (!organizationId || orgStatus !== "ready") {
+        if (!cancelled) {
+          sessionStartedAtRef.current = new Date()
+          setMessages([createWelcomeMessage()])
+          setSessionReady(true)
+        }
+        return
+      }
+
+      const stored = loadAidenChatSession(organizationId, uid)
+      if (cancelled) return
+
+      if (stored?.messages?.length) {
+        sessionStartedAtRef.current = new Date(stored.createdAt)
+        setMessages(messagesFromPayload(stored.messages))
+      } else {
+        sessionStartedAtRef.current = new Date()
+        setMessages([createWelcomeMessage()])
+      }
+      setSessionReady(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, orgStatus])
+
+  /** Persist session (best-effort). */
+  useEffect(() => {
+    if (!open || !sessionReady || !organizationId || orgStatus !== "ready") return
+
+    serializeAidenChatSession({
+      organizationId,
+      userId,
+      messages,
+      path: pathname || "/",
+      moduleLabel: currentModule.label,
+      sessionCreatedAt: sessionStartedAtRef.current,
+    })
+  }, [
+    messages,
+    open,
+    sessionReady,
+    organizationId,
+    orgStatus,
+    userId,
+    pathname,
+    currentModule.label,
+  ])
 
   const chatMessagesForContext = useMemo((): AidenChatMessage[] => {
     return messages
@@ -150,6 +235,24 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages, loading])
 
+  function startNewChat() {
+    if (
+      !confirm(
+        "Start a new chat? Your current conversation will be cleared on this browser (this device only).",
+      )
+    ) {
+      return
+    }
+    if (organizationId) {
+      clearAidenChatSession(organizationId, userId)
+    }
+    sessionStartedAtRef.current = new Date()
+    setMessages([createWelcomeMessage()])
+    setError(null)
+    setFrOpen(false)
+    toast({ title: "New chat started" })
+  }
+
   async function sendMessage(text: string) {
     const content = text.trim()
     if (!content || loading) return
@@ -164,7 +267,8 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       content,
       createdAt: new Date(),
     }
-    const nextMessages = [...messages, userMessage]
+    const prev = messagesRef.current
+    const nextMessages = [...prev, userMessage]
     setMessages(nextMessages)
     setInput("")
     setError(null)
@@ -221,19 +325,35 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-[30rem]">
         <SheetHeader className="border-b border-border bg-card px-4 py-4">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 ring-1 ring-sky-500/25 dark:text-sky-400">
-              <Bot size={16} aria-hidden />
-            </span>
-            <div>
-              <SheetTitle className="flex items-center gap-1.5 text-left">
-                Ask <AidenWordmark size="md" />
-              </SheetTitle>
-              <SheetDescription className="text-xs text-muted-foreground text-left">
-                Help for <strong>{currentModule.label}</strong> — you&apos;re on{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{pathname || "/"}</code>
-              </SheetDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 ring-1 ring-sky-500/25 dark:text-sky-400">
+                <Bot size={16} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <SheetTitle className="flex items-center gap-1.5 text-left">
+                  Ask <AidenWordmark size="md" />
+                </SheetTitle>
+                <SheetDescription className="text-xs text-muted-foreground text-left">
+                  Help for <strong>{currentModule.label}</strong> — you&apos;re on{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{pathname || "/"}</code>
+                </SheetDescription>
+              </div>
             </div>
+            {sessionReady ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+                onClick={startNewChat}
+                disabled={loading}
+                aria-label="Start a new chat"
+              >
+                <MessageSquarePlus className="size-3.5" aria-hidden />
+                New chat
+              </Button>
+            ) : null}
           </div>
         </SheetHeader>
 
@@ -241,7 +361,13 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-muted/30 to-background px-4 py-4"
         >
-          {messages.length <= 1 ? (
+          {!sessionReady ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+              <Loader2 className="size-6 animate-spin" aria-hidden />
+              Loading conversation…
+            </div>
+          ) : null}
+          {sessionReady && messages.length <= 1 ? (
             <div className="mb-4 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 text-sm text-foreground">
               <p className="font-medium">
                 Context: <span className="text-muted-foreground">{currentModule.label}</span>
@@ -253,6 +379,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
             </div>
           ) : null}
 
+          {sessionReady ? (
           <div className="space-y-3">
             {messages.map((message) => (
               <div
@@ -340,6 +467,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
               </div>
             ) : null}
           </div>
+          ) : null}
         </div>
 
         <div className="sticky bottom-0 border-t border-border bg-background/95 p-4 backdrop-blur">
