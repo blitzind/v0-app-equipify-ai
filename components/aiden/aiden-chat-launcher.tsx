@@ -2,9 +2,9 @@
 
 import dynamic from "next/dynamic"
 import { useState } from "react"
-import { MessageCircle } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import { AidenWordmark } from "@/components/aiden/aiden-wordmark"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 const AidenChatPanel = dynamic(
   () => import("@/components/aiden/aiden-chat-panel").then((mod) => mod.AidenChatPanel),
@@ -23,20 +23,31 @@ export function AidenChatLauncher() {
         Layout imports this module statically so production never depends on a separate dynamic chunk for the button.
       */}
       <div className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6">
-        <Button
+        <button
           type="button"
-          size="sm"
-          variant="secondary"
-          className="h-11 rounded-full border-2 border-sky-500/40 bg-card px-3 shadow-xl gap-2 text-foreground ring-2 ring-sky-500/15 ring-offset-2 ring-offset-background hover:bg-muted/90 hover:border-sky-500/55 dark:border-sky-400/45 dark:ring-sky-400/20"
+          className={cn(
+            "group relative inline-flex h-12 shrink-0 items-center gap-2 rounded-full pl-3 pr-4",
+            "bg-gradient-to-br from-sky-500 via-[color:var(--primary)] to-blue-700",
+            "text-white shadow-lg",
+            "border border-white/25",
+            "ring-2 ring-sky-400/55 ring-offset-2 ring-offset-background",
+            "shadow-[0_4px_22px_-4px_rgba(14,165,233,0.65),0_2px_12px_-2px_rgba(37,99,235,0.45),0_0_36px_-8px_rgba(56,189,248,0.55)]",
+            "transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_6px_28px_-4px_rgba(14,165,233,0.72),0_4px_16px_-2px_rgba(37,99,235,0.5),0_0_44px_-6px_rgba(56,189,248,0.6)]",
+            "active:scale-[0.97] active:brightness-[0.98]",
+            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--primary)]",
+          )}
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={open}
+          aria-label="Ask AIden — open Equipify help assistant"
         >
-          <MessageCircle className="size-4 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden />
-          <span className="flex items-center gap-0 text-sm font-medium text-foreground">
-            Ask <AidenWordmark size="sm" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/35 backdrop-blur-[2px] transition-colors group-hover:bg-white/22">
+            <Sparkles className="size-[18px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]" aria-hidden strokeWidth={2} />
           </span>
-        </Button>
+          <span className="flex items-baseline gap-1 pr-0.5 text-[15px] font-medium leading-none tracking-tight text-white drop-shadow-sm">
+            Ask <AidenWordmark size="sm" tone="inverse" className="text-[15px]" />
+          </span>
+        </button>
       </div>
       {open ? <AidenChatPanel open={open} onOpenChange={setOpen} /> : null}
     </>
