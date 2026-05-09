@@ -262,6 +262,12 @@ export function CommunicationsFeedPage() {
     )
   }
 
+  /** Match Catalog / Inventory toolbar: compact triggers on xl+, horizontal scroll if needed. */
+  const filterTriggerClass =
+    "h-9 w-full min-w-0 sm:min-w-[104px] sm:max-w-[152px] md:w-[min(100%,148px)] xl:w-[118px] xl:max-w-[124px] xl:shrink-0 2xl:w-[126px] 2xl:max-w-[132px]"
+  const filterTriggerWideClass =
+    "h-9 w-full min-w-0 sm:min-w-[128px] sm:max-w-[188px] md:w-[min(100%,176px)] xl:w-[156px] xl:max-w-[164px] xl:shrink-0 2xl:w-[164px] 2xl:max-w-[172px]"
+
   return (
     <div className="flex flex-col gap-6 min-w-0">
       {/*
@@ -304,22 +310,23 @@ export function CommunicationsFeedPage() {
         </p>
       </div>
 
-      {/* Toolbar — single row on desktop, wraps cleanly on tablet/mobile */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2 min-w-0">
+      {/* Toolbar — xl+: search + filters + actions one row (Catalog pattern); smaller viewports wrap. */}
+      <div className="flex min-w-0 flex-col gap-2 xl:flex-row xl:flex-nowrap xl:items-center xl:gap-2">
+        <div className="flex h-9 w-full min-w-0 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 xl:w-[220px] xl:max-w-[220px] 2xl:w-[236px] 2xl:max-w-[236px]">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Customer, email, WO/INV/quote number, snippet…"
+            placeholder="Search messages…"
+            title="Customer, email, WO / invoice / quote #, snippet"
             className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:flex-nowrap xl:gap-1.5 xl:overflow-x-auto xl:pb-0.5 xl:[scrollbar-width:thin]">
           <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
-            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerClass}>
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -333,7 +340,7 @@ export function CommunicationsFeedPage() {
           </Select>
 
           <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
-            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerClass}>
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -351,7 +358,7 @@ export function CommunicationsFeedPage() {
           </Select>
 
           <Select value={entityType} onValueChange={(v) => setEntityType(v as EntityType)}>
-            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerClass}>
               <SelectValue placeholder="Entity" />
             </SelectTrigger>
             <SelectContent>
@@ -367,7 +374,7 @@ export function CommunicationsFeedPage() {
           </Select>
 
           <Select value={direction} onValueChange={(v) => setDirection(v as DirectionFilter)}>
-            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerClass}>
               <SelectValue placeholder="Direction" />
             </SelectTrigger>
             <SelectContent>
@@ -381,7 +388,7 @@ export function CommunicationsFeedPage() {
             value={communicationKind}
             onValueChange={(v) => setCommunicationKind(v as KindFilter)}
           >
-            <SelectTrigger className="w-[200px] sm:w-[220px] min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerWideClass}>
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -396,7 +403,7 @@ export function CommunicationsFeedPage() {
           </Select>
 
           <Select value={aiSource} onValueChange={(v) => setAiSource(v as AiSourceFilter)}>
-            <SelectTrigger className="w-36 sm:w-40 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerWideClass}>
               <SelectValue placeholder="AI / manual" />
             </SelectTrigger>
             <SelectContent>
@@ -407,7 +414,7 @@ export function CommunicationsFeedPage() {
           </Select>
 
           <Select value={assignedFilter} onValueChange={(v) => setAssignedFilter(v as AssignedFilter)}>
-            <SelectTrigger className="w-36 sm:w-40 min-h-11 lg:min-h-10">
+            <SelectTrigger className={filterTriggerWideClass}>
               <SelectValue placeholder="Assigned" />
             </SelectTrigger>
             <SelectContent>
@@ -418,7 +425,7 @@ export function CommunicationsFeedPage() {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1.5 min-h-11 lg:min-h-10 rounded-md border border-border bg-card px-2.5">
+          <div className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2.5">
             <input
               type="date"
               value={fromDate}
@@ -436,7 +443,7 @@ export function CommunicationsFeedPage() {
             />
           </div>
 
-          <label className="inline-flex items-center gap-2 min-h-11 lg:min-h-10 rounded-md border border-border bg-card px-3 text-xs font-medium cursor-pointer select-none">
+          <label className="inline-flex h-9 shrink-0 cursor-pointer select-none items-center gap-2 rounded-md border border-border bg-card px-3 text-xs font-medium">
             <input
               type="checkbox"
               checked={automatedOnly}
@@ -447,13 +454,13 @@ export function CommunicationsFeedPage() {
           </label>
         </div>
 
-        <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto">
+        <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-2 sm:ml-auto sm:w-auto xl:ml-auto xl:w-auto">
           <Button
             type="button"
             variant="outline"
             onClick={exportCsv}
             disabled={items.length === 0}
-            className="min-h-11 lg:min-h-10 gap-1.5 w-full sm:w-auto"
+            className="h-9 gap-1.5 w-full sm:w-auto"
           >
             <ArrowDownToLine className="w-4 h-4" aria-hidden />
             Export CSV
@@ -462,7 +469,7 @@ export function CommunicationsFeedPage() {
             <Button
               type="button"
               onClick={() => setComposeOpen(true)}
-              className="min-h-11 lg:min-h-10 gap-1.5 w-full sm:w-auto"
+              className="h-9 gap-1.5 w-full sm:w-auto"
             >
               <NotebookPen className="w-4 h-4" aria-hidden />
               Compose draft
@@ -472,7 +479,7 @@ export function CommunicationsFeedPage() {
             type="button"
             variant="ghost"
             asChild
-            className="min-h-11 lg:min-h-10 gap-1.5 w-full sm:w-auto"
+            className="h-9 gap-1.5 w-full sm:w-auto"
           >
             <Link href="/settings/automations">
               <Settings2 className="w-4 h-4" aria-hidden />

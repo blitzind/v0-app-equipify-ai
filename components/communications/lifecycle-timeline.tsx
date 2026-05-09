@@ -40,7 +40,7 @@ export function LifecycleTimeline({ steps }: { steps: LifecycleStep[] }) {
         aria-hidden
       />
       {steps.map((step) => (
-        <li key={step.id} className="relative pb-3 last:pb-0">
+        <li key={step.id} className="relative pb-4 last:pb-0">
           <span
             className={cn(
               "absolute -left-[19px] top-[6px] h-3 w-3 rounded-full ring-4",

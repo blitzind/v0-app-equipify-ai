@@ -10,7 +10,7 @@
  * coming later without rendering live actions.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -36,7 +36,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -46,6 +45,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import {
+  DrawerSection,
+  DRAWER_DIALOG_FOOTER_SURFACE,
+  DRAWER_NESTED_CARD,
+} from "@/components/detail-drawer"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { eventTypeMeta } from "@/lib/communications/event-catalog"
 import { buildLifecycle, explainFailure } from "@/lib/communications/lifecycle"
@@ -271,10 +276,12 @@ export function FeedDetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-xl flex flex-col overflow-hidden">
-        <SheetHeader className="space-y-2 pr-6">
-          <SheetTitle className="text-base text-pretty">{item?.title ?? "Communication"}</SheetTitle>
-          <SheetDescription className="text-xs flex flex-wrap items-center gap-2">
+      <SheetContent className="flex h-full max-h-[100dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <SheetHeader className="shrink-0 gap-2 border-b border-border p-0 px-5 pb-4 pt-6 pr-14">
+          <SheetTitle className="text-base leading-snug text-pretty pr-1">
+            {item?.title ?? "Communication"}
+          </SheetTitle>
+          <SheetDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs">
             <FeedStatusPill status={status} />
             {item ? (
               <>
@@ -326,7 +333,7 @@ export function FeedDetailDrawer({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-5 pt-2 pr-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 space-y-6">
           {loading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground py-6">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading communication…
@@ -338,81 +345,85 @@ export function FeedDetailDrawer({
 
           {item ? (
             <>
-              <Section label="Message">
-                <div className="space-y-2">
+              <DrawerSection title="Message">
+                <div className={cn(DRAWER_NESTED_CARD, "space-y-3 p-4")}>
                   {item.summary ? (
-                    <p className="text-sm text-foreground/90 leading-relaxed">{item.summary}</p>
+                    <p className="text-sm leading-relaxed text-foreground/90">{item.summary}</p>
                   ) : null}
                   {item.body ? (
-                    <pre className="text-xs leading-relaxed whitespace-pre-wrap rounded-md border border-border bg-muted/30 px-3 py-2 font-mono">
+                    <pre className="rounded-lg bg-muted/40 px-3 py-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap dark:bg-muted/25">
                       {item.body}
                     </pre>
                   ) : !item.summary ? (
-                    <p className="text-xs text-muted-foreground italic">
+                    <p className="text-xs italic text-muted-foreground">
                       No message body captured for this event.
                     </p>
                   ) : null}
                 </div>
-              </Section>
+              </DrawerSection>
 
-              <Section label="Delivery">
-                <DefList
-                  items={[
-                    ["Status", <FeedStatusPill key="s" status={status} />],
-                    ["Channel", item.channel],
-                    ["Provider", item.provider],
-                    [
-                      "Recipient",
-                      item.recipient_address ?? item.customer_label ?? "—",
-                    ],
-                    ["Created", formatRelativeTime(item.created_at)],
-                    item.sent_at ? ["Sent", formatRelativeTime(item.sent_at)] : null,
-                    item.delivered_at
-                      ? ["Delivered", formatRelativeTime(item.delivered_at)]
-                      : null,
-                    item.failed_at ? ["Failed", formatRelativeTime(item.failed_at)] : null,
-                    handoffRouteLabel
-                      ? ["Hand-off", `Sent via ${handoffRouteLabel}`]
-                      : null,
-                  ].filter(Boolean) as [string, React.ReactNode][]}
-                />
-                {item.error_message ? (
-                  <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/[0.05] px-3 py-2 text-xs space-y-1">
-                    <p className="flex items-center gap-1.5 font-medium text-red-700 dark:text-red-300">
-                      <AlertTriangle className="w-3.5 h-3.5" aria-hidden />
-                      Last failure
-                    </p>
-                    <p className="text-red-700/90 dark:text-red-300/90 leading-relaxed">
-                      {item.error_message}
-                    </p>
-                    {failureHint ? (
-                      <p className="text-[11px] text-red-700/80 dark:text-red-300/80 leading-snug">
-                        {failureHint}
+              <DrawerSection title="Delivery">
+                <div className={cn(DRAWER_NESTED_CARD, "space-y-3 p-4")}>
+                  <DefList
+                    items={[
+                      ["Status", <FeedStatusPill key="s" status={status} />],
+                      ["Channel", item.channel],
+                      ["Provider", item.provider],
+                      [
+                        "Recipient",
+                        item.recipient_address ?? item.customer_label ?? "—",
+                      ],
+                      ["Created", formatRelativeTime(item.created_at)],
+                      item.sent_at ? ["Sent", formatRelativeTime(item.sent_at)] : null,
+                      item.delivered_at
+                        ? ["Delivered", formatRelativeTime(item.delivered_at)]
+                        : null,
+                      item.failed_at ? ["Failed", formatRelativeTime(item.failed_at)] : null,
+                      handoffRouteLabel
+                        ? ["Hand-off", `Sent via ${handoffRouteLabel}`]
+                        : null,
+                    ].filter(Boolean) as [string, ReactNode][]}
+                  />
+                  {item.error_message ? (
+                    <div className="space-y-1 rounded-lg border border-red-500/30 bg-red-500/[0.05] px-3 py-2.5 text-xs">
+                      <p className="flex items-center gap-1.5 font-medium text-red-700 dark:text-red-300">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                        Last failure
                       </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </Section>
+                      <p className="leading-relaxed text-red-700/90 dark:text-red-300/90">
+                        {item.error_message}
+                      </p>
+                      {failureHint ? (
+                        <p className="text-[11px] leading-snug text-red-700/80 dark:text-red-300/80">
+                          {failureHint}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </DrawerSection>
 
               {lifecycle.length > 0 ? (
-                <Section label="Lifecycle">
-                  <LifecycleTimeline steps={lifecycle} />
-                </Section>
+                <DrawerSection title="Lifecycle">
+                  <div className={cn(DRAWER_NESTED_CARD, "p-4")}>
+                    <LifecycleTimeline steps={lifecycle} />
+                  </div>
+                </DrawerSection>
               ) : null}
 
               {isDraft(item) ? (
-                <Section label="Draft hand-off">
-                  <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
+                <DrawerSection title="Draft hand-off">
+                  <div className={cn(DRAWER_NESTED_CARD, "space-y-2 p-4 text-xs")}>
                     <p className="text-foreground/90">
                       Drafts hand off to the existing live send route based on the
                       related entity. Sending is permission-gated and never auto-fires.
                     </p>
                     {draftBlocker ? (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+                      <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-300">
                         {draftBlocker}
                       </p>
                     ) : (
-                      <p className="text-[11px] text-muted-foreground leading-snug">
+                      <p className="text-[11px] leading-snug text-muted-foreground">
                         Ready to dispatch via{" "}
                         <span className="font-medium">
                           {prettyEntityLabel(item.related_entity_type).toLowerCase()}
@@ -421,15 +432,15 @@ export function FeedDetailDrawer({
                       </p>
                     )}
                   </div>
-                </Section>
+                </DrawerSection>
               ) : null}
 
               {(item.entity_label ||
                 item.customer_label ||
                 item.related_entity_type ||
                 item.recipient_customer_id) && (
-                <Section label="Related">
-                  <div className="flex flex-col gap-2">
+                <DrawerSection title="Related">
+                  <div className="flex flex-col gap-3">
                     {item.customer_label ? (
                       <EntityLink
                         label="Customer"
@@ -451,13 +462,18 @@ export function FeedDetailDrawer({
                       />
                     ) : null}
                   </div>
-                </Section>
+                </DrawerSection>
               )}
 
               {item && canViewCommunications ? (
-                <Section label="AI assist (does not send)">
-                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 space-y-3">
-                    <p className="text-[11px] text-muted-foreground leading-snug">
+                <DrawerSection title="AI assist (does not send)">
+                  <div
+                    className={cn(
+                      DRAWER_NESTED_CARD,
+                      "space-y-3 bg-muted/15 p-4 dark:bg-muted/10",
+                    )}
+                  >
+                    <p className="text-[11px] leading-snug text-muted-foreground">
                       Summaries and drafts are for review only. Paste into compose or your mail client
                       after approval — outbound sending stays on existing routes.
                     </p>
@@ -540,12 +556,17 @@ export function FeedDetailDrawer({
                       </div>
                     ) : null}
                   </div>
-                </Section>
+                </DrawerSection>
               ) : null}
 
               {(item.automated || automationId || workflowName || triggerType) && (
-                <Section label="Automation">
-                  <div className="rounded-md border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2 text-xs text-violet-900 dark:text-violet-100 space-y-1">
+                <DrawerSection title="Automation">
+                  <div
+                    className={cn(
+                      DRAWER_NESTED_CARD,
+                      "space-y-1.5 border-violet-500/20 bg-violet-500/[0.06] p-4 text-xs text-violet-900 dark:text-violet-100",
+                    )}
+                  >
                     <p className="flex items-center gap-1.5 font-medium">
                       <Workflow className="w-3.5 h-3.5" aria-hidden />
                       Triggered by automation
@@ -566,12 +587,17 @@ export function FeedDetailDrawer({
                       </p>
                     ) : null}
                   </div>
-                </Section>
+                </DrawerSection>
               )}
 
               {detail?.ai_generated || aiAssistantName ? (
-                <Section label="AI assistant">
-                  <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 text-xs text-emerald-900 dark:text-emerald-100 space-y-1">
+                <DrawerSection title="AI assistant">
+                  <div
+                    className={cn(
+                      DRAWER_NESTED_CARD,
+                      "space-y-1.5 border-emerald-500/20 bg-emerald-500/[0.06] p-4 text-xs text-emerald-900 dark:text-emerald-100",
+                    )}
+                  >
                     <p className="flex items-center gap-1.5 font-medium">
                       <Bot className="w-3.5 h-3.5" aria-hidden />
                       AI-generated content
@@ -582,36 +608,40 @@ export function FeedDetailDrawer({
                       </p>
                     ) : null}
                   </div>
-                </Section>
+                </DrawerSection>
               ) : null}
 
               {showRawMetadata && item.metadata ? (
-                <Section label="Raw metadata (admin)">
+                <DrawerSection title="Raw metadata (admin)">
                   <details
                     open={showMeta}
                     onToggle={(e) => setShowMeta((e.target as HTMLDetailsElement).open)}
-                    className="rounded-md border border-border bg-muted/30"
+                    className={cn(DRAWER_NESTED_CARD, "overflow-hidden")}
                   >
-                    <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+                    <summary className="cursor-pointer select-none px-4 py-3 text-xs text-muted-foreground hover:text-foreground">
                       {showMeta ? "Hide JSON" : "Show JSON"}
                     </summary>
-                    <pre className="text-[11px] leading-relaxed whitespace-pre-wrap rounded-b-md border-t border-border bg-muted/30 px-3 py-2 font-mono overflow-x-auto">
+                    <pre className="overflow-x-auto border-t border-border bg-muted/30 px-4 py-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                       {JSON.stringify(item.metadata, null, 2)}
                     </pre>
                   </details>
-                  <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">
+                  <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
                     Raw metadata is restricted to admins / managers. Provider IDs and signed
                     URLs are intentionally redacted from this view.
                   </p>
-                </Section>
+                </DrawerSection>
               ) : null}
 
             </>
           ) : null}
         </div>
 
-        <Separator />
-        <SheetFooter className="gap-2 pt-3 flex-col sm:flex-row sm:items-center">
+        <SheetFooter
+          className={cn(
+            DRAWER_DIALOG_FOOTER_SURFACE,
+            "shrink-0 gap-3 border-t px-5 py-4 flex-col sm:flex-row sm:items-center sm:justify-end",
+          )}
+        >
           {item && isDraft(item) ? (
             canManageCommunications ? (
               <Button
@@ -678,30 +708,13 @@ export function FeedDetailDrawer({
   )
 }
 
-function Section({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-2">
-      <p className="text-[11px] uppercase tracking-wide font-semibold text-muted-foreground">
-        {label}
-      </p>
-      {children}
-    </section>
-  )
-}
-
 function DefList({
   items,
 }: {
-  items: [string, React.ReactNode][]
+  items: [string, ReactNode][]
 }) {
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-xs">
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-2 text-xs">
       {items.map(([k, v], i) => (
         <div key={`${k}-${i}`} className="contents">
           <dt className="text-muted-foreground capitalize">{k}</dt>
@@ -722,7 +735,12 @@ function EntityLink({
   href: string | null
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
+    <div
+      className={cn(
+        DRAWER_NESTED_CARD,
+        "flex items-center justify-between gap-2 px-3 py-2.5 text-xs",
+      )}
+    >
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
           {label}
