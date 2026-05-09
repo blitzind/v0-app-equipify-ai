@@ -1,11 +1,17 @@
 import type { PlanId } from "@/lib/plans"
 import { planRank } from "@/lib/ai/plan-ai-config"
 
-/** Tracked + gated AIden surfaces (Phase 3 foundation). */
-export const AIDEN_TRACKED_FEATURES = ["support_chat", "feature_request"] as const
+/** Tracked + gated AIden surfaces (Phase 3 foundation + Phase 4 productivity usage keys). */
+export const AIDEN_TRACKED_FEATURES = [
+  "support_chat",
+  "feature_request",
+  "customer_summary",
+  "work_order_summary",
+  "draft_generation",
+] as const
 export type AidenTrackedFeatureKey = (typeof AIDEN_TRACKED_FEATURES)[number]
 
-/** Reserved for future Growth / Scale — not enabled in APIs yet. */
+/** Future-only keys (partially wired — see `canUseAidenCapability`). */
 export type AidenFutureCapabilityKey = "productivity_ai" | "operational_copilot" | "summaries_drafting"
 
 export type AidenPageGuidanceLevel = "limited" | "rich"
@@ -31,9 +37,9 @@ export function canUseAidenCapability(
     case "page_guidance":
       return true
     case "productivity_ai":
+    case "summaries_drafting":
       return planRank(planId) >= planRank("growth")
     case "operational_copilot":
-    case "summaries_drafting":
       return planRank(planId) >= planRank("scale")
     default:
       return false

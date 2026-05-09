@@ -55,6 +55,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
+import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 
 function uiStatusToDb(s: WorkOrderStatus): string {
@@ -888,6 +889,13 @@ export default function WorkOrderDetailPage() {
         onTabsValueChange={setPageWoTab}
         overviewLeadSlot={
           <>
+            {activeOrg.organizationId ?
+              <AidenProductivitySection
+                organizationId={activeOrg.organizationId}
+                mode="work_order"
+                workOrderId={workOrder.id}
+              />
+            : null}
             {linkedInvoices.length > 0 ? (
               <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
                 <div className="border-b border-border bg-muted/30 dark:bg-muted/15 px-4 py-2.5 flex items-center justify-between gap-2">

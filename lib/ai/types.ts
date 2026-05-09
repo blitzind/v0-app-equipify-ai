@@ -19,6 +19,9 @@ export type AiTaskId =
   | "tagging"
   | "inventory_operations"
   | "aiden_help"
+  | "aiden_customer_summary"
+  | "aiden_work_order_productivity"
+  | "aiden_draft_generation"
 
 export type AiProviderId = "openai" | "anthropic" | "google"
 

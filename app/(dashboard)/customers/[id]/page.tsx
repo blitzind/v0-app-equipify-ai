@@ -81,6 +81,7 @@ import {
 } from "@/lib/equipment/intelligence-rollup"
 import { loadCustomerRollupTree } from "@/lib/customers/consolidated-rollup"
 import { ParentAccountCard } from "@/components/customers/parent-account-card"
+import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -1772,6 +1773,12 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <AidenProductivitySection
+        organizationId={customer.organizationId}
+        mode="customer"
+        customerId={customer.id}
+      />
 
       {/* Phase 2: Parent account context (sub-account view only). */}
       {hierarchySummary?.parent ? (
