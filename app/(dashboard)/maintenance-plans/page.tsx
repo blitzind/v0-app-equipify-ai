@@ -95,6 +95,7 @@ import {
 import { ViewToggle } from "@/components/ui/view-toggle"
 import { EditMaintenancePlanDialog } from "@/components/maintenance-plans/edit-maintenance-plan-dialog"
 import { CreateMaintenancePlanDialog } from "@/components/maintenance-plans/create-maintenance-plan-dialog"
+import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
 import { useBillingAccess } from "@/lib/billing-access-context"
@@ -1068,6 +1069,7 @@ function MaintenancePlansPageInner() {
     error,
     plansListVisibility,
     setPlansListVisibility,
+    organizationId: maintenanceOrgId,
   } = useMaintenancePlans()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -1181,6 +1183,9 @@ function MaintenancePlansPageInner() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      {maintenanceOrgId ?
+        <AidenOperationalInsightsCard organizationId={maintenanceOrgId} moduleContext="maintenance_plans" />
+      : null}
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[

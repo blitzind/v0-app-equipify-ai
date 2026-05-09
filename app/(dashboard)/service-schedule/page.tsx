@@ -17,6 +17,7 @@ import {
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useMaintenancePlans } from "@/lib/maintenance-store"
+import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { cn } from "@/lib/utils"
@@ -2595,6 +2596,10 @@ function ServiceSchedulePageInner() {
           />
         </>
       )}
+
+      {organizationId ?
+        <AidenOperationalInsightsCard organizationId={organizationId} moduleContext="service_schedule" />
+      : null}
 
       {/* ── View Tabs + My/Team Toggle ─────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">

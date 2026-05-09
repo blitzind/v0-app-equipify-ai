@@ -42,6 +42,7 @@ import { applyArchivedAtScope } from "@/lib/archive-scope"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 import { buildWorkOrderListSelect } from "@/lib/work-orders/supabase-select"
 import { WorkOrderDrawer } from "@/components/drawers/work-order-drawer"
+import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -1212,6 +1213,10 @@ function WorkOrdersPageInner() {
           </p>
         </div>
       ) : null}
+
+      {orgStatus === "ready" && activeOrgId ?
+        <AidenOperationalInsightsCard organizationId={activeOrgId} moduleContext="work_orders" />
+      : null}
 
       {/* Status KPI cards — responsive grid (no horizontal slider / arrows) */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">

@@ -8,6 +8,7 @@ export const AIDEN_TRACKED_FEATURES = [
   "customer_summary",
   "work_order_summary",
   "draft_generation",
+  "operational_recommendations",
 ] as const
 export type AidenTrackedFeatureKey = (typeof AIDEN_TRACKED_FEATURES)[number]
 

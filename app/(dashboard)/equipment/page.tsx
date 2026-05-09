@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ViewToggle } from "@/components/ui/view-toggle"
+import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
 import {
   Search,
   Plus,
@@ -613,6 +614,9 @@ function EquipmentPageInner() {
           </p>
         </div>
       ) : null}
+      {orgStatus === "ready" && activeOrgId ?
+        <AidenOperationalInsightsCard organizationId={activeOrgId} moduleContext="equipment" />
+      : null}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />

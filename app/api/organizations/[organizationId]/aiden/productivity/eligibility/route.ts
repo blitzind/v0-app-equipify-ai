@@ -43,12 +43,17 @@ export async function GET(
 
   const subscription = await getOrganizationSubscription(supabase, organizationId)
   const planId = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
-  const productivityEnabled =
-    canAccessApp(subscription) && canUseAidenCapability(planId, "productivity_ai")
+  const billingOk = canAccessApp(subscription)
+  const productivityEnabled = billingOk && canUseAidenCapability(planId, "productivity_ai")
+  const operationalCopilotEnabled = billingOk && canUseAidenCapability(planId, "operational_copilot")
+  /** Growth / Scale when billing ok — used for Scale-only messaging without exposing nag copy to Solo/Core. */
+  const operationalGrowthHint = billingOk && productivityEnabled && !operationalCopilotEnabled
 
   return NextResponse.json({
     ok: true,
     productivityEnabled,
+    operationalCopilotEnabled,
+    operationalGrowthHint,
     planTier: planId,
   })
 }

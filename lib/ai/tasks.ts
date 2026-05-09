@@ -326,6 +326,22 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     maxRetries: 2,
     confidenceThreshold: null,
   },
+  aiden_operational_recommendations: {
+    id: "aiden_operational_recommendations",
+    label: "AIden operational recommendations (Scale)",
+    requiredPlan: "scale",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.25,
+    maxOutputTokens: 4096,
+    structuredMode: "json_object",
+    timeoutMs: 90_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {
