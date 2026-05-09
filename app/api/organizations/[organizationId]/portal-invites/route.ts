@@ -78,7 +78,7 @@ export async function POST(
     .select("id")
     .eq("organization_id", organizationId)
     .eq("id", customerId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
     .maybeSingle()
 
   if (cErr || !cust) {

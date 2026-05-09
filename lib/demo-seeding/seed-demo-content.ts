@@ -631,7 +631,6 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
       name: t.name,
       equipment_category_id: t.equipmentCategoryId,
       fields: t.fields,
-      is_archived: false,
       is_sample: true,
     }))
     const { data: tIns, error: tErr } = await args.supabase.from("calibration_templates").insert(tRows).select("id")
@@ -677,7 +676,6 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
       contact_name: v.contact,
       billing_address: `${500 + i * 7} Commerce Blvd, Industry CA 91746`,
       shipping_address: `${500 + i * 7} Commerce Blvd, Industry CA 91746`,
-      is_archived: false,
       is_sample: true,
     }))
     const { data: vIns, error: vErr } = await args.supabase.from("org_vendors").insert(vRows).select("id")

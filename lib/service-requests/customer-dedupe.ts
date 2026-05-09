@@ -34,6 +34,7 @@ export async function findCustomersByRequesterIdentity(
         .select("id, company_name")
         .eq("organization_id", organizationId)
         .in("id", contactCustomerIds)
+        .is("archived_at", null)
 
       for (const c of custRows ?? []) {
         const cid = (c as { id: string }).id
@@ -55,7 +56,7 @@ export async function findCustomersByRequesterIdentity(
       .select("id, company_name")
       .eq("organization_id", organizationId)
       .ilike("company_name", co)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .limit(25)
 
     for (const c of custs ?? []) {

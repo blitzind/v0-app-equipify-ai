@@ -171,7 +171,7 @@ export async function evaluateFollowUpAutomationForOrganization(
         "id, status, scheduled_on, completed_at, updated_at, assigned_technician_id, customer_id, title, is_sample",
       )
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("is_sample", false)
 
     const sigCut = hoursAgoIso(th.woSignaturePendingHours)
@@ -368,13 +368,14 @@ export async function evaluateFollowUpAutomationForOrganization(
       .from("customers")
       .select("id, company_name, is_sample")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("is_sample", false)
 
     const { data: woDone } = await admin
       .from("work_orders")
       .select("customer_id, completed_at")
       .eq("organization_id", organizationId)
+      .is("archived_at", null)
       .eq("is_sample", false)
       .in("status", ["completed", "invoiced", "completed_pending_signature"])
       .not("completed_at", "is", null)
@@ -419,10 +420,10 @@ export async function evaluateFollowUpAutomationForOrganization(
     const { data: equip } = await admin
       .from("equipment")
       .select(
-        "id, customer_id, name, next_due_at, warranty_expiration_date, warranty_expires_at, is_archived, is_sample",
+        "id, customer_id, name, next_due_at, warranty_expiration_date, warranty_expires_at, is_sample",
       )
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("is_sample", false)
 
     for (const e of equip ?? []) {
@@ -543,10 +544,10 @@ export async function evaluateFollowUpAutomationForOrganization(
     const { data: equipMr } = await admin
       .from("equipment")
       .select(
-        "id, customer_id, name, next_due_at, next_calibration_due_at, warranty_expiration_date, warranty_expires_at, is_archived, is_sample",
+        "id, customer_id, name, next_due_at, next_calibration_due_at, warranty_expiration_date, warranty_expires_at, is_sample",
       )
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("is_sample", false)
 
     for (const e of equipMr ?? []) {

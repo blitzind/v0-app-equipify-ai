@@ -129,11 +129,11 @@ export async function syncCustomersToQuickBooks(params: {
   const { data: locs } = await params.svc
     .from("customer_locations")
     .select(
-      "customer_id, name, address_line1, address_line2, city, state, postal_code, phone, is_default, is_archived",
+      "customer_id, name, address_line1, address_line2, city, state, postal_code, phone, is_default",
     )
     .eq("organization_id", params.organizationId)
     .in("customer_id", ids)
-    .eq("is_archived", false)
+    .is("archived_at", null)
 
   const contactByCust = new Map<string, typeof contacts>()
   for (const row of contacts ?? []) {

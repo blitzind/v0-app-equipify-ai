@@ -226,7 +226,7 @@ function ServiceRequestsQueuePageContent() {
         .select("id, name, customer_location_id")
         .eq("organization_id", organizationId)
         .eq("customer_id", customerId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .order("name", { ascending: true })
         .limit(100)
       setEqOpts(

@@ -217,7 +217,7 @@ const unscheduledHighPriorityWO: RuleDescriptor = {
       .from("work_orders")
       .select("id, title, status, priority, scheduled_on, created_at, work_order_number")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["open"])
       .in("priority", ["high", "critical"])
       .is("scheduled_on", null)
@@ -268,7 +268,7 @@ const repeatRepairRisk: RuleDescriptor = {
       .from("work_orders")
       .select("equipment_id, type, completed_at, status")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .eq("type", "repair")
       .gte("created_at", since)
       .limit(500)
@@ -289,6 +289,7 @@ const repeatRepairRisk: RuleDescriptor = {
       .from("equipment")
       .select("id, name, equipment_code, customer_id")
       .eq("organization_id", organizationId)
+      .is("archived_at", null)
       .in("id", ids)
     const labelById = new Map<string, { label: string; customerId: string }>()
     for (const e of eq ?? []) {
@@ -780,7 +781,7 @@ const techCapacityPressure: RuleDescriptor = {
       .from("work_orders")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .in("status", ["open"])
       .is("scheduled_on", null)
 
@@ -845,7 +846,7 @@ const maintenancePlanGap: RuleDescriptor = {
       .eq("organization_id", organizationId)
       .in("equipment_id", ids)
       .eq("status", "active")
-      .eq("is_archived", false)
+      .is("archived_at", null)
 
     const covered = new Set((plans ?? []).map((p) => p.equipment_id as string))
 

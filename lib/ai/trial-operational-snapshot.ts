@@ -74,7 +74,7 @@ export async function fetchTrialOperationalSnapshot(
         .from("equipment")
         .select("id", { head: true, count: "exact" })
         .eq("organization_id", oid)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .not("next_calibration_due_at", "is", null)
         .lte("next_calibration_due_at", weekAhead)
         .gte("next_calibration_due_at", isoDate),
@@ -82,7 +82,7 @@ export async function fetchTrialOperationalSnapshot(
         .from("maintenance_plans")
         .select("id", { head: true, count: "exact" })
         .eq("organization_id", oid)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .eq("status", "active")
         .not("next_due_date", "is", null)
         .lte("next_due_date", weekAhead)

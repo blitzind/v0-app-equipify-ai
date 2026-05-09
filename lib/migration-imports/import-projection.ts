@@ -94,7 +94,7 @@ export async function computeImportProjection(
       .from("customer_locations")
       .select("customer_id, address_line1, city, state, postal_code")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
 
     const addressToCustomer = new Map<string, string>()
     for (const lr of locationRows ?? []) {

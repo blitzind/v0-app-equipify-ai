@@ -90,7 +90,7 @@ export async function buildCustomerPreview(
     .from("customer_locations")
     .select("address_line1, city, state, postal_code, customers(company_name)")
     .eq("organization_id", organizationId)
-    .eq("is_archived", false)
+    .is("archived_at", null)
 
   const byAddress = new Map<string, string>()
   for (const location of locations ?? []) {
