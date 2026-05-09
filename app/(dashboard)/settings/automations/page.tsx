@@ -5,6 +5,7 @@ import { Mail, Clock, Send, Eye, Edit3, Check, ChevronDown, ChevronUp, Zap } fro
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { WorkflowAutomationsSection } from "@/components/settings/workflow-automations-section"
+import { FollowUpAutomationSettingsSection } from "@/components/settings/follow-up-automation-settings"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,6 +334,10 @@ export default function AutomationsPage() {
           </p>
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <FollowUpAutomationSettingsSection />
+      </Suspense>
 
       <Suspense fallback={null}>
         <WorkflowAutomationsSection />

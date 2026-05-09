@@ -28,6 +28,7 @@ import { TechnicianHome } from "@/components/dashboard/technician-home"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { AidenOperationalInsightsCard } from "@/components/aiden/aiden-operational-insights-card"
+import { FollowUpAutomationSignals } from "@/components/dashboard/follow-up-automation-signals"
 import { cn } from "@/lib/utils"
 
 function formatUsdFromCents(cents: number): string {
@@ -64,9 +65,12 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <TechnicianTodayMobileCard />
-      {dashboardOrgStatus === "ready" && dashboardOrgId ?
-        <AidenOperationalInsightsCard organizationId={dashboardOrgId} moduleContext="dashboard" />
-      : null}
+      {dashboardOrgStatus === "ready" && dashboardOrgId ? (
+        <>
+          <FollowUpAutomationSignals organizationId={dashboardOrgId} />
+          <AidenOperationalInsightsCard organizationId={dashboardOrgId} moduleContext="dashboard" />
+        </>
+      ) : null}
       {error && (
         <div
           className={cn(

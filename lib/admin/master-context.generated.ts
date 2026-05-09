@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 183,
-  sqlMigrations: 130,
-  dashboardPages: 57,
-  componentsTsx: 211,
-  libTsFiles: 364,
+  apiRouteHandlers: 191,
+  sqlMigrations: 131,
+  dashboardPages: 58,
+  componentsTsx: 213,
+  libTsFiles: 372,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **183** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **130** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **57** |
-| \`components/**/*.tsx\` | **211** |
-| \`lib/**/*.ts\` | **364** |
+| API route handlers (\`app/api/**/route.ts\`) | **191** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **131** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **58** |
+| \`components/**/*.tsx\` | **213** |
+| \`lib/**/*.ts\` | **372** |
 
 ### Vercel crons
 
@@ -114,6 +114,14 @@ organizations/[organizationId]/customers/[customerId]/locations/[locationId]/rou
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-consolidated-documents/route.ts
+organizations/[organizationId]/follow-up-automation/settings/route.ts
+organizations/[organizationId]/follow-up-tasks/[taskId]/approve/route.ts
+organizations/[organizationId]/follow-up-tasks/[taskId]/dismiss/route.ts
+organizations/[organizationId]/follow-up-tasks/[taskId]/handoff/route.ts
+organizations/[organizationId]/follow-up-tasks/[taskId]/regenerate-draft/route.ts
+organizations/[organizationId]/follow-up-tasks/evaluate/route.ts
+organizations/[organizationId]/follow-up-tasks/route.ts
+organizations/[organizationId]/follow-up-tasks/stats/route.ts
 organizations/[organizationId]/integrations/quickbooks/invoice-auto-sync/route.ts
 organizations/[organizationId]/integrations/quickbooks/route.ts
 organizations/[organizationId]/inventory/adjust/route.ts

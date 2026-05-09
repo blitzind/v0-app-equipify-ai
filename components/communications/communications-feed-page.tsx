@@ -244,6 +244,16 @@ export function CommunicationsFeedPage() {
         />
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Review automation suggestions in the{" "}
+          <Link href="/communications/follow-ups" className="font-medium text-primary hover:underline">
+            follow-up queue
+          </Link>
+          .
+        </p>
+      </div>
+
       {/* Toolbar — single row on desktop, wraps cleanly on tablet/mobile */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-h-11 items-center gap-2 w-full sm:flex-1 sm:max-w-sm rounded-md border border-border bg-card px-3 py-2 min-w-0">
