@@ -81,6 +81,7 @@ export default function AiUsageSettingsPage() {
   const [cacheLogHitsToUsage, setCacheLogHitsToUsage] = useState(true)
   const [cacheNote, setCacheNote] = useState<string | null>(null)
   const [planAi, setPlanAi] = useState<PlanAiPayload | null>(null)
+  const [aidenUsageMonth, setAidenUsageMonth] = useState({ support_chat: 0, feature_request: 0 })
 
   const load = useCallback(async () => {
     if (!organizationId) return
@@ -107,6 +108,7 @@ export default function AiUsageSettingsPage() {
           note?: string
         }
         planAi?: PlanAiPayload
+        aidenUsageMonth?: { support_chat: number; feature_request: number }
       }
       if (!res.ok) {
         throw new Error(data.message || data.error || "Could not load AI usage.")
@@ -130,6 +132,7 @@ export default function AiUsageSettingsPage() {
       setCacheLogHitsToUsage(data.cache?.logCacheHitsToUsage !== false)
       setCacheNote(typeof data.cache?.note === "string" ? data.cache.note : null)
       setPlanAi(data.planAi ?? null)
+      setAidenUsageMonth(data.aidenUsageMonth ?? { support_chat: 0, feature_request: 0 })
       setLoadState("ready")
     } catch (e) {
       setLoadState("error")
@@ -263,6 +266,13 @@ export default function AiUsageSettingsPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           Estimated costs from the AI router (tokens × model pricing). Totals are for the current calendar month (UTC).
+        </p>
+        <p className="text-xs text-muted-foreground mt-3 rounded-md border border-border bg-muted/25 px-3 py-2">
+          <span className="font-medium text-foreground">AIden</span> usage this month (UTC):{" "}
+          <span className="tabular-nums">{aidenUsageMonth.support_chat.toLocaleString()}</span> help chats ·{" "}
+          <span className="tabular-nums">{aidenUsageMonth.feature_request.toLocaleString()}</span> feature requests
+          submitted. Token spend for chats is included under task{" "}
+          <code className="text-[11px]">aiden_help</code> in the breakdown below.
         </p>
       </div>
 

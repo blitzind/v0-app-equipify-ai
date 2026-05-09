@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { AidenChatMessageSchema, AidenFeatureRequestDraftSchema } from "@/lib/aiden/aiden-response-rules"
+import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
+import { canAccessApp } from "@/lib/billing/access"
+import { getEffectivePlanId } from "@/lib/billing/effective-plan"
+import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -94,6 +98,17 @@ export async function POST(
     return jsonError("forbidden", "You do not have access to this organization.", 403)
   }
 
+  const subscription = await getOrganizationSubscription(supabase, organizationId)
+  if (!canAccessApp(subscription)) {
+    return jsonError(
+      "billing_inactive",
+      "Feature requests are unavailable while billing is restricted for this workspace.",
+      403,
+    )
+  }
+
+  const planId = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
+
   const payload = parsed.data.draft
     ? {
         kind: "draft" as const,
@@ -145,6 +160,13 @@ export async function POST(
   })
 
   if (duplicate?.id) {
+    await recordAidenUsageEvent({
+      organizationId,
+      userId: user.id,
+      featureKey: "feature_request",
+      planTier: planId,
+      metadata: { kind: payload.kind, duplicate: true },
+    })
     return NextResponse.json({ ok: true, duplicate: true, requestId: duplicate.id })
   }
 
@@ -180,6 +202,14 @@ export async function POST(
   if (insertErr || !inserted?.id) {
     return jsonError("insert_failed", insertErr?.message ?? "Could not save feature request.", 500)
   }
+
+  await recordAidenUsageEvent({
+    organizationId,
+    userId: user.id,
+    featureKey: "feature_request",
+    planTier: planId,
+    metadata: { kind: payload.kind, duplicate: false },
+  })
 
   return NextResponse.json({ ok: true, duplicate: false, requestId: inserted.id })
 }

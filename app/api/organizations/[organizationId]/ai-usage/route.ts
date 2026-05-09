@@ -7,6 +7,7 @@ import {
   fetchOrganizationAiCacheOverview,
   shouldLogCacheHitsToUsage,
 } from "@/lib/ai/result-cache"
+import { fetchAidenUsageCountsMtd } from "@/lib/aiden/usage-events"
 import { computeAiUsageSummary, fetchRecentAiUsageLogs } from "@/lib/ai/usage-summary"
 import { isPlanGatingDisabled, PLAN_AI_INCLUDED_MONTHLY_BUDGET_USD } from "@/lib/ai/plan-ai-config"
 import {
@@ -103,10 +104,12 @@ export async function GET(
   }
 
   const cacheOverview = await fetchOrganizationAiCacheOverview(organizationId)
+  const aidenUsageMonth = await fetchAidenUsageCountsMtd(db, organizationId)
 
   const planId = await fetchOrganizationPlanId(organizationId)
   const includedUsd = PLAN_AI_INCLUDED_MONTHLY_BUDGET_USD[planId] ?? 0
   const taskIds = [
+    "aiden_help",
     "catalog_extraction",
     "certificate_cleanup",
     "workflow_builder",
@@ -150,6 +153,8 @@ export async function GET(
       note:
         "Summaries sum estimated_cost from ai_usage_logs; cache-hit log rows are $0 and do not increase estimated AI spend.",
     },
+    /** UTC month-to-date counts from aiden_usage_events (distinct from provider token logs). */
+    aidenUsageMonth,
   })
 }
 

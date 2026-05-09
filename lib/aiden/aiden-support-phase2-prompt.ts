@@ -1,6 +1,8 @@
 import "server-only"
 
 import { getEquipifyMasterContext } from "@/lib/admin/master-context"
+import type { AidenPageGuidanceLevel } from "@/lib/aiden/tier-capabilities"
+import type { PlanId } from "@/lib/plans"
 
 const IDENTITY = `
 You are AIden (pronounced as the name "AIden" — "AI" + "den"), Equipify's in-app **support and help** assistant.
@@ -51,20 +53,41 @@ Return a single JSON object (no markdown fences) with exactly these keys:
 Do NOT include: actions, proposedAction, or executable payloads.
 `
 
+const TIER_GUIDANCE_RULES = `
+Workspace tier & pacing:
+- Solo: keep answers concise; essential steps first; at most one or two related routes when clearly helpful.
+- Core or higher: you may give richer guidance tailored to the current module/path, mention several related routes when useful, and briefly note trade-offs or permission nuances when relevant.
+
+Future roadmap (not available in this chat yet — explain calmly if asked):
+- Deeper productivity-style AI may ship on Growth; advanced operational copilot-style assistance may ship on Scale. These are not enabled today.
+- If someone asks you to auto-draft documents at scale, run bulk operations, autonomously schedule work, or act as an operational copilot, say those capabilities are not available yet and may come to higher tiers later. Do not pressure them to upgrade; no aggressive sales tone.
+`
+
 export function buildAidenSupportPhase2Prompt(args: {
   organizationName: string | null
   currentPath: string | null
   currentModule: string | null
+  /** Effective billing tier for prompt shaping (trial may map to Scale for entitlements elsewhere; label still reflects product tier name when passed). */
+  planTier: PlanId
+  pageGuidanceLevel: AidenPageGuidanceLevel
 }): string {
   const path = args.currentPath?.trim() || "unknown"
   const moduleLabel = args.currentModule?.trim() || "Unknown area"
   const org = args.organizationName?.trim() || "Current workspace"
+  const tierLabel = args.planTier
+  const pacing =
+    args.pageGuidanceLevel === "limited"
+      ? "This workspace uses limited contextual pacing (Solo-style): prioritize brevity and clarity."
+      : "This workspace uses richer contextual pacing (Core+): tie answers to the current module when it helps."
 
   const sessionContext = [
     "Non-sensitive session context (for grounding only):",
     `- Organization display name: ${org}`,
     `- Current browser path: ${path}`,
     `- Current module label: ${moduleLabel}`,
+    `- Subscription tier label (for tone only): ${tierLabel}`,
+    `- Page guidance mode: ${args.pageGuidanceLevel}`,
+    `- ${pacing}`,
     "",
     "Infer \"this page\" / \"here\" from the module label and path when the user refers to the current screen.",
   ].join("\n")
@@ -72,6 +95,7 @@ export function buildAidenSupportPhase2Prompt(args: {
   return [
     IDENTITY,
     PHASE2_HARD_RULES,
+    TIER_GUIDANCE_RULES,
     FEATURE_REQUEST_RULES,
     RESPONSE_SHAPE,
     sessionContext,

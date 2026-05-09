@@ -1,0 +1,41 @@
+import type { PlanId } from "@/lib/plans"
+import { planRank } from "@/lib/ai/plan-ai-config"
+
+/** Tracked + gated AIden surfaces (Phase 3 foundation). */
+export const AIDEN_TRACKED_FEATURES = ["support_chat", "feature_request"] as const
+export type AidenTrackedFeatureKey = (typeof AIDEN_TRACKED_FEATURES)[number]
+
+/** Reserved for future Growth / Scale — not enabled in APIs yet. */
+export type AidenFutureCapabilityKey = "productivity_ai" | "operational_copilot" | "summaries_drafting"
+
+export type AidenPageGuidanceLevel = "limited" | "rich"
+
+/**
+ * Core+ gets richer contextual guidance in prompts; Solo stays concise.
+ */
+export function getAidenPageGuidanceLevel(planId: PlanId): AidenPageGuidanceLevel {
+  return planRank(planId) >= planRank("core") ? "rich" : "limited"
+}
+
+/**
+ * Whether an org on `planId` may use an AIden feature today.
+ * Future-only keys return false until those phases ship.
+ */
+export function canUseAidenCapability(
+  planId: PlanId,
+  feature: AidenTrackedFeatureKey | AidenFutureCapabilityKey | "page_guidance",
+): boolean {
+  switch (feature) {
+    case "support_chat":
+    case "feature_request":
+    case "page_guidance":
+      return true
+    case "productivity_ai":
+      return planRank(planId) >= planRank("growth")
+    case "operational_copilot":
+    case "summaries_drafting":
+      return planRank(planId) >= planRank("scale")
+    default:
+      return false
+  }
+}

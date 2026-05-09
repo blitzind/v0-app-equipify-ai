@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logAidenHelpEvent } from "@/lib/aiden/analytics"
 import { buildAidenSupportPhase2Prompt } from "@/lib/aiden/aiden-support-phase2-prompt"
+import { getAidenPageGuidanceLevel } from "@/lib/aiden/tier-capabilities"
+import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
+import { canAccessApp } from "@/lib/billing/access"
+import { getEffectivePlanId } from "@/lib/billing/effective-plan"
+import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
 import {
   AidenSupportPhase2AnswerSchema,
   type AidenSupportPhase2Answer,
@@ -77,6 +82,18 @@ export async function POST(
     return jsonError("forbidden", "You do not have access to this organization.", 403)
   }
 
+  const subscription = await getOrganizationSubscription(supabase, organizationId)
+  if (!canAccessApp(subscription)) {
+    return jsonError(
+      "billing_inactive",
+      "AIden is unavailable while billing is restricted for this workspace. Restore billing to continue using help chat.",
+      403,
+    )
+  }
+
+  const planId = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
+  const pageGuidanceLevel = getAidenPageGuidanceLevel(planId)
+
   const { data: organization } = await supabase
     .from("organizations")
     .select("name")
@@ -94,6 +111,8 @@ export async function POST(
     organizationName: orgName,
     currentPath: path,
     currentModule: moduleLabel,
+    planTier: planId,
+    pageGuidanceLevel,
   })
 
   const result = await runAiTask<AidenSupportPhase2Answer>({
@@ -119,6 +138,17 @@ export async function POST(
 
   const latestQuestion = parsed.data.messages.filter((m) => m.role === "user").at(-1)?.content ?? ""
 
+  await recordAidenUsageEvent({
+    organizationId,
+    userId: user.id,
+    featureKey: "support_chat",
+    planTier: planId,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    durationMs: result.meta.durationMs,
+    metadata: { module: moduleLabel },
+  })
+
   logAidenHelpEvent({
     organizationId,
     userId: user.id,
@@ -136,6 +166,8 @@ export async function POST(
       phase: 2,
       module: moduleLabel,
       currentPath: path,
+      planTier: planId,
+      pageGuidanceLevel,
     },
     meta: {
       provider: result.meta.provider,
