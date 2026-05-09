@@ -164,7 +164,7 @@ export function AiDraftFollowUpDialog({
             <Sparkles className="w-4 h-4 text-primary" /> AI follow-up draft
           </DialogTitle>
           <DialogDescription>
-            We pull this prospect's status, notes, and recent touches to draft a short, professional
+            We pull this prospect&apos;s status, notes, and recent touches to draft a short, professional
             follow-up. Review carefully — Equipify never sends messages on your behalf.
           </DialogDescription>
         </DialogHeader>
@@ -180,7 +180,7 @@ export function AiDraftFollowUpDialog({
             <Sparkles className="w-6 h-6 text-primary" />
             <p className="text-sm font-medium">Draft a thoughtful follow-up in seconds.</p>
             <p className="text-xs text-muted-foreground max-w-md">
-              We'll generate a short subject + body tailored to{" "}
+              We&apos;ll generate a short subject + body tailored to{" "}
               <strong>{prospect?.company_name ?? "this prospect"}</strong>. Nothing leaves Equipify
               automatically.
             </p>

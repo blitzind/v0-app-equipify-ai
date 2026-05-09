@@ -116,7 +116,7 @@ export function ConvertProspectDialog({
         <DialogHeader>
           <DialogTitle>Convert prospect to customer</DialogTitle>
           <DialogDescription>
-            We'll create a customer using the existing customers + contacts tables. The original
+            We&apos;ll create a customer using the existing customers + contacts tables. The original
             prospect stays in your pipeline marked as <strong>Won</strong> with a link to the new
             customer record.
           </DialogDescription>

@@ -294,6 +294,26 @@ export default function WorkOrderDetailPage() {
     [tabTasks, savedTasks],
   )
 
+  /** Must run unconditionally (before early returns) — use `wo` until `workOrder` is assigned below. */
+  const primaryPhone = useCustomerPrimaryPhone(
+    wo?.customerId,
+    activeOrg.status === "ready" ? activeOrg.organizationId : null,
+  )
+  const navigateQuery = useMemo(() => {
+    return [wo?.customerName, wo?.location].filter(Boolean).join(" ").trim()
+  }, [wo?.customerName, wo?.location])
+
+  const mobileJumpToSection = useCallback((tab: string, sectionId: string) => {
+    setPageWoTab(tab)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "center" })
+        }, 100)
+      })
+    })
+  }, [])
+
   if (!workOrderRouteId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 max-w-md mx-auto text-center px-4">
@@ -764,25 +784,6 @@ export default function WorkOrderDetailPage() {
   }
 
   const quoteHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(workOrder.customerId)}&equipmentId=${encodeURIComponent(workOrder.equipmentId)}`
-
-  const primaryPhone = useCustomerPrimaryPhone(
-    workOrder.customerId,
-    activeOrg.status === "ready" ? activeOrg.organizationId : null,
-  )
-  const navigateQuery = useMemo(() => {
-    return [workOrder.customerName, workOrder.location].filter(Boolean).join(" ").trim()
-  }, [workOrder.customerName, workOrder.location])
-
-  const mobileJumpToSection = useCallback((tab: string, sectionId: string) => {
-    setPageWoTab(tab)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.setTimeout(() => {
-          document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "center" })
-        }, 100)
-      })
-    })
-  }, [])
 
   const closeCertificateGate = certificateGateForCompletionAllAssets({
     calibrationTemplateId: workOrder.calibrationTemplateId,

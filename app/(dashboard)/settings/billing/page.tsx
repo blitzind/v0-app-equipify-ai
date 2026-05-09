@@ -697,7 +697,7 @@ function BillingPageContent() {
                 )}
               >
                 <p className="text-xs font-semibold text-foreground">
-                  You're using Scale access during your trial.
+                  You&apos;re using Scale access during your trial.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} remaining · Trial ends{" "}

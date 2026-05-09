@@ -209,7 +209,7 @@ export function ProspectFollowUpWidget() {
         </div>
       ) : !loading && !error ? (
         <div className="px-5 py-4 border-t border-border text-xs text-muted-foreground">
-          You're caught up on prospect follow-ups. Add a new lead from the pipeline to start the
+          You&apos;re caught up on prospect follow-ups. Add a new lead from the pipeline to start the
           next cycle.
         </div>
       ) : null}

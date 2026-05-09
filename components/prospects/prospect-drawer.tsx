@@ -413,7 +413,7 @@ export function ProspectDrawer({
             <AlertDialogTitle>Archive prospect?</AlertDialogTitle>
             <AlertDialogDescription>
               The prospect will be hidden from the active list but its history is preserved. You can
-              restore it later by switching the list filter to "Archived".
+              restore it later by switching the list filter to &quot;Archived&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

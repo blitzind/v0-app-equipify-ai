@@ -144,7 +144,7 @@ export function ComposeDraftDialog({
           </DialogTitle>
           <DialogDescription className="text-xs">
             Saves a draft into the Communications feed. Equipify never auto-sends drafts —
-            forward them through the existing email / send flow when you're ready.
+            forward them through the existing email / send flow when you&apos;re ready.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

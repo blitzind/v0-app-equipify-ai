@@ -88,7 +88,7 @@ export function AiOpsDigestCard() {
           </span>
           <div className="min-w-0">
             <CardTitle className="text-sm flex items-center gap-2">
-              Today's focus
+              Today&apos;s focus
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide gap-1">
                 <Bot className="h-3 w-3" aria-hidden /> AI Ops
               </Badge>

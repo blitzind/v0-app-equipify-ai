@@ -121,7 +121,7 @@ export function LogFollowUpDialog({
           <DialogTitle>Log follow-up</DialogTitle>
           <DialogDescription>
             Record an outreach touch on the prospect timeline. Setting a next follow-up date keeps
-            this prospect on the dashboard's overdue / today list.
+            this prospect on the dashboard&apos;s overdue / today list.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 py-2 sm:grid-cols-2">

@@ -92,7 +92,7 @@ export async function generateRecommendations(args: {
       r
         .fn({ supabase, organizationId, permissions, now })
         .catch((e: unknown) => {
-          // eslint-disable-next-line no-console
+           
           console.warn(`[ai-ops] rule ${r.id} failed`, e)
           return [] as Recommendation[]
         }),
@@ -158,7 +158,7 @@ export async function generateRecommendations(args: {
         items = applyOutcomeAwareRanking(items, adjustments)
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.warn("[ai-ops] outcome-aware ranking failed", e)
     }
   }

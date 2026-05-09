@@ -474,7 +474,7 @@ export function TechnicianInventoryMobileCard({
           <DialogHeader>
             <DialogTitle className="text-base">Request restock</DialogTitle>
             <DialogDescription className="text-xs">
-              We'll log a request on the inventory ledger so dispatch can reorder during the next
+              We&apos;ll log a request on the inventory ledger so dispatch can reorder during the next
               purchasing run.
             </DialogDescription>
           </DialogHeader>

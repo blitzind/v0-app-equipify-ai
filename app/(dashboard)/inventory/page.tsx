@@ -1222,7 +1222,7 @@ export default function InventoryPage() {
             <AlertDialogTitle>Confirm stock decrease</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block">
-                You're about to decrease on-hand quantity by{" "}
+                You&apos;re about to decrease on-hand quantity by{" "}
                 <span className="font-semibold tabular-nums">{adjQty}</span> for the selected
                 location.
               </span>

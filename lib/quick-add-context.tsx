@@ -71,7 +71,7 @@ export function useQuickAdd(action: QuickAddAction, handler: () => void) {
     return ctx.subscribe((dispatched) => {
       if (dispatched === action) handlerRef.current()
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [ctx, action])
 }
 

@@ -223,7 +223,7 @@ function PortalLoginInner() {
                 Portal sign-in is temporarily unavailable.
               </p>
               <p className="mt-0.5 text-[12px]" style={{ color: "var(--portal-nav-text)" }}>
-                Please contact your service provider — they'll be notified to restore portal
+                Please contact your service provider — they&apos;ll be notified to restore portal
                 access shortly.
               </p>
             </div>

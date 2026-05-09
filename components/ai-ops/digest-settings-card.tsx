@@ -523,7 +523,7 @@ export function AiOpsDigestSettingsCard() {
               <div>
                 <p className="text-xs font-semibold">Skip weekends</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Don't send on Saturday and Sunday. Useful when ops staff don't work weekends.
+                  Don&apos;t send on Saturday and Sunday. Useful when ops staff don&apos;t work weekends.
                 </p>
               </div>
             </div>
@@ -785,7 +785,7 @@ export function AiOpsDigestSettingsCardLazyHint() {
     <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-dashed border-border bg-muted/30 px-3 py-2">
       <AlertCircle className="h-3 w-3 inline mr-1 -mt-0.5" />
       Recipients only see the digest if your workspace has Resend configured. Ask an admin if
-      delivery isn't working.
+      delivery isn&apos;t working.
     </p>
   )
 }

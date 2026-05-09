@@ -39,7 +39,7 @@ const UUID_RE =
 
 function devWarn(label: string, payload: unknown): void {
   if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
+     
     console.warn(`[scheduling-events] ${label}`, payload)
   }
 }
