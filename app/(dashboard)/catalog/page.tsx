@@ -350,113 +350,134 @@ export default function CatalogPage() {
     return <p className="text-sm text-muted-foreground py-10">Select an organization to view the catalog.</p>
   }
 
+  const catalogActionButtons = (
+    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+      {canManageCatalog ? (
+        <Button
+          type="button"
+          className="gap-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
+          onClick={() => setAddItemOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Add Item
+        </Button>
+      ) : null}
+      <Button asChild variant="outline" className="gap-2 text-muted-foreground border-border">
+        <Link href="/catalog/import">
+          <Upload className="h-4 w-4" />
+          Import price list
+        </Link>
+      </Button>
+    </div>
+  )
+
+  /** Compact triggers keep search + 5 filters on one row at xl; narrow viewports wrap or scroll horizontally. */
+  const filterTriggerClass =
+    "h-9 w-full min-w-0 sm:min-w-[128px] sm:max-w-[160px] sm:w-[min(100%,152px)] xl:w-[152px] xl:shrink-0"
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Search + filters + primary Add Item, secondary Import */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
-        <div className="flex items-center gap-2 w-full lg:flex-1 lg:max-w-md rounded-md border border-border bg-card px-3 py-1.5 min-w-0">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
-            type="text"
-            placeholder="Search catalog items…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
-          />
-        </div>
+      {/* Row 1 (desktop): search + filters on one line. Row 2: count + actions */}
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-2 xl:flex-row xl:flex-nowrap xl:items-center xl:gap-2">
+          <div className="flex items-center gap-2 w-full shrink-0 rounded-md border border-border bg-card px-3 py-1.5 min-w-0 xl:max-w-[min(100%,280px)] xl:basis-[280px]">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="Search catalog items…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
+            />
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Item type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              {ITEM_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {formatItemType(t)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {ROW_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {formatItemType(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={verificationFilter} onValueChange={setVerificationFilter}>
-            <SelectTrigger className="w-[168px]">
-              <SelectValue placeholder="Verification" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All verification</SelectItem>
-              <SelectItem value="verified">Verified</SelectItem>
-              <SelectItem value="needs_review">Needs review</SelectItem>
-              <SelectItem value="ai_generated">AI (ok)</SelectItem>
-              <SelectItem value="manual">Not AI-sourced</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {manufacturers.length > 0 ? (
-            <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Manufacturer" />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:flex-nowrap xl:overflow-x-auto xl:pb-0.5 xl:[scrollbar-width:thin]">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className={filterTriggerClass}>
+                <SelectValue placeholder="Item type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All manufacturers</SelectItem>
-                {manufacturers.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
+                <SelectItem value="all">All types</SelectItem>
+                {ITEM_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {formatItemType(t)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
 
-          {vendors.length > 0 ? (
-            <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Vendor" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className={filterTriggerClass}>
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All vendors</SelectItem>
-                {vendors.map((v) => (
-                  <SelectItem key={v} value={v}>
-                    {v}
+                <SelectItem value="all">All statuses</SelectItem>
+                {ROW_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {formatItemType(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
+
+            <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+              <SelectTrigger className={filterTriggerClass}>
+                <SelectValue placeholder="Verification" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All verification</SelectItem>
+                <SelectItem value="verified">Verified</SelectItem>
+                <SelectItem value="needs_review">Needs review</SelectItem>
+                <SelectItem value="ai_generated">AI (ok)</SelectItem>
+                <SelectItem value="manual">Not AI-sourced</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {manufacturers.length > 0 ? (
+              <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
+                <SelectTrigger className={filterTriggerClass}>
+                  <SelectValue placeholder="Manufacturer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All manufacturers</SelectItem>
+                  {manufacturers.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
+            {vendors.length > 0 ? (
+              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                <SelectTrigger className={filterTriggerClass}>
+                  <SelectValue placeholder="Vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All vendors</SelectItem>
+                  {vendors.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0 lg:ml-auto">
-          {canManageCatalog ? (
-            <Button
-              type="button"
-              className="gap-2 w-full sm:w-auto bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
-              onClick={() => setAddItemOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
-          ) : null}
-          <Button asChild variant="outline" className="gap-2 w-full sm:w-auto text-muted-foreground border-border">
-            <Link href="/catalog/import">
-              <Upload className="h-4 w-4" />
-              Import price list
-            </Link>
-          </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0">
+          <p className="text-sm text-muted-foreground min-w-0 shrink">
+            {!loading && !error ? (
+              <>
+                Showing{" "}
+                <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
+                <span className="font-medium text-foreground">{items.length}</span> items
+              </>
+            ) : null}
+          </p>
+          <div className="w-full sm:w-auto min-w-0 shrink-0">{catalogActionButtons}</div>
         </div>
       </div>
 
@@ -520,11 +541,6 @@ export default function CatalogPage() {
         </Card>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground -mt-1">
-            Showing{" "}
-            <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
-            <span className="font-medium text-foreground">{items.length}</span> items
-          </p>
           <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <Table>
