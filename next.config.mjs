@@ -5,6 +5,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    // Expose Vercel metadata to client when debugging deployment mismatch (NEXT_PUBLIC_AIDEN_LAUNCHER_DEBUG).
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "",
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
