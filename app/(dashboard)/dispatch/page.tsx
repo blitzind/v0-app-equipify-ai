@@ -67,6 +67,11 @@ import {
   isPhase34DispatchFiltering,
   type Phase34DispatchFilters,
 } from "@/lib/dispatch/advanced-filters"
+import {
+  DISPATCH_HEAVY_DAY_JOB_THRESHOLD,
+  computeSelectedDayScheduleRiskSummary,
+  type ScheduleWarnPeer,
+} from "@/lib/dispatch/schedule-warnings"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
@@ -200,6 +205,20 @@ function DispatchPageInner() {
     () => computeDispatchPlanningMetrics(displayWorkOrders, selectedYmd),
     [displayWorkOrders, selectedYmd],
   )
+
+  const selectedDayRisk = useMemo(() => {
+    const peers: ScheduleWarnPeer[] = displayWorkOrders.map((w) => ({
+      id: w.id,
+      status: w.status,
+      scheduled_on: w.scheduled_on,
+      scheduled_time: w.scheduled_time,
+      assigned_user_id: w.assigned_user_id,
+      customer_id: w.customer_id,
+      customerLocationId: w.customerLocationId ?? null,
+      opsFlags: w.opsFlags ?? null,
+    }))
+    return computeSelectedDayScheduleRiskSummary(peers, selectedYmd)
+  }, [displayWorkOrders, selectedYmd])
 
   const customerFilterOptions = useMemo(() => {
     const m = new Map<string, string>()
@@ -1315,7 +1334,29 @@ function DispatchPageInner() {
                 ·
               </span>
               <span className="mt-1 block text-rose-800 dark:text-rose-200 lg:mt-0 lg:inline">
-                Heavy day (6+ jobs): {overloadedTechLabels.join(", ")}
+                Heavy day ({DISPATCH_HEAVY_DAY_JOB_THRESHOLD}+ jobs): {overloadedTechLabels.join(", ")}
+              </span>
+            </>
+          ) : null}
+          {selectedDayRisk.overlappingSlotCount > 0 ? (
+            <>
+              <span className="mx-2 hidden lg:inline" aria-hidden>
+                ·
+              </span>
+              <span className="mt-1 block text-amber-900 dark:text-amber-100 lg:mt-0 lg:inline">
+                Possible overlap — {selectedDayRisk.overlappingSlotCount} time slot
+                {selectedDayRisk.overlappingSlotCount === 1 ? "" : "s"} with double-booked technicians.
+              </span>
+            </>
+          ) : null}
+          {selectedDayRisk.siteConflictGroupCount > 0 ? (
+            <>
+              <span className="mx-2 hidden xl:inline" aria-hidden>
+                ·
+              </span>
+              <span className="mt-1 block text-violet-900 dark:text-violet-100 xl:mt-0 xl:inline">
+                Possible site conflict — {selectedDayRisk.siteConflictGroupCount} customer/site/time group
+                {selectedDayRisk.siteConflictGroupCount === 1 ? "" : "s"}.
               </span>
             </>
           ) : null}

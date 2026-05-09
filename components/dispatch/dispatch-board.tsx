@@ -27,7 +27,12 @@ import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import type { OperationalBadge, OpsFlags } from "@/lib/dispatch/operational-badges"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
-import { AlertTriangle, Boxes, Clock, Plus } from "lucide-react"
+import {
+  buildScheduleWarningsByPeer,
+  type ScheduleWarningItem,
+  type ScheduleWarnPeer,
+} from "@/lib/dispatch/schedule-warnings"
+import { AlertTriangle, Boxes, Clock, Info, Plus } from "lucide-react"
 
 export type DispatchTech = {
   id: string
@@ -98,18 +103,34 @@ function formatCardTimeLabel(scheduledTime: string | null): string | null {
   return formatSlotLabel(timeToSlotIndex(head))
 }
 
+function toWarnPeer(w: DispatchWo): ScheduleWarnPeer {
+  return {
+    id: w.id,
+    status: w.status,
+    scheduled_on: w.scheduled_on,
+    scheduled_time: w.scheduled_time,
+    assigned_user_id: w.assigned_user_id,
+    customer_id: w.customer_id,
+    customerLocationId: w.customerLocationId ?? null,
+    opsFlags: w.opsFlags ?? null,
+  }
+}
+
 function WoCard({
   wo,
   dragging,
   overlay,
   onOpen,
   slotOverlap,
+  scheduleWarnings,
 }: {
   wo: DispatchWo
   dragging?: boolean
   overlay?: boolean
   onOpen: (id: string) => void
   slotOverlap?: boolean
+  /** Phase 35: soft checks (overlap may duplicate slot icon — still listed in tooltip). */
+  scheduleWarnings?: ScheduleWarningItem[]
 }) {
   const num = getWorkOrderDisplay({
     id: wo.id,
@@ -124,11 +145,16 @@ function WoCard({
   const equipmentChip =
     wo.equipmentCount && wo.equipmentCount > 0 ? wo.equipmentCount : null
   const timeLabel = formatCardTimeLabel(wo.scheduled_time)
+  const warnTitle =
+    scheduleWarnings && scheduleWarnings.length > 0
+      ? scheduleWarnings.map((w) => w.message).join("\n")
+      : undefined
 
   return (
     <button
       type="button"
       onClick={() => onOpen(wo.id)}
+      title={warnTitle}
       className={cn(
         "w-full rounded-md border px-2 py-1.5 text-left text-xs shadow-sm transition-shadow",
         cardTone(wo.status),
@@ -189,12 +215,24 @@ function WoCard({
             aria-label="Overlapping appointments"
           />
         ) : null}
+        {!slotOverlap && scheduleWarnings && scheduleWarnings.length > 0 ? (
+          <Info
+            className="h-3 w-3 shrink-0 text-muted-foreground"
+            aria-label="Scheduling notes"
+          />
+        ) : null}
       </div>
       <p className="line-clamp-2 font-medium leading-snug">{wo.title}</p>
       <p className="truncate text-[10px] text-muted-foreground">{wo.customerName}</p>
       {techMeta || locationMeta ? (
         <p className="truncate text-[10px] text-muted-foreground">
           {[techMeta, locationMeta].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
+      {scheduleWarnings && scheduleWarnings.length > 0 ? (
+        <p className="mt-1 line-clamp-2 text-[9px] leading-snug text-muted-foreground">
+          {scheduleWarnings[0]!.message}
+          {scheduleWarnings.length > 1 ? ` (+${scheduleWarnings.length - 1})` : ""}
         </p>
       ) : null}
       <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1" />
@@ -206,10 +244,12 @@ function DraggableWo({
   wo,
   onOpen,
   slotOverlap,
+  scheduleWarnings,
 }: {
   wo: DispatchWo
   onOpen: (id: string) => void
   slotOverlap?: boolean
+  scheduleWarnings?: ScheduleWarningItem[]
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: DND.wo(wo.id),
@@ -230,7 +270,13 @@ function DraggableWo({
         isDragging ? "cursor-grabbing" : "cursor-grab",
       )}
     >
-      <WoCard wo={wo} dragging={isDragging} onOpen={onOpen} slotOverlap={slotOverlap} />
+      <WoCard
+        wo={wo}
+        dragging={isDragging}
+        onOpen={onOpen}
+        slotOverlap={slotOverlap}
+        scheduleWarnings={scheduleWarnings}
+      />
     </div>
   )
 }
@@ -376,6 +422,12 @@ export function DispatchBoard({
     return m
   }, [workOrders, selectedYmd])
 
+  const warnPeers = useMemo(() => workOrders.map(toWarnPeer), [workOrders])
+  const scheduleWarningsByWoId = useMemo(
+    () => buildScheduleWarningsByPeer(warnPeers),
+    [warnPeers],
+  )
+
   const overdueByTech = useMemo(() => {
     const m = new Map<string, number>()
     for (const wo of workOrders) {
@@ -467,7 +519,12 @@ export function DispatchBoard({
             ) : (
               <div className="flex flex-col gap-2">
                 {unassigned.map((wo) => (
-                  <DraggableWo key={wo.id} wo={wo} onOpen={onOpenWo} />
+                  <DraggableWo
+                    key={wo.id}
+                    wo={wo}
+                    onOpen={onOpenWo}
+                    scheduleWarnings={scheduleWarningsByWoId.get(wo.id)}
+                  />
                 ))}
               </div>
             )}
@@ -600,6 +657,7 @@ export function DispatchBoard({
                             wo={wo}
                             onOpen={onOpenWo}
                             slotOverlap={list.length > 1}
+                            scheduleWarnings={scheduleWarningsByWoId.get(wo.id)}
                           />
                         ))}
                       </DroppableSlot>
@@ -614,7 +672,14 @@ export function DispatchBoard({
       </div>
 
       <DragOverlay dropAnimation={null}>
-        {activeWo ? <WoCard wo={activeWo} overlay onOpen={() => {}} /> : null}
+        {activeWo ? (
+          <WoCard
+            wo={activeWo}
+            overlay
+            onOpen={() => {}}
+            scheduleWarnings={scheduleWarningsByWoId.get(activeWo.id)}
+          />
+        ) : null}
       </DragOverlay>
     </DndContext>
   )

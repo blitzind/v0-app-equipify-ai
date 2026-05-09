@@ -11,8 +11,13 @@ import {
   workOrderToRouteStop,
   type DispatchRouteStop,
 } from "@/lib/dispatch/route-stops"
-import type { DispatchTech } from "./dispatch-board"
+import type { DispatchTech, DispatchWo } from "./dispatch-board"
 import { useToast } from "@/hooks/use-toast"
+import {
+  buildScheduleWarningsByPeer,
+  type ScheduleWarningItem,
+  type ScheduleWarnPeer,
+} from "@/lib/dispatch/schedule-warnings"
 
 function routeOrderStorageKey(techId: string, ymd: string) {
   return `equipify:dispatch:route-order:${techId}:${ymd}`
@@ -39,6 +44,19 @@ function saveOrder(techId: string, ymd: string, ids: string[]) {
   }
 }
 
+function warnPeerFromDispatchWo(w: DispatchWo): ScheduleWarnPeer {
+  return {
+    id: w.id,
+    status: w.status,
+    scheduled_on: w.scheduled_on,
+    scheduled_time: w.scheduled_time,
+    assigned_user_id: w.assigned_user_id,
+    customer_id: w.customer_id,
+    customerLocationId: w.customerLocationId ?? null,
+    opsFlags: w.opsFlags ?? null,
+  }
+}
+
 function StopRow({
   stop,
   position,
@@ -47,6 +65,7 @@ function StopRow({
   disableUp,
   disableDown,
   onOpenWo,
+  scheduleWarnings,
 }: {
   stop: DispatchRouteStop
   position: number
@@ -55,6 +74,7 @@ function StopRow({
   disableUp: boolean
   disableDown: boolean
   onOpenWo: (id: string) => void
+  scheduleWarnings?: ScheduleWarningItem[]
 }) {
   const time =
     stop.scheduledTime != null && String(stop.scheduledTime).trim().length >= 5
@@ -113,6 +133,13 @@ function StopRow({
               {stop.workKind === "request" ? "request" : stop.workKind === "maintenance" ? "maint" : "repair"}
             </span>
           </div>
+          {scheduleWarnings && scheduleWarnings.length > 0 ? (
+            <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[10px] text-muted-foreground">
+              {scheduleWarnings.map((w) => (
+                <li key={w.key}>{w.message}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col gap-0.5">
           <button
@@ -150,11 +177,13 @@ function TechnicianRouteColumn({
   stops,
   selectedYmd,
   onOpenWo,
+  scheduleWarningsByWoId,
 }: {
   tech: DispatchTech
   stops: DispatchRouteStop[]
   selectedYmd: string
   onOpenWo: (id: string) => void
+  scheduleWarningsByWoId: Map<string, ScheduleWarningItem[]>
 }) {
   const { toast } = useToast()
   const [manualIds, setManualIds] = useState<string[]>(() => loadSavedOrder(tech.id, selectedYmd))
@@ -236,6 +265,7 @@ function TechnicianRouteColumn({
             disableUp={idx === 0}
             disableDown={idx === ordered.length - 1}
             onOpenWo={onOpenWo}
+            scheduleWarnings={scheduleWarningsByWoId.get(stop.workOrderId)}
           />
         ))}
       </ol>
@@ -254,6 +284,11 @@ export function DispatchRouteView({
   selectedYmd: string
   onOpenWo: (id: string) => void
 }) {
+  const scheduleWarningsByWoId = useMemo(() => {
+    const peers = workOrders.map(warnPeerFromDispatchWo)
+    return buildScheduleWarningsByPeer(peers)
+  }, [workOrders])
+
   const byTech = useMemo(() => {
     const m = new Map<string, DispatchRouteStop[]>()
     for (const t of technicians) m.set(t.id, [])
@@ -295,6 +330,7 @@ export function DispatchRouteView({
           stops={byTech.get(t.id) ?? []}
           selectedYmd={selectedYmd}
           onOpenWo={onOpenWo}
+          scheduleWarningsByWoId={scheduleWarningsByWoId}
         />
       ))}
     </div>

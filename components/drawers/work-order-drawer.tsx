@@ -94,6 +94,11 @@ import { TechnicianMobileQuickBar } from "@/components/technician/technician-mob
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
+import {
+  collectScheduleWarningsForPeer,
+  type ScheduleWarnPeer,
+  type ScheduleWarningItem,
+} from "@/lib/dispatch/schedule-warnings"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { buildWorkOrderServiceTimeline } from "@/lib/lifecycle/service-timeline"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
@@ -175,6 +180,21 @@ function uiTypeToDb(t: WorkOrderType): string {
     Emergency: "emergency",
   }
   return m[t]
+}
+
+function drawerSchedPastDue(wo: WorkOrder): boolean {
+  const y = wo.scheduledDate?.trim().slice(0, 10)
+  if (!y) return false
+  const today = new Date().toISOString().slice(0, 10)
+  const db = uiStatusToDb(wo.status)
+  return ["open", "scheduled", "in_progress"].includes(db) && y < today
+}
+
+function normalizePeerTimeForWarnings(t: string | null | undefined): string | null {
+  const s = t?.trim()
+  if (!s) return null
+  if (s.length === 5 && s.includes(":")) return `${s}:00`
+  return s
 }
 
 function normalizeTimeForDb(time: string): string | null {
@@ -401,6 +421,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [billingProfile, setBillingProfile] = useState<CustomerBillingProfile | null>(null)
   /** Phase 4: bumping this triggers the SchedulingEventsCard to re-fetch — used after we emit an event from this drawer. */
   const [schedulingEventsRefresh, setSchedulingEventsRefresh] = useState(0)
+  /** Phase 35: same-calendar-day peers for soft scheduling warnings (org + technician scope). */
+  const [schedulePeerRows, setSchedulePeerRows] = useState<ScheduleWarnPeer[] | null>(null)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -498,6 +520,105 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setSavedLaborHours(lh)
     setLoading(false)
   }, [workOrderId, activeOrgId, orgStatus, woOrgPermissions])
+
+  useEffect(() => {
+    if (!workOrderId) setSchedulePeerRows(null)
+  }, [workOrderId])
+
+  useEffect(() => {
+    if (!wo || !activeOrgId || orgStatus !== "ready") {
+      setSchedulePeerRows(null)
+      return
+    }
+    const ymdHead = wo.scheduledDate?.trim().slice(0, 10)
+    if (!ymdHead) {
+      setSchedulePeerRows(null)
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      let q = supabase
+        .from("work_orders")
+        .select("id, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, customer_location_id")
+        .eq("organization_id", activeOrgId)
+        .is("archived_at", null)
+        .eq("scheduled_on", ymdHead)
+        .in("status", ["open", "scheduled", "in_progress"])
+
+      if (woOrgPermissions.canViewAssignedWorkOrdersOnly && !woOrgPermissions.canViewAllWorkOrders) {
+        const scope = await loadAssignedWorkScope(supabase, { organizationId: activeOrgId, userId: user.id })
+        const ids = [...new Set([...scope.workOrderIds, wo.id])]
+        if (ids.length === 0) {
+          if (!cancelled) setSchedulePeerRows([])
+          return
+        }
+        q = q.in("id", ids)
+      }
+
+      const { data, error } = await q
+      if (cancelled) return
+      if (error || !data) {
+        setSchedulePeerRows([])
+        return
+      }
+
+      const rows: ScheduleWarnPeer[] = (
+        data as Array<{
+          id: string
+          status: string
+          scheduled_on: string | null
+          scheduled_time: string | null
+          assigned_user_id: string | null
+          customer_id: string
+          customer_location_id: string | null
+        }>
+      ).map((r) => ({
+        id: r.id,
+        status: r.status,
+        scheduled_on: r.scheduled_on,
+        scheduled_time: r.scheduled_time,
+        assigned_user_id: r.assigned_user_id,
+        customer_id: r.customer_id,
+        customerLocationId: r.customer_location_id ?? null,
+        opsFlags: undefined,
+      }))
+      setSchedulePeerRows(rows)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    wo,
+    activeOrgId,
+    orgStatus,
+    woOrgPermissions.canViewAssignedWorkOrdersOnly,
+    woOrgPermissions.canViewAllWorkOrders,
+  ])
+
+  const workOrderScheduleSoftWarnings: ScheduleWarningItem[] = useMemo(() => {
+    if (!wo || schedulePeerRows === null) return []
+    const self: ScheduleWarnPeer = {
+      id: wo.id,
+      status: uiStatusToDb(wo.status),
+      scheduled_on: wo.scheduledDate?.trim() || null,
+      scheduled_time: normalizePeerTimeForWarnings(wo.scheduledTime),
+      assigned_user_id: wo.assignedUserId ?? null,
+      customer_id: wo.customerId,
+      customerLocationId: null,
+      opsFlags: { sched_past_due: drawerSchedPastDue(wo) },
+    }
+    const others = schedulePeerRows.filter((p) => p.id !== wo.id)
+    return collectScheduleWarningsForPeer(self, [self, ...others])
+  }, [wo, schedulePeerRows])
 
   const partsDirty = useMemo(() => !partsEqual(tabParts, savedParts), [tabParts, savedParts])
 
@@ -1611,6 +1732,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             Operational signals
           </p>
           <OperationalBadgeRow badges={operationalDrawerBadges} cap={6} />
+        </div>
+      ) : null}
+
+      {workOrderScheduleSoftWarnings.length > 0 ? (
+        <div className="rounded-lg border border-border bg-muted/15 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Scheduling checks
+          </p>
+          <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[11px] text-muted-foreground">
+            {workOrderScheduleSoftWarnings.map((w) => (
+              <li key={w.key}>{w.message}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

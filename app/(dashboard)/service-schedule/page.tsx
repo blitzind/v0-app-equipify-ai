@@ -53,6 +53,12 @@ import {
 } from "@/lib/dispatch/board-utils"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
+import {
+  buildScheduleWarningsByPeer,
+  type ScheduleWarningItem,
+  type ScheduleWarnPeer,
+} from "@/lib/dispatch/schedule-warnings"
+import { useToast } from "@/hooks/use-toast"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
@@ -1128,14 +1134,30 @@ function formatWoStatusLabel(status: string): string {
   return status.split("_").map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : "")).join(" ")
 }
 
+function scheduleRowToWarnPeer(row: ScheduledWoRowView): ScheduleWarnPeer {
+  const w = row.wo
+  return {
+    id: w.id,
+    status: w.status,
+    scheduled_on: w.scheduled_on,
+    scheduled_time: w.scheduled_time,
+    assigned_user_id: w.assigned_user_id,
+    customer_id: w.customer_id,
+    customerLocationId: w.customerLocationId ?? null,
+    opsFlags: w.opsFlags ?? null,
+  }
+}
+
 function ScheduledWorkOrdersSection({
   rows,
   loading,
   overlapKeys,
+  scheduleWarningsByWoId,
 }: {
   rows: ScheduledWoRowView[]
   loading: boolean
   overlapKeys: Set<string>
+  scheduleWarningsByWoId: Map<string, ScheduleWarningItem[]>
 }) {
   return (
     <Card className="border border-border">
@@ -1167,11 +1189,12 @@ function ScheduledWorkOrdersSection({
         {!loading &&
           rows.map((row) => {
             const wo = row.wo
+            const softWarnings = scheduleWarningsByWoId.get(wo.id)
             const days = daysUntil(wo.scheduled_on ?? "")
             const timeStr = formatScheduleTimeHm(wo.scheduled_time)
             const slotKey =
               wo.assigned_user_id && wo.scheduled_on
-                ? `${wo.assigned_user_id}|${wo.scheduled_on}|${(wo.scheduled_time ?? "").trim()}`
+                ? `${wo.assigned_user_id}|${wo.scheduled_on}|${timeToSlotIndex(wo.scheduled_time)}`
                 : ""
             const slotOverlap = Boolean(slotKey && overlapKeys.has(slotKey))
             return (
@@ -1224,6 +1247,13 @@ function ScheduledWorkOrdersSection({
                     </span>
                   </div>
                   <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-0.5" cap={5} />
+                  {softWarnings?.length ? (
+                    <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-muted-foreground">
+                      {softWarnings.map((w) => (
+                        <li key={w.key}>{w.message}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
                     <span className="truncate">{wo.customerName}</span>
                     <span className="flex items-center gap-1 min-w-0">
@@ -1943,6 +1973,7 @@ function CompactPlanAlert({
 function ServiceSchedulePageInner() {
   const { plans, organizationId } = useMaintenancePlans()
   const { permissions } = useOrgPermissions()
+  const { toast } = useToast()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageSchedule = permissions.canManageDispatch
 
@@ -2382,11 +2413,16 @@ function ServiceSchedulePageInner() {
     for (const row of filteredScheduledWoRows) {
       const w = row.wo
       if (!w.assigned_user_id || !w.scheduled_on) continue
-      const slot = (w.scheduled_time ?? "").trim()
+      const slot = timeToSlotIndex(w.scheduled_time)
       const k = `${w.assigned_user_id}|${w.scheduled_on}|${slot}`
       counts.set(k, (counts.get(k) ?? 0) + 1)
     }
     return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
+  }, [filteredScheduledWoRows])
+
+  const scheduleListWarningsByWoId = useMemo(() => {
+    const peers = filteredScheduledWoRows.map(scheduleRowToWarnPeer)
+    return buildScheduleWarningsByPeer(peers)
   }, [filteredScheduledWoRows])
 
   /**
@@ -2559,10 +2595,11 @@ function ServiceSchedulePageInner() {
       return row.wo.scheduled_on === scheduleSelectedYmd && timeToSlotIndex(row.wo.scheduled_time) === cell.slotIdx
     })
     if (overlaps.length > 0) {
-      const ok = window.confirm(
-        `${assignTechnicians.find((tech) => tech.id === cell.techId)?.label ?? "This technician"} already has ${overlaps.length} item${overlaps.length === 1 ? "" : "s"} in that slot. Schedule here anyway?`,
-      )
-      if (!ok) return
+      const techLabel = assignTechnicians.find((tech) => tech.id === cell.techId)?.label ?? "This technician"
+      toast({
+        title: "Possible overlap",
+        description: `${techLabel} already has ${overlaps.length} job${overlaps.length === 1 ? "" : "s"} in that slot — scheduling anyway (soft check).`,
+      })
     }
     await handleQuickAssignWork({
       wo: active.wo,
@@ -2862,6 +2899,7 @@ function ServiceSchedulePageInner() {
             rows={filteredScheduledWoRows}
             loading={scheduledWoLoading}
             overlapKeys={scheduleOverlapKeys}
+            scheduleWarningsByWoId={scheduleListWarningsByWoId}
           />
 
           {viewTab === "list" && (

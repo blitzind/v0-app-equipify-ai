@@ -7,6 +7,10 @@ import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
 import { formatSlotLabel, timeToSlotIndex } from "@/lib/dispatch/board-utils"
+import {
+  buildScheduleWarningsByPeer,
+  type ScheduleWarnPeer,
+} from "@/lib/dispatch/schedule-warnings"
 
 function cardTone(status: string): string {
   switch (status) {
@@ -22,6 +26,19 @@ function cardTone(status: string): string {
       return "border-border bg-muted/50"
     default:
       return "border-border bg-card"
+  }
+}
+
+function toWarnPeer(w: DispatchWo): ScheduleWarnPeer {
+  return {
+    id: w.id,
+    status: w.status,
+    scheduled_on: w.scheduled_on,
+    scheduled_time: w.scheduled_time,
+    assigned_user_id: w.assigned_user_id,
+    customer_id: w.customer_id,
+    customerLocationId: w.customerLocationId ?? null,
+    opsFlags: w.opsFlags ?? null,
   }
 }
 
@@ -46,6 +63,11 @@ export function DispatchMobileList({
     () => workOrders.filter((w) => !w.assigned_user_id && ["open", "scheduled", "in_progress"].includes(w.status)),
     [workOrders],
   )
+
+  const scheduleWarningsByWoId = useMemo(() => {
+    const peers = workOrders.map(toWarnPeer)
+    return buildScheduleWarningsByPeer(peers)
+  }, [workOrders])
 
   const byTech = useMemo(() => {
     const map = new Map<string, DispatchWo[]>()
@@ -165,6 +187,16 @@ export function DispatchMobileList({
                   ) : wo.serviceLocationLabel ? (
                     <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
                   ) : null}
+                  {(() => {
+                    const sw = scheduleWarningsByWoId.get(wo.id)
+                    if (!sw?.length) return null
+                    return (
+                      <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">
+                        {sw[0]!.message}
+                        {sw.length > 1 ? ` (+${sw.length - 1})` : ""}
+                      </p>
+                    )
+                  })()}
                   <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
                 </button>
                 {/* Phase: Scheduling Field-Speed Polish — quick actions row.
@@ -299,6 +331,16 @@ export function DispatchMobileList({
                     ) : wo.serviceLocationLabel ? (
                       <p className="truncate text-[10px] text-muted-foreground">{wo.serviceLocationLabel}</p>
                     ) : null}
+                    {(() => {
+                      const sw = scheduleWarningsByWoId.get(wo.id)
+                      if (!sw?.length) return null
+                      return (
+                        <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">
+                          {sw[0]!.message}
+                          {sw.length > 1 ? ` (+${sw.length - 1})` : ""}
+                        </p>
+                      )
+                    })()}
                     <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
                   </button>
                 ))}

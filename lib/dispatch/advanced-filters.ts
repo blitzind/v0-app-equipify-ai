@@ -1,4 +1,5 @@
 import type { DispatchWo } from "@/components/dispatch/dispatch-board"
+import { DISPATCH_HEAVY_DAY_JOB_THRESHOLD } from "@/lib/dispatch/schedule-warnings"
 
 export type Phase34WorkKindFilter = "all" | "maintenance" | "repair" | "request"
 
@@ -123,7 +124,7 @@ export type DispatchPlanningMetrics = {
 export function computeDispatchPlanningMetrics(
   rows: DispatchWo[],
   selectedYmd: string,
-  overloadThreshold = 6,
+  overloadThreshold = DISPATCH_HEAVY_DAY_JOB_THRESHOLD,
 ): DispatchPlanningMetrics {
   const jobsOnSelectedDayByTech = new Map<string, number>()
   let overdueScheduledCount = 0
