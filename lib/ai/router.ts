@@ -19,6 +19,8 @@ import { readAiCache, recordCacheHitMeta, writeAiCache } from "@/lib/ai/result-c
 import { recordAiUsageLog, safeAiFailureReason, sumUsage } from "@/lib/ai/usage"
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { buildAiUsageOperationalMetadata } from "@/lib/ai/redaction"
+import { resolveAiExecutionMode } from "@/lib/ai/execution-mode"
+import { buildMockStructuredOutput } from "@/lib/ai/mock-task-output"
 import { getProviderAdapter, isProviderAvailable } from "@/lib/ai/providers/index"
 import type {
   AiChatMessage,
@@ -304,6 +306,147 @@ export async function runAiTask<T = string>(options: RunAiTaskOptions<T>): Promi
         attempts: 0,
         durationMs: Date.now() - started,
       },
+    }
+  }
+
+  const orgIdForMode = options.organizationId?.trim() ?? ""
+  if (orgIdForMode && !options.skipExecutionModeMock) {
+    const resolved = await resolveAiExecutionMode({
+      organizationId: orgIdForMode,
+      actingUserEmail: options.actingUserEmail ?? null,
+      forceLiveAi: options.forceLiveAi ?? false,
+    })
+    if (resolved.mode === "disabled") {
+      const durationMs = Date.now() - started
+      return {
+        ok: false,
+        error: new Error(
+          "AI is unavailable while billing is restricted for this workspace. Restore billing to continue.",
+        ),
+        usage: { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 },
+        meta: {
+          task: def.id,
+          provider: primaryRef.provider,
+          model: primaryRef.model,
+          escalated: false,
+          escalationReasons,
+          attempts: 0,
+          durationMs,
+        },
+      }
+    }
+
+    if (resolved.mode === "mock_trial") {
+      try {
+        const mock = await buildMockStructuredOutput<T>({
+          task: def.id,
+          input: options.input,
+          schema: options.schema,
+          acceptResult: options.acceptResult,
+        })
+        const durationMs = Date.now() - started
+        const trialAiPreview = def.id === "aiden_safe_action_prepare"
+        const meta: AiRunMeta = {
+          task: def.id,
+          provider: "mock",
+          model: "simulated",
+          escalated: false,
+          escalationReasons: [],
+          attempts: 1,
+          durationMs,
+          trialAiPreview,
+        }
+        if (!options.skipUsageLog) {
+          const usageMeta = buildAiUsageOperationalMetadata({
+            task: def.id,
+            provider: "mock",
+            model: "simulated",
+            attemptCount: 1,
+            escalationReasons: [],
+            cacheHit: false,
+            budgetBlocked: false,
+            durationMs,
+            promptMeta: usagePromptMeta,
+            extras: {
+              execution_mode: "mock_trial",
+              real_cost_usd: 0,
+            },
+          })
+          await recordAiUsageLog({
+            organization_id: orgIdForMode,
+            task: def.id,
+            provider: "mock",
+            model: "simulated",
+            prompt_tokens: mock.promptTokens,
+            completion_tokens: mock.completionTokens,
+            estimated_cost: 0,
+            duration_ms: durationMs,
+            success: true,
+            cache_hit: false,
+            budget_blocked: false,
+            metadata: usageMeta,
+          })
+        }
+        return {
+          ok: true,
+          output: mock.output,
+          rawText: mock.rawText,
+          usage: {
+            promptTokens: mock.promptTokens,
+            completionTokens: mock.completionTokens,
+            estimatedCostUsd: 0,
+          },
+          meta,
+        }
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e))
+        const durationMs = Date.now() - started
+        if (!options.skipUsageLog) {
+          await recordAiUsageLog({
+            organization_id: orgIdForMode,
+            task: def.id,
+            provider: "mock",
+            model: "simulated",
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            estimated_cost: 0,
+            duration_ms: durationMs,
+            success: false,
+            failure_reason: safeAiFailureReason(err.message),
+            cache_hit: false,
+            budget_blocked: false,
+            metadata: buildAiUsageOperationalMetadata({
+              task: def.id,
+              provider: "mock",
+              model: "simulated",
+              attemptCount: 1,
+              escalationReasons: [],
+              cacheHit: false,
+              budgetBlocked: false,
+              durationMs,
+              promptMeta: usagePromptMeta,
+              extras: {
+                execution_mode: "mock_trial",
+                real_cost_usd: 0,
+              },
+            }),
+          })
+        }
+        return {
+          ok: false,
+          error: err,
+          usage: { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 },
+          meta: {
+            task: def.id,
+            provider: "mock",
+            model: "simulated",
+            escalated: false,
+            escalationReasons,
+            attempts: 1,
+            durationMs,
+          },
+        }
+      }
     }
   }
 

@@ -17,6 +17,8 @@ function buildAdapter(id: AiProviderId): AiProviderAdapter {
       return createAnthropicAdapter()
     case "google":
       return createGoogleAdapter()
+    case "mock":
+      throw new Error("Mock provider has no adapter — mock outputs never call the provider stack.")
     default: {
       const _exhaustive: never = id
       return _exhaustive

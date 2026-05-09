@@ -118,6 +118,7 @@ async function runSingleFixture(fixture: AiEvalFixture, mock: boolean): Promise<
       skipBudgetCheck: true,
       skipPlanGateCheck: true,
       skipCache: true,
+      skipExecutionModeMock: true,
       promptVersionOverride: fixture.promptVersion,
     })
 
@@ -158,6 +159,7 @@ async function runSingleFixture(fixture: AiEvalFixture, mock: boolean): Promise<
     skipBudgetCheck: true,
     skipPlanGateCheck: true,
     skipCache: true,
+    skipExecutionModeMock: true,
     promptVersionOverride: fixture.promptVersion,
   })
 

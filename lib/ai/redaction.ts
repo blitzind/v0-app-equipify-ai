@@ -61,6 +61,8 @@ const ALLOWED_METADATA_KEYS = new Set([
   "fileMimeType",
   "fileSizeBytes",
   "durationMs",
+  "execution_mode",
+  "real_cost_usd",
 ])
 
 /**

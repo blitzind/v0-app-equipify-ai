@@ -29,6 +29,8 @@ import { readAiCache, recordCacheHitMeta, writeAiCache } from "@/lib/ai/result-c
 import { recordAiUsageLog, safeAiFailureReason, sumUsage } from "@/lib/ai/usage"
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { buildAiUsageOperationalMetadata } from "@/lib/ai/redaction"
+import { resolveAiExecutionMode } from "@/lib/ai/execution-mode"
+import { buildMockFileExtractionOutput } from "@/lib/ai/mock-task-output"
 
 function mergeTaskDef(base: AiTaskDefinition, patch?: Partial<AiTaskDefinition>): AiTaskDefinition {
   const merged = patch ? { ...base, ...patch } : base
@@ -89,12 +91,10 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
   skipPlanGateCheck?: boolean
   /** Skip ai_cache lookup/write (debug). */
   skipCache?: boolean
+  /** Bypass trial simulation for scripts/tests that must hit live extraction. */
+  skipExecutionModeMock?: boolean
 }): Promise<T> {
   const started = Date.now()
-  const apiKey = getProviderApiKey("openai")
-  if (!apiKey?.trim()) {
-    throw new Error("AI extraction is not configured. Add OPENAI_API_KEY.")
-  }
 
   const base = getTaskDefinition(args.task)
   const legacy =
@@ -107,6 +107,60 @@ export async function executeOpenAiStructuredFileExtraction<T>(args: {
   if (def.promptId?.trim()) {
     const pr = getPromptForTask(args.task)
     usagePromptMeta = promptMetadataForLog(pr) as unknown as Record<string, unknown>
+  }
+
+  const orgIdTrim = args.organizationId?.trim()
+  if (orgIdTrim && !(args.skipExecutionModeMock ?? false)) {
+    const { mode } = await resolveAiExecutionMode({ organizationId: orgIdTrim })
+    if (mode === "disabled") {
+      throw new Error("AI extraction is unavailable while billing is restricted for this workspace.")
+    }
+    if (mode === "mock_trial") {
+      const mock = await buildMockFileExtractionOutput({
+        task: args.task,
+        schema: args.schema,
+        fileName: args.fileName,
+        byteLength: args.buffer.byteLength,
+      })
+      const durationMs = Date.now() - started
+      if (!args.skipUsageLog) {
+        await recordAiUsageLog({
+          organization_id: orgIdTrim,
+          task: args.task,
+          provider: "mock",
+          model: "simulated",
+          prompt_tokens: mock.promptTokens,
+          completion_tokens: mock.completionTokens,
+          estimated_cost: 0,
+          duration_ms: durationMs,
+          success: true,
+          cache_hit: false,
+          budget_blocked: false,
+          metadata: buildAiUsageOperationalMetadata({
+            task: args.task,
+            provider: "mock",
+            model: "simulated",
+            attemptCount: 1,
+            cacheHit: false,
+            budgetBlocked: false,
+            durationMs,
+            promptMeta: usagePromptMeta,
+            extras: {
+              execution_mode: "mock_trial",
+              real_cost_usd: 0,
+              fileMimeType: args.mimeType,
+              fileSizeBytes: args.buffer.byteLength,
+            },
+          }),
+        })
+      }
+      return mock.output
+    }
+  }
+
+  const apiKey = getProviderApiKey("openai")
+  if (!apiKey?.trim()) {
+    throw new Error("AI extraction is not configured. Add OPENAI_API_KEY.")
   }
 
   if (chain.length === 0) {

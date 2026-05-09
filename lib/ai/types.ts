@@ -25,7 +25,7 @@ export type AiTaskId =
   | "aiden_operational_recommendations"
   | "aiden_safe_action_prepare"
 
-export type AiProviderId = "openai" | "anthropic" | "google"
+export type AiProviderId = "openai" | "anthropic" | "google" | "mock"
 
 /** Relative spend envelope for observability and routing hints — primary models stay on cheaper tiers first. */
 export type AiCostTier = "low" | "medium" | "high"
@@ -132,6 +132,8 @@ export type AiRunMeta = {
   durationMs: number
   /** Result served from ai_cache without calling the provider. */
   cacheHit?: boolean
+  /** Trial simulation — callers must not persist side effects (e.g. pending workspace actions). */
+  trialAiPreview?: boolean
 }
 
 export type AiTaskSuccess<T> = {
@@ -178,6 +180,12 @@ export type RunAiTaskOptions<T = string> = {
   cacheSchemaVersion?: string
   /** Pin a registry prompt `version` (defaults to active). */
   promptVersionOverride?: number
+  /** Skip trial simulation / execution resolver (evals and scripts). */
+  skipExecutionModeMock?: boolean
+  /** Platform-admin-only: force live providers when resolver allows (see `resolveAiExecutionMode`). */
+  forceLiveAi?: boolean
+  /** Authenticated user email for admin-only force-live resolution. */
+  actingUserEmail?: string | null
 }
 
 /** Unified provider completion contract — implemented per vendor in `providers/`. */

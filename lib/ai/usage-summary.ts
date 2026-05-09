@@ -132,6 +132,57 @@ export async function computeAiUsageSummary(
   return summary
 }
 
+export type AiUsageMockLiveSplit = {
+  mockTrial: { aiTokens: number; estimatedCostUsd: number; requests: number }
+  live: { aiTokens: number; estimatedCostUsd: number; requests: number }
+}
+
+/** Month-to-date split between simulated trial rows (`provider = mock`) and live provider calls. */
+export async function computeAiUsageMockLiveSplit(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<AiUsageMockLiveSplit> {
+  const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString()
+  const split: AiUsageMockLiveSplit = {
+    mockTrial: { aiTokens: 0, estimatedCostUsd: 0, requests: 0 },
+    live: { aiTokens: 0, estimatedCostUsd: 0, requests: 0 },
+  }
+
+  const pageSize = 1000
+  let offset = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from("ai_usage_logs")
+      .select("estimated_cost, prompt_tokens, completion_tokens, provider")
+      .eq("organization_id", organizationId)
+      .gte("created_at", monthStart)
+      .order("created_at", { ascending: true })
+      .range(offset, offset + pageSize - 1)
+
+    if (error || !data?.length) break
+
+    for (const row of data) {
+      const cost = num(row.estimated_cost)
+      const pt = Math.max(0, Math.floor(num(row.prompt_tokens)))
+      const ct = Math.max(0, Math.floor(num(row.completion_tokens)))
+      const tokens = pt + ct
+      const provider = String(row.provider ?? "")
+      const bucket = provider === "mock" ? split.mockTrial : split.live
+      bucket.aiTokens += tokens
+      bucket.estimatedCostUsd += cost
+      bucket.requests += 1
+    }
+
+    if (data.length < pageSize) break
+    offset += pageSize
+  }
+
+  split.mockTrial.estimatedCostUsd = Math.round(split.mockTrial.estimatedCostUsd * 1_000_000) / 1_000_000
+  split.live.estimatedCostUsd = Math.round(split.live.estimatedCostUsd * 1_000_000) / 1_000_000
+
+  return split
+}
+
 export async function fetchRecentAiUsageLogs(
   supabase: SupabaseClient,
   organizationId: string,

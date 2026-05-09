@@ -65,6 +65,8 @@ type PendingSafeActionPreview = {
   affected_record_ids: unknown
 }
 
+const TRIAL_ACTION_PREVIEW_ID = "00000000-0000-4000-8000-000000000001"
+
 function defaultFrValues(moduleLabel: string): AidenFrFormValues {
   return {
     title: "",
@@ -185,6 +187,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [actionIntent, setActionIntent] = useState("")
   const [actionBusy, setActionBusy] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingSafeActionPreview | null>(null)
+  const [trialActionPreview, setTrialActionPreview] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -322,6 +325,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     setError(null)
     setFrOpen(false)
     setPendingAction(null)
+    setTrialActionPreview(false)
     setActionIntent("")
     setActionError(null)
     toast({ title: "New chat started" })
@@ -344,13 +348,47 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
+        trialAiPreview?: boolean
+        proposal?: {
+          title: string
+          explanation: string
+          action_type: string
+          risk_level: string
+          proposed_payload: Record<string, unknown>
+        }
         pending?: PendingSafeActionPreview
+        notice?: string
         message?: string
         error?: string
       }
-      if (!res.ok || !data.ok || !data.pending) {
+      if (!res.ok || !data.ok) {
         throw new Error(data.message ?? data.error ?? "Could not prepare an action.")
       }
+      if (data.trialAiPreview && data.proposal) {
+        setTrialActionPreview(true)
+        setPendingAction({
+          id: TRIAL_ACTION_PREVIEW_ID,
+          title: data.proposal.title,
+          explanation: data.proposal.explanation,
+          action_type: data.proposal.action_type,
+          risk_level: data.proposal.risk_level,
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          proposed_payload: data.proposal.proposed_payload,
+          affected_record_ids: [],
+        })
+        setActionIntent("")
+        toast({
+          title: "Trial AI preview",
+          description:
+            data.notice ??
+            "This workspace action is preview-only during trial. Upgrade to save pending actions.",
+        })
+        return
+      }
+      if (!data.pending) {
+        throw new Error(data.message ?? data.error ?? "Could not prepare an action.")
+      }
+      setTrialActionPreview(false)
       setPendingAction(data.pending)
       setActionIntent("")
       toast({
@@ -368,6 +406,14 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
 
   async function confirmPendingAction() {
     if (!pendingAction || actionBusy || !organizationId || orgStatus !== "ready") return
+    if (trialActionPreview || pendingAction.id === TRIAL_ACTION_PREVIEW_ID) {
+      toast({
+        title: "Trial AI preview",
+        description:
+          "Confirming workspace actions that update records requires an active paid subscription. You can still copy details manually.",
+      })
+      return
+    }
     setActionBusy(true)
     setActionError(null)
     try {
@@ -386,6 +432,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
         throw new Error(data.message ?? data.error ?? "Could not complete the action.")
       }
       setPendingAction(null)
+      setTrialActionPreview(false)
       toast({
         title: "Action saved",
         description: data.summary ?? "Your workspace was updated.",
@@ -414,6 +461,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
         throw new Error(data.message ?? data.error ?? "Could not cancel.")
       }
       setPendingAction(null)
+      setTrialActionPreview(false)
       toast({ title: "Canceled", description: "No changes were made." })
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not cancel."
@@ -781,12 +829,17 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   <p className="text-[10px] text-muted-foreground">
                     Expires {new Date(pendingAction.expires_at).toLocaleString()}
                   </p>
+                  {trialActionPreview ? (
+                    <p className="rounded-md border border-dashed border-border bg-muted/40 px-2 py-1.5 text-[11px] text-muted-foreground">
+                      Trial AI experience — review only. Saving workspace actions requires an active paid subscription.
+                    </p>
+                  ) : null}
                   <div className="flex gap-2">
                     <Button
                       type="button"
                       size="sm"
                       className="flex-1"
-                      disabled={actionBusy}
+                      disabled={actionBusy || trialActionPreview}
                       onClick={() => void confirmPendingAction()}
                     >
                       {actionBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : "Confirm"}

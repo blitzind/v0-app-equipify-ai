@@ -74,6 +74,16 @@ export async function POST(
     return jsonError("ai_failed", aiResult.error.message || "Could not prepare an action.", 502)
   }
 
+  if (aiResult.meta.trialAiPreview) {
+    return NextResponse.json({
+      ok: true,
+      trialAiPreview: true,
+      proposal: aiResult.output,
+      notice:
+        "Trial AI preview — workspace actions are shown for review only. Saving pending actions requires an active paid subscription.",
+    })
+  }
+
   const proposal = aiResult.output
 
   const guard = await validatePreparedProposalForPrepare({

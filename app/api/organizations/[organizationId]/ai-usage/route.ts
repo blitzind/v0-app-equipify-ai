@@ -8,7 +8,12 @@ import {
   shouldLogCacheHitsToUsage,
 } from "@/lib/ai/result-cache"
 import { fetchAidenUsageCountsMtd } from "@/lib/aiden/usage-events"
-import { computeAiUsageSummary, fetchRecentAiUsageLogs } from "@/lib/ai/usage-summary"
+import {
+  computeAiUsageMockLiveSplit,
+  computeAiUsageSummary,
+  fetchRecentAiUsageLogs,
+} from "@/lib/ai/usage-summary"
+import { centsToIncludedAiTokens, usdToIncludedAiTokens } from "@/lib/ai/display-tokens"
 import { isPlanGatingDisabled, PLAN_AI_INCLUDED_MONTHLY_BUDGET_USD } from "@/lib/ai/plan-ai-config"
 import {
   fetchOrganizationPlanId,
@@ -127,23 +132,67 @@ export async function GET(
     }
   })
 
+  const mockLiveSplit = platformAdmin ? await computeAiUsageMockLiveSplit(db, organizationId) : undefined
+
+  const tenantAiUsage = !platformAdmin
+    ? {
+        aiTokensUsedMonth: summary.promptTokensMonth + summary.completionTokensMonth,
+        aiTokensUsedToday: summary.promptTokensToday + summary.completionTokensToday,
+        aiTokensIncludedApprox: usdToIncludedAiTokens(includedUsd),
+        byTask: Object.fromEntries(
+          Object.entries(summary.byTask).map(([task, row]) => [
+            task,
+            { aiTokens: row.promptTokens + row.completionTokens },
+          ]),
+        ),
+        aidenUsageMonth,
+      }
+    : undefined
+
+  const recentTenant = !platformAdmin
+    ? recent.map((r) => ({
+        id: r.id,
+        created_at: r.created_at,
+        task: r.task,
+        ai_tokens: r.prompt_tokens + r.completion_tokens,
+        ai_mode: r.provider === "mock" ? ("trial_preview" as const) : ("live" as const),
+        success: r.success,
+      }))
+    : undefined
+
+  const tenantBudget = !platformAdmin
+    ? {
+        aiMonthlyAiTokenBudgetApprox:
+          aiMonthlyBudgetCents != null ? centsToIncludedAiTokens(aiMonthlyBudgetCents) : null,
+        aiBudgetEnforcementMode,
+        mtdAiTokensUsedApprox: usdToIncludedAiTokens(mtdEstimatedCostUsd),
+      }
+    : undefined
+
   return NextResponse.json({
-    summary,
+    viewerRole: platformAdmin ? "platform_admin" : "member",
+    summary: platformAdmin ? summary : undefined,
+    tenantAiUsage,
+    mockLiveSplit,
     planAi: {
       planId,
       planLabel: planTierDisplayName(planId),
       includedMonthlyBudgetUsd: includedUsd,
+      includedAiTokensApprox: usdToIncludedAiTokens(includedUsd),
       planGatingDisabled: isPlanGatingDisabled(),
       features,
       catalogExtractionAllowed: isTaskAllowedOnPlan(getTaskDefinition("catalog_extraction"), planId),
       certificateCleanupAllowed: isTaskAllowedOnPlan(getTaskDefinition("certificate_cleanup"), planId),
     },
-    budget: {
-      aiMonthlyBudgetCents,
-      aiBudgetEnforcementMode,
-      mtdEstimatedCostUsd,
-    },
-    recent,
+    budget: platformAdmin
+      ? {
+          aiMonthlyBudgetCents,
+          aiBudgetEnforcementMode,
+          mtdEstimatedCostUsd,
+        }
+      : tenantBudget,
+    recent: platformAdmin ? recent : undefined,
+    recentTenant,
     canEditBudget,
     cache: {
       ...cacheOverview,

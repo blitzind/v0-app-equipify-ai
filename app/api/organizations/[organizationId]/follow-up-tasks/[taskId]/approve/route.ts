@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { mergeFollowUpAutomationConfig } from "@/lib/follow-up-automation/merge-config"
 import { generateFollowUpAutomationDraft } from "@/lib/follow-up-automation/generate-draft"
+import { resolveAiExecutionMode } from "@/lib/ai/execution-mode"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
 import type { FollowUpAutomationConfig, FollowUpEntityType } from "@/lib/follow-up-automation/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
@@ -40,6 +41,14 @@ export async function POST(request: Request, context: { params: Promise<{ organi
 
   const gate = await requireOrgPermission(organizationId, "canManageCommunications")
   if ("error" in gate) return gate.error
+
+  const execMode = await resolveAiExecutionMode({ organizationId })
+  if (execMode.mode === "mock_trial") {
+    return jsonError(
+      "Trial AI preview — automated follow-up approval is not available during trial. Review drafts manually or upgrade for outbound automation.",
+      422,
+    )
+  }
 
   let generateAi = true
   try {
