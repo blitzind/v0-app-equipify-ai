@@ -35,7 +35,11 @@ import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
+import {
+  isAssignedWorkOnly,
+  loadAssignedWorkScope,
+  type AssignedWorkScope,
+} from "@/lib/permissions/technician-scope"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -84,6 +88,8 @@ import { loadCustomerRollupTree } from "@/lib/customers/consolidated-rollup"
 import { ParentAccountCard } from "@/components/customers/parent-account-card"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { normalizeAddressFingerprint } from "@/lib/customer-locations/format"
+import { buildMultiLocationDashboard } from "@/lib/customers/multi-location-dashboard"
+import { CustomerMultiLocationDashboard } from "@/components/customers/customer-multi-location-dashboard"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -320,9 +326,27 @@ type CustomerWoListRow = {
   type: string
   created_at: string
   completed_at: string | null
+  scheduled_on: string | null
   total_labor_cents: number
   total_parts_cents: number
   customer_location_id: string | null
+  equipment_id: string | null
+}
+
+type CustomerServiceRequestRow = {
+  id: string
+  customer_location_id: string | null
+  equipment_id: string | null
+  status: string
+  urgency: string
+  issue_summary: string
+  created_at: string
+  converted_work_order_id: string | null
+}
+
+type CustomerInvoiceMlRow = {
+  amount_cents: number
+  status: string
   equipment_id: string | null
 }
 
@@ -507,6 +531,10 @@ export default function CustomerDetailPage() {
 
   const [customerEquipment, setCustomerEquipment] = useState<Equipment[]>([])
   const [customerWorkOrders, setCustomerWorkOrders] = useState<CustomerWoListRow[]>([])
+  const [technicianScope, setTechnicianScope] = useState<AssignedWorkScope | null>(null)
+  const [customerServiceRequests, setCustomerServiceRequests] = useState<CustomerServiceRequestRow[]>([])
+  const [customerInvoicesForMl, setCustomerInvoicesForMl] = useState<CustomerInvoiceMlRow[] | null>(null)
+  const [intakeMetricsLoading, setIntakeMetricsLoading] = useState(false)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [lifetimeRevenueCents, setLifetimeRevenueCents] = useState(0)
   const [equipmentCreatedAt, setEquipmentCreatedAt] = useState<Record<string, string>>({})
@@ -599,6 +627,99 @@ export default function CustomerDetailPage() {
     return customerWorkOrders.filter((w) => woSite(w) === workOrderSiteFilter)
   }, [customerWorkOrders, customerEquipment, workOrderSiteFilter])
 
+  const scopedServiceRequests = useMemo(() => {
+    if (!assignedOnlyView || !technicianScope) return customerServiceRequests
+    const eqSet = new Set(technicianScope.equipmentIds)
+    const woSet = new Set(technicianScope.workOrderIds)
+    const scopedLocs = new Set<string>()
+    for (const eq of customerEquipment) {
+      if (eqSet.has(eq.id) && eq.serviceSiteId) scopedLocs.add(eq.serviceSiteId)
+    }
+    for (const w of customerWorkOrders) {
+      if (!woSet.has(w.id)) continue
+      let lid: string | null = w.customer_location_id
+      if (!lid && w.equipment_id) {
+        const e = customerEquipment.find((x) => x.id === w.equipment_id)
+        lid = e?.serviceSiteId ?? null
+      }
+      if (lid) scopedLocs.add(lid)
+    }
+    return customerServiceRequests.filter(
+      (sr) =>
+        (sr.equipment_id && eqSet.has(sr.equipment_id)) ||
+        (sr.converted_work_order_id && woSet.has(sr.converted_work_order_id)) ||
+        (sr.customer_location_id ? scopedLocs.has(sr.customer_location_id) : false),
+    )
+  }, [
+    assignedOnlyView,
+    technicianScope,
+    customerEquipment,
+    customerWorkOrders,
+    customerServiceRequests,
+  ])
+
+  const multiLocationDashboard = useMemo(() => {
+    if (!customer) return null
+    const locations = customer.locations.map((l) => ({
+      id: l.id,
+      name: l.name,
+      addressLine: [l.address, l.addressLine2, `${l.city}, ${l.state} ${l.zip}`].filter(Boolean).join(", "),
+      isDefault: l.isDefault,
+    }))
+    const equipmentMl = customerEquipment.map((e) => ({
+      id: e.id,
+      customer_location_id: e.serviceSiteId,
+      last_service_at: e.lastServiceDate || null,
+      next_due_at: e.nextDueDate || null,
+      next_calibration_due_at: e.nextCalibrationDue || null,
+    }))
+    const woMl = customerWorkOrders.map((w) => ({
+      id: w.id,
+      status: w.status,
+      customer_location_id: w.customer_location_id,
+      equipment_id: w.equipment_id,
+      completed_at: w.completed_at,
+      scheduled_on: w.scheduled_on,
+    }))
+    const planMl = customerPlans.map((p) => ({
+      equipment_id: p.equipment_id,
+      next_due_date: p.next_due_date,
+      status: p.status,
+    }))
+    let invoicesMl = customerInvoicesForMl
+    if (assignedOnlyView && technicianScope && invoicesMl) {
+      const eqSet = new Set(technicianScope.equipmentIds)
+      invoicesMl = invoicesMl.filter((inv) => !inv.equipment_id || eqSet.has(inv.equipment_id))
+    }
+    return buildMultiLocationDashboard({
+      locations,
+      equipment: equipmentMl,
+      workOrders: woMl,
+      maintenancePlans: planMl,
+      serviceRequests: scopedServiceRequests.map((sr) => ({
+        id: sr.id,
+        customer_location_id: sr.customer_location_id,
+        equipment_id: sr.equipment_id,
+        status: sr.status,
+        urgency: sr.urgency,
+        issue_summary: sr.issue_summary,
+        created_at: sr.created_at,
+        converted_work_order_id: sr.converted_work_order_id,
+      })),
+      invoices: canViewCustomerFinancials ? invoicesMl : null,
+    })
+  }, [
+    customer,
+    customerEquipment,
+    customerWorkOrders,
+    customerPlans,
+    scopedServiceRequests,
+    customerInvoicesForMl,
+    canViewCustomerFinancials,
+    assignedOnlyView,
+    technicianScope,
+  ])
+
   useEffect(() => {
     let active = true
 
@@ -611,6 +732,7 @@ export default function CustomerDetailPage() {
       if (!user) {
         if (active) {
           setCustomer(null)
+          setTechnicianScope(null)
           setLoading(false)
         }
         return
@@ -630,10 +752,14 @@ export default function CustomerDetailPage() {
         if (!scope.customerIds.includes(id)) {
           if (active) {
             setCustomer(null)
+            setTechnicianScope(null)
             setLoading(false)
           }
           return
         }
+        if (active) setTechnicianScope(scope)
+      } else if (active) {
+        setTechnicianScope(null)
       }
 
       const customerSelectAttempts = [
@@ -663,6 +789,7 @@ export default function CustomerDetailPage() {
       if (customerError || !customerRow) {
         if (active) {
           setCustomer(null)
+          setTechnicianScope(null)
           setLoading(false)
         }
         return
@@ -999,6 +1126,17 @@ export default function CustomerDetailPage() {
     const supabase = createBrowserSupabaseClient()
 
     void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      let scope: AssignedWorkScope | null = null
+      if (assignedOnlyView && user) {
+        scope = await loadAssignedWorkScope(supabase, {
+          organizationId: customer.organizationId,
+          userId: user.id,
+        })
+      }
+
       const { data: eqRows, error: eqError } = await supabase
         .from("equipment")
         .select(
@@ -1033,17 +1171,26 @@ export default function CustomerDetailPage() {
 
       if (!active) return
 
+      let equipRowsRaw =
+        (eqRows ?? []) as Array<Parameters<typeof equipmentRowToUi>[0] & { created_at: string }>
+      let wos = (woRes.data ?? []) as CustomerWoListRow[]
+
+      if (scope) {
+        const eqSet = new Set(scope.equipmentIds)
+        const woSet = new Set(scope.workOrderIds)
+        equipRowsRaw = equipRowsRaw.filter((r) => eqSet.has(r.id))
+        wos = wos.filter(
+          (w) => woSet.has(w.id) || (w.equipment_id ? eqSet.has(w.equipment_id) : false),
+        )
+      }
+
       if (eqError) {
         setCustomerEquipment([])
         setEquipmentCreatedAt({})
       } else {
-        const rows =
-          (eqRows ?? []) as Array<
-            Parameters<typeof equipmentRowToUi>[0] & { created_at: string }
-          >
         const createdMap: Record<string, string> = {}
         const equipUi: Equipment[] = []
-        for (const r of rows) {
+        for (const r of equipRowsRaw) {
           createdMap[r.id] = r.created_at
           const { created_at: _ca, ...rest } = r
           equipUi.push(equipmentRowToUi(rest, customer.company))
@@ -1052,7 +1199,6 @@ export default function CustomerDetailPage() {
         setEquipmentCreatedAt(createdMap)
       }
 
-      const wos = (woRes.data ?? []) as CustomerWoListRow[]
       setCustomerWorkOrders(wos)
 
       const revenue = wos
@@ -1066,7 +1212,62 @@ export default function CustomerDetailPage() {
     return () => {
       active = false
     }
-  }, [customer, refreshToken])
+  }, [customer, refreshToken, assignedOnlyView])
+
+  useEffect(() => {
+    if (!customer) {
+      setCustomerServiceRequests([])
+      setCustomerInvoicesForMl(null)
+      setIntakeMetricsLoading(false)
+      return
+    }
+
+    let active = true
+    setIntakeMetricsLoading(true)
+    const supabase = createBrowserSupabaseClient()
+
+    void (async () => {
+      const { data: srRows, error: srErr } = await supabase
+        .from("org_service_requests")
+        .select(
+          "id, customer_location_id, equipment_id, status, urgency, issue_summary, created_at, converted_work_order_id",
+        )
+        .eq("organization_id", customer.organizationId)
+        .eq("customer_id", customer.id)
+        .order("created_at", { ascending: false })
+        .limit(400)
+
+      if (!active) return
+
+      if (srErr) {
+        setCustomerServiceRequests([])
+      } else {
+        setCustomerServiceRequests((srRows ?? []) as CustomerServiceRequestRow[])
+      }
+
+      if (canViewCustomerFinancials) {
+        const { data: invRows, error: invErr } = await supabase
+          .from("org_invoices")
+          .select("amount_cents, status, equipment_id")
+          .eq("organization_id", customer.organizationId)
+          .eq("customer_id", customer.id)
+        if (!active) return
+        if (invErr) {
+          setCustomerInvoicesForMl([])
+        } else {
+          setCustomerInvoicesForMl((invRows ?? []) as CustomerInvoiceMlRow[])
+        }
+      } else {
+        setCustomerInvoicesForMl(null)
+      }
+
+      if (active) setIntakeMetricsLoading(false)
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [customer, refreshToken, canViewCustomerFinancials])
 
   useEffect(() => {
     if (!customer) return
@@ -1992,6 +2193,23 @@ export default function CustomerDetailPage() {
             />
           ) : null}
 
+          <CustomerMultiLocationDashboard
+            summary={multiLocationDashboard?.summary ?? null}
+            locationCards={multiLocationDashboard?.locationCards ?? []}
+            showFinancials={canViewCustomerFinancials}
+            loading={metricsLoading || intakeMetricsLoading || plansSectionLoading}
+            customerId={customer.id}
+            onSelectLocation={(locId, mode) => {
+              if (mode === "equipment") {
+                setEquipmentSiteFilter(locId)
+                setActiveTab("equipment")
+              } else {
+                setWorkOrderSiteFilter(locId)
+                setActiveTab("work-orders")
+              }
+            }}
+          />
+
           {/* Phase 2: Portal certificate release clarity */}
           {canManageCustomerRecords && activeOrgId ? (
             <CustomerPortalCertificateRuleCard
@@ -2313,6 +2531,12 @@ export default function CustomerDetailPage() {
                           >
                             View work orders
                           </button>
+                          <Link
+                            href={`/communications/service-requests?focusCustomer=${encodeURIComponent(customer.id)}&focusLocation=${encodeURIComponent(loc.id)}`}
+                            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            Service requests
+                          </Link>
                         </div>
                       </div>
                     </div>

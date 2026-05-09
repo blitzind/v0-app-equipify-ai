@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   Bot,
@@ -83,12 +84,17 @@ function urgencyBadge(u: string) {
   return "bg-amber-500/10 text-amber-900 dark:text-amber-100 border-amber-500/25"
 }
 
-export default function ServiceRequestsQueuePage() {
+function ServiceRequestsQueuePageContent() {
   const { toast } = useToast()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
   const canView = canReadServiceRequestQueue(permissions)
   const canManage = Boolean(permissions.canManageDispatch)
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+  const focusCustomer = (searchParams.get("focusCustomer") ?? "").trim()
+  const focusLocation = (searchParams.get("focusLocation") ?? "").trim()
 
   const baseUrl =
     organizationId ? `/api/organizations/${encodeURIComponent(organizationId)}` : ""
@@ -153,6 +159,18 @@ export default function ServiceRequestsQueuePage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const visibleRows = useMemo(() => {
+    let list = rows
+    const idLooksLikeUuid = (s: string) => /^[0-9a-f-]{20,}$/i.test(s)
+    if (focusCustomer && idLooksLikeUuid(focusCustomer)) {
+      list = list.filter((r) => r.customer_id === focusCustomer)
+    }
+    if (focusLocation && idLooksLikeUuid(focusLocation)) {
+      list = list.filter((r) => r.customer_location_id === focusLocation)
+    }
+    return list
+  }, [rows, focusCustomer, focusLocation])
 
   useEffect(() => {
     if (detail) {
@@ -392,6 +410,19 @@ export default function ServiceRequestsQueuePage() {
             </Button>
           </div>
 
+          {(focusCustomer || focusLocation) && !loading ?
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">
+                Filtered from customer dashboard
+                {focusCustomer ? " · customer scope" : ""}
+                {focusLocation ? " · service site" : ""} ({visibleRows.length} shown)
+              </span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => router.replace(pathname)}>
+                Clear location filter
+              </Button>
+            </div>
+          : null}
+
           {loading ?
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -409,13 +440,13 @@ export default function ServiceRequestsQueuePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ?
+                {visibleRows.length === 0 ?
                   <TableRow>
                     <TableCell colSpan={6} className="text-sm text-muted-foreground py-10 text-center">
                       No requests match your filters.
                     </TableCell>
                   </TableRow>
-                : rows.map((r) => (
+                : visibleRows.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="max-w-[280px]">
                         <div className="font-medium text-sm truncate">{r.issue_summary}</div>
@@ -869,5 +900,19 @@ export default function ServiceRequestsQueuePage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function ServiceRequestsQueuePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading service requests…
+        </div>
+      }
+    >
+      <ServiceRequestsQueuePageContent />
+    </Suspense>
   )
 }
