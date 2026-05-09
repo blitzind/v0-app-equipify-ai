@@ -12,6 +12,7 @@
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { COMMUNICATION_KIND_LABEL } from "@/lib/communications/communication-kind"
 import { Bot, ChevronRight, FlaskConical, Sparkles, Zap } from "lucide-react"
 import { communicationEventPresentation } from "@/lib/notifications/event-icons"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
@@ -76,6 +77,12 @@ export function FeedRow({
             >
               {item.title}
             </span>
+            <Badge variant="secondary" className="text-[10px] font-normal capitalize shrink-0">
+              {item.direction === "inbound" ? "Inbound" : "Outbound"}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] font-normal shrink-0">
+              {COMMUNICATION_KIND_LABEL[item.communication_kind]}
+            </Badge>
             <FeedStatusPill status={isSimulated ? "simulated" : status} />
             {item.automated ? (
               <Badge

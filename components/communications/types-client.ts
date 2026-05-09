@@ -6,19 +6,22 @@
  * "use client" files.
  */
 
+import type { CommunicationCenterKind } from "@/lib/communications/communication-kind"
 import type {
   CommunicationChannel,
   CommunicationDeliveryStatus,
+  CommunicationDirection,
   RelatedEntityType,
 } from "@/lib/notifications/types"
 
 export type FeedCategoryClient = "billing" | "operations" | "marketing" | "system"
+export type { CommunicationCenterKind }
 
 export type FeedItemClient = {
   id: string
   organization_id: string
   channel: CommunicationChannel
-  direction: "outbound" | "inbound"
+  direction: CommunicationDirection
   event_type: string
   title: string
   summary: string | null
@@ -49,6 +52,7 @@ export type FeedItemClient = {
   customer_href: string | null
   category: FeedCategoryClient
   automated: boolean
+  communication_kind: CommunicationCenterKind
 }
 
 export type FeedStatsClient = {
@@ -66,6 +70,8 @@ export type FeedResponseClient = {
   stats: FeedStatsClient
   role: string | null
   canManageCommunications: boolean
+  /** Present so the client can offer “assigned to me” without an extra round-trip. */
+  currentUserId?: string
 }
 
 export type FeedDetailClient = FeedItemClient & {

@@ -38,6 +38,11 @@ import {
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  COMMUNICATION_CENTER_KINDS,
+  COMMUNICATION_KIND_LABEL,
+  type CommunicationCenterKind,
+} from "@/lib/communications/communication-kind"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -80,6 +85,11 @@ type EntityType =
   | "equipment"
   | "maintenance_plan"
 
+type DirectionFilter = "all" | "outbound" | "inbound"
+type KindFilter = "all" | CommunicationCenterKind
+type AiSourceFilter = "all" | "ai" | "manual"
+type AssignedFilter = "all" | "me"
+
 const EMPTY_STATS: FeedStatsClient = {
   sentToday: 0,
   failed: 0,
@@ -104,6 +114,11 @@ export function CommunicationsFeedPage() {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [automatedOnly, setAutomatedOnly] = useState(false)
+  const [direction, setDirection] = useState<DirectionFilter>("all")
+  const [communicationKind, setCommunicationKind] = useState<KindFilter>("all")
+  const [aiSource, setAiSource] = useState<AiSourceFilter>("all")
+  const [assignedFilter, setAssignedFilter] = useState<AssignedFilter>("all")
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [items, setItems] = useState<FeedItemClient[]>([])
   const [stats, setStats] = useState<FeedStatsClient>(EMPTY_STATS)
@@ -129,9 +144,28 @@ export function CommunicationsFeedPage() {
     if (fromDate) p.set("fromDate", fromDate)
     if (toDate) p.set("toDate", toDate)
     if (automatedOnly) p.set("automated", "1")
+    if (direction !== "all") p.set("direction", direction)
+    if (communicationKind !== "all") p.set("communicationKind", communicationKind)
+    if (aiSource !== "all") p.set("aiSource", aiSource)
+    if (assignedFilter === "me" && currentUserId) {
+      p.set("assignedUserId", currentUserId)
+    }
     p.set("limit", "100")
     return p.toString()
-  }, [debouncedSearch, channel, status, entityType, fromDate, toDate, automatedOnly])
+  }, [
+    debouncedSearch,
+    channel,
+    status,
+    entityType,
+    fromDate,
+    toDate,
+    automatedOnly,
+    direction,
+    communicationKind,
+    aiSource,
+    assignedFilter,
+    currentUserId,
+  ])
 
   const reload = useCallback(async () => {
     if (!organizationId) return
@@ -146,6 +180,7 @@ export function CommunicationsFeedPage() {
       if (!res.ok) throw new Error(body.error ?? "Failed to load communications.")
       setItems(body.items ?? [])
       setStats(body.stats ?? EMPTY_STATS)
+      if (body.currentUserId) setCurrentUserId(body.currentUserId)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load communications.")
       setItems([])
@@ -154,6 +189,17 @@ export function CommunicationsFeedPage() {
       setLoading(false)
     }
   }, [organizationId, params])
+
+  const groupedTimeline = useMemo(() => {
+    const buckets = new Map<string, FeedItemClient[]>()
+    for (const it of items) {
+      const key = localDayKey(it.created_at)
+      const list = buckets.get(key)
+      if (list) list.push(it)
+      else buckets.set(key, [it])
+    }
+    return [...buckets.entries()].sort(([a], [b]) => b.localeCompare(a))
+  }, [items])
 
   useEffect(() => {
     void reload()
@@ -316,6 +362,58 @@ export function CommunicationsFeedPage() {
             </SelectContent>
           </Select>
 
+          <Select value={direction} onValueChange={(v) => setDirection(v as DirectionFilter)}>
+            <SelectTrigger className="w-32 sm:w-36 min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Direction" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any direction</SelectItem>
+              <SelectItem value="outbound">Outbound</SelectItem>
+              <SelectItem value="inbound">Inbound</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={communicationKind}
+            onValueChange={(v) => setCommunicationKind(v as KindFilter)}
+          >
+            <SelectTrigger className="w-[200px] sm:w-[220px] min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {COMMUNICATION_CENTER_KINDS.filter((k) => k !== "general").map((k) => (
+                <SelectItem key={k} value={k}>
+                  {COMMUNICATION_KIND_LABEL[k]}
+                </SelectItem>
+              ))}
+              <SelectItem value="general">{COMMUNICATION_KIND_LABEL.general}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={aiSource} onValueChange={(v) => setAiSource(v as AiSourceFilter)}>
+            <SelectTrigger className="w-36 sm:w-40 min-h-11 lg:min-h-10">
+              <SelectValue placeholder="AI / manual" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">AI & manual</SelectItem>
+              <SelectItem value="ai">AI-assisted only</SelectItem>
+              <SelectItem value="manual">Manual only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={assignedFilter} onValueChange={(v) => setAssignedFilter(v as AssignedFilter)}>
+            <SelectTrigger className="w-36 sm:w-40 min-h-11 lg:min-h-10">
+              <SelectValue placeholder="Assigned" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Anyone</SelectItem>
+              <SelectItem value="me" disabled={!currentUserId}>
+                Assigned to me
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="flex items-center gap-1.5 min-h-11 lg:min-h-10 rounded-md border border-border bg-card px-2.5">
             <input
               type="date"
@@ -402,7 +500,19 @@ export function CommunicationsFeedPage() {
               Outbound emails, automations, prospect follow-ups, and portal events appear here as
               they happen. Adjust filters or clear them to see more.
             </p>
-            {hasActiveFilters({ debouncedSearch, channel, status, entityType, fromDate, toDate, automatedOnly }) ? (
+            {hasActiveFilters({
+              debouncedSearch,
+              channel,
+              status,
+              entityType,
+              fromDate,
+              toDate,
+              automatedOnly,
+              direction,
+              communicationKind,
+              aiSource,
+              assignedFilter,
+            }) ? (
               <Button
                 type="button"
                 size="sm"
@@ -415,6 +525,10 @@ export function CommunicationsFeedPage() {
                   setFromDate("")
                   setToDate("")
                   setAutomatedOnly(false)
+                  setDirection("all")
+                  setCommunicationKind("all")
+                  setAiSource("all")
+                  setAssignedFilter("all")
                 }}
               >
                 Clear filters
@@ -422,11 +536,22 @@ export function CommunicationsFeedPage() {
             ) : null}
           </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {items.map((it) => (
-              <FeedRow key={it.id} item={it} onSelect={onSelect} />
+          <div className="divide-y divide-border">
+            {groupedTimeline.map(([dayKey, dayItems]) => (
+              <div key={dayKey}>
+                <div className="sticky top-0 z-[1] bg-muted/50 backdrop-blur-sm border-b border-border px-4 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {formatDayHeading(dayKey)}
+                  </p>
+                </div>
+                <ul className="divide-y divide-border">
+                  {dayItems.map((it) => (
+                    <FeedRow key={it.id} item={it} onSelect={onSelect} />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
@@ -456,6 +581,36 @@ function csvEscape(s: string): string {
   return s
 }
 
+/** YYYY-MM-DD in the viewer's local calendar for grouping. */
+function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+function formatDayHeading(dayKey: string): string {
+  const [y, mo, da] = dayKey.split("-").map((n) => Number.parseInt(n, 10))
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(da)) return dayKey
+  const d = new Date(y, mo - 1, da)
+  const now = new Date()
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  const yest = new Date(now)
+  yest.setDate(yest.getDate() - 1)
+  const yesterdayKey = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, "0")}-${String(yest.getDate()).padStart(2, "0")}`
+  const fmt = (x: Date) =>
+    x.toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    })
+  if (todayKey === dayKey) return `Today — ${fmt(d)}`
+  if (yesterdayKey === dayKey) return `Yesterday — ${fmt(d)}`
+  return fmt(d)
+}
+
 function hasActiveFilters(args: {
   debouncedSearch: string
   channel: Channel
@@ -464,6 +619,10 @@ function hasActiveFilters(args: {
   fromDate: string
   toDate: string
   automatedOnly: boolean
+  direction: DirectionFilter
+  communicationKind: KindFilter
+  aiSource: AiSourceFilter
+  assignedFilter: AssignedFilter
 }): boolean {
   return Boolean(
     args.debouncedSearch ||
@@ -472,7 +631,11 @@ function hasActiveFilters(args: {
       args.entityType !== "all" ||
       args.fromDate ||
       args.toDate ||
-      args.automatedOnly,
+      args.automatedOnly ||
+      args.direction !== "all" ||
+      args.communicationKind !== "all" ||
+      args.aiSource !== "all" ||
+      args.assignedFilter !== "all",
   )
 }
 

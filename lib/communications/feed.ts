@@ -15,9 +15,16 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
   CommunicationDeliveryStatus,
   CommunicationChannel,
+  CommunicationDirection,
   CommunicationEventRow,
   RelatedEntityType,
 } from "@/lib/notifications/types"
+import {
+  type CommunicationCenterKind,
+  deriveCommunicationCenterKind,
+} from "@/lib/communications/communication-kind"
+import { communicationEventInAssignedScope } from "@/lib/communications/feed-scope"
+import type { AssignedWorkScope } from "@/lib/permissions/technician-scope"
 
 export type FeedFilters = {
   search?: string | null
@@ -34,6 +41,13 @@ export type FeedFilters = {
   entityId?: string | null
   /** Restrict to events tied to a customer (recent-communications card). */
   customerId?: string | null
+  direction?: CommunicationDirection | "all" | null
+  /** Phase 28 — coarse category derived server-side. */
+  communicationKind?: CommunicationCenterKind | "all" | null
+  /** Phase 28 — AI-assisted vs human-created heuristics. */
+  aiSource?: "ai" | "manual" | "all" | null
+  /** Phase 28 — filter rows where user created OR is recipient user. */
+  assignedUserId?: string | null
   limit?: number | null
   /** ISO timestamp cursor for "load more". */
   beforeCreatedAt?: string | null
@@ -52,12 +66,17 @@ export type FeedItem = CommunicationEventRow & {
   category: FeedCategory
   /** True when this event was triggered by a workflow / AI / scheduled system. */
   automated: boolean
+  /** Phase 28 — derived communication category for filters + labels. */
+  communication_kind: CommunicationCenterKind
 }
 
 export type FeedCategory = "billing" | "operations" | "marketing" | "system"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 200
+
+const UUID_LENIENT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
  * Whether the caller can see financial-channel communications.
@@ -66,8 +85,11 @@ const MAX_LIMIT = 200
  */
 export type FeedAccessHints = {
   canSeeFinancials: boolean
-  /** Restrict the feed to events on jobs assigned to this user. */
-  techRestrictedToAssignedWorkOrderIds?: string[] | null
+  /**
+   * Phase 28 — when set (assigned-work-only technicians), only surface events
+   * tied to scoped work orders / equipment / customers.
+   */
+  assignedWorkScope?: AssignedWorkScope | null
 }
 
 export async function loadCommunicationFeed(args: {
@@ -91,6 +113,9 @@ export async function loadCommunicationFeed(args: {
   if (filters.entityType && filters.entityType !== "all") query = query.eq("related_entity_type", filters.entityType)
   if (filters.entityId) query = query.eq("related_entity_id", filters.entityId)
   if (filters.customerId) query = query.eq("recipient_customer_id", filters.customerId)
+  if (filters.direction && filters.direction !== "all") {
+    query = query.eq("direction", filters.direction)
+  }
   if (filters.fromDate) query = query.gte("created_at", `${filters.fromDate}T00:00:00.000Z`)
   if (filters.toDate) query = query.lte("created_at", `${filters.toDate}T23:59:59.999Z`)
   if (filters.status && filters.status !== "all") {
@@ -102,27 +127,19 @@ export async function loadCommunicationFeed(args: {
       query = query.eq("delivery_status", filters.status)
     }
   }
-  if (access.techRestrictedToAssignedWorkOrderIds) {
-    const ids = access.techRestrictedToAssignedWorkOrderIds
-    if (ids.length === 0) {
-      // Tech with no assigned work — suppress entirely instead of
-      // returning the entire org feed.
-      return { items: [], nextCursor: null }
-    }
-    query = query
-      .or(
-        [
-          `related_entity_type.eq.work_order,related_entity_id.in.(${ids.map((id) => `"${id}"`).join(",")})`,
-          "related_entity_type.is.null",
-        ].join(","),
-      )
-  }
-
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
   const rowsRaw = (data ?? []) as CommunicationEventRow[]
   let rows = rowsRaw
+
+  if (access.assignedWorkScope) {
+    const scope = access.assignedWorkScope
+    if (!scope.workOrderIds.length) {
+      return { items: [], nextCursor: null }
+    }
+    rows = rows.filter((r) => communicationEventInAssignedScope(r, scope))
+  }
 
   // Server-side text search across title/summary/recipient_address. We
   // do this in JS to avoid bringing in a tsvector index for Phase 1; the
@@ -143,6 +160,24 @@ export async function loadCommunicationFeed(args: {
   // Hide finance-only rows from techs / unauthorized roles.
   if (!access.canSeeFinancials) {
     rows = rows.filter((r) => !isFinancialRow(r))
+  }
+
+  if (filters.communicationKind && filters.communicationKind !== "all") {
+    const want = filters.communicationKind
+    rows = rows.filter((r) => deriveCommunicationCenterKind(r) === want)
+  }
+
+  if (filters.aiSource === "ai") {
+    rows = rows.filter((r) => isAiGeneratedRow(r))
+  } else if (filters.aiSource === "manual") {
+    rows = rows.filter((r) => !isAiGeneratedRow(r))
+  }
+
+  if (filters.assignedUserId && UUID_LENIENT.test(filters.assignedUserId)) {
+    const uid = filters.assignedUserId
+    rows = rows.filter(
+      (r) => r.created_by === uid || r.recipient_user_id === uid,
+    )
   }
 
   const trimmed = rows.slice(0, limit)
@@ -276,6 +311,7 @@ async function enrichRows(
       customer_href: customerHref,
       category: categorizeRow(r),
       automated: isAutomatedRow(r),
+      communication_kind: deriveCommunicationCenterKind(r),
     }
   })
 }

@@ -475,25 +475,31 @@ export async function buildMockStructuredOutput<T>(params: {
   }
 
   if (params.task === "customer_email") {
-    const wantsBrief = /summary.*next_steps|next_steps/i.test(snippet) || /Return JSON only with keys summary/i.test(snippet)
-    rawObj = wantsBrief
-      ? {
-          summary:
-            "Trial AI preview brief — follow up with the prospect using facts already in Equipify; confirm pricing outside the product.",
-          next_steps: ["Confirm timeline", "Send recap email", "Schedule onsite if qualified"],
-        }
-      : {
-          subject: "Trial AI preview — quick follow-up",
-          body: [
-            "Hello —",
-            "",
-            "Thank you for the update. Here is a short trial-generated draft for review before sending.",
-            "",
-            "Next steps: let me know the best time to reconnect.",
-            "",
-            "[Trial AI preview — edit before sending]",
-          ].join("\n"),
-        }
+    if (snippet.includes("[communication_ai_assist]")) {
+      rawObj = {
+        text: "Trial AI preview — AI-assisted communication output would appear here on a subscribed workspace. Nothing is sent automatically; copy and approve manually.",
+      }
+    } else {
+      const wantsBrief = /summary.*next_steps|next_steps/i.test(snippet) || /Return JSON only with keys summary/i.test(snippet)
+      rawObj = wantsBrief
+        ? {
+            summary:
+              "Trial AI preview brief — follow up with the prospect using facts already in Equipify; confirm pricing outside the product.",
+            next_steps: ["Confirm timeline", "Send recap email", "Schedule onsite if qualified"],
+          }
+        : {
+            subject: "Trial AI preview — quick follow-up",
+            body: [
+              "Hello —",
+              "",
+              "Thank you for the update. Here is a short trial-generated draft for review before sending.",
+              "",
+              "Next steps: let me know the best time to reconnect.",
+              "",
+              "[Trial AI preview — edit before sending]",
+            ].join("\n"),
+          }
+    }
   }
 
   if (params.task === "work_order_summary") {

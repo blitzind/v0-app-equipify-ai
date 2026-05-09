@@ -13,6 +13,8 @@ export const AIDEN_TRACKED_FEATURES = [
   "operational_insight_interaction",
   "action_prepare",
   "action_confirm",
+  /** Phase 28 — communications center summarize / draft / tone (human approval only). */
+  "communication_center_ai",
 ] as const
 export type AidenTrackedFeatureKey = (typeof AIDEN_TRACKED_FEATURES)[number]
 
@@ -45,6 +47,7 @@ export function canUseAidenCapability(
     case "feature_request":
     case "page_guidance":
     case "operational_insight_interaction":
+    case "communication_center_ai":
       return true
     case "productivity_ai":
     case "summaries_drafting":

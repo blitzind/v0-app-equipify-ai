@@ -4,9 +4,16 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { loadCommunicationFeed, summarizeCommunicationStats } from "@/lib/communications/feed"
+import type { CommunicationCenterKind } from "@/lib/communications/communication-kind"
+import { COMMUNICATION_CENTER_KINDS } from "@/lib/communications/communication-kind"
+import {
+  isAssignedWorkOnly,
+  loadAssignedWorkScope,
+} from "@/lib/permissions/technician-scope"
 import type {
   CommunicationChannel,
   CommunicationDeliveryStatus,
+  CommunicationDirection,
   RelatedEntityType,
 } from "@/lib/notifications/types"
 
@@ -44,6 +51,10 @@ function jsonError(message: string, status: number) {
  *   ?automated     — '1' | 'true'
  *   ?limit         — 1..200 (default 50)
  *   ?before        — ISO created_at cursor
+ *   ?direction     — outbound | inbound | all
+ *   ?communicationKind — Phase 28 category id (see communication-kind.ts)
+ *   ?aiSource      — ai | manual | all
+ *   ?assignedUserId — created_by OR recipient_user_id match
  */
 export async function GET(
   request: NextRequest,
@@ -86,18 +97,23 @@ export async function GET(
   const limitRaw = params.get("limit")
   const before = params.get("before")
   const limit = limitRaw ? Number(limitRaw) : null
+  const direction = (params.get("direction") ?? "all") as CommunicationDirection | "all"
+  const communicationKindRaw = params.get("communicationKind")
+  const communicationKind = (
+    communicationKindRaw &&
+    (COMMUNICATION_CENTER_KINDS as string[]).includes(communicationKindRaw)
+      ? communicationKindRaw
+      : "all"
+  ) as CommunicationCenterKind | "all"
+  const aiSource = (params.get("aiSource") ?? "all") as "ai" | "manual" | "all"
+  const assignedUserId = params.get("assignedUserId")
 
-  // Tech read-scope: only events tied to a work order assigned to
-  // them. Managers and above see the full org feed.
-  let assignedIds: string[] | null = null
-  if (role === "tech" && !isPlatformAdmin) {
-    const { data: assigned } = await supabase
-      .from("work_orders")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("assigned_user_id", user.id)
-      .limit(500)
-    assignedIds = ((assigned ?? []) as Array<{ id: string }>).map((r) => r.id)
+  let assignedScope = null as Awaited<ReturnType<typeof loadAssignedWorkScope>> | null
+  if (!isPlatformAdmin && isAssignedWorkOnly(permissions)) {
+    assignedScope = await loadAssignedWorkScope(supabase, {
+      organizationId,
+      userId: user.id,
+    })
   }
 
   try {
@@ -111,6 +127,10 @@ export async function GET(
         entityType,
         entityId: UUID_RE.test(entityId ?? "") ? entityId : null,
         customerId: UUID_RE.test(customerId ?? "") ? customerId : null,
+        direction,
+        communicationKind,
+        aiSource,
+        assignedUserId: UUID_RE.test(assignedUserId ?? "") ? assignedUserId : null,
         fromDate,
         toDate,
         automatedOnly: automated === "1" || automated === "true",
@@ -118,8 +138,10 @@ export async function GET(
         beforeCreatedAt: before,
       },
       access: {
-        canSeeFinancials: Boolean(permissions.canViewFinancials || isPlatformAdmin),
-        techRestrictedToAssignedWorkOrderIds: assignedIds,
+        canSeeFinancials: Boolean(
+          permissions.canViewFinancials || permissions.canViewBilling || isPlatformAdmin,
+        ),
+        assignedWorkScope: assignedScope,
       },
     })
 
@@ -129,6 +151,7 @@ export async function GET(
       stats: summarizeCommunicationStats(items),
       role,
       canManageCommunications: Boolean(permissions.canManageCommunications || isPlatformAdmin),
+      currentUserId: user.id,
     })
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : "Failed to load communications.", 500)

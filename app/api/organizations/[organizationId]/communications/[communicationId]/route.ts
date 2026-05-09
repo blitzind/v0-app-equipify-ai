@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
+import { deriveCommunicationCenterKind } from "@/lib/communications/communication-kind"
+import { communicationEventInAssignedScope } from "@/lib/communications/feed-scope"
 import {
   categorizeRow,
   isAiGeneratedRow,
@@ -10,6 +12,10 @@ import {
   isFinancialRow,
   isSimulatedRow,
 } from "@/lib/communications/feed"
+import {
+  isAssignedWorkOnly,
+  loadAssignedWorkScope,
+} from "@/lib/permissions/technician-scope"
 import type { CommunicationEventRow } from "@/lib/notifications/types"
 
 export const runtime = "nodejs"
@@ -65,19 +71,20 @@ export async function GET(
 
   const row = data as CommunicationEventRow
 
-  if (isFinancialRow(row) && !permissions.canViewFinancials && !isPlatformAdmin) {
+  const canBilling =
+    Boolean(permissions.canViewFinancials || permissions.canViewBilling) || isPlatformAdmin
+  if (isFinancialRow(row) && !canBilling) {
     return jsonError("This communication is restricted to roles with billing access.", 403)
   }
 
-  if (role === "tech" && !isPlatformAdmin && row.related_entity_type === "work_order" && row.related_entity_id) {
-    const { data: wo } = await supabase
-      .from("work_orders")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("id", row.related_entity_id)
-      .eq("assigned_user_id", user.id)
-      .maybeSingle()
-    if (!wo) return jsonError("Forbidden.", 403)
+  if (!isPlatformAdmin && isAssignedWorkOnly(permissions)) {
+    const scope = await loadAssignedWorkScope(supabase, {
+      organizationId,
+      userId: user.id,
+    })
+    if (!communicationEventInAssignedScope(row, scope)) {
+      return jsonError("Forbidden.", 403)
+    }
   }
 
   const showRawMetadata = Boolean(
@@ -116,6 +123,7 @@ export async function GET(
       automated: isAutomatedRow(row),
       ai_generated: isAiGeneratedRow(row),
       simulated: isSimulatedRow(row),
+      communication_kind: deriveCommunicationCenterKind(row),
       category: categorizeRow(row),
       entity_label: labels.entity ?? null,
       customer_label: labels.customer ?? null,

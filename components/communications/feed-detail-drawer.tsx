@@ -10,13 +10,14 @@
  * coming later without rendering live actions.
  */
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   AlertTriangle,
   Bot,
   ChevronRight,
   ExternalLink,
+  Copy,
   FlaskConical,
   Loader2,
   RefreshCw,
@@ -36,12 +37,21 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { eventTypeMeta } from "@/lib/communications/event-catalog"
 import { buildLifecycle, explainFailure } from "@/lib/communications/lifecycle"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
+import { COMMUNICATION_KIND_LABEL } from "@/lib/communications/communication-kind"
 import { FeedStatusPill } from "./feed-status-pill"
 import { LifecycleTimeline } from "./lifecycle-timeline"
 import type { FeedDetailClient, FeedItemClient } from "./types-client"
@@ -60,6 +70,7 @@ export function FeedDetailDrawer({
   const { toast } = useToast()
   const { permissions } = useOrgPermissions()
   const canManageCommunications = Boolean(permissions.canManageCommunications)
+  const canViewCommunications = Boolean(permissions.canViewCommunications)
 
   const [detail, setDetail] = useState<FeedDetailClient | null>(null)
   const [showRawMetadata, setShowRawMetadata] = useState(false)
@@ -71,12 +82,68 @@ export function FeedDetailDrawer({
   const [sending, setSending] = useState(false)
   const [sendDoneAt, setSendDoneAt] = useState<string | null>(null)
 
+  const [aiAssistOutput, setAiAssistOutput] = useState("")
+  const [aiAssistBusy, setAiAssistBusy] = useState(false)
+  const [aiAssistTone, setAiAssistTone] = useState<"professional" | "friendly" | "concise">(
+    "professional",
+  )
+
+  const activeCommunicationId = detail?.id ?? initial?.id ?? null
+
+  const runAiAssist = useCallback(
+    async (action: "summarize" | "draft_reply" | "regenerate_tone") => {
+      if (!activeCommunicationId || !organizationId || !canViewCommunications) return
+      setAiAssistBusy(true)
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/communications/${encodeURIComponent(activeCommunicationId)}/ai-assist`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action,
+              tone: action === "regenerate_tone" ? aiAssistTone : undefined,
+            }),
+          },
+        )
+        const body = (await res.json()) as { ok?: boolean; text?: string; error?: string; message?: string }
+        if (!res.ok) throw new Error(body.message ?? body.error ?? "AI assist failed.")
+        setAiAssistOutput(body.text ?? "")
+        toast({
+          title:
+            action === "summarize"
+              ? "Summary ready"
+              : action === "draft_reply"
+                ? "Draft reply generated"
+                : "Tone updated",
+          description: "Review the text below — nothing was sent automatically.",
+        })
+      } catch (e) {
+        toast({
+          title: "AI assist failed",
+          description: e instanceof Error ? e.message : "Unknown error",
+          variant: "destructive",
+        })
+      } finally {
+        setAiAssistBusy(false)
+      }
+    },
+    [
+      activeCommunicationId,
+      organizationId,
+      canViewCommunications,
+      aiAssistTone,
+      toast,
+    ],
+  )
+
   useEffect(() => {
     setDetail(null)
     setError(null)
     setRetryDoneAt(null)
     setShowMeta(false)
     setSendDoneAt(null)
+    setAiAssistOutput("")
     if (!open || !initial) return
     let cancelled = false
     setLoading(true)
@@ -209,6 +276,16 @@ export function FeedDetailDrawer({
           <SheetTitle className="text-base text-pretty">{item?.title ?? "Communication"}</SheetTitle>
           <SheetDescription className="text-xs flex flex-wrap items-center gap-2">
             <FeedStatusPill status={status} />
+            {item ? (
+              <>
+                <Badge variant="secondary" className="text-[10px] font-normal capitalize">
+                  {item.direction === "inbound" ? "Inbound" : "Outbound"}
+                </Badge>
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {COMMUNICATION_KIND_LABEL[item.communication_kind]}
+                </Badge>
+              </>
+            ) : null}
             {meta ? (
               <Badge variant="outline" className="text-[10px] gap-1">
                 <Sparkles className="w-3 h-3" aria-hidden />
@@ -376,6 +453,95 @@ export function FeedDetailDrawer({
                   </div>
                 </Section>
               )}
+
+              {item && canViewCommunications ? (
+                <Section label="AI assist (does not send)">
+                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 space-y-3">
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Summaries and drafts are for review only. Paste into compose or your mail client
+                      after approval — outbound sending stays on existing routes.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={aiAssistBusy}
+                        onClick={() => void runAiAssist("summarize")}
+                        className="gap-1"
+                      >
+                        {aiAssistBusy ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" aria-hidden />
+                        )}
+                        Summarize
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={aiAssistBusy}
+                        onClick={() => void runAiAssist("draft_reply")}
+                        className="gap-1"
+                      >
+                        <Bot className="w-3.5 h-3.5" aria-hidden />
+                        Draft customer reply
+                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Select
+                          value={aiAssistTone}
+                          onValueChange={(v) =>
+                            setAiAssistTone(v as "professional" | "friendly" | "concise")
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-[140px] text-xs">
+                            <SelectValue placeholder="Tone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="professional">Professional</SelectItem>
+                            <SelectItem value="friendly">Friendly</SelectItem>
+                            <SelectItem value="concise">Concise</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={aiAssistBusy}
+                          onClick={() => void runAiAssist("regenerate_tone")}
+                          className="gap-1"
+                        >
+                          Regenerate tone
+                        </Button>
+                      </div>
+                    </div>
+                    {aiAssistOutput ? (
+                      <div className="space-y-2 pt-1">
+                        <Textarea
+                          readOnly
+                          value={aiAssistOutput}
+                          rows={10}
+                          className="text-xs font-mono leading-relaxed min-h-[120px]"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 gap-1"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(aiAssistOutput)
+                            toast({ title: "Copied to clipboard" })
+                          }}
+                        >
+                          <Copy className="w-3.5 h-3.5" aria-hidden />
+                          Copy
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </Section>
+              ) : null}
 
               {(item.automated || automationId || workflowName || triggerType) && (
                 <Section label="Automation">
