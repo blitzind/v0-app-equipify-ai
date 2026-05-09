@@ -1,10 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { Bot, ChevronDown, ChevronUp, Lightbulb, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { OPERATIONAL_SCALE_ONLY_MESSAGE } from "@/lib/aiden/operational-messages"
+import {
+  OPERATIONAL_SCALE_ONLY_MESSAGE_AFTER_LINK,
+  OPERATIONAL_SCALE_ONLY_MESSAGE_BEFORE_LINK,
+} from "@/lib/aiden/operational-messages"
 import type {
   AidenOperationalRecommendationsAnswer,
   OperationalModuleContext,
@@ -120,7 +124,14 @@ export function AidenOperationalInsightsCard({
           className,
         )}
       >
-        {OPERATIONAL_SCALE_ONLY_MESSAGE}
+        {OPERATIONAL_SCALE_ONLY_MESSAGE_BEFORE_LINK}
+        <Link
+          href="/settings/billing"
+          className="text-muted-foreground underline decoration-muted-foreground/50 underline-offset-[3px] hover:text-foreground hover:decoration-foreground/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+        >
+          Scale
+        </Link>
+        {OPERATIONAL_SCALE_ONLY_MESSAGE_AFTER_LINK}
       </div>
     )
   }
