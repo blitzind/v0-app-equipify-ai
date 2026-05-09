@@ -1052,6 +1052,7 @@ type DbScheduledWoRow = {
   id: string
   work_order_number?: number | null
   customer_id: string
+  customer_location_id?: string | null
   equipment_id: string | null
   title: string
   status: string
@@ -1064,6 +1065,7 @@ type DbScheduledWoRow = {
   billing_state?: string | null
   maintenance_plan_id?: string | null
   calibration_template_id?: string | null
+  created_by_pm_automation?: boolean | null
   billable_to_customer?: boolean | null
   warranty_review_required?: boolean | null
   total_parts_cents?: number | null
@@ -1100,12 +1102,14 @@ function mapDbRowToDispatchWoRow(r: DbScheduledWoRow, mini: boolean): DispatchWo
     assigned_user_id: r.assigned_user_id,
     assigned_technician_id: r.assigned_technician_id ?? null,
     customer_id: r.customer_id,
+    customer_location_id: r.customer_location_id ?? null,
     equipment_id: r.equipment_id,
     priority: r.priority ?? "normal",
     type: r.type ?? "repair",
     billing_state: mini ? null : (r.billing_state ?? null),
     maintenance_plan_id: mini ? null : (r.maintenance_plan_id ?? null),
     calibration_template_id: mini ? null : (r.calibration_template_id ?? null),
+    created_by_pm_automation: mini ? false : Boolean(r.created_by_pm_automation),
     billable_to_customer: mini ? true : (r.billable_to_customer ?? true),
     warranty_review_required: mini ? false : Boolean(r.warranty_review_required),
     total_parts_cents: mini ? 0 : (r.total_parts_cents ?? 0),
@@ -1987,10 +1991,10 @@ function ServiceSchedulePageInner() {
       const assignedWorkOrderIds = assignedScope?.workOrderIds ?? []
 
       const selFull =
-        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
-      const selNoBilling = `${WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM}, assigned_technician_id`
+        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, created_by_pm_automation, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+      const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
       const selMini =
-        "id, work_order_number, customer_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id"
+        "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, priority, type, created_by_pm_automation, created_at"
 
       async function fetchScheduled() {
         let mini = false

@@ -13,6 +13,15 @@ import { allLinkedInvoicesPaid } from "@/lib/portal/work-order-invoices"
 import { timeToSlotIndex } from "@/lib/dispatch/board-utils"
 import type { DispatchTech, DispatchWo } from "@/components/dispatch/dispatch-board"
 
+type CustomerLocationRow = {
+  id: string
+  name: string
+  address_line1: string
+  city: string
+  state: string
+  postal_code: string
+}
+
 export type DispatchWoRow = {
   id: string
   work_order_number?: number | null
@@ -23,12 +32,14 @@ export type DispatchWoRow = {
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   customer_id: string
+  customer_location_id?: string | null
   equipment_id: string | null
   priority: string | null
   type: string
   billing_state: string | null
   maintenance_plan_id: string | null
   calibration_template_id: string | null
+  created_by_pm_automation?: boolean | null
   billable_to_customer: boolean | null
   warranty_review_required: boolean | null
   total_parts_cents: number | null
@@ -60,7 +71,10 @@ export async function enrichDispatchWorkOrders(
 
   const custIds = [...new Set(rows.map((r) => r.customer_id).filter(Boolean))]
 
-  const [{ data: woeRows }, { data: calRows }, invOps, orgRes, custRes] = await Promise.all([
+  const locIds = [...new Set(rows.map((r) => r.customer_location_id).filter(Boolean))] as string[]
+
+  const [{ data: woeRows }, { data: calRows }, invOps, orgRes, custRes, { data: locRows }, { data: srRows }] =
+    await Promise.all([
     woIds.length
       ? supabase
           .from("work_order_equipment")
@@ -80,7 +94,31 @@ export async function enrichDispatchWorkOrders(
           .eq("organization_id", organizationId)
           .in("id", custIds)
       : Promise.resolve({ data: [] as { id: string; portal_certificate_release_mode: string | null }[] }),
+    locIds.length
+      ? supabase
+          .from("customer_locations")
+          .select("id, name, address_line1, city, state, postal_code")
+          .eq("organization_id", organizationId)
+          .is("archived_at", null)
+          .in("id", locIds)
+      : Promise.resolve({ data: [] as CustomerLocationRow[] }),
+    woIds.length
+      ? supabase
+          .from("org_service_requests")
+          .select("converted_work_order_id")
+          .eq("organization_id", organizationId)
+          .in("converted_work_order_id", woIds)
+          .not("converted_work_order_id", "is", null)
+      : Promise.resolve({ data: [] as { converted_work_order_id: string }[] }),
   ])
+
+  const locById = new Map<string, CustomerLocationRow>(
+    ((locRows ?? []) as CustomerLocationRow[]).map((r) => [r.id, r] as const),
+  )
+
+  const fromSrSet = new Set(
+    ((srRows ?? []) as { converted_work_order_id: string }[]).map((r) => r.converted_work_order_id),
+  )
 
   const orgCertMode =
     (orgRes.data as { portal_certificate_release_mode?: string | null } | null)?.portal_certificate_release_mode ?? null
@@ -221,17 +259,42 @@ export async function enrichDispatchWorkOrders(
     const tech = wo.assigned_user_id ? techByUserId.get(wo.assigned_user_id) : null
     const eqIdsForLoc =
       equipmentIdsByWo.get(wo.id)?.length ? equipmentIdsByWo.get(wo.id)! : wo.equipment_id ? [wo.equipment_id] : []
-    let loc: string | null = null
-    if (wo.equipment_id) loc = eqMeta.get(wo.equipment_id)?.location_label ?? null
-    if (!loc) {
+    let equipLoc: string | null = null
+    if (wo.equipment_id) equipLoc = eqMeta.get(wo.equipment_id)?.location_label ?? null
+    if (!equipLoc) {
       for (const id of eqIdsForLoc) {
         const L = eqMeta.get(id)?.location_label
         if (L) {
-          loc = L
+          equipLoc = L
           break
         }
       }
     }
+
+    const cl = wo.customer_location_id ? locById.get(wo.customer_location_id) : undefined
+    const siteLabel = cl
+      ? `${cl.name.trim()} · ${cl.address_line1.trim()}`
+      : null
+    const addressLine1 = cl?.address_line1?.trim() ?? null
+    const city = cl?.city?.trim() ?? null
+    const state = cl?.state?.trim() ?? null
+    const postalCode = cl?.postal_code?.trim() ?? null
+    const geoLine =
+      [city, [state, postalCode].filter(Boolean).join(" ").trim()].filter(Boolean).join(", ") || null
+
+    const serviceLocationLabel = siteLabel ?? equipLoc
+
+    const fromServiceRequest = fromSrSet.has(wo.id)
+    const tLower = (wo.type ?? "").toLowerCase()
+    const maintenanceHint =
+      Boolean(wo.maintenance_plan_id) ||
+      Boolean(wo.created_by_pm_automation) ||
+      /\bmaint|preventive|\bpm\b|calibration\b/i.test(tLower)
+    const workKind: DispatchWo["workKind"] = fromServiceRequest
+      ? "request"
+      : maintenanceHint
+        ? "maintenance"
+        : "repair"
 
     out.push({
       id: wo.id,
@@ -242,6 +305,7 @@ export async function enrichDispatchWorkOrders(
       assigned_user_id: wo.assigned_user_id,
       assigned_technician_id: wo.assigned_technician_id ?? null,
       customer_id: wo.customer_id,
+      customerLocationId: wo.customer_location_id ?? null,
       customerName: customerNameById.get(wo.customer_id) ?? "Customer",
       work_order_number: wo.work_order_number ?? null,
       priority: wo.priority ?? null,
@@ -249,7 +313,18 @@ export async function enrichDispatchWorkOrders(
       opsBadges,
       opsFlags: flags,
       technicianLabel: tech?.label ?? null,
-      serviceLocationLabel: loc,
+      serviceLocationLabel,
+      siteLabel,
+      addressLine1,
+      city,
+      state,
+      postalCode,
+      geoLine,
+      workKind,
+      fromServiceRequest,
+      createdByPmAutomation: Boolean(wo.created_by_pm_automation),
+      latitude: null,
+      longitude: null,
       equipmentCount: ctx.equipmentCount,
     })
   }

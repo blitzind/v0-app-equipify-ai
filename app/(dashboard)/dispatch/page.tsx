@@ -6,17 +6,23 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
   Plus,
   SlidersHorizontal,
+  Waypoints,
   X,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
+  missingAssignedTechnicianColumn,
   missingOperationalBillingColumns,
   missingWorkOrderNumberColumn,
 } from "@/lib/work-orders/postgrest-fallback"
-import { WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM } from "@/lib/work-orders/supabase-select"
+import {
+  WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_NO_ASSIGN_TECH_WITH_NUM,
+  WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM,
+} from "@/lib/work-orders/supabase-select"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import {
   queryOrganizationMembersForRoster,
@@ -35,6 +41,7 @@ import {
   type DispatchWo,
 } from "@/components/dispatch/dispatch-board"
 import { DispatchMobileList } from "@/components/dispatch/dispatch-mobile-list"
+import { DispatchRouteView } from "@/components/dispatch/dispatch-route-view"
 import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filter"
 import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overview"
 import { QuickAppointmentDialog } from "@/components/dispatch/quick-appointment-dialog"
@@ -53,6 +60,15 @@ import {
   filterByStatuses,
   type DispatchStatusKey,
 } from "@/lib/dispatch/status-filter"
+import {
+  applyPhase34DispatchFilters,
+  computeDispatchPlanningMetrics,
+  DEFAULT_PHASE34_DISPATCH_FILTERS,
+  isPhase34DispatchFiltering,
+  type Phase34DispatchFilters,
+} from "@/lib/dispatch/advanced-filters"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
 import { usePersistedDispatchPref } from "@/lib/dispatch/persisted-prefs"
 import {
   describeConflicts,
@@ -103,7 +119,9 @@ function isDispatchSort(v: unknown): v is "schedule" | "priority" {
 
 function DispatchPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { toast } = useToast()
+  const assignedOnlyView = isAssignedWorkOnly(permissions)
 
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeekMonday(new Date()))
   const [selectedYmd, setSelectedYmd] = useState(() => toYmd(new Date()))
@@ -163,6 +181,8 @@ function DispatchPageInner() {
     scheduledOn: string
     scheduledTimeHhMm: string | null
   } | null>(null)
+  const [viewMode, setViewMode] = useState<"board" | "route">("board")
+  const [phase34Filters, setPhase34Filters] = useState<Phase34DispatchFilters>(DEFAULT_PHASE34_DISPATCH_FILTERS)
 
   const weekStart = useMemo(() => startOfWeekMonday(weekAnchor), [weekAnchor])
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
@@ -172,8 +192,28 @@ function DispatchPageInner() {
   const displayWorkOrders = useMemo(() => {
     const opsFiltered = filterDispatchRows(workOrders, dispatchFilter)
     const statusFiltered = filterByStatuses(opsFiltered, statusFilter)
-    return sortDispatchRows(statusFiltered, dispatchSort)
-  }, [workOrders, dispatchFilter, statusFilter, dispatchSort])
+    const phase34 = applyPhase34DispatchFilters(statusFiltered, phase34Filters, selectedYmd)
+    return sortDispatchRows(phase34, dispatchSort)
+  }, [workOrders, dispatchFilter, statusFilter, dispatchSort, phase34Filters, selectedYmd])
+
+  const planningMetrics = useMemo(
+    () => computeDispatchPlanningMetrics(displayWorkOrders, selectedYmd),
+    [displayWorkOrders, selectedYmd],
+  )
+
+  const customerFilterOptions = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const w of workOrders) m.set(w.customer_id, w.customerName)
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [workOrders])
+
+  const locationFilterOptions = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const w of workOrders) {
+      if (w.customerLocationId && w.siteLabel) m.set(w.customerLocationId, w.siteLabel)
+    }
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [workOrders])
 
   const statusCounts = useMemo(
     () => countByStatus(filterDispatchRows(workOrders, dispatchFilter)),
@@ -190,6 +230,15 @@ function DispatchPageInner() {
     if (dispatchFilter === "all") return null
     return DISPATCH_FOCUS_OPTIONS.find((o) => o.id === dispatchFilter)?.label ?? null
   }, [dispatchFilter])
+
+  const planningFiltersActive = isPhase34DispatchFiltering(phase34Filters)
+  const moreFiltersBadgeCount =
+    (activeFocusLabel ? 1 : 0) + (planningFiltersActive ? 1 : 0)
+
+  const overloadedTechLabels = useMemo(() => {
+    const ids = planningMetrics.overloadedTechIds
+    return technicians.filter((t) => ids.has(t.id)).map((t) => t.label)
+  }, [technicians, planningMetrics])
 
   const handleQuickAdd = useCallback(
     (args: {
@@ -266,6 +315,22 @@ function DispatchPageInner() {
 
     setLoading(true)
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setLoadError("Sign in to load dispatch.")
+      setTechnicians([])
+      setWorkOrders([])
+      setLoading(false)
+      return
+    }
+
+    const assignedScope = assignedOnlyView
+      ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+      : null
+    const assignedWorkOrderIds = assignedScope?.workOrderIds ?? []
+
     const memberRes = await queryOrganizationMembersForRoster(supabase, {
       organizationId: orgId,
       statusIn: ["active"],
@@ -297,57 +362,104 @@ function DispatchPageInner() {
       }
     })
     techList.sort((a, b) => a.label.localeCompare(b.label))
-    setTechnicians(techList)
+
+    const rosterTechs = assignedOnlyView ? techList.filter((t) => t.id === user.id) : techList
+    setTechnicians(rosterTechs)
 
     const selFull =
-      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_at, completed_at"
+      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, assigned_technician_id, customer_id, customer_location_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_by_pm_automation, created_at, completed_at"
+    const selFullNoAssignTech =
+      "id, work_order_number, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, customer_location_id, equipment_id, priority, type, billing_state, maintenance_plan_id, calibration_template_id, billable_to_customer, warranty_review_required, total_parts_cents, created_by_pm_automation, created_at, completed_at"
+
     const selNoBilling = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_WITH_NUM
+    const selNoBillingNoAssignTech = WO_DISPATCH_SCHEDULE_SELECT_NO_BILLING_NO_ASSIGN_TECH_WITH_NUM
+
     const selMini =
-      "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, equipment_id, priority, type, created_at"
+      "id, title, status, scheduled_on, scheduled_time, assigned_user_id, customer_id, customer_location_id, equipment_id, priority, type, created_by_pm_automation, created_at"
 
     const dispatchStatuses = includeInvoiced
       ? [...DISPATCH_STATUSES_WITH_INVOICED]
       : [...DISPATCH_STATUSES_BASE]
 
+    function applyAssignedScope<
+      T extends {
+        in: (c: string, v: string[]) => T
+        eq: (c: string, v: string) => T
+      },
+    >(q: T): T {
+      if (!assignedOnlyView) return q
+      return assignedWorkOrderIds.length > 0 ? q.in("id", assignedWorkOrderIds) : q.eq("id", "__none__")
+    }
+
     async function fetchRange(): Promise<{ data: unknown; error: { message: string } | null; mini: boolean }> {
       let mini = false
-      let q = supabase
-        .from("work_orders")
-        .select(selFull)
-        .eq("organization_id", orgId)
-        .is("archived_at", null)
-        .in("status", dispatchStatuses)
-        .gte("scheduled_on", ws)
-        .lte("scheduled_on", we)
-
-      let res = await q
-      if (res.error && missingOperationalBillingColumns(res.error)) {
-        res = await supabase
+      let res = await applyAssignedScope(
+        supabase
           .from("work_orders")
-          .select(selNoBilling)
+          .select(selFull)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .in("status", dispatchStatuses)
           .gte("scheduled_on", ws)
-          .lte("scheduled_on", we)
+          .lte("scheduled_on", we),
+      )
+
+      if (res.error && missingAssignedTechnicianColumn(res.error)) {
+        res = await applyAssignedScope(
+          supabase
+            .from("work_orders")
+            .select(selFullNoAssignTech)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", dispatchStatuses)
+            .gte("scheduled_on", ws)
+            .lte("scheduled_on", we),
+        )
+      }
+
+      if (res.error && missingOperationalBillingColumns(res.error)) {
+        res = await applyAssignedScope(
+          supabase
+            .from("work_orders")
+            .select(selNoBilling)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", dispatchStatuses)
+            .gte("scheduled_on", ws)
+            .lte("scheduled_on", we),
+        )
+      }
+      if (res.error && missingAssignedTechnicianColumn(res.error)) {
+        res = await applyAssignedScope(
+          supabase
+            .from("work_orders")
+            .select(selNoBillingNoAssignTech)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", dispatchStatuses)
+            .gte("scheduled_on", ws)
+            .lte("scheduled_on", we),
+        )
       }
       if (res.error && missingWorkOrderNumberColumn(res.error)) {
         mini = true
-        res = await supabase
-          .from("work_orders")
-          .select(selMini)
-          .eq("organization_id", orgId)
-          .is("archived_at", null)
-          .in("status", dispatchStatuses)
-          .gte("scheduled_on", ws)
-          .lte("scheduled_on", we)
+        res = await applyAssignedScope(
+          supabase
+            .from("work_orders")
+            .select(selMini)
+            .eq("organization_id", orgId)
+            .is("archived_at", null)
+            .in("status", dispatchStatuses)
+            .gte("scheduled_on", ws)
+            .lte("scheduled_on", we),
+        )
       }
       return { data: res.data, error: res.error, mini }
     }
 
     async function fetchUnassigned(): Promise<{ data: unknown; error: { message: string } | null; mini: boolean }> {
       let mini = false
-      let q = supabase
+      let res = await supabase
         .from("work_orders")
         .select(selFull)
         .eq("organization_id", orgId)
@@ -355,11 +467,29 @@ function DispatchPageInner() {
         .is("assigned_user_id", null)
         .in("status", ["open", "scheduled", "in_progress"])
 
-      let res = await q
+      if (res.error && missingAssignedTechnicianColumn(res.error)) {
+        res = await supabase
+          .from("work_orders")
+          .select(selFullNoAssignTech)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .is("assigned_user_id", null)
+          .in("status", ["open", "scheduled", "in_progress"])
+      }
+
       if (res.error && missingOperationalBillingColumns(res.error)) {
         res = await supabase
           .from("work_orders")
           .select(selNoBilling)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .is("assigned_user_id", null)
+          .in("status", ["open", "scheduled", "in_progress"])
+      }
+      if (res.error && missingAssignedTechnicianColumn(res.error)) {
+        res = await supabase
+          .from("work_orders")
+          .select(selNoBillingNoAssignTech)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .is("assigned_user_id", null)
@@ -378,7 +508,11 @@ function DispatchPageInner() {
       return { data: res.data, error: res.error, mini }
     }
 
-    const [rangeRes, unassignRes] = await Promise.all([fetchRange(), fetchUnassigned()])
+    const unassignPromise = assignedOnlyView
+      ? Promise.resolve({ data: [] as unknown[], error: null, mini: false })
+      : fetchUnassigned()
+
+    const [rangeRes, unassignRes] = await Promise.all([fetchRange(), unassignPromise])
 
     if (rangeRes.error) {
       setLoadError(rangeRes.error.message)
@@ -401,13 +535,16 @@ function DispatchPageInner() {
       scheduled_on: string | null
       scheduled_time: string | null
       assigned_user_id: string | null
+      assigned_technician_id?: string | null
       customer_id: string
+      customer_location_id?: string | null
       equipment_id: string
       priority?: string | null
       type?: string | null
       billing_state?: string | null
       maintenance_plan_id?: string | null
       calibration_template_id?: string | null
+      created_by_pm_automation?: boolean | null
       billable_to_customer?: boolean | null
       warranty_review_required?: boolean | null
       total_parts_cents?: number | null
@@ -427,13 +564,16 @@ function DispatchPageInner() {
           scheduled_on: r.scheduled_on ?? null,
           scheduled_time: r.scheduled_time ?? null,
           assigned_user_id: r.assigned_user_id ?? null,
+          assigned_technician_id: r.assigned_technician_id ?? null,
           customer_id: r.customer_id,
+          customer_location_id: r.customer_location_id ?? null,
           equipment_id: r.equipment_id ?? "",
           priority: r.priority ?? "normal",
           type: r.type ?? "repair",
           billing_state: mini ? null : (r.billing_state ?? null),
           maintenance_plan_id: mini ? null : (r.maintenance_plan_id ?? null),
           calibration_template_id: mini ? null : (r.calibration_template_id ?? null),
+          created_by_pm_automation: mini ? false : Boolean(r.created_by_pm_automation),
           billable_to_customer: mini ? true : (r.billable_to_customer ?? true),
           warranty_review_required: mini ? false : Boolean(r.warranty_review_required),
           total_parts_cents: mini ? 0 : (r.total_parts_cents ?? 0),
@@ -466,11 +606,11 @@ function DispatchPageInner() {
 
     setWorkOrders(enriched)
     setLoading(false)
-  }, [activeOrgId, orgStatus, weekStart, weekEnd, refresh, includeInvoiced])
+  }, [activeOrgId, orgStatus, weekStart, weekEnd, includeInvoiced, assignedOnlyView])
 
   useEffect(() => {
     void loadData()
-  }, [loadData])
+  }, [loadData, refresh])
 
   async function handleMoveWo(args: {
     woId: string
@@ -785,7 +925,7 @@ function DispatchPageInner() {
             className={cn(
               "h-8 gap-1.5 text-xs",
               // Active = blue tint, not CTA orange.
-              (moreFiltersOpen || activeFocusLabel) &&
+              (moreFiltersOpen || moreFiltersBadgeCount > 0) &&
                 "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
             )}
             onClick={() => setMoreFiltersOpen((v) => !v)}
@@ -793,9 +933,9 @@ function DispatchPageInner() {
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             More filters
-            {activeFocusLabel ? (
+            {moreFiltersBadgeCount > 0 ? (
               <span className="ml-0.5 inline-flex items-center rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium text-primary">
-                1
+                {moreFiltersBadgeCount}
               </span>
             ) : null}
           </Button>
@@ -830,6 +970,40 @@ function DispatchPageInner() {
             <Plus className="h-3.5 w-3.5" />
             Quick add
           </Button>
+          <div
+            className="flex h-8 items-center rounded-md border border-border bg-card p-0.5"
+            role="group"
+            aria-label="Dispatch view mode"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("board")}
+              className={cn(
+                "inline-flex h-full items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
+                viewMode === "board"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              aria-pressed={viewMode === "board"}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Board
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("route")}
+              className={cn(
+                "inline-flex h-full items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
+                viewMode === "route"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              aria-pressed={viewMode === "route"}
+            >
+              <Waypoints className="h-3.5 w-3.5" />
+              Route
+            </button>
+          </div>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="shrink-0">Sort</span>
             <select
@@ -846,20 +1020,40 @@ function DispatchPageInner() {
       </div>
 
       {/* Active focus chip — shows current advanced filter outside the panel */}
-      {activeFocusLabel ? (
+      {activeFocusLabel || planningFiltersActive ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Focus
-          </span>
-          <button
-            type="button"
-            onClick={() => setDispatchFilter("all")}
-            className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/15"
-            aria-label={`Clear focus filter: ${activeFocusLabel}`}
-          >
-            {activeFocusLabel}
-            <X className="h-3 w-3" />
-          </button>
+          {activeFocusLabel ? (
+            <>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Focus
+              </span>
+              <button
+                type="button"
+                onClick={() => setDispatchFilter("all")}
+                className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+                aria-label={`Clear focus filter: ${activeFocusLabel}`}
+              >
+                {activeFocusLabel}
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          ) : null}
+          {planningFiltersActive ? (
+            <>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Planning
+              </span>
+              <button
+                type="button"
+                onClick={() => setPhase34Filters(DEFAULT_PHASE34_DISPATCH_FILTERS)}
+                className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+                aria-label="Clear planning filters"
+              >
+                Clear planning
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -870,13 +1064,16 @@ function DispatchPageInner() {
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Advanced filters
             </p>
-            {activeFocusLabel ? (
+            {moreFiltersBadgeCount > 0 ? (
               <button
                 type="button"
-                onClick={() => setDispatchFilter("all")}
+                onClick={() => {
+                  setDispatchFilter("all")
+                  setPhase34Filters(DEFAULT_PHASE34_DISPATCH_FILTERS)
+                }}
                 className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
               >
-                Clear
+                Clear all
               </button>
             ) : null}
           </div>
@@ -906,6 +1103,222 @@ function DispatchPageInner() {
               )
             })}
           </div>
+
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Dispatch planning
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                Technician
+                <select
+                  value={phase34Filters.technicianId}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({
+                      ...p,
+                      technicianId: e.target.value as Phase34DispatchFilters["technicianId"],
+                    }))
+                  }
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="all">All technicians</option>
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                Customer
+                <select
+                  value={phase34Filters.customerId}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({
+                      ...p,
+                      customerId: e.target.value as Phase34DispatchFilters["customerId"],
+                    }))
+                  }
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="all">All customers</option>
+                  {customerFilterOptions.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                Site / location
+                <select
+                  value={phase34Filters.customerLocationId}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({
+                      ...p,
+                      customerLocationId: e.target.value as Phase34DispatchFilters["customerLocationId"],
+                    }))
+                  }
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                  disabled={locationFilterOptions.length === 0}
+                >
+                  <option value="all">All sites</option>
+                  {locationFilterOptions.map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                Priority
+                <select
+                  value={phase34Filters.priority}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({
+                      ...p,
+                      priority: e.target.value as Phase34DispatchFilters["priority"],
+                    }))
+                  }
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="all">All priorities</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                Work kind
+                <select
+                  value={phase34Filters.workKind}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({
+                      ...p,
+                      workKind: e.target.value as Phase34DispatchFilters["workKind"],
+                    }))
+                  }
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="all">All kinds</option>
+                  <option value="maintenance">Maintenance / PM</option>
+                  <option value="repair">Repair</option>
+                  <option value="request">From service request</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                WO type contains
+                <input
+                  type="search"
+                  value={phase34Filters.woTypeText}
+                  onChange={(e) => setPhase34Filters((p) => ({ ...p, woTypeText: e.target.value }))}
+                  placeholder="e.g. calibration"
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground sm:col-span-2">
+                Search customer / WO
+                <input
+                  type="search"
+                  value={phase34Filters.customerText}
+                  onChange={(e) => setPhase34Filters((p) => ({ ...p, customerText: e.target.value }))}
+                  placeholder="Company, title, or WO #"
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-muted-foreground sm:col-span-2 lg:col-span-1">
+                City / state / ZIP / site
+                <input
+                  type="search"
+                  value={phase34Filters.geoText}
+                  onChange={(e) => setPhase34Filters((p) => ({ ...p, geoText: e.target.value }))}
+                  placeholder="e.g. Austin or 78701"
+                  className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={phase34Filters.unassignedOnly}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({ ...p, unassignedOnly: e.target.checked }))
+                  }
+                  className="rounded border-border"
+                />
+                Unassigned only
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={phase34Filters.overdueScheduledOnly}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({ ...p, overdueScheduledOnly: e.target.checked }))
+                  }
+                  className="rounded border-border"
+                />
+                Overdue scheduled
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={phase34Filters.fromServiceRequestOnly}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({ ...p, fromServiceRequestOnly: e.target.checked }))
+                  }
+                  className="rounded border-border"
+                />
+                Service request origin
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  checked={phase34Filters.selectedDayOnly}
+                  onChange={(e) =>
+                    setPhase34Filters((p) => ({ ...p, selectedDayOnly: e.target.checked }))
+                  }
+                  className="rounded border-border"
+                />
+                Selected day only (assigned)
+              </label>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && technicians.length > 0 ? (
+        <div className="rounded-lg border border-border bg-muted/10 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Planning snapshot</span>
+          <span className="mx-2 hidden sm:inline" aria-hidden>
+            ·
+          </span>
+          <span className="mt-1 block sm:mt-0 sm:inline">
+            Unassigned scheduled:{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {planningMetrics.unassignedScheduledCount}
+            </span>
+          </span>
+          <span className="mx-2 hidden md:inline" aria-hidden>
+            ·
+          </span>
+          <span className="mt-1 block md:mt-0 md:inline">
+            Overdue scheduled:{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {planningMetrics.overdueScheduledCount}
+            </span>
+          </span>
+          {overloadedTechLabels.length > 0 ? (
+            <>
+              <span className="mx-2 hidden lg:inline" aria-hidden>
+                ·
+              </span>
+              <span className="mt-1 block text-rose-800 dark:text-rose-200 lg:mt-0 lg:inline">
+                Heavy day (6+ jobs): {overloadedTechLabels.join(", ")}
+              </span>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -922,6 +1335,13 @@ function DispatchPageInner() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading dispatch…</p>
+      ) : viewMode === "route" ? (
+        <DispatchRouteView
+          technicians={technicians}
+          workOrders={displayWorkOrders}
+          selectedYmd={selectedYmd}
+          onOpenWo={setSelectedWoId}
+        />
       ) : (
         <>
           <div className="hidden md:block">

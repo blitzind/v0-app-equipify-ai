@@ -138,6 +138,25 @@ export function DispatchMobileList({
                   </div>
                   <p className="font-medium">{wo.title}</p>
                   <p className="text-xs text-muted-foreground">{wo.customerName}</p>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {wo.priority && wo.priority !== "normal" ? (
+                      <span className="rounded bg-muted px-1 py-px text-[10px] font-medium text-foreground">
+                        {wo.priority}
+                      </span>
+                    ) : null}
+                    {wo.fromServiceRequest ? (
+                      <span className="rounded bg-sky-500/15 px-1 py-px text-[10px] font-medium text-sky-800 dark:text-sky-200">
+                        SR
+                      </span>
+                    ) : null}
+                    <span className="rounded bg-background/80 px-1 py-px text-[10px] text-muted-foreground">
+                      {wo.workKind === "request"
+                        ? "Request"
+                        : wo.workKind === "maintenance"
+                          ? "Maint"
+                          : "Repair"}
+                    </span>
+                  </div>
                   {wo.assigned_user_id && wo.technicianLabel ? (
                     <p className="truncate text-[10px] text-muted-foreground">
                       {wo.technicianLabel}
@@ -253,6 +272,25 @@ export function DispatchMobileList({
                     </p>
                     <p className="font-medium">{wo.title}</p>
                     <p className="text-xs text-muted-foreground">{wo.customerName}</p>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {wo.priority && wo.priority !== "normal" ? (
+                        <span className="rounded bg-muted px-1 py-px text-[10px] font-medium text-foreground">
+                          {wo.priority}
+                        </span>
+                      ) : null}
+                      {wo.fromServiceRequest ? (
+                        <span className="rounded bg-sky-500/15 px-1 py-px text-[10px] font-medium text-sky-800 dark:text-sky-200">
+                          SR
+                        </span>
+                      ) : null}
+                      <span className="rounded bg-background/80 px-1 py-px text-[10px] text-muted-foreground">
+                        {wo.workKind === "request"
+                          ? "Request"
+                          : wo.workKind === "maintenance"
+                            ? "Maint"
+                            : "Repair"}
+                      </span>
+                    </div>
                     {wo.technicianLabel ? (
                       <p className="truncate text-[10px] text-muted-foreground">
                         {wo.technicianLabel}

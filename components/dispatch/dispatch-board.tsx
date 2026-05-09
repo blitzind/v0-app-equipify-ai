@@ -36,6 +36,8 @@ export type DispatchTech = {
   avatarUrl?: string | null
 }
 
+export type DispatchWoWorkKind = "maintenance" | "repair" | "request"
+
 export type DispatchWo = {
   id: string
   title: string
@@ -45,6 +47,7 @@ export type DispatchWo = {
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   customer_id: string
+  customerLocationId?: string | null
   customerName: string
   work_order_number?: number | null
   priority?: string | null
@@ -52,7 +55,21 @@ export type DispatchWo = {
   opsBadges: OperationalBadge[]
   opsFlags?: OpsFlags
   technicianLabel?: string | null
+  /** Equipment or customer site line shown on cards */
   serviceLocationLabel?: string | null
+  /** Customer site label when `customer_location_id` is set */
+  siteLabel?: string | null
+  addressLine1?: string | null
+  city?: string | null
+  state?: string | null
+  postalCode?: string | null
+  /** City, ST ZIP — for dispatch search/filter */
+  geoLine?: string | null
+  workKind: DispatchWoWorkKind
+  fromServiceRequest: boolean
+  createdByPmAutomation?: boolean
+  latitude?: number | null
+  longitude?: number | null
   /** Phase 1: explicit chip on dispatch card; falls back to 1 if join missing. */
   equipmentCount?: number
 }
@@ -101,6 +118,9 @@ function WoCard({
   const techMeta =
     wo.assigned_user_id && wo.technicianLabel ? wo.technicianLabel : null
   const locationMeta = wo.serviceLocationLabel?.trim() ?? null
+  const priority = wo.priority?.trim() || "normal"
+  const kindShort =
+    wo.workKind === "request" ? "SR" : wo.workKind === "maintenance" ? "PM" : "RP"
   const equipmentChip =
     wo.equipmentCount && wo.equipmentCount > 0 ? wo.equipmentCount : null
   const timeLabel = formatCardTimeLabel(wo.scheduled_time)
@@ -134,6 +154,35 @@ function WoCard({
             {equipmentChip}
           </span>
         ) : null}
+        {priority !== "normal" ? (
+          <span
+            className={cn(
+              "shrink-0 rounded px-1 py-px text-[9px] font-semibold uppercase tabular-nums",
+              priority === "critical"
+                ? "bg-rose-500/20 text-rose-800 dark:text-rose-200"
+                : priority === "high"
+                  ? "bg-amber-500/20 text-amber-900 dark:text-amber-100"
+                  : "bg-muted text-muted-foreground",
+            )}
+            title="Priority"
+          >
+            {priority}
+          </span>
+        ) : null}
+        {wo.fromServiceRequest ? (
+          <span
+            className="shrink-0 rounded bg-sky-500/15 px-1 py-px text-[9px] font-semibold text-sky-800 dark:text-sky-200"
+            title="Originated from a service request"
+          >
+            Req
+          </span>
+        ) : null}
+        <span
+          className="shrink-0 rounded bg-background/60 px-1 py-px text-[9px] font-medium text-muted-foreground"
+          title={wo.workKind === "request" ? "Request" : wo.workKind === "maintenance" ? "Maintenance" : "Repair"}
+        >
+          {kindShort}
+        </span>
         {slotOverlap ? (
           <AlertTriangle
             className="h-3 w-3 shrink-0 text-[color:var(--status-warning)]"
@@ -327,6 +376,17 @@ export function DispatchBoard({
     return m
   }, [workOrders, selectedYmd])
 
+  const overdueByTech = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const wo of workOrders) {
+      if (!wo.assigned_user_id || wo.scheduled_on !== selectedYmd) continue
+      if (!wo.opsFlags?.sched_past_due) continue
+      const uid = wo.assigned_user_id
+      m.set(uid, (m.get(uid) ?? 0) + 1)
+    }
+    return m
+  }, [workOrders, selectedYmd])
+
   function handleDragStart(e: DragStartEvent) {
     const id = String(e.active.id)
     const woId = DND.parseWo(id)
@@ -439,6 +499,7 @@ export function DispatchBoard({
               </div>
               {technicians.map((t) => {
                 const load = workloadByTech.get(t.id) ?? 0
+                const overdue = overdueByTech.get(t.id) ?? 0
                 return (
                   <div
                     key={t.id}
@@ -479,7 +540,7 @@ export function DispatchBoard({
                       ) : null}
                     </div>
                     {/* Row 2: lightweight workload indicator. */}
-                    <div className="mt-0.5 flex items-center gap-1.5">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
@@ -495,6 +556,14 @@ export function DispatchBoard({
                       >
                         {load} {load === 1 ? "job" : "jobs"}
                       </span>
+                      {overdue > 0 ? (
+                        <span
+                          className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-900 dark:text-amber-100"
+                          title={`${overdue} overdue scheduled (past appointment day)`}
+                        >
+                          {overdue} late
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 )
