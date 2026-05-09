@@ -23,6 +23,7 @@ export type AiTaskId =
   | "aiden_work_order_productivity"
   | "aiden_draft_generation"
   | "aiden_operational_recommendations"
+  | "aiden_safe_action_prepare"
 
 export type AiProviderId = "openai" | "anthropic" | "google"
 

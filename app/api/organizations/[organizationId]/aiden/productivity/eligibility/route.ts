@@ -46,14 +46,19 @@ export async function GET(
   const billingOk = canAccessApp(subscription)
   const productivityEnabled = billingOk && canUseAidenCapability(planId, "productivity_ai")
   const operationalCopilotEnabled = billingOk && canUseAidenCapability(planId, "operational_copilot")
+  const safeActionsEnabled = billingOk && canUseAidenCapability(planId, "safe_aiden_actions")
   /** Growth / Scale when billing ok — used for Scale-only messaging without exposing nag copy to Solo/Core. */
   const operationalGrowthHint = billingOk && productivityEnabled && !operationalCopilotEnabled
+  /** Growth — calm Scale upsell for prepared actions (Phase 6); Solo/Core unchanged (productivity false). */
+  const safeActionsGrowthHint = billingOk && productivityEnabled && !safeActionsEnabled
 
   return NextResponse.json({
     ok: true,
     productivityEnabled,
     operationalCopilotEnabled,
+    safeActionsEnabled,
     operationalGrowthHint,
+    safeActionsGrowthHint,
     planTier: planId,
   })
 }

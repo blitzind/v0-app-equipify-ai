@@ -9,11 +9,17 @@ export const AIDEN_TRACKED_FEATURES = [
   "work_order_summary",
   "draft_generation",
   "operational_recommendations",
+  "action_prepare",
+  "action_confirm",
 ] as const
 export type AidenTrackedFeatureKey = (typeof AIDEN_TRACKED_FEATURES)[number]
 
 /** Future-only keys (partially wired — see `canUseAidenCapability`). */
-export type AidenFutureCapabilityKey = "productivity_ai" | "operational_copilot" | "summaries_drafting"
+export type AidenFutureCapabilityKey =
+  | "productivity_ai"
+  | "operational_copilot"
+  | "summaries_drafting"
+  | "safe_aiden_actions"
 
 export type AidenPageGuidanceLevel = "limited" | "rich"
 
@@ -41,6 +47,7 @@ export function canUseAidenCapability(
     case "summaries_drafting":
       return planRank(planId) >= planRank("growth")
     case "operational_copilot":
+    case "safe_aiden_actions":
       return planRank(planId) >= planRank("scale")
     default:
       return false

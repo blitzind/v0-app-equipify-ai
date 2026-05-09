@@ -342,6 +342,22 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     maxRetries: 2,
     confidenceThreshold: null,
   },
+  aiden_safe_action_prepare: {
+    id: "aiden_safe_action_prepare",
+    label: "AIden safe workspace action (prepare)",
+    requiredPlan: "scale",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.2,
+    maxOutputTokens: 3072,
+    structuredMode: "json_object",
+    timeoutMs: 60_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {

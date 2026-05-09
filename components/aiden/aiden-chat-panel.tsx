@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
-import { AlertCircle, Bot, Clock3, Loader2, MessageSquarePlus, Send, User } from "lucide-react"
+import { AlertCircle, Bot, ClipboardList, Clock3, Loader2, MessageSquarePlus, Send, User } from "lucide-react"
 import { AidenWordmark } from "@/components/aiden/aiden-wordmark"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,6 +25,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { SAFE_ACTIONS_SCALE_ONLY_MESSAGE } from "@/lib/aiden/safe-actions/messages"
 import type { AidenChatMessage, AidenFeatureRequestDraft } from "@/lib/aiden/aiden-response-rules"
 import type { AidenSupportPhase2Answer } from "@/lib/aiden/aiden-support-phase2-schema"
 
@@ -51,6 +52,17 @@ function createWelcomeMessage(): ChatMessage {
 type AidenChatPanelProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+type PendingSafeActionPreview = {
+  id: string
+  title: string
+  explanation: string
+  action_type: string
+  risk_level: string
+  expires_at: string
+  proposed_payload: Record<string, unknown>
+  affected_record_ids: unknown
 }
 
 function defaultFrValues(moduleLabel: string): AidenFrFormValues {
@@ -150,6 +162,15 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [frNonce, setFrNonce] = useState(0)
   const [frInitial, setFrInitial] = useState<AidenFrFormValues>(() => defaultFrValues(""))
 
+  const [aidenEligibility, setAidenEligibility] = useState<{
+    safeActionsEnabled: boolean
+    safeActionsGrowthHint: boolean
+  } | null>(null)
+  const [actionIntent, setActionIntent] = useState("")
+  const [actionBusy, setActionBusy] = useState(false)
+  const [pendingAction, setPendingAction] = useState<PendingSafeActionPreview | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
@@ -191,6 +212,40 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       setSessionReady(true)
     })()
 
+    return () => {
+      cancelled = true
+    }
+  }, [open, organizationId, orgStatus])
+
+  useEffect(() => {
+    if (!open || !organizationId || orgStatus !== "ready") {
+      setAidenEligibility(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/aiden/productivity/eligibility`,
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          safeActionsEnabled?: boolean
+          safeActionsGrowthHint?: boolean
+        }
+        if (cancelled) return
+        if (res.ok && data.ok) {
+          setAidenEligibility({
+            safeActionsEnabled: Boolean(data.safeActionsEnabled),
+            safeActionsGrowthHint: Boolean(data.safeActionsGrowthHint),
+          })
+        } else {
+          setAidenEligibility(null)
+        }
+      } catch {
+        if (!cancelled) setAidenEligibility(null)
+      }
+    })()
     return () => {
       cancelled = true
     }
@@ -250,7 +305,107 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     setMessages([createWelcomeMessage()])
     setError(null)
     setFrOpen(false)
+    setPendingAction(null)
+    setActionIntent("")
+    setActionError(null)
     toast({ title: "New chat started" })
+  }
+
+  async function prepareWorkspaceAction() {
+    const intent = actionIntent.trim()
+    if (!intent || actionBusy || !organizationId || orgStatus !== "ready") return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/actions/prepare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent,
+          currentPath: pathname || "/",
+          currentModule: currentModule.label,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        pending?: PendingSafeActionPreview
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok || !data.pending) {
+        throw new Error(data.message ?? data.error ?? "Could not prepare an action.")
+      }
+      setPendingAction(data.pending)
+      setActionIntent("")
+      toast({
+        title: "Review required",
+        description: "Confirm or cancel this prepared workspace action — nothing runs until you confirm.",
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not prepare an action."
+      setActionError(msg)
+      toast({ title: "Prepare failed", description: msg, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function confirmPendingAction() {
+    if (!pendingAction || actionBusy || !organizationId || orgStatus !== "ready") return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/actions/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pending_action_id: pendingAction.id }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        summary?: string
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? data.error ?? "Could not complete the action.")
+      }
+      setPendingAction(null)
+      toast({
+        title: "Action saved",
+        description: data.summary ?? "Your workspace was updated.",
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not complete the action."
+      setActionError(msg)
+      toast({ title: "Action failed", description: msg, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function cancelPendingAction() {
+    if (!pendingAction || actionBusy || !organizationId || orgStatus !== "ready") return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/actions/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pending_action_id: pendingAction.id }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; error?: string }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message ?? data.error ?? "Could not cancel.")
+      }
+      setPendingAction(null)
+      toast({ title: "Canceled", description: "No changes were made." })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not cancel."
+      setActionError(msg)
+      toast({ title: "Cancel failed", description: msg, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   async function sendMessage(text: string) {
@@ -526,6 +681,112 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
             <div className="mb-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
               <span>{error}</span>
+            </div>
+          ) : null}
+          {actionError ? (
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
+              <span>{actionError}</span>
+            </div>
+          ) : null}
+          {aidenEligibility?.safeActionsGrowthHint ? (
+            <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">{SAFE_ACTIONS_SCALE_ONLY_MESSAGE}</p>
+          ) : null}
+          {aidenEligibility?.safeActionsEnabled && !frOpen ? (
+            <div className="mb-3 rounded-xl border border-border bg-card p-3 shadow-xs">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
+                <ClipboardList size={14} className="shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                Prepared workspace action
+              </div>
+              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+                Describe what you want to capture (task, note, reminder, or unsent draft). Nothing is saved until you
+                confirm below.
+              </p>
+              {!pendingAction ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={actionIntent}
+                    onChange={(e) => setActionIntent(e.target.value)}
+                    placeholder="Example: Add a follow-up task on today’s job to call the customer about parts."
+                    className="max-h-28 min-h-[4.5rem] resize-none text-xs"
+                    disabled={actionBusy || loading || !organizationId || orgStatus !== "ready"}
+                    aria-label="Describe an action for AIden to prepare"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full"
+                    disabled={
+                      actionBusy ||
+                      loading ||
+                      !actionIntent.trim() ||
+                      !organizationId ||
+                      orgStatus !== "ready"
+                    }
+                    onClick={() => void prepareWorkspaceAction()}
+                  >
+                    {actionBusy ? (
+                      <>
+                        <Loader2 size={14} className="mr-2 animate-spin" aria-hidden />
+                        Preparing…
+                      </>
+                    ) : (
+                      "Prepare action"
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {pendingAction.action_type}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        pendingAction.risk_level === "high"
+                          ? "bg-red-500/15 text-red-800 dark:text-red-200"
+                          : pendingAction.risk_level === "medium"
+                            ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                            : "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100",
+                      )}
+                    >
+                      Risk: {pendingAction.risk_level}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{pendingAction.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{pendingAction.explanation}</p>
+                  </div>
+                  <pre className="max-h-28 overflow-auto rounded-lg bg-muted/60 p-2 text-[10px] leading-snug text-muted-foreground">
+                    {JSON.stringify(pendingAction.proposed_payload, null, 2)}
+                  </pre>
+                  <p className="text-[10px] text-muted-foreground">
+                    Expires {new Date(pendingAction.expires_at).toLocaleString()}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="flex-1"
+                      disabled={actionBusy}
+                      onClick={() => void confirmPendingAction()}
+                    >
+                      {actionBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : "Confirm"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      disabled={actionBusy}
+                      onClick={() => void cancelPendingAction()}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
           <form onSubmit={handleSubmit} className="flex items-end gap-2">
