@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { formatSlotLabel, timeToSlotIndex } from "@/lib/dispatch/board-utils"
 import {
+  buildTechnicianRouteJsonExport,
   orderStopsByManualList,
   sortStopsBySchedule,
   workOrderToRouteStop,
   type DispatchRouteStop,
 } from "@/lib/dispatch/route-stops"
+import type { DispatchAddressQuality } from "@/lib/dispatch/dispatch-address"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -41,6 +43,17 @@ function saveOrder(techId: string, ymd: string, ids: string[]) {
     window.localStorage.setItem(routeOrderStorageKey(techId, ymd), JSON.stringify(ids))
   } catch {
     /* ignore quota */
+  }
+}
+
+function addressQualityPillClass(q: DispatchAddressQuality): string {
+  switch (q) {
+    case "missing":
+      return "bg-rose-500/15 text-rose-800 dark:text-rose-200"
+    case "partial":
+      return "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+    default:
+      return "bg-emerald-500/12 text-emerald-900 dark:text-emerald-200"
   }
 }
 
@@ -131,6 +144,15 @@ function StopRow({
             ) : null}
             <span className="rounded bg-background px-1.5 py-px text-muted-foreground">
               {stop.workKind === "request" ? "request" : stop.workKind === "maintenance" ? "maint" : "repair"}
+            </span>
+            <span
+              className={cn(
+                "max-w-[140px] truncate rounded px-1.5 py-px text-[9px] font-medium",
+                addressQualityPillClass(stop.addressQuality),
+              )}
+              title={stop.addressQualityLabel}
+            >
+              {stop.addressQualityLabel}
             </span>
           </div>
           {scheduleWarnings && scheduleWarnings.length > 0 ? (
@@ -223,9 +245,17 @@ function TechnicianRouteColumn({
   }, [persist, toast])
 
   const copyPayload = useCallback(() => {
-    void navigator.clipboard.writeText(JSON.stringify(ordered, null, 2))
-    toast({ title: "Copied", description: "Map-ready stop list (JSON) for this technician." })
-  }, [ordered, toast])
+    const payload = buildTechnicianRouteJsonExport({
+      selectedYmd,
+      technician: { id: tech.id, label: tech.label },
+      orderedStops: ordered,
+    })
+    void navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+    toast({
+      title: "Copied",
+      description: "Route JSON with map-ready addresses (coordinates null until geocoded).",
+    })
+  }, [ordered, selectedYmd, tech.id, tech.label, toast])
 
   if (stops.length === 0) return null
 
@@ -251,8 +281,9 @@ function TechnicianRouteColumn({
         </div>
       </div>
       <p className="mb-2 text-[11px] text-muted-foreground">
-        Stops for {selectedYmd}. Reorder with arrows — saved per technician and day for quick field use. Latitude and
-        longitude are reserved for future maps (null until geocoded).
+        Stops for {selectedYmd}. Reorder with arrows — saved per technician and day. Address quality reflects
+        customer/site rows from work orders; copy JSON includes structured fields for future maps (lat/lng null until
+        geocoded).
       </p>
       <ol className="flex flex-col gap-2">
         {ordered.map((stop, idx) => (

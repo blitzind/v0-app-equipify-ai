@@ -32,7 +32,12 @@ import {
   type ScheduleWarningItem,
   type ScheduleWarnPeer,
 } from "@/lib/dispatch/schedule-warnings"
-import { AlertTriangle, Boxes, Clock, Info, Plus } from "lucide-react"
+import {
+  assessDispatchAddressQualityForWorkOrder,
+  buildDispatchStopAddressLabel,
+  dispatchAddressPartsFromWorkOrder,
+} from "@/lib/dispatch/dispatch-address"
+import { AlertTriangle, Boxes, Clock, Info, MapPin, Plus } from "lucide-react"
 
 export type DispatchTech = {
   id: string
@@ -145,16 +150,21 @@ function WoCard({
   const equipmentChip =
     wo.equipmentCount && wo.equipmentCount > 0 ? wo.equipmentCount : null
   const timeLabel = formatCardTimeLabel(wo.scheduled_time)
-  const warnTitle =
-    scheduleWarnings && scheduleWarnings.length > 0
-      ? scheduleWarnings.map((w) => w.message).join("\n")
-      : undefined
+  const addrParts = dispatchAddressPartsFromWorkOrder(wo)
+  const addressLineTooltip = buildDispatchStopAddressLabel(addrParts)
+  const addressAssessment = assessDispatchAddressQualityForWorkOrder(wo)
+  const tooltipLines = [
+    addressLineTooltip,
+    addressAssessment.label,
+    ...(scheduleWarnings?.map((w) => w.message) ?? []),
+  ].filter(Boolean)
+  const cardTitle = tooltipLines.length > 0 ? tooltipLines.join("\n") : undefined
 
   return (
     <button
       type="button"
       onClick={() => onOpen(wo.id)}
-      title={warnTitle}
+      title={cardTitle}
       className={cn(
         "w-full rounded-md border px-2 py-1.5 text-left text-xs shadow-sm transition-shadow",
         cardTone(wo.status),
@@ -221,6 +231,18 @@ function WoCard({
             aria-label="Scheduling notes"
           />
         ) : null}
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-px text-[8px] font-semibold uppercase",
+            addressAssessment.quality === "missing" && "bg-rose-500/15 text-rose-800 dark:text-rose-200",
+            addressAssessment.quality === "partial" && "bg-amber-500/15 text-amber-900 dark:text-amber-100",
+            addressAssessment.quality === "ready" && "bg-emerald-500/12 text-emerald-900 dark:text-emerald-200",
+          )}
+          title={`${addressAssessment.label}\n${addressLineTooltip}`}
+        >
+          <MapPin className="h-2 w-2" aria-hidden />
+          {addressAssessment.quality === "missing" ? "!" : addressAssessment.quality === "partial" ? "~" : "OK"}
+        </span>
       </div>
       <p className="line-clamp-2 font-medium leading-snug">{wo.title}</p>
       <p className="truncate text-[10px] text-muted-foreground">{wo.customerName}</p>
