@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 196,
+  apiRouteHandlers: 199,
   sqlMigrations: 136,
   dashboardPages: 58,
-  componentsTsx: 215,
-  libTsFiles: 392,
+  componentsTsx: 216,
+  libTsFiles: 393,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **196** |
+| API route handlers (\`app/api/**/route.ts\`) | **199** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **136** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **58** |
-| \`components/**/*.tsx\` | **215** |
-| \`lib/**/*.ts\` | **392** |
+| \`components/**/*.tsx\` | **216** |
+| \`lib/**/*.ts\` | **393** |
 
 ### Vercel crons
 
@@ -129,10 +129,12 @@ organizations/[organizationId]/inventory/adjust/route.ts
 organizations/[organizationId]/inventory/allocate/route.ts
 organizations/[organizationId]/inventory/consume/route.ts
 organizations/[organizationId]/inventory/deallocate/route.ts
+organizations/[organizationId]/inventory/draft-po-from-reorder/route.ts
 organizations/[organizationId]/inventory/locations/route.ts
 organizations/[organizationId]/inventory/low-stock/route.ts
 organizations/[organizationId]/inventory/my-vehicle-location/route.ts
 organizations/[organizationId]/inventory/receive/route.ts
+organizations/[organizationId]/inventory/reorder-center/route.ts
 organizations/[organizationId]/inventory/reorder-record/route.ts
 organizations/[organizationId]/inventory/restock-request/route.ts
 organizations/[organizationId]/inventory/stock/route.ts
@@ -140,6 +142,7 @@ organizations/[organizationId]/inventory/technician-truck-stock/route.ts
 organizations/[organizationId]/inventory/thresholds/route.ts
 organizations/[organizationId]/inventory/transactions/route.ts
 organizations/[organizationId]/inventory/transfer/route.ts
+organizations/[organizationId]/inventory/truck-restock-complete/route.ts
 organizations/[organizationId]/inventory/truck-transfer/route.ts
 organizations/[organizationId]/inventory/vehicle-stock/route.ts
 organizations/[organizationId]/invite-member/route.ts

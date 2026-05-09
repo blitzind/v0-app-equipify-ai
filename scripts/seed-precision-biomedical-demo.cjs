@@ -711,14 +711,24 @@ async function seedPrecisionExtendedRelations(supabase, {
     const sc = stockScenario(i)
     const loc = i % 5 === 0 ? locVan2 : i % 3 === 0 ? locVan1 : locWh
     const wantAlloc = i % 17 === 0 ? 1 : 0
+    /** Phase 29 demo: some rows intentionally lack reorder thresholds (coverage alerts). */
+    const missingRp = i % 13 === 1
+    let qtyOnHand = sc.oh
+    let reorderPoint = missingRp ? null : sc.rp
+    let reorderQty = missingRp ? null : sc.rp >= 10 ? sc.rp : 12
+    const onVan = loc === locVan1 || loc === locVan2
+    /** Phase 29 demo: force several van bins clearly below threshold for restock UX. */
+    if (onVan && !missingRp && i % 6 === 0) {
+      qtyOnHand = i % 12 === 0 ? 0 : 2
+    }
     stockRows.push({
       organization_id: orgId,
       catalog_item_id: cid,
       location_id: loc,
-      quantity_on_hand: sc.oh,
-      quantity_allocated: Math.min(wantAlloc, sc.oh),
-      reorder_point: sc.rp,
-      reorder_quantity: sc.rp >= 10 ? sc.rp : 12,
+      quantity_on_hand: qtyOnHand,
+      quantity_allocated: Math.min(wantAlloc, qtyOnHand),
+      reorder_point: reorderPoint,
+      reorder_quantity: reorderQty,
     })
   }
   const insStock = await supabase.from("inventory_stock").insert(stockRows)

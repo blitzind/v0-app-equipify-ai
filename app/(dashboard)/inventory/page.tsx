@@ -49,6 +49,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { InventoryOverviewKpis } from "@/components/inventory/inventory-overview-kpis"
+import { InventoryReorderCenter } from "@/components/inventory/inventory-reorder-center"
 import { InventoryVehicleStockSummary } from "@/components/inventory/inventory-vehicle-stock-summary"
 import { InventoryRecentActivityCard } from "@/components/inventory/inventory-recent-activity-card"
 import { isLowStock, stockTone } from "@/lib/inventory/format"
@@ -501,6 +502,7 @@ export default function InventoryPage() {
             <TabsTrigger value="transfer">Transfers</TabsTrigger>
             <TabsTrigger value="history">Consumption &amp; history</TabsTrigger>
             <TabsTrigger value="vans">Van inventory</TabsTrigger>
+            <TabsTrigger value="reorder">Reorder Center</TabsTrigger>
           </TabsList>
           {canManage ? (
             <div className="flex w-full shrink-0 justify-end sm:w-auto">
@@ -1402,6 +1404,10 @@ export default function InventoryPage() {
               </CardContent>
             </Card>
           ) : null}
+        </TabsContent>
+
+        <TabsContent value="reorder" className="space-y-4">
+          <InventoryReorderCenter organizationId={organizationId} onInventoryMutated={() => void load()} />
         </TabsContent>
       </Tabs>
 
