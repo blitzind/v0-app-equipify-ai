@@ -13,15 +13,24 @@ import type {
 
 const STATUS_LABELS: Record<ProspectStatus, string> = {
   new: "New",
+  attempting_contact: "Attempting contact",
   contacted: "Contacted",
-  follow_up: "Follow-up",
-  quoted: "Quoted",
+  qualified: "Qualified",
+  proposal_sent: "Proposal sent",
   won: "Won",
   lost: "Lost",
+  nurture: "Nurture",
+}
+
+/** Legacy DB / workflow strings — labels only (no longer valid statuses). */
+const LEGACY_STATUS_LABELS: Record<string, string> = {
+  follow_up: "Follow-up (legacy)",
+  quoted: "Quoted (legacy)",
 }
 
 export function formatProspectStatus(status: ProspectStatus | string): string {
   if (status in STATUS_LABELS) return STATUS_LABELS[status as ProspectStatus]
+  if (status in LEGACY_STATUS_LABELS) return LEGACY_STATUS_LABELS[status]
   return status.replace(/_/g, " ")
 }
 
@@ -30,16 +39,20 @@ export function prospectStatusBadgeClasses(status: ProspectStatus | string): str
   switch (status) {
     case "new":
       return "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+    case "attempting_contact":
+      return "border-orange-500/40 bg-orange-500/10 text-orange-800 dark:text-orange-200"
     case "contacted":
       return "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-    case "follow_up":
-      return "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-    case "quoted":
+    case "qualified":
+      return "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+    case "proposal_sent":
       return "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300"
     case "won":
       return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
     case "lost":
       return "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+    case "nurture":
+      return "border-teal-500/40 bg-teal-500/10 text-teal-800 dark:text-teal-200"
     default:
       return "border-border bg-muted/40 text-muted-foreground"
   }

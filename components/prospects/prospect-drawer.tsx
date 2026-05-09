@@ -27,6 +27,13 @@ import { DetailDrawer, DrawerSection } from "@/components/detail-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -75,7 +82,26 @@ export type ProspectDrawerProps = {
   organizationId: string
   prospect: ProspectListItem | null
   canManage: boolean
+  assignees?: Array<{ id: string; label: string }>
   onChanged: () => void
+}
+
+function timelineEventKind(eventType: string): string {
+  const map: Record<string, string> = {
+    prospect_followup_email: "Follow-up · Email",
+    prospect_followup_sms: "Follow-up · SMS",
+    prospect_followup_note: "Follow-up · Note / call",
+    prospect_status_changed: "Status change",
+    prospect_ai_draft_generated: "AI draft",
+    prospect_ai_brief_generated: "AI brief",
+    prospect_quote_created: "Quote created",
+    prospect_work_order_created: "Work order",
+    prospect_equipment_created: "Equipment",
+    prospect_location_added: "Location",
+    prospect_opportunity_tracked: "Opportunity task",
+    prospect_converted: "Customer conversion",
+  }
+  return map[eventType] ?? eventType.replace(/_/g, " ")
 }
 
 export function ProspectDrawer({
@@ -84,6 +110,7 @@ export function ProspectDrawer({
   organizationId,
   prospect,
   canManage,
+  assignees = [],
   onChanged,
 }: ProspectDrawerProps) {
   const { toast } = useToast()
@@ -102,6 +129,14 @@ export function ProspectDrawer({
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [briefLoading, setBriefLoading] = useState(false)
+  const [briefSummary, setBriefSummary] = useState<string | null>(null)
+  const [briefSteps, setBriefSteps] = useState<string[]>([])
+
+  useEffect(() => {
+    setBriefSummary(null)
+    setBriefSteps([])
+  }, [prospect?.id])
 
   useEffect(() => {
     if (!open || !prospect) return
@@ -143,6 +178,60 @@ export function ProspectDrawer({
       : bucket === "today"
         ? "text-amber-700 dark:text-amber-300"
         : "text-muted-foreground"
+
+  async function patchOwnership(patch: {
+    assigned_to_user_id?: string | null
+    next_action_owner_user_id?: string | null
+  }) {
+    if (!prospect) return
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/prospects/${encodeURIComponent(prospect.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      )
+      const j = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) throw new Error(j.message ?? "Could not update ownership.")
+      onChanged()
+      toast({ title: "Saved" })
+    } catch (e) {
+      toast({
+        title: e instanceof Error ? e.message : "Failed",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function runAiBrief() {
+    if (!prospect) return
+    setBriefLoading(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/prospects/${encodeURIComponent(prospect.id)}/ai-brief`,
+        { method: "POST" },
+      )
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        summary?: string
+        next_steps?: string[]
+        message?: string
+      }
+      if (!res.ok || !j.ok) throw new Error(j.message ?? "Could not generate brief.")
+      setBriefSummary(j.summary ?? "")
+      setBriefSteps(Array.isArray(j.next_steps) ? j.next_steps : [])
+      void refreshTimeline()
+    } catch (e) {
+      toast({
+        title: e instanceof Error ? e.message : "Failed",
+        variant: "destructive",
+      })
+    } finally {
+      setBriefLoading(false)
+    }
+  }
 
   async function refreshTimeline() {
     if (!prospect) return
@@ -227,16 +316,14 @@ export function ProspectDrawer({
               >
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
-              {!prospect.converted_customer_id ? (
-                <Button
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => setConvertOpen(true)}
-                  disabled={Boolean(prospect.archived_at)}
-                >
-                  <UserPlus2 className="w-3.5 h-3.5" /> Convert to customer
-                </Button>
-              ) : null}
+              <Button
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => setConvertOpen(true)}
+                disabled={Boolean(prospect.archived_at)}
+              >
+                <UserPlus2 className="w-3.5 h-3.5" /> Convert / advance
+              </Button>
               {!prospect.archived_at ? (
                 <Button
                   size="sm"
@@ -276,6 +363,75 @@ export function ProspectDrawer({
           </div>
         </DrawerSection>
 
+        <DrawerSection title="Ownership">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Assigned rep</p>
+              {canManage && assignees.length > 0 ? (
+                <Select
+                  value={(prospect.assigned_to_user_id as string | undefined) || "__none__"}
+                  onValueChange={(v) =>
+                    void patchOwnership({
+                      assigned_to_user_id: v === "__none__" ? null : v,
+                    })
+                  }
+                  disabled={Boolean(prospect.archived_at)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm font-medium">{prospect.assigned_to_label ?? "—"}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Next action owner
+              </p>
+              {canManage && assignees.length > 0 ? (
+                <Select
+                  value={(prospect.next_action_owner_user_id as string | undefined) || "__none__"}
+                  onValueChange={(v) =>
+                    void patchOwnership({
+                      next_action_owner_user_id: v === "__none__" ? null : v,
+                    })
+                  }
+                  disabled={Boolean(prospect.archived_at)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm font-medium">{prospect.next_action_owner_label ?? "—"}</p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <Stat
+                label="Last contacted by"
+                value={prospect.last_contacted_by_label ?? "—"}
+              />
+            </div>
+          </div>
+        </DrawerSection>
+
         <DrawerSection title="Contact">
           <ul className="space-y-1.5 text-sm">
             <li className="flex items-center gap-2">
@@ -311,10 +467,14 @@ export function ProspectDrawer({
         ) : null}
 
         {prospect.converted_customer_id ? (
-          <DrawerSection title="Converted">
-            <p className="text-sm text-muted-foreground">
-              Converted on {formatDateOnly(prospect.converted_at)}.
-            </p>
+          <DrawerSection title={prospect.status === "won" ? "Converted" : "Customer record"}>
+            {prospect.converted_at ? (
+              <p className="text-sm text-muted-foreground">Converted on {formatDateOnly(prospect.converted_at)}.</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Linked customer from a quote or field conversion — timeline history is preserved on this prospect.
+              </p>
+            )}
             <Link
               href={`/customers/${prospect.converted_customer_id}`}
               className="text-sm text-primary hover:underline inline-flex items-center gap-1.5 mt-1"
@@ -325,7 +485,38 @@ export function ProspectDrawer({
           </DrawerSection>
         ) : null}
 
-        <DrawerSection title="Follow-up timeline">
+        {aiDraftAvailable ? (
+          <DrawerSection title="AI lead brief">
+            <p className="text-xs text-muted-foreground mb-2">
+              Operational summary and suggested next steps — review before acting.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={Boolean(prospect.archived_at) || briefLoading}
+              onClick={() => void runAiBrief()}
+            >
+              {briefLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {briefLoading ? "Generating…" : "Generate brief"}
+            </Button>
+            {briefSummary ? (
+              <div className="mt-3 space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <p className="whitespace-pre-wrap text-foreground/90">{briefSummary}</p>
+                {briefSteps.length > 0 ? (
+                  <ul className="list-disc pl-4 space-y-1 text-xs text-muted-foreground">
+                    {briefSteps.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </DrawerSection>
+        ) : null}
+
+        <DrawerSection title="Activity timeline">
           {loadingTimeline ? (
             <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin" /> Loading timeline…
@@ -338,6 +529,9 @@ export function ProspectDrawer({
             <ul className="divide-y divide-border">
               {timeline.map((ev) => (
                 <li key={ev.id} className="py-2.5 space-y-0.5">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    {timelineEventKind(ev.event_type)}
+                  </p>
                   <p className="text-sm font-medium">{ev.title}</p>
                   {ev.summary ? <p className="text-xs text-muted-foreground">{ev.summary}</p> : null}
                   {ev.body ? (
@@ -381,6 +575,7 @@ export function ProspectDrawer({
         onOpenChange={setEditOpen}
         organizationId={organizationId}
         prospect={prospect}
+        assignees={assignees}
         onSaved={() => {
           onChanged()
         }}

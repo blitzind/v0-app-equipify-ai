@@ -215,7 +215,12 @@ export const AIDEN_MODULES: AidenModuleDefinition[] = [
     label: "Settings",
     routes: ["/settings"],
     summary: "Workspace, team, permissions, billing, portal, imports, integrations, automations, and security configuration.",
-    quickPrompts: ["How do I invite a team member?", "How do I configure portal settings?", "How do I change permissions?"],
+    quickPrompts: [
+      "Where do I manage billing?",
+      "How do I invite a customer to the portal?",
+      "How do I invite a team member?",
+      "How do I upload a technician signature?",
+    ],
     allowedActions: [{ label: "Open Settings", href: "/settings/workspace", anyOf: ["canManageWorkspaceSettings"] }],
   },
   {

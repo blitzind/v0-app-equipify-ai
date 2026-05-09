@@ -6,9 +6,12 @@ import { PROSPECT_STATUSES, type ProspectStatus } from "@/lib/prospects/types"
 import {
   PROSPECT_SELECT_COLUMNS,
   optionalString,
+  optionalUuid,
   parseOptionalCents,
   parseOptionalIso,
 } from "@/lib/prospects/server-helpers"
+import { enrichProspectRows } from "@/lib/prospects/member-profiles"
+import type { ProspectRow } from "@/lib/prospects/types"
 
 export const runtime = "nodejs"
 
@@ -98,35 +101,10 @@ export async function GET(
 
   if (error) return jsonError(error.message, 500, "query_failed")
 
-  // Resolve converted-customer names so the UI can show a friendly link.
-  const rows = data ?? []
-  const customerIds = Array.from(
-    new Set(
-      rows
-        .map((r) => (r as { converted_customer_id?: string | null }).converted_customer_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  )
-  const customerNameMap = new Map<string, string>()
-  if (customerIds.length > 0) {
-    const { data: cRows } = await supabase
-      .from("customers")
-      .select("id, company_name")
-      .eq("organization_id", organizationId)
-      .in("id", customerIds)
-    for (const c of (cRows ?? []) as Array<{ id: string; company_name: string }>) {
-      customerNameMap.set(c.id, c.company_name)
-    }
-  }
+  const rows = (data ?? []) as ProspectRow[]
+  const prospects = await enrichProspectRows(supabase, organizationId, rows)
 
-  return NextResponse.json({
-    prospects: rows.map((r) => ({
-      ...r,
-      converted_customer_name: r.converted_customer_id
-        ? customerNameMap.get(r.converted_customer_id as string) ?? null
-        : null,
-    })),
-  })
+  return NextResponse.json({ prospects })
 }
 
 /**
@@ -155,6 +133,7 @@ export async function POST(
     next_follow_up_at?: string | null
     estimated_value_cents?: number | null
     notes?: string | null
+    assigned_to_user_id?: string | null
   }
   try {
     body = (await request.json()) as typeof body
@@ -177,6 +156,9 @@ export async function POST(
   const value = parseOptionalCents(body.estimated_value_cents)
   if (value === "invalid") return jsonError("estimated_value_cents must be a positive integer.", 400)
 
+  const assignedTo = optionalUuid(body.assigned_to_user_id)
+  if (assignedTo === "invalid") return jsonError("assigned_to_user_id must be a valid UUID.", 400)
+
   const insertRow = {
     organization_id: organizationId,
     company_name: company,
@@ -189,6 +171,7 @@ export async function POST(
     estimated_value_cents: value,
     notes: optionalString(body.notes),
     created_by: userId,
+    ...(assignedTo !== null ? { assigned_to_user_id: assignedTo } : {}),
   }
 
   const { data, error } = await supabase
@@ -199,5 +182,6 @@ export async function POST(
 
   if (error || !data) return jsonError(error?.message ?? "Could not create prospect.", 500, "insert_failed")
 
-  return NextResponse.json({ prospect: data })
+  const [prospect] = await enrichProspectRows(supabase, organizationId, [data as ProspectRow])
+  return NextResponse.json({ prospect })
 }

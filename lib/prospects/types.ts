@@ -8,20 +8,37 @@
 
 export const PROSPECT_STATUSES = [
   "new",
+  "attempting_contact",
   "contacted",
-  "follow_up",
-  "quoted",
+  "qualified",
+  "proposal_sent",
   "won",
   "lost",
+  "nurture",
 ] as const
 
 export type ProspectStatus = (typeof PROSPECT_STATUSES)[number]
 
+/** Open pipeline stages (excludes terminal won/lost). */
 export const ACTIVE_PROSPECT_STATUSES: ProspectStatus[] = [
   "new",
+  "attempting_contact",
   "contacted",
-  "follow_up",
-  "quoted",
+  "qualified",
+  "proposal_sent",
+  "nurture",
+]
+
+/** Kanban / pipeline column order (left → right). */
+export const PIPELINE_STAGE_ORDER: ProspectStatus[] = [
+  "new",
+  "attempting_contact",
+  "contacted",
+  "qualified",
+  "proposal_sent",
+  "won",
+  "lost",
+  "nurture",
 ]
 
 /**
@@ -56,6 +73,9 @@ export type ProspectRow = {
   converted_customer_id: string | null
   converted_at: string | null
   archived_at: string | null
+  assigned_to_user_id?: string | null
+  last_contacted_by_user_id?: string | null
+  next_action_owner_user_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -67,6 +87,10 @@ export type ProspectListItem = ProspectRow & {
    * the raw UUID.
    */
   converted_customer_name: string | null
+  /** Resolved display labels for ownership UUIDs (best-effort). */
+  assigned_to_label?: string | null
+  last_contacted_by_label?: string | null
+  next_action_owner_label?: string | null
 }
 
 export type FollowUpKpis = {
@@ -77,3 +101,15 @@ export type FollowUpKpis = {
 }
 
 export type StatusKpis = Record<ProspectStatus, number>
+
+/** POST /prospects/{id}/convert — `conversion_target` body field. */
+export const PROSPECT_CONVERSION_TARGETS = [
+  "customer",
+  "customer_location",
+  "quote",
+  "work_order",
+  "opportunity",
+  "equipment",
+] as const
+
+export type ProspectConversionTarget = (typeof PROSPECT_CONVERSION_TARGETS)[number]

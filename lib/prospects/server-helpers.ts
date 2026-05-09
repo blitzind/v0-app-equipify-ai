@@ -32,5 +32,18 @@ export function parseOptionalCents(value: unknown): number | null | "invalid" {
   return Math.round(value)
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Nullable UUID from JSON — empty string clears to null. */
+export function optionalUuid(value: unknown): string | null | "invalid" {
+  if (value === undefined || value === null || value === "") return null
+  if (typeof value !== "string") return "invalid"
+  const t = value.trim()
+  if (!t) return null
+  if (!UUID_RE.test(t)) return "invalid"
+  return t
+}
+
 export const PROSPECT_SELECT_COLUMNS =
-  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, converted_customer_id, converted_at, archived_at, created_at, updated_at"
+  "id, organization_id, company_name, contact_name, contact_email, contact_phone, lead_source, status, next_follow_up_at, last_contacted_at, estimated_value_cents, notes, converted_customer_id, converted_at, archived_at, assigned_to_user_id, last_contacted_by_user_id, next_action_owner_user_id, created_at, updated_at"

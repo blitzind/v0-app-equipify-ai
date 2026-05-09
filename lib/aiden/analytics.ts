@@ -1,7 +1,5 @@
 import "server-only"
 
-import type { AidenNormalizedContext } from "@/lib/aiden/context-builders"
-
 type AidenAnalyticsEvent = {
   organizationId: string
   userId: string
@@ -24,7 +22,8 @@ export function logAidenHelpEvent(args: {
   organizationId: string
   userId: string
   latestQuestion: string
-  context: AidenNormalizedContext
+  /** Module label only (Phase 1 — no record-level context). */
+  context: { module: string }
   unresolved: boolean
   answerText: string
   relatedRoutes: string[]

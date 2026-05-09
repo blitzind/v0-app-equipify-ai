@@ -4,10 +4,13 @@ import { PROSPECT_STATUSES, type ProspectStatus } from "@/lib/prospects/types"
 import {
   PROSPECT_SELECT_COLUMNS,
   optionalString,
+  optionalUuid,
   parseOptionalCents,
   parseOptionalIso,
 } from "@/lib/prospects/server-helpers"
+import { enrichProspectRows } from "@/lib/prospects/member-profiles"
 import { recordProspectStatusChange } from "@/lib/prospects/status-events"
+import type { ProspectRow } from "@/lib/prospects/types"
 
 export const runtime = "nodejs"
 
@@ -81,6 +84,24 @@ export async function PATCH(
     update.estimated_value_cents = value
   }
 
+  if ("assigned_to_user_id" in body) {
+    const value = optionalUuid(body.assigned_to_user_id)
+    if (value === "invalid") return jsonError("assigned_to_user_id must be a valid UUID.", 400)
+    update.assigned_to_user_id = value
+  }
+
+  if ("last_contacted_by_user_id" in body) {
+    const value = optionalUuid(body.last_contacted_by_user_id)
+    if (value === "invalid") return jsonError("last_contacted_by_user_id must be a valid UUID.", 400)
+    update.last_contacted_by_user_id = value
+  }
+
+  if ("next_action_owner_user_id" in body) {
+    const value = optionalUuid(body.next_action_owner_user_id)
+    if (value === "invalid") return jsonError("next_action_owner_user_id must be a valid UUID.", 400)
+    update.next_action_owner_user_id = value
+  }
+
   if (Object.keys(update).length === 0) {
     return jsonError("No editable fields supplied.", 400)
   }
@@ -117,7 +138,8 @@ export async function PATCH(
     })
   }
 
-  return NextResponse.json({ prospect: data })
+  const [prospect] = await enrichProspectRows(supabase, organizationId, [data as ProspectRow])
+  return NextResponse.json({ prospect })
 }
 
 /**

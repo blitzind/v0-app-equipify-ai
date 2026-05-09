@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logAidenHelpEvent } from "@/lib/aiden/analytics"
-import { buildAidenSystemPrompt } from "@/lib/aiden/aiden-system-prompt"
+import { buildAidenSupportPhase1Prompt } from "@/lib/aiden/aiden-support-phase1-prompt"
 import {
-  buildServerAidenContext,
-  formatAidenContextForPrompt,
-  type AidenClientPageContext,
-} from "@/lib/aiden/context-builders"
-import {
-  AidenAnswerSchema,
-  AidenChatMessageSchema,
-  type AidenChatMessage,
-} from "@/lib/aiden/aiden-response-rules"
+  AidenSupportPhase1AnswerSchema,
+  type AidenSupportPhase1Answer,
+} from "@/lib/aiden/aiden-support-phase1-schema"
+import { AidenChatMessageSchema } from "@/lib/aiden/aiden-response-rules"
+import { moduleFromPath } from "@/lib/aiden/module-context"
 import { runAiTask } from "@/lib/ai/server"
-import { getAidenActionAvailability } from "@/lib/permissions/aiden-actions"
-import { getEffectiveOrgPermissions, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import type { AiChatMessage } from "@/lib/ai/types"
 
@@ -24,78 +18,26 @@ export const maxDuration = 60
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+/**
+ * Phase 1 — safe support chat only.
+ *
+ * - Org-scoped, authenticated members only.
+ * - No tools, no mutations, no action execution (ignored if legacy clients send extra fields).
+ * - Context: current path + module label only (no record payloads).
+ */
 const BodySchema = z.object({
   messages: z.array(AidenChatMessageSchema).min(1).max(20),
   currentPath: z.string().trim().max(300).optional().nullable(),
   currentModule: z.string().trim().max(120).optional().nullable(),
-  pageContext: z
-    .object({
-      currentPath: z.string().trim().max(300).optional().nullable(),
-      currentModule: z.string().trim().max(120).optional().nullable(),
-      visibleTitle: z.string().trim().max(160).optional().nullable(),
-      organizationId: z.string().trim().max(80).optional().nullable(),
-      selectedEntityIds: z
-        .object({
-          customerId: z.string().trim().max(80).optional().nullable(),
-          equipmentId: z.string().trim().max(80).optional().nullable(),
-          workOrderId: z.string().trim().max(80).optional().nullable(),
-          invoiceId: z.string().trim().max(80).optional().nullable(),
-          quoteId: z.string().trim().max(80).optional().nullable(),
-          maintenancePlanId: z.string().trim().max(80).optional().nullable(),
-        })
-        .optional(),
-      currentRecord: z
-        .object({
-          type: z.string().trim().max(80),
-          id: z.string().trim().max(80).optional().nullable(),
-          label: z.string().trim().max(160).optional().nullable(),
-          number: z.string().trim().max(80).optional().nullable(),
-          status: z.string().trim().max(80).optional().nullable(),
-          customer: z.string().trim().max(160).optional().nullable(),
-          equipment: z.string().trim().max(160).optional().nullable(),
-          assignedTech: z.string().trim().max(160).optional().nullable(),
-          serial: z.string().trim().max(120).optional().nullable(),
-        })
-        .optional()
-        .nullable(),
-      pageState: z.record(z.union([z.string().max(160), z.number(), z.boolean(), z.null()])).optional(),
-    })
-    .optional()
-    .nullable(),
-  stream: z.boolean().optional().default(false),
 })
 
 function jsonError(code: string, message: string, status: number) {
   return NextResponse.json({ ok: false, error: code, message }, { status })
 }
 
-function buildUserContext(args: {
-  formattedContext: string
-}): string {
-  return [
-    "Current app context:",
-    args.formattedContext,
-    "",
-    "Answer the user's latest Equipify help question using this context and the user's permissions.",
-    "Return JSON with: message, answer, classification, steps, relatedRoutes, actions, proposedAction, featureRequestDraft, permissionNote, limitation, unresolved, howToMode.",
-  ].join("\n")
-}
-
-function toAiMessages(messages: AidenChatMessage[], formattedContext: string, promptContext: Parameters<typeof buildAidenSystemPrompt>[0]): AiChatMessage[] {
-  const trimmedHistory = messages.slice(-12)
-  return [
-    { role: "system", content: buildAidenSystemPrompt(promptContext) },
-    { role: "user", content: buildUserContext({ formattedContext }) },
-    ...trimmedHistory.map((m): AiChatMessage => ({ role: m.role, content: m.content })),
-  ]
-}
-
-function withLegacyContext(body: z.infer<typeof BodySchema>): AidenClientPageContext {
-  return {
-    ...(body.pageContext ?? {}),
-    currentPath: body.pageContext?.currentPath ?? body.currentPath ?? null,
-    currentModule: body.pageContext?.currentModule ?? body.currentModule ?? null,
-  }
+function toAiMessages(systemPrompt: string, chat: z.infer<typeof BodySchema>["messages"]): AiChatMessage[] {
+  const trimmed = chat.slice(-12)
+  return [{ role: "system", content: systemPrompt }, ...trimmed.map((m) => ({ role: m.role, content: m.content }))]
 }
 
 export async function POST(
@@ -110,7 +52,7 @@ export async function POST(
   const rawBody = await request.json().catch(() => null)
   const parsed = BodySchema.safeParse(rawBody)
   if (!parsed.success) {
-    return jsonError("invalid_body", "Send messages plus optional currentPath/currentModule.", 400)
+    return jsonError("invalid_body", "Send messages plus optional currentPath and currentModule.", 400)
   }
 
   const supabase = await createServerSupabaseClient()
@@ -125,7 +67,7 @@ export async function POST(
 
   const { data: member, error: memberErr } = await supabase
     .from("organization_members")
-    .select("user_id, role, permission_profile, permissions_json")
+    .select("user_id")
     .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .eq("status", "active")
@@ -141,35 +83,26 @@ export async function POST(
     .eq("id", organizationId)
     .maybeSingle()
 
-  const permissions = getEffectiveOrgPermissions({
-    role: normalizeOrgMemberRole((member as { role?: string | null }).role),
-    permissionProfile: (member as { permission_profile?: string | null }).permission_profile ?? null,
-    permissionsJson: (member as { permissions_json?: unknown }).permissions_json ?? null,
-  })
-  const pageContext = await buildServerAidenContext({
-    supabase,
-    organizationId,
-    organizationName: (organization as { name?: string | null } | null)?.name ?? null,
-    permissions,
-    clientContext: withLegacyContext(parsed.data),
-  })
-  const aidenActions = await getAidenActionAvailability({ supabase, organizationId })
-  const formattedContext = formatAidenContextForPrompt({
-    ...pageContext,
-    aidenActions,
-  } as typeof pageContext & { aidenActions: typeof aidenActions })
+  const orgName = (organization as { name?: string | null } | null)?.name ?? null
 
-  const result = await runAiTask({
+  const pathRaw = parsed.data.currentPath?.trim() ?? ""
+  const path = pathRaw.length > 0 ? pathRaw : null
+  const derivedModule = moduleFromPath(path ?? "/")
+  const moduleLabel = parsed.data.currentModule?.trim() || derivedModule.label
+
+  const systemPrompt = buildAidenSupportPhase1Prompt({
+    organizationName: orgName,
+    currentPath: path,
+    currentModule: moduleLabel,
+  })
+
+  const result = await runAiTask<AidenSupportPhase1Answer>({
     task: "aiden_help",
     organizationId,
     input: {
-      messages: toAiMessages(
-        parsed.data.messages,
-        formattedContext,
-        pageContext,
-      ),
+      messages: toAiMessages(systemPrompt, parsed.data.messages),
     },
-    schema: AidenAnswerSchema,
+    schema: AidenSupportPhase1AnswerSchema,
     skipCache: true,
   })
 
@@ -185,38 +118,24 @@ export async function POST(
   }
 
   const latestQuestion = parsed.data.messages.filter((m) => m.role === "user").at(-1)?.content ?? ""
+
   logAidenHelpEvent({
     organizationId,
     userId: user.id,
     latestQuestion,
-    context: pageContext,
+    context: { module: moduleLabel },
     unresolved: Boolean(result.output.unresolved),
     answerText: result.output.answer,
     relatedRoutes: result.output.relatedRoutes,
   })
 
-  if (result.output.proposedAction?.type) {
-    await supabase.from("aiden_action_logs").insert({
-      organization_id: organizationId,
-      user_id: user.id,
-      action_type: result.output.proposedAction.type,
-      status: "proposed",
-      request_payload: result.output.proposedAction,
-      result_payload: {},
-    })
-  }
-
   return NextResponse.json({
     ok: true,
     answer: result.output,
     context: {
-      module: pageContext.module,
-      currentRecord: pageContext.currentRecord,
-      allowedActions: pageContext.allowedActions,
-      streaming: {
-        requested: parsed.data.stream,
-        supported: false,
-      },
+      phase: 1,
+      module: moduleLabel,
+      currentPath: path,
     },
     meta: {
       provider: result.meta.provider,

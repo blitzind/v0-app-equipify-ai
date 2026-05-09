@@ -1,17 +1,13 @@
 "use client"
 
 /**
- * Leads + Follow-Up Phase 1 — convert prospect to customer dialog.
- *
- * Confirms the destination customer's company / primary contact details
- * before creating the customer record. Pre-fills with the prospect's
- * fields so a one-click convert is the common path. The server route is
- * the source of truth — it handles the customer + contact insert, plan
- * limit gate, and prospect stamping.
+ * Prospect conversion — fast paths into operational records (customer, quote, WO, etc.).
+ * Server owns inserts and duplicate-customer avoidance via `converted_customer_id`.
  */
 
 import { useEffect, useState } from "react"
-import { Loader2, ArrowRight } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,8 +19,36 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import type { ProspectListItem } from "@/lib/prospects/types"
+import type { ProspectConversionTarget, ProspectListItem } from "@/lib/prospects/types"
+
+const TARGETS: Array<{ value: ProspectConversionTarget; label: string; hint: string }> = [
+  { value: "customer", label: "Customer (won)", hint: "Creates customer + marks prospect won." },
+  { value: "quote", label: "Draft quote", hint: "Links customer + draft quote · proposal sent stage." },
+  {
+    value: "work_order",
+    label: "Open work order",
+    hint: "Links customer + open WO for scheduling.",
+  },
+  { value: "equipment", label: "Equipment record", hint: "Stub asset under the customer." },
+  {
+    value: "customer_location",
+    label: "Service location",
+    hint: "Requires full address below.",
+  },
+  {
+    value: "opportunity",
+    label: "Track opportunity",
+    hint: "Creates an internal task + qualifies the prospect.",
+  },
+]
 
 export type ConvertProspectDialogProps = {
   open: boolean
@@ -34,7 +58,9 @@ export type ConvertProspectDialogProps = {
   onConverted: (result: {
     customerId: string
     customerName: string | null
-    convertedAt: string
+    convertedAt?: string
+    quoteId?: string
+    workOrderId?: string
   }) => void
 }
 
@@ -50,6 +76,12 @@ export function ConvertProspectDialog({
   const [contactName, setContactName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [target, setTarget] = useState<ProspectConversionTarget>("customer")
+  const [locName, setLocName] = useState("")
+  const [locAddress, setLocAddress] = useState("")
+  const [locCity, setLocCity] = useState("")
+  const [locState, setLocState] = useState("")
+  const [locZip, setLocZip] = useState("")
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -58,6 +90,12 @@ export function ConvertProspectDialog({
     setContactName(prospect.contact_name ?? "")
     setEmail(prospect.contact_email ?? "")
     setPhone(prospect.contact_phone ?? "")
+    setTarget("customer")
+    setLocName(prospect.company_name ? `${prospect.company_name} — Site` : "")
+    setLocAddress("")
+    setLocCity("")
+    setLocState("")
+    setLocZip("")
   }, [open, prospect])
 
   async function handleConvert() {
@@ -68,36 +106,58 @@ export function ConvertProspectDialog({
     }
     setBusy(true)
     try {
+      const body: Record<string, unknown> = {
+        conversion_target: target,
+        company_name: company.trim(),
+        contact_name: contactName.trim() || null,
+        contact_email: email.trim() || null,
+        contact_phone: phone.trim() || null,
+      }
+      if (target === "customer_location") {
+        body.location = {
+          name: locName.trim(),
+          address_line1: locAddress.trim(),
+          city: locCity.trim(),
+          state: locState.trim(),
+          postal_code: locZip.trim(),
+          is_default: false,
+        }
+      }
+
       const res = await fetch(
         `/api/organizations/${encodeURIComponent(organizationId)}/prospects/${encodeURIComponent(prospect.id)}/convert`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            company_name: company.trim(),
-            contact_name: contactName.trim() || null,
-            contact_email: email.trim() || null,
-            contact_phone: phone.trim() || null,
-          }),
+          body: JSON.stringify(body),
         },
       )
       const j = (await res.json().catch(() => ({}))) as {
         customer_id?: string
         customer_name?: string | null
         converted_at?: string
+        quote_id?: string
+        work_order_id?: string
         message?: string
       }
       if (!res.ok || !j.customer_id) {
         throw new Error(j.message ?? "Could not convert prospect.")
       }
       toast({
-        title: "Prospect converted",
-        description: `Created customer ${j.customer_name ?? company.trim()}.`,
+        title: "Conversion complete",
+        description:
+          target === "quote" && j.quote_id
+            ? `Draft quote ready — open Quotes to finish lines and send.`
+            : target === "work_order" && j.work_order_id
+              ? `Work order created — schedule from Work orders.`
+              : `Linked customer ${j.customer_name ?? company.trim()}.`,
       })
       onConverted({
         customerId: j.customer_id,
         customerName: j.customer_name ?? company.trim(),
-        convertedAt: j.converted_at ?? new Date().toISOString(),
+        convertedAt: j.converted_at,
+        quoteId: j.quote_id,
+        workOrderId: j.work_order_id,
       })
       onOpenChange(false)
     } catch (e) {
@@ -110,56 +170,110 @@ export function ConvertProspectDialog({
     }
   }
 
+  const meta = TARGETS.find((t) => t.value === target)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Convert prospect to customer</DialogTitle>
+          <DialogTitle>Convert prospect</DialogTitle>
           <DialogDescription>
-            We&apos;ll create a customer using the existing customers + contacts tables. The original
-            prospect stays in your pipeline marked as <strong>Won</strong> with a link to the new
-            customer record.
+            Choose where this lead should land next. We reuse one customer record per prospect so you don&apos;t get
+            duplicates — timeline stays on the prospect.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-3 py-2 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs">
-              Company <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className="h-9 text-sm"
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-3 py-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Primary contact</Label>
-            <Input
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder="Optional"
-              className="h-9 text-sm"
-            />
+            <Label className="text-xs">Destination</Label>
+            <Select value={target} onValueChange={(v) => setTarget(v as ProspectConversionTarget)}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TARGETS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {meta ? <p className="text-[11px] text-muted-foreground leading-snug">{meta.hint}</p> : null}
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Phone</Label>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Optional"
-              className="h-9 text-sm"
-            />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">
+                Company <span className="text-destructive">*</span>
+              </Label>
+              <Input value={company} onChange={(e) => setCompany(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Primary contact</Label>
+              <Input
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Optional"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Phone</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Optional"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">Email</Label>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                placeholder="Optional"
+                className="h-9 text-sm"
+              />
+            </div>
           </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs">Email</Label>
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder="Optional"
-              className="h-9 text-sm"
-            />
-          </div>
+
+          {target === "customer_location" ? (
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-medium text-foreground">Service location</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Location name</Label>
+                  <Input value={locName} onChange={(e) => setLocName(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Street</Label>
+                  <Input value={locAddress} onChange={(e) => setLocAddress(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">City</Label>
+                  <Input value={locCity} onChange={(e) => setLocCity(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">State</Label>
+                  <Input value={locState} onChange={(e) => setLocState(e.target.value)} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">ZIP</Label>
+                  <Input value={locZip} onChange={(e) => setLocZip(e.target.value)} className="h-9 text-sm" />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {(target === "quote" || target === "work_order") && (
+            <p className="text-[11px] text-muted-foreground">
+              After converting, open{" "}
+              <Link href={target === "quote" ? "/quotes" : "/work-orders"} className="text-primary underline">
+                {target === "quote" ? "Quotes" : "Work orders"}
+              </Link>{" "}
+              from the nav to continue.
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" type="button" onClick={() => onOpenChange(false)} disabled={busy}>
@@ -168,7 +282,7 @@ export function ConvertProspectDialog({
           <Button type="button" onClick={() => void handleConvert()} disabled={busy}>
             {busy ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Converting…
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Working…
               </>
             ) : (
               <>

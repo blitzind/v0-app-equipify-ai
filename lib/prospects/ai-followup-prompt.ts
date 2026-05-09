@@ -30,12 +30,14 @@ Rules:
   missing, address them generically (e.g. "Hi there,").
 - Always close with a single concrete call-to-action that is appropriate
   for the current pipeline status. For example:
-    new           -> introduce yourself + ask one qualifying question
-    contacted     -> reference prior touch + suggest a short call
-    follow_up     -> nudge politely, offer to answer questions
-    quoted        -> check whether they had questions, propose next step
-    won           -> thank-you and onboarding nudge
-    lost          -> a respectful "keeping the door open" check-in
+    new                  -> introduce yourself + ask one qualifying question
+    attempting_contact   -> polite persistence + offer specific times to connect
+    contacted            -> reference prior touch + suggest a short call
+    qualified            -> clarify scope + propose site visit or discovery call
+    proposal_sent        -> answer questions + confirm receipt / timeline
+    nurture              -> light check-in without pressure
+    won                  -> thank-you and onboarding nudge
+    lost                 -> a respectful "keeping the door open" check-in
 - Do not include a signature block — leave the user's signature blank.
 - Do not include automated disclaimers, legal text, or marketing footers.
 - Output MUST be valid JSON parsable by JSON.parse.`

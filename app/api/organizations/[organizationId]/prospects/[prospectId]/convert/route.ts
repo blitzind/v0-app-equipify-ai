@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
-import { logCommunicationEvent } from "@/lib/notifications/log-event"
-import { requireCanCreateRecord } from "@/lib/billing/server-guard"
 import { optionalString } from "@/lib/prospects/server-helpers"
-import { recordProspectStatusChange } from "@/lib/prospects/status-events"
-import type { ProspectStatus } from "@/lib/prospects/types"
+import { parseConversionTarget, runProspectConversion } from "@/lib/prospects/run-conversion"
 
 export const runtime = "nodejs"
 
@@ -18,23 +15,18 @@ function jsonError(message: string, status: number, code = "bad_request") {
 /**
  * POST /api/organizations/{org}/prospects/{prospectId}/convert
  *
- * Promotes a prospect to a customer:
- *   1. Validates the prospect belongs to the org and has not already
- *      been converted.
- *   2. Runs the standard create-customer billing/plan gate so plan limits
- *      are honoured the same way the in-app modal does.
- *   3. Inserts a `customers` row + (optional) primary `customer_contacts`.
- *      Stays on the existing customer architecture — no new tables.
- *   4. Stamps the prospect with `converted_customer_id`, `converted_at`,
- *      sets status to `won`, and preserves all pre-conversion notes /
- *      pipeline history.
- *   5. Logs a single `communication_events` row tied to the *customer*
- *      (`related_entity_type='customer'`) and a metadata pointer back to
- *      the originating prospect for forward traceability.
+ * Promotes a prospect along multiple operational paths. `conversion_target`
+ * selects the destination (default: customer). All paths share a single linked
+ * customer record on the prospect once created — duplicate customer rows are
+ * avoided by reusing `converted_customer_id`.
  *
- * Gated by `canManageProspects`. Body fields are optional overrides for
- * the customer/contact insert; otherwise the server uses the prospect's
- * own data.
+ * Targets:
+ *   - customer — Phase 1 behaviour (customer + contact, prospect → won)
+ *   - quote — draft org_quote + proposal_sent
+ *   - work_order — open WO + linked customer
+ *   - equipment — asset stub under customer
+ *   - customer_location — site row (requires `location` in body)
+ *   - opportunity — internal org_tasks follow-up + qualified status
  */
 export async function POST(
   request: Request,
@@ -49,166 +41,67 @@ export async function POST(
   if ("error" in gate) return gate.error
   const { supabase, userId } = gate
 
-  let body: {
-    company_name?: string
-    contact_name?: string | null
-    contact_email?: string | null
-    contact_phone?: string | null
-  }
+  let body: Record<string, unknown>
   try {
-    body = (await request.json().catch(() => ({}))) as typeof body
+    body = (await request.json().catch(() => ({}))) as Record<string, unknown>
   } catch {
     body = {}
   }
 
-  const { data: prospect, error: lookupError } = await supabase
-    .from("prospects")
-    .select(
-      "id, status, company_name, contact_name, contact_email, contact_phone, converted_customer_id",
-    )
-    .eq("organization_id", organizationId)
-    .eq("id", prospectId)
-    .maybeSingle()
+  const target = parseConversionTarget(body.conversion_target)
+  if (target === "invalid") return jsonError("Invalid conversion_target.", 400)
 
-  if (lookupError) return jsonError(lookupError.message, 500, "query_failed")
-  if (!prospect) return jsonError("Prospect not found.", 404, "not_found")
-
-  if (prospect.converted_customer_id) {
-    return jsonError("Prospect has already been converted.", 409, "already_converted")
+  const overrides = {
+    company_name: typeof body.company_name === "string" ? body.company_name : undefined,
+    contact_name: typeof body.contact_name === "string" ? body.contact_name : undefined,
+    contact_email: typeof body.contact_email === "string" ? body.contact_email : undefined,
+    contact_phone: typeof body.contact_phone === "string" ? body.contact_phone : undefined,
   }
 
-  // Plan / billing gate — mirrors what AddCustomerModal calls client-side.
-  const billingGate = await requireCanCreateRecord(supabase, userId, organizationId, "customer")
-  if (!billingGate.ok) {
-    return NextResponse.json(
-      { error: billingGate.code, message: billingGate.message },
-      { status: billingGate.httpStatus },
-    )
-  }
+  const rawLoc = body.location
+  const location =
+    rawLoc && typeof rawLoc === "object"
+      ? {
+          name: optionalString((rawLoc as Record<string, unknown>).name, 200) ?? undefined,
+          address_line1: optionalString((rawLoc as Record<string, unknown>).address_line1, 400) ?? undefined,
+          address_line2: optionalString((rawLoc as Record<string, unknown>).address_line2, 400),
+          city: optionalString((rawLoc as Record<string, unknown>).city, 120) ?? undefined,
+          state: optionalString((rawLoc as Record<string, unknown>).state, 80) ?? undefined,
+          postal_code: optionalString((rawLoc as Record<string, unknown>).postal_code, 32) ?? undefined,
+          phone: optionalString((rawLoc as Record<string, unknown>).phone, 64),
+          contact_person: optionalString((rawLoc as Record<string, unknown>).contact_person, 200),
+          notes: optionalString((rawLoc as Record<string, unknown>).notes, 4000),
+          is_default: Boolean((rawLoc as Record<string, unknown>).is_default),
+        }
+      : undefined
 
-  const overrideCompany = optionalString(body.company_name, 200)
-  const overrideContactName = optionalString(body.contact_name, 200)
-  const overrideEmail = optionalString(body.contact_email, 200)
-  const overridePhone = optionalString(body.contact_phone, 100)
-
-  const company = overrideCompany ?? (prospect.company_name as string)
-  const contactName = overrideContactName ?? optionalString(prospect.contact_name, 200)
-  const contactEmail = overrideEmail ?? optionalString(prospect.contact_email, 200)
-  const contactPhone = overridePhone ?? optionalString(prospect.contact_phone, 100)
-
-  // 1. Insert the customer.
-  const { data: customer, error: insertError } = await supabase
-    .from("customers")
-    .insert({
-      organization_id: organizationId,
-      company_name: company,
-      status: "active",
-      created_by: userId,
-    })
-    .select("id, company_name")
-    .single()
-
-  if (insertError || !customer?.id) {
-    return jsonError(insertError?.message ?? "Could not create customer.", 500, "insert_failed")
-  }
-
-  // 2. Optional primary contact.
-  if (contactName || contactEmail || contactPhone) {
-    const fullName = contactName ?? company
-    const parts = fullName.split(/\s+/).filter(Boolean)
-    const firstName = parts[0] ?? null
-    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : null
-
-    const { error: contactError } = await supabase.from("customer_contacts").insert({
-      organization_id: organizationId,
-      customer_id: customer.id,
-      full_name: fullName,
-      first_name: firstName,
-      last_name: lastName,
-      role: "Primary",
-      email: contactEmail,
-      phone: contactPhone,
-      is_primary: true,
-    })
-
-    if (contactError) {
-      // Roll back the customer if the contact insert fails so we don't leave
-      // an orphan record. Mirrors what AddCustomerModal does on the client.
-      await supabase
-        .from("customers")
-        .delete()
-        .eq("id", customer.id)
-        .eq("organization_id", organizationId)
-      return jsonError(contactError.message, 500, "insert_failed")
-    }
-  }
-
-  // 3. Stamp the prospect as converted.
-  const convertedAt = new Date().toISOString()
-  const { error: stampError } = await supabase
-    .from("prospects")
-    .update({
-      converted_customer_id: customer.id,
-      converted_at: convertedAt,
-      status: "won",
-    })
-    .eq("organization_id", organizationId)
-    .eq("id", prospectId)
-
-  if (stampError) {
-    // Customer is already created; surface the error but leave the
-    // customer in place (the user can manually reconcile from the UI).
-    return jsonError(stampError.message, 500, "update_failed")
-  }
-
-  // 4a. Phase 2: emit the prospect status-change foundation (won) so the
-  //     prospect timeline + future workflow rules see the conversion as a
-  //     status delta. The conversion-specific customer-timeline event below
-  //     is intentionally separate so customers see "Prospect converted"
-  //     while the prospect timeline sees "Status: Quoted → Won".
-  if (typeof prospect.status === "string" && prospect.status !== "won") {
-    await recordProspectStatusChange({
-      supabase,
-      organizationId,
-      prospectId,
-      companyName: prospect.company_name as string,
-      previousStatus: prospect.status as ProspectStatus,
-      nextStatus: "won",
-      reason: "converted_to_customer",
-      actorUserId: userId,
-      extraMetadata: {
-        converted_customer_id: customer.id,
-      },
-    })
-  }
-
-  // 4b. Log a single conversion event on the customer timeline.
-  await logCommunicationEvent(supabase, {
+  const result = await runProspectConversion({
+    supabase,
+    userId,
     organizationId,
-    channel: "system",
-    direction: "outbound",
-    eventType: "prospect_converted",
-    title: `Prospect converted to customer · ${company}`,
-    summary: `Prospect "${prospect.company_name as string}" was converted to a customer.`,
-    audience: "organization",
-    countsTowardUnread: false,
-    deliveryStatus: "sent",
-    recipientKind: "none",
-    relatedEntityType: "customer",
-    relatedEntityId: customer.id,
-    provider: "manual",
-    metadata: {
-      prospect_id: prospectId,
-      converted_at: convertedAt,
-    },
-    sentAt: convertedAt,
-    createdBy: userId,
+    prospectId,
+    target,
+    overrides,
+    location,
   })
+
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.code, message: result.message },
+      { status: result.httpStatus },
+    )
+  }
 
   return NextResponse.json({
     ok: true,
-    customer_id: customer.id,
-    customer_name: customer.company_name,
-    converted_at: convertedAt,
+    conversion_target: target,
+    customer_id: result.customer_id,
+    customer_name: result.customer_name,
+    converted_at: result.converted_at,
+    quote_id: result.quote_id,
+    work_order_id: result.work_order_id,
+    equipment_id: result.equipment_id,
+    location_id: result.location_id,
+    org_task_id: result.org_task_id,
   })
 }

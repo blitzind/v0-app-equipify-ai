@@ -17,10 +17,13 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  Columns3,
   Inbox,
+  LayoutList,
   Plus,
   Search,
   Sparkles,
+  TrendingUp,
   Users,
 } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -46,7 +49,9 @@ import { useToast } from "@/hooks/use-toast"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { ProspectFormDialog } from "@/components/prospects/prospect-form-dialog"
 import { ProspectDrawer } from "@/components/prospects/prospect-drawer"
+import { ProspectPipelineBoard } from "@/components/prospects/prospect-pipeline-board"
 import {
+  ACTIVE_PROSPECT_STATUSES,
   PROSPECT_STATUSES,
   type FollowUpBucket,
   type ProspectListItem,
@@ -63,6 +68,17 @@ import {
 import { cn } from "@/lib/utils"
 
 type ArchiveScope = "active" | "archived" | "all"
+
+type ViewMode = "table" | "pipeline"
+
+type AssigneeOption = { id: string; label: string }
+
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return null
+  return Math.max(0, Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24)))
+}
 
 /**
  * `useSearchParams` requires a Suspense boundary during static export. The
@@ -116,6 +132,8 @@ function ProspectsPageInner() {
   const [createOpen, setCreateOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeProspect, setActiveProspect] = useState<ProspectListItem | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>("table")
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([])
 
   const baseUrl = organizationId
     ? `/api/organizations/${encodeURIComponent(organizationId)}/prospects`
@@ -151,6 +169,26 @@ function ProspectsPageInner() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!organizationId || orgStatus !== "ready") return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/prospect-assignees`,
+          { cache: "no-store" },
+        )
+        const j = (await res.json().catch(() => ({}))) as { assignees?: AssigneeOption[] }
+        if (!cancelled && res.ok && Array.isArray(j.assignees)) setAssignees(j.assignees)
+      } catch {
+        if (!cancelled) setAssignees([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, orgStatus])
+
   // Re-sync the active drawer prospect when the underlying list refreshes
   // (e.g. after edit/follow-up/convert).
   useEffect(() => {
@@ -182,23 +220,71 @@ function ProspectsPageInner() {
   }, [rows])
 
   const statusKpis = useMemo(() => {
-    const map: Record<ProspectStatus, number> = {
-      new: 0,
-      contacted: 0,
-      follow_up: 0,
-      quoted: 0,
-      won: 0,
-      lost: 0,
-    }
+    const map = {} as Record<ProspectStatus, number>
+    for (const s of PROSPECT_STATUSES) map[s] = 0
     for (const r of rows) {
       if (r.status in map) map[r.status as ProspectStatus] += 1
     }
     return map
   }, [rows])
 
+  const operationalMetrics = useMemo(() => {
+    const active = rows.filter((r) => !r.archived_at)
+    const openPipeline = active.filter((r) => ACTIVE_PROSPECT_STATUSES.includes(r.status))
+    const pipelineValueCents = openPipeline.reduce((acc, r) => acc + (r.estimated_value_cents ?? 0), 0)
+    const staleOpen = openPipeline.filter((r) => {
+      const d = daysSince(r.created_at)
+      return d != null && d >= 14
+    }).length
+    const decided = statusKpis.won + statusKpis.lost
+    const winRatePct = decided > 0 ? Math.round((100 * statusKpis.won) / decided) : null
+    const openCount = openPipeline.length
+    const withFollowUp = openPipeline.filter((r) => r.next_follow_up_at).length
+    const followUpCompliancePct =
+      openCount > 0 ? Math.round((100 * withFollowUp) / openCount) : null
+    let overdueActive = 0
+    for (const r of active) {
+      if (followUpBucketFor(r.next_follow_up_at) === "overdue") overdueActive += 1
+    }
+    return {
+      pipelineValueCents,
+      staleOpen,
+      winRatePct,
+      followUpCompliancePct,
+      overdueActive,
+    }
+  }, [rows, statusKpis])
+
   function openProspect(p: ProspectListItem) {
     setActiveProspect(p)
     setDrawerOpen(true)
+  }
+
+  async function handlePipelinePatch(prospectId: string, status: ProspectStatus) {
+    if (!organizationId || !canManage) return false
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/prospects/${encodeURIComponent(prospectId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        },
+      )
+      const j = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) {
+        toast({
+          title: j.message ?? "Could not move card",
+          variant: "destructive",
+        })
+        return false
+      }
+      void load()
+      return true
+    } catch {
+      toast({ title: "Could not move card", variant: "destructive" })
+      return false
+    }
   }
 
   const isLoadingState = loading || permStatus === "loading"
@@ -288,7 +374,38 @@ function ProspectsPageInner() {
           value={statusKpis.won}
           icon={CheckCircle2}
           tone="emerald"
-          sub={`Quoted: ${statusKpis.quoted} · Lost: ${statusKpis.lost}`}
+          sub={`Proposal sent: ${statusKpis.proposal_sent} · Lost: ${statusKpis.lost}`}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiTile
+          label="Pipeline value (open)"
+          value={`${formatEstimatedValue(operationalMetrics.pipelineValueCents)}`}
+          icon={TrendingUp}
+          tone="blue"
+          sub="Estimated across active stages"
+        />
+        <KpiTile
+          label="Win rate"
+          value={operationalMetrics.winRatePct != null ? `${operationalMetrics.winRatePct}%` : "—"}
+          icon={Sparkles}
+          tone="violet"
+          sub="Won ÷ (won + lost) on this list"
+        />
+        <KpiTile
+          label="Stale leads (14d+)"
+          value={operationalMetrics.staleOpen}
+          icon={CalendarClock}
+          tone={operationalMetrics.staleOpen > 0 ? "amber" : "muted"}
+          sub="Open pipeline, aging from created date"
+        />
+        <KpiTile
+          label="Follow-up coverage"
+          value={operationalMetrics.followUpCompliancePct != null ? `${operationalMetrics.followUpCompliancePct}%` : "—"}
+          icon={CheckCircle2}
+          tone="emerald"
+          sub={`Open rows with a next step · ${operationalMetrics.overdueActive} overdue touches`}
         />
       </div>
 
@@ -352,6 +469,31 @@ function ProspectsPageInner() {
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
           </Select>
+
+          <div className="flex rounded-lg border border-border bg-card p-0.5 shrink-0">
+            <Button
+              type="button"
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-9 px-2.5 gap-1.5"
+              onClick={() => setViewMode("table")}
+              title="Table view"
+            >
+              <LayoutList className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline text-xs font-medium">Table</span>
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "pipeline" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-9 px-2.5 gap-1.5"
+              onClick={() => setViewMode("pipeline")}
+              title="Pipeline view"
+            >
+              <Columns3 className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline text-xs font-medium">Pipeline</span>
+            </Button>
+          </div>
         </div>
 
         {canManage ? (
@@ -372,8 +514,22 @@ function ProspectsPageInner() {
         </p>
       ) : null}
 
-      {/* Table */}
+      {/* Table or pipeline */}
       <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.15)]">
+        {viewMode === "pipeline" ? (
+          <div className="p-4 sm:p-5">
+            {followUpFiltered.length === 0 && !loading ? (
+              <EmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
+            ) : (
+              <ProspectPipelineBoard
+                prospects={followUpFiltered}
+                canManage={canManage}
+                onOpen={openProspect}
+                onPipelinePatch={handlePipelinePatch}
+              />
+            )}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -381,6 +537,8 @@ function ProspectsPageInner() {
                 <TableHead>Company</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Assigned</TableHead>
+                <TableHead>Next action</TableHead>
                 <TableHead>Next follow-up</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="text-right">Estimated value</TableHead>
@@ -389,13 +547,13 @@ function ProspectsPageInner() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground py-8 text-center">
+                  <TableCell colSpan={8} className="text-sm text-muted-foreground py-8 text-center">
                     Loading prospects…
                   </TableCell>
                 </TableRow>
               ) : followUpFiltered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-7 sm:py-8 text-center align-middle">
+                  <TableCell colSpan={8} className="py-7 sm:py-8 text-center align-middle">
                     <EmptyState canManage={canManage} onCreate={() => setCreateOpen(true)} />
                   </TableCell>
                 </TableRow>
@@ -448,6 +606,12 @@ function ProspectsPageInner() {
                           {formatProspectStatus(p.status)}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
+                        {p.assigned_to_label ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[140px] truncate">
+                        {p.next_action_owner_label ?? "—"}
+                      </TableCell>
                       <TableCell className={cn("text-sm tabular-nums", followUpTone)}>
                         {p.next_follow_up_at ? formatFollowUpStamp(p.next_follow_up_at) : "—"}
                       </TableCell>
@@ -464,6 +628,7 @@ function ProspectsPageInner() {
             </TableBody>
           </Table>
         </div>
+        )}
       </div>
 
       <ProspectFormDialog
@@ -471,6 +636,7 @@ function ProspectsPageInner() {
         onOpenChange={setCreateOpen}
         organizationId={organizationId ?? ""}
         prospect={null}
+        assignees={assignees}
         onSaved={(saved) => {
           setCreateOpen(false)
           void load()
@@ -488,6 +654,7 @@ function ProspectsPageInner() {
         organizationId={organizationId ?? ""}
         prospect={activeProspect}
         canManage={canManage}
+        assignees={assignees}
         onChanged={() => {
           void load()
         }}
@@ -505,7 +672,7 @@ function KpiTile({
   onClick,
 }: {
   label: string
-  value: number
+  value: number | string
   icon: typeof Sparkles
   tone: "rose" | "amber" | "blue" | "emerald" | "violet" | "muted"
   sub: string

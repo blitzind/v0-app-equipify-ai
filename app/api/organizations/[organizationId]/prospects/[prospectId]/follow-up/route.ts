@@ -3,7 +3,7 @@ import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { parseOptionalIso, optionalString } from "@/lib/prospects/server-helpers"
 import { recordProspectStatusChange } from "@/lib/prospects/status-events"
-import type { ProspectStatus } from "@/lib/prospects/types"
+import { PROSPECT_STATUSES, type ProspectStatus } from "@/lib/prospects/types"
 import type { CommunicationChannel } from "@/lib/notifications/types"
 
 export const runtime = "nodejs"
@@ -131,16 +131,18 @@ export async function POST(
     return jsonError(eventResult.error, 500, "log_failed")
   }
 
+  const advanceAllowed = new Set<string>(PROSPECT_STATUSES)
+
   // 2 + 3. Update prospect timestamps and (optionally) advance status.
   const update: Record<string, unknown> = {
     last_contacted_at: new Date().toISOString(),
+    last_contacted_by_user_id: userId,
   }
   if (followUp !== null) update.next_follow_up_at = followUp
 
   if (typeof body.advance_status === "string") {
     const advanceTo = body.advance_status.toLowerCase()
-    const allowed = new Set(["new", "contacted", "follow_up", "quoted", "won", "lost"])
-    if (allowed.has(advanceTo)) update.status = advanceTo
+    if (advanceAllowed.has(advanceTo)) update.status = advanceTo
   } else if (prospect.status === "new") {
     // First touch defaults to "contacted" so the pipeline progresses
     // without an extra click.

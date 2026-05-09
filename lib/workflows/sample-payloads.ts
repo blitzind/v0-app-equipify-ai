@@ -25,7 +25,7 @@ export const SAMPLE_PAYLOADS: Record<
       contact_name: "Jordan Lee",
       contact_email: "jordan@acme.example",
       previous_status: "contacted",
-      next_status: "quoted",
+      next_status: "proposal_sent",
       reason: "manual_edit",
       next_follow_up_at: "2026-05-12T14:00:00Z",
       estimated_value_cents: 480000,

@@ -38,6 +38,8 @@ export type ProspectFormDialogProps = {
   onOpenChange: (open: boolean) => void
   organizationId: string
   prospect: ProspectListItem | null
+  /** Org members for ownership pickers (optional). */
+  assignees?: Array<{ id: string; label: string }>
   onSaved: (prospect: ProspectListItem) => void
 }
 
@@ -51,6 +53,8 @@ type FormState = {
   next_follow_up_at: string
   estimated_value_dollars: string
   notes: string
+  assigned_to_user_id: string
+  next_action_owner_user_id: string
 }
 
 const EMPTY: FormState = {
@@ -63,6 +67,8 @@ const EMPTY: FormState = {
   next_follow_up_at: "",
   estimated_value_dollars: "",
   notes: "",
+  assigned_to_user_id: "",
+  next_action_owner_user_id: "",
 }
 
 function toLocalDateInput(iso: string | null | undefined): string {
@@ -80,6 +86,7 @@ export function ProspectFormDialog({
   onOpenChange,
   organizationId,
   prospect,
+  assignees = [],
   onSaved,
 }: ProspectFormDialogProps) {
   const { toast } = useToast()
@@ -102,6 +109,8 @@ export function ProspectFormDialog({
             ? String(Math.round(Number(prospect.estimated_value_cents) / 100))
             : "",
         notes: prospect.notes ?? "",
+        assigned_to_user_id: prospect.assigned_to_user_id ?? "",
+        next_action_owner_user_id: prospect.next_action_owner_user_id ?? "",
       })
     } else {
       setForm(EMPTY)
@@ -142,6 +151,8 @@ export function ProspectFormDialog({
       next_follow_up_at: followUpIso,
       estimated_value_cents: cents,
       notes: form.notes.trim() || null,
+      assigned_to_user_id: form.assigned_to_user_id.trim() || null,
+      next_action_owner_user_id: form.next_action_owner_user_id.trim() || null,
     }
 
     setSaving(true)
@@ -274,6 +285,48 @@ export function ProspectFormDialog({
               placeholder="What do they need? Pain points? Decision-maker?"
             />
           </div>
+          {assignees.length > 0 ? (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Assigned rep</Label>
+                <Select
+                  value={form.assigned_to_user_id || "__none__"}
+                  onValueChange={(v) => set("assigned_to_user_id", v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Next action owner</Label>
+                <Select
+                  value={form.next_action_owner_user_id || "__none__"}
+                  onValueChange={(v) => set("next_action_owner_user_id", v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Same as assigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {assignees.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" type="button" onClick={() => onOpenChange(false)} disabled={saving}>
