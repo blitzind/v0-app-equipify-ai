@@ -470,6 +470,7 @@ function CustomersPageInner() {
         (c) =>
           c.company.toLowerCase().includes(q) ||
           c.name.toLowerCase().includes(q) ||
+          (c.parent?.companyName?.toLowerCase().includes(q) ?? false) ||
           c.locations.some((l) => l.city.toLowerCase().includes(q))
       )
     }

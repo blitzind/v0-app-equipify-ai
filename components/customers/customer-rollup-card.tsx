@@ -1,17 +1,8 @@
 "use client"
 
 /**
- * Customer Hierarchy — Phase 2
- *
- * Operational rollup card mounted on the **parent** customer detail page.
- * Aggregates equipment, locations, work orders, and invoice totals across
- * the parent + its descendant accounts.
- *
- * Strict rules:
- *   - never expose raw UUIDs (parent/child names come from the rollup tree)
- *   - dark-mode + mobile responsive
- *   - non-blocking: renders a soft loading state and degrades to zero values
- *     on RLS deny / network error
+ * Parent-account rollup on customer detail — operational + optional financial totals.
+ * Phase 33: **direct** (this customer) vs **with sub-accounts** (rolled up).
  */
 
 import Link from "next/link"
@@ -19,24 +10,30 @@ import {
   AlertTriangle,
   BarChart3,
   ClipboardList,
-  Layers,
+  FilePen,
+  Inbox,
   MapPin,
   ReceiptText,
   Wrench,
+  CalendarClock,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import {
   formatCentsCompact,
   type CustomerRollupMetrics,
+  type CustomerRollupSlice,
 } from "@/lib/customers/rollup-metrics"
 
 type Props = {
   metrics: CustomerRollupMetrics | null
   loading?: boolean
-  /** Root customer name; used in helper copy. */
   rootCompanyName: string
   className?: string
+  /** Mirrors `loadCustomerRollupMetrics({ includeFinancialRollup })`. */
+  financialRollupEnabled: boolean
+  /** Mirrors `loadCustomerRollupMetrics({ includeQuotesRollup })`. */
+  quotesRollupEnabled: boolean
 }
 
 function StatCell({
@@ -82,14 +79,106 @@ function StatCell({
       <span className={cn("text-base font-semibold tabular-nums leading-tight", valueCls)}>
         {value}
       </span>
-      {sub ? (
-        <span className="text-[10px] text-muted-foreground">{sub}</span>
-      ) : null}
+      {sub ? <span className="text-[10px] text-muted-foreground">{sub}</span> : null}
     </div>
   )
 }
 
-export function CustomerRollupCard({ metrics, loading, rootCompanyName, className }: Props) {
+function SliceSection({
+  title,
+  slice,
+  showFinancials,
+  showQuotes,
+}: {
+  title: string
+  slice: CustomerRollupSlice
+  showFinancials: boolean
+  showQuotes: boolean
+}) {
+  const fin = slice.invoiceTotalsCents
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <StatCell
+          icon={<MapPin className="h-3 w-3" aria-hidden />}
+          label="Locations"
+          value={String(slice.locationCount)}
+        />
+        <StatCell
+          icon={<Wrench className="h-3 w-3" aria-hidden />}
+          label="Equipment"
+          value={String(slice.equipmentCount)}
+        />
+        <StatCell
+          icon={<ClipboardList className="h-3 w-3" aria-hidden />}
+          label="Open WOs"
+          value={String(slice.openWorkOrderCount)}
+          sub={slice.inProgressWorkOrderCount > 0 ? `${slice.inProgressWorkOrderCount} in progress` : undefined}
+          tone={slice.openWorkOrderCount > 0 ? "warning" : "default"}
+        />
+        <StatCell
+          icon={<AlertTriangle className="h-3 w-3" aria-hidden />}
+          label="Overdue WOs"
+          value={String(slice.overdueWorkOrderCount)}
+          tone={slice.overdueWorkOrderCount > 0 ? "danger" : "default"}
+        />
+        <StatCell
+          icon={<Inbox className="h-3 w-3" aria-hidden />}
+          label="Open requests"
+          value={String(slice.openServiceRequestCount)}
+          tone={slice.openServiceRequestCount > 0 ? "warning" : "default"}
+        />
+        <StatCell
+          icon={<CalendarClock className="h-3 w-3" aria-hidden />}
+          label="Upcoming maint."
+          value={String(slice.upcomingMaintenanceCount)}
+          sub="next 60 days"
+        />
+        {showQuotes ?
+          <StatCell
+            icon={<FilePen className="h-3 w-3" aria-hidden />}
+            label="Open quotes"
+            value={String(slice.openQuotesCount)}
+            sub="draft / sent / pending"
+            tone={slice.openQuotesCount > 0 ? "primary" : "default"}
+          />
+        : null}
+        {showFinancials && fin ?
+          <>
+            <StatCell
+              icon={<ReceiptText className="h-3 w-3" aria-hidden />}
+              label="Unpaid total"
+              value={formatCentsCompact(fin.unpaid)}
+              tone={fin.unpaid > 0 ? "warning" : "default"}
+            />
+            <StatCell
+              icon={<AlertTriangle className="h-3 w-3" aria-hidden />}
+              label="Overdue total"
+              value={formatCentsCompact(fin.overdue)}
+              tone={fin.overdue > 0 ? "danger" : "default"}
+            />
+            <StatCell
+              icon={<ReceiptText className="h-3 w-3" aria-hidden />}
+              label="Paid (1y)"
+              value={formatCentsCompact(fin.paidLast365)}
+              sub="last 365 days"
+            />
+          </>
+        : null}
+      </div>
+    </div>
+  )
+}
+
+export function CustomerRollupCard({
+  metrics,
+  loading,
+  rootCompanyName,
+  className,
+  financialRollupEnabled,
+  quotesRollupEnabled,
+}: Props) {
   if (loading || !metrics) {
     return (
       <Card className={cn("border-border", className)}>
@@ -108,17 +197,7 @@ export function CustomerRollupCard({ metrics, loading, rootCompanyName, classNam
     )
   }
 
-  const {
-    childAccountCount,
-    locationCount,
-    equipmentCount,
-    openWorkOrderCount,
-    overdueWorkOrderCount,
-    inProgressWorkOrderCount,
-    invoiceTotalsCents,
-  } = metrics
-
-  if (childAccountCount === 0) return null
+  if (metrics.childAccountCount === 0) return null
 
   return (
     <Card className={cn("border-border", className)}>
@@ -128,69 +207,41 @@ export function CustomerRollupCard({ metrics, loading, rootCompanyName, classNam
           Parent rollup
         </CardTitle>
         <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-          {childAccountCount} sub-account{childAccountCount === 1 ? "" : "s"}
+          {metrics.childAccountCount} sub-account{metrics.childAccountCount === 1 ? "" : "s"}
         </span>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-5">
         <p className="text-xs text-muted-foreground">
-          Operational totals across <span className="font-medium text-foreground">{rootCompanyName}</span>{" "}
-          and its sub-accounts. Click any sub-account below to drill in.
+          Reporting-only totals for <span className="font-medium text-foreground">{rootCompanyName}</span>. Invoices
+          stay owned by each sub-account; nothing is merged for billing.
         </p>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          <StatCell
-            icon={<Layers className="h-3 w-3" aria-hidden />}
-            label="Sub-accounts"
-            value={String(childAccountCount)}
-            tone="primary"
-          />
-          <StatCell
-            icon={<MapPin className="h-3 w-3" aria-hidden />}
-            label="Locations"
-            value={String(locationCount)}
-          />
-          <StatCell
-            icon={<Wrench className="h-3 w-3" aria-hidden />}
-            label="Equipment"
-            value={String(equipmentCount)}
-          />
-          <StatCell
-            icon={<ClipboardList className="h-3 w-3" aria-hidden />}
-            label="Open WOs"
-            value={String(openWorkOrderCount)}
-            sub={inProgressWorkOrderCount > 0 ? `${inProgressWorkOrderCount} in progress` : undefined}
-            tone={openWorkOrderCount > 0 ? "warning" : "default"}
-          />
-          <StatCell
-            icon={<AlertTriangle className="h-3 w-3" aria-hidden />}
-            label="Overdue WOs"
-            value={String(overdueWorkOrderCount)}
-            tone={overdueWorkOrderCount > 0 ? "danger" : "default"}
-          />
-          <StatCell
-            icon={<ReceiptText className="h-3 w-3" aria-hidden />}
-            label="Unpaid total"
-            value={formatCentsCompact(invoiceTotalsCents.unpaid)}
-            tone={invoiceTotalsCents.unpaid > 0 ? "warning" : "default"}
-          />
-          <StatCell
-            icon={<AlertTriangle className="h-3 w-3" aria-hidden />}
-            label="Overdue total"
-            value={formatCentsCompact(invoiceTotalsCents.overdue)}
-            tone={invoiceTotalsCents.overdue > 0 ? "danger" : "default"}
-          />
-          <StatCell
-            icon={<ReceiptText className="h-3 w-3" aria-hidden />}
-            label="Paid (1y)"
-            value={formatCentsCompact(invoiceTotalsCents.paidLast365)}
-            sub="last 365 days"
+        <SliceSection
+          title="This account (direct)"
+          slice={metrics.direct}
+          showFinancials={financialRollupEnabled}
+          showQuotes={quotesRollupEnabled}
+        />
+
+        <div className="border-t border-border pt-4">
+          <SliceSection
+            title="With all sub-accounts (rolled up)"
+            slice={metrics.withSubAccounts}
+            showFinancials={financialRollupEnabled}
+            showQuotes={quotesRollupEnabled}
           />
         </div>
 
-        {metrics.tree.length > 1 ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
+        {!financialRollupEnabled ?
+          <p className="text-[11px] text-muted-foreground">
+            Invoice and payment totals are hidden without billing or financial visibility.
+          </p>
+        : null}
+
+        {metrics.tree.length > 1 ?
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Sub-accounts in this rollup:
+              Sub-accounts:
             </span>
             {metrics.tree
               .filter((t) => t.id !== metrics.tree[0]?.id)
@@ -204,13 +255,11 @@ export function CustomerRollupCard({ metrics, loading, rootCompanyName, classNam
                   {node.companyName}
                 </Link>
               ))}
-            {metrics.tree.length - 1 > 8 ? (
-              <span className="text-[11px] text-muted-foreground">
-                + {metrics.tree.length - 1 - 8} more
-              </span>
-            ) : null}
+            {metrics.tree.length - 1 > 8 ?
+              <span className="text-[11px] text-muted-foreground">+ {metrics.tree.length - 1 - 8} more</span>
+            : null}
           </div>
-        ) : null}
+        : null}
       </CardContent>
     </Card>
   )

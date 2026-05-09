@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import {
   MapPin,
   Phone,
@@ -476,6 +478,7 @@ export default function CustomerDetailPage() {
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageCustomerRecords = !assignedOnlyView
   const canViewCustomerFinancials = permissions.canViewFinancials || permissions.canViewBilling
+  const canViewQuotes = permissions.canViewQuotes
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -556,6 +559,8 @@ export default function CustomerDetailPage() {
   const [locationSearch, setLocationSearch] = useState("")
   const [equipmentSiteFilter, setEquipmentSiteFilter] = useState<string>("all")
   const [workOrderSiteFilter, setWorkOrderSiteFilter] = useState<string>("all")
+  /** Parent accounts only: merge sub-account rows into equipment / WO / SR lists (RLS + assigned scope still apply). */
+  const [includeChildAccountsInTables, setIncludeChildAccountsInTables] = useState(false)
 
   const locationLabelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -1011,6 +1016,9 @@ export default function CustomerDetailPage() {
       const metrics = await loadCustomerRollupMetrics(supabase, {
         organizationId: hierarchySummary.organizationId,
         rootCustomerId: hierarchySummary.customerId,
+        maxDepth: 1,
+        includeFinancialRollup: canViewCustomerFinancials,
+        includeQuotesRollup: canViewQuotes,
       }).catch(() => null)
       if (cancelled) return
       setRollupMetrics(metrics)
@@ -1019,7 +1027,7 @@ export default function CustomerDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [hierarchySummary, refreshToken])
+  }, [hierarchySummary, refreshToken, canViewCustomerFinancials, canViewQuotes])
 
   // Invoicing Phase 3 — invoice aging for this customer (and consolidated
   // rollup when this account has sub-accounts).
@@ -1044,6 +1052,7 @@ export default function CustomerDetailPage() {
         const tree = await loadCustomerRollupTree(supabase, {
           organizationId: customer.organizationId,
           rootCustomerId: customer.id,
+          maxDepth: 1,
         }).catch(() => [])
         if (tree.length > 0) consolidatedIds = tree.map((n) => n.id)
       }
@@ -1094,6 +1103,7 @@ export default function CustomerDetailPage() {
         const tree = await loadCustomerRollupTree(supabase, {
           organizationId: customer.organizationId,
           rootCustomerId: customer.id,
+          maxDepth: 1,
         }).catch(() => [])
         if (tree.length > 0) customerIds = tree.map((n) => n.id)
       }
@@ -1137,36 +1147,73 @@ export default function CustomerDetailPage() {
         })
       }
 
-      const { data: eqRows, error: eqError } = await supabase
+      const expandChildren =
+        includeChildAccountsInTables && (hierarchySummary?.childCount ?? 0) > 0
+      let targetCustomerIds = [customer.id]
+      if (expandChildren) {
+        const tree = await loadCustomerRollupTree(supabase, {
+          organizationId: customer.organizationId,
+          rootCustomerId: customer.id,
+          maxDepth: 1,
+        }).catch(() => [])
+        if (tree.length > 0) targetCustomerIds = tree.map((t) => t.id)
+      }
+
+      let eqQuery = supabase
         .from("equipment")
         .select(
           "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, customer_location_id, install_date, warranty_expires_at, last_service_at, notes, created_at",
         )
         .eq("organization_id", customer.organizationId)
-        .eq("customer_id", customer.id)
         .is("archived_at", null)
         .order("name", { ascending: true })
+      eqQuery =
+        targetCustomerIds.length === 1 ?
+          eqQuery.eq("customer_id", targetCustomerIds[0]!)
+        : eqQuery.in("customer_id", targetCustomerIds)
+
+      const { data: eqRows, error: eqError } = await eqQuery
 
       if (!active) return
 
-      let woRes = await supabase
-        .from("work_orders")
-        .select(WO_LIST_SELECT_WITH_NUM)
-        .eq("organization_id", customer.organizationId)
-        .eq("customer_id", customer.id)
-        .is("archived_at", null)
-        .order("created_at", { ascending: false })
-        .limit(200)
+      let woRes =
+        targetCustomerIds.length === 1 ?
+          await supabase
+            .from("work_orders")
+            .select(WO_LIST_SELECT_WITH_NUM)
+            .eq("organization_id", customer.organizationId)
+            .eq("customer_id", targetCustomerIds[0]!)
+            .is("archived_at", null)
+            .order("created_at", { ascending: false })
+            .limit(400)
+        : await supabase
+            .from("work_orders")
+            .select(WO_LIST_SELECT_WITH_NUM)
+            .eq("organization_id", customer.organizationId)
+            .in("customer_id", targetCustomerIds)
+            .is("archived_at", null)
+            .order("created_at", { ascending: false })
+            .limit(400)
 
       if (woRes.error && missingWorkOrderNumberColumn(woRes.error)) {
-        woRes = await supabase
-          .from("work_orders")
-          .select(WO_LIST_SELECT)
-          .eq("organization_id", customer.organizationId)
-          .eq("customer_id", customer.id)
-          .is("archived_at", null)
-          .order("created_at", { ascending: false })
-          .limit(200)
+        woRes =
+          targetCustomerIds.length === 1 ?
+            await supabase
+              .from("work_orders")
+              .select(WO_LIST_SELECT)
+              .eq("organization_id", customer.organizationId)
+              .eq("customer_id", targetCustomerIds[0]!)
+              .is("archived_at", null)
+              .order("created_at", { ascending: false })
+              .limit(400)
+          : await supabase
+              .from("work_orders")
+              .select(WO_LIST_SELECT)
+              .eq("organization_id", customer.organizationId)
+              .in("customer_id", targetCustomerIds)
+              .is("archived_at", null)
+              .order("created_at", { ascending: false })
+              .limit(400)
       }
 
       if (!active) return
@@ -1212,7 +1259,7 @@ export default function CustomerDetailPage() {
     return () => {
       active = false
     }
-  }, [customer, refreshToken, assignedOnlyView])
+  }, [customer, refreshToken, assignedOnlyView, includeChildAccountsInTables, hierarchySummary])
 
   useEffect(() => {
     if (!customer) {
@@ -1227,15 +1274,32 @@ export default function CustomerDetailPage() {
     const supabase = createBrowserSupabaseClient()
 
     void (async () => {
-      const { data: srRows, error: srErr } = await supabase
+      const expandChildren =
+        includeChildAccountsInTables && (hierarchySummary?.childCount ?? 0) > 0
+      let targetCustomerIds = [customer.id]
+      if (expandChildren) {
+        const tree = await loadCustomerRollupTree(supabase, {
+          organizationId: customer.organizationId,
+          rootCustomerId: customer.id,
+          maxDepth: 1,
+        }).catch(() => [])
+        if (tree.length > 0) targetCustomerIds = tree.map((t) => t.id)
+      }
+
+      let srQuery = supabase
         .from("org_service_requests")
         .select(
           "id, customer_location_id, equipment_id, status, urgency, issue_summary, created_at, converted_work_order_id",
         )
         .eq("organization_id", customer.organizationId)
-        .eq("customer_id", customer.id)
         .order("created_at", { ascending: false })
-        .limit(400)
+        .limit(600)
+      srQuery =
+        targetCustomerIds.length === 1 ?
+          srQuery.eq("customer_id", targetCustomerIds[0]!)
+        : srQuery.in("customer_id", targetCustomerIds)
+
+      const { data: srRows, error: srErr } = await srQuery
 
       if (!active) return
 
@@ -1246,11 +1310,15 @@ export default function CustomerDetailPage() {
       }
 
       if (canViewCustomerFinancials) {
-        const { data: invRows, error: invErr } = await supabase
+        let invQuery = supabase
           .from("org_invoices")
           .select("amount_cents, status, equipment_id")
           .eq("organization_id", customer.organizationId)
-          .eq("customer_id", customer.id)
+        invQuery =
+          targetCustomerIds.length === 1 ?
+            invQuery.eq("customer_id", targetCustomerIds[0]!)
+          : invQuery.in("customer_id", targetCustomerIds)
+        const { data: invRows, error: invErr } = await invQuery
         if (!active) return
         if (invErr) {
           setCustomerInvoicesForMl([])
@@ -1267,7 +1335,7 @@ export default function CustomerDetailPage() {
     return () => {
       active = false
     }
-  }, [customer, refreshToken, canViewCustomerFinancials])
+  }, [customer, refreshToken, canViewCustomerFinancials, includeChildAccountsInTables, hierarchySummary])
 
   useEffect(() => {
     if (!customer) return
@@ -2142,6 +2210,26 @@ export default function CustomerDetailPage() {
         />
       ) : null}
 
+      {hierarchySummary && hierarchySummary.childCount > 0 ?
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="include-child-rows" className="text-sm font-medium text-foreground">
+              Include sub-accounts in lists
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Merge direct sub-accounts into equipment, work orders, service requests, and invoice-driven overview
+              metrics (one level). Sub-account service sites are not combined into this account’s location list. Portal
+              access is unchanged.
+            </p>
+          </div>
+          <Switch
+            id="include-child-rows"
+            checked={includeChildAccountsInTables}
+            onCheckedChange={setIncludeChildAccountsInTables}
+          />
+        </div>
+      : null}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-card border border-border h-auto flex-wrap justify-start gap-1 p-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">
@@ -2190,6 +2278,8 @@ export default function CustomerDetailPage() {
               metrics={rollupMetrics}
               loading={rollupLoading}
               rootCompanyName={customer.company}
+              financialRollupEnabled={canViewCustomerFinancials}
+              quotesRollupEnabled={canViewQuotes}
             />
           ) : null}
 
@@ -2422,6 +2512,7 @@ export default function CustomerDetailPage() {
                   organizationId={hierarchySummary.organizationId}
                   parentCustomerId={hierarchySummary.customerId}
                   parentCompanyName={customer.company}
+                  showUnpaidInvoices={canViewCustomerFinancials}
                 />
               ) : null}
 

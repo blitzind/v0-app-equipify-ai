@@ -29,21 +29,34 @@ type ChildRow = {
   equipmentCount: number
   openWorkOrderCount: number
   recentInvoiceCount: number
+  /** Sum of sent + unpaid + overdue invoice amounts (cents); only when `showUnpaidInvoices`. */
+  unpaidInvoiceCents: number | null
 }
 
 type Props = {
   organizationId: string
   parentCustomerId: string
   parentCompanyName: string
+  /** Requires billing / financial visibility — unpaid totals stay hidden otherwise. */
+  showUnpaidInvoices?: boolean
   className?: string
 }
 
 const OPEN_WO_STATUSES = ["open", "scheduled", "in_progress"] as const
 
+function formatUsd0(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(cents / 100)
+}
+
 export function ChildAccountsCard({
   organizationId,
   parentCustomerId,
   parentCompanyName,
+  showUnpaidInvoices = false,
   className,
 }: Props) {
   const [rows, setRows] = useState<ChildRow[] | null>(null)
@@ -96,7 +109,9 @@ export function ChildAccountsCard({
       // Bulk-fetch counts in parallel. Each query is RLS-safe.
       const since = new Date()
       since.setMonth(since.getMonth() - 12)
-      const [locRes, eqRes, woRes, invRes] = await Promise.all([
+      const invSelect = showUnpaidInvoices ? "customer_id, amount_cents, status" : "customer_id"
+
+      const [locRes, eqRes, woRes, invRes, unpaidRes] = await Promise.all([
         supabase
           .from("customer_locations")
           .select("customer_id")
@@ -118,10 +133,18 @@ export function ChildAccountsCard({
           .in("status", OPEN_WO_STATUSES as unknown as string[]),
         supabase
           .from("org_invoices")
-          .select("customer_id")
+          .select(invSelect)
           .eq("organization_id", organizationId)
           .in("customer_id", childIds)
           .gte("issued_at", since.toISOString().slice(0, 10)),
+        showUnpaidInvoices ?
+          supabase
+            .from("org_invoices")
+            .select("customer_id, amount_cents, status")
+            .eq("organization_id", organizationId)
+            .in("customer_id", childIds)
+            .in("status", ["sent", "unpaid", "overdue"])
+        : Promise.resolve({ data: null, error: null }),
       ])
 
       if (cancelled) return
@@ -130,6 +153,7 @@ export function ChildAccountsCard({
       const eqMap = new Map<string, number>()
       const woMap = new Map<string, number>()
       const invMap = new Map<string, number>()
+      const unpaidMap = new Map<string, number>()
 
       for (const r of (locRes.data ?? []) as Array<{ customer_id: string }>) {
         locMap.set(r.customer_id, (locMap.get(r.customer_id) ?? 0) + 1)
@@ -144,6 +168,13 @@ export function ChildAccountsCard({
         invMap.set(r.customer_id, (invMap.get(r.customer_id) ?? 0) + 1)
       }
 
+      if (showUnpaidInvoices && unpaidRes.data) {
+        for (const r of unpaidRes.data as Array<{ customer_id: string; amount_cents: number | null }>) {
+          const cents = typeof r.amount_cents === "number" ? r.amount_cents : 0
+          unpaidMap.set(r.customer_id, (unpaidMap.get(r.customer_id) ?? 0) + cents)
+        }
+      }
+
       const mapped: ChildRow[] = children.map((c) => ({
         id: c.id,
         companyName: c.company_name,
@@ -152,6 +183,7 @@ export function ChildAccountsCard({
         equipmentCount: eqMap.get(c.id) ?? 0,
         openWorkOrderCount: woMap.get(c.id) ?? 0,
         recentInvoiceCount: invMap.get(c.id) ?? 0,
+        unpaidInvoiceCents: showUnpaidInvoices ? (unpaidMap.get(c.id) ?? 0) : null,
       }))
 
       setRows(mapped)
@@ -160,7 +192,7 @@ export function ChildAccountsCard({
     return () => {
       cancelled = true
     }
-  }, [organizationId, parentCustomerId])
+  }, [organizationId, parentCustomerId, showUnpaidInvoices])
 
   return (
     <Card className={cn("border-border", className)}>
@@ -227,6 +259,12 @@ export function ChildAccountsCard({
                     </span>
                     {" · "}
                     {row.recentInvoiceCount} recent invoice{row.recentInvoiceCount === 1 ? "" : "s"}
+                    {row.unpaidInvoiceCents != null && row.unpaidInvoiceCents > 0 ?
+                      <>
+                        {" · "}
+                        <span className="font-medium text-foreground">{formatUsd0(row.unpaidInvoiceCents)} unpaid</span>
+                      </>
+                    : null}
                   </p>
                 </div>
                 {row.status === "inactive" ? (

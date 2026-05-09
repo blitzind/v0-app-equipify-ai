@@ -46,9 +46,10 @@ const TREE_SELECT = "id, organization_id, company_name, parent_customer_id"
  */
 export async function loadCustomerRollupTree(
   supabase: SupabaseClient,
-  args: { organizationId: string; rootCustomerId: string },
+  args: { organizationId: string; rootCustomerId: string; /** Default 6 (DB cap). Use 1 for Phase 33 financial rollups. */ maxDepth?: number },
 ): Promise<CustomerTreeNode[]> {
   const { organizationId, rootCustomerId } = args
+  const maxDepth = Math.min(args.maxDepth ?? MAX_DEPTH, MAX_DEPTH)
 
   const rootRes = await supabase
     .from("customers")
@@ -92,7 +93,7 @@ export async function loadCustomerRollupTree(
   ]
 
   let frontier: string[] = [root.id]
-  for (let depth = 1; depth <= MAX_DEPTH; depth += 1) {
+  for (let depth = 1; depth <= maxDepth; depth += 1) {
     if (frontier.length === 0) break
     const childRes = await supabase
       .from("customers")

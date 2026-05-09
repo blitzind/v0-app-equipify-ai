@@ -168,6 +168,7 @@ export function ManageHierarchyDialog({
         .eq("organization_id", organizationId)
         .neq("id", customerId)
         .is("archived_at", null)
+        .is("parent_customer_id", null)
         .order("company_name", { ascending: true })
         .limit(500)
       if (cancelled) return

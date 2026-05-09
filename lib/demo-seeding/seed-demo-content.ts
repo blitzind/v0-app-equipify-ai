@@ -297,6 +297,34 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
     if (c.external_code) customerIndex.set(c.external_code, c.id)
   }
 
+  // Phase 33 — sample parent / sub-account structure (single-level; reporting only).
+  const demoParentCode = "DEMO-C01"
+  const parentDemoId = customerIndex.get(demoParentCode)
+  if (parentDemoId) {
+    const { error: parentNameErr } = await args.supabase
+      .from("customers")
+      .update({ company_name: "Demo Regional Medical System (Parent)" })
+      .eq("organization_id", args.organizationId)
+      .eq("id", parentDemoId)
+    if (parentNameErr) throw new Error(parentNameErr.message)
+
+    const childSpecs: Array<{ code: string; name: string }> = [
+      { code: "DEMO-C02", name: "Demo RMS — North Campus" },
+      { code: "DEMO-C03", name: "Demo RMS — South Campus" },
+      { code: "DEMO-C04", name: "Demo RMS — East Imaging Center" },
+    ]
+    for (const ch of childSpecs) {
+      const cid = customerIndex.get(ch.code)
+      if (!cid) continue
+      const { error: linkErr } = await args.supabase
+        .from("customers")
+        .update({ parent_customer_id: parentDemoId, company_name: ch.name })
+        .eq("organization_id", args.organizationId)
+        .eq("id", cid)
+      if (linkErr) throw new Error(linkErr.message)
+    }
+  }
+
   const primaryLocations = customerRows.map((c, i) => ({
     organization_id: args.organizationId,
     customer_id: customerIndex.get(c.external_code)!,
