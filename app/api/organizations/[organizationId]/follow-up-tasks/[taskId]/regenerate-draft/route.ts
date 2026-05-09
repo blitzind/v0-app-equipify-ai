@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { mergeFollowUpAutomationConfig } from "@/lib/follow-up-automation/merge-config"
 import { generateFollowUpAutomationDraft } from "@/lib/follow-up-automation/generate-draft"
+import { resolveDraftCategorySettings } from "@/lib/follow-up-automation/draft-category"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
-import type { FollowUpAutomationConfig, FollowUpEntityType } from "@/lib/follow-up-automation/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
@@ -12,26 +12,6 @@ const UUID_RE =
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
-}
-
-function categoryCfg(
-  cfg: FollowUpAutomationConfig,
-  entityType: FollowUpEntityType,
-): { aiDraftsEnabled: boolean; channels: ("email" | "sms")[] } | null {
-  switch (entityType) {
-    case "prospect":
-      return cfg.categories.prospects
-    case "work_order":
-      return cfg.categories.work_orders
-    case "invoice":
-      return cfg.categories.invoices
-    case "customer":
-      return cfg.categories.customers
-    case "equipment":
-      return cfg.categories.equipment
-    default:
-      return null
-  }
 }
 
 export async function POST(_request: Request, context: { params: Promise<{ organizationId: string; taskId: string }> }) {
@@ -59,8 +39,11 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
     .maybeSingle()
 
   const cfg = mergeFollowUpAutomationConfig((settingsRow as { config?: unknown } | null)?.config ?? {})
-  const cat = categoryCfg(cfg, task.entity_type as FollowUpEntityType)
-  if (!cat?.aiDraftsEnabled) return jsonError("AI drafts are disabled for this category.", 400)
+  const cat = resolveDraftCategorySettings(cfg, {
+    entityType: task.entity_type as string,
+    ruleKey: task.rule_key as string,
+  })
+  if (!cat?.aiDraftsEnabled) return jsonError("AI drafts are disabled for this automation category.", 400)
 
   const { data: orgRow } = await gate.supabase.from("organizations").select("name").eq("id", organizationId).maybeSingle()
   const orgName = (orgRow as { name?: string } | null)?.name ?? null

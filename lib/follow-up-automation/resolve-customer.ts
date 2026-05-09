@@ -39,6 +39,16 @@ export async function resolveRecipientCustomerIdForTask(
     return (data as { customer_id?: string } | null)?.customer_id ?? null
   }
 
+  if (entityType === "maintenance_plan") {
+    const { data } = await supabase
+      .from("maintenance_plans")
+      .select("customer_id")
+      .eq("organization_id", organizationId)
+      .eq("id", entityId)
+      .maybeSingle()
+    return (data as { customer_id?: string } | null)?.customer_id ?? null
+  }
+
   if (entityType === "prospect") {
     const { data } = await supabase
       .from("prospects")

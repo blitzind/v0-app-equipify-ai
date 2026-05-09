@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react"
 import { ClipboardList, Loader2, Play, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -17,12 +24,14 @@ function NumInput({
   min,
   max,
   id,
+  disabled,
 }: {
   value: number
   onChange: (n: number) => void
   min: number
   max: number
   id: string
+  disabled?: boolean
 }) {
   return (
     <input
@@ -31,8 +40,9 @@ function NumInput({
       min={min}
       max={max}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+      className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50"
     />
   )
 }
@@ -47,6 +57,7 @@ export function FollowUpAutomationSettingsSection() {
   const [saving, setSaving] = useState(false)
   const [evalRunning, setEvalRunning] = useState(false)
   const [cfg, setCfg] = useState<FollowUpAutomationConfig | null>(null)
+  const [assignees, setAssignees] = useState<{ id: string; label: string }[]>([])
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready" || !canConfigure) {
@@ -75,6 +86,26 @@ export function FollowUpAutomationSettingsSection() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!organizationId || status !== "ready" || !canConfigure) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/prospect-assignees`,
+          { cache: "no-store" },
+        )
+        const j = (await res.json().catch(() => ({}))) as { assignees?: { id: string; label: string }[] }
+        if (!cancelled && res.ok && Array.isArray(j.assignees)) setAssignees(j.assignees)
+      } catch {
+        if (!cancelled) setAssignees([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, status, canConfigure])
 
   async function save() {
     if (!organizationId || !cfg) return
@@ -200,6 +231,190 @@ export function FollowUpAutomationSettingsSection() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Maintenance reminders</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Plans, service intervals, calibration, and warranty windows — tasks appear in the follow-up queue for approval.
+                Nothing sends automatically.
+              </p>
+            </div>
+            <Switch
+              checked={cfg.maintenanceReminders.enabled}
+              onCheckedChange={(v) =>
+                setCfg({ ...cfg, maintenanceReminders: { ...cfg.maintenanceReminders, enabled: v } })
+              }
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 opacity-100">
+            <Label className="text-xs text-muted-foreground">AI drafts for maintenance messages</Label>
+            <Switch
+              checked={cfg.maintenanceReminders.aiDraftsEnabled}
+              disabled={!cfg.maintenanceReminders.enabled}
+              onCheckedChange={(v) =>
+                setCfg({
+                  ...cfg,
+                  maintenanceReminders: { ...cfg.maintenanceReminders, aiDraftsEnabled: v },
+                })
+              }
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Due soon window (days)</Label>
+              <NumInput
+                id="mr1"
+                min={1}
+                max={365}
+                value={cfg.maintenanceReminders.dueSoonDays}
+                disabled={!cfg.maintenanceReminders.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    maintenanceReminders: { ...cfg.maintenanceReminders, dueSoonDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Overdue threshold (days past due)</Label>
+              <NumInput
+                id="mr2"
+                min={0}
+                max={365}
+                value={cfg.maintenanceReminders.overdueThresholdDays}
+                disabled={!cfg.maintenanceReminders.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    maintenanceReminders: { ...cfg.maintenanceReminders, overdueThresholdDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Calibration due soon (days)</Label>
+              <NumInput
+                id="mr3"
+                min={1}
+                max={365}
+                value={cfg.maintenanceReminders.calibrationDueSoonDays}
+                disabled={!cfg.maintenanceReminders.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    maintenanceReminders: { ...cfg.maintenanceReminders, calibrationDueSoonDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Warranty expiring soon (days)</Label>
+              <NumInput
+                id="mr4"
+                min={1}
+                max={365}
+                value={cfg.maintenanceReminders.warrantyDueSoonDays}
+                disabled={!cfg.maintenanceReminders.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    maintenanceReminders: { ...cfg.maintenanceReminders, warrantyDueSoonDays: n },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Reminder cadence (days, reserved)</Label>
+              <NumInput
+                id="mr5"
+                min={0}
+                max={90}
+                value={cfg.maintenanceReminders.reminderCadenceDays}
+                disabled={!cfg.maintenanceReminders.enabled}
+                onChange={(n) =>
+                  setCfg({
+                    ...cfg,
+                    maintenanceReminders: { ...cfg.maintenanceReminders, reminderCadenceDays: n },
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Draft channels</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Email</span>
+                <Switch
+                  checked={cfg.maintenanceReminders.draftChannels.includes("email")}
+                  disabled={!cfg.maintenanceReminders.enabled}
+                  onCheckedChange={(on) => {
+                    const next = new Set(cfg.maintenanceReminders.draftChannels)
+                    if (on) next.add("email")
+                    else next.delete("email")
+                    let channels = Array.from(next) as ("email" | "sms")[]
+                    if (channels.length === 0) channels = ["email"]
+                    setCfg({
+                      ...cfg,
+                      maintenanceReminders: { ...cfg.maintenanceReminders, draftChannels: channels },
+                    })
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">SMS</span>
+                <Switch
+                  checked={cfg.maintenanceReminders.draftChannels.includes("sms")}
+                  disabled={!cfg.maintenanceReminders.enabled}
+                  onCheckedChange={(on) => {
+                    const next = new Set(cfg.maintenanceReminders.draftChannels)
+                    if (on) next.add("sms")
+                    else next.delete("sms")
+                    let channels = Array.from(next) as ("email" | "sms")[]
+                    if (channels.length === 0) channels = ["email"]
+                    setCfg({
+                      ...cfg,
+                      maintenanceReminders: { ...cfg.maintenanceReminders, draftChannels: channels },
+                    })
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 max-w-md">
+            <Label className="text-xs text-muted-foreground">Default assignee (optional)</Label>
+            <Select
+              disabled={!cfg.maintenanceReminders.enabled}
+              value={cfg.maintenanceReminders.defaultAssigneeUserId ?? "_none"}
+              onValueChange={(v) =>
+                setCfg({
+                  ...cfg,
+                  maintenanceReminders: {
+                    ...cfg.maintenanceReminders,
+                    defaultAssigneeUserId: v === "_none" ? null : v,
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">None</SelectItem>
+                {assignees.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div>

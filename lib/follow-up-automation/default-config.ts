@@ -3,6 +3,17 @@ import type { FollowUpAutomationConfig } from "@/lib/follow-up-automation/types"
 /** Conservative defaults — no autonomous sending; categories enabled but safe thresholds. */
 export const DEFAULT_FOLLOW_UP_AUTOMATION_CONFIG: FollowUpAutomationConfig = {
   version: 1,
+  maintenanceReminders: {
+    enabled: true,
+    dueSoonDays: 14,
+    overdueThresholdDays: 0,
+    calibrationDueSoonDays: 30,
+    warrantyDueSoonDays: 30,
+    reminderCadenceDays: 0,
+    defaultAssigneeUserId: null,
+    draftChannels: ["email"],
+    aiDraftsEnabled: true,
+  },
   categories: {
     prospects: {
       enabled: true,

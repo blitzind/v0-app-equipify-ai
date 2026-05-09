@@ -26,6 +26,22 @@ Rules:
 - No signature block.
 - Output MUST be valid JSON.`
 
+/** Review-only drafts — intents steer tone without inventing dates or dollar amounts. */
+const RULE_INTENT: Partial<Record<string, string>> = {
+  maintenance_plan_due_soon:
+    "Customer-facing preventive maintenance reminder — offer to schedule or confirm the upcoming plan visit.",
+  maintenance_plan_overdue:
+    "Polite overdue notice for a missed planned maintenance — focus on safety and scheduling next steps.",
+  equipment_service_due_soon:
+    "Service interval reminder tied to equipment — suggest coordinating service before the due window closes.",
+  equipment_service_overdue:
+    "Service is past due — emphasize reliability and scheduling without blame.",
+  equipment_calibration_due_soon:
+    "Calibration due reminder — compliance-focused, ask to schedule calibration.",
+  equipment_warranty_expiring_soon:
+    "Warranty or coverage window ending soon — informational, no pricing unless provided in context.",
+}
+
 function buildUserPrompt(params: {
   organizationName: string | null
   ruleKey: string
@@ -33,11 +49,13 @@ function buildUserPrompt(params: {
   metadata: Record<string, unknown>
   preferredChannel: "email" | "sms"
 }): string {
+  const intent = RULE_INTENT[params.ruleKey]
   const lines: string[] = [
     params.organizationName ? `Organization: ${params.organizationName}` : "Organization: (name unavailable)",
     `Automation rule: ${params.ruleKey}`,
     `Entity type: ${params.entityType}`,
     `Preferred channel hint: ${params.preferredChannel}`,
+    ...(intent ? [`Draft intent: ${intent}`] : []),
     "",
     "Context (trust only these facts):",
     JSON.stringify(params.metadata, null, 2),

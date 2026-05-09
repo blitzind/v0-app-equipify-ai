@@ -22,6 +22,10 @@ export function mergeFollowUpAutomationConfig(stored: unknown): FollowUpAutomati
       equipment: { ...d.categories.equipment, ...(s.categories?.equipment ?? {}) },
     },
     thresholds: { ...d.thresholds, ...(s.thresholds ?? {}) },
+    maintenanceReminders: {
+      ...d.maintenanceReminders,
+      ...(s.maintenanceReminders ?? {}),
+    },
   }
   const parsed = followUpAutomationConfigSchema.safeParse(merged)
   return parsed.success ? parsed.data : followUpAutomationConfigSchema.parse(d)

@@ -100,6 +100,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockMaintenancePlanDialogIfNotEligible } from "@/lib/billing/guard-toast"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1074,6 +1075,13 @@ function MaintenancePlansPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
+  const { permissions } = useOrgPermissions()
+  const canViewFollowUpStats = Boolean(permissions.canViewCommunications)
+  const [followUpMaintenanceStats, setFollowUpMaintenanceStats] = useState<{
+    pending: number
+    overdue: number
+    draftReady: number
+  } | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<PlanStatus | "All">("All")
   const [intervalFilter, setIntervalFilter] = useState<PlanInterval | "All">("All")
@@ -1102,6 +1110,39 @@ function MaintenancePlansPageInner() {
   }
 
   // Open create modal from Customer / Equipment quick actions (?new=1&customerId=&equipmentId=)
+  useEffect(() => {
+    if (!maintenanceOrgId || !canViewFollowUpStats) {
+      setFollowUpMaintenanceStats(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(maintenanceOrgId)}/follow-up-tasks/stats`,
+          { cache: "no-store" },
+        )
+        const body = (await res.json()) as {
+          maintenanceRemindersPending?: number
+          maintenanceRemindersOverdue?: number
+          maintenanceRemindersDraftReady?: number
+        }
+        if (!cancelled && res.ok) {
+          setFollowUpMaintenanceStats({
+            pending: body.maintenanceRemindersPending ?? 0,
+            overdue: body.maintenanceRemindersOverdue ?? 0,
+            draftReady: body.maintenanceRemindersDraftReady ?? 0,
+          })
+        }
+      } catch {
+        if (!cancelled) setFollowUpMaintenanceStats(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [maintenanceOrgId, canViewFollowUpStats])
+
   useEffect(() => {
     if (searchParams.get("new") === "1") {
       if (blockMaintenancePlanDialogIfNotEligible(standardCreateEligibility, maintenancePlansFeatureAllowed)) {
@@ -1183,6 +1224,34 @@ function MaintenancePlansPageInner() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      {canViewFollowUpStats &&
+        followUpMaintenanceStats &&
+        (followUpMaintenanceStats.pending > 0 ||
+          followUpMaintenanceStats.overdue > 0 ||
+          followUpMaintenanceStats.draftReady > 0) && (
+          <Alert className="border-amber-500/25 bg-amber-500/[0.06]">
+            <ClipboardList className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+            <AlertTitle className="text-sm">Maintenance follow-ups</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
+              {followUpMaintenanceStats.pending} pending
+              {followUpMaintenanceStats.overdue > 0 ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <span className="text-amber-800 dark:text-amber-300">{followUpMaintenanceStats.overdue}</span> past
+                  scheduled date
+                </>
+              ) : null}
+              {followUpMaintenanceStats.draftReady > 0 ? (
+                <> · {followUpMaintenanceStats.draftReady} AI draft(s) ready</>
+              ) : null}
+              .{" "}
+              <Link href="/communications/follow-ups" className="font-medium text-primary hover:underline">
+                Open follow-up queue
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
       {maintenanceOrgId ?
         <AidenOperationalInsightsCard organizationId={maintenanceOrgId} moduleContext="maintenance_plans" />
       : null}

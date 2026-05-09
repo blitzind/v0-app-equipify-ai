@@ -10,6 +10,9 @@ type Stats = {
   overdueReminders: number
   invoiceRemindersPending: number
   proposalFollowUpsPending: number
+  maintenanceRemindersPending?: number
+  maintenanceRemindersOverdue?: number
+  maintenanceRemindersDraftReady?: number
 }
 
 export function FollowUpAutomationSignals({
@@ -64,6 +67,20 @@ export function FollowUpAutomationSignals({
               <>
                 {" "}
                 · <span className="text-amber-700 dark:text-amber-300">{stats.overdueReminders}</span> overdue reminders
+              </>
+            ) : null}
+            {(stats.maintenanceRemindersPending ?? 0) > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                <span className="font-medium text-foreground">{stats.maintenanceRemindersPending}</span> maintenance
+                {(stats.maintenanceRemindersOverdue ?? 0) > 0 ? (
+                  <>
+                    {" "}
+                    (<span className="text-amber-700 dark:text-amber-300">{stats.maintenanceRemindersOverdue}</span>{" "}
+                    past due date)
+                  </>
+                ) : null}
               </>
             ) : null}
           </p>

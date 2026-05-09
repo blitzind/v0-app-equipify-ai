@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { filterFollowUpTasksForViewer } from "@/lib/follow-up-automation/filter-view"
+import { isMaintenanceReminderRuleKey } from "@/lib/follow-up-automation/maintenance-rules"
 import type { FollowUpTaskRow } from "@/lib/follow-up-automation/types"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
 
@@ -10,6 +11,18 @@ const UUID_RE =
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
+}
+
+function isMaintenanceFollowUpRow(r: FollowUpTaskRow): boolean {
+  return r.entity_type === "maintenance_plan" || isMaintenanceReminderRuleKey(r.rule_key)
+}
+
+function draftLooksReady(draft: unknown): boolean {
+  const d = draft as Record<string, unknown> | null | undefined
+  if (!d || typeof d !== "object") return false
+  const sub = typeof d.subject === "string" ? d.subject.trim() : ""
+  const bod = typeof d.body === "string" ? d.body.trim() : ""
+  return Boolean(sub && bod)
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ organizationId: string }> }) {
@@ -36,11 +49,28 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
   let overdueReminders = 0
   let invoicePending = 0
   let proposalFollowUps = 0
+  let maintenanceRemindersPending = 0
+  let maintenanceRemindersOverdue = 0
+  let maintenanceRemindersDraftReady = 0
 
   for (const r of filtered) {
     if (r.scheduled_for && Date.parse(r.scheduled_for) < now) overdueReminders++
     if (r.entity_type === "invoice") invoicePending++
     if (r.rule_key === "prospect_proposal_no_response") proposalFollowUps++
+
+    if (isMaintenanceFollowUpRow(r)) {
+      if (r.status === "pending") {
+        maintenanceRemindersPending++
+        if (draftLooksReady(r.draft_payload)) maintenanceRemindersDraftReady++
+      }
+      if (
+        r.scheduled_for &&
+        Date.parse(r.scheduled_for) < now &&
+        (r.status === "pending" || r.status === "approved")
+      ) {
+        maintenanceRemindersOverdue++
+      }
+    }
   }
 
   return NextResponse.json({
@@ -48,5 +78,8 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
     overdueReminders,
     invoiceRemindersPending: invoicePending,
     proposalFollowUpsPending: proposalFollowUps,
+    maintenanceRemindersPending,
+    maintenanceRemindersOverdue,
+    maintenanceRemindersDraftReady,
   })
 }

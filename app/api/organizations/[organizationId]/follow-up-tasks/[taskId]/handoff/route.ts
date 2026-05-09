@@ -27,6 +27,8 @@ function toRelatedEntityType(entityType: FollowUpEntityType): RelatedEntityType 
       return "customer"
     case "equipment":
       return "equipment"
+    case "maintenance_plan":
+      return "maintenance_plan"
     default:
       return null
   }

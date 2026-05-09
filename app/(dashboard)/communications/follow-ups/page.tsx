@@ -47,16 +47,40 @@ export default function FollowUpQueuePage() {
   const [tasks, setTasks] = useState<FollowUpTaskRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [queueStats, setQueueStats] = useState<{
+    maintenanceRemindersPending: number
+    maintenanceRemindersOverdue: number
+    maintenanceRemindersDraftReady: number
+  } | null>(null)
 
   const load = useCallback(async () => {
     if (!organizationId || status !== "ready") return
     setLoading(true)
     try {
-      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/follow-up-tasks`, {
-        cache: "no-store",
-      })
-      const body = (await res.json()) as { tasks?: FollowUpTaskRow[]; error?: string }
-      if (!res.ok) throw new Error(body.error ?? "Could not load queue.")
+      const [tasksRes, statsRes] = await Promise.all([
+        fetch(`/api/organizations/${encodeURIComponent(organizationId)}/follow-up-tasks`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/organizations/${encodeURIComponent(organizationId)}/follow-up-tasks/stats`, {
+          cache: "no-store",
+        }),
+      ])
+      const body = (await tasksRes.json()) as { tasks?: FollowUpTaskRow[]; error?: string }
+      if (!tasksRes.ok) throw new Error(body.error ?? "Could not load queue.")
+      const statsBody = (await statsRes.json()) as {
+        maintenanceRemindersPending?: number
+        maintenanceRemindersOverdue?: number
+        maintenanceRemindersDraftReady?: number
+      }
+      if (statsRes.ok) {
+        setQueueStats({
+          maintenanceRemindersPending: statsBody.maintenanceRemindersPending ?? 0,
+          maintenanceRemindersOverdue: statsBody.maintenanceRemindersOverdue ?? 0,
+          maintenanceRemindersDraftReady: statsBody.maintenanceRemindersDraftReady ?? 0,
+        })
+      } else {
+        setQueueStats(null)
+      }
       const open = (body.tasks ?? []).filter((t) => t.status === "pending" || t.status === "approved")
       setTasks(open)
     } catch (e) {
@@ -66,6 +90,7 @@ export default function FollowUpQueuePage() {
         description: e instanceof Error ? e.message : "Unexpected error.",
       })
       setTasks([])
+      setQueueStats(null)
     } finally {
       setLoading(false)
     }
@@ -139,6 +164,34 @@ export default function FollowUpQueuePage() {
           </p>
         </div>
       </div>
+
+      {queueStats &&
+        (queueStats.maintenanceRemindersPending > 0 ||
+          queueStats.maintenanceRemindersOverdue > 0 ||
+          queueStats.maintenanceRemindersDraftReady > 0) && (
+          <div className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-x-5 gap-y-1">
+            <span>
+              <span className="font-medium text-foreground">Maintenance reminders</span>
+              {queueStats.maintenanceRemindersPending > 0 ? (
+                <>
+                  {" "}
+                  · {queueStats.maintenanceRemindersPending} pending
+                </>
+              ) : null}
+              {queueStats.maintenanceRemindersOverdue > 0 ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <span className="text-amber-700 dark:text-amber-300">{queueStats.maintenanceRemindersOverdue}</span> past
+                  scheduled date
+                </>
+              ) : null}
+              {queueStats.maintenanceRemindersDraftReady > 0 ? (
+                <> · {queueStats.maintenanceRemindersDraftReady} AI draft(s) ready</>
+              ) : null}
+            </span>
+          </div>
+        )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-12">

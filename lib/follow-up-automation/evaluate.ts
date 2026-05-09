@@ -353,8 +353,8 @@ export async function evaluateFollowUpAutomationForOrganization(
     }
   }
 
-  /** Equipment service / warranty */
-  if (cfg.categories.equipment.enabled) {
+  /** Equipment service / warranty — legacy path when maintenance reminder bundle is off */
+  if (cfg.categories.equipment.enabled && !cfg.maintenanceReminders.enabled) {
     const th = cfg.thresholds
     const today = todayUtcIsoDate()
     const svcUntil = addDaysUtcIsoDate(th.equipmentServiceDueSoonDays)
@@ -408,6 +408,169 @@ export async function evaluateFollowUpAutomationForOrganization(
             summary: `Warranty expiring soon — ${row.name}`,
             equipment_name: row.name,
             warranty_end: wEnd,
+          },
+        })
+      }
+    }
+  }
+
+  /** Maintenance reminders — preventive plans + calibration / service / warranty windows */
+  if (cfg.maintenanceReminders.enabled) {
+    const mr = cfg.maintenanceReminders
+    const today = todayUtcIsoDate()
+    const overdueCutoff = addDaysUtcIsoDate(-mr.overdueThresholdDays)
+    const dueSoonEnd = addDaysUtcIsoDate(mr.dueSoonDays)
+    const calUntil = addDaysUtcIsoDate(mr.calibrationDueSoonDays)
+    const warUntil = addDaysUtcIsoDate(mr.warrantyDueSoonDays)
+
+    const { data: plans } = await admin
+      .from("maintenance_plans")
+      .select(
+        "id, customer_id, equipment_id, name, status, next_due_date, assigned_user_id, assigned_technician_id, archived_at",
+      )
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .eq("status", "active")
+      .not("next_due_date", "is", null)
+
+    for (const p of plans ?? []) {
+      const plan = p as {
+        id: string
+        customer_id: string
+        equipment_id: string | null
+        name: string
+        next_due_date: string
+        assigned_user_id: string | null
+        assigned_technician_id: string | null
+      }
+      const techUid = plan.assigned_technician_id ? techUserByTechId.get(plan.assigned_technician_id) : null
+      const assignUid =
+        mr.defaultAssigneeUserId ?? plan.assigned_user_id ?? techUid ?? null
+
+      if (plan.next_due_date < overdueCutoff) {
+        candidates.push({
+          entity_type: "maintenance_plan",
+          entity_id: plan.id,
+          rule_key: "maintenance_plan_overdue",
+          priority: "high",
+          assigned_to_user_id: assignUid,
+          scheduled_for: `${plan.next_due_date}T12:00:00.000Z`,
+          metadata: {
+            summary: `Maintenance plan overdue — ${plan.name}`,
+            maintenance_plan_name: plan.name,
+            next_due_date: plan.next_due_date,
+            equipment_id: plan.equipment_id,
+            customer_id: plan.customer_id,
+            assigned_technician_user_id: techUid ?? null,
+          },
+        })
+      } else if (plan.next_due_date >= today && plan.next_due_date <= dueSoonEnd) {
+        candidates.push({
+          entity_type: "maintenance_plan",
+          entity_id: plan.id,
+          rule_key: "maintenance_plan_due_soon",
+          priority: "normal",
+          assigned_to_user_id: assignUid,
+          scheduled_for: `${plan.next_due_date}T12:00:00.000Z`,
+          metadata: {
+            summary: `Maintenance plan due soon — ${plan.name}`,
+            maintenance_plan_name: plan.name,
+            next_due_date: plan.next_due_date,
+            equipment_id: plan.equipment_id,
+            customer_id: plan.customer_id,
+            assigned_technician_user_id: techUid ?? null,
+          },
+        })
+      }
+    }
+
+    const { data: equipMr } = await admin
+      .from("equipment")
+      .select(
+        "id, customer_id, name, next_due_at, next_calibration_due_at, warranty_expiration_date, warranty_expires_at, is_archived, is_sample",
+      )
+      .eq("organization_id", organizationId)
+      .eq("is_archived", false)
+      .eq("is_sample", false)
+
+    for (const e of equipMr ?? []) {
+      const row = e as {
+        id: string
+        customer_id: string
+        name: string
+        next_due_at: string | null
+        next_calibration_due_at: string | null
+        warranty_expiration_date: string | null
+        warranty_expires_at: string | null
+      }
+      const wEnd = row.warranty_expiration_date ?? row.warranty_expires_at
+
+      if (row.next_due_at && row.next_due_at < overdueCutoff) {
+        candidates.push({
+          entity_type: "equipment",
+          entity_id: row.id,
+          rule_key: "equipment_service_overdue",
+          priority: "high",
+          assigned_to_user_id: mr.defaultAssigneeUserId,
+          scheduled_for: `${row.next_due_at}T12:00:00.000Z`,
+          metadata: {
+            summary: `Service overdue — ${row.name}`,
+            equipment_name: row.name,
+            next_due_at: row.next_due_at,
+            customer_id: row.customer_id,
+          },
+        })
+      } else if (row.next_due_at && row.next_due_at >= today && row.next_due_at <= dueSoonEnd) {
+        candidates.push({
+          entity_type: "equipment",
+          entity_id: row.id,
+          rule_key: "equipment_service_due_soon",
+          priority: "normal",
+          assigned_to_user_id: mr.defaultAssigneeUserId,
+          scheduled_for: `${row.next_due_at}T12:00:00.000Z`,
+          metadata: {
+            summary: `Service due soon — ${row.name}`,
+            equipment_name: row.name,
+            next_due_at: row.next_due_at,
+            customer_id: row.customer_id,
+          },
+        })
+      }
+
+      if (
+        row.next_calibration_due_at &&
+        row.next_calibration_due_at >= today &&
+        row.next_calibration_due_at <= calUntil
+      ) {
+        candidates.push({
+          entity_type: "equipment",
+          entity_id: row.id,
+          rule_key: "equipment_calibration_due_soon",
+          priority: "high",
+          assigned_to_user_id: mr.defaultAssigneeUserId,
+          scheduled_for: `${row.next_calibration_due_at}T12:00:00.000Z`,
+          metadata: {
+            summary: `Calibration due soon — ${row.name}`,
+            equipment_name: row.name,
+            next_calibration_due_at: row.next_calibration_due_at,
+            customer_id: row.customer_id,
+          },
+        })
+      }
+
+      if (wEnd && wEnd >= today && wEnd <= warUntil) {
+        candidates.push({
+          entity_type: "equipment",
+          entity_id: row.id,
+          rule_key: "equipment_warranty_expiring_soon",
+          priority: "normal",
+          assigned_to_user_id: mr.defaultAssigneeUserId,
+          scheduled_for: `${wEnd}T12:00:00.000Z`,
+          metadata: {
+            summary: `Warranty expiring soon — ${row.name}`,
+            equipment_name: row.name,
+            warranty_end: wEnd,
+            customer_id: row.customer_id,
           },
         })
       }

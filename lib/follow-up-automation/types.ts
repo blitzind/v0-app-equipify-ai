@@ -10,14 +10,40 @@ export const FOLLOW_UP_RULE_KEYS = [
   "invoice_overdue",
   "invoice_due_soon",
   "customer_stale_no_completed_wo",
+  "maintenance_plan_due_soon",
+  "maintenance_plan_overdue",
   "equipment_service_due_soon",
+  "equipment_service_overdue",
+  "equipment_calibration_due_soon",
   "equipment_warranty_expiring_soon",
 ] as const
 
 export type FollowUpRuleKey = (typeof FOLLOW_UP_RULE_KEYS)[number]
 
-export const FOLLOW_UP_ENTITY_TYPES = ["prospect", "work_order", "invoice", "customer", "equipment"] as const
+export const FOLLOW_UP_ENTITY_TYPES = [
+  "prospect",
+  "work_order",
+  "invoice",
+  "customer",
+  "equipment",
+  "maintenance_plan",
+] as const
 export type FollowUpEntityType = (typeof FOLLOW_UP_ENTITY_TYPES)[number]
+
+export const maintenanceRemindersSettingsSchema = z.object({
+  enabled: z.boolean(),
+  /** Days before next due to surface a “due soon” reminder. */
+  dueSoonDays: z.number().min(1).max(365),
+  /** Extra whole days past due before flagging overdue (0 = next calendar day after due date). */
+  overdueThresholdDays: z.number().min(0).max(365),
+  calibrationDueSoonDays: z.number().min(1).max(365),
+  warrantyDueSoonDays: z.number().min(1).max(365),
+  /** Minimum spacing before re-evaluating the same reminder (reserved for future cooldown logic). */
+  reminderCadenceDays: z.number().min(0).max(90),
+  defaultAssigneeUserId: z.string().uuid().nullable(),
+  draftChannels: z.array(z.enum(["email", "sms"])).min(1),
+  aiDraftsEnabled: z.boolean(),
+})
 
 export const followUpAutomationConfigSchema = z.object({
   version: z.literal(1),
@@ -60,6 +86,7 @@ export const followUpAutomationConfigSchema = z.object({
     equipmentServiceDueSoonDays: z.number().min(1).max(365),
     equipmentWarrantyExpiringDays: z.number().min(1).max(365),
   }),
+  maintenanceReminders: maintenanceRemindersSettingsSchema,
 })
 
 export type FollowUpAutomationConfig = z.infer<typeof followUpAutomationConfigSchema>
