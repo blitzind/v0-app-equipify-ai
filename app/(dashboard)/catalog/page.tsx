@@ -351,18 +351,18 @@ export default function CatalogPage() {
   }
 
   const catalogActionButtons = (
-    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+    <div className="flex flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
       {canManageCatalog ? (
         <Button
           type="button"
-          className="gap-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
+          className="h-9 gap-2 bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
           onClick={() => setAddItemOpen(true)}
         >
           <Plus className="h-4 w-4" />
           Add Item
         </Button>
       ) : null}
-      <Button asChild variant="outline" className="gap-2 text-muted-foreground border-border">
+      <Button asChild variant="outline" className="h-9 gap-2 text-muted-foreground border-border">
         <Link href="/catalog/import">
           <Upload className="h-4 w-4" />
           Import price list
@@ -371,16 +371,16 @@ export default function CatalogPage() {
     </div>
   )
 
-  /** Compact triggers keep search + 5 filters on one row at xl; narrow viewports wrap or scroll horizontally. */
+  /** Narrower triggers + search at xl help fit filters + actions on one row without oversized gaps. */
   const filterTriggerClass =
-    "h-9 w-full min-w-0 sm:min-w-[128px] sm:max-w-[160px] sm:w-[min(100%,152px)] xl:w-[152px] xl:shrink-0"
+    "h-9 w-full min-w-0 sm:min-w-[108px] sm:max-w-[160px] md:w-[min(100%,140px)] xl:w-[124px] xl:max-w-[128px] xl:shrink-0 2xl:w-[132px] 2xl:max-w-[136px]"
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Row 1 (desktop): search + filters on one line. Row 2: count + actions */}
       <div className="flex flex-col gap-3">
+        {/* xl+: search, filters, and actions share one row; actions align right. Smaller screens wrap naturally. */}
         <div className="flex min-w-0 flex-col gap-2 xl:flex-row xl:flex-nowrap xl:items-center xl:gap-2">
-          <div className="flex items-center gap-2 w-full shrink-0 rounded-md border border-border bg-card px-3 py-1.5 min-w-0 xl:max-w-[min(100%,280px)] xl:basis-[280px]">
+          <div className="flex h-9 w-full min-w-0 shrink-0 items-center gap-2 rounded-md border border-border bg-card px-3 xl:w-[220px] xl:max-w-[220px] 2xl:w-[248px] 2xl:max-w-[248px]">
             <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -391,7 +391,7 @@ export default function CatalogPage() {
             />
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:flex-nowrap xl:overflow-x-auto xl:pb-0.5 xl:[scrollbar-width:thin]">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:flex-nowrap xl:gap-1.5 xl:overflow-x-auto xl:pb-0.5 xl:[scrollbar-width:thin]">
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className={filterTriggerClass}>
                 <SelectValue placeholder="Item type" />
@@ -465,20 +465,21 @@ export default function CatalogPage() {
               </Select>
             ) : null}
           </div>
+
+          <div className="flex w-full min-w-0 shrink-0 justify-end xl:ml-auto xl:w-auto">
+            {catalogActionButtons}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0">
-          <p className="text-sm text-muted-foreground min-w-0 shrink">
-            {!loading && !error ? (
-              <>
-                Showing{" "}
-                <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
-                <span className="font-medium text-foreground">{items.length}</span> items
-              </>
-            ) : null}
-          </p>
-          <div className="w-full sm:w-auto min-w-0 shrink-0">{catalogActionButtons}</div>
-        </div>
+        <p className="text-sm text-muted-foreground min-h-[1.25rem]">
+          {!loading && !error ? (
+            <>
+              Showing{" "}
+              <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
+              <span className="font-medium text-foreground">{items.length}</span> items
+            </>
+          ) : null}
+        </p>
       </div>
 
       {loading ? (
