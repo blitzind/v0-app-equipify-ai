@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logAidenHelpEvent } from "@/lib/aiden/analytics"
-import { buildAidenSupportPhase1Prompt } from "@/lib/aiden/aiden-support-phase1-prompt"
+import { buildAidenSupportPhase2Prompt } from "@/lib/aiden/aiden-support-phase2-prompt"
 import {
-  AidenSupportPhase1AnswerSchema,
-  type AidenSupportPhase1Answer,
-} from "@/lib/aiden/aiden-support-phase1-schema"
+  AidenSupportPhase2AnswerSchema,
+  type AidenSupportPhase2Answer,
+} from "@/lib/aiden/aiden-support-phase2-schema"
 import { AidenChatMessageSchema } from "@/lib/aiden/aiden-response-rules"
 import { moduleFromPath } from "@/lib/aiden/module-context"
 import { runAiTask } from "@/lib/ai/server"
@@ -19,10 +19,10 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
- * Phase 1 — safe support chat only.
+ * Phase 2 — safe support chat + optional feature-request draft text (no execution).
  *
  * - Org-scoped, authenticated members only.
- * - No tools, no mutations, no action execution (ignored if legacy clients send extra fields).
+ * - No tools, no mutations, no action execution.
  * - Context: current path + module label only (no record payloads).
  */
 const BodySchema = z.object({
@@ -90,19 +90,19 @@ export async function POST(
   const derivedModule = moduleFromPath(path ?? "/")
   const moduleLabel = parsed.data.currentModule?.trim() || derivedModule.label
 
-  const systemPrompt = buildAidenSupportPhase1Prompt({
+  const systemPrompt = buildAidenSupportPhase2Prompt({
     organizationName: orgName,
     currentPath: path,
     currentModule: moduleLabel,
   })
 
-  const result = await runAiTask<AidenSupportPhase1Answer>({
+  const result = await runAiTask<AidenSupportPhase2Answer>({
     task: "aiden_help",
     organizationId,
     input: {
       messages: toAiMessages(systemPrompt, parsed.data.messages),
     },
-    schema: AidenSupportPhase1AnswerSchema,
+    schema: AidenSupportPhase2AnswerSchema,
     skipCache: true,
   })
 
@@ -133,7 +133,7 @@ export async function POST(
     ok: true,
     answer: result.output,
     context: {
-      phase: 1,
+      phase: 2,
       module: moduleLabel,
       currentPath: path,
     },

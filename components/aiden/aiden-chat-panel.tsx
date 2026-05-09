@@ -13,18 +13,19 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import { AidenFeatureRequestFlow, type AidenFrFormValues } from "@/components/aiden/aiden-feature-request-flow"
 import { moduleFromPath } from "@/lib/aiden/module-context"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import type { AidenChatMessage } from "@/lib/aiden/aiden-response-rules"
-import type { AidenSupportPhase1Answer } from "@/lib/aiden/aiden-support-phase1-schema"
+import type { AidenChatMessage, AidenFeatureRequestDraft } from "@/lib/aiden/aiden-response-rules"
+import type { AidenSupportPhase2Answer } from "@/lib/aiden/aiden-support-phase2-schema"
 
 type ChatMessage = {
   id: string
   role: "user" | "assistant"
   content: string
-  answer?: AidenSupportPhase1Answer
+  answer?: AidenSupportPhase2Answer
   createdAt: Date
 }
 
@@ -33,7 +34,27 @@ type AidenChatPanelProps = {
   onOpenChange: (open: boolean) => void
 }
 
-function answerToContent(answer: AidenSupportPhase1Answer): string {
+function defaultFrValues(moduleLabel: string): AidenFrFormValues {
+  return {
+    title: "",
+    description: "",
+    moduleContext: moduleLabel,
+    priority: "medium",
+    userNotes: "",
+  }
+}
+
+function draftToFrValues(draft: AidenFeatureRequestDraft, moduleLabel: string): AidenFrFormValues {
+  return {
+    title: draft.title,
+    description: [draft.originalQuestion, draft.suggestedImprovement].filter(Boolean).join("\n\n"),
+    moduleContext: draft.module?.trim() || moduleLabel,
+    priority: "medium",
+    userNotes: draft.businessValue?.trim() ?? "",
+  }
+}
+
+function answerToContent(answer: AidenSupportPhase2Answer): string {
   const sections = [answer.answer]
   if (answer.steps.length > 0) sections.push(answer.steps.map((s, i) => `${i + 1}. ${s}`).join("\n"))
   if (answer.permissionNote) sections.push(`Permission note: ${answer.permissionNote}`)
@@ -100,7 +121,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       id: "welcome",
       role: "assistant",
       content:
-        "Hi — I'm AIden, here to help you use Equipify. Ask how to create work orders, manage certificates, billing, the portal, equipment, or anything in the app. I explain steps — I can't perform actions for you.",
+        "Hi — I'm AIden, here to help you use Equipify. Ask how to create work orders, manage certificates, billing, the portal, equipment, or anything in the app. I explain steps — I can't perform actions for you. If something isn't built yet, you can submit a feature request from here.",
       createdAt: new Date(),
     },
   ])
@@ -108,6 +129,22 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const [frOpen, setFrOpen] = useState(false)
+  const [frNonce, setFrNonce] = useState(0)
+  const [frInitial, setFrInitial] = useState<AidenFrFormValues>(() => defaultFrValues(""))
+
+  const chatMessagesForContext = useMemo((): AidenChatMessage[] => {
+    return messages
+      .filter((m) => m.id !== "welcome")
+      .map((m) => ({ role: m.role, content: m.content }))
+  }, [messages])
+
+  function openFeatureRequest(draft?: AidenFeatureRequestDraft | null) {
+    setFrInitial(draft ? draftToFrValues(draft, currentModule.label) : defaultFrValues(currentModule.label))
+    setFrNonce((n) => n + 1)
+    setFrOpen(true)
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
@@ -149,7 +186,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        answer?: AidenSupportPhase1Answer
+        answer?: AidenSupportPhase2Answer
         message?: string
         error?: string
       }
@@ -264,6 +301,25 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   {message.answer?.limitation ? (
                     <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{message.answer.limitation}</p>
                   ) : null}
+                  {message.role === "assistant" &&
+                  message.answer?.classification === "not_built_feature_candidate" &&
+                  message.answer.featureRequestDraft ? (
+                    <div className="mt-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-foreground">
+                      <p className="font-medium text-sky-950 dark:text-sky-50">This capability isn&apos;t in Equipify yet.</p>
+                      <p className="mt-1 text-muted-foreground">
+                        You can send your idea to our product team — it won&apos;t change anything in your workspace.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="mt-2 h-8 bg-background text-xs"
+                        onClick={() => openFeatureRequest(message.answer!.featureRequestDraft)}
+                      >
+                        Submit feature request
+                      </Button>
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Clock3 size={10} aria-hidden />
                     {formatTime(message.createdAt)}
@@ -287,7 +343,32 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
         </div>
 
         <div className="sticky bottom-0 border-t border-border bg-background/95 p-4 backdrop-blur">
-          {messages.length <= 1 ? (
+          {frOpen && organizationId && orgStatus === "ready" ? (
+            <div className="mb-3">
+              <AidenFeatureRequestFlow
+                organizationId={organizationId}
+                sessionNonce={frNonce}
+                initialValues={frInitial}
+                currentPath={pathname || "/"}
+                chatMessagesForContext={chatMessagesForContext}
+                onCancel={() => setFrOpen(false)}
+                onSuccess={({ duplicate, requestId }) => {
+                  if (duplicate) {
+                    toast({
+                      title: "Similar request on file",
+                      description: requestId ? `Reference: ${requestId}` : undefined,
+                    })
+                  } else {
+                    toast({
+                      title: "Feature request sent",
+                      description: "The Equipify team will review your feedback.",
+                    })
+                  }
+                }}
+              />
+            </div>
+          ) : null}
+          {messages.length <= 1 && !frOpen ? (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {quickPrompts.map((starter) => (
                 <button
@@ -299,6 +380,18 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   {starter}
                 </button>
               ))}
+            </div>
+          ) : null}
+          {!frOpen ? (
+            <div className="mb-3">
+              <button
+                type="button"
+                className="text-left text-[11px] font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-400"
+                onClick={() => openFeatureRequest()}
+                disabled={!organizationId || orgStatus !== "ready" || loading}
+              >
+                Submit a feature request
+              </button>
             </div>
           ) : null}
           {error ? (

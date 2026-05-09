@@ -94,9 +94,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <AppSidebar />
                             <DashboardWorkspaceShell>
                               <PageShell>{children}</PageShell>
-                              <AidenChatLauncher />
                             </DashboardWorkspaceShell>
                           </div>
+                          {/* Fixed launcher lives outside workspace overflow stacks; still not part of sidebar/nav RBAC */}
+                          <AidenChatLauncher />
                         </div>
                       </SidebarContext.Provider>
                     </EquipmentTypeProvider>

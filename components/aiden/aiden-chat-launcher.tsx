@@ -17,18 +17,22 @@ export function AidenChatLauncher() {
 
   return (
     <>
-      <div className="fixed bottom-5 right-5 z-40">
+      {/*
+        z-[95]: above mobile bottom nav (z-[80]/[91]), below Sheet/drawer stacks (z-[100]+).
+        bottom-24 on small screens clears the fixed nav + FAB (matches PageShell pb-24); lg+ uses compact inset.
+      */}
+      <div className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6">
         <Button
           type="button"
           size="sm"
           variant="secondary"
-          className="h-11 rounded-full border border-border px-3 shadow-lg gap-2 bg-card hover:bg-muted/80"
+          className="h-11 rounded-full border-2 border-sky-500/40 bg-card px-3 shadow-xl gap-2 text-foreground ring-2 ring-sky-500/15 ring-offset-2 ring-offset-background hover:bg-muted/90 hover:border-sky-500/55 dark:border-sky-400/45 dark:ring-sky-400/20"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={open}
         >
           <MessageCircle className="size-4 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden />
-          <span className="flex items-center gap-0 text-sm font-medium">
+          <span className="flex items-center gap-0 text-sm font-medium text-foreground">
             Ask <AidenWordmark size="sm" />
           </span>
         </Button>
