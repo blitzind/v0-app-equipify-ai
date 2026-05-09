@@ -4,7 +4,8 @@
  * - Seeds the Precision marketing org (default slug `precision-biomedical-demo`, same as the app workspace map).
  *   Override with PRECISION_ORG_SLUG if your project uses a different slug for the same org.
  * - Idempotent: skips when the full fingerprint is already present (no duplicate rows).
- * - Replaces ONLY that org’s tenant rows (customers → financials → work orders) then inserts fresh data.
+ * - Replaces ONLY that org’s tenant rows (customers → financials → work orders → prospects → vendors →
+ *   catalog/inventory → communications) then inserts fresh marketing data.
  * - Does NOT delete or modify Acme, Zephyr, Medology, or any other organization.
  *
  * Requires:
@@ -38,6 +39,15 @@ const TARGET_TOTAL_WORK_ORDERS = TARGET_WORK_ORDERS + TARGET_PM_PLAN_WORK_ORDERS
 const TARGET_PLANS = 40
 const TARGET_QUOTES = 25
 const TARGET_INVOICES = 30
+
+/** Pipeline, supply chain, and communications — Precision marketing org only (stable prefixes / domains). */
+const TARGET_PROSPECTS = 36
+const TARGET_VENDOR_ROWS = 14
+const TARGET_CATALOG_ITEMS = 28
+const TARGET_COMM_EVENTS = 42
+const SEED_SKU_PREFIX = "PBS-SEED-"
+const SEED_VENDOR_EMAIL_DOMAIN = "pbs-vendor.seed"
+const SEED_LEAD_EMAIL_DOMAIN = "pbs-lead.demo.local"
 
 const TARGET_OPEN_WOS = 40
 const TARGET_COMPLETED_WOS = 85
@@ -186,6 +196,699 @@ const TECH_SEED = [
   { email: "demo.tech.ibrahim@precision-biomedical.seed", name: "Amira Ibrahim" },
   { email: "demo.tech.kim@precision-biomedical.seed", name: "Jordan Kim" },
 ]
+
+function buildProspectSeedRows(now) {
+  const leadEmail = (n) => `lead${String(n).padStart(2, "0")}@${SEED_LEAD_EMAIL_DOMAIN}`
+  const stages = [
+    ...Array(6).fill("new"),
+    ...Array(5).fill("attempting_contact"),
+    ...Array(5).fill("contacted"),
+    ...Array(5).fill("qualified"),
+    ...Array(4).fill("proposal_sent"),
+    ...Array(3).fill("won"),
+    ...Array(3).fill("lost"),
+    ...Array(5).fill("nurture"),
+  ]
+  const companies = [
+    ["UCSF Audiology & Hearing Center", "Dr. Elena Ortiz", "Chief of Audiology"],
+    ["Stanford Children's OR Biomedical", "Marcus Webb", "Perioperative Clinical Engineering"],
+    ["Kaiser Fresno — Clinical Engineering Storeroom", "Priya Nandakumar", "Regional BMET Lead"],
+    ["Sierra Surgery Center — SPD", "Chris Dalton", "SPD Manager"],
+    ["Golden Gate ENT Partners", "Dr. Jamie Liu", "Practice Administrator"],
+    ["UC Davis Vet Teaching Hospital — Lab Support", "Taylor Brooks", "Lab Operations"],
+    ["Monterey Bay Hearing Center", "Samira Haddad", "Clinic Director"],
+    ["Sharp Grossmont Diagnostic Imaging", "Renee Collins", "Imaging QA Coordinator"],
+    ["Regional Medical Center — Cath Lab", "Omar Hassan", "Cardiology CE Supervisor"],
+    ["North Coast ENT & Allergy", "Dr. Avery Cole", "Managing Partner"],
+    ["Palm Desert Ambulatory Surgery Center", "Jordan Malik", "Facilities Director"],
+    ["USC Keck Dept of Otolaryngology", "Dr. Nina Park", "Department Administrator"],
+    ["VA Palo Alto — Audiology Service", "Leslie Tran", "Chief Audiologist"],
+    ["Sutter Roseville — Clinical Engineering", "Greg Yoshida", "CE Manager"],
+    ["Children's Hospital Oakland — NICU", "Morgan Ellis", "NICU Equipment Coordinator"],
+    ["Solano Diagnostic Radiology", "Paul Neumann", "Radiology Operations"],
+    ["Napa Valley Surgery Center", "Hailey Stone", "Materials Management"],
+    ["UCSF Hearing & Balance Center", "Dr. Priya Raman", "Lead Audiologist"],
+    ["Providence Santa Rosa — Clinical Engineering", "Casey Wu", "Regional BMET"],
+    ["Barton Memorial Hospital — Imaging QA", "Skyler Moore", "Imaging Physics Liaison"],
+    ["Torrance Memorial — Sleep Lab", "Dr. Devon Ellis", "Medical Director"],
+    ["Desert Regional Medical Center — SPD", "Frank Ibarra", "SPD Supervisor"],
+    ["Hoag Orthopedic Institute — Surgery", "Riley Santos", "Service Line Administrator"],
+    ["St. Joseph Heritage — Infusion", "Ana Duarte", "Infusion Clinical Manager"],
+    ["Coast Community College — Biotech Lab", "Jan Kowalski", "Lab Manager"],
+    ["Loma Linda University Medical Center — Audiology Research", "Dr. Helena Moss", "Research Coordinator"],
+    ["Bay Imaging Partners LLC", "Vik Mehta", "Operations"],
+    ["Central Coast Ambulatory Surgery", "Brooke Chen", "Administrator"],
+    ["Redwood Audiology Associates", "Dr. Noah Pierce", "Owner"],
+    ["Golden State Pathology Labs", "Imani Wright", "Lab Director"],
+    ["Pacific Hearing Services", "Denise Lowe", "Office Manager"],
+    ["Mission Neuroscience Institute — EEG Lab", "Sydney Park", "Neurodiagnostics Lead"],
+    ["Sacramento State Audiology Clinic", "Prof. Kim Alvarez", "Clinic Director"],
+    ["Community Regional Medical Center — Facilities RFP", "Hardeep Singh", "VP Facilities"],
+    ["Elite Surgical Suites — Ownership Office", "Mel Carter", "CEO"],
+    ["Western University COMP — Simulation Center", "Dr. Rosa Mendez", "Simulation Director"],
+  ]
+  const sources = [
+    "Website form",
+    "Trade show — AAMI",
+    "Customer referral",
+    "Cold outreach — LinkedIn",
+    "Purchasing cooperative RFP",
+    "Manufacturer lead share",
+    "Hospital system bundled RFP",
+    "Audiology society networking",
+    "Email campaign — Q1 outreach",
+    "Partner referral — OEM",
+  ]
+  const rows = []
+  for (let i = 0; i < TARGET_PROSPECTS; i++) {
+    const [company, contact, role] = companies[i]
+    const st = stages[i]
+    const src = sources[i % sources.length]
+    const estUsd =
+      st === "won" || st === "proposal_sent"
+        ? 120 + (i % 9) * 45
+        : st === "lost"
+          ? 35 + (i % 5) * 12
+          : 18 + (i % 11) * 8
+    const highValue = i === 12 || i === 21 || i === 33
+    const estCents = (highValue ? estUsd * 4 : estUsd) * 100 * 100
+    const overdue = i % 7 === 0 || i === 4 || i === 19
+    const fuDays = overdue ? -(3 + (i % 5)) : 2 + (i % 18)
+    const nextFu = new Date(now.getTime() + fuDays * 86400000)
+    const lastDays = 1 + (i % 20)
+    const lastAt = new Date(now.getTime() - lastDays * 86400000)
+    const assignIdx = i % 8
+    const nextOwnerIdx = i % 11 === 0 ? (assignIdx + 3) % 8 : assignIdx
+    rows.push({
+      company_name: company,
+      contact_name: contact,
+      contact_email: leadEmail(i + 1),
+      contact_phone: `(559) 555-${String(1900 + i).slice(-4)}`,
+      lead_source: src,
+      status: st,
+      notes: `${role} — ${["Hospital campus", "Outpatient clinic", "ENT practice", "ASC", "University lab", "Diagnostic center", "Surgery center"][i % 7]}; PBS marketing pipeline seed.`,
+      estimated_value_cents: estCents,
+      next_follow_up_at: nextFu.toISOString(),
+      last_contacted_at: lastAt.toISOString(),
+      assigned_idx: assignIdx,
+      next_owner_idx: nextOwnerIdx,
+    })
+  }
+  return rows
+}
+
+const PBS_VENDOR_SEED = [
+  {
+    name: "STERIS Instrument Management Services",
+    email: `steris.orders@steris.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(440) 555-0101",
+    contact_name: "West Region Parts Desk",
+    notes: "[Category: Sterilization OEM] Preferred SPD consumables & chamber components. Net 30.",
+    preferred: true,
+  },
+  {
+    name: "Philips Healthcare Parts & Service",
+    email: `parts.west@philips.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(978) 555-0140",
+    contact_name: "Capital Parts Queue",
+    notes: "[Category: Medical equipment manufacturer] Preferred monitoring & imaging spares.",
+    preferred: true,
+  },
+  {
+    name: "Fluke Biomedical",
+    email: `orders@flukebiomed.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(425) 555-0166",
+    contact_name: "Calibration Sales",
+    notes: "[Category: Calibration supplies] Electrical safety analyzers, test leads, references.",
+    preferred: true,
+  },
+  {
+    name: "Tektronix Healthcare Service Solutions",
+    email: `svc.store@tek.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(503) 555-0182",
+    contact_name: "Bench Calibration Desk",
+    notes: "[Category: Electronics / test equipment] Oscilloscope probes & compliance accessories.",
+    preferred: true,
+  },
+  {
+    name: "Henry Schein Medical — Capital Parts",
+    email: `capital.parts@schein.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(800) 555-0129",
+    contact_name: "National Accounts",
+    notes: "[Category: Parts distributor] Non-preferred for cables — longer lead times on imaging harnesses.",
+    preferred: false,
+  },
+  {
+    name: "Concordance Healthcare Solutions",
+    email: `biomed.ops@concordance.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(314) 555-0137",
+    contact_name: "West Distribution Center",
+    notes: "[Category: Parts distributor] Disposable SPD peel packs & chemical indicators.",
+    preferred: true,
+  },
+  {
+    name: "Digi-Key Electronics",
+    email: `biomed.bulk@digikey.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(218) 555-0199",
+    contact_name: "Corporate Accounts",
+    notes: "[Category: Electronics supplier] Connectors, ferrites, bench consumables.",
+    preferred: true,
+  },
+  {
+    name: "Cole-Parmer — Clinical Lab Supply",
+    email: `clinical.orders@coleparmer.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(800) 555-0170",
+    contact_name: "Fluidics & Tubing",
+    notes: "[Category: Tubing / filtration] Peristaltic pump tubing, filters, barbed fittings.",
+    preferred: true,
+  },
+  {
+    name: "FedEx Healthcare Priority",
+    email: `acct.exec@fedexhc.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(901) 555-0144",
+    contact_name: "Cold Chain Specialist",
+    notes: "[Category: Shipping / logistics] Time-definite returns & probe shipments.",
+    preferred: true,
+  },
+  {
+    name: "UPS Healthcare Logistics",
+    email: `clinical.ops@upshealth.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(404) 555-0118",
+    contact_name: "West Clinical Desk",
+    notes: "[Category: Shipping / logistics] Van stock replenishment & depot routing.",
+    preferred: false,
+  },
+  {
+    name: "West Coast Biomed Parts Exchange",
+    email: `desk@wcbpx.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(510) 555-0160",
+    contact_name: "Exchange Coordinator",
+    notes: "[Category: Specialty repair / depot] Legacy ultrasound boards & power supplies.",
+    preferred: true,
+  },
+  {
+    name: "Master Repair Solutions Inc.",
+    email: `intake@mrsrepair.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(714) 555-0155",
+    contact_name: "Advanced Imaging Repair",
+    notes: "[Category: Specialty repair supplier] DR detectors & portable X-ray boards.",
+    preferred: true,
+  },
+  {
+    name: "Maico / Natus Hearing Diagnostics",
+    email: `na.spares@maico.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(847) 555-0181",
+    contact_name: "Audiology OEM Parts",
+    notes: "[Category: Audiology equipment manufacturer] Audiometer inserts, calibration couplers.",
+    preferred: true,
+  },
+  {
+    name: "GE HealthCare Service Shop — Consumables",
+    email: `consumables.west@gehc.${SEED_VENDOR_EMAIL_DOMAIN}`,
+    phone: "(414) 555-0191",
+    contact_name: "Consumables Queue",
+    notes: "[Category: Medical equipment manufacturer] Imaging QA phantoms & printer supplies.",
+    preferred: true,
+  },
+]
+
+/** Each entry: part_number suffix, name, category, item_type, manufacturer, vendor_idx (into inserted vendors), cost_dollars */
+const PBS_CATALOG_SEED = [
+  ["CAL-SVA-10", "Electrical safety analyzer verification adapter kit", "Calibration", "accessory", "Fluke Biomedical", 2, 245],
+  ["FLK-TL175", "IEC 60601 test lead set — guarded probes", "Field service consumables", "part", "Fluke Biomedical", 2, 189],
+  ["PHL-MX-SPO2", "SpO₂ finger sensor — reusable adult", "Patient monitoring", "part", "Philips", 1, 312],
+  ["PHL-NBP-HOSE", "NIBP hose & cuff interface kit", "Patient monitoring", "accessory", "Philips", 1, 118],
+  ["GE-MAC-LEAD", "12-lead patient cable — MAC series", "Diagnostics / cardiology", "part", "GE HealthCare", 13, 428],
+  ["SIEM-US-CBL", "Ultrasound probe extension cable — shielded", "Imaging", "part", "Siemens Healthineers", 5, 265],
+  ["ZEB-ZT410-RBN", "Thermal transfer ribbon — cycle documentation printer", "SPD / sterilization", "accessory", "Zebra", 6, 54],
+  ["MPR-PAPER-80", "Sterilizer cycle printer paper — 80mm rolls (case)", "SPD / sterilization", "part", "STERIS", 0, 72],
+  ["ZOLL-XBAT-PACK", "Defibrillator battery pack — OEM compatible", "Emergency care", "part", "ZOLL", 5, 338],
+  ["BD-ALRIS-BATT", "Infusion module battery — OEM", "Infusion", "part", "BD", 5, 156],
+  ["MIND-FLU-O2", "Ventilator / anesthesia O₂ sensor cell", "Anesthesia / ventilation", "part", "Mindray", 5, 198],
+  ["GET-DOOR-GSK", "Autoclave door gasket kit — HSG series", "SPD / sterilization", "part", "Getinge", 0, 412],
+  ["SPI-FLT-H13", "Sterilizer intake HEPA filter element", "SPD / sterilization", "part", "STERIS", 0, 289],
+  ["DK-BNC-KIT", "Shielded BNC & SMB connector repair kit", "Bench repair", "part", "Digi-Key", 6, 67],
+  ["CP-TUBE-SIL", "Peristaltic pump silicone tubing — 15 ft roll", "Laboratory / fluids", "part", "Cole-Parmer", 7, 44],
+  ["MAICO-EAR-35", "Audiometer insert earphones — screening pair", "Audiology", "part", "Maico", 12, 210],
+  ["TYMP-TIP-KIT", "Disposable tympanometry probe tip kit (96 ct)", "Audiology", "accessory", "Maico", 12, 96],
+  ["PHANT-CIRS", "CT QA phantom — routine constancy checks", "Imaging QA", "accessory", "GE HealthCare", 13, 4200],
+  ["FLUKE-IMP-450", "Impulse / defib tester calibration module", "Calibration", "part", "Fluke Biomedical", 2, 890],
+  ["LOAN-MX450", "Loaner pool — Philips MX450 transport monitor", "Loaner pool", "rental", "Philips", 1, 0],
+  ["LOAN-MA42", "Loaner pool — Maico MA 42 screening audiometer", "Loaner pool", "rental", "Maico", 12, 0],
+  ["PROBE-CVX-LEN", "Convex ultrasound probe lens assembly — refurbished", "Imaging repair", "part", "West Coast Biomed Parts Exchange", 10, 1450],
+  ["BOARD-DR-DET", "Portable DR detector interface board — depot exchange", "Imaging repair", "part", "Master Repair Solutions", 11, 2800],
+  ["KIT-SEP-BASIC", "Annual SEP documentation bundle — labels & forms", "Compliance", "service", "Precision Biomedical Services", 2, 350],
+  ["CUFF-NBP-PED", "Pediatric NIBP cuff assortment kit", "Patient monitoring", "accessory", "Philips", 1, 155],
+  ["LABEL-ZT230", "Direct thermal label roll — equipment asset tags", "Operations", "accessory", "Zebra", 6, 38],
+  ["FILTER-AIR-SPD", "Sterilizer exhaust composite filter", "SPD / sterilization", "part", "STERIS", 0, 175],
+  ["CASE-PELICAN-MED", "Pelican-style transport case — loaner monitor shipping", "Operations", "accessory", "FedEx Healthcare Priority", 8, 210],
+]
+
+if (PBS_VENDOR_SEED.length !== TARGET_VENDOR_ROWS) {
+  throw new Error(`Precision seed: PBS_VENDOR_SEED length ${PBS_VENDOR_SEED.length} !== ${TARGET_VENDOR_ROWS}`)
+}
+if (PBS_CATALOG_SEED.length !== TARGET_CATALOG_ITEMS) {
+  throw new Error(`Precision seed: PBS_CATALOG_SEED length ${PBS_CATALOG_SEED.length} !== ${TARGET_CATALOG_ITEMS}`)
+}
+
+/**
+ * Prospects, vendors, catalog/stock, communications — called inside the main seed transaction.
+ */
+async function seedPrecisionExtendedRelations(tx, {
+  orgId,
+  ownerId,
+  techUserIds,
+  customerIds,
+  seededWorkOrders,
+  now,
+}) {
+  const prospectRows = buildProspectSeedRows(now)
+  const prospectIds = []
+  for (const p of prospectRows) {
+    const aid = techUserIds[p.assigned_idx % techUserIds.length]
+    const lid = techUserIds[p.next_owner_idx % techUserIds.length]
+    const [{ id: pid }] = await tx`
+      insert into public.prospects (
+        organization_id,
+        company_name,
+        contact_name,
+        contact_email,
+        contact_phone,
+        lead_source,
+        status,
+        next_follow_up_at,
+        last_contacted_at,
+        estimated_value_cents,
+        notes,
+        assigned_to_user_id,
+        last_contacted_by_user_id,
+        next_action_owner_user_id,
+        created_by
+      )
+      values (
+        ${orgId},
+        ${p.company_name},
+        ${p.contact_name},
+        ${p.contact_email}::citext,
+        ${p.contact_phone},
+        ${p.lead_source},
+        ${p.status},
+        ${p.next_follow_up_at}::timestamptz,
+        ${p.last_contacted_at}::timestamptz,
+        ${p.estimated_value_cents},
+        ${p.notes},
+        ${aid}::uuid,
+        ${aid}::uuid,
+        ${lid}::uuid,
+        ${ownerId}::uuid
+      )
+      returning id
+    `
+    prospectIds.push(pid)
+  }
+
+  const vendorIds = []
+  for (const v of PBS_VENDOR_SEED) {
+    const [{ id: vid }] = await tx`
+      insert into public.org_vendors (
+        organization_id,
+        name,
+        email,
+        phone,
+        contact_name,
+        billing_address,
+        shipping_address,
+        notes,
+        is_sample
+      )
+      values (
+        ${orgId},
+        ${v.name},
+        ${v.email},
+        ${v.phone},
+        ${v.contact_name},
+        ${"500 Distribution Pkwy, Sacramento CA 95828"},
+        ${"500 Distribution Pkwy, Sacramento CA 95828"},
+        ${v.notes},
+        true
+      )
+      returning id
+    `
+    vendorIds.push(vid)
+  }
+
+  const catalogIds = []
+  for (let i = 0; i < PBS_CATALOG_SEED.length; i++) {
+    const [pn, name, cat, itype, mfr, vIdx, cost] = PBS_CATALOG_SEED[i]
+    const sku = `${SEED_SKU_PREFIX}${String(i + 1).padStart(3, "0")}`
+    const vid = vendorIds[vIdx % vendorIds.length]
+    const listPrice = cost > 0 ? Math.round(cost * 1.22 * 100) / 100 : 395
+    const salePrice = cost > 0 ? Math.round(cost * 1.12 * 100) / 100 : 350
+    const [{ id: cid }] = await tx`
+      insert into public.catalog_items (
+        organization_id,
+        vendor_id,
+        manufacturer_name,
+        category,
+        item_type,
+        part_number,
+        sku,
+        name,
+        description,
+        cost,
+        list_price,
+        sale_price,
+        unit,
+        status,
+        source_type,
+        notes,
+        is_sample
+      )
+      values (
+        ${orgId},
+        ${vid}::uuid,
+        ${mfr},
+        ${cat},
+        ${itype},
+        ${pn},
+        ${sku},
+        ${name},
+        ${"Precision Biomedical marketing inventory seed."},
+        ${cost > 0 ? cost : null},
+        ${listPrice},
+        ${salePrice},
+        ${"ea"},
+        ${"active"},
+        ${"manual"},
+        ${itype === "rental" ? "Loaner asset — coordinate with dispatch." : "Stocked for demo replenishment scenarios."},
+        true
+      )
+      returning id
+    `
+    catalogIds.push(cid)
+  }
+
+  const [{ id: locWh }] = await tx`
+    insert into public.inventory_locations (
+      organization_id, name, code, location_type, is_active, notes
+    )
+    values (
+      ${orgId},
+      ${"Fresno Central Parts — PBS"},
+      ${"PBS-SEED-WH1"},
+      ${"warehouse"},
+      true,
+      ${"Marketing seed — main biomedical storeroom."}
+    )
+    returning id
+  `
+  const [{ id: locVan1 }] = await tx`
+    insert into public.inventory_locations (
+      organization_id, name, code, location_type, is_active, notes
+    )
+    values (
+      ${orgId},
+      ${"Van 04 — Central Valley"},
+      ${"PBS-SEED-VAN04"},
+      ${"vehicle"},
+      true,
+      ${"Marketing seed — primary route stock."}
+    )
+    returning id
+  `
+  const [{ id: locVan2 }] = await tx`
+    insert into public.inventory_locations (
+      organization_id, name, code, location_type, is_active, notes
+    )
+    values (
+      ${orgId},
+      ${"Van 07 — Bay / Peninsula"},
+      ${"PBS-SEED-VAN07"},
+      ${"vehicle"},
+      true,
+      ${"Marketing seed — audiology & imaging heavy route."}
+    )
+    returning id
+  `
+
+  const stockScenario = (idx) => {
+    if (idx % 11 === 0) return { oh: 0, rp: 6 }
+    if (idx % 9 === 0) return { oh: 2, rp: 10 }
+    if (idx % 7 === 0) return { oh: 14, rp: 12 }
+    return { oh: 42 + (idx % 18), rp: 10 + (idx % 6) }
+  }
+
+  for (let i = 0; i < catalogIds.length; i++) {
+    const cid = catalogIds[i]
+    const sc = stockScenario(i)
+    const loc = i % 5 === 0 ? locVan2 : i % 3 === 0 ? locVan1 : locWh
+    await tx`
+      insert into public.inventory_stock (
+        organization_id,
+        catalog_item_id,
+        location_id,
+        quantity_on_hand,
+        quantity_allocated,
+        reorder_point,
+        reorder_quantity
+      )
+      values (
+        ${orgId},
+        ${cid}::uuid,
+        ${loc}::uuid,
+        ${sc.oh},
+        ${i % 17 === 0 ? 1 : 0},
+        ${sc.rp},
+        ${sc.rp >= 10 ? sc.rp : 12}
+      )
+    `
+  }
+
+  const metaJson = (extra) => tx.json({ pbs_demo_seed: true, ...extra })
+
+  const completedWos = seededWorkOrders.filter((w) => w.status === "completed" || w.status === "invoiced")
+  const openWos = seededWorkOrders.filter((w) => ["open", "scheduled", "in_progress"].includes(w.status))
+
+  let commIdx = 0
+  const pushComm = async (row) => {
+    commIdx += 1
+    await tx`
+      insert into public.communication_events (
+        organization_id,
+        channel,
+        direction,
+        event_type,
+        title,
+        summary,
+        body,
+        audience,
+        counts_toward_unread,
+        delivery_status,
+        recipient_kind,
+        recipient_customer_id,
+        recipient_address,
+        related_entity_type,
+        related_entity_id,
+        provider,
+        metadata,
+        scheduled_at,
+        sent_at,
+        created_at,
+        created_by
+      )
+      values (
+        ${orgId},
+        ${row.channel},
+        ${row.direction},
+        ${row.event_type},
+        ${row.title},
+        ${row.summary},
+        ${row.body},
+        ${row.audience},
+        ${row.counts_unread},
+        ${row.delivery_status},
+        ${row.recipient_kind},
+        ${row.recipient_customer_id},
+        ${row.recipient_address},
+        ${row.related_entity_type},
+        ${row.related_entity_id},
+        ${"manual"},
+        ${metaJson(row.meta_extra ?? {})},
+        ${row.scheduled_at},
+        ${row.sent_at},
+        ${row.created_at}::timestamptz,
+        ${ownerId}::uuid
+      )
+    `
+  }
+
+  const hoursAgo = (h) => new Date(now.getTime() - h * 3600000).toISOString()
+
+  for (let i = 0; i < Math.min(12, prospectIds.length); i++) {
+    const pid = prospectIds[i]
+    await pushComm({
+      channel: "email",
+      direction: "outbound",
+      event_type: "follow_up",
+      title: `Follow-up: ${prospectRows[i].company_name}`.slice(0, 200),
+      summary: "Queued recap of SEP capabilities & onboarding timeline.",
+      body: `Hi ${prospectRows[i].contact_name.split(" ").slice(-2).join(" ")},\n\nFollowing up on biomedical coverage options for your department. Can we schedule a 20-minute facilities intro next week?\n\n— Precision Biomedical Dispatch`,
+      audience: i % 3 === 0 ? "both" : "organization",
+      counts_unread: i % 4 === 0,
+      delivery_status: i % 5 === 0 ? "pending" : "sent",
+      recipient_kind: "external",
+      recipient_customer_id: null,
+      recipient_address: prospectRows[i].contact_email,
+      related_entity_type: "prospect",
+      related_entity_id: pid,
+      scheduled_at: null,
+      sent_at: i % 5 === 0 ? null : hoursAgo(30 + i * 3),
+      created_at: hoursAgo(31 + i * 3),
+      meta_extra: { seed_index: commIdx },
+    })
+  }
+
+  for (let i = 0; i < 6; i++) {
+    await pushComm({
+      channel: "sms",
+      direction: "inbound",
+      event_type: "missed_call_note",
+      title: `Missed call — BMET callback (${i + 1})`,
+      summary: "Voicemail: infusion library question — returned during business hours.",
+      body: `Caller left VM regarding pump fleet tagging; dispatch paged on-call tech.`,
+      audience: "organization",
+      counts_unread: true,
+      delivery_status: "delivered",
+      recipient_kind: "none",
+      recipient_customer_id: null,
+      recipient_address: null,
+      related_entity_type: null,
+      related_entity_id: null,
+      scheduled_at: null,
+      sent_at: hoursAgo(6 + i * 5),
+      created_at: hoursAgo(6 + i * 5),
+    })
+  }
+
+  for (let i = 0; i < Math.min(5, customerIds.length); i++) {
+    const c = customerIds[i]
+    await pushComm({
+      channel: "email",
+      direction: "outbound",
+      event_type: "customer_update_draft",
+      title: `Draft customer update — ${c.company}`,
+      summary: "Draft for approval — quarterly PM schedule shift.",
+      body: `Team — draft note for ${c.company}: proposing consolidated SEP visits on Tuesdays starting next month.`,
+      audience: "customer_timeline",
+      counts_unread: false,
+      delivery_status: "pending",
+      recipient_kind: "customer",
+      recipient_customer_id: c.id,
+      recipient_address: null,
+      related_entity_type: "customer",
+      related_entity_id: c.id,
+      scheduled_at: hoursAgo(2),
+      sent_at: null,
+      created_at: hoursAgo(2),
+    })
+  }
+
+  for (let i = 0; i < Math.min(5, openWos.length); i++) {
+    const wo = openWos[i]
+    await pushComm({
+      channel: "sms",
+      direction: "outbound",
+      event_type: "appointment_confirmation",
+      title: `Appointment confirmation — ${wo.title}`.slice(0, 200),
+      summary: "Technician ETA window & parking instructions sent.",
+      body: `Your biomedical visit is confirmed. Reply HELP for scheduling.`,
+      audience: "both",
+      counts_unread: false,
+      delivery_status: "sent",
+      recipient_kind: "customer",
+      recipient_customer_id: wo.customer_id,
+      recipient_address: null,
+      related_entity_type: "work_order",
+      related_entity_id: wo.id,
+      scheduled_at: null,
+      sent_at: hoursAgo(18 + i * 4),
+      created_at: hoursAgo(19 + i * 4),
+    })
+  }
+
+  for (let i = 0; i < Math.min(5, completedWos.length); i++) {
+    const wo = completedWos[i]
+    await pushComm({
+      channel: "email",
+      direction: "outbound",
+      event_type: "service_completion",
+      title: `Service documentation uploaded — ${wo.title}`.slice(0, 200),
+      summary: "CMMS packet & badge-close confirmation emailed to CE inbox.",
+      body: `Work completed; drift checks within tolerance. Reports attached per IFU.`,
+      audience: "customer_timeline",
+      counts_unread: false,
+      delivery_status: "delivered",
+      recipient_kind: "customer",
+      recipient_customer_id: wo.customer_id,
+      recipient_address: null,
+      related_entity_type: "work_order",
+      related_entity_id: wo.id,
+      scheduled_at: null,
+      sent_at: hoursAgo(40 + i * 6),
+      created_at: hoursAgo(41 + i * 6),
+    })
+  }
+
+  for (let i = 0; i < Math.min(5, prospectIds.length - 12); i++) {
+    const idx = 12 + i
+    const pid = prospectIds[idx]
+    await pushComm({
+      channel: "in_app",
+      direction: "outbound",
+      event_type: "quote_follow_up",
+      title: `Quote follow-up — ${prospectRows[idx].company_name}`.slice(0, 200),
+      summary: "Ask on revision window & volume assumptions.",
+      body: `Internal playbook: confirm indemnification clause & SLA metrics before resending proposal.`,
+      audience: "organization",
+      counts_unread: i % 2 === 0,
+      delivery_status: "sent",
+      recipient_kind: "none",
+      recipient_customer_id: null,
+      recipient_address: null,
+      related_entity_type: "prospect",
+      related_entity_id: pid,
+      scheduled_at: null,
+      sent_at: hoursAgo(12 + i),
+      created_at: hoursAgo(12 + i),
+    })
+  }
+
+  for (let i = 0; i < 4; i++) {
+    await pushComm({
+      channel: "in_app",
+      direction: "outbound",
+      event_type: "internal_note",
+      title: `Dispatch stand-up note ${i + 1}`,
+      summary: "Loaner monitor swap prioritized for cath lab contractor window.",
+      body: `Operations: prioritize PBS-SEED loaner pool checkout before Thursday freeze.`,
+      audience: "organization",
+      counts_unread: true,
+      delivery_status: "sent",
+      recipient_kind: "none",
+      recipient_customer_id: null,
+      recipient_address: null,
+      related_entity_type: "organization",
+      related_entity_id: orgId,
+      scheduled_at: null,
+      sent_at: hoursAgo(3 + i * 2),
+      created_at: hoursAgo(3 + i * 2),
+    })
+  }
+
+  if (commIdx !== TARGET_COMM_EVENTS) {
+    throw new Error(`Precision seed: expected ${TARGET_COMM_EVENTS} communications, built ${commIdx}`)
+  }
+}
 
 /** Public app paths (Next.js `public/`) — must match `lib/mock-data` demo headshots. */
 function precisionDemoTechAvatarPath(index) {
@@ -361,6 +1064,59 @@ async function ensureTechUsers(sql, supabase) {
 
 /** Remove tenant rows for Precision org only (preserves organization + members). */
 async function clearPrecisionTenantData(tx, orgId) {
+  await tx`
+    delete from public.inventory_transactions it
+    using public.catalog_items ci
+    where it.organization_id = ${orgId}
+      and ci.id = it.catalog_item_id
+      and ci.organization_id = ${orgId}
+      and ci.sku like ${SEED_SKU_PREFIX + "%"}
+  `
+  await tx`
+    delete from public.inventory_stock ist
+    using public.catalog_items ci
+    where ist.organization_id = ${orgId}
+      and ci.id = ist.catalog_item_id
+      and ci.organization_id = ${orgId}
+      and ci.sku like ${SEED_SKU_PREFIX + "%"}
+  `
+  await tx`
+    delete from public.technician_vehicle_stock tvs
+    where tvs.organization_id = ${orgId}
+      and exists (
+        select 1
+        from public.inventory_locations il
+        where il.id = tvs.inventory_location_id
+          and il.organization_id = ${orgId}
+          and il.code like 'PBS-SEED-%'
+      )
+  `
+  await tx`
+    delete from public.inventory_locations
+    where organization_id = ${orgId}
+      and code like 'PBS-SEED-%'
+  `
+  await tx`
+    delete from public.catalog_items
+    where organization_id = ${orgId}
+      and sku like ${SEED_SKU_PREFIX + "%"}
+  `
+  await tx`
+    delete from public.org_vendors
+    where organization_id = ${orgId}
+      and email::text like ${"%@" + SEED_VENDOR_EMAIL_DOMAIN}
+  `
+  await tx`
+    delete from public.communication_events
+    where organization_id = ${orgId}
+      and coalesce(metadata ->> 'pbs_demo_seed', '') = 'true'
+  `
+  await tx`
+    delete from public.prospects
+    where organization_id = ${orgId}
+      and contact_email::text like ${"%@" + SEED_LEAD_EMAIL_DOMAIN}
+  `
+
   await tx`delete from public.org_invoices where organization_id = ${orgId}`
   await tx`delete from public.org_quotes where organization_id = ${orgId}`
   await tx`delete from public.work_orders where organization_id = ${orgId}`
@@ -439,6 +1195,9 @@ async function main() {
     const eqLike = `${SEED_EQ_PREFIX}%`
     const qtLike = `${SEED_QUOTE_KEY_PREFIX}%`
     const invLike = `${SEED_INV_KEY_PREFIX}%`
+    const leadDomainLike = `%@${SEED_LEAD_EMAIL_DOMAIN}`
+    const vendorDomainLike = `%@${SEED_VENDOR_EMAIL_DOMAIN}`
+    const skuLike = `${SEED_SKU_PREFIX}%`
     const [seedCheck] = await sql`
       select
         (select count(*)::int from public.customers c
@@ -453,7 +1212,19 @@ async function main() {
         (select count(*)::int from public.org_quotes q
           where q.organization_id = ${orgId} and q.seed_key like ${qtLike}) as quote_total,
         (select count(*)::int from public.org_invoices inv
-          where inv.organization_id = ${orgId} and inv.seed_key like ${invLike}) as invoice_total
+          where inv.organization_id = ${orgId} and inv.seed_key like ${invLike}) as invoice_total,
+        (select count(*)::int from public.prospects pr
+          where pr.organization_id = ${orgId}
+            and pr.contact_email::text like ${leadDomainLike}) as seed_prospects,
+        (select count(*)::int from public.catalog_items ci
+          where ci.organization_id = ${orgId}
+            and ci.sku like ${skuLike}) as seed_catalog,
+        (select count(*)::int from public.org_vendors ov
+          where ov.organization_id = ${orgId}
+            and ov.email::text like ${vendorDomainLike}) as seed_vendors,
+        (select count(*)::int from public.communication_events ce
+          where ce.organization_id = ${orgId}
+            and coalesce(ce.metadata ->> 'pbs_demo_seed', '') = 'true') as seed_comm
     `
     const seedCustomers = Number(seedCheck?.seed_customers ?? 0)
     const seedEquipment = Number(seedCheck?.seed_equipment ?? 0)
@@ -461,6 +1232,10 @@ async function main() {
     const planTotal = Number(seedCheck?.plan_total ?? 0)
     const quoteTotal = Number(seedCheck?.quote_total ?? 0)
     const invoiceTotal = Number(seedCheck?.invoice_total ?? 0)
+    const seedProspects = Number(seedCheck?.seed_prospects ?? 0)
+    const seedCatalog = Number(seedCheck?.seed_catalog ?? 0)
+    const seedVendors = Number(seedCheck?.seed_vendors ?? 0)
+    const seedComm = Number(seedCheck?.seed_comm ?? 0)
 
     if (
       seedCustomers === TARGET_CUSTOMERS &&
@@ -468,10 +1243,14 @@ async function main() {
       woTotal === TARGET_TOTAL_WORK_ORDERS &&
       planTotal === TARGET_PLANS &&
       quoteTotal === TARGET_QUOTES &&
-      invoiceTotal === TARGET_INVOICES
+      invoiceTotal === TARGET_INVOICES &&
+      seedProspects === TARGET_PROSPECTS &&
+      seedCatalog === TARGET_CATALOG_ITEMS &&
+      seedVendors === TARGET_VENDOR_ROWS &&
+      seedComm === TARGET_COMM_EVENTS
     ) {
       console.log(
-        `Precision marketing seed already complete for slug ${orgSlug} (customers ${seedCustomers}, equipment ${seedEquipment}, WOs ${woTotal}, plans ${planTotal}, quotes ${quoteTotal}, invoices ${invoiceTotal}). No changes.`,
+        `Precision marketing seed already complete for slug ${orgSlug} (customers ${seedCustomers}, equipment ${seedEquipment}, WOs ${woTotal}, plans ${planTotal}, quotes ${quoteTotal}, invoices ${invoiceTotal}; prospects ${seedProspects}, catalog ${seedCatalog}, vendors ${seedVendors}, communications ${seedComm}). No changes.`,
       )
       return
     }
@@ -722,6 +1501,8 @@ async function main() {
       }
       await tx`alter table public.maintenance_plans enable trigger trg_maintenance_plans_set_created_by`
 
+      const seededWorkOrders = []
+
       const priorities = ["low", "normal", "normal", "high", "critical"]
       const types = ["repair", "pm", "inspection", "install", "emergency"]
       let revenueSlotIdx = 0
@@ -790,7 +1571,7 @@ async function main() {
         assertIsoTimestamptzOk(updatedAt, `work_orders updated_at i=${i}`)
         if (completedAt) assertIsoTimestamptzOk(completedAt, `work_orders completed_at i=${i}`)
 
-        await tx`
+        const [woRow] = await tx`
           insert into public.work_orders (
             organization_id, customer_id, equipment_id, title, status, priority, type,
             scheduled_on, scheduled_time, completed_at, assigned_user_id, invoice_number,
@@ -819,7 +1600,14 @@ async function main() {
             ${updatedAt}::timestamptz,
             null
           )
+          returning id, customer_id, title, status
         `
+        seededWorkOrders.push({
+          id: woRow.id,
+          customer_id: woRow.customer_id,
+          title: woRow.title,
+          status: woRow.status,
+        })
       }
 
       const monthStartTs = `${mb.monthStart}T08:00:00.000Z`
@@ -832,7 +1620,7 @@ async function main() {
         const title = `Auto-scheduled PM — ${PLAN_NAMES[p % PLAN_NAMES.length]}`.slice(0, 200)
         assertIsoTimestamptzOk(createdAt, `pm_from_plan created p=${p}`)
         assertIsoTimestamptzOk(updatedAt, `pm_from_plan updated p=${p}`)
-        await tx`
+        const [pmWo] = await tx`
           insert into public.work_orders (
             organization_id, customer_id, equipment_id, title, status, priority, type,
             scheduled_on, scheduled_time, completed_at, assigned_user_id, invoice_number,
@@ -861,14 +1649,33 @@ async function main() {
             ${updatedAt}::timestamptz,
             ${plan.id}
           )
+          returning id, customer_id, title, status
         `
+        seededWorkOrders.push({
+          id: pmWo.id,
+          customer_id: pmWo.customer_id,
+          title: pmWo.title,
+          status: pmWo.status,
+        })
       }
+
+      await seedPrecisionExtendedRelations(tx, {
+        orgId,
+        ownerId,
+        techUserIds,
+        customerIds,
+        seededWorkOrders,
+        now,
+      })
     })
 
     console.log("Done. Precision Biomedical Services marketing seed applied.")
     console.log(`  Org slug: ${orgSlug}`)
     console.log(
       `  Customers: ${TARGET_CUSTOMERS}, Equipment: ${TARGET_EQUIPMENT}, Work orders: ${TARGET_TOTAL_WORK_ORDERS} (incl. ${TARGET_PM_PLAN_WORK_ORDERS} PM-from-plan), Plans: ${TARGET_PLANS}, Quotes: ${TARGET_QUOTES}, Invoices: ${TARGET_INVOICES}`,
+    )
+    console.log(
+      `  Prospects: ${TARGET_PROSPECTS}, Catalog/inventory SKUs: ${TARGET_CATALOG_ITEMS}, Vendors: ${TARGET_VENDOR_ROWS}, Communications: ${TARGET_COMM_EVENTS}`,
     )
     console.log("  Technician demo logins (password for all): PrecisionSeed2026!")
     for (const t of TECH_SEED) console.log(`    - ${t.email} (${t.name})`)
