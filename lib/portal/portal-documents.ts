@@ -26,7 +26,7 @@ import {
   type PortalCertificateItem,
 } from "@/lib/portal/portal-certificate-items"
 import { fetchInvoicesLinkedToWorkOrdersBatch } from "@/lib/portal/work-order-invoices"
-import { mapInvoiceStatus, mapQuoteStatus, mapWorkOrderStatus } from "@/lib/portal/display-mappers"
+import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapQuoteStatus } from "@/lib/portal/display-mappers"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 export type PortalDocumentKind =
@@ -501,7 +501,7 @@ export async function buildPortalDocuments(
       blockedByInvoice: null,
       viewPath: "/portal/work-orders",
       downloadPath: null,
-      statusLabel: mapWorkOrderStatus(w.status),
+      statusLabel: mapCustomerWorkOrderStatus(w.status, w.scheduled_on),
       fileSizeBytes: null,
       accountLabel: chipFor(w.customer_id),
       meta: {

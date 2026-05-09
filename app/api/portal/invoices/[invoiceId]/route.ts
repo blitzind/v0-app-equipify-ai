@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { mapInvoiceStatus, mapWorkOrderStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
+import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
@@ -137,7 +137,7 @@ export async function GET(
             workOrderNumber: w.work_order_number as number | null,
           }),
           title: w.title as string,
-          statusLabel: mapWorkOrderStatus(w.status as string),
+          statusLabel: mapCustomerWorkOrderStatus(w.status as string, w.scheduled_on as string | null),
           typeLabel: mapWorkOrderType(w.type as string),
           scheduledOn: (w.scheduled_on as string | null) ?? null,
           completedAt: (w.completed_at as string | null) ?? null,

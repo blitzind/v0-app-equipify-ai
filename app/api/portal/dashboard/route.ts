@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import {
+  mapCustomerWorkOrderStatus,
   mapInvoiceStatus,
   mapMaintenancePlanStatus,
-  mapWorkOrderStatus,
   mapWorkOrderType,
 } from "@/lib/portal/display-mappers"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -15,14 +15,6 @@ function fmtCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(
     cents / 100,
   )
-}
-
-function customerWorkOrderStatus(status: string, scheduledOn: string | null): string {
-  if (status === "canceled" || status === "cancelled") return "Canceled"
-  if (status === "in_progress") return "In progress"
-  if (status === "completed" || status === "completed_pending_signature" || status === "invoiced") return "Completed"
-  if (scheduledOn) return "Scheduled"
-  return "Pending confirmation"
 }
 
 function timeLabel(raw: unknown): string | null {
@@ -154,7 +146,7 @@ export async function GET() {
         workOrderNumber: w.work_order_number as number | null,
       }),
       title: w.title as string,
-      statusLabel: mapWorkOrderStatus(w.status as string),
+      statusLabel: mapCustomerWorkOrderStatus(w.status as string, w.scheduled_on as string | null),
       typeLabel: mapWorkOrderType(w.type as string),
       scheduledOn: w.scheduled_on as string | null,
       equipmentName: equipMap.get(w.equipment_id as string) ?? "Equipment",
@@ -325,7 +317,7 @@ export async function GET() {
             workOrderNumber: nextAppointment.work_order_number as number | null,
           }),
           title: nextAppointment.title as string,
-          statusLabel: customerWorkOrderStatus(nextAppointment.status as string, nextAppointment.scheduled_on as string | null),
+          statusLabel: mapCustomerWorkOrderStatus(nextAppointment.status as string, nextAppointment.scheduled_on as string | null),
           scheduledOn: nextAppointment.scheduled_on as string | null,
           scheduledTime: timeLabel(nextAppointment.scheduled_time),
           equipmentName: appointmentEquipMap.get(nextAppointment.equipment_id as string)?.name ?? "Equipment",
@@ -346,7 +338,7 @@ export async function GET() {
             workOrderNumber: recentCompleted.work_order_number as number | null,
           }),
           title: recentCompleted.title as string,
-          statusLabel: customerWorkOrderStatus(recentCompleted.status as string, recentCompleted.scheduled_on as string | null),
+          statusLabel: mapCustomerWorkOrderStatus(recentCompleted.status as string, recentCompleted.scheduled_on as string | null),
           completedAt: recentCompleted.completed_at as string | null,
           equipmentName: appointmentEquipMap.get(recentCompleted.equipment_id as string)?.name ?? "Equipment",
           locationLabel: appointmentEquipMap.get(recentCompleted.equipment_id as string)?.location ?? null,

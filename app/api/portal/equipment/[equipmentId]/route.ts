@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import {
+  mapCustomerWorkOrderStatus,
   mapEquipmentStatus,
-  mapWorkOrderStatus,
   mapWorkOrderType,
 } from "@/lib/portal/display-mappers"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
@@ -111,7 +111,7 @@ export async function GET(
         workOrderNumber: w.work_order_number as number | null,
       }),
       title: w.title as string,
-      statusLabel: mapWorkOrderStatus(w.status as string),
+      statusLabel: mapCustomerWorkOrderStatus(w.status as string, w.scheduled_on as string | null),
       typeLabel: mapWorkOrderType(w.type as string),
       scheduledOn: (w.scheduled_on as string | null) ?? null,
       completedAt: (w.completed_at as string | null) ?? null,

@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server"
-import { mapWorkOrderType } from "@/lib/portal/display-mappers"
+import { mapCustomerWorkOrderStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { resolvePortalDocumentScope } from "@/lib/portal/portal-document-scope"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 
 export const runtime = "nodejs"
-
-function customerStatus(status: string, scheduledOn: string | null): string {
-  if (status === "canceled" || status === "cancelled") return "Canceled"
-  if (status === "in_progress") return "In progress"
-  if (status === "completed" || status === "completed_pending_signature" || status === "invoiced") return "Completed"
-  if (scheduledOn) return "Scheduled"
-  return "Pending confirmation"
-}
 
 function appointmentGroup(status: string, scheduledOn: string | null, completedAt: string | null): "upcoming" | "in_progress" | "completed" | "all" {
   if (status === "in_progress") return "in_progress"
@@ -110,7 +102,7 @@ export async function GET() {
           workOrderNumber: w.work_order_number as number | null,
         }),
         title: w.title as string,
-        statusLabel: customerStatus(w.status as string, (w.scheduled_on as string | null) ?? null),
+        statusLabel: mapCustomerWorkOrderStatus(w.status as string, (w.scheduled_on as string | null) ?? null),
         appointmentGroup: appointmentGroup(
           w.status as string,
           (w.scheduled_on as string | null) ?? null,
@@ -118,7 +110,6 @@ export async function GET() {
         ),
         isAppointment: Boolean(w.scheduled_on),
         typeLabel: mapWorkOrderType(w.type as string),
-        priority: w.priority as string,
         scheduledOn: (w.scheduled_on as string | null) ?? null,
         // `HH:MM:SS` from postgres `time without time zone`; truncate to HH:MM
         // for the portal which only displays start time.

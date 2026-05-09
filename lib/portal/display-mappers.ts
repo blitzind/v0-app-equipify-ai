@@ -10,6 +10,21 @@ export function mapWorkOrderStatus(db: string): string {
   return m[db] ?? db
 }
 
+export function mapCustomerWorkOrderStatus(db: string, scheduledOn?: string | null): string {
+  const normalized = db.trim().toLowerCase()
+  if (normalized === "canceled" || normalized === "cancelled") return "Canceled"
+  if (normalized === "in_progress") return "In progress"
+  if (
+    normalized === "completed" ||
+    normalized === "completed_pending_signature" ||
+    normalized === "invoiced"
+  ) {
+    return "Completed"
+  }
+  if (scheduledOn) return "Scheduled"
+  return "Pending confirmation"
+}
+
 export function mapWorkOrderType(db: string): string {
   const m: Record<string, string> = {
     repair: "Repair",

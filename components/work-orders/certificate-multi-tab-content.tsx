@@ -121,7 +121,7 @@ export function CertificateMultiTabContent({
   onFocusEquipmentApplied,
 }: CertificateMultiTabContentProps) {
   const { workspace } = useTenant()
-  const { permissions: orgPermissions } = useOrgPermissions()
+  const { permissions: orgPermissions, status: permissionsStatus } = useOrgPermissions()
   const workspaceCompanyName = workspace.name?.trim() || "Organization"
   const workspaceLogoUrl = pickPreferredDocumentLogoUrl(workspace.documentLogoUrl, workspace.logoUrl)
   const workspaceDocumentBranding = useMemo(
@@ -142,6 +142,11 @@ export function CertificateMultiTabContent({
     updatedAt: string | null
   }>({ url: null, updatedAt: null })
   const touchedRef = useRef<Record<string, Set<string>>>({})
+  const canEditCertificate =
+    permissionsStatus !== "ready" ||
+    orgPermissions.canEditWorkOrders ||
+    orgPermissions.canUploadCertificateAttachments ||
+    orgPermissions.canManageCertificateTemplates
 
   const equipmentKey = equipmentAssets.map((a) => a.id).join(",")
 
@@ -378,6 +383,14 @@ export function CertificateMultiTabContent({
 
   async function handleSave(assetId: string) {
     if (!orgId) return
+    if (!canEditCertificate) {
+      toast({
+        variant: "destructive",
+        title: "Cannot save certificate",
+        description: "Your current role does not allow editing certificates.",
+      })
+      return
+    }
     const st = slotStates[assetId]
     if (!st?.templateId) return
     const gate = await enforceCanCreateRecord(orgId, "calibration_record")
@@ -660,8 +673,11 @@ export function CertificateMultiTabContent({
                     technicianSignatureFallbackUsed={signatureState.fallbackUsed}
                     technicianSignatureStatus={signatureState}
                     completedAtLabel={workOrder.completedDate ? fmtShort(workOrder.completedDate) : null}
-                    manageTemplatesHref="/calibration-templates"
+                    manageTemplatesHref={
+                      orgPermissions.canManageCertificateTemplates ? "/calibration-templates" : undefined
+                    }
                     showPrefillHelper={st.prefillNotice}
+                    canEditCertificate={canEditCertificate}
                     staffPortalLines={staffPortalLines}
                     portalReleasedAt={st.portalReleasedAt ?? null}
                     onReleaseToPortal={

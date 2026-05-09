@@ -12,7 +12,6 @@ type Wo = {
   appointmentGroup: "upcoming" | "in_progress" | "completed" | "all"
   isAppointment: boolean
   typeLabel: string
-  priority: string
   scheduledOn: string | null
   /**
    * Phase: Scheduling Field-Speed Polish — start time (HH:MM, 24h) of the

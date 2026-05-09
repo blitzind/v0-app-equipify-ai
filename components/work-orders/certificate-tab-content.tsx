@@ -77,6 +77,7 @@ type CertificateTabContentProps = {
   onReleaseToPortal?: () => void | Promise<void>
   onRevokePortal?: () => void | Promise<void>
   releaseToPortalBusy?: boolean
+  canEditCertificate?: boolean
   /** Optional slot rendered above the template fields — used for the cert attachments card. */
   attachmentsSlot?: React.ReactNode
 }
@@ -137,6 +138,7 @@ export function CertificateTabContent({
   onReleaseToPortal,
   onRevokePortal,
   releaseToPortalBusy = false,
+  canEditCertificate = true,
 }: CertificateTabContentProps) {
   const { toast } = useToast()
   const resolvedLogoUrl = logoUrl?.trim() ? logoUrl.trim() : undefined
@@ -222,6 +224,7 @@ export function CertificateTabContent({
             <select
               value={selectedTemplateId}
               onChange={(e) => onTemplateChange(e.target.value)}
+              disabled={!canEditCertificate}
               className={cn(
                 DRAWER_FIELD_CLASS,
                 "w-full px-2 py-1.5 cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -235,7 +238,12 @@ export function CertificateTabContent({
               ))}
             </select>
           </div>
-          <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => void onSave()} disabled={!selectedTemplate || saveBusy}>
+          <Button
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => void onSave()}
+            disabled={!canEditCertificate || !selectedTemplate || saveBusy}
+          >
             <Save className="w-3.5 h-3.5" />
             {saveBusy ? "Saving…" : "Save Certificate"}
           </Button>
@@ -505,6 +513,11 @@ export function CertificateTabContent({
               Some fields were prefilled from the work order. You can edit them.
             </p>
           ) : null}
+          {!canEditCertificate ? (
+            <p className="text-[11px] text-muted-foreground border-l-2 border-border pl-2.5 py-0.5 leading-relaxed">
+              Certificate fields are read-only for your current role.
+            </p>
+          ) : null}
           {selectedTemplate.fields.length === 0 ? (
             <p className="text-sm text-muted-foreground">This template has no fields yet.</p>
           ) : (
@@ -532,6 +545,7 @@ export function CertificateTabContent({
                     <Input
                       value={typeof raw === "string" ? raw : ""}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
+                      disabled={!canEditCertificate}
                       className="h-9"
                     />
                   )}
@@ -540,6 +554,7 @@ export function CertificateTabContent({
                       type="number"
                       value={typeof raw === "number" ? raw : typeof raw === "string" ? raw : ""}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
+                      disabled={!canEditCertificate}
                       className="h-9"
                     />
                   )}
@@ -550,6 +565,7 @@ export function CertificateTabContent({
                         className="rounded border-input"
                         checked={Boolean(raw)}
                         onChange={(e) => onValueChange(field.id, e.target.checked)}
+                        disabled={!canEditCertificate}
                       />
                       Checked
                     </label>
@@ -558,6 +574,7 @@ export function CertificateTabContent({
                     <select
                       value={raw === "fail" ? "fail" : "pass"}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
+                      disabled={!canEditCertificate}
                       className={cn(
                 DRAWER_FIELD_CLASS,
                 "w-full px-2 py-1.5 cursor-pointer shadow-xs transition-[color,box-shadow,border-color] focus:border-border focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -571,6 +588,7 @@ export function CertificateTabContent({
                     <Textarea
                       value={typeof raw === "string" ? raw : ""}
                       onChange={(e) => onValueChange(field.id, e.target.value)}
+                      disabled={!canEditCertificate}
                       rows={4}
                     />
                   )}
