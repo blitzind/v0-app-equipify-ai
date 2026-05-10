@@ -128,3 +128,7 @@ Platform admin accounts table (optional): Plan column shows billing cycle and pe
 Phase 54.1 required no schema changes. Phase 54.2 reuses existing `organization_subscriptions` and `stripe_webhook_events` — **no new migrations** for lifecycle validation.
 
 If you already applied historical migrations, **no** extra `supabase db push` is needed solely for 54.2.
+
+## Related: BlitzPay / customer payments (Phase 54.3)
+
+SaaS subscription Stripe setup above is **not** used for **end-customer invoice** collection. Architecture for Connect, application fees, and future webhooks is documented in [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md) (design-only; no live BlitzPay in 54.3).
