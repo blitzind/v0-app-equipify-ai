@@ -130,12 +130,11 @@ export function StaffPreviewFrame({
               </Button>
               <Link
                 href="/"
-                className="inline-flex items-center gap-1 text-xs font-medium underline-offset-4 hover:underline"
-                style={{ color: "var(--portal-nav-text)" }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-[color:var(--portal-secondary)] underline-offset-4 hover:text-[color:var(--portal-foreground)] hover:underline"
                 title="Leave preview and return to the staff app"
               >
                 Exit to main app
-                <ArrowRight className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                <ArrowRight className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
               </Link>
             </div>
           </div>
@@ -153,14 +152,25 @@ export function StaffPreviewFrame({
                 <Link
                   key={path}
                   href={href}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "group flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--portal-accent)_40%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-surface)]",
                     active
-                      ? "text-[--portal-accent] bg-[--portal-accent-muted]"
-                      : "text-[--portal-nav-text] hover:bg-[--portal-hover] hover:text-[--portal-foreground]",
+                      ? "bg-[--portal-accent-muted] font-semibold text-[--portal-accent]"
+                      : "text-[color:var(--portal-secondary)] hover:bg-[--portal-hover] hover:text-[color:var(--portal-foreground)]",
                   )}
                 >
-                  <Icon size={15} className={active ? "text-[--portal-accent]" : "text-[--portal-nav-icon]"} />
+                  <Icon
+                    size={15}
+                    className={cn(
+                      "shrink-0 transition-colors",
+                      active
+                        ? "text-[--portal-accent]"
+                        : "text-[color:var(--portal-secondary)] group-hover:text-[color:var(--portal-foreground)]",
+                    )}
+                    aria-hidden
+                  />
                   {label}
                 </Link>
               )
@@ -175,8 +185,8 @@ export function StaffPreviewFrame({
               Jump to section
             </label>
             <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-xs font-medium"
-              style={{ borderColor: "var(--portal-border)", color: "var(--portal-foreground)" }}
+              className="h-9 w-full cursor-pointer rounded-md border border-[var(--portal-border)] bg-[var(--portal-surface)] px-2 text-xs font-medium text-[var(--portal-foreground)] outline-none transition-[border-color,box-shadow] focus:border-[var(--portal-accent)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--portal-accent)_28%,transparent)]"
+              aria-label="Jump to preview section"
               value={navPath}
               onChange={(e) => {
                 window.location.href = buildStaffPreviewHref(organizationId, qCustomer, e.target.value)
@@ -222,8 +232,7 @@ export function StaffPreviewFrame({
               />
               <Link
                 href={buildStaffPreviewHref(organizationId, qCustomer, "/portal/preview/account")}
-                className="shrink-0 self-end text-[11px] font-medium underline-offset-4 hover:underline sm:self-center"
-                style={{ color: "var(--portal-nav-text)" }}
+                className="shrink-0 self-end text-[11px] font-medium text-[color:var(--portal-secondary)] underline-offset-4 hover:text-[color:var(--portal-foreground)] hover:underline sm:self-center"
                 title="Read-only account information in staff preview"
               >
                 Account (preview)

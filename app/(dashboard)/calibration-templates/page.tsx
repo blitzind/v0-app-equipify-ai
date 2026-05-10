@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   BadgeCheck,
   FileBadge2,
@@ -199,9 +199,12 @@ function completedCertMatchesSearch(row: CompletedCertificateListItem, tokens: s
   return haystackIncludesAllTokens(haystack, tokens)
 }
 
-export default function CertificatesPage() {
+type CertificatesTab = "completed" | "templates"
+
+function CertificatesPageInner() {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { standardCreateEligibility } = useBillingAccess()
   const { canArchiveRestore } = useOrgArchivePermissions()
@@ -215,7 +218,7 @@ export default function CertificatesPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("templates")
+  const [activeTab, setActiveTab] = useState<CertificatesTab>("completed")
   /** Incremented when user starts a new template so we focus the name field after the Templates tab panel mounts. */
   const [newTemplateFocusTick, setNewTemplateFocusTick] = useState(0)
   /** After adding a field, focus and scroll to its label input. */
@@ -229,6 +232,14 @@ export default function CertificatesPage() {
   const [completedCertificatesSearchQuery, setCompletedCertificatesSearchQuery] = useState("")
   const [templateListVisibility, setTemplateListVisibility] =
     useState<CalibrationTemplateListVisibility>("active")
+
+  /** Deep link: `?tab=templates` | `?tab=completed`. Default tab is completed when omitted. */
+  useEffect(() => {
+    const t = searchParams.get("tab")
+    if (t === "templates" || t === "completed") {
+      setActiveTab(t)
+    }
+  }, [searchParams])
 
   const completedSearchTokens = useMemo(
     () => normalizeCertSearchTokens(completedCertificatesSearchQuery),
@@ -699,7 +710,7 @@ export default function CertificatesPage() {
               Certificates
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed">
-              Create reusable calibration templates and manage completed certificates.
+              Review completed certificates from work orders and build reusable calibration templates.
             </p>
           </div>
         </div>
@@ -712,7 +723,13 @@ export default function CertificatesPage() {
       ) : null}
 
       {/* gap-2 only — avoid stacking space-y-* with Root gap (was pushing content too far down) */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          if (v === "templates" || v === "completed") setActiveTab(v)
+        }}
+        className="gap-2"
+      >
         <div className="flex flex-nowrap items-center justify-between gap-3 bg-background px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsList
             className={cn(
@@ -721,18 +738,18 @@ export default function CertificatesPage() {
             )}
           >
             <TabsTrigger
-              value="templates"
-              className={tabsTriggerDrawerRowClassName("inline-flex grow-0 items-center gap-2")}
-            >
-              <FileText className="h-4 w-4 shrink-0" aria-hidden />
-              Templates
-            </TabsTrigger>
-            <TabsTrigger
               value="completed"
               className={tabsTriggerDrawerRowClassName("inline-flex grow-0 items-center gap-2")}
             >
               <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden />
               Completed Certificates
+            </TabsTrigger>
+            <TabsTrigger
+              value="templates"
+              className={tabsTriggerDrawerRowClassName("inline-flex grow-0 items-center gap-2")}
+            >
+              <FileText className="h-4 w-4 shrink-0" aria-hidden />
+              Templates
             </TabsTrigger>
           </TabsList>
           <div className="flex shrink-0 items-center gap-2 flex-wrap justify-end py-1">
@@ -1306,5 +1323,21 @@ export default function CertificatesPage() {
         certificateAiImportAllowed={certificateAiImportAllowed && !planAiGateLoading}
       />
     </div>
+  )
+}
+
+export default function CertificatesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <Card className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <p className="text-sm text-muted-foreground">Loading certificates…</p>
+          </Card>
+        </div>
+      }
+    >
+      <CertificatesPageInner />
+    </Suspense>
   )
 }

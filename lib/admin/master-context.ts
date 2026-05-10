@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:38:33.492Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:45:16.118Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -110,6 +110,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Certificates (calibration)
 - **Routes:** \`/calibration-templates\` (nav label “Certificates”), WO certificate tabs.
+- **Phase 56.8:** Certificates page defaults to the **Completed Certificates** tab; **Templates** is next in the tab row. Deep link with \`?tab=templates\` or \`?tab=completed\` (default when omitted: completed). Work order **Manage templates** links use \`?tab=templates\`.
 - **Purpose:** Templates (\`calibration_templates\`), per-WO records (\`calibration_records\`), generated PDF/HTML output, external certificate PDF uploads, technician signature application, and portal release policy.
 - **Status:** MVP complete; portal exposes certificates API and released certificate attachments.
 - **Key UI:** Work order certificate tabs support template-based generation plus external certificate uploads with labels, issue/expiry dates, portal visibility, equipment, calibration record, invoice metadata, release/revoke controls, signature status, and withheld reasons.

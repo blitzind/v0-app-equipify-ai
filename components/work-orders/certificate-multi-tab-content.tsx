@@ -674,7 +674,9 @@ export function CertificateMultiTabContent({
                     technicianSignatureStatus={signatureState}
                     completedAtLabel={workOrder.completedDate ? fmtShort(workOrder.completedDate) : null}
                     manageTemplatesHref={
-                      orgPermissions.canManageCertificateTemplates ? "/calibration-templates" : undefined
+                      orgPermissions.canManageCertificateTemplates
+                        ? "/calibration-templates?tab=templates"
+                        : undefined
                     }
                     showPrefillHelper={st.prefillNotice}
                     canEditCertificate={canEditCertificate}
