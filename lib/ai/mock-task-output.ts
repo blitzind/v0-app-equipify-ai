@@ -14,6 +14,7 @@ import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-sc
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
 import { WorkOrderServiceSummaryAiSchema } from "@/lib/work-orders/service-summary-ai-schema"
+import { WorkOrderTechnicianAssistAiSchema } from "@/lib/work-orders/technician-assist-schema"
 import { getIndustryLens } from "@/lib/ai/mock-industry-lens"
 import {
   EMPTY_TRIAL_OPERATIONAL_SNAPSHOT,
@@ -519,6 +520,30 @@ export async function buildMockStructuredOutput<T>(params: {
       }
   }
 
+  if (params.task === "work_order_technician_assist") {
+    rawObj = {
+      troubleshootingSteps: [
+        "Trial preview — verify power, fluids, and obvious fault indicators before deeper disassembly.",
+        "Reproduce the customer-reported symptom with a short controlled test when safe.",
+      ],
+      customerQuestions: [
+        "When did you first notice the issue, and does it happen under load or at idle?",
+        "Any recent service, fluid changes, or alarms we should know about?",
+      ],
+      partsAndToolsChecklist: [
+        "Basic hand tools appropriate for the asset class",
+        "Shop towels / spill containment",
+        "PPE per your shop policy",
+      ],
+      safetyAndEscalation: [
+        "Follow lockout/tagout before removing guards or working on stored energy.",
+        "Stop and escalate if you see fuel leaks, electrical arcing, or unstable loads.",
+      ],
+      customerSafeWording:
+        "Thanks for having us out. We’re going to run a few checks on the equipment and keep you posted. If anything changes while we’re on site, just flag us right away.",
+    }
+  }
+
   if (params.task === "OCR_cleanup") {
     rawObj = {
       cleanedText: snippet ? snippet.slice(0, 2000) : "Trial preview — cleaned text would appear here.",
@@ -579,6 +604,13 @@ export async function buildMockStructuredOutput<T>(params: {
       const highlightsRaw = o.highlights ?? o.checklist
       const highlights = Array.isArray(highlightsRaw) ? highlightsRaw.filter((x): x is string => typeof x === "string") : undefined
       const normalized = WorkOrderServiceSummaryAiSchema.safeParse({ summary, highlights })
+      if (normalized.success) {
+        rawText = JSON.stringify(normalized.data)
+        schemaResult = await parseWithSchemaSafe(rawText, params.schema)
+      }
+    }
+    if (!schemaResult.ok && params.task === "work_order_technician_assist") {
+      const normalized = WorkOrderTechnicianAssistAiSchema.safeParse(rawObj)
       if (normalized.success) {
         rawText = JSON.stringify(normalized.data)
         schemaResult = await parseWithSchemaSafe(rawText, params.schema)

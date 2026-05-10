@@ -120,6 +120,7 @@ export async function GET(
     "workflow_builder",
     "maintenance_prediction",
     "work_order_summary",
+    "work_order_technician_assist",
     "customer_email",
     "OCR_cleanup",
   ] as const

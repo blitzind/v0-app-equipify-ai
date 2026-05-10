@@ -737,6 +737,8 @@ export interface WorkOrderDetailExperienceProps {
   leading?: React.ReactNode
   /** Top of Overview tab — billing linkage, lifecycle timeline, etc. */
   overviewLeadSlot?: React.ReactNode
+  /** Bottom of Overview tab (e.g. AI technician guidance). */
+  overviewFooterSlot?: React.ReactNode
   /** `drawer` aligns chrome with `EquipmentDrawer` (underline tabs, KPI cards, quick actions). */
   layout?: "page" | "drawer"
   /** Controlled tabs (e.g. confirm before leaving Parts tab with unsaved edits). Requires both. */
@@ -839,6 +841,7 @@ export function WorkOrderDetailExperience({
   fullPageHref,
   leading,
   overviewLeadSlot,
+  overviewFooterSlot,
   layout = "page",
   tabsValue,
   onTabsValueChange,
@@ -1682,6 +1685,7 @@ export function WorkOrderDetailExperience({
               onCustomerSignatureSave={onCustomerSignatureSave}
             />
           </Section>
+          {overviewFooterSlot ? <div className="pt-1 space-y-3">{overviewFooterSlot}</div> : null}
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-4 mt-0">

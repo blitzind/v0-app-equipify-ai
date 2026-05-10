@@ -43,6 +43,7 @@ import {
   buildWorkOrderActivityItems,
 } from "@/components/work-orders/work-order-detail-experience"
 import { WorkOrderAiServiceSummaryPanel } from "@/components/work-orders/work-order-ai-service-summary-panel"
+import { WorkOrderAiTechnicianAssistPanel } from "@/components/work-orders/work-order-ai-technician-assist-panel"
 import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-order-equipment-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
@@ -2447,6 +2448,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             planServices={planServices}
             activityItems={buildWorkOrderActivityItems(wo)}
             overviewLeadSlot={drawerOverviewLeadSlot}
+            overviewFooterSlot={
+              orgStatus === "ready" && activeOrgId && wo.id && woCanEdit ?
+                <WorkOrderAiTechnicianAssistPanel
+                  organizationId={activeOrgId}
+                  workOrderId={wo.id}
+                  workOrderArchived={Boolean(wo.isArchived)}
+                  canEdit={woCanEdit}
+                />
+              : null
+            }
             problemReported={problemReportedDraft}
             onProblemReportedChange={setProblemReportedDraft}
             problemReportedInlineEditable={!wo.isArchived}

@@ -53,6 +53,7 @@ import {
   buildWorkOrderActivityItems,
 } from "@/components/work-orders/work-order-detail-experience"
 import { WorkOrderAiServiceSummaryPanel } from "@/components/work-orders/work-order-ai-service-summary-panel"
+import { WorkOrderAiTechnicianAssistPanel } from "@/components/work-orders/work-order-ai-technician-assist-panel"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
@@ -933,6 +934,16 @@ export default function WorkOrderDetailPage() {
             ) : null}
             <ServiceLifecycleTimeline title="Service timeline" events={woTimelineEvents} />
           </>
+        }
+        overviewFooterSlot={
+          activeOrg.status === "ready" && activeOrg.organizationId && woCanEdit ?
+            <WorkOrderAiTechnicianAssistPanel
+              organizationId={activeOrg.organizationId}
+              workOrderId={workOrder.id}
+              workOrderArchived={Boolean(workOrder.isArchived)}
+              canEdit={woCanEdit}
+            />
+          : null
         }
         workOrder={workOrder}
         internalNotes={internalNotes}

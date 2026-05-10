@@ -6,6 +6,7 @@ export type AiTaskId =
   | "catalog_extraction"
   | "insights_generation"
   | "work_order_summary"
+  | "work_order_technician_assist"
   | "dispatch_recommendation"
   | "quote_generation"
   | "invoice_summary"
