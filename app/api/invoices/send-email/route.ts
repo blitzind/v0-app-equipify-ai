@@ -308,7 +308,14 @@ export async function POST(request: Request) {
     certificate: certificatesList.length > 0 ? undefined : legacyCertificate,
   })
 
-  const sendResult = await sendEmail({ to, subject, html, text })
+  const sendResult = await sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    category: "invoice_customer",
+    organizationId,
+  })
 
   if (!sendResult.ok) {
     const status = sendResult.code === "config" ? 503 : 502

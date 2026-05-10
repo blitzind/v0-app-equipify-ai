@@ -2,6 +2,7 @@ import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { getPublicAppOrigin } from "@/lib/email/config"
 import { sendEmail } from "@/lib/email/resend"
 import { insertTeamAuditEvent } from "@/lib/team-audit"
 
@@ -96,11 +97,13 @@ export async function POST(request: Request) {
     metadata: { email, role },
   })
 
-  const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.equipify.ai").replace(/\/$/, "")
+  const appBaseUrl = getPublicAppOrigin()
   const inviteLink = `${appBaseUrl}/onboarding?inviteToken=${encodeURIComponent(token)}`
 
   const emailSend = await sendEmail({
     to: email,
+    category: "team_invite",
+    organizationId,
     subject: `You're invited to join ${organizationName} on Equipify`,
     html: `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#111827">

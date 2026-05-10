@@ -249,7 +249,14 @@ export async function POST(request: Request) {
           messagePlain,
         })
 
-  const sendResult = await sendEmail({ to, subject, html, text })
+  const sendResult = await sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    category: variant === "appointment_confirmation" ? "work_order_appointment_confirmation" : "work_order_summary",
+    organizationId,
+  })
 
   if (!sendResult.ok) {
     const status = sendResult.code === "config" ? 503 : 502

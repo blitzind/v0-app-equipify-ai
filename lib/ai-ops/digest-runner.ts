@@ -17,6 +17,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getPublicAppOrigin } from "@/lib/email/config"
 import { sendEmail } from "@/lib/email/resend"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { renderAiOpsDigestEmail } from "@/lib/email/ai-ops-digest-template"
@@ -90,7 +91,7 @@ export type RunDigestResult = {
   payload?: DigestPayload
 }
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "")
+const APP_URL = getPublicAppOrigin()
 
 const DESTINATION_NOT_CONFIGURED: DestinationResult = {
   status: "not_configured",
@@ -230,7 +231,7 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
   // result of each independently. A single failure must not block
   // the others.
   const [emailResult, slackResult, teamsResult] = await Promise.all([
-    dispatchEmail(payload, recipients),
+    dispatchEmail(payload, recipients, args.organizationId),
     slackEnabled
       ? dispatchSlack(payload, settings.slack_webhook_url ?? "")
       : Promise.resolve<DestinationResult>(
@@ -326,6 +327,7 @@ export async function runDigestForOrganization(args: RunDigestArgs): Promise<Run
 async function dispatchEmail(
   payload: DigestPayload,
   recipients: string[],
+  organizationId: string,
 ): Promise<DestinationResult> {
   if (recipients.length === 0) return DESTINATION_NOT_CONFIGURED
   try {
@@ -335,6 +337,8 @@ async function dispatchEmail(
       subject: email.subject,
       html: email.html,
       text: email.text,
+      category: "ai_ops_digest",
+      organizationId,
     })
     if (!send.ok) {
       return {

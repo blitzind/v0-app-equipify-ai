@@ -135,7 +135,14 @@ export async function sendInvoicePaymentReminderFromAiOps(args: {
     subjectOverride: undefined,
   })
 
-  const sendResult = await sendEmail({ to: billingEmail, subject, html, text })
+  const sendResult = await sendEmail({
+    to: billingEmail,
+    subject,
+    html,
+    text,
+    category: "invoice_payment_reminder_ai_ops",
+    organizationId: args.organizationId,
+  })
 
   if (!sendResult.ok) {
     return { ok: false, code: sendResult.code ?? "send_failed", message: sendResult.error }

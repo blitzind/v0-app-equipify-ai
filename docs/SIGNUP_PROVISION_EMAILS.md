@@ -25,13 +25,14 @@ Provisioning retries for the **same** org do not resend. If welcome succeeds but
 | `RESEND_API_KEY` | To send in that environment | Resend API (server only). |
 | `EMAIL_FROM_ADDRESS` | To send in that environment | From header (verified domain in Resend). |
 | `EMAIL_REPLY_TO` | Optional | Reply-To on customer welcome (and other `sendEmail` uses). |
-| `NEXT_PUBLIC_SITE_URL` | Recommended | Absolute app URL for dashboard link (fallback: `http://localhost:3000`). |
+| `NEXT_PUBLIC_SITE_URL` | Recommended | Dashboard link resolution via `getPublicAppOrigin()` (see [EMAIL_INFRASTRUCTURE.md](./EMAIL_INFRASTRUCTURE.md)). |
 | `EMAIL_SIGNUP_INTERNAL_NOTIFY` | Optional | Internal recipient for new signup alerts (default: `mike@equipify.ai`). |
 
 If `RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset, `sendEmail` returns a config error; provisioning still returns `ok: true` and logs `signup-provision-email` lines.
 
 ## Code
 
+- `lib/email/config.ts` — env + `getPublicAppOrigin()` / internal notify recipient.
 - `lib/email/resend.ts` — shared Resend client (`sendEmail`).
 - `lib/email/signup-provision-emails.ts` — welcome + internal templates and idempotency.
 - `app/api/onboarding/provision/route.ts` — invokes emails after successful provision.
@@ -41,3 +42,7 @@ If `RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset, `sendEmail` returns a conf
 - Supabase Auth confirmation / magic-link templates (still managed in Supabase Dashboard).
 - Invite-accept welcome (separate product decision).
 - Marketing drips.
+
+## Related
+
+- [EMAIL_INFRASTRUCTURE.md](./EMAIL_INFRASTRUCTURE.md) — Resend setup, logging, and env vars for all transactional email.

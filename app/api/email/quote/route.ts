@@ -121,6 +121,8 @@ export async function POST(request: Request) {
     subject,
     html,
     text,
+    category: "quote_customer",
+    organizationId,
   })
 
   if (!sendResult.ok) {

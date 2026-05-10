@@ -1,22 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getPublicAppOrigin, getSignupInternalNotifyRecipient } from "@/lib/email/config"
 import { sendEmail } from "@/lib/email/resend"
 
 const WELCOME_META_KEY = "signup_welcome_email_org_id"
 const ADMIN_META_KEY = "signup_admin_notify_org_id"
-
-function appOrigin(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (raw) return raw.replace(/\/+$/, "")
-  return "http://localhost:3000"
-}
-
-function internalNotifyRecipient(): string {
-  const fromEnv = process.env.EMAIL_SIGNUP_INTERNAL_NOTIFY?.trim()
-  if (fromEnv && fromEnv.includes("@")) return fromEnv
-  return "mike@equipify.ai"
-}
 
 function logSignupEmail(payload: Record<string, unknown>) {
   try {
@@ -167,7 +156,7 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
     return
   }
 
-  const dashboardUrl = `${appOrigin()}/`
+  const dashboardUrl = `${getPublicAppOrigin()}/`
   const atIso = new Date().toISOString()
   const orgName = typeof orgRow.name === "string" ? orgRow.name : null
 
@@ -181,7 +170,14 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
       })
     } else {
       const { subject, html, text } = buildWelcomeContent({ fullName, dashboardUrl })
-      const result = await sendEmail({ to: userEmail.trim(), subject, html, text })
+      const result = await sendEmail({
+        to: userEmail.trim(),
+        subject,
+        html,
+        text,
+        category: "signup_welcome",
+        organizationId,
+      })
       if (result.ok) {
         await mergeUserMetadata(admin, userId, { [WELCOME_META_KEY]: organizationId })
         logSignupEmail({
@@ -205,7 +201,7 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
   }
 
   if (!adminDone) {
-    const to = internalNotifyRecipient()
+    const to = getSignupInternalNotifyRecipient()
     const { subject, html, text } = buildAdminNotifyContent({
       userEmail,
       fullName,
@@ -213,7 +209,14 @@ export async function sendSignupProvisionEmailsIfNeeded(params: {
       organizationId,
       atIso,
     })
-    const result = await sendEmail({ to, subject, html, text })
+    const result = await sendEmail({
+      to,
+      subject,
+      html,
+      text,
+      category: "signup_internal_notify",
+      organizationId,
+    })
     if (result.ok) {
       await mergeUserMetadata(admin, userId, { [ADMIN_META_KEY]: organizationId })
       logSignupEmail({

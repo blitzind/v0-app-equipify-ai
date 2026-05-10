@@ -156,7 +156,14 @@ export async function POST(request: Request) {
     recordHint,
   })
 
-  const sendResult = await sendEmail({ to, subject, html, text })
+  const sendResult = await sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    category: "certificate_customer",
+    organizationId,
+  })
 
   if (!sendResult.ok) {
     const status = sendResult.code === "config" ? 503 : 502

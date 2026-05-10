@@ -131,6 +131,8 @@ export async function POST(request: Request) {
     subject,
     html,
     text,
+    category: "invoice_customer_legacy_route",
+    organizationId,
   })
 
   if (!sendResult.ok) {

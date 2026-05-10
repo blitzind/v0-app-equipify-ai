@@ -1,6 +1,7 @@
 import "server-only"
 
 import { Resend } from "resend"
+import { getOutboundEmailEnv } from "@/lib/email/config"
 
 export class EmailConfigError extends Error {
   constructor(message: string) {
@@ -9,23 +10,23 @@ export class EmailConfigError extends Error {
   }
 }
 
-function getFromAddress(): string {
-  const from = process.env.EMAIL_FROM_ADDRESS?.trim()
+function requireFromAddress(): string {
+  const from = getOutboundEmailEnv().fromAddress
   if (!from) {
     throw new EmailConfigError("EMAIL_FROM_ADDRESS is not set. Add it to the server environment.")
   }
   return from
 }
 
-function getOptionalReplyTo(): string | undefined {
-  const r = process.env.EMAIL_REPLY_TO?.trim()
+function defaultReplyTo(): string | undefined {
+  const r = getOutboundEmailEnv().replyToDefault
   return r || undefined
 }
 
 let resendSingleton: Resend | null = null
 
 function getResendClient(): Resend {
-  const key = process.env.RESEND_API_KEY?.trim()
+  const key = getOutboundEmailEnv().resendApiKey
   if (!key) {
     throw new EmailConfigError("RESEND_API_KEY is not set. Add it to the server environment to send email.")
   }
@@ -35,12 +36,36 @@ function getResendClient(): Resend {
   return resendSingleton
 }
 
+function recipientCount(to: string | string[]): number {
+  return Array.isArray(to) ? to.length : 1
+}
+
+function truncateForLog(s: string, max = 180): string {
+  const t = s.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max)}…`
+}
+
+function logOutboundEmail(payload: Record<string, unknown>) {
+  try {
+    console.info(JSON.stringify({ source: "outbound-email", provider: "resend", ...payload }))
+  } catch {
+    /* best-effort */
+  }
+}
+
 export type SendEmailInput = {
   to: string | string[]
   subject: string
   html: string
   text?: string
   replyTo?: string
+  /**
+   * Observability category (Phase 55.1). Use stable snake_case identifiers.
+   * @example "invoice_customer", "team_invite", "signup_welcome"
+   */
+  category?: string
+  organizationId?: string | null
 }
 
 export type SendEmailResult =
@@ -49,12 +74,18 @@ export type SendEmailResult =
 
 /**
  * Sends an email via Resend. Server-only; never import from client components.
+ * Configuration is read via {@link getOutboundEmailEnv}; failures are logged without bodies or secrets.
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const category = input.category?.trim() || "transactional"
+  const organizationId = input.organizationId ?? null
+  const nRecipients = recipientCount(input.to)
+  const replyToEffective = input.replyTo?.trim() || defaultReplyTo()
+  const hasReplyTo = Boolean(replyToEffective)
+
   try {
-    const from = getFromAddress()
+    const from = requireFromAddress()
     const resend = getResendClient()
-    const replyTo = input.replyTo?.trim() || getOptionalReplyTo()
 
     const { data, error } = await resend.emails.send({
       from,
@@ -62,10 +93,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       subject: input.subject,
       html: input.html,
       ...(input.text ? { text: input.text } : {}),
-      ...(replyTo ? { replyTo } : {}),
+      ...(replyToEffective ? { replyTo: replyToEffective } : {}),
     })
 
     if (error) {
+      logOutboundEmail({
+        category,
+        organizationId,
+        recipientCount: nRecipients,
+        ok: false,
+        code: "provider",
+        error: truncateForLog(error.message ?? "Resend rejected the message."),
+        hasReplyTo,
+      })
       return {
         ok: false,
         error: error.message ?? "Resend rejected the message.",
@@ -73,12 +113,39 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       }
     }
 
+    logOutboundEmail({
+      category,
+      organizationId,
+      recipientCount: nRecipients,
+      ok: true,
+      providerMessageId: data?.id ?? null,
+      hasReplyTo,
+    })
+
     return { ok: true, id: data?.id }
   } catch (e) {
     if (e instanceof EmailConfigError) {
+      logOutboundEmail({
+        category,
+        organizationId,
+        recipientCount: nRecipients,
+        ok: false,
+        code: "config",
+        error: truncateForLog(e.message),
+        hasReplyTo,
+      })
       return { ok: false, error: e.message, code: "config" }
     }
     const message = e instanceof Error ? e.message : String(e)
+    logOutboundEmail({
+      category,
+      organizationId,
+      recipientCount: nRecipients,
+      ok: false,
+      code: "provider",
+      error: truncateForLog(message),
+      hasReplyTo,
+    })
     return { ok: false, error: message, code: "provider" }
   }
 }
