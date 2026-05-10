@@ -32,3 +32,60 @@ export function buildSchedulePatch(args: {
   }
   return patch
 }
+
+/** Update schedule fields while keeping existing assignment columns (bulk date/time edits). */
+export function buildDispatchPreserveAssignmentSchedulePatch(args: {
+  assigned_technician_id: string | null | undefined
+  assigned_user_id: string | null | undefined
+  scheduledOn: string
+  scheduledTimeHhMm: string | null
+}) {
+  return {
+    scheduled_on: args.scheduledOn,
+    scheduled_time:
+      args.scheduledTimeHhMm != null ? normalizeTimeForDb(args.scheduledTimeHhMm) : null,
+    assigned_technician_id: args.assigned_technician_id ?? null,
+    assigned_user_id: args.assigned_user_id ?? null,
+    updated_at: new Date().toISOString(),
+  } satisfies Record<string, unknown>
+}
+
+/**
+ * Set time only; keeps assignment. Uses the work order's existing `scheduled_on`, or
+ * `fallbackDateYmd` when the row has no date yet.
+ */
+export function buildDispatchTimeOnlyPatch(args: {
+  assigned_technician_id: string | null | undefined
+  assigned_user_id: string | null | undefined
+  scheduled_on: string | null | undefined
+  fallbackDateYmd: string
+  scheduledTimeHhMm: string | null
+}) {
+  const head = args.scheduled_on?.trim()
+  const on =
+    head && head.length >= 10 ? head.slice(0, 10) : args.fallbackDateYmd.trim().slice(0, 10)
+  return {
+    scheduled_on: on,
+    scheduled_time:
+      args.scheduledTimeHhMm != null ? normalizeTimeForDb(args.scheduledTimeHhMm) : null,
+    assigned_technician_id: args.assigned_technician_id ?? null,
+    assigned_user_id: args.assigned_user_id ?? null,
+    updated_at: new Date().toISOString(),
+  } satisfies Record<string, unknown>
+}
+
+/** Clear both assignment FKs; leaves schedule + status unchanged (dispatcher may reassign the same window). */
+export function buildDispatchUnassignPatch() {
+  return {
+    assigned_technician_id: null,
+    assigned_user_id: null,
+    updated_at: new Date().toISOString(),
+  } satisfies Record<string, unknown>
+}
+
+export function buildDispatchStatusOnlyPatch(nextStatus: string) {
+  return {
+    status: nextStatus,
+    updated_at: new Date().toISOString(),
+  } satisfies Record<string, unknown>
+}

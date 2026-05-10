@@ -34,13 +34,21 @@ import {
   startOfWeekMonday,
   toYmd,
 } from "@/lib/dispatch/board-utils"
-import {
-  DispatchBoard,
-  buildSchedulePatch,
-  type DispatchTech,
-  type DispatchWo,
-} from "@/components/dispatch/dispatch-board"
+import { DispatchBoard, type DispatchTech, type DispatchWo } from "@/components/dispatch/dispatch-board"
 import { DispatchMobileList } from "@/components/dispatch/dispatch-mobile-list"
+import { DispatchBulkBar } from "@/components/dispatch/dispatch-bulk-bar"
+import {
+  DispatchBulkReviewDialog,
+  type DispatchBulkDialogTab,
+} from "@/components/dispatch/dispatch-bulk-review-dialog"
+import {
+  buildDispatchPreserveAssignmentSchedulePatch,
+  buildDispatchStatusOnlyPatch,
+  buildDispatchTimeOnlyPatch,
+  buildDispatchUnassignPatch,
+  buildSchedulePatch,
+} from "@/lib/work-orders/schedule-patch"
+import type { BulkDispatchFormAction } from "@/lib/dispatch/bulk-dispatch"
 import { DispatchRouteView } from "@/components/dispatch/dispatch-route-view"
 import { DispatchStatusFilter } from "@/components/dispatch/dispatch-status-filter"
 import { DispatchWeekOverview } from "@/components/dispatch/dispatch-week-overview"
@@ -124,7 +132,7 @@ function isDispatchSort(v: unknown): v is "schedule" | "priority" {
 
 function DispatchPageInner() {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
-  const { permissions } = useOrgPermissions()
+  const { permissions, status: orgPermissionsStatus } = useOrgPermissions()
   const { toast } = useToast()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
 
@@ -188,6 +196,19 @@ function DispatchPageInner() {
   } | null>(null)
   const [viewMode, setViewMode] = useState<"board" | "route">("board")
   const [phase34Filters, setPhase34Filters] = useState<Phase34DispatchFilters>(DEFAULT_PHASE34_DISPATCH_FILTERS)
+
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([])
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkDialogTab, setBulkDialogTab] = useState<DispatchBulkDialogTab>("assign")
+
+  const canBulkDispatchPlanning = permissions.canManageDispatch
+  const canBulkStatus = permissions.canEditWorkOrders
+  const bulkSelectionEnabled =
+    viewMode === "board" &&
+    orgPermissionsStatus === "ready" &&
+    (canBulkDispatchPlanning || canBulkStatus)
+  /** Hide bulk chrome while the board data is loading so actions target a consistent snapshot. */
+  const bulkUiActive = bulkSelectionEnabled && !loading
 
   const weekStart = useMemo(() => startOfWeekMonday(weekAnchor), [weekAnchor])
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
@@ -787,6 +808,198 @@ function DispatchPageInner() {
       }
     }
   }
+
+  const bulkSelection = useMemo(
+    () => ({
+      selectedIds: bulkSelectedIds,
+      onToggle: (id: string) => {
+        setBulkSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+      },
+    }),
+    [bulkSelectedIds],
+  )
+
+  useEffect(() => {
+    if (viewMode === "route") {
+      setBulkSelectedIds([])
+      setBulkDialogOpen(false)
+    }
+  }, [viewMode])
+
+  function hhmmFromScheduledDb(t: string | null | undefined): string | null {
+    if (!t?.trim()) return null
+    return t.trim().slice(0, 5)
+  }
+
+  const handleBulkApply = useCallback(
+    async (action: BulkDispatchFormAction, eligible: DispatchWo[]) => {
+      if (!activeOrgId || orgStatus !== "ready" || eligible.length === 0) return
+      setPersistBusy(true)
+      setLoadError(null)
+      const supabase = createBrowserSupabaseClient()
+      const orgId = activeOrgId
+
+      try {
+        for (const wo of eligible) {
+          let patch: Record<string, unknown>
+          switch (action.kind) {
+            case "assign_technician": {
+              const assign = await workOrderAssignmentColumns(supabase, orgId, action.technicianUserId)
+              patch = buildSchedulePatch({
+                scheduledOn: action.scheduledOn,
+                scheduledTimeHhMm: action.scheduledTimeHhMm,
+                assignment: assign,
+                previousStatus: wo.status,
+              })
+              break
+            }
+            case "unassign":
+              patch = buildDispatchUnassignPatch()
+              break
+            case "set_scheduled_date":
+              patch = buildDispatchPreserveAssignmentSchedulePatch({
+                assigned_technician_id: wo.assigned_technician_id,
+                assigned_user_id: wo.assigned_user_id,
+                scheduledOn: action.scheduledOn,
+                scheduledTimeHhMm: hhmmFromScheduledDb(wo.scheduled_time),
+              })
+              break
+            case "set_scheduled_time":
+              patch = buildDispatchTimeOnlyPatch({
+                assigned_technician_id: wo.assigned_technician_id,
+                assigned_user_id: wo.assigned_user_id,
+                scheduled_on: wo.scheduled_on,
+                fallbackDateYmd: selectedYmd,
+                scheduledTimeHhMm: action.scheduledTimeHhMm,
+              })
+              break
+            case "set_status":
+              patch = buildDispatchStatusOnlyPatch(action.targetStatus)
+              break
+          }
+
+          const { error } = await supabase
+            .from("work_orders")
+            .update(patch)
+            .eq("id", wo.id)
+            .eq("organization_id", orgId)
+
+          if (error) {
+            toast({
+              variant: "destructive",
+              title: "Bulk update failed",
+              description: error.message,
+            })
+            setLoadError(error.message)
+            return
+          }
+
+          if (action.kind === "assign_technician") {
+            const techLabel = technicians.find((t) => t.id === action.technicianUserId)?.label ?? null
+            const previousTechLabel = wo.assigned_user_id
+              ? technicians.find((t) => t.id === wo.assigned_user_id)?.label ?? wo.technicianLabel ?? null
+              : wo.technicianLabel ?? null
+            if (wo.assigned_user_id !== action.technicianUserId) {
+              void emitSchedulingEvent({
+                organizationId: orgId,
+                workOrderId: wo.id,
+                eventType: "reassign",
+                severity: "info",
+                message: composeReassignMessage({
+                  fromTechLabel: previousTechLabel,
+                  toTechLabel: techLabel,
+                }),
+                metadata: {
+                  source: "dispatch_board.bulk",
+                  previousTechnicianId: wo.assigned_user_id ?? null,
+                  nextTechnicianId: action.technicianUserId,
+                },
+              })
+            }
+            const scheduleChanged =
+              wo.scheduled_on !== action.scheduledOn ||
+              hhmmFromScheduledDb(wo.scheduled_time) !== (action.scheduledTimeHhMm ?? null)
+            if (scheduleChanged) {
+              void emitSchedulingEvent({
+                organizationId: orgId,
+                workOrderId: wo.id,
+                eventType: "reschedule",
+                severity: "info",
+                message: composeRescheduleMessage({
+                  scheduledOn: action.scheduledOn,
+                  scheduledTimeHhMm: action.scheduledTimeHhMm,
+                }),
+                metadata: {
+                  source: "dispatch_board.bulk",
+                  previousScheduledOn: wo.scheduled_on,
+                  previousScheduledTime: wo.scheduled_time,
+                  nextScheduledOn: action.scheduledOn,
+                  nextScheduledTime: action.scheduledTimeHhMm,
+                  technicianId: action.technicianUserId,
+                },
+              })
+            }
+          } else if (action.kind === "unassign" && wo.assigned_user_id) {
+            const previousTechLabel =
+              technicians.find((t) => t.id === wo.assigned_user_id)?.label ?? wo.technicianLabel ?? null
+            void emitSchedulingEvent({
+              organizationId: orgId,
+              workOrderId: wo.id,
+              eventType: "unassign",
+              severity: "info",
+              message: composeUnassignMessage({ fromTechLabel: previousTechLabel }),
+              metadata: {
+                source: "dispatch_board.bulk",
+                previousTechnicianId: wo.assigned_user_id ?? null,
+                nextTechnicianId: null,
+              },
+            })
+          } else if (
+            (action.kind === "set_scheduled_date" || action.kind === "set_scheduled_time") &&
+            wo.assigned_user_id
+          ) {
+            const nextOn =
+              action.kind === "set_scheduled_date"
+                ? action.scheduledOn
+                : wo.scheduled_on?.trim().slice(0, 10) || selectedYmd
+            const nextTime =
+              action.kind === "set_scheduled_time"
+                ? action.scheduledTimeHhMm
+                : hhmmFromScheduledDb(wo.scheduled_time)
+            void emitSchedulingEvent({
+              organizationId: orgId,
+              workOrderId: wo.id,
+              eventType: "reschedule",
+              severity: "info",
+              message: composeRescheduleMessage({
+                scheduledOn: nextOn,
+                scheduledTimeHhMm: nextTime,
+              }),
+              metadata: {
+                source: "dispatch_board.bulk",
+                previousScheduledOn: wo.scheduled_on,
+                previousScheduledTime: wo.scheduled_time,
+                nextScheduledOn: nextOn,
+                nextScheduledTime: nextTime,
+                technicianId: wo.assigned_user_id,
+              },
+            })
+          }
+        }
+
+        toast({
+          title: "Bulk update complete",
+          description: `Updated ${eligible.length} job${eligible.length === 1 ? "" : "s"}.`,
+        })
+        setBulkDialogOpen(false)
+        setBulkSelectedIds([])
+        setRefresh((n) => n + 1)
+      } finally {
+        setPersistBusy(false)
+      }
+    },
+    [activeOrgId, orgStatus, selectedYmd, technicians, toast],
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -1394,6 +1607,7 @@ function DispatchPageInner() {
               onMoveWo={handleMoveWo}
               busy={persistBusy}
               onQuickAdd={handleQuickAdd}
+              bulkSelection={bulkUiActive ? bulkSelection : null}
             />
           </div>
           <div className="md:hidden">
@@ -1403,8 +1617,22 @@ function DispatchPageInner() {
               selectedYmd={selectedYmd}
               onOpenWo={setSelectedWoId}
               onQuickAdd={handleQuickAdd}
+              bulkSelection={bulkUiActive ? bulkSelection : null}
             />
           </div>
+          {bulkUiActive ? (
+            <DispatchBulkBar
+              selectedCount={bulkSelectedIds.length}
+              onClear={() => setBulkSelectedIds([])}
+              onSelectVisible={() => setBulkSelectedIds(displayWorkOrders.map((w) => w.id))}
+              canManageDispatch={canBulkDispatchPlanning}
+              canEditStatus={canBulkStatus}
+              onOpenDialog={(tab: DispatchBulkDialogTab) => {
+                setBulkDialogTab(tab)
+                setBulkDialogOpen(true)
+              }}
+            />
+          ) : null}
         </>
       )}
 
@@ -1426,6 +1654,21 @@ function DispatchPageInner() {
           setQuickAddSeed(null)
           setRefresh((n) => n + 1)
         }}
+      />
+
+      <DispatchBulkReviewDialog
+        open={bulkDialogOpen && bulkUiActive}
+        onOpenChange={setBulkDialogOpen}
+        initialTab={bulkDialogTab}
+        selectedIds={bulkSelectedIds}
+        displayWorkOrders={displayWorkOrders}
+        technicians={technicians}
+        selectedYmd={selectedYmd}
+        assignedOnlyUser={assignedOnlyView}
+        canManageDispatch={canBulkDispatchPlanning}
+        canEditStatus={canBulkStatus}
+        busy={persistBusy}
+        onApply={handleBulkApply}
       />
     </div>
   )

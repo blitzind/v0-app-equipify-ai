@@ -24,6 +24,7 @@ import {
 } from "@/lib/dispatch/board-utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
+import { Checkbox } from "@/components/ui/checkbox"
 import { buildSchedulePatch } from "@/lib/work-orders/schedule-patch"
 import type { OperationalBadge, OpsFlags } from "@/lib/dispatch/operational-badges"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
@@ -267,11 +268,13 @@ function DraggableWo({
   onOpen,
   slotOverlap,
   scheduleWarnings,
+  bulkSelection,
 }: {
   wo: DispatchWo
   onOpen: (id: string) => void
   slotOverlap?: boolean
   scheduleWarnings?: ScheduleWarningItem[]
+  bulkSelection?: { selectedIds: string[]; onToggle: (id: string) => void } | null
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: DND.wo(wo.id),
@@ -281,24 +284,41 @@ function DraggableWo({
     ? { transform: `translate3d(${transform.x}px,${transform.y}px,0)` }
     : undefined
 
+  const selected = bulkSelection?.selectedIds.includes(wo.id) ?? false
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      className={cn(
-        "touch-none select-none",
-        isDragging ? "cursor-grabbing" : "cursor-grab",
-      )}
+      className={cn("flex gap-1.5", isDragging ? "cursor-grabbing" : "cursor-grab")}
     >
-      <WoCard
-        wo={wo}
-        dragging={isDragging}
-        onOpen={onOpen}
-        slotOverlap={slotOverlap}
-        scheduleWarnings={scheduleWarnings}
-      />
+      {bulkSelection ? (
+        <label
+          className="flex shrink-0 cursor-pointer items-start pt-1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => bulkSelection.onToggle(wo.id)}
+            aria-label={`Select work order ${wo.work_order_number ?? wo.id.slice(0, 8)}`}
+            className="size-4"
+          />
+        </label>
+      ) : null}
+      <div
+        {...listeners}
+        {...attributes}
+        className={cn("min-w-0 flex-1 touch-none select-none", isDragging ? "cursor-grabbing" : "cursor-grab")}
+      >
+        <WoCard
+          wo={wo}
+          dragging={isDragging}
+          onOpen={onOpen}
+          slotOverlap={slotOverlap}
+          scheduleWarnings={scheduleWarnings}
+        />
+      </div>
     </div>
   )
 }
@@ -387,6 +407,7 @@ export function DispatchBoard({
   onMoveWo,
   busy,
   onQuickAdd,
+  bulkSelection,
 }: {
   technicians: DispatchTech[]
   workOrders: DispatchWo[]
@@ -409,6 +430,8 @@ export function DispatchBoard({
     scheduledOn: string
     scheduledTimeHhMm: string | null
   }) => void
+  /** Phase 36B: optional multi-select for bulk dispatch (checkbox per card). */
+  bulkSelection?: { selectedIds: string[]; onToggle: (id: string) => void } | null
 }) {
   const [activeWo, setActiveWo] = useState<DispatchWo | null>(null)
 
@@ -546,6 +569,7 @@ export function DispatchBoard({
                     wo={wo}
                     onOpen={onOpenWo}
                     scheduleWarnings={scheduleWarningsByWoId.get(wo.id)}
+                    bulkSelection={bulkSelection}
                   />
                 ))}
               </div>
@@ -680,6 +704,7 @@ export function DispatchBoard({
                             onOpen={onOpenWo}
                             slotOverlap={list.length > 1}
                             scheduleWarnings={scheduleWarningsByWoId.get(wo.id)}
+                            bulkSelection={bulkSelection}
                           />
                         ))}
                       </DroppableSlot>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { DispatchTech, DispatchWo } from "./dispatch-board"
 import { OperationalBadgeRow } from "@/components/dispatch/operational-badge-row"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatSlotLabel, timeToSlotIndex } from "@/lib/dispatch/board-utils"
 import {
   buildScheduleWarningsByPeer,
@@ -48,6 +49,7 @@ export function DispatchMobileList({
   selectedYmd,
   onOpenWo,
   onQuickAdd,
+  bulkSelection,
 }: {
   technicians: DispatchTech[]
   workOrders: DispatchWo[]
@@ -58,6 +60,7 @@ export function DispatchMobileList({
     scheduledOn: string
     scheduledTimeHhMm: string | null
   }) => void
+  bulkSelection?: { selectedIds: string[]; onToggle: (id: string) => void } | null
 }) {
   const unassigned = useMemo(
     () => workOrders.filter((w) => !w.assigned_user_id && ["open", "scheduled", "in_progress"].includes(w.status)),
@@ -138,10 +141,24 @@ export function DispatchMobileList({
               <div
                 key={wo.id}
                 className={cn(
-                  "flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                  "flex gap-2 rounded-lg border px-2 py-2.5 text-sm sm:px-3",
                   cardTone(wo.status),
                 )}
               >
+                {bulkSelection ? (
+                  <label
+                    className="flex shrink-0 cursor-pointer items-center self-stretch pt-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={bulkSelection.selectedIds.includes(wo.id)}
+                      onCheckedChange={() => bulkSelection.onToggle(wo.id)}
+                      className="size-5"
+                      aria-label={`Select work order ${wo.work_order_number ?? wo.id.slice(0, 8)}`}
+                    />
+                  </label>
+                ) : null}
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => onOpenWo(wo.id)}
@@ -202,7 +219,7 @@ export function DispatchMobileList({
                 {/* Phase: Scheduling Field-Speed Polish — quick actions row.
                     Direct path to schedule the unassigned job from mobile. */}
                 {onQuickAdd ? (
-                  <div className="flex items-center gap-1.5 pt-1 border-t border-border/40">
+                  <div className="flex items-center gap-1.5 border-t border-border/40 pt-1">
                     <button
                       type="button"
                       onClick={() =>
@@ -212,7 +229,7 @@ export function DispatchMobileList({
                           scheduledTimeHhMm: null,
                         })
                       }
-                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
+                      className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
                       aria-label="Schedule like this one"
                     >
                       <CalendarPlus className="h-3.5 w-3.5" /> Schedule similar
@@ -220,13 +237,14 @@ export function DispatchMobileList({
                     <button
                       type="button"
                       onClick={() => onOpenWo(wo.id)}
-                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary min-h-[36px]"
+                      className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground hover:border-primary/40 hover:text-primary"
                       aria-label="Open to assign technician"
                     >
                       <UserPlus className="h-3.5 w-3.5" /> Assign
                     </button>
                   </div>
                 ) : null}
+                </div>
               </div>
             ))
           )}
@@ -282,12 +300,31 @@ export function DispatchMobileList({
             ) : (
               <div className="flex flex-col gap-2">
                 {list.map((wo) => (
-                  <button
+                  <div
                     key={wo.id}
-                    type="button"
-                    onClick={() => onOpenWo(wo.id)}
-                    className={cn("rounded-lg border px-3 py-2 text-left text-sm", cardTone(wo.status))}
+                    className={cn(
+                      "flex gap-2 rounded-lg border px-2 py-2 text-sm sm:px-3",
+                      cardTone(wo.status),
+                    )}
                   >
+                    {bulkSelection ? (
+                      <label
+                        className="flex shrink-0 cursor-pointer items-center self-stretch"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={bulkSelection.selectedIds.includes(wo.id)}
+                          onCheckedChange={() => bulkSelection.onToggle(wo.id)}
+                          className="size-5"
+                          aria-label={`Select work order ${wo.work_order_number ?? wo.id.slice(0, 8)}`}
+                        />
+                      </label>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onOpenWo(wo.id)}
+                      className="min-w-0 flex-1 px-0 py-0 text-left"
+                    >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[10px] text-muted-foreground">
                         {formatSlotLabel(timeToSlotIndex(wo.scheduled_time))}
@@ -342,7 +379,8 @@ export function DispatchMobileList({
                       )
                     })()}
                     <OperationalBadgeRow badges={wo.opsBadges ?? []} className="mt-1.5" />
-                  </button>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
