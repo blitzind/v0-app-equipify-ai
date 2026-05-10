@@ -16,6 +16,7 @@ import {
   Receipt,
   Download,
   RefreshCw,
+  Activity,
 } from "lucide-react"
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 function fmtDate(d: string | null | undefined) {
@@ -84,6 +85,12 @@ type DetailPayload = {
     referenceNumber: string | null
   }
   replacementReadiness?: {
+    label: string
+    labelKey: string
+    reasons: string[]
+    disclaimer: string
+  }
+  serviceReliability?: {
     label: string
     labelKey: string
     reasons: string[]
@@ -259,6 +266,32 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
               </ul>
               <p className="text-[10px] leading-snug" style={{ color: "var(--portal-nav-text)" }}>
                 {data.replacementReadiness.disclaimer}
+              </p>
+            </div>
+          : null}
+
+          {data.serviceReliability && data.serviceReliability.labelKey !== "stable" ?
+            <div
+              className="mt-5 p-3 rounded-lg space-y-2"
+              style={{
+                background: "var(--portal-warning-muted)",
+                border: "1px solid #fed7aa",
+              }}
+            >
+              <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--portal-foreground)" }}>
+                <Activity size={12} style={{ color: "var(--portal-warning)" }} />
+                Service reliability
+              </p>
+              <p className="text-sm font-medium" style={{ color: "var(--portal-secondary)" }}>
+                {data.serviceReliability.label}
+              </p>
+              <ul className="text-xs space-y-1 list-disc pl-4" style={{ color: "var(--portal-nav-text)" }}>
+                {data.serviceReliability.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              <p className="text-[10px] leading-snug" style={{ color: "var(--portal-nav-text)" }}>
+                {data.serviceReliability.disclaimer}
               </p>
             </div>
           : null}

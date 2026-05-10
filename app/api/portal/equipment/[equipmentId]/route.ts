@@ -15,6 +15,7 @@ import {
   equipmentStatusDbToUi,
   portalReplacementPayload,
 } from "@/lib/equipment-replacement/eval"
+import { evaluateEquipmentReliability, portalReliabilityPayload } from "@/lib/equipment-reliability/eval"
 
 export const runtime = "nodejs"
 
@@ -111,7 +112,7 @@ export async function GET(
       .limit(25),
     svc
       .from("work_orders")
-      .select("created_at, completed_at, status")
+      .select("created_at, completed_at, status, title, type")
       .eq("organization_id", portalUser.organization_id)
       .eq("customer_id", portalUser.customer_id)
       .eq("equipment_id", equipmentId)
@@ -139,6 +140,16 @@ export async function GET(
     maintenancePlans:
       (planReplRows ?? []) as Array<{ status: string; next_due_date: string | null }>,
   })
+
+  const reliabilityEval = evaluateEquipmentReliability(
+    (woReplRows ?? []) as Array<{
+      created_at: string
+      completed_at: string | null
+      status: string
+      title: string
+      type: string
+    }>,
+  )
 
   const woIds = (wos ?? []).map((w) => w.id as string)
 
@@ -221,5 +232,6 @@ export async function GET(
       referenceNumber: warrantyEval.referenceNumber,
     },
     replacementReadiness: portalReplacementPayload(replacementEval),
+    serviceReliability: portalReliabilityPayload(reliabilityEval),
   })
 }

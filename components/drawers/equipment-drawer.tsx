@@ -16,6 +16,8 @@ import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warrant
 import { EquipmentWarrantyFormDialog } from "@/components/equipment-warranties/equipment-warranty-form-dialog"
 import { evaluateReplacementReadiness } from "@/lib/equipment-replacement/eval"
 import { ReplacementReadinessPanel } from "@/components/equipment-replacement/replacement-readiness-panel"
+import { evaluateEquipmentReliability } from "@/lib/equipment-reliability/eval"
+import { ReliabilityPanel } from "@/components/equipment-reliability/reliability-panel"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -451,6 +453,19 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       maintenancePlans: drawerPlans.map((p) => ({ status: p.status, next_due_date: p.next_due_date })),
     })
   }, [eq, drawerWarrantyEval, drawerWOs, drawerPlans])
+
+  const drawerServiceReliability = useMemo(() => {
+    if (!eq) return null
+    return evaluateEquipmentReliability(
+      drawerWOs.map((w) => ({
+        created_at: w.created_at,
+        completed_at: w.completed_at,
+        status: w.status,
+        type: w.type,
+        title: w.title,
+      })),
+    )
+  }, [eq, drawerWOs])
 
   useEffect(() => {
     if (!eq?.id || !activeOrgId || orgStatus !== "ready") {
@@ -1236,8 +1251,16 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 </div>
               )}
 
+              {!editing && drawerServiceReliability ?
+                <ReliabilityPanel result={drawerServiceReliability} variant="inline" />
+              : null}
+
               {!editing && drawerReplacementReadiness ?
-                <ReplacementReadinessPanel result={drawerReplacementReadiness} variant="inline" />
+                <ReplacementReadinessPanel
+                  result={drawerReplacementReadiness}
+                  variant="inline"
+                  reliability={drawerServiceReliability}
+                />
               : null}
 
               {!editing && (

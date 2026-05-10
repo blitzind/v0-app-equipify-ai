@@ -66,6 +66,9 @@ import { EquipmentWarrantyFormDialog } from "@/components/equipment-warranties/e
 import { evaluateReplacementReadiness } from "@/lib/equipment-replacement/eval"
 import { ReplacementReadinessPanel } from "@/components/equipment-replacement/replacement-readiness-panel"
 import { ReplacementReadinessBadge } from "@/components/equipment-replacement/replacement-readiness-badge"
+import { evaluateEquipmentReliability } from "@/lib/equipment-reliability/eval"
+import { ReliabilityPanel } from "@/components/equipment-reliability/reliability-panel"
+import { ReliabilityBadge } from "@/components/equipment-reliability/reliability-badge"
 
 type DbEquipmentRow = {
   id: string
@@ -793,6 +796,19 @@ export default function EquipmentDetailPage() {
     })
   }, [eq, warrantyEval, workOrders, plans])
 
+  const equipmentReliability = useMemo(() => {
+    if (!eq) return null
+    return evaluateEquipmentReliability(
+      workOrders.map((w) => ({
+        created_at: w.created_at,
+        completed_at: w.completed_at,
+        status: w.status,
+        type: w.type,
+        title: w.title,
+      })),
+    )
+  }, [eq, workOrders])
+
   const warrantyDays = eq ? daysToDue(eq.warrantyExpiration) : 9999
   const warrantyHasDate = Boolean(eq?.warrantyExpiration?.trim())
   const warrantyKpi = warrantyEval ? formatWarrantyCoverageLabel(warrantyEval.label) : eq ? warrantyKpiLabel(warrantyDays, warrantyHasDate) : "—"
@@ -1478,23 +1494,42 @@ export default function EquipmentDetailPage() {
               summary={equipmentPmForecast}
               contractHint={equipmentPmContractHint}
               replacementHintSlot={
-                replacementReadiness ?
-                  <div className="border-t border-border pt-2 mt-2 space-y-1">
-                    <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
-                      <span>Replacement readiness</span>
-                      <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
-                    </p>
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      {replacementReadiness.reasons.slice(0, 2).join(" · ")}
-                    </p>
-                  </div>
-                : null
+                <>
+                  {replacementReadiness ?
+                    <div className="border-t border-border pt-2 mt-2 space-y-1">
+                      <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                        <span>Replacement readiness</span>
+                        <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        {replacementReadiness.reasons.slice(0, 2).join(" · ")}
+                      </p>
+                    </div>
+                  : null}
+                  {equipmentReliability && equipmentReliability.label !== "stable" ?
+                    <div className="border-t border-border pt-2 mt-2 space-y-1">
+                      <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                        <span>Service reliability</span>
+                        <ReliabilityBadge label={equipmentReliability.label} className="normal-case" />
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        {equipmentReliability.reasons[0] ?? ""}
+                      </p>
+                    </div>
+                  : null}
+                </>
               }
             />
           ) : null}
 
+          {equipmentReliability ? <ReliabilityPanel result={equipmentReliability} variant="card" /> : null}
+
           {replacementReadiness ?
-            <ReplacementReadinessPanel result={replacementReadiness} variant="card" />
+            <ReplacementReadinessPanel
+              result={replacementReadiness}
+              variant="card"
+              reliability={equipmentReliability}
+            />
           : null}
 
           <Card className="border-border">
@@ -1635,17 +1670,30 @@ export default function EquipmentDetailPage() {
               summary={equipmentPmForecast}
               contractHint={equipmentPmContractHint}
               replacementHintSlot={
-                replacementReadiness ?
-                  <div className="border-t border-border pt-2 mt-2 space-y-1">
-                    <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
-                      <span>Replacement readiness</span>
-                      <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
-                    </p>
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      {replacementReadiness.reasons.slice(0, 2).join(" · ")}
-                    </p>
-                  </div>
-                : null
+                <>
+                  {replacementReadiness ?
+                    <div className="border-t border-border pt-2 mt-2 space-y-1">
+                      <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                        <span>Replacement readiness</span>
+                        <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        {replacementReadiness.reasons.slice(0, 2).join(" · ")}
+                      </p>
+                    </div>
+                  : null}
+                  {equipmentReliability && equipmentReliability.label !== "stable" ?
+                    <div className="border-t border-border pt-2 mt-2 space-y-1">
+                      <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                        <span>Service reliability</span>
+                        <ReliabilityBadge label={equipmentReliability.label} className="normal-case" />
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        {equipmentReliability.reasons[0] ?? ""}
+                      </p>
+                    </div>
+                  : null}
+                </>
               }
             />
           ) : null}

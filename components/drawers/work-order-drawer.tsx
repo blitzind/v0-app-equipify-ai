@@ -130,6 +130,13 @@ import {
   REPLACEMENT_DISCLAIMER,
 } from "@/lib/equipment-replacement/eval"
 import { ReplacementReadinessBadge } from "@/components/equipment-replacement/replacement-readiness-badge"
+import type { EquipmentReliabilityResult } from "@/lib/equipment-reliability/types"
+import {
+  evaluateEquipmentReliability,
+  formatEquipmentReliabilityLabel,
+  RELIABILITY_DISCLAIMER,
+} from "@/lib/equipment-reliability/eval"
+import { ReliabilityBadge } from "@/components/equipment-reliability/reliability-badge"
 
 let toastCounter = 0
 
@@ -440,6 +447,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [woContractEval, setWoContractEval] = useState<ReturnType<typeof evaluateSlaCoverageLabel> | null>(null)
   const [woWarrantyEval, setWoWarrantyEval] = useState<ReturnType<typeof evaluateWarrantyCoverage> | null>(null)
   const [woReplacementReadiness, setWoReplacementReadiness] = useState<ReplacementReadinessResult | null>(null)
+  const [woEquipmentReliability, setWoEquipmentReliability] = useState<EquipmentReliabilityResult | null>(null)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -602,6 +610,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!wo?.equipmentId?.trim() || !activeOrgId || orgStatus !== "ready") {
       setWoWarrantyEval(null)
       setWoReplacementReadiness(null)
+      setWoEquipmentReliability(null)
       return
     }
     let cancelled = false
@@ -624,7 +633,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           .maybeSingle(),
         supabase
           .from("work_orders")
-          .select("created_at, completed_at, status")
+          .select("created_at, completed_at, status, title, type")
           .eq("organization_id", activeOrgId)
           .eq("equipment_id", eid)
           .is("archived_at", null)
@@ -667,6 +676,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       const eqStatusUi = equipmentStatusDbToUi(row?.status ?? undefined)
       const woRowsMinimal =
         (woHist ?? []) as Array<{ created_at: string; completed_at: string | null; status: string }>
+      const woRowsReliability =
+        (woHist ?? []) as Array<{
+          created_at: string
+          completed_at: string | null
+          status: string
+          title: string
+          type: string
+        }>
       const repl = evaluateReplacementReadiness({
         warranty: ev,
         installDateYmd: installYmd,
@@ -677,6 +694,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           (planRows ?? []) as Array<{ status: string; next_due_date: string | null }>,
       })
       setWoReplacementReadiness(repl)
+      setWoEquipmentReliability(evaluateEquipmentReliability(woRowsReliability))
     })()
     return () => {
       cancelled = true
@@ -1884,6 +1902,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </p>
           </div>
           <WarrantyCoverageBadge label={woWarrantyEval.label} />
+        </div>
+      : null}
+      {woEquipmentReliability && wo?.equipmentId?.trim() && woEquipmentReliability.label !== "stable" ?
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Service reliability
+            </p>
+            <ReliabilityBadge label={woEquipmentReliability.label} className="normal-case" />
+          </div>
+          <p className="text-xs font-medium text-foreground">
+            {formatEquipmentReliabilityLabel(woEquipmentReliability.label)}
+          </p>
+          <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc pl-4">
+            {woEquipmentReliability.reasons.slice(0, 3).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-muted-foreground leading-snug">{RELIABILITY_DISCLAIMER}</p>
         </div>
       : null}
       {woReplacementReadiness && wo?.equipmentId?.trim() ?
