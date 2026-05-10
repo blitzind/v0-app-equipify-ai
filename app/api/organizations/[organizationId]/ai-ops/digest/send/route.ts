@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { runDigestForOrganization } from "@/lib/ai-ops/digest-runner"
 
 export const runtime = "nodejs"
@@ -40,25 +37,9 @@ export async function POST(
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400, "invalid_org")
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) return jsonError("Sign in required.", 401, "unauthorized")
-  const isPlatformAdmin = isPlatformAdminEmail(user.email)
-  const rawRole = isPlatformAdmin
-    ? "owner"
-    : await getOrganizationMemberRole(supabase, user.id, organizationId)
-  const role = normalizeOrgMemberRole(rawRole)
-  if (!role && !isPlatformAdmin) return jsonError("Forbidden.", 403, "forbidden")
-  const permissions = getOrgPermissionsForRole(role)
-  if (!permissions.canManageWorkspaceSettings && !isPlatformAdmin) {
-    return jsonError(
-      "Only owners, admins, and managers can send the AI Ops digest.",
-      403,
-      "forbidden",
-    )
-  }
+  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  if ("error" in gate) return gate.error
+  const { supabase, userId } = gate
 
   let body: unknown = {}
   if (request.headers.get("content-length")) {
@@ -87,7 +68,7 @@ export async function POST(
     supabase,
     organizationId,
     triggerKind: "manual",
-    triggeredBy: user.id,
+    triggeredBy: userId,
     overrideRecipients,
   })
 

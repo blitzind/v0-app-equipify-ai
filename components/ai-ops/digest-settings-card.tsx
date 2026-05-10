@@ -211,6 +211,10 @@ export function AiOpsDigestSettingsCard() {
         const j = (await res.json()) as SettingsResponse & { error?: string; message?: string }
         if (!res.ok) throw new Error(j.message ?? j.error ?? "Failed to save.")
         setSettings(j.settings)
+        toast({
+          title: "Saved",
+          description: "AI Ops digest settings were updated.",
+        })
       } catch (e) {
         toast({
           title: "Could not save digest settings",

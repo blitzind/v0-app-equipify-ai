@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ExternalLink, Plug, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
 
 interface Integration {
@@ -103,9 +104,44 @@ const LOGO_COLORS: Record<string, string> = {
   DS: "#ffbe00",
 }
 
-function IntegrationCard({ integration }: { integration: Integration }) {
+type QuickBooksLive = "idle" | "loading" | "connected" | "disconnected" | "error"
+
+function IntegrationCard({
+  integration,
+  quickBooksLive,
+}: {
+  integration: Integration
+  quickBooksLive?: QuickBooksLive
+}) {
   const color = LOGO_COLORS[integration.logo] ?? "#6b7280"
   const isLive = Boolean(integration.detailHref)
+
+  const statusPill =
+    integration.id === "quickbooks" && quickBooksLive && quickBooksLive !== "idle" ?
+      quickBooksLive === "loading" ?
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
+          Checking…
+        </span>
+      : quickBooksLive === "connected" ?
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-success border">
+          Connected
+        </span>
+      : quickBooksLive === "disconnected" ?
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
+          Not connected
+        </span>
+      : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
+          Status unavailable
+        </span>
+    : isLive ?
+      integration.id === "stripe" ?
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
+          Billing
+        </span>
+      : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-info border">Setup</span>
+    : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-warning border">
+        Coming soon
+      </span>
 
   return (
     <div
@@ -127,13 +163,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground font-medium">
               {integration.category}
             </span>
-            {isLive ? (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-info border">Setup</span>
-            ) : (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-warning border">
-                Coming soon
-              </span>
-            )}
+            {statusPill}
           </div>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{integration.description}</p>
         </div>
@@ -160,7 +190,39 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 }
 
 export default function IntegrationsPage() {
+  const { organizationId, status: orgStatus } = useActiveOrganization()
   const [activeCategory, setActiveCategory] = useState("All")
+  const [quickBooksLive, setQuickBooksLive] = useState<QuickBooksLive>("idle")
+
+  useEffect(() => {
+    if (orgStatus !== "ready" || !organizationId) {
+      setQuickBooksLive("idle")
+      return
+    }
+    let cancelled = false
+    setQuickBooksLive("loading")
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/integrations/quickbooks`,
+          { cache: "no-store" },
+        )
+        if (cancelled) return
+        if (!res.ok) {
+          setQuickBooksLive("error")
+          return
+        }
+        const j = (await res.json()) as { integration?: { connection_status?: string } | null }
+        const st = j.integration?.connection_status
+        setQuickBooksLive(st === "connected" ? "connected" : "disconnected")
+      } catch {
+        if (!cancelled) setQuickBooksLive("error")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, orgStatus])
 
   const filtered =
     activeCategory === "All" ? INTEGRATIONS : INTEGRATIONS.filter((i) => i.category === activeCategory)
@@ -216,7 +278,11 @@ export default function IntegrationsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filtered.map((integration) => (
-          <IntegrationCard key={integration.id} integration={integration} />
+          <IntegrationCard
+            key={integration.id}
+            integration={integration}
+            quickBooksLive={integration.id === "quickbooks" ? quickBooksLive : undefined}
+          />
         ))}
       </div>
 

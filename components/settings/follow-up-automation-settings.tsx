@@ -51,7 +51,9 @@ export function FollowUpAutomationSettingsSection() {
   const { toast } = useToast()
   const { organizationId, status } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
-  const canConfigure = Boolean(permissions.canManageWorkspaceSettings)
+  const canConfigure = Boolean(
+    permissions.canManageAutomations || permissions.canManageWorkspaceSettings,
+  )
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -118,7 +120,10 @@ export function FollowUpAutomationSettingsSection() {
       })
       const body = (await res.json()) as { error?: string }
       if (!res.ok) throw new Error(body.error ?? "Save failed.")
-      toast({ title: "Automation settings saved" })
+      toast({
+        title: "Saved",
+        description: "Follow-up automation settings were updated.",
+      })
     } catch (e) {
       toast({
         variant: "destructive",

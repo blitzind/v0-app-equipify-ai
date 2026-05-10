@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import { normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
 
@@ -16,8 +13,8 @@ function jsonError(message: string, status: number, code = "error") {
 /**
  * AI Ops Phase 3 — recent digest history (last 30 runs).
  *
- * Read-only for any org member; the table itself is RLS-gated to
- * org members. Provider message IDs are returned for delivery
+ * Read-only for staff with insights or workspace settings access (effective
+ * capabilities). Provider message IDs are returned for delivery
  * support but the route never exposes the raw HTML or recipient
  * provider responses.
  */
@@ -28,17 +25,12 @@ export async function GET(
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400, "invalid_org")
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) return jsonError("Sign in required.", 401, "unauthorized")
-  const isPlatformAdmin = isPlatformAdminEmail(user.email)
-  const rawRole = isPlatformAdmin
-    ? "owner"
-    : await getOrganizationMemberRole(supabase, user.id, organizationId)
-  const role = normalizeOrgMemberRole(rawRole)
-  if (!role && !isPlatformAdmin) return jsonError("Forbidden.", 403, "forbidden")
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canViewInsights",
+    "canManageWorkspaceSettings",
+  ])
+  if ("error" in gate) return gate.error
+  const { supabase } = gate
 
   const limitRaw = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "30", 10)
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 30

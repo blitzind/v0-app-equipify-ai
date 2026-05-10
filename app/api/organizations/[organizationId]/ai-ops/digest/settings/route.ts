@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/api/require-org-permission"
 import { defaultDigestSettings, loadDigestSettings } from "@/lib/ai-ops/digest"
 import type { RecommendationCategory, RecommendationPriority } from "@/lib/ai-ops/types"
 
@@ -50,11 +47,16 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ organizationId: string }> },
 ) {
-  const guard = await ensureMember(context)
-  if ("error" in guard) return guard.error
-  const { supabase, organizationId } = guard
+  const { organizationId } = await context.params
+  if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400, "invalid_org")
 
-  const result = await loadDigestSettings(supabase, organizationId)
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canViewInsights",
+    "canManageWorkspaceSettings",
+  ])
+  if ("error" in gate) return gate.error
+
+  const result = await loadDigestSettings(gate.supabase, organizationId)
   const row = result.row ?? defaultDigestSettings(organizationId)
   return NextResponse.json({
     ok: true,
@@ -68,9 +70,12 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ organizationId: string }> },
 ) {
-  const guard = await ensureManager(context)
-  if ("error" in guard) return guard.error
-  const { supabase, organizationId, userId } = guard
+  const { organizationId } = await context.params
+  if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400, "invalid_org")
+
+  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  if ("error" in gate) return gate.error
+  const { supabase, userId } = gate
 
   let body: unknown
   try {
@@ -174,59 +179,4 @@ function maskWebhook(url: string | null): string | null {
   } catch {
     return "configured"
   }
-}
-
-type Guard =
-  | { error: NextResponse }
-  | {
-      supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
-      organizationId: string
-      userId: string
-    }
-
-async function ensureMember(
-  context: { params: Promise<{ organizationId: string }> },
-): Promise<Guard> {
-  const { organizationId } = await context.params
-  if (!UUID_RE.test(organizationId)) return { error: jsonError("Invalid organization.", 400, "invalid_org") }
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) return { error: jsonError("Sign in required.", 401, "unauthorized") }
-  const isPlatformAdmin = isPlatformAdminEmail(user.email)
-  const rawRole = isPlatformAdmin
-    ? "owner"
-    : await getOrganizationMemberRole(supabase, user.id, organizationId)
-  const role = normalizeOrgMemberRole(rawRole)
-  if (!role && !isPlatformAdmin) return { error: jsonError("Forbidden.", 403, "forbidden") }
-  return { supabase, organizationId, userId: user.id }
-}
-
-async function ensureManager(
-  context: { params: Promise<{ organizationId: string }> },
-): Promise<Guard> {
-  const guard = await ensureMember(context)
-  if ("error" in guard) return guard
-  const supabase = guard.supabase
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) return { error: jsonError("Sign in required.", 401, "unauthorized") }
-  const isPlatformAdmin = isPlatformAdminEmail(user.email)
-  const rawRole = isPlatformAdmin
-    ? "owner"
-    : await getOrganizationMemberRole(supabase, user.id, guard.organizationId)
-  const role = normalizeOrgMemberRole(rawRole)
-  const permissions = getOrgPermissionsForRole(role)
-  if (!permissions.canManageWorkspaceSettings && !isPlatformAdmin) {
-    return {
-      error: jsonError(
-        "Only owners, admins, and managers can edit digest settings.",
-        403,
-        "forbidden",
-      ),
-    }
-  }
-  return guard
 }

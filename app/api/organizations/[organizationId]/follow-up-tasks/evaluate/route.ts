@@ -3,7 +3,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { tryConsumeAiOperationSlot } from "@/lib/ai/operation-rate-limit"
 import { evaluateFollowUpAutomationForOrganization } from "@/lib/follow-up-automation/evaluate"
 import { logFollowUpAutomationUsage } from "@/lib/follow-up-automation/log-usage"
-import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
 
@@ -18,7 +18,10 @@ export async function POST(_request: Request, context: { params: Promise<{ organ
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canManageAutomations",
+    "canManageWorkspaceSettings",
+  ])
   if ("error" in gate) return gate.error
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>

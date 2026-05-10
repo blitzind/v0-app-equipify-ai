@@ -24,12 +24,13 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 | `/settings/notifications` | Alert matrix (in-app / email / SMS) | — | — | `canManageWorkspaceSettings` | **Planned** — preview only; toggles **disabled**; no save |
 | `/settings/notifications` | Email digest / quiet hours (shell) | — | — | Same | **Planned** — preview only; controls **disabled** |
 | `/settings/notifications` | Internal escalation rules | Org settings | `InternalEscalationRulesPanel` APIs | Same | **Wired** |
-| `/settings/notifications` | AI Ops digest card | Org AI ops digest | `AiOpsDigestSettingsCard` APIs | Same + internal checks in component | **Wired** |
-| `/settings/automations` | Follow-up automation | Org config | `GET/PATCH …/follow-up-automation/settings` | Nav `canManageAutomations`; section also checks `canManageWorkspaceSettings` | **Wired** |
+| `/settings/notifications` | AI Ops digest card | Org AI ops digest (`ai_ops_digest_settings`) | Digest settings/preview/send/runs/test routes | **Phase 57.4:** Routes use `requireOrgPermission` / `requireAnyOrgPermission` (effective capabilities); GET settings/runs need insights **or** workspace settings; PATCH/send/test need `canManageWorkspaceSettings`. UI shows success toast after successful PATCH. | **Wired** |
+| `/settings/automations` | Follow-up automation | Org config | `GET/PUT …/follow-up-automation/settings` + evaluate POST | **Phase 57.4:** API allows `canManageAutomations` **or** `canManageWorkspaceSettings` (matches Automations nav); UI `FollowUpAutomationSettingsSection` uses the same OR | **Wired** |
 | `/settings/automations` | Workflow automations list/builder | `workflow_automations` (product) | Workflow automation APIs | `canManageAutomations` | **Wired** |
 | `/settings/automations` | Reminder email cadence cards | — | — | Same | **Planned** — **preview only**; disabled; no save |
 | `/settings/portal` | Portal toggles & copy | Portal / org settings | Portal settings APIs | `canManagePortalSettings` | **Wired** (prior portal phases); review copy for “coming soon” islands |
 | `/settings/integrations` | QuickBooks & connectors | Integration tables + OAuth | Connector routes | `canManageIntegrations` | **Wired** where implemented |
+| `/settings/integrations` | QuickBooks connection pill | `organization_integrations` | **Phase 57.4:** Hub page `GET …/integrations/quickbooks` for live `connection_status` (Connected / Not connected / error); Stripe card shows **Billing** (not “connected”) | Same | **Wired** (status read-only) |
 | `/settings/integrations` | Gmail / other catalog entries | — | — | Same | **Planned** — disabled / “coming soon” |
 | `/settings/integrations/quickbooks` | Connection, sync, auto-sync | QBO integration state | QuickBooks settings APIs | Same | **Wired** (labels reflect server state) |
 | `/settings/security` | MFA, sessions, timeout, events | — | — | `canManageSecuritySettings` | **Planned** — non-interactive honesty page (Phase 57.2) |
@@ -54,3 +55,4 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 ## Changelog
 
 - **Phase 57.2:** Removed misleading password form, demo Security page, demo API keys, fake notification/automation saves; added this document.
+- **Phase 57.4:** Follow-up automation API/UI aligned on `canManageAutomations | canManageWorkspaceSettings`; AI Ops digest APIs aligned on `requireOrgPermission` (effective caps) + digest save toast; Integrations hub shows real QuickBooks connection status and honest Stripe label.

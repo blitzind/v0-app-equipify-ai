@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { mergeFollowUpAutomationConfig } from "@/lib/follow-up-automation/merge-config"
 import { followUpAutomationConfigSchema } from "@/lib/follow-up-automation/types"
-import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 
 export const runtime = "nodejs"
 
@@ -16,7 +16,10 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canManageAutomations",
+    "canManageWorkspaceSettings",
+  ])
   if ("error" in gate) return gate.error
 
   const { data } = await gate.supabase
@@ -36,7 +39,10 @@ export async function PUT(request: Request, context: { params: Promise<{ organiz
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canManageAutomations",
+    "canManageWorkspaceSettings",
+  ])
   if ("error" in gate) return gate.error
 
   let body: unknown
