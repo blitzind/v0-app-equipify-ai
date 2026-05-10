@@ -3,7 +3,7 @@ import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 
 /**
  * Plan feature matrix + numeric limits for UI and `canUseFeature` / `requireFeatureAccess`.
- * API monthly caps are displayed on billing; hard enforcement across all API routes is not universal yet (Phase 60.2+).
+ * API monthly caps: UI + `organization_api_usage_monthly` reads — **no route increments `api_calls` yet** (see `docs/USAGE_METERING_ENFORCEMENT.md`).
  */
 
 export type Feature =

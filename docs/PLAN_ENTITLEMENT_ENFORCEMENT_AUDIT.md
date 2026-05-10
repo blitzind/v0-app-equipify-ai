@@ -2,6 +2,8 @@
 
 This document maps **how Equipify ties Stripe / `organization_subscriptions` to product behavior**, separates **permissions** from **entitlements**, and records **enforcement status** by area. It is not a billing redesign spec.
 
+**Usage counters & numeric limits** (what is metered vs display-only) are covered in **`docs/USAGE_METERING_ENFORCEMENT.md`** (Phase 60.2).
+
 ## Architecture summary
 
 ### Where the current plan is resolved

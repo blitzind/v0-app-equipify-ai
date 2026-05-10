@@ -16,7 +16,11 @@ function utcMonthStartDateString(d = new Date()): string {
   return day
 }
 
-/** Live counts from Supabase; API usage is 0 until callers increment `organization_api_usage_monthly`. */
+/**
+ * Live counts from Supabase.
+ * `api_calls` in `organization_api_usage_monthly` is read here; **no application route increments it yet**
+ * (Phase 60.2 — see `docs/USAGE_METERING_ENFORCEMENT.md`). Until writers exist, the billing “API calls” bar stays at zero.
+ */
 export async function getOrganizationUsage(
   supabase: SupabaseClient,
   organizationId: string,
@@ -104,4 +108,11 @@ export async function getUsageWithLimits(
 export function planIdFromSubscriptionRow(rawPlanId: string | null | undefined): PlanId {
   if (!rawPlanId) return "solo"
   return normalizePlanIdForRead(rawPlanId)
+}
+
+/** True when the plan defines a monthly API cap and recorded usage is at or over that cap. */
+export function isMonthlyApiCallPlanCapExceeded(pack: UsageWithLimits): boolean {
+  const cap = pack.limits.apiCallsMonthly
+  if (cap == null || cap <= 0) return false
+  return pack.usage.apiCallsUsedThisMonth >= cap
 }

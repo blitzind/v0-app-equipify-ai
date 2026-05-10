@@ -61,7 +61,7 @@ export async function enforcePlanLimit(
   }
   const denied = await requireCanCreateRecord(supabase, user.id, organizationId, "customer")
   if (!denied.ok) return denied
-  return requireWithinPlanLimit(supabase, organizationId, limitType)
+  return requireWithinPlanLimit(supabase, organizationId, limitType, user.id)
 }
 
 /** Billing + maintenance_plans feature + membership. */

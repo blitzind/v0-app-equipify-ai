@@ -5,8 +5,10 @@ import {
   evaluateEquipmentCreate,
   evaluateSeatInvite,
   evaluateStandardCreate,
+  type QuotaEvaluationOptions,
   type RecordEligibility,
 } from "@/lib/billing/record-eligibility"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import {
   getOrganizationSubscription,
   isTrialActive,
@@ -40,6 +42,7 @@ export type GuardFailureCode =
   | "seats"
   | "feature_denied"
   | "membership_error"
+  | "usage_unavailable"
 
 export type GuardResult =
   | { ok: true }
@@ -47,8 +50,15 @@ export type GuardResult =
 
 function fromEligibility(el: RecordEligibility, httpStatus = 403): GuardResult {
   if (el.ok) return { ok: true }
+  if (el.reason === "usage_verify") {
+    return { ok: false, code: "usage_unavailable", message: el.message, httpStatus: 503 }
+  }
   const code: GuardFailureCode =
-    el.reason === "billing" ? "billing_restricted" : el.reason === "equipment" ? "equipment" : "seats"
+    el.reason === "billing"
+      ? "billing_restricted"
+      : el.reason === "equipment"
+        ? "equipment"
+        : "seats"
   return { ok: false, code, message: el.message, httpStatus }
 }
 
@@ -67,6 +77,8 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
   subscription: OrganizationSubscription | null
   usagePack: UsageWithLimits | null
   seatSlotsUsed: number | null
+  /** True when usage + limits could not be loaded (quota checks may be skipped unless strict). */
+  usageLoadFailed: boolean
 }> {
   let subscription: OrganizationSubscription | null = null
   try {
@@ -78,14 +90,16 @@ export async function loadOrgBillingContext(supabase: SupabaseClient, organizati
   const planId = planIdFromSubscriptionRow(subscription?.plan_id)
   const trialOn = subscription ? isTrialActive(subscription) : false
   let usagePack: UsageWithLimits | null = null
+  let usageLoadFailed = false
   try {
     usagePack = await getUsageWithLimits(supabase, organizationId, planId, trialOn)
   } catch {
     usagePack = null
+    usageLoadFailed = true
   }
 
   const seatSlotsUsed = await fetchSeatSlots(supabase, organizationId)
-  return { subscription, usagePack, seatSlotsUsed }
+  return { subscription, usagePack, seatSlotsUsed, usageLoadFailed }
 }
 
 async function verifyActiveMembership(
@@ -129,7 +143,25 @@ export async function requireCanCreateRecord(
   if (denied) return denied
 
   const ctx = await loadOrgBillingContext(supabase, organizationId)
-  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType)
+  let usageLoadFailed = ctx.usageLoadFailed
+  if (
+    usageLoadFailed &&
+    (recordType === "equipment" || recordType === "team_invite")
+  ) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle()
+    if (isPlatformAdminEmail((prof as { email?: string | null } | null)?.email)) {
+      usageLoadFailed = false
+    }
+  }
+
+  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
+    usageLoadFailed,
+    strictUsageCounts: true,
+  })
 }
 
 /**
@@ -141,7 +173,10 @@ export async function requireCanCreateRecordForOrganization(
   recordType: CreateRecordType,
 ): Promise<GuardResult> {
   const ctx = await loadOrgBillingContext(supabase, organizationId)
-  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType)
+  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
+    usageLoadFailed: ctx.usageLoadFailed,
+    strictUsageCounts: false,
+  })
 }
 
 function applyCreateRules(
@@ -149,12 +184,13 @@ function applyCreateRules(
   usagePack: UsageWithLimits | null,
   seatSlotsUsed: number | null,
   recordType: CreateRecordType,
+  quotaOpts?: QuotaEvaluationOptions,
 ): GuardResult {
   switch (recordType) {
     case "equipment":
-      return fromEligibility(evaluateEquipmentCreate(subscription, usagePack))
+      return fromEligibility(evaluateEquipmentCreate(subscription, usagePack, quotaOpts))
     case "team_invite":
-      return fromEligibility(evaluateSeatInvite(subscription, usagePack, seatSlotsUsed))
+      return fromEligibility(evaluateSeatInvite(subscription, usagePack, seatSlotsUsed, quotaOpts))
     case "customer":
     case "work_order":
     case "quote":
@@ -198,12 +234,30 @@ export async function requireWithinPlanLimit(
   supabase: SupabaseClient,
   organizationId: string,
   limitType: PlanLimitType,
+  actingUserId?: string | null,
 ): Promise<GuardResult> {
   const ctx = await loadOrgBillingContext(supabase, organizationId)
-  if (limitType === "equipment") {
-    return fromEligibility(evaluateEquipmentCreate(ctx.subscription, ctx.usagePack))
+  let usageLoadFailed = ctx.usageLoadFailed
+  if (usageLoadFailed && actingUserId) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", actingUserId)
+      .maybeSingle()
+    if (isPlatformAdminEmail((prof as { email?: string | null } | null)?.email)) {
+      usageLoadFailed = false
+    }
   }
-  return fromEligibility(evaluateSeatInvite(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed))
+  const quotaOpts: QuotaEvaluationOptions = {
+    usageLoadFailed,
+    strictUsageCounts: true,
+  }
+  if (limitType === "equipment") {
+    return fromEligibility(evaluateEquipmentCreate(ctx.subscription, ctx.usagePack, quotaOpts))
+  }
+  return fromEligibility(
+    evaluateSeatInvite(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, quotaOpts),
+  )
 }
 
 /** Combined gate for maintenance plan UI: membership + feature + billing. */
@@ -217,5 +271,8 @@ export async function requireMaintenancePlanCreate(
   const feat = await requireFeatureAccess(supabase, organizationId, "maintenance_plans")
   if (!feat.ok) return feat
   const ctx = await loadOrgBillingContext(supabase, organizationId)
-  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, "maintenance_plan")
+  return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, "maintenance_plan", {
+    usageLoadFailed: ctx.usageLoadFailed,
+    strictUsageCounts: true,
+  })
 }

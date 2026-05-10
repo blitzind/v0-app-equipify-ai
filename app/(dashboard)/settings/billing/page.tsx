@@ -857,9 +857,11 @@ function BillingPageContent() {
           </div>
         </div>
         <p className="px-4 md:px-6 pb-4 pt-1 text-[11px] text-muted-foreground leading-snug border-t border-border/70">
-          Team seats and equipment limits are enforced on supported create and invite flows (server-verified). API call totals
-          are shown for plans that include a monthly allowance; automated hard enforcement across every API path is planned —
-          this chart is accurate for usage we record, not a guarantee that all traffic is capped yet.
+          <strong className="font-medium text-foreground/90">Enforced:</strong> team seats and equipment on supported server
+          actions (create / invite). If live counts cannot be loaded for a subscribed workspace, those actions return a retry
+          message instead of skipping the check. <strong className="font-medium text-foreground/90">Tracked, not enforced
+          yet:</strong> the API calls bar — there is no app code incrementing monthly API totals today, so it stays at zero
+          until metering is wired; see <span className="whitespace-nowrap">docs/USAGE_METERING_ENFORCEMENT.md</span>.
         </p>
       </div>
 
