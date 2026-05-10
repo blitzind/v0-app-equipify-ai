@@ -15,6 +15,7 @@ import {
   Package,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { Button } from "@/components/ui/button"
 
 function mapsSearchUrl(query: string) {
@@ -103,9 +104,7 @@ export function TechnicianMobileQuickBar({
     <div className={wrapClass} role="toolbar" aria-label="Field technician quick actions">
       <p className="mx-auto max-w-lg px-2 pb-1.5 text-center text-[10px] leading-snug text-muted-foreground flex items-start justify-center gap-1.5">
         <WifiOff className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" aria-hidden />
-        <span>
-          Photos and signatures upload when you&apos;re online. If signal drops, reopen this job and retry any failed save.
-        </span>
+        <span>{SYNC_PREP_COPY.technicianQuickBarLead}</span>
       </p>
       <input
         ref={fileRef}

@@ -95,6 +95,9 @@ import { printHtmlDocument } from "@/lib/certificates/certificate-pdf-html"
 import { buildWorkOrderPartFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
+import { OnlineRequiredBadge } from "@/components/sync-prep/online-required-badge"
+import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-prep-banner"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
@@ -2288,7 +2291,16 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         actions={
           editing ? (
             <>
-              <Button size="sm" variant="default" className="gap-1.5 text-xs cursor-pointer" onClick={() => void saveEdit()}>
+              <div className="hidden lg:flex items-center">
+                <OnlineRequiredBadge />
+              </div>
+              <Button
+                size="sm"
+                variant="default"
+                className="gap-1.5 text-xs cursor-pointer"
+                title={SYNC_PREP_COPY.saveRequiresNetwork}
+                onClick={() => void saveEdit()}
+              >
                 <Check className="w-3.5 h-3.5" /> Save Changes
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={cancelEdit}>
@@ -2340,14 +2352,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         }
       >
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+          {wo ? <WorkOrderSyncPrepBanner /> : null}
           {!editing && wo && !wo.isArchived && woCanEdit && (wo.status === "Open" || wo.status === "Scheduled") ? (
             <div className="lg:hidden shrink-0 border-b border-border bg-muted/25 dark:bg-muted/10 px-3 py-3 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5">
-                Field status
-              </p>
+              <div className="flex items-center justify-between gap-2 px-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Field status
+                </p>
+                <OnlineRequiredBadge />
+              </div>
               <Button
                 type="button"
                 className="h-12 w-full rounded-xl text-sm font-semibold gap-2 touch-manipulation"
+                title={SYNC_PREP_COPY.statusChangeRequiresNetwork}
                 disabled={quickStatusBusy}
                 onClick={() => void quickSetInProgressFromMobile()}
               >

@@ -59,6 +59,8 @@ import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
+import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-prep-banner"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -870,6 +872,7 @@ export default function WorkOrderDetailPage() {
                   variant="outline"
                   size="sm"
                   className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
+                  title={SYNC_PREP_COPY.statusChangeRequiresNetwork}
                   onClick={() => void handleStatusAdvance(nextStatus[workOrder.status]!)}
                 >
                   Move to {nextStatus[workOrder.status]}
@@ -899,6 +902,7 @@ export default function WorkOrderDetailPage() {
               <Button
                 size="sm"
                 className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
+                title={SYNC_PREP_COPY.saveRequiresNetwork}
                 onClick={() => void handleSave()}
               >
                 <Save className="w-3.5 h-3.5 mr-1.5" />
@@ -908,6 +912,8 @@ export default function WorkOrderDetailPage() {
           )}
         </div>
       </div>
+
+      <WorkOrderSyncPrepBanner />
 
       <WorkOrderDetailExperience
         tabsValue={pageWoTab}
