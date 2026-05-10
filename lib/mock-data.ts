@@ -1,5 +1,7 @@
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+import type { InvoicePaymentAllocationState } from "@/lib/billing/invoice-payment-allocation"
+
 export type CustomerStatus = "Active" | "Inactive"
 export type EquipmentStatus = "Active" | "Needs Service" | "Out of Service" | "In Repair"
 
@@ -1825,6 +1827,14 @@ export interface AdminInvoice {
   taxProvider?: string | null
   taxProviderReference?: string | null
   taxSnapshotJson?: unknown
+  /** Grand total (subtotal + tax) in cents when loaded from DB. */
+  invoiceTotalCents?: number
+  /** Sum of org_invoice_payments for this invoice (cents). */
+  totalPaidCents?: number
+  /** invoiceTotalCents - totalPaidCents (may be negative if overpaid). */
+  balanceDueCents?: number
+  /** Derived from payments vs total; independent of workflow status (Draft/Sent/…). */
+  paymentAllocationState?: InvoicePaymentAllocationState
 }
 
 export const adminInvoices: AdminInvoice[] = [

@@ -56,6 +56,11 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
 import { formatTaxBasisLabel, formatTaxModeLabel } from "@/lib/billing/tax-framework"
 import {
+  formatPaymentMethodDb,
+  mapUiPaymentMethodToDb,
+  paymentAllocationUiLabel,
+} from "@/lib/billing/invoice-payment-allocation"
+import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
   ChevronDown, X, Check, Pencil, Plus, Trash2, AlertTriangle, DollarSign,
@@ -88,6 +93,12 @@ function fmtCurrency(n: number) {
     currency: "USD",
     maximumFractionDigits: 2,
   }).format(n)
+}
+
+function invoiceGrandTotalDollars(inv: AdminInvoice): number {
+  if (inv.invoiceTotalCents != null) return inv.invoiceTotalCents / 100
+  const sub = inv.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
+  return sub + (inv.taxAmount ?? 0)
 }
 
 function daysOverdue(dueDate: string): number {
@@ -927,59 +938,171 @@ function SmsModal({
   )
 }
 
-function PaymentModal({ invoice, onClose, onRecord }: { invoice: AdminInvoice; onClose: () => void; onRecord: () => void }) {
-  const total = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  const [amount,  setAmount]  = useState(total.toString())
-  const [method,  setMethod]  = useState("Check")
-  const [refNum,  setRefNum]  = useState("")
+function PaymentModal({
+  invoice,
+  onClose,
+  onSuccess,
+  onError,
+}: {
+  invoice: AdminInvoice
+  onClose: () => void
+  onSuccess: (message: string) => void
+  onError: (message: string) => void
+}) {
+  const { recordInvoicePayment } = useInvoices()
+  const grand = invoiceGrandTotalDollars(invoice)
+  const balanceDollars =
+    invoice.balanceDueCents != null
+      ? invoice.balanceDueCents / 100
+      : invoice.status === "Paid"
+        ? 0
+        : grand
+  const defaultAmt = balanceDollars > 0 && balanceDollars < grand ? balanceDollars : grand
+
+  const [amount, setAmount] = useState(defaultAmt.toString())
+  const [method, setMethod] = useState("Check")
+  const [refNum, setRefNum] = useState("")
+  const [note, setNote] = useState("")
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10))
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    setAmount(defaultAmt.toString())
+  }, [invoice.id, defaultAmt])
+
+  async function submit() {
+    const amt = Number(amount)
+    if (!Number.isFinite(amt) || amt <= 0) {
+      onError("Enter a valid payment amount.")
+      return
+    }
+    const cents = Math.round(amt * 100)
+    setBusy(true)
+    const { error } = await recordInvoicePayment(invoice.id, {
+      amountCents: cents,
+      paidOn: payDate,
+      paymentMethod: mapUiPaymentMethodToDb(method),
+      reference: refNum.trim() || null,
+      note: note.trim() || null,
+    })
+    setBusy(false)
+    if (error) {
+      onError(error)
+      return
+    }
+    onSuccess("Payment recorded.")
+    onClose()
+  }
 
   return (
     <div className={cn("fixed inset-0 flex items-center justify-center p-4", NESTED_OVER_DRAWER_Z)}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !busy && onClose()} />
       <div className={cn(DRAWER_STACKED_MODAL, "relative z-[1] max-w-md")}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" /> Record Payment
           </h3>
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted transition-colors cursor-pointer">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="p-1 rounded hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+          >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
         <div className="p-5 space-y-3">
-          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Invoice Total</span>
-            <span className="text-sm font-bold text-primary tabular-nums">{fmtCurrency(total)}</span>
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Invoice total</p>
+              <p className="text-sm font-bold text-primary tabular-nums">{fmtCurrency(grand)}</p>
+              {invoice.balanceDueCents != null && invoice.balanceDueCents > 0 ? (
+                <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
+                  Balance due {fmtCurrency(invoice.balanceDueCents / 100)}
+                </p>
+              ) : null}
+            </div>
+            <DollarSign className="w-8 h-8 text-primary/30 shrink-0" />
           </div>
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Amount Received</label>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+              Amount received
+            </label>
+            <input
+              type="number"
+              value={amount}
+              disabled={busy}
+              onChange={(e) => setAmount(e.target.value)}
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")}
+            />
           </div>
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Method</label>
-            <select value={method} onChange={(e) => setMethod(e.target.value)}
-              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 cursor-pointer")}>
-              {["Check", "ACH / Bank Transfer", "Credit Card", "Cash", "Zelle", "Other"].map((m) => (
-                <option key={m} value={m}>{m}</option>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+              Payment method
+            </label>
+            <select
+              value={method}
+              disabled={busy}
+              onChange={(e) => setMethod(e.target.value)}
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 cursor-pointer")}
+            >
+              {["Check", "ACH / Bank Transfer", "Wire transfer", "Credit Card", "Cash", "Zelle", "Other"].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Reference / Check Number</label>
-            <input type="text" value={refNum} onChange={(e) => setRefNum(e.target.value)} placeholder="Optional"
-              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+              Reference / check number
+            </label>
+            <input
+              type="text"
+              value={refNum}
+              disabled={busy}
+              onChange={(e) => setRefNum(e.target.value)}
+              placeholder="Optional"
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")}
+            />
           </div>
           <div>
-            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Payment Date</label>
-            <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
-              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")} />
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">Note</label>
+            <textarea
+              rows={2}
+              value={note}
+              disabled={busy}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional internal note"
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2 resize-none")}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1">
+              Payment date
+            </label>
+            <input
+              type="date"
+              value={payDate}
+              disabled={busy}
+              onChange={(e) => setPayDate(e.target.value)}
+              className={cn(DRAWER_FIELD_CLASS, "w-full px-3 py-2")}
+            />
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-          <Button size="sm" variant="outline" onClick={onClose} className="text-xs cursor-pointer">Cancel</Button>
-          <Button size="sm" variant="default" onClick={() => { onRecord(); onClose() }} className="text-xs gap-1.5 cursor-pointer">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Record Payment
+          <Button size="sm" variant="outline" disabled={busy} onClick={onClose} className="text-xs cursor-pointer">
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            disabled={busy}
+            onClick={() => void submit()}
+            className="text-xs gap-1.5 cursor-pointer"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Record payment
           </Button>
         </div>
       </div>
@@ -1117,6 +1240,35 @@ function InfoTab({
             <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[invoice.status].className)}>{invoice.status}</Badge>
           } />
         )}
+        {!editing && showFinancials && invoice.paymentAllocationState ? (
+          <Row
+            label="Payment allocation"
+            value={
+              <span className="inline-flex flex-wrap items-center gap-1">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] font-semibold",
+                    invoice.paymentAllocationState === "paid"
+                      ? "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30"
+                      : invoice.paymentAllocationState === "partial"
+                        ? "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30"
+                        : invoice.paymentAllocationState === "overpaid"
+                          ? "bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)] border-[color:var(--ds-info-border)]"
+                          : "bg-muted text-muted-foreground border-border",
+                  )}
+                >
+                  {paymentAllocationUiLabel(invoice.paymentAllocationState)}
+                </Badge>
+                {invoice.balanceDueCents != null && invoice.balanceDueCents > 0 ? (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {fmtCurrency(invoice.balanceDueCents / 100)} due
+                  </span>
+                ) : null}
+              </span>
+            }
+          />
+        ) : null}
         {!editing && invoice.sentAt && (
           <Row label="Sent" value={`Sent on ${fmtDate(invoice.sentAt)}`} />
         )}
@@ -1226,19 +1378,133 @@ function InfoTab({
   )
 }
 
+type OrgPaymentRow = {
+  id: string
+  amount_cents: number
+  paid_on: string
+  payment_method: string
+  reference: string | null
+  note: string | null
+  created_at: string
+  created_by: string | null
+}
+
 function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
-  const total   = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  const taxAmt  = invoice.taxAmount ?? 0
-  const grandTotal = total + taxAmt
-  const isPaid  = invoice.status === "Paid"
+  const { permissions } = useOrgPermissions()
+  const activeOrg = useActiveOrganization()
+  const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
+  const canEditPayments = permissions.canViewBilling && permissions.canEditInvoices
+
+  const grandTotal = invoiceGrandTotalDollars(invoice)
+  const totalPaid =
+    invoice.totalPaidCents != null ? invoice.totalPaidCents / 100 : invoice.status === "Paid" ? grandTotal : 0
+  const balance =
+    invoice.balanceDueCents != null
+      ? invoice.balanceDueCents / 100
+      : invoice.status === "Paid"
+        ? 0
+        : grandTotal
+  const allocLabel =
+    invoice.paymentAllocationState != null
+      ? paymentAllocationUiLabel(invoice.paymentAllocationState)
+      : invoice.status === "Paid"
+        ? "Paid in full"
+        : "Unpaid"
+
+  const [rows, setRows] = useState<OrgPaymentRow[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [creatorMap, setCreatorMap] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    if (!orgId) {
+      setRows([])
+      setLoading(false)
+      setLoadError(null)
+      return () => {
+        cancelled = true
+      }
+    }
+    setLoading(true)
+    setLoadError(null)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("org_invoice_payments")
+        .select("id, amount_cents, paid_on, payment_method, reference, note, created_at, created_by")
+        .eq("organization_id", orgId)
+        .eq("invoice_id", invoice.id)
+        .order("paid_on", { ascending: false })
+        .order("created_at", { ascending: false })
+      if (cancelled) return
+      if (error) {
+        setLoadError("Payment records could not be loaded. Try again or contact support if this persists.")
+        setRows([])
+      } else {
+        setRows((data ?? []) as OrgPaymentRow[])
+      }
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, invoice.id, invoice.totalPaidCents])
+
+  const creatorIds = useMemo(
+    () => [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[],
+    [rows],
+  )
+
+  useEffect(() => {
+    if (!orgId || creatorIds.length === 0) {
+      setCreatorMap(new Map())
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", creatorIds)
+      if (cancelled) return
+      const m = new Map<string, string>()
+      for (const p of (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>) {
+        m.set(p.id, (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team")
+      }
+      setCreatorMap(m)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, creatorIds])
+
+  const summaryTone =
+    invoice.paymentAllocationState === "paid" || invoice.paymentAllocationState === "overpaid"
+      ? "success"
+      : invoice.paymentAllocationState === "partial"
+        ? "warning"
+        : invoice.status === "Overdue"
+          ? "danger"
+          : "warning"
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: "Total Due", value: fmtCurrency(grandTotal), color: "text-foreground" },
-          { label: "Amount Paid", value: isPaid ? fmtCurrency(grandTotal) : "$0.00", color: isPaid ? "text-[color:var(--status-success)]" : "text-muted-foreground" },
-          { label: "Balance", value: isPaid ? "$0.00" : fmtCurrency(grandTotal), color: isPaid ? "text-muted-foreground" : "text-[color:var(--status-warning)]" },
+          { label: "Invoice total", value: fmtCurrency(grandTotal), color: "text-foreground" },
+          {
+            label: "Amount paid",
+            value: fmtCurrency(totalPaid),
+            color:
+              totalPaid > 0 ? "text-[color:var(--status-success)]" : "text-muted-foreground",
+          },
+          {
+            label: "Balance due",
+            value: fmtCurrency(Math.max(0, balance)),
+            color:
+              balance <= 0
+                ? "text-muted-foreground"
+                : "text-[color:var(--status-warning)]",
+          },
         ].map((s) => (
           <div key={s.label} className={cn(DRAWER_NESTED_CARD, "ds-shadow-card p-3 text-center")}>
             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{s.label}</p>
@@ -1247,45 +1513,163 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
         ))}
       </div>
 
-      {invoice.paidDate ? (
-        <div className="rounded-lg border border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/5 p-4 flex items-center gap-3">
+      {invoice.paymentAllocationState === "overpaid" ? (
+        <div className="rounded-lg border border-[color:var(--status-info)]/30 bg-[color:var(--ds-info-bg)]/40 p-3 text-xs text-foreground">
+          <p className="font-semibold text-[color:var(--ds-info-text)]">Credit / overpayment</p>
+          <p className="text-muted-foreground mt-1 tabular-nums">
+            Payments exceed the invoice total by {fmtCurrency(Math.abs(balance))}.
+          </p>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          "rounded-lg border p-4 flex items-center gap-3",
+          summaryTone === "success" && "border-[color:var(--status-success)]/30 bg-[color:var(--status-success)]/5",
+          summaryTone === "warning" && "border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/5",
+          summaryTone === "danger" && "border-destructive/30 bg-destructive/5",
+        )}
+      >
+        {summaryTone === "success" ? (
           <CheckCircle2 className="w-5 h-5 text-[color:var(--status-success)] shrink-0" />
-          <div>
-            <p className="text-xs font-semibold text-[color:var(--status-success)]">Payment received</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {fmtCurrency(grandTotal)} — {fmtDate(invoice.paidDate)}
+        ) : (
+          <AlertTriangle
+            className={cn(
+              "w-5 h-5 shrink-0",
+              summaryTone === "danger" ? "text-destructive" : "text-[color:var(--status-warning)]",
+            )}
+          />
+        )}
+        <div>
+          <p
+            className={cn(
+              "text-xs font-semibold",
+              summaryTone === "success" && "text-[color:var(--status-success)]",
+              summaryTone === "warning" && "text-[color:var(--status-warning)]",
+              summaryTone === "danger" && "text-destructive",
+            )}
+          >
+            {allocLabel}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {invoice.status === "Overdue" && balance > 0
+              ? `Overdue · due ${fmtDate(invoice.dueDate)}`
+              : balance > 0
+                ? `Due ${fmtDate(invoice.dueDate)}`
+                : invoice.paidDate
+                  ? `Last marked paid ${fmtDate(invoice.paidDate)}`
+                  : "—"}
+          </p>
+        </div>
+      </div>
+
+      <Section title="Recorded payments">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading payments…
+          </div>
+        ) : loadError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-4 text-xs text-destructive">
+            {loadError}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border py-10 text-center px-3">
+            <CreditCard className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">No payments recorded yet</p>
+            <p className="text-xs text-muted-foreground/70 mt-1 max-w-sm mx-auto">
+              {canEditPayments
+                ? "Use Record payment in the toolbar to log a check, ACH, card, or other manual payment."
+                : "Payments will appear here when recorded by billing staff."}
             </p>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/5 p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-[color:var(--status-warning)] shrink-0" />
-          <div>
-            <p className="text-xs font-semibold text-[color:var(--status-warning)]">Payment pending</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Due {fmtDate(invoice.dueDate)}</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-muted/30 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-semibold">Date</th>
+                  <th className="px-3 py-2 font-semibold">Method</th>
+                  <th className="px-3 py-2 font-semibold text-right">Amount</th>
+                  <th className="px-3 py-2 font-semibold hidden sm:table-cell">Reference</th>
+                  <th className="px-3 py-2 font-semibold hidden md:table-cell">Recorded by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2 text-foreground whitespace-nowrap">{fmtDate(String(r.paid_on).slice(0, 10))}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{formatPaymentMethodDb(r.payment_method)}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                      {fmtCurrency(r.amount_cents / 100)}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
+                      {r.reference?.trim() || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
+                      {r.created_by ? creatorMap.get(r.created_by) ?? "—" : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.some((r) => r.note?.trim()) ? (
+              <div className="border-t border-border px-3 py-2 space-y-2 bg-muted/10">
+                {rows
+                  .filter((r) => r.note?.trim())
+                  .map((r) => (
+                    <p key={`n-${r.id}`} className="text-[10px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{fmtDate(String(r.paid_on).slice(0, 10))}:</span>{" "}
+                      {r.note}
+                    </p>
+                  ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-      )}
+        )}
+      </Section>
 
-      <Section title="Payment History">
+      <Section title="Milestones">
         <div className="space-y-2">
           {[
-            { date: fmtDate(invoice.issueDate), event: "Invoice issued", detail: fmtCurrency(grandTotal), type: "neutral" },
-            { date: fmtDate(invoice.dueDate),   event: "Payment due",    detail: "",                     type: invoice.status === "Overdue" ? "danger" : "neutral" },
-            ...(invoice.paidDate ? [{ date: fmtDate(invoice.paidDate), event: "Payment received", detail: fmtCurrency(grandTotal), type: "success" }] : []),
+            {
+              date: fmtDate(invoice.issueDate),
+              event: "Invoice issued",
+              detail: fmtCurrency(grandTotal),
+              type: "neutral" as const,
+            },
+            {
+              date: fmtDate(invoice.dueDate),
+              event: "Payment due",
+              detail: "",
+              type: invoice.status === "Overdue" ? ("danger" as const) : ("neutral" as const),
+            },
+            ...(invoice.paidDate && invoice.status === "Paid"
+              ? [
+                  {
+                    date: fmtDate(invoice.paidDate),
+                    event: "Marked paid",
+                    detail: fmtCurrency(grandTotal),
+                    type: "success" as const,
+                  },
+                ]
+              : []),
           ].map((e, i) => (
             <div key={i} className={cn(DRAWER_NESTED_CARD, "flex items-center gap-3 p-2.5 rounded-md shadow-none")}>
-              <div className={cn(
-                "w-2 h-2 rounded-full shrink-0",
-                e.type === "success" ? "bg-[color:var(--status-success)]"
-                : e.type === "danger" ? "bg-destructive"
-                : "bg-muted-foreground/40",
-              )} />
+              <div
+                className={cn(
+                  "w-2 h-2 rounded-full shrink-0",
+                  e.type === "success"
+                    ? "bg-[color:var(--status-success)]"
+                    : e.type === "danger"
+                      ? "bg-destructive"
+                      : "bg-muted-foreground/40",
+                )}
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground">{e.event}</p>
                 <p className="text-[10px] text-muted-foreground">{e.date}</p>
               </div>
-              {e.detail && <span className="text-xs font-semibold tabular-nums text-foreground">{e.detail}</span>}
+              {e.detail ? <span className="text-xs font-semibold tabular-nums text-foreground">{e.detail}</span> : null}
             </div>
           ))}
         </div>
@@ -1880,10 +2264,10 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
   }
 
   const currentStatus = (draft.status ?? invoice.status) as InvoiceStatus
+  const balanceAllowsPayment =
+    invoice.balanceDueCents == null ? !["Paid", "Void", "Draft"].includes(currentStatus) : invoice.balanceDueCents > 0
   const canRecordPayment =
-    showFinancials &&
-    permissions.canApproveInvoices &&
-    ["Unpaid", "Overdue", "Sent"].includes(currentStatus)
+    showFinancials && canEditInvoices && !["Void", "Draft"].includes(currentStatus) && balanceAllowsPayment
 
   const TABS: { id: Tab; label: string; icon: ReactNode }[] = useMemo(() => {
     const base: { id: Tab; label: string; icon: ReactNode }[] = [
@@ -2055,11 +2439,11 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 </div>
 
                 {/* Record Payment (Phase 2: gated by canEditInvoices) */}
-                {canRecordPayment && canEditInvoices && (
+                {canRecordPayment ? (
                   <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={() => setModal("payment")}>
                     <CreditCard className="w-3.5 h-3.5" /> Record Payment
                   </Button>
-                )}
+                ) : null}
               </>
             ) : null}
 
@@ -2374,22 +2758,11 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
       )}
       {modal === "payment" && (
         <PaymentModal
+          key={invoice.id}
           invoice={invoice}
           onClose={() => setModal(null)}
-          onRecord={() => {
-            void (async () => {
-              const { error } = await updateInvoice(invoice.id, {
-                status: "Paid",
-                paidAt: new Date().toISOString(),
-              })
-              if (error) {
-                toast(`Could not record payment: ${error}`, "error")
-                return
-              }
-              toast("Payment recorded — invoice marked as paid")
-              setModal(null)
-            })()
-          }}
+          onSuccess={(msg) => toast(msg)}
+          onError={(msg) => toast(msg, "error")}
         />
       )}
 

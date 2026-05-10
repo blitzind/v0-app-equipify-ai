@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
+import { buildPortalInvoicePaymentSummary } from "@/lib/portal/invoice-payment-summary"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
@@ -32,7 +33,7 @@ export async function GET(
   const custId = portalUser.customer_id
 
   const selFull =
-    "id, invoice_number, title, amount_cents, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, terms_code, terms_custom_days, created_at"
+    "id, invoice_number, title, amount_cents, tax_amount_cents, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, terms_code, terms_custom_days, created_at"
 
   let invRes = await svc
     .from("org_invoices")
@@ -46,7 +47,7 @@ export async function GET(
     invRes = await svc
       .from("org_invoices")
       .select(
-        "id, invoice_number, title, amount_cents, status, issued_at, paid_at, equipment_id, work_order_id, created_at",
+        "id, invoice_number, title, amount_cents, tax_amount_cents, status, issued_at, paid_at, equipment_id, work_order_id, created_at",
       )
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
@@ -62,6 +63,25 @@ export async function GET(
   if (!inv) {
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 })
   }
+
+  let paySum = 0
+  const payRes = await svc
+    .from("org_invoice_payments")
+    .select("amount_cents")
+    .eq("organization_id", orgId)
+    .eq("invoice_id", invoiceId)
+  if (!payRes.error) {
+    paySum = (payRes.data ?? []).reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
+  }
+
+  const paymentSummary = buildPortalInvoicePaymentSummary(
+    {
+      amount_cents: inv.amount_cents as number,
+      tax_amount_cents: inv.tax_amount_cents as number | null | undefined,
+      status: inv.status as string,
+    },
+    paySum,
+  )
 
   const linkRes = await svc
     .from("invoice_work_order_links")
@@ -229,6 +249,10 @@ export async function GET(
       invoiceNumber: inv.invoice_number as string,
       title: inv.title as string,
       amountCents: inv.amount_cents as number,
+      totalDueCents: paymentSummary.totalDueCents,
+      totalPaidCents: paymentSummary.totalPaidCents,
+      balanceDueCents: paymentSummary.balanceDueCents,
+      paymentStatusLabel: paymentSummary.paymentStatusLabel,
       statusLabel: mapInvoiceStatus(inv.status as string),
       status: inv.status as string,
       issuedAt: inv.issued_at as string,

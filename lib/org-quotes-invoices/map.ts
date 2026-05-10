@@ -1,5 +1,6 @@
 import type { AdminInvoice, AdminQuote, InvoiceStatus, QuoteStatus } from "@/lib/mock-data"
 import { rowIsArchived } from "@/lib/archive-scope"
+import type { InvoicePaymentAllocationState } from "@/lib/billing/invoice-payment-allocation"
 
 export type OrgQuoteRow = {
   id: string
@@ -245,6 +246,12 @@ export function mapOrgInvoiceToAdmin(
     createdByLabel: string
     /** From invoice_work_order_links; must include work_order_id when present. */
     linkedWorkOrderIds?: string[]
+    paymentAllocation?: {
+      invoiceTotalCents: number
+      totalPaidCents: number
+      balanceDueCents: number
+      allocationState: InvoicePaymentAllocationState
+    }
   },
 ): AdminInvoice {
   const lineItems = parseLineItems(row.line_items)
@@ -311,5 +318,13 @@ export function mapOrgInvoiceToAdmin(
     taxProvider: row.tax_provider ?? null,
     taxProviderReference: row.tax_provider_reference ?? null,
     taxSnapshotJson: row.tax_snapshot_json,
+    ...(names.paymentAllocation
+      ? {
+          invoiceTotalCents: names.paymentAllocation.invoiceTotalCents,
+          totalPaidCents: names.paymentAllocation.totalPaidCents,
+          balanceDueCents: names.paymentAllocation.balanceDueCents,
+          paymentAllocationState: names.paymentAllocation.allocationState,
+        }
+      : {}),
   }
 }

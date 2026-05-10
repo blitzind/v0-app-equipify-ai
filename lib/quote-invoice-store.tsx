@@ -18,6 +18,7 @@ import {
   fetchInvoicesForOrganization,
   fetchQuotesForOrganization,
   insertOrgInvoice,
+  insertOrgInvoicePayment,
   insertOrgQuote,
   restoreOrgInvoice,
   restoreOrgQuote,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/org-quotes-invoices/repository"
 import type { QuoteStatus, InvoiceStatus } from "@/lib/mock-data"
 import type { LineItemJson } from "@/lib/org-quotes-invoices/map"
+import type { InvoicePaymentMethodDb } from "@/lib/billing/invoice-payment-allocation"
 
 export type { RecordArchiveVisibility }
 
@@ -108,6 +110,16 @@ interface QuoteInvoiceContextValue {
     taxSnapshotJson?: unknown
   }) => Promise<{ id?: string; error?: string }>
   updateInvoice: (id: string, patch: Parameters<typeof updateOrgInvoice>[3]) => Promise<{ error?: string }>
+  recordInvoicePayment: (
+    invoiceId: string,
+    payload: {
+      amountCents: number
+      paidOn: string
+      paymentMethod: InvoicePaymentMethodDb
+      reference?: string | null
+      note?: string | null
+    },
+  ) => Promise<{ error?: string }>
   archiveInvoice: (id: string, options?: { archiveReason?: string | null }) => Promise<{ error?: string }>
   restoreInvoice: (id: string) => Promise<{ error?: string }>
 }
@@ -283,6 +295,30 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
     [activeOrg.organizationId, refreshInvoices],
   )
 
+  const recordInvoicePaymentCb = useCallback(
+    async (
+      invoiceId: string,
+      payload: {
+        amountCents: number
+        paidOn: string
+        paymentMethod: InvoicePaymentMethodDb
+        reference?: string | null
+        note?: string | null
+      },
+    ) => {
+      if (!activeOrg.organizationId) return { error: "No organization selected." }
+      const supabase = createBrowserSupabaseClient()
+      const res = await insertOrgInvoicePayment(supabase, {
+        organizationId: activeOrg.organizationId,
+        invoiceId,
+        ...payload,
+      })
+      if (!res.error) await refreshInvoices()
+      return res
+    },
+    [activeOrg.organizationId, refreshInvoices],
+  )
+
   const archiveInvoiceCb = useCallback(
     async (id: string, options?: { archiveReason?: string | null }) => {
       if (!activeOrg.organizationId) return { error: "No organization selected." }
@@ -323,6 +359,7 @@ export function QuoteInvoiceProvider({ children }: { children: ReactNode }) {
     restoreQuote: restoreQuoteCb,
     addInvoiceFromPayload,
     updateInvoice: updateInvoiceCb,
+    recordInvoicePayment: recordInvoicePaymentCb,
     archiveInvoice: archiveInvoiceCb,
     restoreInvoice: restoreInvoiceCb,
   }
@@ -359,6 +396,7 @@ export function useInvoices() {
     refreshInvoices: ctx.refreshInvoices,
     addInvoiceFromPayload: ctx.addInvoiceFromPayload,
     updateInvoice: ctx.updateInvoice,
+    recordInvoicePayment: ctx.recordInvoicePayment,
     archiveInvoice: ctx.archiveInvoice,
     restoreInvoice: ctx.restoreInvoice,
   }

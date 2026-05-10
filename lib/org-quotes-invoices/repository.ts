@@ -12,6 +12,11 @@ import {
   quoteStatusUiToDb,
   type LineItemJson,
 } from "@/lib/org-quotes-invoices/map"
+import {
+  computeInvoicePaymentAllocation,
+  invoiceGrandTotalCents,
+  type InvoicePaymentMethodDb,
+} from "@/lib/billing/invoice-payment-allocation"
 /** Default lists hide archived rows; use `archived` or `all` for recovery views. */
 export type RecordArchiveVisibility = ArchivedAtScope
 
@@ -144,7 +149,7 @@ async function hydrateAdminInvoicesFromRows(
   const creatorIds = [...new Set(list.map((r) => r.created_by).filter((id): id is string => Boolean(id)))]
   const invoiceIds = list.map((r) => r.id)
 
-  const [custRes, eqRes, profMap, linkRes] = await Promise.all([
+  const [custRes, eqRes, profMap, linkRes, payRes] = await Promise.all([
     supabase.from("customers").select("id, company_name").eq("organization_id", organizationId).in("id", customerIds),
     equipIds.length
       ? supabase
@@ -158,6 +163,13 @@ async function hydrateAdminInvoicesFromRows(
       ? supabase
           .from("invoice_work_order_links")
           .select("invoice_id, work_order_id")
+          .eq("organization_id", organizationId)
+          .in("invoice_id", invoiceIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    invoiceIds.length
+      ? supabase
+          .from("org_invoice_payments")
+          .select("invoice_id, amount_cents")
           .eq("organization_id", organizationId)
           .in("invoice_id", invoiceIds)
       : Promise.resolve({ data: [] as unknown[] }),
@@ -191,14 +203,34 @@ async function hydrateAdminInvoicesFromRows(
     linkMap.set(r.invoice_id, cur)
   }
 
+  const payTotals = new Map<string, number>()
+  if (!payRes.error) {
+    for (const p of (payRes.data ?? []) as Array<{ invoice_id: string; amount_cents: number }>) {
+      payTotals.set(p.invoice_id, (payTotals.get(p.invoice_id) ?? 0) + Math.round(Number(p.amount_cents)))
+    }
+  }
+
   return list.map((row) => {
     const fromLinks = linkMap.get(row.id) ?? []
     const merged = [...new Set([...fromLinks, ...(row.work_order_id ? [row.work_order_id] : [])])]
+    const totalDue = invoiceGrandTotalCents(row)
+    const sumPaid = payTotals.get(row.id) ?? 0
+    const alloc = computeInvoicePaymentAllocation({
+      invoiceTotalCents: totalDue,
+      paymentsTotalCents: sumPaid,
+      dbInvoiceStatus: row.status,
+    })
     return mapOrgInvoiceToAdmin(row, {
       customerName: custMap.get(row.customer_id) ?? "Customer",
       equipmentName: row.equipment_id ? eqMap.get(row.equipment_id) ?? "" : "",
       createdByLabel: row.created_by ? profMap.get(row.created_by) ?? "Team" : "Team",
       linkedWorkOrderIds: merged.length ? merged : undefined,
+      paymentAllocation: {
+        invoiceTotalCents: totalDue,
+        totalPaidCents: alloc.totalPaidCents,
+        balanceDueCents: alloc.balanceDueCents,
+        allocationState: alloc.allocationState,
+      },
     })
   })
 }
@@ -237,6 +269,126 @@ async function syncLinkedWorkOrdersBillingState(
     .update({ billing_state: billingState, updated_at: new Date().toISOString() })
     .eq("organization_id", organizationId)
     .in("id", [...ids])
+}
+
+async function reconcileOrgInvoiceFromPayments(
+  supabase: SupabaseClient,
+  organizationId: string,
+  invoiceId: string,
+): Promise<void> {
+  const { data: inv, error: invErr } = await supabase
+    .from("org_invoices")
+    .select("amount_cents, tax_amount_cents, status, paid_at")
+    .eq("organization_id", organizationId)
+    .eq("id", invoiceId)
+    .maybeSingle()
+
+  if (invErr || !inv) return
+
+  const row = inv as {
+    amount_cents: number
+    tax_amount_cents?: number | null
+    status: string
+    paid_at?: string | null
+  }
+
+  const st = String(row.status || "")
+  if (st === "void" || st === "draft") return
+
+  const { data: payments, error: payErr } = await supabase
+    .from("org_invoice_payments")
+    .select("amount_cents, paid_on")
+    .eq("organization_id", organizationId)
+    .eq("invoice_id", invoiceId)
+
+  if (payErr) return
+
+  const sumPay = (payments ?? []).reduce(
+    (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    0,
+  )
+  if (sumPay === 0) return
+
+  const totalDue = invoiceGrandTotalCents(row)
+
+  const updates: Record<string, unknown> = {}
+  if (sumPay >= totalDue) {
+    updates.status = "paid"
+    let maxPaidOn = ""
+    for (const p of payments ?? []) {
+      const d = String((p as { paid_on: string }).paid_on).slice(0, 10)
+      if (d > maxPaidOn) maxPaidOn = d
+    }
+    updates.paid_at = maxPaidOn || new Date().toISOString().slice(0, 10)
+  } else {
+    updates.paid_at = null
+    if (st === "paid") updates.status = "unpaid"
+  }
+
+  const prevPaid = st === "paid"
+  const nextPaid = updates.status === "paid"
+
+  const { error: upErr } = await supabase
+    .from("org_invoices")
+    .update(updates)
+    .eq("organization_id", organizationId)
+    .eq("id", invoiceId)
+
+  if (upErr) return
+
+  if (nextPaid && !prevPaid) {
+    await syncLinkedWorkOrdersBillingState(supabase, organizationId, invoiceId, "paid")
+  } else if (prevPaid && updates.status === "unpaid") {
+    await syncLinkedWorkOrdersBillingState(supabase, organizationId, invoiceId, "invoiced")
+  }
+
+  queueQuickBooksInvoiceAutoSync(organizationId, invoiceId)
+}
+
+export async function insertOrgInvoicePayment(
+  supabase: SupabaseClient,
+  args: {
+    organizationId: string
+    invoiceId: string
+    amountCents: number
+    paidOn: string
+    paymentMethod: InvoicePaymentMethodDb
+    reference?: string | null
+    note?: string | null
+  },
+): Promise<{ error?: string }> {
+  if (!Number.isFinite(args.amountCents) || args.amountCents <= 0) {
+    return { error: "Payment amount must be greater than zero." }
+  }
+
+  const { data: invRow } = await supabase
+    .from("org_invoices")
+    .select("id")
+    .eq("organization_id", args.organizationId)
+    .eq("id", args.invoiceId)
+    .maybeSingle()
+
+  if (!invRow) return { error: "Invoice not found." }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { error } = await supabase.from("org_invoice_payments").insert({
+    organization_id: args.organizationId,
+    invoice_id: args.invoiceId,
+    amount_cents: Math.round(args.amountCents),
+    paid_on: args.paidOn.slice(0, 10),
+    payment_method: args.paymentMethod,
+    reference: args.reference?.trim() ? args.reference.trim() : null,
+    note: args.note?.trim() ? args.note.trim() : null,
+    created_by: user?.id ?? null,
+  })
+
+  if (error) return { error: error.message }
+
+  await reconcileOrgInvoiceFromPayments(supabase, args.organizationId, args.invoiceId)
+  return {}
 }
 
 export async function fetchInvoicesForOrganization(

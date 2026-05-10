@@ -43,6 +43,10 @@ type DetailPayload = {
     invoiceNumber: string
     title: string
     amountCents: number
+    totalDueCents?: number
+    totalPaidCents?: number
+    balanceDueCents?: number
+    paymentStatusLabel?: string
     statusLabel: string
     status: string
     issuedAt: string
@@ -67,11 +71,14 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
   useEffect(() => {
     fetch(`/api/portal/invoices/${invoiceId}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error("Not found")
+        if (r.status === 404) throw new Error("not_found")
+        if (!r.ok) throw new Error("load_failed")
         return r.json() as Promise<DetailPayload>
       })
       .then(setData)
-      .catch(() => setError("Invoice not found."))
+      .catch((e) =>
+        setError(e instanceof Error && e.message === "not_found" ? "Invoice not found." : "This invoice could not be loaded."),
+      )
   }, [invoiceId])
 
   if (error) {
@@ -97,6 +104,10 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
 
   const inv = data.invoice
   const overdue = inv.status === "overdue"
+  const totalDue = inv.totalDueCents ?? inv.amountCents
+  const totalPaid = inv.totalPaidCents ?? 0
+  const balanceDue = inv.balanceDueCents ?? (inv.status === "paid" ? 0 : totalDue)
+  const paymentLabel = inv.paymentStatusLabel ?? inv.statusLabel
 
   return (
     <div className="space-y-6">
@@ -138,25 +149,76 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
           </div>
           <div className="text-right">
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--portal-foreground)" }}>
-              {fmtCurrency(inv.amountCents)}
+              {fmtCurrency(totalDue)}
             </p>
-            <span
-              className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                background:
-                  inv.statusLabel === "Paid" ? "var(--portal-success-muted)"
-                  : overdue ? "var(--portal-danger-muted)"
-                  : "var(--portal-warning-muted)",
-                color:
-                  inv.statusLabel === "Paid" ? "var(--portal-success)"
-                  : overdue ? "var(--portal-danger)"
-                  : "var(--portal-warning)",
-              }}
-            >
-              {inv.statusLabel}
-            </span>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+              Invoice total
+            </p>
+            <div className="flex flex-col items-end gap-1 mt-2">
+              <span
+                className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  background:
+                    inv.statusLabel === "Paid" ? "var(--portal-success-muted)"
+                    : overdue ? "var(--portal-danger-muted)"
+                    : "var(--portal-warning-muted)",
+                  color:
+                    inv.statusLabel === "Paid" ? "var(--portal-success)"
+                    : overdue ? "var(--portal-danger)"
+                    : "var(--portal-warning)",
+                }}
+              >
+                {inv.statusLabel}
+              </span>
+              <span
+                className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium"
+                style={{
+                  background: "var(--portal-accent-muted)",
+                  color: "var(--portal-accent)",
+                }}
+              >
+                Payment: {paymentLabel}
+              </span>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div className="portal-card p-5">
+        <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--portal-foreground)" }}>
+          Payment status
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide font-medium" style={{ color: "var(--portal-nav-text)" }}>
+              Invoice total
+            </p>
+            <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+              {fmtCurrency(totalDue)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide font-medium" style={{ color: "var(--portal-nav-text)" }}>
+              Paid toward invoice
+            </p>
+            <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: "var(--portal-success)" }}>
+              {fmtCurrency(totalPaid)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide font-medium" style={{ color: "var(--portal-nav-text)" }}>
+              Balance due
+            </p>
+            <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+              {fmtCurrency(balanceDue)}
+            </p>
+          </div>
+        </div>
+        {paymentLabel === "Overpaid" ? (
+          <p className="text-xs mt-3" style={{ color: "var(--portal-nav-text)" }}>
+            Payments on file exceed this invoice total. Contact your service provider if you have questions.
+          </p>
+        ) : null}
       </div>
 
       {data.timeline.length > 0 ? (

@@ -10,6 +10,10 @@ type Inv = {
   invoiceNumber: string
   title: string
   amountCents: number
+  totalDueCents: number
+  totalPaidCents: number
+  balanceDueCents: number
+  paymentStatusLabel: string
   statusLabel: string
   issuedAt: string
   dueDate?: string | null
@@ -27,15 +31,24 @@ function fmtCurrency(cents: number) {
 export default function PortalInvoicesPage() {
   const [items, setItems] = useState<Inv[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
+    setLoadError(null)
     fetch("/api/portal/invoices")
-      .then((r) => r.json())
-      .then((j: { items?: Inv[] }) => setItems(j.items ?? []))
+      .then(async (r) => {
+        if (!r.ok) {
+          const j = (await r.json().catch(() => ({}))) as { error?: string }
+          throw new Error(j.error || "Could not load invoices.")
+        }
+        return r.json() as Promise<{ items?: Inv[] }>
+      })
+      .then((j) => setItems(j.items ?? []))
+      .catch(() => setLoadError("Invoices could not be loaded. Please try again later."))
       .finally(() => setLoading(false))
   }, [])
 
-  const totalOpen = items.filter((i) => i.statusLabel !== "Paid").reduce((s, i) => s + i.amountCents, 0)
+  const totalOpen = items.reduce((s, i) => s + (i.balanceDueCents > 0 ? i.balanceDueCents : 0), 0)
 
   return (
     <div className="space-y-6">
@@ -66,10 +79,15 @@ export default function PortalInvoicesPage() {
 
       <div className="portal-card overflow-hidden">
         {loading && <p className="p-6 text-sm" style={{ color: "var(--portal-nav-text)" }}>Loading…</p>}
-        {!loading && items.length === 0 && (
+        {!loading && loadError && (
+          <p className="p-6 text-sm" style={{ color: "var(--portal-danger)" }}>
+            {loadError}
+          </p>
+        )}
+        {!loading && !loadError && items.length === 0 && (
           <p className="p-6 text-sm" style={{ color: "var(--portal-nav-text)" }}>No invoices yet.</p>
         )}
-        {!loading && items.length > 0 && (
+        {!loading && !loadError && items.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -77,7 +95,8 @@ export default function PortalInvoicesPage() {
                   <th className="px-4 py-2.5 font-medium">Invoice</th>
                   <th className="px-4 py-2.5 font-medium">Issued</th>
                   <th className="px-4 py-2.5 font-medium hidden md:table-cell">Due</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Amount</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Total</th>
+                  <th className="px-4 py-2.5 font-medium text-right hidden sm:table-cell">Payment</th>
                   <th className="px-4 py-2.5 font-medium text-right">Status</th>
                   <th className="px-4 py-2.5 font-medium text-right">Pay</th>
                 </tr>
@@ -104,7 +123,10 @@ export default function PortalInvoicesPage() {
                       {inv.dueDate ? fmtDate(inv.dueDate) : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-right font-semibold tabular-nums" style={{ color: "var(--portal-foreground)" }}>
-                      {fmtCurrency(inv.amountCents)}
+                      {fmtCurrency(inv.totalDueCents ?? inv.amountCents)}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-right hidden sm:table-cell" style={{ color: "var(--portal-nav-text)" }}>
+                      {inv.paymentStatusLabel}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-right" style={{ color: "var(--portal-nav-text)" }}>
                       {inv.statusLabel}

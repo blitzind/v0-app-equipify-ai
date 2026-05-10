@@ -31,6 +31,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { PermissionGate } from "@/components/permissions/permission-gate"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { paymentAllocationUiLabel } from "@/lib/billing/invoice-payment-allocation"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -572,6 +573,26 @@ function InvoicesPageInner() {
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
                         <StatusBadge status={inv.status} />
+                        {inv.paymentAllocationState === "partial" || inv.paymentAllocationState === "overpaid" ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] font-semibold",
+                              inv.paymentAllocationState === "overpaid"
+                                ? "bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)] border-[color:var(--ds-info-border)]"
+                                : "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30",
+                            )}
+                          >
+                            {paymentAllocationUiLabel(inv.paymentAllocationState)}
+                          </Badge>
+                        ) : inv.paymentAllocationState === "paid" && inv.status !== "Paid" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-semibold bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30"
+                          >
+                            {paymentAllocationUiLabel(inv.paymentAllocationState)}
+                          </Badge>
+                        ) : null}
                         {inv.isArchived ? (
                           <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
                             Archived
