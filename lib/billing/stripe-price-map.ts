@@ -27,7 +27,12 @@ export function stripePriceIdForPlan(planId: PlanId, billingCycle: "monthly" | "
 
 /**
  * Infer Equipify plan + billing cycle from a Stripe Price ID by matching env-configured
- * or catalog IDs (`PLAN_PRICE_IDS` / `PLANS`). Returns nulls when the price is unknown (webhook may use metadata).
+ * or catalog IDs (`PLAN_PRICE_IDS` / `PLANS`). Returns nulls when the price is unknown.
+ *
+ * **Webhook behavior (Phase 54.2):** When both `planId` and `billingCycle` are null but the
+ * subscription has a non-null `stripe_price_id`, `/api/stripe/webhook` logs `priceMappingOk: false`
+ * and does not infer tier from arbitrary metadata (see `normalizePlanIdFromMetadataStrict`); checkout
+ * metadata / known `plan_id` metadata still wins when present.
  */
 export function resolvePlanAndBillingCycleFromStripePriceId(
   priceId: string | null | undefined,

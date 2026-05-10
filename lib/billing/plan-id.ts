@@ -29,3 +29,18 @@ export function normalizePlanIdForPersistence(
   if (t === "enterprise") return null
   return hasStripeSubscription ? "core" : "solo"
 }
+
+/**
+ * When Stripe `price_…` cannot be mapped to the catalog, avoid inferring `core`/`solo` from
+ * arbitrary subscription metadata — unknown values become null so {@link buildPatchFromStripeSubscription}
+ * can omit `plan_id` and preserve the existing DB tier (Phase 54.2).
+ */
+export function normalizePlanIdFromMetadataStrict(raw: string | null | undefined): PlanId | null {
+  if (raw == null) return null
+  const t = raw.trim().toLowerCase()
+  if (t === "") return null
+  if (VALID.has(t)) return t as PlanId
+  if (t === "starter") return "solo"
+  if (t === "enterprise") return null
+  return null
+}

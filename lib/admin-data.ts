@@ -64,6 +64,10 @@ export interface PlatformAccount {
   intendedPlanId?: string | null
   stripeSubscriptionId?: string | null
   stripePriceId?: string | null
+  /** ISO current billing period end from `organization_subscriptions.current_period_end`. */
+  subscriptionCurrentPeriodEnd?: string | null
+  /** Row touch time — proxy for last successful billing webhook sync writing this org. */
+  subscriptionUpdatedAt?: string | null
   country: string
   industry: string
 }

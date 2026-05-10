@@ -851,13 +851,41 @@ function AccountsTab({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td
+                      className="px-4 py-3 align-top max-w-[200px]"
+                      title={
+                        [
+                          account.subscriptionStatus ? `status: ${account.subscriptionStatus}` : null,
+                          account.billingCycle ? `cycle: ${account.billingCycle}` : null,
+                          account.subscriptionCurrentPeriodEnd
+                            ? `period ends: ${account.subscriptionCurrentPeriodEnd.slice(0, 10)}`
+                            : null,
+                          account.subscriptionUpdatedAt
+                            ? `subscription row updated: ${account.subscriptionUpdatedAt}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined
+                      }
+                    >
                       <span
                         className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ color: pc.color, background: pc.bg }}
                       >
                         {pillPlan}
                       </span>
+                      {(account.billingCycle || account.subscriptionCurrentPeriodEnd) && (
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                          {account.billingCycle === "annual"
+                            ? "Annual"
+                            : account.billingCycle === "monthly"
+                              ? "Monthly"
+                              : ""}
+                          {account.subscriptionCurrentPeriodEnd
+                            ? `${account.billingCycle ? " · " : ""}through ${account.subscriptionCurrentPeriodEnd.slice(0, 10)}`
+                            : ""}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span

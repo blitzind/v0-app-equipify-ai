@@ -1,6 +1,8 @@
-# Stripe production readiness (Phase 54.1)
+# Stripe production readiness (Phase 54.1–54.2)
 
 Operational checklist for **live** Stripe billing on Equipify. Test mode behavior is unchanged when deploys are not “live-enforced” (see below).
+
+Phase **54.2** adds subscription lifecycle validation: webhook behavior for each event type, safe catalog ↔ price mapping, structured observability, and manual QA below.
 
 ## Live vs test enforcement
 
@@ -56,7 +58,55 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 3. **Events:** Enable at least:  
    `checkout.session.completed`,  
    `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`,  
-   `invoice.payment_succeeded`, `invoice.payment_failed`.
+   `invoice.payment_succeeded`, `invoice.payment_failed`.  
+   Optional (informational only in-app): `customer.subscription.trial_will_end`, `invoice.payment_action_required` — Equipify logs them as `ignored` with no DB mutation.
+
+## Subscription lifecycle (Phase 54.2)
+
+### Events — handled vs ignored
+
+| Stripe event | App behavior |
+|--------------|----------------|
+| `checkout.session.completed` | **Handled** when `mode === subscription` — loads subscription from Stripe, upserts `organization_subscriptions`. Non-subscription checkout: **skipped** (logged). |
+| `customer.subscription.created` / `.updated` | **Handled** — upsert by org id from subscription metadata or DB lookup on `stripe_subscription_id` / `stripe_customer_id`. |
+| `customer.subscription.deleted` | **Handled** — same upsert path; status forced to `canceled`. |
+| `invoice.payment_succeeded` | **Handled** — clears `payment_failed_at`; refreshes row from Stripe subscription when subscription id is present and retrievable. |
+| `invoice.payment_failed` | **Handled** — sets `payment_failed_at`, aligns status with Stripe (`past_due` / etc.). |
+| `invoice.payment_action_required` | **Ignored** — no row write (customer completes authentication in Stripe / hosted flows). |
+| `customer.subscription.trial_will_end` | **Ignored** — informational; trial dates remain on the subscription object / DB via other events. |
+| Any other type | **Ignored** — logged with `dispatch: ignored`; idempotency still recorded. |
+
+### `organization_subscriptions` fields (webhook-maintained)
+
+Writes include: `organization_id`, `stripe_customer_id`, `stripe_subscription_id`, `stripe_price_id`, `plan_id`, `billing_cycle`, `status`, `trial_starts_at`, `trial_ends_at`, `current_period_start`, `current_period_end`, `cancel_at_period_end`, `canceled_at`, `payment_failed_at`, `intended_plan_id` (cleared when subscription reflects paid/tier state). Product ↔ plan mapping uses env/catalog price IDs (`lib/billing/stripe-price-map.ts`), not a separate products table.
+
+### Price → plan mapping failures
+
+If Stripe sends a `price_…` that does not match env overrides or `lib/plans` catalog IDs:
+
+- Logs include `priceMappingOk: false` and a short explanation (no secrets, no raw payloads).
+- The webhook **does not** infer tier from arbitrary subscription metadata (`normalizePlanIdFromMetadataStrict`). Checkout/session metadata and explicit known `plan_id` metadata still apply.
+- Existing `plan_id` in the database is preserved when the patch omits `plan_id` (updates do not overwrite with a wrong tier).
+
+### Entitlements after webhooks
+
+There is no separate entitlement cache: clients read `organization_subscriptions` (and usage tables) on load. After webhooks update the row, **limits follow `plan_id`** via `getUsageWithLimits` / plan gates. **`past_due` / `unpaid` / `canceled`** are not treated as “active subscription” for `isSubscriptionActive()` — failed payment paths update status so the account does not look paid-up while Stripe shows dunning.
+
+### Manual lifecycle QA (test mode recommended)
+
+Use Stripe test mode and the Dashboard or CLI to replay events where useful.
+
+- [ ] **New subscription:** Complete Checkout from `/settings/billing`; confirm `organization_subscriptions` has customer, subscription, price ids, expected `plan_id` / `billing_cycle`, `status` active/trialing, period dates.
+- [ ] **Upgrade / downgrade:** Change plan in Stripe Customer Portal or swap price on subscription; confirm `plan_id` / `stripe_price_id` / `billing_cycle` update on next `.updated` or invoice-driven sync.
+- [ ] **Cancel at period end:** Set cancel at period end in Stripe; confirm `cancel_at_period_end` and eventual `canceled` / `canceled_at` when period ends.
+- [ ] **Immediate cancel:** If used in Stripe; confirm `customer.subscription.deleted` sets status `canceled`.
+- [ ] **Failed payment:** Use test card or invoice action; confirm `past_due` (or Stripe status), `payment_failed_at` set, entitlements not treated as fully active where gated.
+- [ ] **Renewal / payment succeeded:** Confirm `invoice.payment_succeeded` clears `payment_failed_at` and refreshes period / status `active` when appropriate.
+- [ ] **Webhook replay / idempotency:** Replay same `evt_` id — expect `200` with `duplicate: true`, no double side effects.
+- [ ] **Entitlements:** After each change, reload app / session subscription API and confirm limits match tier (seats, equipment caps, etc.).
+- [ ] **Logs:** Handler logs include `eventType`, `dispatch`, org resolution, ids as IDs only — **no** payment method or card data, **no** full raw Stripe payloads.
+
+Platform admin accounts table (optional): Plan column shows billing cycle and period end when present; tooltip includes raw subscription status and row `updated_at` proxy for last webhook write.
 
 ## Code references
 
@@ -75,4 +125,6 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 
 ## Database / migrations
 
-No Supabase migrations are required for Phase 54.1 (env validation + logging only).
+Phase 54.1 required no schema changes. Phase 54.2 reuses existing `organization_subscriptions` and `stripe_webhook_events` — **no new migrations** for lifecycle validation.
+
+If you already applied historical migrations, **no** extra `supabase db push` is needed solely for 54.2.

@@ -4,7 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 import { getStripe } from "@/lib/stripe"
 import type { PlanId } from "@/lib/plans"
-import { normalizePlanIdForPersistence } from "@/lib/billing/plan-id"
+import {
+  normalizePlanIdForPersistence,
+  normalizePlanIdFromMetadataStrict,
+} from "@/lib/billing/plan-id"
 import {
   getPlanFromStripePriceId,
   resolvePlanAndBillingCycleFromStripePriceId,
@@ -79,9 +82,14 @@ export function buildPatchFromStripeSubscription(
   const priceId = primaryPriceId(sub)
   const fromPrice = resolvePlanAndBillingCycleFromStripePriceId(priceId)
 
+  /** Env/catalog does not recognize this price id — do not guess plan from loose metadata. */
+  const catalogPriceMiss = Boolean(priceId) && !fromPrice.planId
+
   const fromOpts =
     opts?.planId != null ? normalizePlanIdForPersistence(String(opts.planId), hasSub) : null
-  const fromMeta = normalizePlanIdForPersistence(rawPlanFromMeta, hasSub)
+  const fromMeta = catalogPriceMiss
+    ? normalizePlanIdFromMetadataStrict(rawPlanFromMeta)
+    : normalizePlanIdForPersistence(rawPlanFromMeta, hasSub)
   const planId = fromOpts ?? fromMeta ?? fromPrice.planId
 
   const billingCycle =
@@ -324,6 +332,10 @@ export type WebhookLogPayload = {
   /** Resolved from Stripe price id → catalog (`lib/plans` / env overrides). */
   mappedPlanId?: string | null
   mappedBillingCycle?: string | null
+  /** False when a non-empty `stripePriceId` did not match env/catalog (no silent wrong tier). */
+  priceMappingOk?: boolean
+  /** DB row updated / partial invoice path applied without throwing. */
+  entitlementsSyncOk?: boolean
   /** Stripe `subscription.status` when a subscription object was loaded. */
   stripeSubscriptionStatus?: string | null
   /** Whether dispatch mutated state or intentionally skipped / ignored. */
@@ -393,9 +405,12 @@ export async function handleCheckoutSessionCompleted(
   })
 
   const mapped = getPlanFromStripePriceId(priceId)
+  const mappingOk = !priceId || mapped != null
   const upsert = await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
   log({
-    message: `checkout.session.completed synced (${upsert.inserted ? "inserted" : "updated"})`,
+    message: mappingOk
+      ? `checkout.session.completed synced (${upsert.inserted ? "inserted" : "updated"})`
+      : `checkout.session.completed synced (${upsert.inserted ? "inserted" : "updated"}) — stripe_price_id not in catalog (plan from checkout/session metadata only)`,
     organizationIdFound: true,
     organizationId,
     subscriptionId: normalizedSubId,
@@ -403,6 +418,8 @@ export async function handleCheckoutSessionCompleted(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    priceMappingOk: mappingOk,
+    entitlementsSyncOk: true,
     stripeSubscriptionStatus: fullSub.status,
     dispatch: "handled",
   })
@@ -441,6 +458,8 @@ export async function handleSubscriptionEvent(
     if (organizationId) resolvedVia = "database_lookup"
   }
 
+  const mappingOk = !priceId || mapped != null
+
   if (!organizationId) {
     log({
       message: `${eventType}: organization not found (metadata.organization_id missing, no DB match for subscription/customer)`,
@@ -450,6 +469,7 @@ export async function handleSubscriptionEvent(
       stripePriceId: priceId,
       mappedPlanId: mapped?.planId ?? null,
       mappedBillingCycle: mapped?.billingCycle ?? null,
+      priceMappingOk: mappingOk,
       stripeSubscriptionStatus: fullSub.status,
       dispatch: "skipped",
     })
@@ -465,12 +485,15 @@ export async function handleSubscriptionEvent(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    priceMappingOk: mappingOk,
     stripeSubscriptionStatus: fullSub.status,
   })
 
   await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
   log({
-    message: `${eventType} synced — organization_subscriptions updated`,
+    message: mappingOk
+      ? `${eventType} synced — organization_subscriptions updated`
+      : `${eventType} synced — organization_subscriptions updated (stripe_price_id not in catalog; plan unchanged unless subscription/checkout metadata supplied)`,
     organizationIdFound: true,
     organizationId,
     subscriptionId: subId,
@@ -478,6 +501,8 @@ export async function handleSubscriptionEvent(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    priceMappingOk: mappingOk,
+    entitlementsSyncOk: true,
     stripeSubscriptionStatus: patch.status != null ? String(patch.status) : fullSub.status,
     dispatch: "handled",
   })
@@ -531,12 +556,15 @@ export async function handleInvoicePaymentSucceeded(
         organizationId: found.organization_id,
         subscriptionId: sid,
         customerId: custNorm,
+        priceMappingOk: undefined,
+        entitlementsSyncOk: true,
         dispatch: "handled",
       })
     }
   }
 
   await updateOrganizationSubscriptionByOrgId(admin, found.organization_id, patch)
+  const invMapOk = !invoicePriceId || mapped != null
   log({
     message: "invoice.payment_succeeded synced",
     organizationIdFound: true,
@@ -546,6 +574,8 @@ export async function handleInvoicePaymentSucceeded(
     stripePriceId: invoicePriceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    priceMappingOk: invMapOk,
+    entitlementsSyncOk: true,
     stripeSubscriptionStatus: typeof patch.status === "string" ? patch.status : null,
     dispatch: "handled",
   })
@@ -604,6 +634,7 @@ export async function handleInvoicePaymentFailed(
         subscriptionId: sid,
         customerId: custNorm,
         stripeSubscriptionStatus: "past_due",
+        entitlementsSyncOk: true,
         dispatch: "handled",
       })
     }
@@ -612,6 +643,7 @@ export async function handleInvoicePaymentFailed(
   }
 
   await updateOrganizationSubscriptionByOrgId(admin, found.organization_id, patch)
+  const failMapOk = !invoicePriceId || mapped != null
   log({
     message: "invoice.payment_failed synced",
     organizationIdFound: true,
@@ -621,16 +653,25 @@ export async function handleInvoicePaymentFailed(
     stripePriceId: invoicePriceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    priceMappingOk: failMapOk,
+    entitlementsSyncOk: true,
     stripeSubscriptionStatus: typeof patch.status === "string" ? patch.status : null,
     dispatch: "handled",
   })
 }
 
 /**
- * Supported Stripe webhook types:
- * - checkout.session.completed (subscription mode)
- * - customer.subscription.created | .updated | .deleted
- * - invoice.payment_succeeded | invoice.payment_failed
+ * Stripe subscription lifecycle dispatch (Phase 54.2 audit):
+ *
+ * | Event | Handling |
+ * |-------|----------|
+ * | `checkout.session.completed` | Syncs subscription when `mode=subscription`; skips non-subscription sessions. |
+ * | `customer.subscription.created` / `.updated` / `.deleted` | Upserts `organization_subscriptions`; deleted → status `canceled`. |
+ * | `invoice.payment_succeeded` | Clears `payment_failed_at`, refreshes row from Stripe subscription when retrievable. |
+ * | `invoice.payment_failed` | Sets `past_due` / Stripe status, `payment_failed_at`. |
+ * | `invoice.payment_action_required` | Logged only (`ignored`) — customer completes SCA in Stripe/hosted flow. |
+ * | `customer.subscription.trial_will_end` | Logged only (`ignored`) — informational; trial state remains on subscription rows. |
+ * | *(anything else)* | Logged `ignored` — no handler; idempotency row still recorded. |
  */
 export async function dispatchStripeWebhookEvent(
   event: Stripe.Event,
@@ -652,9 +693,16 @@ export async function dispatchStripeWebhookEvent(
     case "invoice.payment_failed":
       await handleInvoicePaymentFailed(admin, event.data.object as Stripe.Invoice, log)
       return
+    case "invoice.payment_action_required":
+    case "customer.subscription.trial_will_end":
+      log({
+        message: `${event.type}: no Equipify DB mutation (informational Stripe event)`,
+        dispatch: "ignored",
+      })
+      return
     default:
       log({
-        message: `unhandled Stripe event type — no Equipify handler (safe to ignore unless you add a product use case)`,
+        message: `Stripe event has no Equipify handler (${event.type}) — ignored`,
         dispatch: "ignored",
       })
   }

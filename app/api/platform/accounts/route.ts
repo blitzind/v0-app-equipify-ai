@@ -84,7 +84,7 @@ export async function GET() {
   const { data: subs, error: subsErr } = await admin
     .from("organization_subscriptions")
     .select(
-      "organization_id, plan_id, intended_plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id, stripe_price_id, discount_type, discount_value, discount_label, discount_reason, discount_expires_at, created_at",
+      "organization_id, plan_id, intended_plan_id, status, trial_ends_at, billing_cycle, stripe_subscription_id, stripe_price_id, current_period_end, updated_at, discount_type, discount_value, discount_label, discount_reason, discount_expires_at, created_at",
     )
     .in("organization_id", ids)
     .order("created_at", { ascending: false })
@@ -202,6 +202,12 @@ export async function GET() {
       intendedPlanId: sub?.intended_plan_id ?? null,
       stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
       stripePriceId: sub?.stripe_price_id ?? null,
+      subscriptionCurrentPeriodEnd:
+        typeof sub?.current_period_end === "string" && sub.current_period_end.trim() !== ""
+          ? sub.current_period_end
+          : null,
+      subscriptionUpdatedAt:
+        typeof sub?.updated_at === "string" && sub.updated_at.trim() !== "" ? sub.updated_at : null,
       country: "",
       industry: "",
     }

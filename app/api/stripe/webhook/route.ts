@@ -40,6 +40,8 @@ function buildLogger(eventId: string, eventType: string): WebhookLogFn {
       ...(payload.stripeSubscriptionStatus != null && {
         stripeSubscriptionStatus: payload.stripeSubscriptionStatus,
       }),
+      ...(payload.priceMappingOk !== undefined && { priceMappingOk: payload.priceMappingOk }),
+      ...(payload.entitlementsSyncOk !== undefined && { entitlementsSyncOk: payload.entitlementsSyncOk }),
       ...(payload.dispatch != null && { dispatch: payload.dispatch }),
     }
     console.info(JSON.stringify(line))
