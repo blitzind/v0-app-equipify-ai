@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:45:16.118Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:58:24.648Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -44,6 +44,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Layouts:** Dashboard uses main product shell (sidebar, top bar); portal uses portal shell; admin uses \`AdminWorkspaceShell\` + dark admin headers on individual pages.
 - **Middleware:** Session refresh; dashboard path prefixes protected; \`/portal/*\` uses portal cookie gate (except login); \`/admin\` loads only for platform admins (layout redirect).
 - **Tenant handling:** Active organization from membership (\`organization_members\`) + profile default org; almost all domain rows are scoped by \`organization_id\`.
+- **Phase 57.1 — Header search:** Desktop top bar uses \`GlobalSearchHeader\` → \`GET /api/organizations/{organizationId}/global-search?q=\` with \`requireOrgMemberSession\` and \`runOrgGlobalSearch\` (\`lib/global-search/run-global-search.ts\`). Results are grouped (customers, equipment, work orders; invoices if \`canViewFinancials\`; quotes if \`canViewQuotes\`; maintenance plans if \`canManageDispatch\`; roster profiles if technician permissions). Technician assigned-only scope uses \`loadAssignedWorkScope\` for customers/equipment/work orders. Mobile header has no search field (avoid non-functional stub).
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

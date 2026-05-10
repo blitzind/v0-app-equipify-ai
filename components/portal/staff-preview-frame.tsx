@@ -26,6 +26,7 @@ import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { StaffPortalPreviewCustomerPicker } from "@/components/portal/staff-portal-preview-customer-picker"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
+import { PORTAL_HEADER_NAV_ACTIVE_STYLE } from "@/lib/portal/portal-theme-css"
 import { buildStaffPreviewHref } from "@/lib/portal/staff-preview-href"
 import { cn } from "@/lib/utils"
 
@@ -156,19 +157,15 @@ export function StaffPreviewFrame({
                   className={cn(
                     "group flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--portal-accent)_40%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-surface)]",
-                    active
-                      ? "bg-[--portal-accent-muted] font-semibold text-[--portal-accent]"
-                      : "text-[color:var(--portal-secondary)] hover:bg-[--portal-hover] hover:text-[color:var(--portal-foreground)]",
+                    !active &&
+                      "text-[color:var(--portal-secondary)] hover:bg-[color:var(--portal-hover)] hover:text-[color:var(--portal-foreground)]",
                   )}
+                  style={active ? PORTAL_HEADER_NAV_ACTIVE_STYLE : undefined}
                 >
                   <Icon
                     size={15}
-                    className={cn(
-                      "shrink-0 transition-colors",
-                      active
-                        ? "text-[--portal-accent]"
-                        : "text-[color:var(--portal-secondary)] group-hover:text-[color:var(--portal-foreground)]",
-                    )}
+                    className={cn("shrink-0 transition-colors", !active && "text-[color:var(--portal-secondary)] group-hover:text-[color:var(--portal-foreground)]")}
+                    style={active ? { color: "var(--portal-accent)" } : undefined}
                     aria-hidden
                   />
                   {label}

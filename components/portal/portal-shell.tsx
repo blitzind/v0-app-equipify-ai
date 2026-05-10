@@ -29,7 +29,7 @@ import {
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { usePortalSession } from "@/components/portal/portal-session-context"
-import { portalAccentCssVariables } from "@/lib/portal/portal-theme-css"
+import { PORTAL_HEADER_NAV_ACTIVE_STYLE, portalAccentCssVariables } from "@/lib/portal/portal-theme-css"
 
 const NAV_ITEMS = [
   { href: "/portal/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -52,14 +52,21 @@ function NavLink({ href, label, icon: Icon, exact }: (typeof NAV_ITEMS)[number])
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-        active
-          ? "text-[--portal-accent] bg-[--portal-accent-muted]"
-          : "text-[--portal-nav-text] hover:text-[--portal-foreground] hover:bg-[--portal-hover]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--portal-accent)_40%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-surface)]",
+        !active &&
+          "text-[color:var(--portal-nav-text)] hover:text-[color:var(--portal-foreground)] hover:bg-[color:var(--portal-hover)]",
       )}
+      style={active ? PORTAL_HEADER_NAV_ACTIVE_STYLE : undefined}
     >
-      <Icon size={15} className={active ? "text-[--portal-accent]" : "text-[--portal-nav-icon]"} />
+      <Icon
+        size={15}
+        className="shrink-0"
+        style={{ color: active ? "var(--portal-accent)" : "var(--portal-nav-icon)" }}
+        aria-hidden
+      />
       {label}
     </Link>
   )

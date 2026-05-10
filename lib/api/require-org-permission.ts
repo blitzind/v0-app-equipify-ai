@@ -184,3 +184,60 @@ export async function requireAnyOrgPermission(
     permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
   }
 }
+
+/**
+ * Active org membership + effective permissions, without requiring a specific capability.
+ * Use for tenant-scoped utilities (e.g. header search) that apply their own per-entity gates.
+ */
+export async function requireOrgMemberSession(
+  organizationId: string,
+): Promise<Success | { error: NextResponse }> {
+  if (!UUID_RE.test(organizationId)) {
+    return { error: jsonError("Invalid organization.", 400, "bad_request") }
+  }
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user?.id) {
+    return { error: jsonError("Sign in required.", 401, "unauthorized") }
+  }
+
+  const platformAdmin = Boolean(user.email && isPlatformAdminEmail(user.email))
+
+  const { data: mem, error: memErr } = await supabase
+    .from("organization_members")
+    .select("role, permission_profile, permissions_json")
+    .eq("organization_id", organizationId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle()
+
+  if (memErr) {
+    return { error: jsonError(memErr.message, 500, "query_failed") }
+  }
+
+  const rawRole = (mem as { role?: string } | null)?.role?.trim() ?? null
+  const role = normalizeOrgMemberRole(rawRole)
+  const permissions = getEffectiveOrgPermissions({
+    role,
+    permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
+    permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+  })
+
+  if (!platformAdmin) {
+    if (!rawRole) {
+      return {
+        error: jsonError("You are not a member of this organization.", 403),
+      }
+    }
+  }
+
+  return {
+    userId: user.id,
+    supabase,
+    role: rawRole,
+    permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
+  }
+}

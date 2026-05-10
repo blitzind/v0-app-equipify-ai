@@ -37,3 +37,15 @@ export function portalAccentCssVariables(accentHex: string): Record<string, stri
     "--portal-accent-text": `color-mix(in srgb, ${a} 52%, #0f172a)`,
   }
 }
+
+/**
+ * Inline styles for the active portal nav item (header links).
+ * Tailwind arbitrary classes like `text-[--portal-accent]` do not reliably emit
+ * `var(--portal-accent)`; using tokens here keeps branding colors correct.
+ */
+export const PORTAL_HEADER_NAV_ACTIVE_STYLE: Record<string, string> = {
+  color: "var(--portal-accent-text)",
+  background: "var(--portal-accent-muted)",
+  fontWeight: "600",
+  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--portal-accent) 26%, transparent)",
+}

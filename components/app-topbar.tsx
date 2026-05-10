@@ -8,7 +8,7 @@ import {
   User, BellRing, Shield,
   Users,
   CreditCard, Plug, Settings, ShieldCheck,
-  LogOut, ChevronRight, Menu, X,
+  LogOut, ChevronRight, Menu,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +39,7 @@ import {
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { communicationEventPresentation } from "@/lib/notifications/event-icons"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
+import { GlobalSearchHeader } from "@/components/global-search-header"
 
 type FeedPreview = {
   id: string
@@ -112,8 +113,6 @@ export function AppTopbar() {
   const [notifFeed, setNotifFeed] = useState<FeedPreview[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifOpen, setNotifOpen]   = useState(false)
-  const [searchFocused, setSearchFocused] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [hubOpen, setHubOpen]       = useState(false)
   const hubRef     = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -284,26 +283,11 @@ export function AppTopbar() {
         <BrandLogo className="h-7 w-auto max-h-7" priority />
       </Link>
 
-      {/* Search — desktop only (sm+), hidden on mobile */}
-      <div
-        className={cn(
-          "items-center gap-2 flex-1 max-w-sm rounded-md border px-3 py-1.5 bg-background",
-          "hidden md:flex",
-          "transition-all duration-150",
-          searchFocused
-            ? "border-primary ring-2 ring-primary/20 shadow-[0_0_0_3px_rgba(15,122,229,0.08)]"
-            : "border-border hover:border-border/80"
-        )}
-      >
-        <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          placeholder="Search equipment, work orders..."
-          className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-w-0"
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-        />
-      </div>
+      {/* Global search — desktop only; mobile uses sidebar navigation (no broken stub). */}
+      <GlobalSearchHeader
+        organizationId={activeOrgOpt?.organizationId ?? null}
+        orgReady={activeOrgOpt?.status === "ready"}
+      />
 
       <div className="flex items-center gap-1 ml-auto">
         {/* Notifications */}
@@ -441,22 +425,6 @@ export function AppTopbar() {
           <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground hidden md:block transition-transform duration-150", hubOpen && "rotate-180")} />
         </button>
       </div>
-
-      {/* Mobile search bar — full-width dropdown */}
-      {searchOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border px-4 py-2 flex items-center gap-2 shadow-md">
-          <Search className="w-4 h-4 text-sidebar-foreground/60 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search equipment, work orders..."
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-sidebar-foreground/40 text-sidebar-foreground"
-            autoFocus
-          />
-          <button onClick={() => setSearchOpen(false)} className="text-sidebar-foreground/60 hover:text-sidebar-foreground cursor-pointer">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Premium Account Hub Panel */}
       {hubOpen && (
