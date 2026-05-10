@@ -4,6 +4,8 @@ import { logPortalActivity } from "@/lib/portal/activity-log"
 import { portalDisplayStatus } from "@/lib/service-requests/portal-display-status"
 import { logServiceRequestTimeline } from "@/lib/service-requests/log-communication"
 import type { ServiceRequestStatus } from "@/lib/service-requests/types"
+import type { ServiceContractRow } from "@/lib/service-contracts/types"
+import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
 
 export const runtime = "nodejs"
 
@@ -38,7 +40,7 @@ export async function GET() {
 
   const { data: fullRows, error } = await svc
     .from("org_service_requests")
-    .select("id, issue_summary, urgency, status, created_at")
+    .select("id, issue_summary, urgency, status, created_at, customer_location_id, equipment_id")
     .eq("organization_id", portalUser.organization_id)
     .eq("customer_id", portalUser.customer_id)
     .eq("portal_user_id", portalUser.id)
@@ -49,6 +51,14 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  const { data: contractRows } = await svc
+    .from("org_service_contracts")
+    .select("*")
+    .eq("organization_id", portalUser.organization_id)
+    .eq("customer_id", portalUser.customer_id)
+
+  const contracts = (contractRows ?? []) as ServiceContractRow[]
+
   const items = (fullRows ?? []).map((r) => {
     const row = r as {
       id: string
@@ -56,7 +66,23 @@ export async function GET() {
       urgency: string
       status: string
       created_at: string
+      customer_location_id: string | null
+      equipment_id: string | null
     }
+    const best = pickBestContract(contracts, {
+      customerId: portalUser.customer_id,
+      locationId: row.customer_location_id,
+      equipmentId: row.equipment_id,
+      openedAtIso: row.created_at,
+      lifecycleStatus: row.status,
+    })
+    const cov = evaluateSlaCoverageLabel(best, {
+      customerId: portalUser.customer_id,
+      locationId: row.customer_location_id,
+      equipmentId: row.equipment_id,
+      openedAtIso: row.created_at,
+      lifecycleStatus: row.status,
+    })
     return {
       id: row.id,
       issue_summary: row.issue_summary,
@@ -64,6 +90,7 @@ export async function GET() {
       created_at: row.created_at,
       /** Customer-safe status — internal workflow is not exposed. */
       status_label: portalDisplayStatus(row.status as ServiceRequestStatus),
+      coverage_label: cov.label,
     }
   })
 

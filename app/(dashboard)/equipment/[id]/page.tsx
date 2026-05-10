@@ -54,6 +54,9 @@ import {
   FileBadge2,
   Paperclip,
 } from "lucide-react"
+import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
+import type { ServiceContractRow } from "@/lib/service-contracts/types"
+import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
 
 type DbEquipmentRow = {
   id: string
@@ -395,6 +398,9 @@ export default function EquipmentDetailPage() {
   const [serviceSiteSummary, setServiceSiteSummary] = useState<string | null>(null)
   const [tab, setTab] = useState("overview")
   const [historyFilter, setHistoryFilter] = useState<EquipmentHistoryFilter>("all")
+  const [equipmentContractEval, setEquipmentContractEval] = useState<ReturnType<
+    typeof evaluateSlaCoverageLabel
+  > | null>(null)
 
   const load = useCallback(async () => {
     if (!id) {
@@ -625,6 +631,48 @@ export default function EquipmentDetailPage() {
       cancelled = true
     }
   }, [eq?.id, activeOrg.status, activeOrg.organizationId])
+
+  useEffect(() => {
+    if (!eq?.id || activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setEquipmentContractEval(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("org_service_contracts")
+        .select("*")
+        .eq("organization_id", activeOrg.organizationId)
+        .eq("customer_id", eq.customerId)
+      if (cancelled || error) {
+        if (!cancelled) setEquipmentContractEval(null)
+        return
+      }
+      const nowIso = new Date().toISOString()
+      const best = pickBestContract((data ?? []) as ServiceContractRow[], {
+        customerId: eq.customerId,
+        locationId: eq.serviceSiteId,
+        equipmentId: eq.id,
+        openedAtIso: nowIso,
+        lifecycleStatus: "open",
+      })
+      if (!cancelled) {
+        setEquipmentContractEval(
+          evaluateSlaCoverageLabel(best, {
+            customerId: eq.customerId,
+            locationId: eq.serviceSiteId,
+            equipmentId: eq.id,
+            openedAtIso: nowIso,
+            lifecycleStatus: "open",
+          }),
+        )
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [eq?.id, eq?.customerId, eq?.serviceSiteId, activeOrg.status, activeOrg.organizationId])
 
   useEffect(() => {
     void load()
@@ -1158,6 +1206,28 @@ export default function EquipmentDetailPage() {
 
         <TabsContent value="overview" className="mt-4 space-y-6">
           <ServiceLifecycleTimeline title="Equipment timeline" events={equipmentLifecycleEvents} />
+
+          {equipmentContractEval ?
+            <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Service contract coverage
+                  </p>
+                  {equipmentContractEval.contractName ?
+                    <p className="text-sm font-medium text-foreground mt-0.5 truncate">
+                      {equipmentContractEval.contractName}
+                    </p>
+                  : <p className="text-sm text-muted-foreground mt-0.5">No active scoped contract for this asset.</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Based on active agreements for this customer, site, and equipment. SLA clock is illustrative for
+                    open work.
+                  </p>
+                </div>
+                <SlaCoverageBadge label={equipmentContractEval.label} />
+              </CardContent>
+            </Card>
+          : null}
 
           <div className="grid md:grid-cols-2 gap-4">
             {canViewEquipmentFinancials ? (

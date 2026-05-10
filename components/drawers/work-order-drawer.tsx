@@ -116,6 +116,9 @@ import {
   resolveCustomerBillingProfile,
   type CustomerBillingProfile,
 } from "@/lib/customers/billing-profile"
+import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
+import type { ServiceContractRow } from "@/lib/service-contracts/types"
+import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
 
 let toastCounter = 0
 
@@ -423,6 +426,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [schedulingEventsRefresh, setSchedulingEventsRefresh] = useState(0)
   /** Phase 35: same-calendar-day peers for soft scheduling warnings (org + technician scope). */
   const [schedulePeerRows, setSchedulePeerRows] = useState<ScheduleWarnPeer[] | null>(null)
+  const [woContractEval, setWoContractEval] = useState<ReturnType<typeof evaluateSlaCoverageLabel> | null>(null)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -524,6 +528,62 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   useEffect(() => {
     if (!workOrderId) setSchedulePeerRows(null)
   }, [workOrderId])
+
+  useEffect(() => {
+    if (!wo || !activeOrgId || orgStatus !== "ready") {
+      setWoContractEval(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const [{ data: woRow }, { data: contracts }] = await Promise.all([
+        supabase
+          .from("work_orders")
+          .select("customer_location_id, created_at, completed_at, status")
+          .eq("organization_id", activeOrgId)
+          .eq("id", wo.id)
+          .maybeSingle(),
+        supabase
+          .from("org_service_contracts")
+          .select("*")
+          .eq("organization_id", activeOrgId)
+          .eq("customer_id", wo.customerId),
+      ])
+      if (cancelled) return
+      const r = woRow as {
+        customer_location_id: string | null
+        created_at: string
+        completed_at: string | null
+        status: string
+      } | null
+      if (!r) {
+        setWoContractEval(null)
+        return
+      }
+      const best = pickBestContract((contracts ?? []) as ServiceContractRow[], {
+        customerId: wo.customerId,
+        locationId: r.customer_location_id,
+        equipmentId: wo.equipmentId,
+        openedAtIso: r.created_at,
+        closedAtIso: r.completed_at,
+        lifecycleStatus: r.status,
+      })
+      setWoContractEval(
+        evaluateSlaCoverageLabel(best, {
+          customerId: wo.customerId,
+          locationId: r.customer_location_id,
+          equipmentId: wo.equipmentId,
+          openedAtIso: r.created_at,
+          closedAtIso: r.completed_at,
+          lifecycleStatus: r.status,
+        }),
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wo?.id, wo?.customerId, wo?.equipmentId, activeOrgId, orgStatus])
 
   useEffect(() => {
     if (!wo || !activeOrgId || orgStatus !== "ready") {
@@ -1701,6 +1761,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   const drawerOverviewLeadSlot = !editing ? (
     <div className="space-y-3">
+      {woContractEval ?
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Contract / SLA
+            </p>
+            {woContractEval.contractName ?
+              <p className="text-xs text-foreground truncate">{woContractEval.contractName}</p>
+            : <p className="text-xs text-muted-foreground">No active matching contract.</p>}
+          </div>
+          <SlaCoverageBadge label={woContractEval.label} />
+        </div>
+      : null}
       {dispatchState.dispatchIncomplete ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-3 py-2">
           <div>

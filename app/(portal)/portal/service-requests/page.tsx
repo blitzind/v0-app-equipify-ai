@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronLeft, Loader2 } from "lucide-react"
+import { formatSlaCoverageLabel } from "@/components/service-contracts/sla-coverage-badge"
+import type { SlaCoverageLabel } from "@/lib/service-contracts/types"
 
 type Item = {
   id: string
@@ -10,19 +12,35 @@ type Item = {
   urgency: string
   created_at: string
   status_label: string
+  coverage_label?: SlaCoverageLabel
 }
 
 export default function PortalServiceRequestsPage() {
   const [items, setItems] = useState<Item[]>([])
+  const [contracts, setContracts] = useState<Array<{ contract_name: string; end_date: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/portal/service-requests", { cache: "no-store" })
-      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => {
-        if (!ok) throw new Error((j as { error?: string }).error ?? "Could not load")
-        setItems((j as { items?: Item[] }).items ?? [])
+    Promise.all([
+      fetch("/api/portal/service-requests", { cache: "no-store" }).then((r) =>
+        r.json().then((j) => ({ ok: r.ok, j })),
+      ),
+      fetch("/api/portal/service-contracts", { cache: "no-store" }).then((r) =>
+        r.json().then((j) => ({ ok: r.ok, j })),
+      ),
+    ])
+      .then(([reqRes, conRes]) => {
+        if (!reqRes.ok) throw new Error((reqRes.j as { error?: string }).error ?? "Could not load requests")
+        setItems((reqRes.j as { items?: Item[] }).items ?? [])
+        if (conRes.ok) {
+          setContracts(
+            ((conRes.j as { contracts?: Array<{ contract_name: string; end_date: string }> }).contracts ??
+              []) as Array<{ contract_name: string; end_date: string }>,
+          )
+        } else {
+          setContracts([])
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error"))
       .finally(() => setLoading(false))
@@ -42,6 +60,12 @@ export default function PortalServiceRequestsPage() {
         <p className="text-sm mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
           Status updates from your service provider. Internal review steps are not shown here.
         </p>
+        {!loading && !error && contracts.length > 0 ?
+          <p className="text-xs mt-2" style={{ color: "var(--portal-nav-text)" }}>
+            You have {contracts.length} active service agreement{contracts.length === 1 ? "" : "s"} on file
+            {contracts[0]?.contract_name ? ` (e.g. ${contracts[0].contract_name})` : ""}.
+          </p>
+        : null}
       </div>
 
       {loading ?
@@ -74,6 +98,15 @@ export default function PortalServiceRequestsPage() {
                   year: "numeric",
                 })}{" "}
                 · {it.status_label} · Urgency: {it.urgency}
+                {it.coverage_label ?
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                      {formatSlaCoverageLabel(it.coverage_label)}
+                    </span>
+                  </>
+                : null}
               </p>
             </li>
           ))}

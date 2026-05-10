@@ -3,6 +3,8 @@ import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/api/require
 import { hasOrgPermission } from "@/lib/permissions/model"
 import type { InternalNoteEntry } from "@/lib/service-requests/types"
 import { logServiceRequestTimeline } from "@/lib/service-requests/log-communication"
+import type { ServiceContractRow } from "@/lib/service-contracts/types"
+import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
 
 export const runtime = "nodejs"
 
@@ -50,7 +52,48 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ request: row })
+  const r = row as {
+    customer_id: string | null
+    customer_location_id: string | null
+    equipment_id: string | null
+    created_at: string
+    status: string
+  }
+
+  let coverage: ReturnType<typeof evaluateSlaCoverageLabel>
+  if (!r.customer_id) {
+    coverage = {
+      label: "no_contract",
+      contractId: null,
+      contractName: null,
+      responseHoursElapsed: null,
+      resolutionHoursElapsed: null,
+    }
+  } else {
+    const { data: contractRows } = await gate.supabase
+      .from("org_service_contracts")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("customer_id", r.customer_id)
+
+    const best = pickBestContract((contractRows ?? []) as ServiceContractRow[], {
+      customerId: r.customer_id,
+      locationId: r.customer_location_id,
+      equipmentId: r.equipment_id,
+      openedAtIso: r.created_at,
+      lifecycleStatus: r.status,
+    })
+
+    coverage = evaluateSlaCoverageLabel(best, {
+      customerId: r.customer_id,
+      locationId: r.customer_location_id,
+      equipmentId: r.equipment_id,
+      openedAtIso: r.created_at,
+      lifecycleStatus: r.status,
+    })
+  }
+
+  return NextResponse.json({ request: row, coverage })
 }
 
 export async function PATCH(

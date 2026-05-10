@@ -47,6 +47,8 @@ import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
+import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
+import type { SlaCoverageLabel } from "@/lib/service-contracts/types"
 
 type SrRow = {
   id: string
@@ -106,6 +108,10 @@ function ServiceRequestsQueuePageContent() {
   const [fSource, setFSource] = useState<string>("all")
 
   const [detail, setDetail] = useState<SrRow | null>(null)
+  const [detailCoverage, setDetailCoverage] = useState<{
+    label: SlaCoverageLabel
+    contractName: string | null
+  } | null>(null)
   const [noteText, setNoteText] = useState("")
   const [assignId, setAssignId] = useState("")
   const [statusEdit, setStatusEdit] = useState<string>("new")
@@ -183,9 +189,16 @@ function ServiceRequestsQueuePageContent() {
   const openDetail = async (id: string) => {
     if (!baseUrl) return
     const res = await fetch(`${baseUrl}/service-requests/${id}`, { cache: "no-store" })
-    const body = (await res.json().catch(() => ({}))) as { request?: SrRow }
+    const body = (await res.json().catch(() => ({}))) as {
+      request?: SrRow
+      coverage?: { label: SlaCoverageLabel; contractName: string | null }
+    }
     if (res.ok && body.request) {
       setDetail(body.request)
+      const c = body.coverage
+      setDetailCoverage(
+        c ? { label: c.label, contractName: c.contractName ?? null } : null,
+      )
     }
   }
 
@@ -480,16 +493,36 @@ function ServiceRequestsQueuePageContent() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+      <Dialog
+        open={!!detail}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDetail(null)
+            setDetailCoverage(null)
+          }
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Request detail</DialogTitle>
           </DialogHeader>
           {detail ?
             <div className="space-y-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Summary</p>
-                <p className="font-medium">{detail.issue_summary}</p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Summary</p>
+                  <p className="font-medium">{detail.issue_summary}</p>
+                </div>
+                {detailCoverage ?
+                  <div className="flex flex-col items-end gap-1">
+                    {detailCoverage.contractName ?
+                      <p className="text-[11px] text-muted-foreground text-right max-w-[200px] truncate">
+                        {detailCoverage.contractName}
+                      </p>
+                    : null}
+                    <SlaCoverageBadge label={detailCoverage.label} />
+                  </div>
+                : null}
               </div>
               {detail.description ?
                 <div>
@@ -581,7 +614,7 @@ function ServiceRequestsQueuePageContent() {
                         toast({ title: "Saved" })
                         setNoteText("")
                         const updated = (j as { request?: SrRow }).request
-                        if (updated) setDetail(updated)
+                        if (updated) void openDetail(updated.id)
                         void load()
                       }}
                     >

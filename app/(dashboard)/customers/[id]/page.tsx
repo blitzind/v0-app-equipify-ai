@@ -92,6 +92,14 @@ import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-
 import { normalizeAddressFingerprint } from "@/lib/customer-locations/format"
 import { buildMultiLocationDashboard } from "@/lib/customers/multi-location-dashboard"
 import { CustomerMultiLocationDashboard } from "@/components/customers/customer-multi-location-dashboard"
+import {
+  ServiceContractFormDialog,
+  type ServiceContractFormPayload,
+} from "@/components/service-contracts/service-contract-form-dialog"
+import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
+import type { SlaCoverageLabel } from "@/lib/service-contracts/types"
+import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
+import type { ServiceContractRow } from "@/lib/service-contracts/types"
 
 type CustomerStatus = "Active" | "Inactive"
 
@@ -136,13 +144,19 @@ type CustomerLocation = {
   isDefault: boolean
 }
 
-type CustomerContract = {
+type CustomerServiceContract = {
   id: string
   name: string
-  type: "PM Plan" | "Full Coverage" | "Labor Only" | "Parts & Labor"
+  number: string | null
+  coverageType: string
+  status: string
   startDate: string
   endDate: string
-  value: number
+  locationId: string | null
+  equipmentId: string | null
+  slaResponseHours: number | null
+  slaResolutionHours: number | null
+  notes: string | null
 }
 
 type CustomerPortalCertMode = "" | "immediate_release" | "release_on_payment" | "manual_release" | "internal_only"
@@ -183,7 +197,7 @@ type CustomerDetail = {
   notes: string
   contacts: CustomerContact[]
   locations: CustomerLocation[]
-  contracts: CustomerContract[]
+  contracts: CustomerServiceContract[]
   isArchived: boolean
   /** null = use organization default */
   portalCertificateReleaseMode: string | null
@@ -479,6 +493,7 @@ export default function CustomerDetailPage() {
   const canManageCustomerRecords = !assignedOnlyView
   const canViewCustomerFinancials = permissions.canViewFinancials || permissions.canViewBilling
   const canViewQuotes = permissions.canViewQuotes
+  const canManageServiceContracts = permissions.canManageDispatch
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -526,6 +541,9 @@ export default function CustomerDetailPage() {
     phone: "",
     is_primary: false,
   })
+
+  const [serviceContractFormOpen, setServiceContractFormOpen] = useState(false)
+  const [editingServiceContractId, setEditingServiceContractId] = useState<string | null>(null)
 
   const [customerPlans, setCustomerPlans] = useState<CustomerPlanRow[]>([])
   const [planEquipmentNames, setPlanEquipmentNames] = useState<Record<string, string>>({})
@@ -800,29 +818,32 @@ export default function CustomerDetailPage() {
         return
       }
 
-      const [{ data: contactsRows }, { data: locationsRows }, { data: contractRows }] =
-        await Promise.all([
-          supabase
-            .from("customer_contacts")
-            .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
-            .eq("customer_id", id)
-            .eq("organization_id", orgId)
-            .is("archived_at", null)
-            .order("is_primary", { ascending: false }),
-          supabase
-            .from("customer_locations")
-            .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
-            .eq("customer_id", id)
-            .eq("organization_id", orgId)
-            .is("archived_at", null)
-            .order("is_default", { ascending: false })
-            .order("name", { ascending: true }),
-          supabase
-            .from("customer_contracts")
-            .select("id, name, contract_type, start_date, end_date, value_cents")
-            .eq("customer_id", id)
-            .eq("organization_id", orgId),
-        ])
+      const [{ data: contactsRows }, { data: locationsRows }, contractRes] = await Promise.all([
+        supabase
+          .from("customer_contacts")
+          .select("id, full_name, first_name, last_name, role, email, phone, is_primary")
+          .eq("customer_id", id)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .order("is_primary", { ascending: false }),
+        supabase
+          .from("customer_locations")
+          .select("id, name, address_line1, address_line2, city, state, postal_code, phone, contact_person, notes, is_default")
+          .eq("customer_id", id)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .order("is_default", { ascending: false })
+          .order("name", { ascending: true }),
+        supabase
+          .from("org_service_contracts")
+          .select(
+            "id, contract_name, contract_number, coverage_type, status, start_date, end_date, customer_location_id, equipment_id, sla_response_hours, sla_resolution_hours, notes",
+          )
+          .eq("customer_id", id)
+          .eq("organization_id", orgId)
+          .order("start_date", { ascending: false }),
+      ])
+      const contractRows = contractRes.error ? [] : contractRes.data
 
       type ContactRow = {
         id: string
@@ -849,11 +870,17 @@ export default function CustomerDetailPage() {
       }
       type ContractRow = {
         id: string
-        name: string | null
-        contract_type: string | null
+        contract_name: string | null
+        contract_number: string | null
+        coverage_type: string | null
+        status: string | null
         start_date: string | null
         end_date: string | null
-        value_cents: number | null
+        customer_location_id: string | null
+        equipment_id: string | null
+        sla_response_hours: number | null
+        sla_resolution_hours: number | null
+        notes: string | null
       }
 
       const contactsTyped = (contactsRows ?? []) as ContactRow[]
@@ -924,11 +951,17 @@ export default function CustomerDetailPage() {
         })),
         contracts: contractsTyped.map((contract) => ({
           id: contract.id,
-          name: contract.name ?? "Contract",
-          type: (contract.contract_type ?? "PM Plan") as CustomerContract["type"],
+          name: contract.contract_name ?? "Contract",
+          number: contract.contract_number,
+          coverageType: contract.coverage_type ?? "other",
+          status: contract.status ?? "draft",
           startDate: contract.start_date ?? new Date().toISOString().slice(0, 10),
           endDate: contract.end_date ?? new Date().toISOString().slice(0, 10),
-          value: Math.floor((contract.value_cents ?? 0) / 100),
+          locationId: contract.customer_location_id,
+          equipmentId: contract.equipment_id,
+          slaResponseHours: contract.sla_response_hours,
+          slaResolutionHours: contract.sla_resolution_hours,
+          notes: contract.notes,
         })),
         isArchived: Boolean(customerRowTyped.archived_at),
       }
@@ -1506,7 +1539,37 @@ export default function CustomerDetailPage() {
     return out.slice(0, 25)
   }, [customer, customerWorkOrders, customerEquipment, equipmentCreatedAt, customerPlans])
 
-  const totalContractValue = customer?.contracts.reduce((sum, c) => sum + c.value, 0) ?? 0
+  const customerContractCoverageHint = useMemo(() => {
+    if (!customer?.id) return null
+    const rows: ServiceContractRow[] = customer.contracts.map((c) => ({
+      id: c.id,
+      organization_id: customer.organizationId,
+      customer_id: customer.id,
+      customer_location_id: c.locationId,
+      equipment_id: c.equipmentId,
+      contract_name: c.name,
+      contract_number: c.number,
+      start_date: c.startDate,
+      end_date: c.endDate,
+      status: c.status as ServiceContractRow["status"],
+      coverage_type: c.coverageType as ServiceContractRow["coverage_type"],
+      sla_response_hours: c.slaResponseHours,
+      sla_resolution_hours: c.slaResolutionHours,
+      notes: c.notes,
+    }))
+    const nowIso = new Date().toISOString()
+    const best = pickBestContract(rows, {
+      customerId: customer.id,
+      openedAtIso: nowIso,
+      lifecycleStatus: "open",
+    })
+    const ev = evaluateSlaCoverageLabel(best, {
+      customerId: customer.id,
+      openedAtIso: nowIso,
+      lifecycleStatus: "open",
+    })
+    return ev.label as SlaCoverageLabel
+  }, [customer])
 
   const activeCustomerPlans = useMemo(
     () => customerPlans.filter((p) => planStatusDbToUi(p.status) === "Active"),
@@ -2643,16 +2706,43 @@ export default function CustomerDetailPage() {
               </Card>
 
               <Card className="border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Contracts</CardTitle>
-                  <p className="text-xs text-muted-foreground font-normal">
-                    Annual values from customer_contracts
-                    {totalContractValue > 0 ? ` · ${fmtCurrencyCents(totalContractValue * 100)} combined` : ""}.
-                  </p>
+                <CardHeader className="pb-2 flex flex-row flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">Service contracts</CardTitle>
+                    <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                      Coverage scope, SLA targets, and term dates. Expired or inactive contracts do not apply to new
+                      work.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {customerContractCoverageHint ? (
+                      <SlaCoverageBadge label={customerContractCoverageHint} />
+                    ) : null}
+                    {canManageServiceContracts && activeOrgId ?
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setEditingServiceContractId(null)
+                          setServiceContractFormOpen(true)
+                        }}
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add contract
+                      </Button>
+                    : null}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {customer.contracts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">No contracts on file.</p>
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No service contracts yet.
+                      {canManageServiceContracts ?
+                        " Use Add contract to record coverage and SLA targets."
+                      : ""}
+                    </p>
                   ) : (
                     <div className="flex flex-col gap-3">
                       {customer.contracts.map((contract) => (
@@ -2666,7 +2756,10 @@ export default function CustomerDetailPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="font-semibold text-sm text-foreground">{contract.name}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">{contract.type}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+                                {contract.coverageType.replace(/_/g, " ")} · {contract.status}
+                                {contract.number ? ` · #${contract.number}` : ""}
+                              </p>
                               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                                 <Calendar className="w-3.5 h-3.5 shrink-0" />
                                 {new Date(contract.startDate).toLocaleDateString("en-US", {
@@ -2681,12 +2774,42 @@ export default function CustomerDetailPage() {
                                   year: "numeric",
                                 })}
                               </p>
+                              {(contract.slaResponseHours != null || contract.slaResolutionHours != null) ?
+                                <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                                  SLA:{" "}
+                                  {contract.slaResponseHours != null ?
+                                    `${contract.slaResponseHours}h response`
+                                  : "— response"}
+                                  {" · "}
+                                  {contract.slaResolutionHours != null ?
+                                    `${contract.slaResolutionHours}h resolution`
+                                  : "— resolution"}
+                                </p>
+                              : null}
+                              {contract.locationId || contract.equipmentId ?
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                  {contract.locationId ? "Scoped to one service site. " : ""}
+                                  {contract.equipmentId ? "Scoped to one equipment record." : ""}
+                                </p>
+                              : (
+                                <p className="text-[11px] text-muted-foreground mt-1">Customer-wide coverage.</p>
+                              )}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-lg font-bold text-foreground">${contract.value.toLocaleString()}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Annual value</p>
-                          </div>
+                          {canManageServiceContracts ?
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs shrink-0"
+                              onClick={() => {
+                                setEditingServiceContractId(contract.id)
+                                setServiceContractFormOpen(true)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          : null}
                         </div>
                       ))}
                     </div>
@@ -3526,6 +3649,42 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+
+      {activeOrgId && customer ?
+        <ServiceContractFormDialog
+          open={serviceContractFormOpen}
+          onOpenChange={(o) => {
+            setServiceContractFormOpen(o)
+            if (!o) setEditingServiceContractId(null)
+          }}
+          organizationId={activeOrgId}
+          customerId={customer.id}
+          locations={customer.locations.map((l) => ({ id: l.id, name: l.name }))}
+          existing={
+            editingServiceContractId ?
+              (() => {
+                const c = customer.contracts.find((x) => x.id === editingServiceContractId)
+                if (!c) return null
+                return {
+                  id: c.id,
+                  contract_name: c.name,
+                  contract_number: c.number,
+                  start_date: c.startDate,
+                  end_date: c.endDate,
+                  status: c.status as ServiceContractFormPayload["status"],
+                  coverage_type: c.coverageType as ServiceContractFormPayload["coverage_type"],
+                  customer_location_id: c.locationId,
+                  equipment_id: c.equipmentId,
+                  sla_response_hours: c.slaResponseHours,
+                  sla_resolution_hours: c.slaResolutionHours,
+                  notes: c.notes,
+                }
+              })()
+            : null
+          }
+          onSaved={() => setRefreshToken((n) => n + 1)}
+        />
+      : null}
     </div>
   )
 }
