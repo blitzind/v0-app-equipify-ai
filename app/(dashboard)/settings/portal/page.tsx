@@ -1,14 +1,21 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
-  Globe, Paintbrush, LayoutGrid, LogIn, Mail, Link2,
-  Save, Eye, Upload, Check,
+  Paintbrush,
+  Save,
+  Eye,
+  Check,
   Shield,
   Layers,
+  Info,
+  LayoutGrid,
+  LogIn,
+  Mail,
+  Link2,
 } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { CERTIFICATE_RELEASE_OPTIONS } from "@/lib/portal/certificate-release-staff"
@@ -102,63 +109,14 @@ function Toggle({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const MODULE_OPTIONS = [
-  { key: "workOrders",  label: "Work Orders",   description: "Customers can view open and past work orders" },
-  { key: "invoices",    label: "Invoices",       description: "Customers can view and download invoices" },
-  { key: "equipment",   label: "Equipment",      description: "Customers can view their registered equipment" },
-  { key: "quotes",      label: "Quotes",         description: "Customers can view and accept quotes" },
-  { key: "documents",   label: "Documents",      description: "Customers can access shared files" },
-  { key: "scheduling",  label: "Service Requests",  description: "Customers can request service; staff confirms scheduling" },
-  { key: "payments",    label: "Online Payments",description: "Customers can pay invoices directly from the portal" },
-]
-
-const LOGIN_OPTIONS = [
-  { value: "magic-link", label: "Magic Link (passwordless email)" },
-  { value: "password",   label: "Email + Password" },
-  { value: "both",       label: "Both" },
-]
-
-const EMAIL_TEMPLATES = [
-  { key: "invite",    label: "Portal Invite",       description: "Sent when a customer is first invited to the portal" },
-  { key: "magic",     label: "Magic Login Link",     description: "Sent each time a customer requests a login link" },
-  { key: "workorder", label: "Work Order Update",    description: "Sent when a work order status changes" },
-  { key: "invoice",   label: "Invoice Ready",        description: "Sent when a new invoice is available" },
-  { key: "quote",     label: "Quote Approval",       description: "Sent when a quote is waiting for customer approval" },
-]
-
 export default function PortalSettingsPage() {
-  const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { organizationId, organizationName, status: orgStatus } = useActiveOrganization()
   const { has, status: permStatus } = useOrgPermissions()
   const { toast } = useToast()
   const [saved, setSaved] = useState(false)
 
   const canEditPortalSettings = has("canManagePortalSettings")
   const canViewDocActivity = has("canManagePortalSettings") || has("canReleaseCertificatesToPortal")
-
-  // Branding
-  const [portalName, setPortalName] = useState("Equipify Customer Portal")
-  const [primaryColor, setPrimaryColor] = useState("#2563eb")
-  const [logoUploaded, setLogoUploaded] = useState(false)
-  const [faviconUploaded, setFaviconUploaded] = useState(false)
-
-  // Modules
-  const [modules, setModules] = useState<Record<string, boolean>>({
-    workOrders: true, invoices: true, equipment: true,
-    quotes: false, documents: false, scheduling: false, payments: false,
-  })
-
-  // Login
-  const [loginMethod, setLoginMethod] = useState("magic-link")
-  const [sessionDays, setSessionDays] = useState("30")
-
-  // Login page
-  const [welcomeTitle, setWelcomeTitle] = useState("Welcome back")
-  const [welcomeBody, setWelcomeBody] = useState("Sign in to view your equipment, work orders, and invoices.")
-  const [supportEmail, setSupportEmail] = useState("support@example.com")
-
-  // Custom domain
-  const [customDomain, setCustomDomain] = useState("")
-  const [domainVerified] = useState(false)
 
   const [certificateReleaseMode, setCertificateReleaseMode] = useState<
     "immediate_release" | "release_on_payment" | "manual_release" | "internal_only"
@@ -293,66 +251,70 @@ export default function PortalSettingsPage() {
   }, [orgStatus, organizationId, toast])
 
   async function handleSave() {
-    if (orgStatus === "ready" && organizationId?.trim()) {
-      try {
-        const res = await fetch(
-          `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/certificate-release-default`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ portal_certificate_release_mode: certificateReleaseMode }),
-          },
-        )
-        const errBody = (await res.json().catch(() => ({}))) as { error?: string }
-        if (!res.ok) {
-          toast({
-            variant: "destructive",
-            title: "Could not save certificate release default",
-            description: errBody.error ?? res.statusText,
-          })
-          return
-        }
+    if (orgStatus !== "ready" || !organizationId?.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Workspace not ready",
+        description: "Select a workspace and wait for it to load before saving.",
+      })
+      return
+    }
 
-        if (canEditPortalSettings && !consolidatedSchemaPending) {
-          const res2 = await fetch(
-            `/api/organizations/${encodeURIComponent(organizationId.trim())}/portal/consolidated-documents-default`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                portal_consolidated_documents_default: consolidatedDocumentsDefault,
-              }),
-            },
-          )
-          const err2 = (await res2.json().catch(() => ({}))) as { error?: string }
-          if (!res2.ok) {
-            toast({
-              variant: "destructive",
-              title: "Could not save consolidated document setting",
-              description: err2.error ?? res2.statusText,
-            })
-            return
-          }
-        }
-      } catch (e) {
+    const oid = organizationId.trim()
+    const savedBits: string[] = []
+
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(oid)}/portal/certificate-release-default`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ portal_certificate_release_mode: certificateReleaseMode }),
+      })
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
         toast({
           variant: "destructive",
-          title: "Could not save portal settings",
-          description: e instanceof Error ? e.message : String(e),
+          title: "Could not save certificate release default",
+          description: errBody.error ?? res.statusText,
         })
         return
       }
-    }
+      savedBits.push("Certificate release default")
 
-    setSaved(true)
-    toast({
-      title: "Settings saved",
-      description:
-        organizationId?.trim() && orgStatus === "ready"
-          ? "Portal defaults were updated."
-          : "Display preferences updated locally.",
-    })
-    setTimeout(() => setSaved(false), 2500)
+      if (canEditPortalSettings && !consolidatedSchemaPending) {
+        const res2 = await fetch(`/api/organizations/${encodeURIComponent(oid)}/portal/consolidated-documents-default`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            portal_consolidated_documents_default: consolidatedDocumentsDefault,
+          }),
+        })
+        const err2 = (await res2.json().catch(() => ({}))) as { error?: string }
+        if (!res2.ok) {
+          toast({
+            variant: "destructive",
+            title: "Could not save consolidated document setting",
+            description: err2.error ?? res2.statusText,
+          })
+          return
+        }
+        savedBits.push("Consolidated document library default")
+      } else if (consolidatedSchemaPending) {
+        savedBits.push("Consolidated documents skipped (migration pending)")
+      }
+
+      setSaved(true)
+      toast({
+        title: "Portal defaults saved",
+        description: savedBits.join(". ") + ".",
+      })
+      setTimeout(() => setSaved(false), 2500)
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Could not save portal settings",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
   }
 
   return (
@@ -362,7 +324,11 @@ export default function PortalSettingsPage() {
         <div>
           <h1 className="text-base font-semibold text-foreground">Customer Portal</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Configure the global defaults for your customer-facing portal.
+            Workspace defaults for certificates, document library rollup, and activity. Branding is managed under{" "}
+            <Link href="/settings/workspace" className="underline underline-offset-2 hover:text-foreground">
+              Workspace
+            </Link>
+            .
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -375,57 +341,44 @@ export default function PortalSettingsPage() {
           >
             <Eye size={13} /> Preview Portal
           </Button>
-          <Button size="sm" className="gap-1.5 text-xs" onClick={handleSave}>
+          <Button
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={handleSave}
+            disabled={
+              permStatus !== "ready" ||
+              !canEditPortalSettings ||
+              orgStatus !== "ready" ||
+              !organizationId?.trim()
+            }
+          >
             {saved ? <><Check size={13} /> Saved</> : <><Save size={13} /> Save Changes</>}
           </Button>
         </div>
       </div>
 
-      {/* Branding */}
+      {/* Branding — source of truth is Workspace settings (shared with portal + preview). */}
       <SectionCard
         title="Branding"
-        description="Customize how the portal looks for your customers."
+        description="Logo and accent color apply to the customer portal header and staff preview. They are not edited on this page."
         icon={Paintbrush}
       >
-        <FieldRow label="Portal Name" description="Shown in the browser tab and email subject lines.">
-          <Input value={portalName} onChange={(e) => setPortalName(e.target.value)} className="text-xs h-8" />
-        </FieldRow>
-        <FieldRow label="Brand Color" description="Primary color used for buttons and accents.">
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-              className="w-8 h-8 rounded cursor-pointer border border-border p-0.5 bg-background"
-            />
-            <Input
-              value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-              className="text-xs h-8 font-mono"
-              maxLength={7}
-            />
-          </div>
-        </FieldRow>
-        <FieldRow label="Logo" description="Displayed at the top of the portal. PNG or SVG, max 2 MB.">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs w-full"
-            onClick={() => setLogoUploaded(true)}
-          >
-            {logoUploaded ? <><Check size={12} className="text-[color:var(--status-success)]" /> Logo uploaded</> : <><Upload size={12} /> Upload Logo</>}
-          </Button>
-        </FieldRow>
-        <FieldRow label="Favicon" description="Small icon shown in browser tabs.">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs w-full"
-            onClick={() => setFaviconUploaded(true)}
-          >
-            {faviconUploaded ? <><Check size={12} className="text-[color:var(--status-success)]" /> Favicon uploaded</> : <><Upload size={12} /> Upload Favicon</>}
-          </Button>
-        </FieldRow>
+        <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-xs leading-relaxed text-muted-foreground space-y-2">
+          <p>
+            <span className="font-medium text-foreground">Workspace name:</span>{" "}
+            {organizationName?.trim() ? organizationName : "—"}{" "}
+            <span className="text-muted-foreground">(from your workspace profile)</span>
+          </p>
+          <p>
+            Upload the <strong className="text-foreground">workspace logo</strong> and{" "}
+            <strong className="text-foreground">document logo</strong>, and set the{" "}
+            <strong className="text-foreground">primary color</strong>, under{" "}
+            <Link href="/settings/workspace" className="text-foreground underline underline-offset-2">
+              Settings → Workspace
+            </Link>
+            . The portal reuses the same assets as invoices and the app sidebar.
+          </p>
+        </div>
       </SectionCard>
 
       {/* Certificate portal release (persisted) */}
@@ -446,7 +399,13 @@ export default function PortalSettingsPage() {
                   e.target.value as "immediate_release" | "release_on_payment" | "manual_release" | "internal_only",
                 )
               }
-              disabled={certificateReleaseLoading || orgStatus !== "ready" || !organizationId?.trim()}
+              disabled={
+                permStatus !== "ready" ||
+                !canEditPortalSettings ||
+                certificateReleaseLoading ||
+                orgStatus !== "ready" ||
+                !organizationId?.trim()
+              }
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground"
               aria-label="Default certificate release mode"
             >
@@ -608,142 +567,68 @@ export default function PortalSettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Portal Modules */}
+      {/* Portal navigation — not gated by persisted module flags yet */}
       <SectionCard
-        title="Portal Modules"
-        description="Control which features are available to customers by default. These can be overridden per customer."
+        title="Portal modules"
+        description="Per-feature visibility for customers is planned; toggles are not stored yet."
         icon={LayoutGrid}
       >
-        <div className="divide-y divide-border/60">
-          {MODULE_OPTIONS.map(({ key, label, description }) => (
-            <div
-              key={key}
-              className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground">{label}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p>
-              </div>
-              <div className="flex shrink-0 items-center self-center">
-                <Toggle
-                  checked={Boolean(modules[key])}
-                  onChange={(v) => setModules((m) => ({ ...m, [key]: v }))}
-                />
-              </div>
-            </div>
-          ))}
+        <div className="flex gap-3 rounded-lg border border-border bg-muted/15 px-4 py-3">
+          <Info className="shrink-0 text-muted-foreground mt-0.5" size={16} aria-hidden />
+          <div className="text-xs text-muted-foreground leading-relaxed space-y-2">
+            <p>
+              The live portal and staff preview still show standard sections (overview, requests, equipment, work orders,
+              maintenance, invoices, quotes, documents, reports, certificates, etc.) according to{" "}
+              <strong className="text-foreground">data access and release rules</strong>, not module switches on this page.
+            </p>
+            <p>
+              When per-customer or workspace module defaults ship, they will persist here. The propagation matrix lives in{" "}
+              <code className="text-[11px] bg-muted px-1 py-0.5 rounded">docs/PORTAL_SETTINGS_PROPAGATION.md</code> in the
+              repository.
+            </p>
+          </div>
         </div>
       </SectionCard>
 
-      {/* Login Page Settings */}
       <SectionCard
-        title="Login Page"
-        description="Customize the text customers see when they log in."
+        title="Login & session"
+        description="How customers sign in today — advanced customization is not configurable here yet."
         icon={LogIn}
       >
-        <FieldRow label="Welcome Title" description="Headline shown above the login form.">
-          <Input value={welcomeTitle} onChange={(e) => setWelcomeTitle(e.target.value)} className="text-xs h-8" />
-        </FieldRow>
-        <FieldRow label="Welcome Message" description="Short description shown below the title.">
-          <textarea
-            value={welcomeBody}
-            onChange={(e) => setWelcomeBody(e.target.value)}
-            rows={3}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none"
-          />
-        </FieldRow>
-        <FieldRow label="Support Email" description="Shown as a help link on the login page.">
-          <Input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} className="text-xs h-8" type="email" />
-        </FieldRow>
-        <FieldRow label="Login Method" description="How customers authenticate into the portal.">
-          <div className="space-y-1.5">
-            {LOGIN_OPTIONS.map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="loginMethod"
-                  value={value}
-                  checked={loginMethod === value}
-                  onChange={() => setLoginMethod(value)}
-                  className="accent-primary"
-                />
-                <span className="text-xs text-foreground">{label}</span>
-              </label>
-            ))}
-          </div>
-        </FieldRow>
-        <FieldRow label="Session Duration" description="How many days before customers must re-authenticate.">
-          <div className="flex items-center gap-2">
-            <Input
-              value={sessionDays}
-              onChange={(e) => setSessionDays(e.target.value)}
-              className="text-xs h-8 w-20"
-              type="number"
-              min="1"
-              max="365"
-            />
-            <span className="text-xs text-muted-foreground">days</span>
-          </div>
-        </FieldRow>
-      </SectionCard>
-
-      {/* Email Templates */}
-      <SectionCard
-        title="Email Templates"
-        description="Customize the automated emails sent to customers via the portal."
-        icon={Mail}
-      >
-        <div className="space-y-0">
-          {EMAIL_TEMPLATES.map(({ key, label, description }) => (
-            <FieldRow key={key} label={label} description={description}>
-              <Button variant="outline" size="sm" className="text-xs w-full gap-1.5">
-                Edit Template
-              </Button>
-            </FieldRow>
-          ))}
+        <div className="rounded-lg border border-border bg-muted/15 px-4 py-3 text-xs text-muted-foreground leading-relaxed space-y-2">
+          <p>
+            Customers use <strong className="text-foreground">magic-link email</strong> sign-in. Welcome copy, support
+            email, password login, and configurable session length are <strong className="text-foreground">not stored</strong>{" "}
+            from this screen.
+          </p>
+          <p>
+            Optional <code className="text-[11px] bg-muted px-1 py-0.5 rounded">?organizationId=</code> on the login URL
+            loads public branding accent only (no secrets). See{" "}
+            <code className="text-[11px]">/api/portal/public-branding</code>.
+          </p>
         </div>
       </SectionCard>
 
-      {/* Custom Domain */}
       <SectionCard
-        title="Custom Domain"
-        description="Serve the portal from your own domain (e.g. portal.yourcompany.com)."
+        title="Email templates"
+        description="Staff-editable portal email bodies are not wired yet."
+        icon={Mail}
+      >
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Invite, magic login, work order, invoice, and quote emails use system templates. Per-workspace editors are{" "}
+          <strong className="text-foreground">coming soon</strong>.
+        </p>
+      </SectionCard>
+
+      <SectionCard
+        title="Custom domain"
+        description="Serving the portal from your own hostname is not available yet."
         icon={Link2}
       >
-        <FieldRow label="Domain" description="Add a CNAME record pointing to portal.equipify.ai to verify.">
-          <div className="flex items-center gap-2">
-            <Input
-              value={customDomain}
-              onChange={(e) => setCustomDomain(e.target.value)}
-              placeholder="portal.yourcompany.com"
-              className="text-xs h-8"
-            />
-          </div>
-        </FieldRow>
-        <FieldRow label="Status" description="DNS propagation can take up to 48 hours.">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "w-2 h-2 rounded-full shrink-0",
-              domainVerified ? "bg-[color:var(--status-success)]" : "bg-muted-foreground/40"
-            )} />
-            <span className="text-xs text-muted-foreground">
-              {customDomain
-                ? domainVerified ? "Verified" : "Pending verification"
-                : "No domain configured"}
-            </span>
-            {customDomain && !domainVerified && (
-              <Button variant="outline" size="sm" className="text-xs h-6 px-2 ml-auto">
-                Verify
-              </Button>
-            )}
-          </div>
-        </FieldRow>
-        <FieldRow label="Default URL" description="Used when no custom domain is set.">
-          <div className="flex items-center gap-2">
-            <Globe size={12} className="text-muted-foreground shrink-0" />
-            <code className="text-xs text-muted-foreground font-mono">portal.equipify.ai/acme-corp</code>
-          </div>
-        </FieldRow>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Customers use the shared Equipify portal URL. Vanity domains and DNS verification are{" "}
+          <strong className="text-foreground">planned</strong> — there is nothing to configure here today.
+        </p>
       </SectionCard>
     </div>
   )

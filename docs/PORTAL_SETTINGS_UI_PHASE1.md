@@ -1,5 +1,7 @@
 # Portal Settings UI — Phase 1
 
+> **Propagation:** For which controls persist and how they reach the real portal vs preview, see **`PORTAL_SETTINGS_PROPAGATION.md`** (Phase 56.2).
+
 ## Summary
 
 Staff-facing controls for **consolidated portal document access** (parent-account

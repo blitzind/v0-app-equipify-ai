@@ -51,3 +51,7 @@ Preview **does not** bypass tenant isolation: invalid `organizationId` / `custom
 ## Phase 56.1B (real portal accent parity)
 
 Authenticated customers and staff preview now share the same accent variable pipeline; remaining differences are mostly **which route** supplies the hex (bootstrap vs server-rendered org row) and **login** (optional `organizationId` query only).
+
+## Phase 56.2 (settings propagation audit)
+
+Staff **Settings → Customer Portal** only **persists** certificate release default and consolidated document default on **Save**; branding is edited under **Settings → Workspace**. See **`docs/PORTAL_SETTINGS_PROPAGATION.md`** for the full setting matrix and manual checklist.
