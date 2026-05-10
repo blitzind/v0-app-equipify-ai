@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 206,
-  sqlMigrations: 139,
+  apiRouteHandlers: 207,
+  sqlMigrations: 140,
   dashboardPages: 59,
-  componentsTsx: 222,
-  libTsFiles: 409,
+  componentsTsx: 223,
+  libTsFiles: 410,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **206** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **139** |
+| API route handlers (\`app/api/**/route.ts\`) | **207** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **140** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
-| \`components/**/*.tsx\` | **222** |
-| \`lib/**/*.ts\` | **409** |
+| \`components/**/*.tsx\` | **223** |
+| \`lib/**/*.ts\` | **410** |
 
 ### Vercel crons
 
@@ -227,6 +227,7 @@ portal/maintenance/route.ts
 portal/preview/start/route.ts
 portal/public-branding/route.ts
 portal/quotes/[quoteId]/approve/route.ts
+portal/quotes/[quoteId]/decline/route.ts
 portal/quotes/route.ts
 portal/service-requests/route.ts
 portal/session/logout/route.ts

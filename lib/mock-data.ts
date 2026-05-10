@@ -1592,6 +1592,10 @@ export interface AdminQuote {
   internalNotes?: string
   /** Soft-archived quote (hidden from default lists). */
   isArchived?: boolean
+  /** ISO timestamp when the customer last approved or declined via portal (Phase 37). */
+  customerPortalDecisionAt?: string | null
+  /** Customer message from portal (e.g. decline reason); staff notes stay in `notes`. */
+  portalCustomerNote?: string | null
 }
 
 export const adminQuotes: AdminQuote[] = [

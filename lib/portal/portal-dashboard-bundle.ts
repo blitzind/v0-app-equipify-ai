@@ -156,13 +156,16 @@ export async function fetchPortalDashboardBundle(
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("status", "sent"),
+      .is("archived_at", null)
+      .in("status", ["sent", "pending_approval"]),
     svc
       .from("org_quotes")
       .select("id, quote_number, title, amount_cents, status")
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
-      .eq("status", "sent")
+      .is("archived_at", null)
+      .in("status", ["sent", "pending_approval"])
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     svc

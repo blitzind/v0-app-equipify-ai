@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, type ReactNode } from "react"
 import Link from "next/link"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { useInvoices, useQuotes } from "@/lib/quote-invoice-store"
+import { quoteUiAwaitingCustomerDecision } from "@/lib/org-quotes-invoices/quote-approval"
 import type { AdminQuote, QuoteStatus } from "@/lib/mock-data"
 import { enforceCanCreateRecord } from "@/app/actions/org-create-enforcement"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -539,7 +540,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const { standardCreateEligibility } = useBillingAccess()
   const { canArchiveRestore } = useOrgArchivePermissions()
   const { quotes, updateQuote, archiveQuote, restoreQuote, refreshQuotes } = useQuotes()
-  const { addInvoiceFromPayload } = useInvoices()
+  const { addInvoiceFromPayload, invoices } = useInvoices()
   // Phase 2 (Permissions): hide quote mutation actions for non-edit roles.
   const { permissions: quoteOrgPermissions } = useOrgPermissions()
   const canEditQuotes = quoteOrgPermissions.canEditQuotes
@@ -559,6 +560,11 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
+
+  const linkedInvoice = useMemo(() => {
+    if (!quote) return null
+    return invoices.find((inv) => inv.quoteId === quote.id && !inv.isArchived) ?? null
+  }, [invoices, quote])
 
   const { workspace } = useTenant()
   const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
@@ -929,13 +935,32 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     quote.status !== "Expired"
 
   const currentStatus = (draft.status ?? quote.status) as QuoteStatus
-  const alreadySent = quote.status === "Sent" || Boolean(quote.sentDate)
+  const alreadySent =
+    quote.status === "Sent" || quote.status === "Pending Approval" || Boolean(quote.sentDate)
+
+  const portalDecisionLabel = quote.customerPortalDecisionAt
+    ? fmtDate(quote.customerPortalDecisionAt.slice(0, 10))
+    : null
 
   const timelineItems = [
     { date: fmtDate(quote.createdDate), label: "Quote created", description: `Created by ${quote.createdBy}`, accent: "muted" as const },
     ...(quote.sentDate ? [{ date: fmtDate(quote.sentDate), label: "Quote sent to customer", accent: "muted" as const }] : []),
-    ...(currentStatus === "Approved" ? [{ date: "—", label: "Customer approved quote", accent: "success" as const }] : []),
-    ...(currentStatus === "Declined" ? [{ date: "—", label: "Customer declined quote", accent: "danger" as const }] : []),
+    ...(currentStatus === "Approved" ?
+      [{
+        date: portalDecisionLabel ?? "—",
+        label: "Customer approved quote",
+        description: portalDecisionLabel ? "Recorded from portal or updated by your team" : undefined,
+        accent: "success" as const,
+      }]
+    : []),
+    ...(currentStatus === "Declined" ?
+      [{
+        date: portalDecisionLabel ?? "—",
+        label: "Customer declined quote",
+        description: quote.portalCustomerNote?.trim() || undefined,
+        accent: "danger" as const,
+      }]
+    : []),
     ...(currentStatus === "Expired" ? [{ date: fmtDate(quote.expiresDate), label: "Quote expired", accent: "danger" as const }] : []),
   ]
 
@@ -1001,7 +1026,9 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer" onClick={startEdit}>
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
-              {(quote.status === "Draft" || quote.status === "Sent") && (
+              {(quote.status === "Draft" ||
+                quote.status === "Sent" ||
+                quote.status === "Pending Approval") && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -1081,6 +1108,33 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
           )}
 
           <DrawerSection title="Quote Details">
+            <div className={cn(DRAWER_NESTED_CARD, "mb-3 flex flex-wrap gap-2 p-3")}>
+              {quoteUiAwaitingCustomerDecision(quote.status) ? (
+                <Badge variant="outline" className="text-[10px] font-semibold border-[color:var(--status-warning)]/40 bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)]">
+                  Awaiting customer decision
+                </Badge>
+              ) : null}
+              {quote.status === "Approved" && !quote.workOrderId && quote.equipmentId ? (
+                <Badge variant="outline" className="text-[10px] font-semibold border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100">
+                  Ready — create work order
+                </Badge>
+              ) : null}
+              {quote.status === "Approved" && quote.workOrderId ? (
+                <Badge variant="outline" className="text-[10px] font-semibold border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100">
+                  Work order linked
+                </Badge>
+              ) : null}
+              {quote.status === "Approved" && linkedInvoice ? (
+                <Badge variant="outline" className="text-[10px] font-semibold border-violet-500/30 bg-violet-500/10 text-violet-900 dark:text-violet-100">
+                  Invoice linked
+                </Badge>
+              ) : null}
+              {quote.status === "Approved" && !linkedInvoice && canEditQuotes ? (
+                <Badge variant="outline" className="text-[10px] font-semibold border-border text-muted-foreground">
+                  Ready — convert to invoice when billing
+                </Badge>
+              ) : null}
+            </div>
             <div className={cn(DRAWER_NESTED_CARD, "p-4 space-y-1")}>
               <DrawerRow label="Customer" value={
                 <Link href={`/customers?open=${quote.customerId}`} className="text-primary hover:underline cursor-pointer font-medium">
@@ -1125,6 +1179,35 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               )}
             </div>
           </DrawerSection>
+
+          {quote.customerPortalDecisionAt || quote.portalCustomerNote?.trim() ? (
+            <DrawerSection title="Customer approval (portal)">
+              <div className={cn(DRAWER_NESTED_CARD, "space-y-3 p-4 text-sm")}>
+                {quote.customerPortalDecisionAt ? (
+                  <DrawerRow
+                    label="Portal decision time"
+                    value={new Date(quote.customerPortalDecisionAt).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  />
+                ) : null}
+                {quote.portalCustomerNote?.trim() ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Customer message
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+                      {quote.portalCustomerNote}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </DrawerSection>
+          ) : null}
 
           <DrawerSection title="Description">
             <div className={cn(DRAWER_NESTED_CARD, "p-4")}>

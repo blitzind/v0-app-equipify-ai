@@ -8,8 +8,10 @@ export const runtime = "nodejs"
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const MAX_NOTE = 2000
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ quoteId: string }> },
 ) {
   const ctx = await requirePortalSession()
@@ -20,8 +22,18 @@ export async function POST(
     return NextResponse.json({ error: "Invalid quote id." }, { status: 400 })
   }
 
-  const { svc, portalUser } = ctx
+  let note: string | null = null
+  try {
+    const body = (await request.json().catch(() => ({}))) as { note?: unknown }
+    if (typeof body.note === "string") {
+      const t = body.note.trim()
+      note = t.length > 0 ? t.slice(0, MAX_NOTE) : null
+    }
+  } catch {
+    note = null
+  }
 
+  const { svc, portalUser } = ctx
   const todayYmd = new Date().toISOString().slice(0, 10)
 
   const { data: row, error } = await svc
@@ -45,23 +57,20 @@ export async function POST(
 
   const st = row.status as string
   if (!isPortalQuoteCustomerActionableDb(st)) {
-    return NextResponse.json({ error: "This quote cannot be approved in its current state." }, { status: 409 })
+    return NextResponse.json({ error: "This quote cannot be declined in its current state." }, { status: 409 })
   }
 
-  if (st === "expired" || quotePastExpirationYmd(row.expires_at as string | null, todayYmd)) {
-    return NextResponse.json(
-      { error: "This quote has expired. Contact your service provider for a new estimate." },
-      { status: 409 },
-    )
+  if (quotePastExpirationYmd(row.expires_at as string | null, todayYmd)) {
+    return NextResponse.json({ error: "This quote has expired. Contact your service provider for a new estimate." }, { status: 409 })
   }
 
   const decidedAt = new Date().toISOString()
   const { error: upErr } = await svc
     .from("org_quotes")
     .update({
-      status: "approved",
+      status: "declined",
       customer_portal_decision_at: decidedAt,
-      portal_customer_note: null,
+      portal_customer_note: note,
     })
     .eq("organization_id", portalUser.organization_id)
     .eq("id", quoteId)
@@ -74,8 +83,8 @@ export async function POST(
   await logPortalActivity(svc, {
     organizationId: portalUser.organization_id,
     portalUserId: portalUser.id,
-    action: "quote_approved",
-    path: `/api/portal/quotes/${quoteId}/approve`,
+    action: "quote_declined",
+    path: `/api/portal/quotes/${quoteId}/decline`,
     resourceType: "org_quote",
     resourceId: quoteId,
     ip: meta.ip,

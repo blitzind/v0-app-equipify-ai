@@ -20,6 +20,8 @@ export type OrgQuoteRow = {
   internal_notes: string | null
   sent_at: string | null
   archived_at: string | null
+  portal_customer_note?: string | null
+  customer_portal_decision_at?: string | null
   archived_by?: string | null
   archive_reason?: string | null
 }
@@ -230,6 +232,8 @@ export function mapOrgQuoteToAdmin(
     notes: row.notes ?? "",
     internalNotes: row.internal_notes?.trim() ? row.internal_notes : undefined,
     isArchived: rowIsArchived(row.archived_at),
+    customerPortalDecisionAt: row.customer_portal_decision_at ?? null,
+    portalCustomerNote: row.portal_customer_note?.trim() ? row.portal_customer_note.trim() : null,
   }
 }
 

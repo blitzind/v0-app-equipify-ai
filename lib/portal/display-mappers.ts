@@ -56,15 +56,7 @@ export function mapInvoiceStatus(db: string): string {
   return m[db] ?? db
 }
 
-export function mapQuoteStatus(db: string): string {
-  const m: Record<string, string> = {
-    draft: "Draft",
-    sent: "Pending Approval",
-    approved: "Approved",
-    declined: "Declined",
-  }
-  return m[db] ?? db
-}
+export { mapQuoteStatusForPortal as mapQuoteStatus } from "@/lib/org-quotes-invoices/quote-approval"
 
 export function mapMaintenancePlanStatus(db: string): string {
   const m: Record<string, string> = {

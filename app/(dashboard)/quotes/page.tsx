@@ -18,13 +18,14 @@ import { Card } from "@/components/ui/card"
 import { ViewToggle } from "@/components/ui/view-toggle"
 import {
   Search, Plus, ArrowUpDown, ChevronRight,
-  FileText, Clock, CheckCircle2, XCircle, Send, FilePen, Ban, Building2,
+  FileText, Clock, CheckCircle2, Send, Building2,
 } from "lucide-react"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { QuoteDrawer } from "@/components/drawers/quote-drawer"
 import { getWorkOrderDisplay, workOrderMatchesSearch } from "@/lib/work-orders/display"
 import { NewQuoteModal } from "@/components/quotes/new-quote-modal"
+import { QuoteApprovalStatusBadge } from "@/components/quotes/quote-approval-status-badge"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -49,32 +50,50 @@ function quoteDisplayId(q: AdminQuote) {
   return q.quoteNumber?.trim() || "Quote"
 }
 
-// ─── Status config ────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<QuoteStatus, { label: string; className: string; icon: React.ElementType }> = {
-  "Draft":            { label: "Draft",            className: "bg-muted text-muted-foreground border-border",                                               icon: FilePen },
-  "Sent":             { label: "Sent",             className: "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",         icon: Send },
-  "Pending Approval": { label: "Pending Approval", className: "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30", icon: Clock },
-  "Approved":         { label: "Approved",         className: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30", icon: CheckCircle2 },
-  "Declined":         { label: "Declined",         className: "bg-destructive/10 text-destructive border-destructive/30",                                  icon: XCircle },
-  "Expired":          { label: "Expired",          className: "bg-muted text-muted-foreground border-border",                                               icon: Ban },
-}
-
 const ALL_STATUSES: QuoteStatus[] = ["Draft", "Sent", "Pending Approval", "Approved", "Declined", "Expired"]
 
 // ─── Stat Cards ───────────────────────────────────────────────────────────────
 
 function QuoteStatCards({ quotes }: { quotes: AdminQuote[] }) {
-  const pending  = quotes.filter(q => q.status === "Pending Approval").length
-  const approved = quotes.filter(q => q.status === "Approved").length
-  const pendingValue = quotes.filter(q => q.status === "Pending Approval").reduce((s, q) => s + q.amount, 0)
-  const totalValue   = quotes.filter(q => q.status === "Approved").reduce((s, q) => s + q.amount, 0)
+  const awaitingCustomer = quotes.filter((q) => q.status === "Sent" || q.status === "Pending Approval")
+  const awaitingCount = awaitingCustomer.length
+  const awaitingValue = awaitingCustomer.reduce((s, q) => s + q.amount, 0)
+  const approved = quotes.filter((q) => q.status === "Approved").length
+  const approvedValue = quotes.filter((q) => q.status === "Approved").reduce((s, q) => s + q.amount, 0)
 
   const stats = [
-    { label: "Pending Approval", value: String(pending),           sub: `${fmtCurrency(pendingValue)} at stake`,   icon: Clock,         accent: "text-[color:var(--status-warning)]", bg: "bg-[color:var(--status-warning)]/10" },
-    { label: "Approved",         value: String(approved),          sub: `${fmtCurrency(totalValue)} approved`,     icon: CheckCircle2,  accent: "text-[color:var(--status-success)]", bg: "bg-[color:var(--status-success)]/10" },
-    { label: "Total Quotes",     value: String(quotes.length),     sub: "all time",                                icon: FileText,      accent: "text-primary",                       bg: "bg-primary/10" },
-    { label: "Open Value",       value: fmtCurrency(pendingValue), sub: "awaiting customer decision",             icon: Send,          accent: "text-[color:var(--status-info)]",    bg: "bg-[color:var(--status-info)]/10" },
+    {
+      label: "Awaiting customer",
+      value: String(awaitingCount),
+      sub: `${fmtCurrency(awaitingValue)} pending response`,
+      icon: Clock,
+      accent: "text-[color:var(--status-warning)]",
+      bg: "bg-[color:var(--status-warning)]/10",
+    },
+    {
+      label: "Approved",
+      value: String(approved),
+      sub: `${fmtCurrency(approvedValue)} approved`,
+      icon: CheckCircle2,
+      accent: "text-[color:var(--status-success)]",
+      bg: "bg-[color:var(--status-success)]/10",
+    },
+    {
+      label: "Total quotes",
+      value: String(quotes.length),
+      sub: "All active records in view",
+      icon: FileText,
+      accent: "text-primary",
+      bg: "bg-primary/10",
+    },
+    {
+      label: "Pipeline value",
+      value: fmtCurrency(awaitingValue),
+      sub: "Sent + pending approval",
+      icon: Send,
+      accent: "text-[color:var(--status-info)]",
+      bg: "bg-[color:var(--status-info)]/10",
+    },
   ]
 
   return (
@@ -92,17 +111,6 @@ function QuoteStatCards({ quotes }: { quotes: AdminQuote[] }) {
         </div>
       ))}
     </div>
-  )
-}
-
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: QuoteStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1", cfg.className)}>
-      {status}
-    </Badge>
   )
 }
 
@@ -289,8 +297,9 @@ function QuotesPageInner() {
     else { setSortKey(key); setSortDir("asc") }
   }
 
-  const pendingApproval = filtered.filter(q => q.status === "Pending Approval")
-  const others          = filtered.filter(q => q.status !== "Pending Approval")
+  const awaitingCustomerQuotes = filtered.filter(
+    (q) => q.status === "Sent" || q.status === "Pending Approval",
+  )
 
   if (!canViewQuotes) {
     return (
@@ -387,13 +396,17 @@ function QuotesPageInner() {
       </p>
 
       {/* Pending approval callout */}
-      {statusFilter === "all" && pendingApproval.length > 0 && (
+      {statusFilter === "all" && awaitingCustomerQuotes.length > 0 && (
         <div className="rounded-xl border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/5 px-4 py-3 flex items-center gap-3">
           <Clock className="w-4 h-4 text-[color:var(--status-warning)] shrink-0" />
           <p className="text-sm font-medium text-foreground">
-            <span className="text-[color:var(--status-warning)] font-semibold">{pendingApproval.length} quote{pendingApproval.length !== 1 ? "s" : ""}</span>{" "}
-            awaiting customer approval — total value{" "}
-            <span className="font-semibold">{fmtCurrency(pendingApproval.reduce((s, q) => s + q.amount, 0))}</span>
+            <span className="text-[color:var(--status-warning)] font-semibold">
+              {awaitingCustomerQuotes.length} quote{awaitingCustomerQuotes.length !== 1 ? "s" : ""}
+            </span>{" "}
+            awaiting a customer decision (sent or pending approval) — total value{" "}
+            <span className="font-semibold">
+              {fmtCurrency(awaitingCustomerQuotes.reduce((s, q) => s + q.amount, 0))}
+            </span>
           </p>
         </div>
       )}
@@ -404,8 +417,6 @@ function QuotesPageInner() {
           {filtered.length === 0 ? (
             <div className="col-span-full text-center py-16 text-muted-foreground text-sm">No quotes match the current filters.</div>
           ) : filtered.map(qt => {
-            const cfg = STATUS_CONFIG[qt.status]
-            const StatusIcon = cfg.icon
             return (
               <div
                 key={qt.id}
@@ -418,10 +429,7 @@ function QuotesPageInner() {
                     <p className="text-sm font-semibold text-foreground mt-0.5 truncate max-w-[200px]">{qt.customerName}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1 justify-end">
-                    <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 shrink-0", cfg.className)}>
-                      <StatusIcon className="w-3 h-3" />
-                      {qt.status}
-                    </Badge>
+                    <QuoteApprovalStatusBadge status={qt.status} showIcon className="shrink-0" />
                     {qt.isArchived ? (
                       <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
                         Archived
@@ -527,7 +535,7 @@ function QuotesPageInner() {
                     <TableCell className="text-sm font-semibold text-foreground ds-tabular">{fmtCurrency(qt.amount)}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
-                        <StatusBadge status={qt.status} />
+                        <QuoteApprovalStatusBadge status={qt.status} />
                         {qt.isArchived ? (
                           <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
                             Archived
