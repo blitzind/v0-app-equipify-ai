@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 218,
-  sqlMigrations: 143,
+  apiRouteHandlers: 222,
+  sqlMigrations: 144,
   dashboardPages: 59,
-  componentsTsx: 236,
-  libTsFiles: 431,
+  componentsTsx: 237,
+  libTsFiles: 438,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **218** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **143** |
+| API route handlers (\`app/api/**/route.ts\`) | **222** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **144** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
-| \`components/**/*.tsx\` | **236** |
-| \`lib/**/*.ts\` | **431** |
+| \`components/**/*.tsx\` | **237** |
+| \`lib/**/*.ts\` | **438** |
 
 ### Vercel crons
 
@@ -128,6 +128,10 @@ organizations/[organizationId]/follow-up-tasks/stats/route.ts
 organizations/[organizationId]/integrations/quickbooks/apply-inbound-paid/route.ts
 organizations/[organizationId]/integrations/quickbooks/invoice-auto-sync/route.ts
 organizations/[organizationId]/integrations/quickbooks/route.ts
+organizations/[organizationId]/internal-notification-rules/[ruleId]/route.ts
+organizations/[organizationId]/internal-notification-rules/route.ts
+organizations/[organizationId]/internal-notifications/candidates/route.ts
+organizations/[organizationId]/internal-notifications/log/route.ts
 organizations/[organizationId]/inventory/adjust/route.ts
 organizations/[organizationId]/inventory/allocate/route.ts
 organizations/[organizationId]/inventory/consume/route.ts

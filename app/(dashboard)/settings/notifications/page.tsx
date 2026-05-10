@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
+import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
+import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -101,6 +103,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
+  const { organizationId, status: orgStatus } = useActiveOrganization()
   const [prefs, setPrefs] = useState<NotifPreference[]>(INITIAL_PREFS)
   const [saved, setSaved] = useState(false)
   const [digestEmail, setDigestEmail] = useState(true)
@@ -263,6 +266,11 @@ export default function NotificationsPage() {
           <span className="text-xs text-muted-foreground">(your local time)</span>
         </div>
       </div>
+
+      {/* Phase 48 — internal escalation rules (workspace managers edit; all staff preview within scope) */}
+      {orgStatus === "ready" && organizationId ?
+        <InternalEscalationRulesPanel organizationId={organizationId} />
+      : null}
 
       {/* AI Ops daily digest (Phase 3 — internal staff only) */}
       <AiOpsDigestSettingsCard />
