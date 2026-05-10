@@ -15,6 +15,7 @@ import {
   sanitizeProvisioningError,
   type ProvisioningErrorCode,
 } from "@/lib/onboarding/error-mapping"
+import { sendSignupProvisionEmailsIfNeeded } from "@/lib/email/signup-provision-emails"
 
 type Body = {
   organizationId?: string | null
@@ -347,6 +348,24 @@ export async function POST(request: Request) {
     }
   } else {
     logProvision("demo_seed_skipped", { organizationId, seedDemo })
+  }
+
+  // Welcome + internal notify (Phase 54.4): best-effort; never fails provisioning.
+  // Idempotent per org via Auth user_metadata; only when this user created the org (not invite/join).
+  try {
+    await sendSignupProvisionEmailsIfNeeded({
+      admin: svc,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      fullName,
+      organizationId,
+    })
+  } catch (e) {
+    logProvisionError("signup_emails_unexpected", {
+      organizationId,
+      userId: user.id,
+      detail: e instanceof Error ? e.message : String(e),
+    })
   }
 
   return NextResponse.json({
