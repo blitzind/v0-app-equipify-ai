@@ -4,10 +4,10 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 224,
+  apiRouteHandlers: 225,
   sqlMigrations: 145,
   dashboardPages: 59,
-  componentsTsx: 242,
+  componentsTsx: 243,
   libTsFiles: 456,
 } as const
 
@@ -17,10 +17,10 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **224** |
+| API route handlers (\`app/api/**/route.ts\`) | **225** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **145** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
-| \`components/**/*.tsx\` | **242** |
+| \`components/**/*.tsx\` | **243** |
 | \`lib/**/*.ts\` | **456** |
 
 ### Vercel crons
@@ -113,6 +113,7 @@ organizations/[organizationId]/communications/suggestions/route.ts
 organizations/[organizationId]/communications/templates/[templateId]/route.ts
 organizations/[organizationId]/communications/templates/preview/route.ts
 organizations/[organizationId]/communications/templates/route.ts
+organizations/[organizationId]/customers/[customerId]/contact-email/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/[locationId]/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
 organizations/[organizationId]/customers/[customerId]/portal-certificate-release/route.ts

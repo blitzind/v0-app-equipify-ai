@@ -127,7 +127,10 @@ function formatLocationForMaps(loc: Customer["locations"][number]): string | und
   return s || undefined
 }
 
-function buildCustomerContactActionProps(c: Customer): Pick<ContactActionsProps, "address" | "email" | "phone"> {
+function buildCustomerContactActionProps(
+  c: Customer,
+  organizationId: string | null,
+): Pick<ContactActionsProps, "address" | "email" | "phone" | "equipify"> {
   const primaryLoc = c.locations[0]
   const address = primaryLoc ? formatLocationForMaps(primaryLoc) : undefined
   const emailAddr = c.contacts.map((ct) => ct.email).find((e) => e?.trim())
@@ -136,6 +139,14 @@ function buildCustomerContactActionProps(c: Customer): Pick<ContactActionsProps,
     address,
     email: emailAddr ? { customerName: c.company, customerEmail: emailAddr.trim() } : undefined,
     phone: phone?.trim(),
+    equipify: organizationId
+      ? {
+          organizationId,
+          customerId: c.id,
+          customerLabel: c.company,
+          defaultRecipientEmail: emailAddr?.trim(),
+        }
+      : undefined,
   }
 }
 
@@ -155,7 +166,15 @@ function StatusBadge({ status }: { status: Customer["status"] }) {
   )
 }
 
-function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => void }) {
+function CustomerCard({
+  customer,
+  onOpen,
+  organizationId,
+}: {
+  customer: Customer
+  onOpen: () => void
+  organizationId: string | null
+}) {
   return (
     <Card onClick={onOpen} className="hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer group">
         <CardContent className="p-5">
@@ -218,7 +237,7 @@ function CustomerCard({ customer, onOpen }: { customer: Customer; onOpen: () => 
 
           {/* Quick contact actions */}
           <div className="mt-4 pt-3 border-t border-border">
-            <ContactActions {...buildCustomerContactActionProps(customer)} />
+            <ContactActions {...buildCustomerContactActionProps(customer, organizationId)} />
           </div>
 
           <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
@@ -788,7 +807,7 @@ function CustomersPageInner() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="w-[200px] whitespace-nowrap">
                       <div className="flex justify-end">
-                        <ContactActions {...buildCustomerContactActionProps(c)} />
+                        <ContactActions {...buildCustomerContactActionProps(c, orgStatus === "ready" ? activeOrgId : null)} />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -808,7 +827,12 @@ function CustomersPageInner() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((c) => (
-                <CustomerCard key={c.id} customer={c} onOpen={() => openCustomerDrawer(c)} />
+                <CustomerCard
+                  key={c.id}
+                  customer={c}
+                  onOpen={() => openCustomerDrawer(c)}
+                  organizationId={orgStatus === "ready" ? activeOrgId : null}
+                />
               ))}
             </div>
           )}

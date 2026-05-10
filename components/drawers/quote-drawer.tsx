@@ -39,6 +39,7 @@ import {
   ThumbsDown, DollarSign, FileEdit, Loader2, Wrench, Archive, RotateCcw,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
+import { useCustomerOutboundEmails } from "@/hooks/use-customer-outbound-emails"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -560,6 +561,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
+
+  const { emails: quoteCustomerEmails } = useCustomerOutboundEmails(
+    orgStatus === "ready" ? activeOrgId : null,
+    quote?.customerId ?? null,
+  )
+  const quoteMailtoEmail = quoteCustomerEmails[0]
 
   const linkedInvoice = useMemo(() => {
     if (!quote) return null
@@ -1143,7 +1150,21 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               } />
               <div className="py-1">
                 <ContactActions
-                  email={{ customerName: quote.customerName }}
+                  email={
+                    quoteMailtoEmail
+                      ? { customerName: quote.customerName, customerEmail: quoteMailtoEmail }
+                      : undefined
+                  }
+                  equipify={
+                    orgStatus === "ready" && activeOrgId
+                      ? {
+                          organizationId: activeOrgId,
+                          customerId: quote.customerId,
+                          customerLabel: quote.customerName,
+                          defaultRecipientEmail: quoteMailtoEmail,
+                        }
+                      : undefined
+                  }
                 />
               </div>
               <DrawerRow

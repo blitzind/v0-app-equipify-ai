@@ -398,3 +398,24 @@ ${
     .join("\n")
   return { subject, html, text }
 }
+
+/** Ad-hoc staff → customer message from CRM contact surfaces (Phase 55.4). */
+export function buildCustomerStaffMessageEmailContent(args: {
+  organizationName: string
+  customerName: string
+  messagePlain: string
+  subject: string
+}): { subject: string; html: string; text: string } {
+  const subject =
+    args.subject.trim() || `Message from ${args.organizationName}`
+  const inner = `<p>Hello ${escapeHtml(args.customerName)},</p>${plainTextToHtml(args.messagePlain)}`
+  const html = wrapEquipifyEmail(args.organizationName, inner, undefined)
+  const text = [
+    `Hello ${args.customerName},`,
+    "",
+    args.messagePlain.trim(),
+    "",
+    `— ${args.organizationName}`,
+  ].join("\n")
+  return { subject, html, text }
+}

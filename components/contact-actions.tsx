@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { CustomerContactEmailDialog } from "@/components/customer-contact-email-dialog"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   MapPin, Mail, Phone, MessageSquare,
-  ExternalLink, Copy, Check, ChevronDown,
+  ExternalLink, Copy, Check, ChevronDown, Send,
 } from "lucide-react"
 
 // ─── URL builders ──────────────────────────────────────────────────────────────
@@ -148,50 +150,111 @@ function NavigateDropdown({ address }: { address: string }) {
   )
 }
 
-// ─── Email dropdown ────────────────────────────────────────────────────────────
+// ─── Email dropdown (mailto + optional Equipify send) ─────────────────────────
 
-function EmailDropdown({ params }: { params: ContactEmailParams }) {
-  const [open, setOpen] = useState(false)
+export type ContactEquipifyEmail = {
+  organizationId: string
+  customerId: string
+  customerLabel: string
+  defaultRecipientEmail?: string
+  contactId?: string | null
+}
+
+function EmailMenu({
+  mailto,
+  equipify,
+}: {
+  mailto?: ContactEmailParams
+  equipify?: ContactEquipifyEmail
+}) {
+  const perms = useOrgPermissions()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [equipifyOpen, setEquipifyOpen] = useState(false)
+
+  const hasMailto = Boolean(mailto?.customerEmail?.trim())
+  const canEquipify =
+    Boolean(equipify?.organizationId && equipify.customerId) &&
+    perms.status === "ready" &&
+    (perms.has("canManageCommunications") ||
+      perms.has("canEditWorkOrders") ||
+      perms.has("canEditInvoices"))
+
+  if (!hasMailto && !canEquipify) return null
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Email customer">
-          <TriggerBtn
-            label="Email"
-            icon={<Mail className="w-3.5 h-3.5 text-primary" />}
-            open={open}
-          />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={6} className="w-52 z-[200]">
-        <DropdownMenuItem asChild>
-          <a href={buildMailto(params, "appointment")} className="flex items-center gap-2.5 cursor-pointer">
-            <Mail className="w-3.5 h-3.5 text-primary shrink-0" />
-            Appointment Email
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a href={buildMailto(params, "reminder")} className="flex items-center gap-2.5 cursor-pointer">
-            <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            Reminder Email
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a href={buildMailto(params, "followup")} className="flex items-center gap-2.5 cursor-pointer">
-            <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            Follow-Up Email
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href={buildMailto(params, "custom")} className="flex items-center gap-2.5 cursor-pointer">
-            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            Custom Email
-          </a>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Email customer">
+            <TriggerBtn
+              label="Email"
+              icon={<Mail className="w-3.5 h-3.5 text-primary" />}
+              open={menuOpen}
+            />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" sideOffset={6} className="w-56 z-[200]">
+          {canEquipify ? (
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onSelect={(ev) => {
+                ev.preventDefault()
+                setMenuOpen(false)
+                setEquipifyOpen(true)
+              }}
+            >
+              <Send className="w-3.5 h-3.5 text-primary shrink-0" />
+              Send with Equipify…
+            </DropdownMenuItem>
+          ) : null}
+          {canEquipify && hasMailto ? <DropdownMenuSeparator /> : null}
+          {hasMailto && mailto ? (
+            <>
+              <DropdownMenuItem asChild>
+                <a href={buildMailto(mailto, "appointment")} className="flex items-center gap-2.5 cursor-pointer">
+                  <Mail className="w-3.5 h-3.5 text-primary shrink-0" />
+                  Open in email app · Appointment
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={buildMailto(mailto, "reminder")} className="flex items-center gap-2.5 cursor-pointer">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  Open in email app · Reminder
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={buildMailto(mailto, "followup")} className="flex items-center gap-2.5 cursor-pointer">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  Open in email app · Follow-up
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <a href={buildMailto(mailto, "custom")} className="flex items-center gap-2.5 cursor-pointer">
+                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  Open in email app · Custom
+                </a>
+              </DropdownMenuItem>
+            </>
+          ) : !canEquipify ? (
+            <DropdownMenuItem disabled className="text-muted-foreground">
+              Add a contact email to use templates
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {canEquipify && equipify ? (
+        <CustomerContactEmailDialog
+          open={equipifyOpen}
+          onOpenChange={setEquipifyOpen}
+          organizationId={equipify.organizationId}
+          customerId={equipify.customerId}
+          customerLabel={equipify.customerLabel}
+          defaultTo={equipify.defaultRecipientEmail}
+          contactId={equipify.contactId}
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -230,26 +293,29 @@ function TextLink({ phone }: { phone: string }) {
 export interface ContactActionsProps {
   /** Street address / location string for map navigation */
   address?: string
-  /** Contact email params for email composer */
+  /** Contact email params for mailto templates */
   email?: ContactEmailParams
   /** Phone number for call + SMS */
   phone?: string
+  /** Send tracked email via Resend (Phase 55.4) — requires org permission */
+  equipify?: ContactEquipifyEmail
   className?: string
 }
 
 /**
  * Compact row of quick-contact action buttons.
- * Shows Navigate (if address), Email (if customerEmail set), Call + Text (if phone).
- * Email uses template dropdown; Navigate uses maps dropdown.
+ * Shows Navigate (if address), Email (mailto templates + optional Equipify send), Call + Text (if phone).
  */
-export function ContactActions({ address, email, phone, className }: ContactActionsProps) {
+export function ContactActions({ address, email, phone, equipify, className }: ContactActionsProps) {
   const hasAddress = Boolean(address?.trim())
-  const hasEmail = Boolean(email?.customerEmail?.trim())
+  const hasMailto = Boolean(email?.customerEmail?.trim())
   const hasPhone = Boolean(phone?.trim())
+  const showEmail = Boolean(hasMailto || equipify)
 
-  if (!hasAddress && !hasEmail && !hasPhone) return null
+  if (!hasAddress && !showEmail && !hasPhone) return null
 
-  const emailParams = hasEmail && email ? email : null
+  const mailtoParams =
+    hasMailto && email ? { ...email, customerEmail: email.customerEmail!.trim() } : undefined
   const phoneRaw = hasPhone && phone ? phone.trim() : ""
 
   return (
@@ -258,7 +324,7 @@ export function ContactActions({ address, email, phone, className }: ContactActi
       onClick={(e) => e.stopPropagation()}
     >
       {hasAddress && <NavigateDropdown address={address!.trim()} />}
-      {emailParams && <EmailDropdown params={{ ...emailParams, customerEmail: emailParams.customerEmail!.trim() }} />}
+      {showEmail ? <EmailMenu mailto={mailtoParams} equipify={equipify} /> : null}
       {hasPhone && <CallLink phone={phoneRaw} />}
       {hasPhone && <TextLink phone={phoneRaw} />}
     </div>

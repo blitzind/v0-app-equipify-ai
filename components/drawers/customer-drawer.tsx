@@ -1016,8 +1016,23 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 </div>
                 <div className="mt-2">
                   <ContactActions
-                    email={{ customerName: header.company, customerEmail: c.email }}
+                    email={
+                      c.email?.trim()
+                        ? { customerName: header.company, customerEmail: c.email }
+                        : undefined
+                    }
                     phone={c.phone}
+                    equipify={
+                      orgStatus === "ready" && activeOrgId
+                        ? {
+                            organizationId: activeOrgId,
+                            customerId: header.id,
+                            customerLabel: header.company,
+                            defaultRecipientEmail: c.email?.trim() || undefined,
+                            contactId: c.id,
+                          }
+                        : undefined
+                    }
                   />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
@@ -1179,8 +1194,22 @@ export function CustomerDrawer({ customerId, onClose }: CustomerDrawerProps) {
                 <div className="px-3 pb-3">
                   <ContactActions
                     address={`${loc.address}, ${loc.city}, ${loc.state} ${loc.zip}`}
-                    email={contacts[0] ? { customerName: header.company, customerEmail: contacts[0].email } : undefined}
+                    email={
+                      contacts[0]?.email?.trim()
+                        ? { customerName: header.company, customerEmail: contacts[0].email }
+                        : undefined
+                    }
                     phone={loc.phone ?? contacts[0]?.phone}
+                    equipify={
+                      orgStatus === "ready" && activeOrgId
+                        ? {
+                            organizationId: activeOrgId,
+                            customerId: header.id,
+                            customerLabel: header.company,
+                            defaultRecipientEmail: contacts[0]?.email?.trim() || undefined,
+                          }
+                        : undefined
+                    }
                   />
                 </div>
               </div>

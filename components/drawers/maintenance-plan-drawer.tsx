@@ -48,6 +48,7 @@ import {
 import { ReminderRulesPanel } from "@/components/reminders/reminder-rules-panel"
 import { ContactActions } from "@/components/contact-actions"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { useCustomerOutboundEmails } from "@/hooks/use-customer-outbound-emails"
 import {
   loadPlanAutomationEvents,
   type PlanAutomationEventRow,
@@ -124,6 +125,11 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
 
   const plan = planId ? plans.find((p) => p.id === planId) ?? null : null
   const watchedPlan = planId ? plans.find((p) => p.id === planId) : undefined
+
+  const { emails: planCustomerEmails } = useCustomerOutboundEmails(
+    organizationId ?? null,
+    plan?.customerId ?? null,
+  )
 
   useEffect(() => {
     if (!planId || !organizationId) {
@@ -336,7 +342,24 @@ export function MaintenancePlanDrawer({ planId, onClose }: MaintenancePlanDrawer
           <DrawerRow label="Location" value={activePlan.location} />
           {activePlan.location && (
             <div className="py-1">
-              <ContactActions address={activePlan.location} email={{ customerName: activePlan.customerName }} />
+              <ContactActions
+                address={activePlan.location}
+                email={
+                  planCustomerEmails[0]
+                    ? { customerName: activePlan.customerName, customerEmail: planCustomerEmails[0]! }
+                    : undefined
+                }
+                equipify={
+                  organizationId
+                    ? {
+                        organizationId,
+                        customerId: activePlan.customerId,
+                        customerLabel: activePlan.customerName,
+                        defaultRecipientEmail: planCustomerEmails[0],
+                      }
+                    : undefined
+                }
+              />
             </div>
           )}
           <DrawerRow

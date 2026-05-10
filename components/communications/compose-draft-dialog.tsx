@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import type { RelatedEntityType } from "@/lib/notifications/types"
 
@@ -143,11 +144,23 @@ export function ComposeDraftDialog({
             Compose draft communication
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Saves a draft into the Communications feed. Equipify never auto-sends drafts —
-            forward them through the existing email / send flow when you&apos;re ready.
+            Saves a draft into the Communications feed. Open the draft from the feed and use &quot;Send draft
+            now&quot; to hand off to the live email routes (invoice, quote, work order, prospect). Equipify does not
+            auto-send while saving here.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {channel === "email" &&
+          (relatedType === "customer" || relatedType === "equipment" || relatedType === "maintenance_plan") ? (
+            <Alert className="py-2">
+              <AlertDescription className="text-xs">
+                Email hand-off from Communications does not cover {relatedType.replace(/_/g, " ")} drafts yet. To
+                message the customer from their profile, use{" "}
+                <strong className="font-medium text-foreground">Send with Equipify</strong> on the customer contact
+                actions, or link this draft to a quote, invoice, or work order before sending.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs font-medium">Channel</Label>

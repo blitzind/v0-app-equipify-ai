@@ -53,6 +53,7 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { ContactActions } from "@/components/contact-actions"
+import { useCustomerOutboundEmails } from "@/hooks/use-customer-outbound-emails"
 import { AIRecommendationPanel, type AIRecommendation } from "@/components/ai"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 
@@ -466,6 +467,11 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       })),
     )
   }, [eq, drawerWOs])
+
+  const { emails: equipCustomerEmails } = useCustomerOutboundEmails(
+    orgStatus === "ready" ? activeOrgId : null,
+    eq?.customerId ?? null,
+  )
 
   useEffect(() => {
     if (!eq?.id || !activeOrgId || orgStatus !== "ready") {
@@ -1397,7 +1403,24 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                 </EditableRow>
                 {!editing && eq.location && (
                   <div className="pt-1">
-                    <ContactActions address={eq.location} email={{ customerName: eq.customerName }} />
+                    <ContactActions
+                      address={eq.location}
+                      email={
+                        equipCustomerEmails[0]
+                          ? { customerName: eq.customerName, customerEmail: equipCustomerEmails[0]! }
+                          : undefined
+                      }
+                      equipify={
+                        orgStatus === "ready" && activeOrgId
+                          ? {
+                              organizationId: activeOrgId,
+                              customerId: eq.customerId,
+                              customerLabel: eq.customerName,
+                              defaultRecipientEmail: equipCustomerEmails[0],
+                            }
+                          : undefined
+                      }
+                    />
                   </div>
                 )}
               </DrawerSection>

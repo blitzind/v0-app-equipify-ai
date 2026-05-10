@@ -64,6 +64,7 @@ import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
 import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
+import { ContactActions } from "@/components/contact-actions"
 import { CUSTOMER_CERT_RELEASE_OPTIONS, modeLabel } from "@/lib/portal/certificate-release-staff"
 import {
   CUSTOMER_TERMS_OPTIONS,
@@ -2690,13 +2691,17 @@ export default function CustomerDetailPage() {
                           )}
                         </div>
                         <div className="flex flex-col gap-1 mt-2">
-                          <a
-                            href={`mailto:${contact.email}`}
-                            className="flex items-center gap-1.5 text-xs text-primary hover:underline truncate"
-                          >
-                            <Mail className="w-3.5 h-3.5 shrink-0" />
-                            {contact.email}
-                          </a>
+                          {contact.email?.trim() ? (
+                            <a
+                              href={`mailto:${contact.email}`}
+                              className="flex items-center gap-1.5 text-xs text-primary hover:underline truncate"
+                            >
+                              <Mail className="w-3.5 h-3.5 shrink-0" />
+                              {contact.email}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No email on file</span>
+                          )}
                           <a
                             href={`tel:${contact.phone}`}
                             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
@@ -2704,6 +2709,27 @@ export default function CustomerDetailPage() {
                             <Phone className="w-3.5 h-3.5 shrink-0" />
                             {contact.phone}
                           </a>
+                        </div>
+                        <div className="mt-2 flex justify-start">
+                          <ContactActions
+                            email={
+                              contact.email?.trim()
+                                ? { customerName: customer.company, customerEmail: contact.email }
+                                : undefined
+                            }
+                            phone={contact.phone}
+                            equipify={
+                              orgStatus === "ready" && activeOrgId
+                                ? {
+                                    organizationId: activeOrgId,
+                                    customerId: customer.id,
+                                    customerLabel: customer.company,
+                                    defaultRecipientEmail: contact.email?.trim() || undefined,
+                                    contactId: contact.id,
+                                  }
+                                : undefined
+                            }
+                          />
                         </div>
                         <div className="flex items-center gap-2 mt-2">
                           <button

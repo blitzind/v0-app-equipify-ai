@@ -21,6 +21,7 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 | Appointment confirmation | same, `variant: appointment_confirmation` | `work_order_appointment_confirmation` | Request `to` | Yes | 502/503 | ☐ |
 | AI Ops digest | `lib/ai-ops/digest-runner.ts` | `ai_ops_digest` | Settings recipients[] | Yes | Digest run records destination failure; does not throw | ☐ |
 | Invoice payment reminder (AI Ops) | `lib/ai-ops/actions/send-invoice-payment-reminder.ts` | `invoice_payment_reminder_ai_ops` | Customer `billing_email` or override | Yes | Returns structured error to caller | ☐ |
+| Customer / CRM staff message | `POST /api/organizations/{orgId}/customers/{customerId}/contact-email` | `customer_staff_message` | Request `to` **must** match `customers.billing_email` or a non-archived `customer_contacts.email` | Yes | 400 if recipient not on file; 403 if role lacks comms/WO/invoice edit; 502/503; logs `customer_staff_email` + `customer-contact-email` summary | ☐ |
 
 **Centralized compliance:** Every row above calls `sendEmail()`; there is **no** second Resend client or direct `resend.emails.send` outside `lib/email/resend.ts`.
 
@@ -46,6 +47,19 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 
 **Manual check:** fail a draft send (e.g. invalid env), hit Retry, confirm outbound Resend log + row `sent`, and a second timeline row from the live route when applicable.
 
+### Customer / contact send entry points (Phase 55.4)
+
+| Surface | What happens |
+|---------|----------------|
+| **Email → Send with Equipify…** (`ContactActions`) | Opens dialog → `contact-email` API → `sendEmail()` → `communication_events` row `customer_staff_email`. Also available when only billing/contact emails exist (mailto templates use first known address when present). |
+| Customer detail · Contacts card | Same actions row per contact (mailto + Equipify + optional `contact_id` metadata). |
+| Customers list / table cards | `ContactActions` with org + customer id for Equipify. |
+| Customer drawer · contacts & locations | Equipify context wired. |
+| Quote / equipment / maintenance plan drawers | Loads recipient candidates via Supabase (billing + contacts); mailto + Equipify. |
+| **Communications compose draft** | Still **save-only**; email hand-off from the feed supports invoice / quote / work order / prospect. Compose warns when the linked record type is customer / equipment / maintenance plan. |
+
+**Intentionally unsupported here:** Gmail sync, inbound mail, marketing drips, retry replay for `customer_staff_email` (no stored subject/body on the row for automated replay — send again from the customer UI).
+
 ---
 
 ## 3. Log-only / non-Resend “email” touches
@@ -64,6 +78,7 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 - **Invites:** Owner/admin only; email format validated before insert.
 - **AI Ops reminder:** Validates billing email or override before send.
 - **Digest:** Internal staff recipients from workspace settings; not customer-facing.
+- **Customer staff message (`contact-email`):** Active org member; **any of** `canManageCommunications`, `canEditWorkOrders`, or `canEditInvoices`; recipient must belong to the customer (no arbitrary addresses).
 
 ---
 
@@ -84,6 +99,7 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 
 - Every `sendEmail` completion: JSON line `source: "outbound-email"`, `category`, `organizationId` (when passed), `recipientCount`, `ok`, `providerMessageId`, truncated errors — **no** bodies or secrets.
 - Signup path also logs `source: "signup-provision-email"` for idempotency/diagnostics.
+- Customer CRM send: `source: "customer-contact-email"`, `organizationId`, `customerId`, optional `contactId`, `outcome`, `category` — **no** bodies or secrets.
 
 ---
 
@@ -104,6 +120,9 @@ Prerequisites: `RESEND_API_KEY`, `EMAIL_FROM_ADDRESS`, verified domain, `NEXT_PU
 | 9 | Payment reminder | AI Ops confirmed reminder | `invoice_payment_reminder_ai_ops` |
 | 10 | Communications hand-off | Send draft for invoice/quote/WO | Same logs as underlying route; no duplicate Resend client |
 | 10b | Communications retry | Failed draft or failed `invoice_email` / `quote_email` / WO email → Retry | Same as underlying route; `communication-retry` log line; no row stuck in `queued` |
+| 13 | Customer Equipify send | Customer with billing or contact email → Email → Send with Equipify | `customer_staff_message` in `outbound-email`; timeline shows `customer_staff_email`; 400 if recipient not on file |
+| 14 | Customer no email | Customer with zero billing + contact emails | Dialog explains; API returns `no_customer_email` if forced |
+| 15 | Double-click send | Rapid Send in dialog | Second request blocked client-side while in flight |
 | 11 | Missing env | Unset `RESEND_API_KEY`; attempt invoice send | 503, safe message, structured `outbound-email` log |
 | 12 | Bad recipient | Invalid `to` on send route | 400 from route validation before `sendEmail` |
 
