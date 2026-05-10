@@ -44,6 +44,7 @@ type BillingCustomerRow = {
   billing_contact_name: string | null
   billing_email: string | null
   billing_contact_phone: string | null
+  billing_location_id: string | null
   billing_address_same_as_service: boolean | null
   billing_address_line1: string | null
   billing_address_line2: string | null
@@ -86,6 +87,7 @@ const BILLING_SELECT = [
   "billing_contact_name",
   "billing_email",
   "billing_contact_phone",
+  "billing_location_id",
   "billing_address_same_as_service",
   "billing_address_line1",
   "billing_address_line2",
@@ -123,15 +125,15 @@ function normalizeBehavior(value: string | null | undefined): BillingBehavior {
 function buildProfile(
   customer: BillingCustomerRow,
   source: BillingCustomerRow,
-  defaultLocation: DefaultLocationRow | null,
+  serviceLocation: DefaultLocationRow | null,
 ): CustomerBillingProfile {
   const inheritsService = source.billing_address_same_as_service !== false
   const behavior = normalizeBehavior(customer.billing_behavior)
-  const line1 = inheritsService ? defaultLocation?.address_line1 ?? "" : source.billing_address_line1 ?? ""
-  const line2 = inheritsService ? defaultLocation?.address_line2 ?? null : source.billing_address_line2 ?? null
-  const city = inheritsService ? defaultLocation?.city ?? "" : source.billing_city ?? ""
-  const state = inheritsService ? defaultLocation?.state ?? "" : source.billing_state ?? ""
-  const postalCode = inheritsService ? defaultLocation?.postal_code ?? "" : source.billing_postal_code ?? ""
+  const line1 = inheritsService ? serviceLocation?.address_line1 ?? "" : source.billing_address_line1 ?? ""
+  const line2 = inheritsService ? serviceLocation?.address_line2 ?? null : source.billing_address_line2 ?? null
+  const city = inheritsService ? serviceLocation?.city ?? "" : source.billing_city ?? ""
+  const state = inheritsService ? serviceLocation?.state ?? "" : source.billing_state ?? ""
+  const postalCode = inheritsService ? serviceLocation?.postal_code ?? "" : source.billing_postal_code ?? ""
 
   return {
     customerId: customer.id,
@@ -194,16 +196,34 @@ export async function resolveCustomerBillingProfile(
     if (parentData) source = parentData as BillingCustomerRow
   }
 
-  const { data: locData } = await supabase
-    .from("customer_locations")
-    .select("customer_id, address_line1, address_line2, city, state, postal_code")
-    .eq("organization_id", organizationId)
-    .eq("customer_id", source.id)
-    .eq("is_default", true)
-    .is("archived_at", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  let serviceLocation: DefaultLocationRow | null = null
+  if (source.billing_address_same_as_service !== false) {
+    const blId = source.billing_location_id?.trim()
+    if (blId) {
+      const { data: billLoc } = await supabase
+        .from("customer_locations")
+        .select("customer_id, address_line1, address_line2, city, state, postal_code")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", source.id)
+        .eq("id", blId)
+        .is("archived_at", null)
+        .maybeSingle()
+      serviceLocation = (billLoc as DefaultLocationRow | null) ?? null
+    }
+    if (!serviceLocation) {
+      const { data: locData } = await supabase
+        .from("customer_locations")
+        .select("customer_id, address_line1, address_line2, city, state, postal_code")
+        .eq("organization_id", organizationId)
+        .eq("customer_id", source.id)
+        .eq("is_default", true)
+        .is("archived_at", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      serviceLocation = (locData as DefaultLocationRow | null) ?? null
+    }
+  }
 
-  return buildProfile(customer, source, (locData as DefaultLocationRow | null) ?? null)
+  return buildProfile(customer, source, serviceLocation)
 }

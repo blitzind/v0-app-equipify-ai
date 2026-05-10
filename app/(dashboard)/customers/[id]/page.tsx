@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ComponentType } from "react"
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Equipment, EquipmentStatus } from "@/lib/mock-data"
@@ -526,6 +528,7 @@ export default function CustomerDetailPage() {
   const canViewCustomerFinancials = permissions.canViewFinancials || permissions.canViewBilling
   const canViewQuotes = permissions.canViewQuotes
   const canManageServiceContracts = permissions.canManageDispatch
+  const { toast } = useToast()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -881,6 +884,64 @@ export default function CustomerDetailPage() {
     assignedOnlyView,
     technicianScope,
   ])
+
+  const multiLocationCardsWithBilling = useMemo(() => {
+    const cards = multiLocationDashboard?.locationCards ?? []
+    if (!hierarchySummary) {
+      return cards.map((c) => ({ ...c, isBillingSite: false as const }))
+    }
+    const same = hierarchySummary.billingAddressSameAsService
+    const bid = hierarchySummary.billingLocationId
+    return cards.map((c) => ({
+      ...c,
+      isBillingSite: Boolean(same && (bid ? c.locationId === bid : c.isDefault)),
+    }))
+  }, [multiLocationDashboard, hierarchySummary])
+
+  const applyCustomerBillingLocation = useCallback(
+    async (locationId: string | null) => {
+      if (!customer || !activeOrgId) return
+      const supabase = createBrowserSupabaseClient()
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          billing_address_same_as_service: true,
+          billing_location_id: locationId,
+          billing_address_line1: null,
+          billing_address_line2: null,
+          billing_city: null,
+          billing_state: null,
+          billing_postal_code: null,
+        })
+        .eq("organization_id", activeOrgId)
+        .eq("id", customer.id)
+      if (error) {
+        const raw = error.message ?? ""
+        if (raw.toLowerCase().includes("billing_location")) {
+          toast({
+            title: "Could not set billing site",
+            description: "That location is not valid for this customer.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Could not update billing address",
+            description: raw || "Please try again.",
+            variant: "destructive",
+          })
+        }
+        return
+      }
+      toast({
+        title: locationId ? "Billing site updated" : "Billing uses primary site",
+        description: locationId
+          ? "Invoices will use this service location for the bill-to address."
+          : "Invoices will follow the primary service location for the bill-to address.",
+      })
+      setRefreshToken((n) => n + 1)
+    },
+    [customer, activeOrgId, toast],
+  )
 
   useEffect(() => {
     let active = true
@@ -2517,10 +2578,13 @@ export default function CustomerDetailPage() {
 
           <CustomerMultiLocationDashboard
             summary={multiLocationDashboard?.summary ?? null}
-            locationCards={multiLocationDashboard?.locationCards ?? []}
+            locationCards={multiLocationCardsWithBilling}
             showFinancials={canViewCustomerFinancials}
             loading={metricsLoading || intakeMetricsLoading || plansSectionLoading}
             customerId={customer.id}
+            canManageBillingAddress={canManageCustomerRecords && !customer.isArchived}
+            billingAddressUsesServiceLocation={hierarchySummary?.billingAddressSameAsService ?? true}
+            onApplyBillingLocation={applyCustomerBillingLocation}
             onSelectLocation={(locId, mode) => {
               if (mode === "equipment") {
                 setEquipmentSiteFilter(locId)
@@ -3462,7 +3526,8 @@ export default function CustomerDetailPage() {
           }
           initialBilling={{
             billingName: hierarchySummary.billingAddress.billingName,
-            sameAsService: hierarchySummary.billingAddress.inheritsFromDefaultLocation,
+            billingAddressSameAsService: hierarchySummary.billingAddressSameAsService,
+            billingLocationId: hierarchySummary.billingLocationId,
             attention: hierarchySummary.billingAddress.attention,
             contactName: hierarchySummary.billingAddress.contactName,
             email: hierarchySummary.billingAddress.email,
@@ -3891,6 +3956,7 @@ export default function CustomerDetailPage() {
           onSaved={() => setRefreshToken((n) => n + 1)}
         />
       : null}
+      <Toaster />
     </div>
   )
 }

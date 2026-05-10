@@ -27,6 +27,7 @@ import {
   NAV_PRIMARY_ROW_MOTION,
   NAV_ROW_ACTIVE_SIDEBAR,
   NAV_ROW_INACTIVE_HOVER_SIDEBAR,
+  NAV_SIDEBAR_ACTIVE_INDICATOR,
 } from "@/lib/navigation-chrome"
 
 type NavItem = {
@@ -636,7 +637,8 @@ function SidebarBody({
                     {group.label}
                     {groupCollapsed && groupHasActive && (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: NAV_SIDEBAR_ACTIVE_INDICATOR }}
                         aria-label="Active route inside collapsed group"
                       />
                     )}
@@ -700,11 +702,19 @@ function SidebarBody({
                     >
                       {/* Left accent bar — active only, desktop only */}
                       {active && !isCollapsed && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-blue-400" />
+                        <span
+                          className="absolute left-0 top-1/2 z-[1] -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                          style={{ backgroundColor: NAV_SIDEBAR_ACTIVE_INDICATOR }}
+                          aria-hidden
+                        />
                       )}
-                      {/* Collapsed active: dot indicator at bottom */}
+                      {/* Collapsed active: accent dot (matches left-rail orange) */}
                       {active && isCollapsed && (
-                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
+                        <span
+                          className="absolute bottom-1 left-1/2 z-[1] -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: NAV_SIDEBAR_ACTIVE_INDICATOR }}
+                          aria-hidden
+                        />
                       )}
                       <Icon
                         className={cn(

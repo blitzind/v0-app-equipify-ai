@@ -11,14 +11,25 @@ export const NAV_PRIMARY_ROW_MOTION =
 export const NAV_ROW_INACTIVE_HOVER_SIDEBAR =
   "text-sidebar-foreground/75 hover:bg-blue-500/[0.10] hover:text-sidebar-foreground"
 
-/** Active row on dark sidebar. */
-export const NAV_ROW_ACTIVE_SIDEBAR = "bg-blue-500/[0.18] text-white font-medium"
+/**
+ * Active row on dark sidebar — blue wash background, white label; hover stays a
+ * soft blue lift only (no orange fills).
+ */
+export const NAV_ROW_ACTIVE_SIDEBAR =
+  "bg-blue-500/[0.18] hover:bg-blue-500/[0.22] text-white font-medium"
 
 /** Inactive icon on sidebar nav row. */
 export const NAV_ICON_INACTIVE_SIDEBAR =
   "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80"
 
-export const NAV_ICON_ACTIVE_SIDEBAR = "text-blue-300"
+/** Active icon: light/white on dark blue active row (not brand orange). */
+export const NAV_ICON_ACTIVE_SIDEBAR = "text-white"
+
+/**
+ * Equipify brand orange — reserved for the active nav rail accent only
+ * (left indicator / collapsed dot), not icons or row fills.
+ */
+export const NAV_SIDEBAR_ACTIVE_INDICATOR = "#F59F1B"
 
 /**
  * Inactive row on card / popover (account hub, settings layout) —

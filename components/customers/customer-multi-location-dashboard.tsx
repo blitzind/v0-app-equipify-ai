@@ -69,6 +69,9 @@ export function CustomerMultiLocationDashboard({
   loading,
   onSelectLocation,
   customerId,
+  canManageBillingAddress,
+  billingAddressUsesServiceLocation,
+  onApplyBillingLocation,
 }: {
   summary: MultiLocationSummary | null
   locationCards: MultiLocationCardModel[]
@@ -76,6 +79,10 @@ export function CustomerMultiLocationDashboard({
   loading: boolean
   onSelectLocation: (locationId: string, mode: "equipment" | "work-orders") => void
   customerId: string
+  canManageBillingAddress: boolean
+  /** When false (custom bill-to), cards still offer "Use as billing" to switch back to a site. */
+  billingAddressUsesServiceLocation: boolean
+  onApplyBillingLocation: (locationId: string | null) => void | Promise<void>
 }) {
   if (loading || !summary) {
     return (
@@ -196,11 +203,21 @@ export function CustomerMultiLocationDashboard({
                     <p className="text-sm font-semibold text-foreground truncate">{loc.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{loc.addressLine}</p>
                   </div>
-                  {loc.isDefault ?
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
-                      Primary
-                    </Badge>
-                  : null}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {loc.isDefault ?
+                      <Badge variant="secondary" className="text-[10px]">
+                        Primary
+                      </Badge>
+                    : null}
+                    {loc.isBillingSite ?
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-primary/40 text-primary bg-primary/5"
+                      >
+                        Billing
+                      </Badge>
+                    : null}
+                  </div>
                 </div>
               </div>
               <div className="p-4 flex-1 flex flex-col gap-3 text-sm">
@@ -280,6 +297,24 @@ export function CustomerMultiLocationDashboard({
                 : null}
 
                 <div className="flex flex-wrap gap-2 pt-1 mt-auto border-t border-border">
+                  {canManageBillingAddress ?
+                    <Button
+                      type="button"
+                      variant={loc.isBillingSite ? "secondary" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={Boolean(loc.isBillingSite && billingAddressUsesServiceLocation)}
+                      onClick={() => {
+                        if (loc.isBillingSite && billingAddressUsesServiceLocation) return
+                        const target = loc.isDefault ? null : loc.locationId
+                        void onApplyBillingLocation(target)
+                      }}
+                    >
+                      {loc.isBillingSite && billingAddressUsesServiceLocation ?
+                        "Billing address"
+                      : "Use as billing address"}
+                    </Button>
+                  : null}
                   <Button
                     type="button"
                     variant="secondary"

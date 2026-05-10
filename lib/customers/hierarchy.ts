@@ -43,6 +43,13 @@ export type BillingAddress = {
   billingName: string | null
   /** True when the operational billing address is inherited from the default service location. */
   inheritsFromDefaultLocation: boolean
+  /**
+   * True when bill-to street lines come from a non-primary saved location
+   * (`customers.billing_location_id`), not the default service site.
+   */
+  usesSecondaryBillingLocation: boolean
+  /** Display name of the billing location row when usesSecondaryBillingLocation. */
+  billingLocationName: string | null
   /** Optional "Attn:" line. */
   attention: string | null
   contactName: string | null
@@ -88,6 +95,10 @@ export type CustomerHierarchySummary = {
   defaultServiceAddress: ServiceAddress | null
   /** Operational billing address. */
   billingAddress: BillingAddress
+  /** Raw DB flag mirrored for dialogs (not derived from address lines). */
+  billingAddressSameAsService: boolean
+  /** When set and billingAddressSameAsService, bill-to uses this location row. */
+  billingLocationId: string | null
   /**
    * True when the operational billing address has no usable street/city. The
    * UI surfaces a soft warning in this state because invoice-style
@@ -110,6 +121,7 @@ type CustomerHierarchyRow = {
   status: "active" | "inactive"
   archived_at: string | null
   parent_customer_id: string | null
+  billing_location_id: string | null
   billing_address_same_as_service: boolean | null
   billing_attention: string | null
   billing_name: string | null
@@ -161,7 +173,7 @@ type DefaultLocationRow = {
 
 const CUSTOMER_HIERARCHY_SELECT =
   "id, organization_id, company_name, status, archived_at, " +
-  "parent_customer_id, billing_address_same_as_service, billing_name, billing_attention, billing_contact_name, billing_email, billing_contact_phone, " +
+  "parent_customer_id, billing_location_id, billing_address_same_as_service, billing_name, billing_attention, billing_contact_name, billing_email, billing_contact_phone, " +
   "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country, billing_notes, " +
   "billing_behavior, po_required, po_number_required_before_service, po_number_required_before_invoice, default_po_number, invoice_delivery_preference, invoice_instructions, " +
   "default_invoice_terms_code, default_payment_terms_key, default_payment_terms_days, default_payment_terms_label, " +
@@ -198,14 +210,15 @@ function locationToService(loc: DefaultLocationRow | null): ServiceAddress | nul
 }
 
 /**
- * Pure: derive an operational `BillingAddress` from a customer row + its
- * default service location. When `billing_address_same_as_service` is true (or
- * the migration has not run yet, signalled by `null`), we mirror the default
- * service location so existing invoice flows keep working unchanged.
+ * Pure: derive an operational `BillingAddress` from a customer row + resolved
+ * service locations. When `billing_address_same_as_service` is true (or null /
+ * undefined), street lines mirror a location: optional `billing_location_id`
+ * row, otherwise the default service location.
  */
 function deriveBillingAddress(
   row: Partial<CustomerHierarchyRow> | null,
   defaultService: ServiceAddress | null,
+  billingLocationService: ServiceAddress | null,
 ): { address: BillingAddress; missing: boolean } {
   const inherits =
     row?.billing_address_same_as_service === null ||
@@ -214,19 +227,26 @@ function deriveBillingAddress(
       : Boolean(row.billing_address_same_as_service)
 
   if (inherits) {
+    const billingLocId = row?.billing_location_id?.trim() || null
+    const usesSecondary = Boolean(billingLocId && billingLocationService)
+    const fromLocation: ServiceAddress | null = billingLocId
+      ? (billingLocationService ?? defaultService)
+      : defaultService
     return {
       address: {
         billingName: row?.billing_name?.trim() || null,
-        inheritsFromDefaultLocation: true,
+        inheritsFromDefaultLocation: !usesSecondary,
+        usesSecondaryBillingLocation: usesSecondary,
+        billingLocationName: usesSecondary ? billingLocationService?.name ?? null : null,
         attention: row?.billing_attention?.trim() || null,
         contactName: row?.billing_contact_name?.trim() || null,
         email: row?.billing_email?.trim() || null,
         phone: row?.billing_contact_phone?.trim() || null,
-        line1: defaultService?.line1 ?? "",
-        line2: defaultService?.line2 ?? null,
-        city: defaultService?.city ?? "",
-        state: defaultService?.state ?? "",
-        postalCode: defaultService?.postalCode ?? "",
+        line1: fromLocation?.line1 ?? "",
+        line2: fromLocation?.line2 ?? null,
+        city: fromLocation?.city ?? "",
+        state: fromLocation?.state ?? "",
+        postalCode: fromLocation?.postalCode ?? "",
         country: row?.billing_country?.trim() || null,
         notes: row?.billing_notes?.trim() || null,
         behavior: row?.billing_behavior ?? null,
@@ -245,7 +265,7 @@ function deriveBillingAddress(
         defaultTaxBasis: row?.default_tax_basis?.trim() || null,
         defaultTaxCategory: row?.default_tax_category?.trim() || null,
       },
-      missing: !defaultService || !defaultService.line1?.trim() || !defaultService.city?.trim(),
+      missing: !fromLocation || !fromLocation.line1?.trim() || !fromLocation.city?.trim(),
     }
   }
 
@@ -255,6 +275,8 @@ function deriveBillingAddress(
     address: {
       billingName: row?.billing_name?.trim() || null,
       inheritsFromDefaultLocation: false,
+      usesSecondaryBillingLocation: false,
+      billingLocationName: null,
       attention: row?.billing_attention?.trim() || null,
       contactName: row?.billing_contact_name?.trim() || null,
       email: row?.billing_email?.trim() || null,
@@ -328,6 +350,7 @@ export async function loadCustomerHierarchy(
       status: legacy.status,
       archived_at: legacy.archived_at,
       parent_customer_id: null,
+      billing_location_id: null,
       billing_address_same_as_service: true,
       billing_name: null,
       billing_attention: null,
@@ -377,6 +400,22 @@ export async function loadCustomerHierarchy(
     (defaultLocRes.data as DefaultLocationRow | null) ?? null,
   )
 
+  let billingLocationService: ServiceAddress | null = null
+  const billingLocId = row.billing_location_id?.trim() || null
+  if (billingLocId && row.billing_address_same_as_service !== false) {
+    const billLocRes = await supabase
+      .from("customer_locations")
+      .select(DEFAULT_LOCATION_SELECT)
+      .eq("organization_id", organizationId)
+      .eq("customer_id", customerId)
+      .eq("id", billingLocId)
+      .is("archived_at", null)
+      .maybeSingle()
+    billingLocationService = locationToService(
+      (billLocRes.data as DefaultLocationRow | null) ?? null,
+    )
+  }
+
   // Fallback: if no row marked default, take the most recent active location.
   if (!defaultService) {
     const anyLocRes = await supabase
@@ -425,7 +464,8 @@ export async function loadCustomerHierarchy(
   const children = ((childrenRes.data ?? []) as LegacyCustomerRow[]).map(rowToLite)
   const locationCount = typeof locCountRes.count === "number" ? locCountRes.count : 0
 
-  const billing = deriveBillingAddress(row, defaultService)
+  const billing = deriveBillingAddress(row, defaultService, billingLocationService)
+  const billingAddressSameAsService = row.billing_address_same_as_service !== false
 
   return {
     customerId,
@@ -437,6 +477,8 @@ export async function loadCustomerHierarchy(
     defaultServiceAddress: defaultService,
     billingAddress: billing.address,
     billingAddressMissing: billing.missing,
+    billingAddressSameAsService,
+    billingLocationId: billingLocId,
     schemaMigrationPending,
   }
 }

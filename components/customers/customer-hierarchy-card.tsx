@@ -204,7 +204,15 @@ export function CustomerHierarchyCard({
           <HierarchyStat
             icon={<ReceiptText className="h-3 w-3" aria-hidden />}
             label="Billing"
-            value={billingAddressMissing ? "Missing" : billingAddress.inheritsFromDefaultLocation ? "Linked" : "Custom"}
+            value={
+              billingAddressMissing
+                ? "Missing"
+                : billingAddress.inheritsFromDefaultLocation
+                  ? "Primary site"
+                  : billingAddress.usesSecondaryBillingLocation
+                    ? "Billing site"
+                    : "Custom"
+            }
             tone={billingAddressMissing ? "warning" : "default"}
           />
         </div>
@@ -309,17 +317,27 @@ export function CustomerHierarchyCard({
             <span
               className={cn(
                 "rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                billingAddress.inheritsFromDefaultLocation
+                billingAddress.inheritsFromDefaultLocation || billingAddress.usesSecondaryBillingLocation
                   ? "bg-muted text-muted-foreground"
                   : "bg-primary/10 text-primary",
               )}
             >
-              {billingAddress.inheritsFromDefaultLocation ? "Same as service" : "Custom"}
+              {billingAddress.inheritsFromDefaultLocation
+                ? "Same as primary"
+                : billingAddress.usesSecondaryBillingLocation
+                  ? "Saved location"
+                  : "Custom"}
             </span>
           </div>
           {billingAddress.attention ? (
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Attn: <span className="font-medium text-foreground">{billingAddress.attention}</span>
+            </p>
+          ) : null}
+          {billingAddress.usesSecondaryBillingLocation && billingAddress.billingLocationName ? (
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Bill-to site:{" "}
+              <span className="font-medium text-foreground">{billingAddress.billingLocationName}</span>
             </p>
           ) : null}
           {billingLine ? (
@@ -380,8 +398,8 @@ export function CustomerHierarchyCard({
             <div className="mt-2 flex items-start gap-1.5 rounded-md border border-[color:var(--status-warning)]/30 bg-[color:var(--status-warning)]/10 px-2 py-1.5 text-[11px] text-[color:var(--status-warning)]">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               <span>
-                No billing address yet. Invoices and POs will fall back to the default
-                service location until one is added.
+                No billing address yet. Invoices and POs need a bill-to street/city — add a
+                primary service location, pick a billing site, or set a custom bill-to address.
               </span>
             </div>
           ) : null}

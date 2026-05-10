@@ -70,6 +70,8 @@ export type MultiLocationCardModel = {
   name: string
   addressLine: string
   isDefault: boolean
+  /** When true, invoices use this site's street address as bill-to (Phase 56.5). */
+  isBillingSite?: boolean
   equipmentCount: number
   openWorkOrders: number
   lastServiceDate: string | null

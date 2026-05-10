@@ -32,6 +32,11 @@ are untouched.
   locations remain untouched; the new `billing_address_same_as_service`
   boolean (default `true`) lets new customers fall back to the default
   service location automatically — preserving today's invoicing behavior.
+- **Phase 56.5** adds optional `customers.billing_location_id` →
+  `customer_locations(id)`. When `billing_address_same_as_service` is true and
+  this is set, bill-to street lines come from that saved site; when null, they
+  still follow the default (primary) service location. A trigger enforces same
+  org, same customer, and non-archived location rows.
 - **`customer_hierarchy_summary` view** is a read-only convenience layer
   used by the customer list to bulk-fetch `child_count` + `location_count`
   per row without hand-rolling aggregates everywhere. RLS is inherited from

@@ -16,7 +16,7 @@
  *     Postgres trigger raises `23514` which we surface as a friendly error.
  */
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -41,7 +41,10 @@ type Props = {
   /** Initial billing snapshot. */
   initialBilling: {
     billingName: string | null
-    sameAsService: boolean
+    /** DB `billing_address_same_as_service` — street lines from a location vs custom columns. */
+    billingAddressSameAsService: boolean
+    /** When set with billingAddressSameAsService, bill-to uses this customer_locations row. */
+    billingLocationId: string | null
     attention: string | null
     contactName: string | null
     email: string | null
@@ -92,6 +95,8 @@ export function ManageHierarchyDialog({
   const [billingBehavior, setBillingBehavior] = useState<"own_billing" | "parent_billing" | "custom">("own_billing")
   const [billingName, setBillingName] = useState("")
   const [sameAsService, setSameAsService] = useState(true)
+  const [billingLocationId, setBillingLocationId] = useState<string | null>(null)
+  const billingLocationSnapshotOnOpen = useRef<string | null>(null)
   const [attention, setAttention] = useState("")
   const [contactName, setContactName] = useState("")
   const [email, setEmail] = useState("")
@@ -126,7 +131,9 @@ export function ManageHierarchyDialog({
     setParentId(initialParent?.id ?? "")
     setBillingBehavior(initialBilling.behavior ?? "own_billing")
     setBillingName(initialBilling.billingName ?? "")
-    setSameAsService(initialBilling.sameAsService)
+    setSameAsService(initialBilling.billingAddressSameAsService)
+    billingLocationSnapshotOnOpen.current = initialBilling.billingLocationId ?? null
+    setBillingLocationId(initialBilling.billingLocationId ?? null)
     setAttention(initialBilling.attention ?? "")
     setContactName(initialBilling.contactName ?? "")
     setEmail(initialBilling.email ?? "")
@@ -200,6 +207,7 @@ export function ManageHierarchyDialog({
         billing_behavior: billingBehavior,
         billing_name: billingName.trim() || null,
         billing_address_same_as_service: sameAsService,
+        billing_location_id: sameAsService ? billingLocationId || null : null,
         billing_attention: attention.trim() || null,
         billing_contact_name: contactName.trim() || null,
         billing_email: email.trim() || null,
@@ -358,12 +366,26 @@ export function ManageHierarchyDialog({
                 <input
                   type="checkbox"
                   checked={sameAsService}
-                  onChange={(e) => setSameAsService(e.target.checked)}
+                  onChange={(e) => {
+                    const v = e.target.checked
+                    setSameAsService(v)
+                    if (!v) {
+                      setBillingLocationId(null)
+                    } else {
+                      setBillingLocationId(billingLocationSnapshotOnOpen.current)
+                    }
+                  }}
                   className="h-3.5 w-3.5 rounded border-border"
                 />
-                Use default service location
+                Use service location for street address
               </label>
             </div>
+            {sameAsService && billingLocationId ? (
+              <p className="text-[11px] text-muted-foreground">
+                A specific billing site is selected on the customer Overview (multi-location
+                cards). Clear it there to fall back to the primary service location.
+              </p>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
