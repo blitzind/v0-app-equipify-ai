@@ -69,9 +69,15 @@ import {
   deleteWorkOrderOfflineForScope,
   filterPendingOfflineRecords,
   getWorkOrderOfflineRecordForScope,
+  putWorkOrderOfflineRecord,
 } from "@/lib/work-orders/offline/idb-store"
-import { makeWorkOrderOfflineScopeKey, type WorkOrderOfflineOutboxRecord } from "@/lib/work-orders/offline/types"
-import { SYNC_PREP_COPY } from "@/lib/sync-prep"
+import { mergeTechnicianOfflineBundle } from "@/lib/work-orders/offline/merge-bundle"
+import {
+  makeWorkOrderOfflineScopeKey,
+  type WorkOrderOfflineBundlePayload,
+  type WorkOrderOfflineOutboxRecord,
+} from "@/lib/work-orders/offline/types"
+import { ONLINE_REQUIRED_LABEL, SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -276,6 +282,47 @@ export default function WorkOrderDetailPage() {
   }, [activeOrg.status, activeOrg.organizationId])
 
   const wo = dbWo ?? storeWo
+
+  const fullPageOfflineSaveContext = useMemo(() => {
+    if (!wo) {
+      return {
+        unsafeDirty: false,
+        safeTextDirty: false,
+        safeTasksDirty: false,
+      }
+    }
+    const serverLabor = typeof wo.repairLog.laborHours === "number" ? wo.repairLog.laborHours : 0
+    const unsafePartsDirty = !partsEqual(parts, wo.repairLog.partsUsed ?? [])
+    const unsafeLaborDirty = laborHours !== serverLabor
+    const unsafeSigDirty =
+      (sigData ?? "") !== (wo.repairLog.signatureDataUrl ?? "") ||
+      (signedBy ?? "") !== (wo.repairLog.signedBy ?? "") ||
+      (signedAt ?? "") !== (wo.repairLog.signedAt ?? "")
+    const safeTextDirty =
+      problemReported.trim() !== (wo.repairLog.problemReported ?? "").trim() ||
+      diagnosis !== (wo.repairLog.diagnosis ?? "") ||
+      techNotes !== (wo.repairLog.technicianNotes ?? "") ||
+      internalNotes.trim() !== (serverInternalNotes ?? "").trim()
+    const tasksDirtyPage = !tasksEqual(tabTasks, savedTasks)
+    const safeTasksDirty = !usesTasksTable && tasksDirtyPage
+    const unsafeDirty = unsafePartsDirty || unsafeLaborDirty || unsafeSigDirty
+    return { unsafeDirty, safeTextDirty, safeTasksDirty }
+  }, [
+    wo,
+    parts,
+    laborHours,
+    sigData,
+    signedBy,
+    signedAt,
+    problemReported,
+    diagnosis,
+    techNotes,
+    internalNotes,
+    serverInternalNotes,
+    tabTasks,
+    savedTasks,
+    usesTasksTable,
+  ])
 
   const refreshPageOfflineDigest = useCallback(async () => {
     if (!activeOrg.organizationId || !pageUserId || !workOrderRouteId) {
@@ -561,34 +608,9 @@ export default function WorkOrderDetailPage() {
   async function handleSave() {
     if (!woCanEdit) return
 
-    const serverLabor =
-      typeof workOrder.repairLog.laborHours === "number" ? workOrder.repairLog.laborHours : 0
-    const unsafePartsDirty = !partsEqual(parts, workOrder.repairLog.partsUsed ?? [])
-    const unsafeLaborDirty = laborHours !== serverLabor
-    const unsafeSigDirty =
-      (sigData ?? "") !== (workOrder.repairLog.signatureDataUrl ?? "") ||
-      (signedBy ?? "") !== (workOrder.repairLog.signedBy ?? "") ||
-      (signedAt ?? "") !== (workOrder.repairLog.signedAt ?? "")
-
-    const safeTextDirty =
-      problemReported.trim() !== (workOrder.repairLog.problemReported ?? "").trim() ||
-      diagnosis !== (workOrder.repairLog.diagnosis ?? "") ||
-      techNotes !== (workOrder.repairLog.technicianNotes ?? "") ||
-      internalNotes.trim() !== (serverInternalNotes ?? "").trim()
-
-    const tasksDirtyPage = !tasksEqual(tabTasks, savedTasks)
-    const safeTasksDirty = !usesTasksTable && tasksDirtyPage
-
-    const unsafeDirty = unsafePartsDirty || unsafeLaborDirty || unsafeSigDirty
+    const { unsafeDirty, safeTextDirty, safeTasksDirty } = fullPageOfflineSaveContext
 
     if (!online) {
-      if (unsafeDirty) {
-        toast({
-          variant: "destructive",
-          title: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineTitle,
-          description: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineBody,
-        })
-      }
       const patch: Partial<WorkOrderOfflineBundlePayload> = {}
       if (safeTextDirty) {
         patch.repair = {
@@ -609,7 +631,13 @@ export default function WorkOrderDetailPage() {
       }
       const hasPatch = patch.repair !== undefined || patch.tasks !== undefined
       if (!hasPatch) {
-        if (!unsafeDirty) {
+        if (unsafeDirty) {
+          toast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineTitle,
+            description: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineBody,
+          })
+        } else {
           toast({
             title: "Nothing to save",
             description: "No technician field changes to queue offline.",
@@ -626,10 +654,17 @@ export default function WorkOrderDetailPage() {
         })
         return
       }
-      toast({
-        title: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle,
-        description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
-      })
+      if (unsafeDirty) {
+        toast({
+          title: SYNC_PREP_COPY.workOrderFullPageSplitOfflineSaveTitle,
+          description: SYNC_PREP_COPY.workOrderFullPageSplitOfflineSaveBody,
+        })
+      } else {
+        toast({
+          title: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle,
+          description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
+        })
+      }
       if (safeTasksDirty) {
         setSavedTasks(
           cloneTasks(
@@ -644,7 +679,9 @@ export default function WorkOrderDetailPage() {
       }
       setSavedBanner("local")
       setTimeout(() => setSavedBanner(null), 5000)
-      setEditing(false)
+      if (!unsafeDirty) {
+        setEditing(false)
+      }
       return
     }
 
@@ -1215,9 +1252,16 @@ export default function WorkOrderDetailPage() {
             </div>
           ) : null}
           {savedBanner === "local" ? (
-            <div className="flex items-center gap-1.5 text-xs text-sky-900 dark:text-sky-100 bg-sky-500/10 border border-sky-500/25 rounded-md px-3 py-1.5 max-w-md">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              <span>{SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle}</span>
+            <div className="flex items-start gap-1.5 text-xs text-sky-900 dark:text-sky-100 bg-sky-500/10 border border-sky-500/25 rounded-md px-3 py-1.5 max-w-md">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span className="min-w-0">
+                <span className="font-medium block">{SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle}</span>
+                {fullPageOfflineSaveContext.unsafeDirty ? (
+                  <span className="block text-[11px] text-sky-950/80 dark:text-sky-50/85 mt-1 leading-snug">
+                    {SYNC_PREP_COPY.workOrderFullPageOfflineUnsafeEditingNote}
+                  </span>
+                ) : null}
+              </span>
             </div>
           ) : null}
         </div>
@@ -1269,7 +1313,11 @@ export default function WorkOrderDetailPage() {
               <Button
                 size="sm"
                 className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
-                title={!online ? SYNC_PREP_COPY.savedLocallyTooltip : SYNC_PREP_COPY.saveRequiresNetwork}
+                title={
+                  !online
+                    ? SYNC_PREP_COPY.workOrderFullPageOfflineSaveButtonTooltip
+                    : SYNC_PREP_COPY.saveRequiresNetwork
+                }
                 onClick={() => void handleSave()}
               >
                 <Save className="w-3.5 h-3.5 mr-1.5" />
@@ -1321,6 +1369,15 @@ export default function WorkOrderDetailPage() {
           className="text-[11px] text-muted-foreground leading-snug border border-border/80 rounded-lg bg-muted/20 px-3 py-2"
         >
           {SYNC_PREP_COPY.workOrderFullPageOfflineHint}
+        </p>
+      ) : null}
+
+      {!online && editing && fullPageOfflineSaveContext.unsafeDirty ? (
+        <p
+          role="status"
+          className="text-[11px] text-amber-950 dark:text-amber-100 leading-snug border border-amber-500/35 rounded-lg bg-amber-500/10 px-3 py-2"
+        >
+          {SYNC_PREP_COPY.workOrderFullPageOfflineUnsafeEditingNote}
         </p>
       ) : null}
 
@@ -1553,7 +1610,11 @@ export default function WorkOrderDetailPage() {
             Cancel
           </Button>
           <Button
-            title={!online ? SYNC_PREP_COPY.savedLocallyTooltip : SYNC_PREP_COPY.saveRequiresNetwork}
+            title={
+              !online
+                ? SYNC_PREP_COPY.workOrderFullPageOfflineSaveButtonTooltip
+                : SYNC_PREP_COPY.saveRequiresNetwork
+            }
             onClick={() => void handleSave()}
           >
             <Save className="w-3.5 h-3.5 mr-1.5" />

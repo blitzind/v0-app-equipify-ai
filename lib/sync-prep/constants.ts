@@ -93,11 +93,24 @@ export const SYNC_PREP_COPY = {
   workOrderFullPageOfflineHint:
     "Technician notes, problem text, and JSON tasks (when allowed) can be saved on this device while offline. Billing, labor/parts totals, inventory, file uploads, and AI still require a connection.",
 
+  /** Save changes — desktop + mobile footer when offline */
+  workOrderFullPageOfflineSaveButtonTooltip:
+    "Saves problem text, diagnosis, technician notes, internal notes, and JSON tasks (when allowed) on this device. Labor, parts lines, and customer signatures need a connection and stay unsaved until you are online.",
+
   workOrderFullPageTechnicianSavedLocalTitle: "Technician fields saved locally",
   workOrderFullPageTechnicianSavedLocalBody:
     "Billing, inventory, file uploads, and AI still require a connection before they sync to your workspace.",
 
+  /** Same session also had labor/parts/signature edits — those stay local-only in the form until online */
+  workOrderFullPageSplitOfflineSaveTitle: "Technician fields saved locally",
+  workOrderFullPageSplitOfflineSaveBody:
+    "Labor, parts lines, and customer signatures were not saved offline. Stay in edit mode to keep working, then save those when you have a connection.",
+
   workOrderFullPageUnsafeOfflineTitle: "Online required",
   workOrderFullPageUnsafeOfflineBody:
     "Labor, parts lines, and signatures were not saved. Reconnect to save those changes, or use Sync now after saving technician fields locally.",
+
+  /** Inline when offline + editing + labor/parts/signature differs from server */
+  workOrderFullPageOfflineUnsafeEditingNote:
+    "You have unsaved labor, parts, or signature changes. Those cannot be saved offline — they are only sent when you are online.",
 } as const
