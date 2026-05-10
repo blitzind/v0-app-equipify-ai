@@ -25,6 +25,7 @@ import {
   type CompletionCertificateSlot,
 } from "@/lib/work-orders/work-order-completion"
 import { cloneTasks, tasksEqual, type TaskDraft } from "@/lib/work-orders/tasks-snapshot"
+import { partsEqual } from "@/lib/work-orders/parts-snapshot"
 import { useWorkOrders } from "@/lib/work-order-store"
 import type { AdminInvoice, Part, RepairLog, WorkOrder, WorkOrderStatus } from "@/lib/mock-data"
 import { fetchInvoicesForWorkOrder } from "@/lib/org-quotes-invoices/repository"
@@ -129,6 +130,8 @@ export default function WorkOrderDetailPage() {
   const storeWo = getById(workOrderRouteId)
   const [dbWo, setDbWo] = useState<WorkOrder | null | undefined>(undefined)
   const [internalNotes, setInternalNotes] = useState("")
+  /** Server `work_orders.notes` at last successful load — used for offline bundle baselines. */
+  const [serverInternalNotes, setServerInternalNotes] = useState("")
   const [planServices, setPlanServices] = useState<unknown[] | null>(null)
   const [photoGallery, setPhotoGallery] = useState<WorkOrderPhotoGalleryItem[]>([])
   const [documentAttachments, setDocumentAttachments] = useState<WorkOrderDocumentItem[]>([])
@@ -142,7 +145,7 @@ export default function WorkOrderDetailPage() {
   const [detailLoadMessage, setDetailLoadMessage] = useState<string | null>(null)
 
   const [editing, setEditing] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [savedBanner, setSavedBanner] = useState<"server" | "local" | null>(null)
   const [billingDecisionOpen, setBillingDecisionOpen] = useState(false)
   const [billingSaving, setBillingSaving] = useState(false)
   const [billingVendorId, setBillingVendorId] = useState("")
@@ -228,7 +231,9 @@ export default function WorkOrderDetailPage() {
     setDbLoadFailed(false)
     setDetailLoadMessage(null)
     setDbWo(res.data.workOrder)
-    setInternalNotes(res.data.notes)
+    const n = res.data.notes ?? ""
+    setInternalNotes(n)
+    setServerInternalNotes(n)
     setPlanServices(res.data.planServices)
     setPhotoGallery(res.data.photoGallery)
     setDocumentAttachments(res.data.documentAttachments)
@@ -300,6 +305,29 @@ export default function WorkOrderDetailPage() {
     window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
     return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
   }, [])
+
+  const queuePageOfflineBundle = useCallback(
+    async (patch: Partial<WorkOrderOfflineBundlePayload>): Promise<boolean> => {
+      const snapshot = dbWo ?? storeWo
+      if (!activeOrg.organizationId || !pageUserId || !snapshot?.id) return false
+      const existing = await getWorkOrderOfflineRecordForScope(
+        makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, snapshot.id),
+      )
+      const next = mergeTechnicianOfflineBundle({
+        existing,
+        organizationId: activeOrg.organizationId,
+        userId: pageUserId,
+        workOrder: snapshot,
+        dbNotes: serverInternalNotes,
+        patch,
+      })
+      if (!next) return false
+      await putWorkOrderOfflineRecord(next)
+      await refreshPageOfflineDigest()
+      return true
+    },
+    [activeOrg.organizationId, pageUserId, dbWo, storeWo, serverInternalNotes, refreshPageOfflineDigest],
+  )
 
   const woTimelineEvents = useMemo(() => {
     if (!wo) return []
@@ -504,6 +532,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function persistUpdate(payload: Record<string, unknown>) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineBody,
+      })
+      return false
+    }
     if (!activeOrg.organizationId) {
       toast({ title: "Not signed in", description: "Save your session and try again.", variant: "destructive" })
       return false
@@ -523,6 +559,95 @@ export default function WorkOrderDetailPage() {
   }
 
   async function handleSave() {
+    if (!woCanEdit) return
+
+    const serverLabor =
+      typeof workOrder.repairLog.laborHours === "number" ? workOrder.repairLog.laborHours : 0
+    const unsafePartsDirty = !partsEqual(parts, workOrder.repairLog.partsUsed ?? [])
+    const unsafeLaborDirty = laborHours !== serverLabor
+    const unsafeSigDirty =
+      (sigData ?? "") !== (workOrder.repairLog.signatureDataUrl ?? "") ||
+      (signedBy ?? "") !== (workOrder.repairLog.signedBy ?? "") ||
+      (signedAt ?? "") !== (workOrder.repairLog.signedAt ?? "")
+
+    const safeTextDirty =
+      problemReported.trim() !== (workOrder.repairLog.problemReported ?? "").trim() ||
+      diagnosis !== (workOrder.repairLog.diagnosis ?? "") ||
+      techNotes !== (workOrder.repairLog.technicianNotes ?? "") ||
+      internalNotes.trim() !== (serverInternalNotes ?? "").trim()
+
+    const tasksDirtyPage = !tasksEqual(tabTasks, savedTasks)
+    const safeTasksDirty = !usesTasksTable && tasksDirtyPage
+
+    const unsafeDirty = unsafePartsDirty || unsafeLaborDirty || unsafeSigDirty
+
+    if (!online) {
+      if (unsafeDirty) {
+        toast({
+          variant: "destructive",
+          title: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineTitle,
+          description: SYNC_PREP_COPY.workOrderFullPageUnsafeOfflineBody,
+        })
+      }
+      const patch: Partial<WorkOrderOfflineBundlePayload> = {}
+      if (safeTextDirty) {
+        patch.repair = {
+          problemReported,
+          diagnosis,
+          technicianNotes: techNotes,
+          notesInternal: internalNotes,
+        }
+      }
+      if (safeTasksDirty) {
+        patch.tasks = tabTasks
+          .filter((t) => t.label.trim())
+          .map((t) => ({
+            ...t,
+            label: t.label.trim(),
+            description: t.description?.trim() || undefined,
+          }))
+      }
+      const hasPatch = patch.repair !== undefined || patch.tasks !== undefined
+      if (!hasPatch) {
+        if (!unsafeDirty) {
+          toast({
+            title: "Nothing to save",
+            description: "No technician field changes to queue offline.",
+          })
+        }
+        return
+      }
+      const ok = await queuePageOfflineBundle(patch)
+      if (!ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not save locally",
+          description: "Try again when signed in and this job is loaded.",
+        })
+        return
+      }
+      toast({
+        title: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle,
+        description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
+      })
+      if (safeTasksDirty) {
+        setSavedTasks(
+          cloneTasks(
+            (patch.tasks ?? []).map((t) => ({
+              id: t.id,
+              label: t.label,
+              done: t.done,
+              description: t.description,
+            })),
+          ),
+        )
+      }
+      setSavedBanner("local")
+      setTimeout(() => setSavedBanner(null), 5000)
+      setEditing(false)
+      return
+    }
+
     const payload: Record<string, unknown> = {
       problem_reported: problemReported.trim() || null,
       repair_log: repairLogJsonForPersist(
@@ -570,12 +695,21 @@ export default function WorkOrderDetailPage() {
       totalLaborCost: laborCost,
       totalPartsCost: usesPartsLineItems ? workOrder.totalPartsCost : partsCost,
     })
-    setSaved(true)
+    setServerInternalNotes(internalNotes.trim())
+    setSavedBanner("server")
     setEditing(false)
-    setTimeout(() => setSaved(false), 3000)
+    setTimeout(() => setSavedBanner(null), 3000)
   }
 
   async function finalizeWorkOrderCompletion(): Promise<boolean> {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Finishing a job requires a connection (certificates, signatures, and server status).",
+      })
+      return false
+    }
     const gate = certificateGateForCompletionAllAssets({
       calibrationTemplateId: workOrder.calibrationTemplateId,
       slots: completionCertSlots,
@@ -611,6 +745,30 @@ export default function WorkOrderDetailPage() {
       await finalizeWorkOrderCompletion()
       return
     }
+    if (!online) {
+      if (next === "In Progress" && (workOrder.status === "Open" || workOrder.status === "Scheduled")) {
+        const ok = await queuePageOfflineBundle({ statusInProgress: true })
+        if (ok) {
+          toast({
+            title: SYNC_PREP_COPY.savedLocallyLabel,
+            description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
+          })
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again when this job is fully loaded.",
+          })
+        }
+        return
+      }
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: SYNC_PREP_COPY.statusChangeRequiresNetwork,
+      })
+      return
+    }
     const payload: Record<string, unknown> = { status: uiStatusToDb(next) }
     const ok = await persistUpdate(payload)
     if (!ok) return
@@ -622,6 +780,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function applyInvoiceBillingChoice(choice: "customer" | "vendor" | "hold") {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Billing updates require a connection.",
+      })
+      return
+    }
     if (!activeOrg.organizationId) return
     if (choice === "hold") {
       toast({
@@ -669,6 +835,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function handleCustomerSignatureSave(blob: Blob, name: string) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Signatures upload requires a connection.",
+      })
+      return
+    }
     if (!activeOrg.organizationId) return
     const supabase = createBrowserSupabaseClient()
     const repairLogPayload: RepairLog = {
@@ -730,6 +904,14 @@ export default function WorkOrderDetailPage() {
   async function persistTasksFromTabs(
     next: { id: string; label: string; done: boolean; description?: string }[],
   ) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Server-backed tasks require a connection.",
+      })
+      return
+    }
     if (!editable || !activeOrg.organizationId) return
     const supabase = createBrowserSupabaseClient()
     try {
@@ -772,6 +954,36 @@ export default function WorkOrderDetailPage() {
         label: t.label.trim(),
         description: t.description?.trim() || undefined,
       }))
+    if (!online) {
+      if (usesTasksTable) {
+        toast({
+          variant: "destructive",
+          title: ONLINE_REQUIRED_LABEL,
+          description: "This job uses server-backed tasks — connect to save task changes.",
+        })
+        return
+      }
+      setTasksSaving(true)
+      try {
+        const ok = await queuePageOfflineBundle({ tasks: normalized })
+        if (!ok) {
+          toast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again when signed in and this job is loaded.",
+          })
+          return
+        }
+        setSavedTasks(cloneTasks(normalized))
+        toast({
+          title: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle,
+          description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
+        })
+      } finally {
+        setTasksSaving(false)
+      }
+      return
+    }
     setTasksSaving(true)
     try {
       await persistTasksFromTabs(normalized)
@@ -781,6 +993,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function persistPartsFromTabs(next: Part[]) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Parts and materials require a connection to save.",
+      })
+      return
+    }
     if (!editable || !activeOrg.organizationId) return
     const supabase = createBrowserSupabaseClient()
     try {
@@ -808,6 +1028,8 @@ export default function WorkOrderDetailPage() {
   function schedulePersistParts(next: Part[]) {
     setParts(next)
     if (partsPersistTimer.current) clearTimeout(partsPersistTimer.current)
+    partsPersistTimer.current = null
+    if (!online) return
     partsPersistTimer.current = setTimeout(() => {
       void persistPartsFromTabs(next)
       partsPersistTimer.current = null
@@ -815,6 +1037,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function handleAttachmentUpload(files: FileList) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Uploads require a connection.",
+      })
+      return
+    }
     if (!activeOrg.organizationId) return
     if (workOrder.isArchived) return
     const list = Array.from(files)
@@ -852,6 +1082,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function handleRemoveAttachmentPhoto(attachmentId: string) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Removing attachments requires a connection.",
+      })
+      return
+    }
     if (!editable || !activeOrg.organizationId) return
     if (
       !window.confirm(
@@ -875,6 +1113,14 @@ export default function WorkOrderDetailPage() {
   }
 
   async function handleRemoveLegacyPhoto(fullIndex: number) {
+    if (!online) {
+      toast({
+        variant: "destructive",
+        title: ONLINE_REQUIRED_LABEL,
+        description: "Removing photos requires a connection.",
+      })
+      return
+    }
     if (!editable || !activeOrg.organizationId) return
     if (!window.confirm("Remove this photo from the work order?")) return
     const at = legacyRepairPhotoIndex(photoGallery, fullIndex)
@@ -962,12 +1208,18 @@ export default function WorkOrderDetailPage() {
               <ChevronLeft className="w-5 h-5 lg:w-4 lg:h-4" />
             </Button>
           </Link>
-          {saved && (
+          {savedBanner === "server" ? (
             <div className="flex items-center gap-1.5 text-xs text-[color:var(--status-success)] bg-[color:var(--status-success)]/10 border border-[color:var(--status-success)]/20 rounded-md px-3 py-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
               All changes saved
             </div>
-          )}
+          ) : null}
+          {savedBanner === "local" ? (
+            <div className="flex items-center gap-1.5 text-xs text-sky-900 dark:text-sky-100 bg-sky-500/10 border border-sky-500/25 rounded-md px-3 py-1.5 max-w-md">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>{SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalTitle}</span>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 max-lg:w-full max-lg:flex-col max-lg:items-stretch">
           {!editing ? (
@@ -977,7 +1229,17 @@ export default function WorkOrderDetailPage() {
                   variant="outline"
                   size="sm"
                   className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
-                  title={SYNC_PREP_COPY.statusChangeRequiresNetwork}
+                  title={(() => {
+                    const nextSt = nextStatus[workOrder.status]!
+                    if (
+                      !online &&
+                      nextSt === "In Progress" &&
+                      (workOrder.status === "Open" || workOrder.status === "Scheduled")
+                    ) {
+                      return undefined
+                    }
+                    return SYNC_PREP_COPY.statusChangeRequiresNetwork
+                  })()}
                   onClick={() => void handleStatusAdvance(nextStatus[workOrder.status]!)}
                 >
                   Move to {nextStatus[workOrder.status]}
@@ -1007,7 +1269,7 @@ export default function WorkOrderDetailPage() {
               <Button
                 size="sm"
                 className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
-                title={SYNC_PREP_COPY.saveRequiresNetwork}
+                title={!online ? SYNC_PREP_COPY.savedLocallyTooltip : SYNC_PREP_COPY.saveRequiresNetwork}
                 onClick={() => void handleSave()}
               >
                 <Save className="w-3.5 h-3.5 mr-1.5" />
@@ -1052,6 +1314,15 @@ export default function WorkOrderDetailPage() {
         record={pageConflictRecord}
         onDiscardLocal={() => discardPageOfflineDraft()}
       />
+
+      {(!online || pageOfflineDigest.pending) && woCanEdit ? (
+        <p
+          role="note"
+          className="text-[11px] text-muted-foreground leading-snug border border-border/80 rounded-lg bg-muted/20 px-3 py-2"
+        >
+          {SYNC_PREP_COPY.workOrderFullPageOfflineHint}
+        </p>
+      ) : null}
 
       <WorkOrderDetailExperience
         tabsValue={pageWoTab}
@@ -1195,6 +1466,14 @@ export default function WorkOrderDetailPage() {
               savedCustomer={workOrder.repairLog.customerServiceSummary}
               onPersistSummaries={async (patch) => {
                 if (!activeOrg.organizationId || workOrder.isArchived || !woCanEdit) return false
+                if (!online) {
+                  toast({
+                    variant: "destructive",
+                    title: ONLINE_REQUIRED_LABEL,
+                    description: "AI-generated summaries require a connection to save.",
+                  })
+                  return false
+                }
                 const merged: RepairLog = { ...workOrder.repairLog, ...patch }
                 return persistUpdate({
                   repair_log: repairLogJsonForPersist(merged, {
@@ -1273,7 +1552,10 @@ export default function WorkOrderDetailPage() {
           <Button variant="outline" onClick={() => setEditing(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSave()}>
+          <Button
+            title={!online ? SYNC_PREP_COPY.savedLocallyTooltip : SYNC_PREP_COPY.saveRequiresNetwork}
+            onClick={() => void handleSave()}
+          >
             <Save className="w-3.5 h-3.5 mr-1.5" />
             Save repair log
           </Button>

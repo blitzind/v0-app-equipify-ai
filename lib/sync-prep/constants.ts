@@ -88,4 +88,16 @@ export const SYNC_PREP_COPY = {
 
   syncFailedLabel: "Sync failed",
   syncFailedTooltip: "Replay failed — check the error on the sync bar and try again, or discard the local draft.",
+
+  /** Full work order profile page (`/work-orders/[id]`) — Phase 53C */
+  workOrderFullPageOfflineHint:
+    "Technician notes, problem text, and JSON tasks (when allowed) can be saved on this device while offline. Billing, labor/parts totals, inventory, file uploads, and AI still require a connection.",
+
+  workOrderFullPageTechnicianSavedLocalTitle: "Technician fields saved locally",
+  workOrderFullPageTechnicianSavedLocalBody:
+    "Billing, inventory, file uploads, and AI still require a connection before they sync to your workspace.",
+
+  workOrderFullPageUnsafeOfflineTitle: "Online required",
+  workOrderFullPageUnsafeOfflineBody:
+    "Labor, parts lines, and signatures were not saved. Reconnect to save those changes, or use Sync now after saving technician fields locally.",
 } as const
