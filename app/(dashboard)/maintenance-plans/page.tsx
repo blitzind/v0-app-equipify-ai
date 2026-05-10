@@ -10,6 +10,12 @@ import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { createWorkOrderFromMaintenancePlan } from "@/lib/maintenance-plans/create-work-order-from-plan"
 import { computeNextDueDate } from "@/lib/maintenance-plans/db-map"
+import {
+  getMaintenanceWorkOrderReadiness,
+  maintenancePlanToForecastInput,
+  summarizeMaintenanceForecast,
+} from "@/lib/maintenance-plans/forecast"
+import { MaintenanceForecastPanel } from "@/components/maintenance-plans/maintenance-forecast-panel"
 import { DrawerViewport, DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import {
   AlertDialog,
@@ -188,6 +194,8 @@ function formatDays(days: number): string {
 
 function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: () => void }) {
   const planHasEquipment = Boolean(plan.equipmentId?.trim())
+  const { standardCreateEligibility, maintenancePlansFeatureAllowed } = useBillingAccess()
+  const woReadiness = useMemo(() => getMaintenanceWorkOrderReadiness(plan), [plan])
   const {
     updatePlan,
     setStatus,
@@ -484,6 +492,35 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               {plan.customerName}
               {planHasEquipment ? ` — ${plan.equipmentName}` : " — No equipment attached yet"}
             </p>
+            {!plan.isArchived ? (
+              <div className="mt-2 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[10px] font-semibold",
+                      woReadiness.ready
+                        ? "border-[color:var(--status-success)]/50 bg-[color:var(--status-success)]/10 text-emerald-900 dark:text-emerald-100"
+                        : "border-border bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {woReadiness.ready ? "Ready to generate work order" : "Work order not ready"}
+                  </Badge>
+                  {(!standardCreateEligibility || !maintenancePlansFeatureAllowed) && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Billing or subscription limits may still block creation.
+                    </span>
+                  )}
+                </div>
+                {woReadiness.blockers.length > 0 ? (
+                  <ul className="text-[11px] text-muted-foreground list-disc pl-4 space-y-0.5">
+                    {woReadiness.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div
             role="toolbar"
@@ -531,7 +568,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   size="sm"
                   variant="outline"
                   className="gap-1.5 h-8 text-xs cursor-pointer"
-                  disabled={headerWoBusy || !organizationId || !planHasEquipment}
+                  disabled={headerWoBusy || !organizationId || !woReadiness.ready}
                   onClick={() => void handleHeaderCreateWo()}
                 >
                   {headerWoBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
@@ -907,7 +944,7 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
                   onClick={() => void handleAutoCreateWo()}
                   variant="outline"
                   className="h-8 gap-1.5 text-xs cursor-pointer"
-                  disabled={!planHasEquipment}
+                  disabled={!woReadiness.ready}
                 >
                   <Wrench className="w-4 h-4" />
                   {woCreated ? "Work Order Created!" : "Create Work Order Now"}
@@ -1186,9 +1223,16 @@ function MaintenancePlansPageInner() {
     const active   = plansForStats.filter((p) => p.status === "Active").length
     const due7     = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 7).length
     const due30    = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 30).length
+    const due90    = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 90).length
+    const overdue  = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) < 0).length
     const autoWo   = plansForStats.filter((p) => p.autoCreateWorkOrder).length
-    return { active, due7, due30, autoWo }
+    return { active, due7, due30, due60, due90, overdue, autoWo }
   }, [plansForStats])
+
+  const forecastSummary = useMemo(
+    () => summarizeMaintenanceForecast(plans.map(maintenancePlanToForecastInput)),
+    [plans],
+  )
 
   const initialLoading = loading && plans.length === 0
   const listEmpty = !loading && plans.length === 0
@@ -1197,8 +1241,8 @@ function MaintenancePlansPageInner() {
   if (initialLoading) {
     return (
       <div className="flex flex-col gap-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="border border-border">
               <CardContent className="pt-5 pb-4">
                 <div className="h-3 w-24 bg-muted animate-pulse rounded mb-2" />
@@ -1256,11 +1300,13 @@ function MaintenancePlansPageInner() {
         <AidenOperationalInsightsCard organizationId={maintenanceOrgId} moduleContext="maintenance_plans" />
       : null}
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {[
           { label: "Active Plans",       value: stats.active,  sub: "currently running",          color: "text-emerald-600" },
-          { label: "Due This Week",      value: stats.due7,    sub: "within 7 days",               color: "text-red-500" },
-          { label: "Due This Month",     value: stats.due30,   sub: "within 30 days",              color: "text-amber-600" },
+          { label: "Overdue",            value: stats.overdue,   sub: "active & past due",           color: "text-destructive" },
+          { label: "Due ≤7 days",        value: stats.due7,    sub: "includes overdue",            color: "text-red-500" },
+          { label: "Due ≤30 days",       value: stats.due30,   sub: "includes overdue",            color: "text-amber-600" },
+          { label: "Due ≤90 days",       value: stats.due90,   sub: "includes overdue",            color: "text-muted-foreground" },
           { label: "Auto Work Orders",   value: stats.autoWo,  sub: "plans with auto-create on",  color: "text-blue-500" },
         ].map(({ label, value, sub, color }) => (
           <Card key={label} className="border border-border">
@@ -1272,6 +1318,8 @@ function MaintenancePlansPageInner() {
           </Card>
         ))}
       </div>
+
+      {plans.length > 0 && !error ? <MaintenanceForecastPanel summary={forecastSummary} variant="full" /> : null}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">

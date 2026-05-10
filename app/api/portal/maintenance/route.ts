@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { mapMaintenancePlanStatus } from "@/lib/portal/display-mappers"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
+import { daysUntilDue, summarizeMaintenanceForecast } from "@/lib/maintenance-plans/forecast"
 
 export const runtime = "nodejs"
 
@@ -31,15 +32,40 @@ export async function GET() {
     em = new Map((eqs ?? []).map((e) => [e.id as string, (e.name as string) ?? ""]))
   }
 
-  return NextResponse.json({
-    items: (rows ?? []).map((p) => ({
+  const items = (rows ?? []).map((p) => {
+    const nextDue = (p.next_due_date as string | null) ?? null
+    const offset = nextDue ? daysUntilDue(nextDue) : null
+    return {
       id: p.id as string,
       name: p.name as string,
       statusLabel: mapMaintenancePlanStatus(p.status as string),
       priority: p.priority as string,
-      nextDueDate: (p.next_due_date as string | null) ?? null,
+      nextDueDate: nextDue,
       intervalLabel: `${p.interval_value} ${p.interval_unit}`,
       equipmentName: em.get(p.equipment_id as string) ?? "Equipment",
+      daysUntilNext: offset,
+    }
+  })
+
+  const forecast = summarizeMaintenanceForecast(
+    (rows ?? []).map((r) => ({
+      id: r.id as string,
+      status: String(r.status ?? ""),
+      next_due_date: (r.next_due_date as string | null) ?? null,
+      is_archived: false,
+      customer_id: custId,
+      equipment_id: (r.equipment_id as string | null) ?? null,
+      equipment_name: em.get(r.equipment_id as string) ?? "Equipment",
     })),
+  )
+
+  return NextResponse.json({
+    items,
+    forecast: {
+      forecastableCount: forecast.forecastableCount,
+      overdue: forecast.exclusive.overdue,
+      cumulative: forecast.cumulative,
+      exclusive: forecast.exclusive,
+    },
   })
 }

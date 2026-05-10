@@ -31,8 +31,10 @@ import { buildEquipmentLifecycleTimeline, sumInvoiceAmountCents } from "@/lib/li
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import { RecentCommunicationsCard } from "@/components/communications/recent-communications-card"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
+import { summarizeMaintenanceForecast } from "@/lib/maintenance-plans/forecast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { MaintenanceForecastPanel } from "@/components/maintenance-plans/maintenance-forecast-panel"
 import {
   loadEquipmentSignalsByIds,
   type EquipmentSignals,
@@ -54,7 +56,7 @@ import {
   FileBadge2,
   Paperclip,
 } from "lucide-react"
-import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
+import { SlaCoverageBadge, formatSlaCoverageLabel } from "@/components/service-contracts/sla-coverage-badge"
 import type { ServiceContractRow } from "@/lib/service-contracts/types"
 import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
 
@@ -683,6 +685,27 @@ export default function EquipmentDetailPage() {
     if (!canViewEquipmentFinancials && tab === "quotes") setTab("overview")
   }, [assignedOnlyView, canViewEquipmentFinancials, tab])
 
+  const equipmentPmForecast = useMemo(() => {
+    if (!eq) return null
+    return summarizeMaintenanceForecast(
+      plans.map((p) => ({
+        id: p.id,
+        status: p.status,
+        next_due_date: p.next_due_date,
+        is_archived: false,
+        customer_id: eq.customerId,
+        customer_name: eq.customerName,
+        equipment_id: eq.id,
+        equipment_name: eq.name,
+      })),
+    )
+  }, [eq, plans])
+
+  const equipmentPmContractHint = useMemo(() => {
+    if (!equipmentContractEval) return null
+    return `Service contract posture: ${formatSlaCoverageLabel(equipmentContractEval.label)}.`
+  }, [equipmentContractEval])
+
   const openWOs = useMemo(
     () => workOrders.filter((w) => w.status !== "completed" && w.status !== "invoiced"),
     [workOrders],
@@ -1266,6 +1289,14 @@ export default function EquipmentDetailPage() {
             </Card>
           </div>
 
+          {equipmentPmForecast && plans.length > 0 ? (
+            <MaintenanceForecastPanel
+              variant="compact"
+              summary={equipmentPmForecast}
+              contractHint={equipmentPmContractHint}
+            />
+          ) : null}
+
           <Card className="border-border">
             <CardContent className="p-5 space-y-0">
               <DrawerSection title="Compliance & maintenance">
@@ -1398,6 +1429,13 @@ export default function EquipmentDetailPage() {
               </Link>
             </Button>
           </div>
+          {equipmentPmForecast && plans.length > 0 ? (
+            <MaintenanceForecastPanel
+              variant="compact"
+              summary={equipmentPmForecast}
+              contractHint={equipmentPmContractHint}
+            />
+          ) : null}
           <Card className="border-border">
             <CardContent className="p-4 space-y-2">
               {plans.length === 0 ? (

@@ -48,6 +48,8 @@ import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supab
 import { getEquipmentDisplayPrimary, getEquipmentSecondaryLine } from "@/lib/equipment/display"
 import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map"
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
+import { summarizeMaintenanceForecast } from "@/lib/maintenance-plans/forecast"
+import { MaintenanceForecastPanel } from "@/components/maintenance-plans/maintenance-forecast-panel"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
@@ -1580,6 +1582,36 @@ export default function CustomerDetailPage() {
     [customerPlans],
   )
 
+  const customerPmForecastSummary = useMemo(() => {
+    if (!customer) return null
+    return summarizeMaintenanceForecast(
+      customerPlans.map((p) => ({
+        id: p.id,
+        status: p.status,
+        next_due_date: p.next_due_date,
+        is_archived: false,
+        customer_id: customer.id,
+        customer_name: customer.company,
+        equipment_id: p.equipment_id,
+        equipment_name: p.equipment_id ? planEquipmentNames[p.equipment_id] ?? "Equipment" : "",
+      })),
+    )
+  }, [customer, customerPlans, planEquipmentNames])
+
+  const customerPmContractHint = useMemo(() => {
+    if (!customer) return null
+    const today = new Date().toISOString().slice(0, 10)
+    const hit = customer.contracts.some(
+      (c) =>
+        c.status === "active" &&
+        c.startDate.slice(0, 10) <= today &&
+        c.endDate.slice(0, 10) >= today,
+    )
+    return hit
+      ? "Active service agreement on file — align preventive visits with any contract response or resolution targets."
+      : null
+  }, [customer])
+
   const planNameById = useMemo(() => {
     const m: Record<string, string> = {}
     for (const p of customerPlans) m[p.id] = p.name
@@ -3072,6 +3104,15 @@ export default function CustomerDetailPage() {
               </Link>
             </Button>
           </div>
+
+          {customerPmForecastSummary && customerPlans.length > 0 ? (
+            <MaintenanceForecastPanel
+              variant="compact"
+              summary={customerPmForecastSummary}
+              contractHint={customerPmContractHint}
+              className="mb-4"
+            />
+          ) : null}
 
           {plansSectionLoading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground text-sm">

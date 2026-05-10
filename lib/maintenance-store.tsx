@@ -27,7 +27,10 @@ import {
   serializeServicesForDb,
 } from "@/lib/maintenance-plans/db-map"
 import { insertMaintenancePlanAutomationEvent } from "@/lib/maintenance-plans/automation-events"
+import { filterMaintenancePlansForAssignedScope } from "@/lib/maintenance-plans/assigned-scope-filter"
 import { maintenancePlanAssignmentColumns } from "@/lib/work-orders/assignment-payload"
+import { isAssignedWorkOnly, loadAssignedWorkScope } from "@/lib/permissions/technician-scope"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import type { RecordArchiveVisibility } from "@/lib/org-quotes-invoices/repository"
 
 export type { RecordArchiveVisibility }
@@ -58,6 +61,7 @@ const MaintenanceContext = createContext<MaintenanceContextValue | null>(null)
 
 export function MaintenanceProvider({ children }: { children: ReactNode }) {
   const activeOrg = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const [plans, setPlans] = useState<MaintenancePlan[]>([])
   const [notificationLog, setNotificationLog] = useState<NotificationLogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,10 +112,27 @@ export function MaintenanceProvider({ children }: { children: ReactNode }) {
     const { plans: loaded, error: loadErr } = await loadMaintenancePlansForOrg(supabase, orgId, {
       visibility: plansListVisibility,
     })
-    setPlans(loaded)
+
+    const assignedOnly = isAssignedWorkOnly(permissions)
+    const scope = assignedOnly
+      ? await loadAssignedWorkScope(supabase, { organizationId: orgId, userId: user.id })
+      : null
+    const visible = filterMaintenancePlansForAssignedScope(loaded, {
+      assignedOnly,
+      userId: user.id,
+      scope,
+    })
+
+    setPlans(visible)
     setError(loadErr)
     if (!silent) setLoading(false)
-  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, plansListVisibility])
+  }, [
+    activeOrg.status,
+    activeOrg.organizationId,
+    activeOrg.organizations.length,
+    plansListVisibility,
+    permissions,
+  ])
 
   useEffect(() => {
     void refreshPlans()
