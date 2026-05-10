@@ -260,6 +260,6 @@ function buildPlainText(
   }
   lines.push("")
   lines.push(`Open AI Operations → ${absoluteUrl("/ai-ops", appUrl)}`)
-  lines.push("Manage digest settings → /settings/notifications#ai-ops-digest")
+  lines.push(`Manage digest settings → ${absoluteUrl("/settings/notifications#ai-ops-digest", appUrl)}`)
   return lines.join("\n")
 }

@@ -11,7 +11,7 @@ Equipify uses **one** outbound path: [Resend](https://resend.com) via `sendEmail
 | `lib/email/templates.ts` | HTML/text bodies (unchanged). |
 | `lib/email/signup-provision-emails.ts` | Signup welcome + internal notify (calls `sendEmail`). |
 
-**All** transactional sends observed in the repo go through `sendEmail` (invoice, quote, certificate, work order summary, invites, AI Ops digest/reminder, signup).
+**All** Resend-backed transactional sends go through `sendEmail`. The authoritative per-route list, categories, and manual matrix live in [EMAIL_OUTBOUND_AUDIT.md](./EMAIL_OUTBOUND_AUDIT.md).
 
 ### From / reply-to
 
@@ -66,4 +66,5 @@ Config exposes `provider: "resend"` in health metadata so a later swap can branc
 
 ## Related
 
+- [EMAIL_OUTBOUND_AUDIT.md](./EMAIL_OUTBOUND_AUDIT.md) — **Phase 55.2** full send-path inventory, link rules, manual test matrix.
 - [SIGNUP_PROVISION_EMAILS.md](./SIGNUP_PROVISION_EMAILS.md) — signup-specific idempotency and copy.
