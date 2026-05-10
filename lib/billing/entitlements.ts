@@ -1,6 +1,11 @@
 import type { PlanId } from "@/lib/plans"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 
+/**
+ * Plan feature matrix + numeric limits for UI and `canUseFeature` / `requireFeatureAccess`.
+ * API monthly caps are displayed on billing; hard enforcement across all API routes is not universal yet (Phase 60.2+).
+ */
+
 export type Feature =
   | "automation"
   | "ai"

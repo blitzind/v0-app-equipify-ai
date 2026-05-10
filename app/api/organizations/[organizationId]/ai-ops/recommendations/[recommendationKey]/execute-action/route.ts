@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
@@ -61,6 +62,13 @@ export async function POST(
       403,
       "forbidden",
     )
+  }
+
+  if (!isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) {
+      return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+    }
   }
 
   let json: unknown

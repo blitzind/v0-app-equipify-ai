@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { runDigestForOrganization } from "@/lib/ai-ops/digest-runner"
 
 export const runtime = "nodejs"
@@ -40,6 +41,11 @@ export async function POST(
   const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
   if ("error" in gate) return gate.error
   const { supabase, userId } = gate
+
+  const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+  if (!planGate.ok) {
+    return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+  }
 
   let body: unknown = {}
   if (request.headers.get("content-length")) {

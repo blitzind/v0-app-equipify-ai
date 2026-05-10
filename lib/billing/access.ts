@@ -22,6 +22,8 @@ export type BillingAccessState = {
  * Derives subscription UX tier for billing gates (does not change stored rows).
  */
 export function getBillingAccessState(subscription: OrganizationSubscription | null): BillingAccessState {
+  // No row yet: treat as "open" for record creation so onboarding/demo and legacy orgs are not hard-blocked.
+  // Product risk: orgs that never get a subscription row are not restricted here — see docs/PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md.
   if (!subscription) {
     return { level: "full", allowRecordCreation: true, effectiveStatus: "none" }
   }

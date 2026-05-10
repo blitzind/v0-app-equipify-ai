@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { runDigestForOrganization } from "@/lib/ai-ops/digest-runner"
 import { renderAiOpsDigestEmail } from "@/lib/email/ai-ops-digest-template"
 
@@ -30,6 +31,11 @@ export async function GET(
 
   const gate = await requireOrgPermission(organizationId, "canViewInsights")
   if ("error" in gate) return gate.error
+
+  const planGate = await requireFeatureAccess(gate.supabase, organizationId, "ai")
+  if (!planGate.ok) {
+    return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+  }
 
   const result = await runDigestForOrganization({
     supabase: gate.supabase,

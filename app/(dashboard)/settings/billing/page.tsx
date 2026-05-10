@@ -856,6 +856,11 @@ function BillingPageContent() {
             />
           </div>
         </div>
+        <p className="px-4 md:px-6 pb-4 pt-1 text-[11px] text-muted-foreground leading-snug border-t border-border/70">
+          Team seats and equipment limits are enforced on supported create and invite flows (server-verified). API call totals
+          are shown for plans that include a monthly allowance; automated hard enforcement across every API path is planned —
+          this chart is accurate for usage we record, not a guarantee that all traffic is capped yet.
+        </p>
       </div>
 
       {/* ── Payment method (Stripe) ── */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
@@ -84,6 +85,14 @@ export async function GET(
   if (!user?.email) return jsonError("Sign in required.", 401, "unauthorized")
 
   const isPlatformAdmin = isPlatformAdminEmail(user.email)
+
+  if (!isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) {
+      return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+    }
+  }
+
   const rawRole = isPlatformAdmin
     ? "owner"
     : await getOrganizationMemberRole(supabase, user.id, organizationId)
