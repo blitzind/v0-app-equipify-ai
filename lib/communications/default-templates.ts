@@ -45,4 +45,12 @@ export const DEFAULT_COMMUNICATION_TEMPLATES = [
       "Hi {{customer_name}},\n\nIf you have a moment, we would love a short review of your recent service experience. Your feedback helps our team improve.\n\nThank you,\n{{sender_name}}",
     channel: "email" as const,
   },
+  {
+    template_key: "sms_appointment_reminder",
+    name: "SMS — appointment reminder",
+    category: "sms_reminder" as const,
+    subject: null,
+    body: "{{company_name}}: Hi {{customer_name}}, reminder — we have you scheduled {{appointment_date}}. Questions? Reply to this thread. Reply STOP to opt out.",
+    channel: "sms" as const,
+  },
 ]

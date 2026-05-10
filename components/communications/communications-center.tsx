@@ -26,9 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -41,6 +39,7 @@ import type {
   CommunicationSuggestion,
 } from "@/lib/communications/types"
 import { useToast } from "@/hooks/use-toast"
+import { CommunicationTemplatesSection } from "@/components/communications/communication-templates-section"
 
 type CommRow = {
   id: string
@@ -56,17 +55,6 @@ type CommRow = {
   customer_display_name?: string | null
   error_message?: string | null
   is_read?: boolean
-}
-
-type TemplateRow = {
-  id: string
-  template_key: string
-  name: string
-  category: string
-  subject: string | null
-  body: string
-  channel: string
-  updated_at: string
 }
 
 function initials(name: string | null | undefined): string {
@@ -140,12 +128,6 @@ export default function CommunicationsCenter() {
 
   const [automations, setAutomations] = useState<CommunicationAutomationRow[]>([])
   const [autoLoading, setAutoLoading] = useState(false)
-
-  const [templates, setTemplates] = useState<TemplateRow[]>([])
-  const [tplLoading, setTplLoading] = useState(false)
-  const [editTpl, setEditTpl] = useState<TemplateRow | null>(null)
-  const [tplDraft, setTplDraft] = useState({ name: "", subject: "", body: "" })
-  const [tplSaving, setTplSaving] = useState(false)
 
   const [suggestions, setSuggestions] = useState<CommunicationSuggestion[]>([])
   const [suggLoading, setSuggLoading] = useState(false)
@@ -257,25 +239,6 @@ export default function CommunicationsCenter() {
     }
   }, [orgId])
 
-  const loadTemplates = useCallback(async () => {
-    if (!orgId) return
-    setTplLoading(true)
-    try {
-      const res = await fetch(`/api/organizations/${encodeURIComponent(orgId)}/communications/templates`, {
-        cache: "no-store",
-      })
-      const body = (await res.json()) as { templates?: TemplateRow[]; error?: string }
-      if (!res.ok) throw new Error(body.error ?? "")
-      setTemplates(body.templates ?? [])
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not load templates (migration applied?)."
-      toast({ title: "Templates unavailable", description: msg, variant: "destructive" })
-      setTemplates([])
-    } finally {
-      setTplLoading(false)
-    }
-  }, [orgId, toast])
-
   const loadSuggestions = useCallback(async () => {
     if (!orgId) return
     setSuggLoading(true)
@@ -304,9 +267,8 @@ export default function CommunicationsCenter() {
   useEffect(() => {
     if (tab === "failed") void loadFailed()
     if (tab === "automations") void loadAutomations()
-    if (tab === "templates") void loadTemplates()
     if (tab === "ai") void loadSuggestions()
-  }, [tab, loadFailed, loadAutomations, loadTemplates, loadSuggestions])
+  }, [tab, loadFailed, loadAutomations, loadSuggestions])
 
   async function markAllRead() {
     if (!orgId) return
@@ -342,38 +304,6 @@ export default function CommunicationsCenter() {
     void loadFailed()
     void loadMetrics()
     void loadActivity()
-  }
-
-  function openEdit(t: TemplateRow) {
-    setEditTpl(t)
-    setTplDraft({ name: t.name, subject: t.subject ?? "", body: t.body })
-  }
-
-  async function saveTemplate() {
-    if (!orgId || !editTpl) return
-    setTplSaving(true)
-    try {
-      const res = await fetch(
-        `/api/organizations/${encodeURIComponent(orgId)}/communications/templates/${encodeURIComponent(editTpl.id)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: tplDraft.name,
-            subject: tplDraft.subject,
-            body: tplDraft.body,
-          }),
-        },
-      )
-      if (!res.ok) throw new Error()
-      toast({ title: "Template saved" })
-      setEditTpl(null)
-      void loadTemplates()
-    } catch {
-      toast({ title: "Save failed", variant: "destructive" })
-    } finally {
-      setTplSaving(false)
-    }
   }
 
   const m = metrics ?? emptyMetrics()
@@ -623,62 +553,7 @@ export default function CommunicationsCenter() {
         </TabsContent>
 
         <TabsContent value="templates" className="mt-0 space-y-4">
-          {tplLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-12">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading templates…
-            </div>
-          ) : templates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No templates — apply DB migration and refresh.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {templates.map((t) => (
-                <Card key={t.id} className="border-border/80 shadow-sm">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{t.name}</CardTitle>
-                    <CardDescription className="capitalize">{t.category.replace(/_/g, " ")}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      <span className="font-medium text-foreground">Subject: </span>
-                      {t.subject ?? "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">{t.body}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => openEdit(t)}>
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          toast({
-                            title: "Preview",
-                            description: "Merge fields like {{customer_name}} replace at send time.",
-                          })
-                        }
-                      >
-                        Preview notes
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          toast({
-                            title: "AI rewrite (placeholder)",
-                            description: "Wire to org AI tasks when policy allows — not sending provider calls yet.",
-                          })
-                        }
-                      >
-                        AI polish (placeholder)
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+          {orgId ? <CommunicationTemplatesSection orgId={orgId} active={tab === "templates"} /> : null}
         </TabsContent>
 
         <TabsContent value="failed" className="mt-0 space-y-4">
@@ -807,43 +682,6 @@ export default function CommunicationsCenter() {
         </TabsContent>
       </Tabs>
 
-      <Sheet open={Boolean(editTpl)} onOpenChange={(o) => !o && setEditTpl(null)}>
-        <SheetContent className="sm:max-w-lg flex flex-col">
-          <SheetHeader>
-            <SheetTitle>Edit template</SheetTitle>
-            <SheetDescription>Variables like {"{{customer_name}}"} are replaced when sending.</SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 space-y-3 py-4 overflow-y-auto">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Name</label>
-              <Input value={tplDraft.name} onChange={(e) => setTplDraft((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Subject</label>
-              <Input
-                value={tplDraft.subject}
-                onChange={(e) => setTplDraft((p) => ({ ...p, subject: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Body</label>
-              <Textarea
-                rows={12}
-                value={tplDraft.body}
-                onChange={(e) => setTplDraft((p) => ({ ...p, body: e.target.value }))}
-              />
-            </div>
-          </div>
-          <SheetFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setEditTpl(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => void saveTemplate()} disabled={tplSaving}>
-              {tplSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </div>
   )
 }

@@ -1,56 +1,69 @@
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { parseUuid, requireOrganizationMember } from "@/lib/email/route-auth"
+import { z } from "zod"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { COMMUNICATION_TEMPLATE_CATEGORIES } from "@/lib/communications/template-category"
 
 export const runtime = "nodejs"
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const CategoryEnum = z.enum(COMMUNICATION_TEMPLATE_CATEGORIES)
+
+const PatchSchema = z
+  .object({
+    subject: z.string().max(500).optional().nullable(),
+    body: z.string().min(1).max(20000).optional(),
+    name: z.string().trim().min(1).max(160).optional(),
+    enabled: z.boolean().optional(),
+    category: CategoryEnum.optional(),
+    channel: z.enum(["email", "sms", "in_app"]).optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: "empty_patch" })
+
+function jsonError(message: string, status: number, code?: string) {
+  return NextResponse.json({ ok: false, error: code ?? "error", message }, { status })
+}
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ organizationId: string; templateId: string }> },
 ) {
-  const { organizationId: rawOrg, templateId: rawTpl } = await context.params
-  const organizationId = parseUuid(rawOrg)
-  const templateId = parseUuid(rawTpl)
-  if (!organizationId || !templateId) {
-    return NextResponse.json({ error: "invalid_ids", message: "Invalid ids." }, { status: 400 })
+  const { organizationId, templateId } = await context.params
+  if (!UUID_RE.test(organizationId) || !UUID_RE.test(templateId)) {
+    return jsonError("Invalid ids.", 400, "invalid_ids")
   }
 
-  let body: { subject?: string; body?: string; name?: string }
+  const gate = await requireOrgPermission(organizationId, "canManageCommunications")
+  if ("error" in gate) return gate.error
+
+  let raw: unknown
   try {
-    body = (await request.json()) as { subject?: string; body?: string; name?: string }
+    raw = await request.json()
   } catch {
-    return NextResponse.json({ error: "invalid_json", message: "Invalid JSON body." }, { status: 400 })
+    return jsonError("Invalid JSON.", 400)
   }
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser()
-  if (authErr || !user) {
-    return NextResponse.json({ error: "unauthorized", message: "Sign in required." }, { status: 401 })
+  const parsed = PatchSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "invalid_body", details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const allowed = await requireOrganizationMember(supabase, user.id, organizationId)
-  if (!allowed) {
-    return NextResponse.json({ error: "forbidden", message: "No access to this organization." }, { status: 403 })
-  }
+  const p = parsed.data
+  const patch: Record<string, unknown> = { updated_by: gate.userId }
+  if (p.subject !== undefined) patch.subject = p.subject
+  if (p.body !== undefined) patch.body = p.body
+  if (p.name !== undefined) patch.name = p.name
+  if (p.enabled !== undefined) patch.enabled = p.enabled
+  if (p.category !== undefined) patch.category = p.category
+  if (p.channel !== undefined) patch.channel = p.channel
 
-  const patch: Record<string, unknown> = {}
-  if (typeof body.subject === "string") patch.subject = body.subject
-  if (typeof body.body === "string") patch.body = body.body
-  if (typeof body.name === "string") patch.name = body.name
-
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: "invalid_payload", message: "No updates." }, { status: 400 })
-  }
-
-  const { data: row, error: upErr } = await supabase
+  const { data: row, error: upErr } = await gate.supabase
     .from("communication_templates")
     .update(patch)
     .eq("id", templateId)
     .eq("organization_id", organizationId)
-    .select("id, template_key, name, category, subject, body, channel, updated_at")
+    .select("id, template_key, name, category, subject, body, channel, enabled, updated_at")
     .maybeSingle()
 
   if (upErr) {
