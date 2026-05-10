@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Search } from "lucide-react"
+import { AlertCircle, Loader2, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import type { GlobalSearchGroup } from "@/lib/global-search/run-global-search"
 
 type Props = {
@@ -165,9 +166,31 @@ export function GlobalSearchHeader({ organizationId, orgReady }: Props) {
           className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[min(70vh,420px)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
         >
           {fetchError ? (
-            <p className="px-3 py-4 text-sm text-destructive">{fetchError}</p>
+            <div className="px-4 py-5 text-center space-y-2">
+              <AlertCircle className="mx-auto h-8 w-8 text-destructive/80" aria-hidden />
+              <p className="text-sm font-medium text-destructive">{fetchError}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Check your connection, then try again or refine your search.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-1"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void runSearch(query.trim())}
+              >
+                Retry search
+              </Button>
+            </div>
           ) : groups.length === 0 && !loading ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">No matches in this workspace.</p>
+            <div className="px-4 py-6 text-center space-y-2">
+              <Search className="mx-auto h-8 w-8 text-muted-foreground/45" aria-hidden />
+              <p className="text-sm font-medium text-foreground">No matches</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Try a customer name, equipment code, work order #, or invoice number.
+              </p>
+            </div>
           ) : (
             <div className="py-1">
               {groups.map((g) => (

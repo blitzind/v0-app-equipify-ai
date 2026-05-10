@@ -9,6 +9,7 @@ import {
   Download, Clock, TrendingUp,
   AlertTriangle, Shield, RefreshCcw, DollarSign,
   ChevronDown, Filter, X, Printer, BookmarkPlus, Trash2,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkspaceData } from "@/lib/tenant-store"
@@ -25,6 +26,7 @@ import {
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { cn } from "@/lib/utils"
 
 const woByTypeFallback = [
   { type: "Repair", count: 98, fill: "var(--color-chart-1)" },
@@ -829,9 +831,31 @@ export default function ReportsPage() {
         </div>
 
         {(analyticsLoading || analyticsError) && (
-          <p className={`text-xs -mt-2 print:hidden ${analyticsError ? "text-destructive" : "text-muted-foreground"}`}>
-            {analyticsLoading ? "Loading filtered analytics…" : analyticsError}
-          </p>
+          <div
+            className={cn(
+              "-mt-2 print:hidden flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-3 py-2 text-xs",
+              analyticsError
+                ? "border-destructive/25 bg-destructive/5 text-destructive"
+                : "border-border bg-muted/30 text-muted-foreground",
+            )}
+          >
+            {analyticsLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                Loading filtered analytics…
+              </span>
+            ) : (
+              <>
+                <span className="flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="font-medium break-words">{analyticsError}</span>
+                </span>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => void fetchAnalytics()}>
+                  Retry
+                </Button>
+              </>
+            )}
+          </div>
         )}
 
         {(permissions.canViewBilling || permissions.canViewFinancials) && (

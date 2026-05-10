@@ -1744,7 +1744,15 @@ export function WorkOrderDetailExperience({
             </CardHeader>
             <CardContent className="space-y-2">
               {tasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">No tasks yet. Add tasks to track work on this job.</p>
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center space-y-2">
+                  <ClipboardList className="mx-auto h-8 w-8 text-muted-foreground/55" aria-hidden />
+                  <p className="text-sm font-medium text-foreground">No tasks yet</p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                    {tasksEditable
+                      ? "Add checklist items to track work on this job."
+                      : "No checklist items on this work order."}
+                  </p>
+                </div>
               ) : (
                 tasks.map((t) => (
                   <div

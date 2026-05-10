@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:19:37.856Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:24:31.428Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -48,6 +48,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 57.2 — Settings wiring honesty:** See \`docs/SETTINGS_WIRING_AUDIT.md\` for the full matrix. High-signal changes: \`/settings/security\` and \`/settings/api\` no longer show interactive demo MFA, sessions, or fake API keys; \`/settings/general\` drops a non-functional password form; \`/settings/notifications\` personal channel matrix and digest/quiet shells are read-only previews; \`/settings/automations\` “Reminder emails” cadence cards are preview-only (persisted automation is Follow-up + Workflow sections). Workspace “Contact support” links out instead of a disabled stub.
 - **Phase 57.3 — Permission enforcement alignment:** See \`docs/PERMISSIONS_ENFORCEMENT_AUDIT.md\`. Server gates now use \`getOrganizationMemberRecord\` + effective capabilities for **staff portal preview**; **portal invites** require \`canManagePortalSettings\` (not a loose manager role list); **workspace PATCH** uses \`canManageWorkspaceSettings\` (fixes manager vs owner/admin-only raw check); **default invoice terms** GET/PATCH use financial/billing capabilities. Legacy \`requireOrgMemberPermission\` (rarely used) resolves effective permissions.
 - **Phase 57.4 — Settings wiring sprint:** See \`docs/SETTINGS_WIRING_AUDIT.md\` changelog. **Follow-up automation** settings + evaluate APIs accept \`canManageAutomations\` **or** \`canManageWorkspaceSettings\` (UI matches). **AI Ops digest** Route Handlers use \`requireOrgPermission\` / \`requireAnyOrgPermission\` instead of raw-role checks; digest PATCH shows an honest saved toast. **Integrations** hub fetches QuickBooks \`connection_status\` for a real Connected/Not connected pill; Stripe remains labeled as billing-only.
+- **Phase 57.5 — UI consistency polish:** Tightened inline empty/error patterns in high-traffic surfaces (global search panel, notifications dropdown, work order tasks card, reports analytics banner, technicians table empty row). Prefer icon + short title + helper line; for recoverable fetch failures add **Retry** next to the message. Full-page empty states continue to use \`components/ui/empty.tsx\` where already adopted.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
@@ -257,6 +258,7 @@ ${MCG_SCAN_SECTION}
 - **UI:** Team settings show DB role, optional permission profile, and an access preview; Settings → Permissions is generated from the shared capability map. Demo **TenantProvider** \`can()\` helpers can still diverge from live membership — treat **server checks + RLS** as source of truth.
 
 ## UI/UX Standards
+- **Inline empty & errors (dropdowns, table footers, compact panels):** Use a muted or semantic icon, one-line title, and short helper text. When a request can be retried, pair the message with an outline **Retry** button (\`Button\` \`variant="outline"\` \`size="sm"\`). Avoid raw API strings as the only copy — add context or a next step where feasible.
 - **Brand:** Primary blue (\`--primary\`, \`--status-info\` ~ **#0f7ae5**); **CTA orange** \`--cta\` **#f59f1c** for primary filled actions; **AI accent** aligns with brand blue (\`--ai-purple\`).
 - **Dark chrome:** Admin header uses **#0F172A**; app sidebar dark navy per \`globals.css\` (\`--sidebar\` / **#08111f** tones).
 - **Components:** Prefer \`components/ui\` patterns; tables + cards for dense data; **drawers/sheets** for create/edit flows.

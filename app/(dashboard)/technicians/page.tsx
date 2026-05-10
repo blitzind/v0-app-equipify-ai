@@ -65,6 +65,7 @@ import {
   Trash2,
   Eye,
   Camera,
+  Users,
 } from "lucide-react"
 import { ALL_REGIONS, ALL_ROLES, ALL_SKILLS, ALL_STATUSES } from "@/lib/technicians/roster-form-constants"
 import {
@@ -1519,8 +1520,14 @@ function TechniciansPageInner() {
                 ))}
                 {!loading && filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground text-sm">
-                      No technicians match your filters.
+                    <TableCell colSpan={9} className="py-12">
+                      <div className="flex flex-col items-center justify-center gap-2 text-center px-4">
+                        <Users className="w-8 h-8 text-muted-foreground/45" aria-hidden />
+                        <p className="text-sm font-medium text-foreground">No technicians match your filters</p>
+                        <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                          Clear search or adjust status and region filters to see more of your team.
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

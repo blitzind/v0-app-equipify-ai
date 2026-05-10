@@ -334,7 +334,15 @@ export function AppTopbar() {
             {/* Items */}
             <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
               {notifFeed.length === 0 ? (
-                <p className="text-xs text-muted-foreground px-4 py-6 text-center">No notifications yet.</p>
+                <div className="px-4 py-8 text-center space-y-2">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <Bell className="h-5 w-5 text-muted-foreground" aria-hidden />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    New alerts will appear here when there&apos;s activity in your workspace.
+                  </p>
+                </div>
               ) : (
                 notifFeed.map((n) => {
                   const unread = n.is_read === false
