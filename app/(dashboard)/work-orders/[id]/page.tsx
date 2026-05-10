@@ -60,6 +60,16 @@ import { CertificateMultiTabContent } from "@/components/work-orders/certificate
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
 import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-prep-banner"
+import { WorkOrderOfflineConflictDialog } from "@/components/work-orders/work-order-offline-conflict-dialog"
+import { WorkOrderOfflineSyncBar } from "@/components/work-orders/work-order-offline-sync-bar"
+import { useNetworkStatus } from "@/hooks/use-network-status"
+import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import {
+  deleteWorkOrderOfflineForScope,
+  filterPendingOfflineRecords,
+  getWorkOrderOfflineRecordForScope,
+} from "@/lib/work-orders/offline/idb-store"
+import { makeWorkOrderOfflineScopeKey, type WorkOrderOfflineOutboxRecord } from "@/lib/work-orders/offline/types"
 import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
@@ -154,6 +164,15 @@ export default function WorkOrderDetailPage() {
   const [pageWoTab, setPageWoTab] = useState("overview")
   const [pageCertificateFocusEqId, setPageCertificateFocusEqId] = useState<string | null>(null)
   const [linkedInvoices, setLinkedInvoices] = useState<AdminInvoice[]>([])
+  const { online } = useNetworkStatus()
+  const [pageUserId, setPageUserId] = useState<string | null>(null)
+  const [pageOfflineDigest, setPageOfflineDigest] = useState<{
+    status?: WorkOrderOfflineOutboxRecord["status"]
+    pending: boolean
+  }>({ pending: false })
+  const [pageConflictOpen, setPageConflictOpen] = useState(false)
+  const [pageConflictRecord, setPageConflictRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
+  const [pageOfflineFormEpoch, setPageOfflineFormEpoch] = useState(0)
 
   const reload = useCallback(async () => {
     if (!workOrderRouteId) {
@@ -168,11 +187,13 @@ export default function WorkOrderDetailPage() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
+      setPageUserId(null)
       setDbWo(null)
       setDetailLoadMessage(null)
       setDbLoadFailed(false)
       return
     }
+    setPageUserId(user.id)
     // Wait for org context — do not setDbWo(null) here or we flash "not found" before org is ready.
     if (activeOrg.switching || activeOrg.status !== "ready" || !activeOrg.organizationId) {
       return
@@ -250,6 +271,36 @@ export default function WorkOrderDetailPage() {
   }, [activeOrg.status, activeOrg.organizationId])
 
   const wo = dbWo ?? storeWo
+
+  const refreshPageOfflineDigest = useCallback(async () => {
+    if (!activeOrg.organizationId || !pageUserId || !workOrderRouteId) {
+      setPageOfflineDigest({ pending: false })
+      return
+    }
+    const sk = makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, workOrderRouteId)
+    const r = await getWorkOrderOfflineRecordForScope(sk)
+    setPageOfflineDigest({
+      status: r?.status,
+      pending: r ? filterPendingOfflineRecords([r]).length > 0 : false,
+    })
+  }, [activeOrg.organizationId, pageUserId, workOrderRouteId])
+
+  useEffect(() => {
+    void refreshPageOfflineDigest()
+  }, [refreshPageOfflineDigest])
+
+  useEffect(() => {
+    const fn = () => void refreshPageOfflineDigest()
+    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+  }, [refreshPageOfflineDigest])
+
+  useEffect(() => {
+    const fn = () => setPageOfflineFormEpoch((n) => n + 1)
+    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+  }, [])
+
   const woTimelineEvents = useMemo(() => {
     if (!wo) return []
     return buildWorkOrderServiceTimeline(wo, linkedInvoices)
@@ -284,19 +335,59 @@ export default function WorkOrderDetailPage() {
 
   useEffect(() => {
     if (!wo) return
-    const rl = wo.repairLog
-    setProblemReported(rl.problemReported)
-    setDiagnosis(rl.diagnosis)
-    setParts(rl.partsUsed)
-    setLaborHours(rl.laborHours)
-    setTechNotes(rl.technicianNotes)
-    const tsn = cloneTasks(rl.tasks ?? [])
-    setTabTasks(tsn)
-    setSavedTasks(tsn)
-    setSigData(rl.signatureDataUrl)
-    setSignedBy(rl.signedBy)
-    setSignedAt(rl.signedAt)
-  }, [wo?.id])
+    let cancelled = false
+    void (async () => {
+      if (activeOrg.organizationId && pageUserId) {
+        const sk = makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, wo.id)
+        const rec = await getWorkOrderOfflineRecordForScope(sk)
+        if (
+          !cancelled &&
+          rec &&
+          filterPendingOfflineRecords([rec]).length
+        ) {
+          if (rec.payload.repair) {
+            setProblemReported(rec.payload.repair.problemReported)
+            setDiagnosis(rec.payload.repair.diagnosis)
+            setTechNotes(rec.payload.repair.technicianNotes)
+            setInternalNotes(rec.payload.repair.notesInternal)
+          }
+          if (rec.payload.tasks && !usesTasksTable) {
+            const ots = rec.payload.tasks.map((t) => ({
+              id: t.id,
+              label: t.label,
+              done: t.done,
+              description: t.description,
+            }))
+            setTabTasks(ots)
+            setSavedTasks(ots)
+          }
+          const rl = wo.repairLog
+          setParts(rl.partsUsed)
+          setLaborHours(rl.laborHours)
+          setSigData(rl.signatureDataUrl)
+          setSignedBy(rl.signedBy)
+          setSignedAt(rl.signedAt)
+          return
+        }
+      }
+      if (cancelled) return
+      const rl = wo.repairLog
+      setProblemReported(rl.problemReported)
+      setDiagnosis(rl.diagnosis)
+      setParts(rl.partsUsed)
+      setLaborHours(rl.laborHours)
+      setTechNotes(rl.technicianNotes)
+      const tsn = cloneTasks(rl.tasks ?? [])
+      setTabTasks(tsn)
+      setSavedTasks(tsn)
+      setSigData(rl.signatureDataUrl)
+      setSignedBy(rl.signedBy)
+      setSignedAt(rl.signedAt)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wo, activeOrg.organizationId, pageUserId, usesTasksTable, pageOfflineFormEpoch])
 
   const tasksDirty = useMemo(
     () => !tasksEqual(tabTasks ?? [], savedTasks ?? []),
@@ -397,6 +488,20 @@ export default function WorkOrderDetailPage() {
   const laborCost = laborHours * LABOR_RATE
   const editable = editing && ["Open", "Scheduled", "In Progress"].includes(workOrder.status)
   const woCanEdit = orgPermStatus !== "loading" && orgPermissions.canEditWorkOrders
+
+  async function openPageOfflineConflictReview() {
+    if (!activeOrg.organizationId || !pageUserId) return
+    const sk = makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, workOrder.id)
+    setPageConflictRecord((await getWorkOrderOfflineRecordForScope(sk)) ?? null)
+    setPageConflictOpen(true)
+  }
+
+  async function discardPageOfflineDraft() {
+    if (!activeOrg.organizationId || !pageUserId) return
+    await deleteWorkOrderOfflineForScope(makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, workOrder.id))
+    await refreshPageOfflineDigest()
+    await reload()
+  }
 
   async function persistUpdate(payload: Record<string, unknown>) {
     if (!activeOrg.organizationId) {
@@ -913,7 +1018,40 @@ export default function WorkOrderDetailPage() {
         </div>
       </div>
 
-      <WorkOrderSyncPrepBanner />
+      <WorkOrderSyncPrepBanner
+        networkOnline={online}
+        hasPendingOffline={pageOfflineDigest.pending}
+        offlineStatus={
+          pageOfflineDigest.status === "conflict" ||
+          pageOfflineDigest.status === "failed" ||
+          pageOfflineDigest.status === "syncing"
+            ? pageOfflineDigest.status
+            : null
+        }
+      />
+
+      {activeOrg.organizationId && pageUserId ? (
+        <WorkOrderOfflineSyncBar
+          organizationId={activeOrg.organizationId}
+          userId={pageUserId}
+          workOrderId={workOrder.id}
+          workOrder={workOrder}
+          usesTasksTable={usesTasksTable}
+          usesPartsLineItems={usesPartsLineItems}
+          canEdit={woCanEdit}
+          onAfterChange={() => void reload()}
+          onConflict={() => void openPageOfflineConflictReview()}
+        />
+      ) : null}
+
+      <WorkOrderOfflineConflictDialog
+        open={pageConflictOpen}
+        onOpenChange={setPageConflictOpen}
+        organizationId={activeOrg.organizationId}
+        workOrderId={workOrder.id}
+        record={pageConflictRecord}
+        onDiscardLocal={() => discardPageOfflineDraft()}
+      />
 
       <WorkOrderDetailExperience
         tabsValue={pageWoTab}

@@ -95,9 +95,25 @@ import { printHtmlDocument } from "@/lib/certificates/certificate-pdf-html"
 import { buildWorkOrderPartFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
-import { OnlineRequiredBadge } from "@/components/sync-prep/online-required-badge"
+import { OnlineRequiredBadge, type TechnicianSyncBadgeMode } from "@/components/sync-prep/online-required-badge"
 import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-prep-banner"
-import { SYNC_PREP_COPY } from "@/lib/sync-prep"
+import { WorkOrderOfflineConflictDialog } from "@/components/work-orders/work-order-offline-conflict-dialog"
+import { WorkOrderOfflineSyncBar } from "@/components/work-orders/work-order-offline-sync-bar"
+import { useNetworkStatus } from "@/hooks/use-network-status"
+import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import {
+  deleteWorkOrderOfflineForScope,
+  filterPendingOfflineRecords,
+  getWorkOrderOfflineRecordForScope,
+  putWorkOrderOfflineRecord,
+} from "@/lib/work-orders/offline/idb-store"
+import { mergeTechnicianOfflineBundle } from "@/lib/work-orders/offline/merge-bundle"
+import {
+  makeWorkOrderOfflineScopeKey,
+  type WorkOrderOfflineBundlePayload,
+  type WorkOrderOfflineOutboxRecord,
+} from "@/lib/work-orders/offline/types"
+import { ONLINE_REQUIRED_LABEL, SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
 import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
@@ -383,6 +399,7 @@ function initialsFromTechnicianLabel(name: string): string {
 
 export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }: WorkOrderDrawerProps) {
   const { toast: pushToast } = useToast()
+  const { online } = useNetworkStatus()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
   const { canArchiveRestore } = useOrgArchivePermissions()
   // Phase 2 (Permissions): hide work-order mutation buttons for read-only roles.
@@ -456,6 +473,62 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [woWarrantyEval, setWoWarrantyEval] = useState<ReturnType<typeof evaluateWarrantyCoverage> | null>(null)
   const [woReplacementReadiness, setWoReplacementReadiness] = useState<ReplacementReadinessResult | null>(null)
   const [woEquipmentReliability, setWoEquipmentReliability] = useState<EquipmentReliabilityResult | null>(null)
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null)
+  const [offlineDigest, setOfflineDigest] = useState<{
+    status?: WorkOrderOfflineOutboxRecord["status"]
+    pending: boolean
+  }>({ pending: false })
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false)
+  const [conflictDialogRecord, setConflictDialogRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
+
+  const refreshOfflineDigest = useCallback(async () => {
+    if (!activeOrgId || !drawerUserId || !workOrderId) {
+      setOfflineDigest({ pending: false })
+      return
+    }
+    const sk = makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, workOrderId)
+    const r = await getWorkOrderOfflineRecordForScope(sk)
+    setOfflineDigest({
+      status: r?.status,
+      pending: r ? filterPendingOfflineRecords([r]).length > 0 : false,
+    })
+  }, [activeOrgId, drawerUserId, workOrderId])
+
+  useEffect(() => {
+    void refreshOfflineDigest()
+  }, [refreshOfflineDigest, workOrderId])
+
+  useEffect(() => {
+    const fn = () => void refreshOfflineDigest()
+    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+  }, [refreshOfflineDigest])
+
+  const queueOfflineBundle = useCallback(
+    async (patch: Partial<WorkOrderOfflineBundlePayload>): Promise<boolean> => {
+      if (!wo || !activeOrgId || !drawerUserId) return false
+      const existing = await getWorkOrderOfflineRecordForScope(
+        makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, wo.id),
+      )
+      const next = mergeTechnicianOfflineBundle({
+        existing,
+        organizationId: activeOrgId,
+        userId: drawerUserId,
+        workOrder: wo,
+        dbNotes,
+        patch,
+      })
+      if (!next) return false
+      await putWorkOrderOfflineRecord(next)
+      await refreshOfflineDigest()
+      pushToast({
+        title: "Saved locally",
+        description: "Sync when you are back online — use Sync now in the bar above.",
+      })
+      return true
+    },
+    [wo, activeOrgId, drawerUserId, dbNotes, refreshOfflineDigest, pushToast],
+  )
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -471,10 +544,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
+      setDrawerUserId(null)
       setWo(null)
       setLoading(false)
       return
     }
+    setDrawerUserId(user.id)
 
     const orgId = orgStatus === "ready" ? activeOrgId : null
     if (!orgId) {
@@ -551,6 +626,28 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         : 0
     setTabLaborHours(lh)
     setSavedLaborHours(lh)
+
+    const sk = makeWorkOrderOfflineScopeKey(orgId, user.id, res.data.workOrder.id)
+    const offlineRec = await getWorkOrderOfflineRecordForScope(sk)
+    if (offlineRec && filterPendingOfflineRecords([offlineRec]).length) {
+      if (offlineRec.payload.repair) {
+        setProblemReportedDraft(offlineRec.payload.repair.problemReported)
+        setNotesDiagnosis(offlineRec.payload.repair.diagnosis)
+        setNotesTechnician(offlineRec.payload.repair.technicianNotes)
+        setNotesInternal(offlineRec.payload.repair.notesInternal)
+      }
+      if (offlineRec.payload.tasks && !res.data.usesTasksTable) {
+        setTabTasks(
+          offlineRec.payload.tasks.map((t) => ({
+            id: t.id,
+            label: t.label,
+            done: t.done,
+            description: t.description,
+          })),
+        )
+      }
+    }
+
     setLoading(false)
   }, [workOrderId, activeOrgId, orgStatus, woOrgPermissions])
 
@@ -1162,6 +1259,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   async function saveProblemReported() {
     if (!wo || !activeOrgId) return
+    if (!online) {
+      if (!woCanEdit) return
+      const ok = await queueOfflineBundle({
+        repair: {
+          problemReported: problemReportedDraft,
+          diagnosis: notesDiagnosis,
+          technicianNotes: notesTechnician,
+          notesInternal,
+        },
+      })
+      if (!ok) {
+        pushToast({
+          variant: "destructive",
+          title: "Could not save locally",
+          description: "Try again or reconnect to save to the server.",
+        })
+      }
+      return
+    }
     const supabase = createBrowserSupabaseClient()
     setProblemSaving(true)
     try {
@@ -1195,6 +1311,25 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   async function saveNotes(): Promise<boolean> {
     if (!wo || !activeOrgId) return false
+    if (!online) {
+      if (!woCanEdit) return false
+      const ok = await queueOfflineBundle({
+        repair: {
+          problemReported: problemReportedDraft,
+          diagnosis: notesDiagnosis,
+          technicianNotes: notesTechnician,
+          notesInternal,
+        },
+      })
+      if (!ok) {
+        pushToast({
+          variant: "destructive",
+          title: "Could not save locally",
+          description: "Try again or reconnect to save to the server.",
+        })
+      }
+      return ok
+    }
     const supabase = createBrowserSupabaseClient()
     setNotesSaving(true)
     try {
@@ -1312,6 +1447,30 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         label: t.label.trim(),
         description: t.description?.trim() || undefined,
       }))
+    if (!online) {
+      if (usesTasksTable) {
+        pushToast({
+          variant: "destructive",
+          title: ONLINE_REQUIRED_LABEL,
+          description: "This job uses server-backed tasks — connect to save task changes.",
+        })
+        return
+      }
+      setTasksSaving(true)
+      try {
+        const ok = await queueOfflineBundle({ tasks: normalized })
+        if (!ok) {
+          pushToast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again or reconnect to save to the server.",
+          })
+        }
+      } finally {
+        setTasksSaving(false)
+      }
+      return
+    }
     setTasksSaving(true)
     try {
       await persistTasksFromTabs(normalized)
@@ -1512,6 +1671,22 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!wo || !activeOrgId || !woCanEdit || wo.isArchived) return
     const cur = wo.status
     if (cur !== "Open" && cur !== "Scheduled") return
+    if (!online) {
+      setQuickStatusBusy(true)
+      try {
+        const ok = await queueOfflineBundle({ statusInProgress: true })
+        if (!ok) {
+          pushToast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again or reconnect to update status on the server.",
+          })
+        }
+      } finally {
+        setQuickStatusBusy(false)
+      }
+      return
+    }
     setQuickStatusBusy(true)
     try {
       const supabase = createBrowserSupabaseClient()
@@ -1932,6 +2107,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setDraft((prev) => ({ ...prev, [field]: value }))
   }
 
+  const fieldTechnicianSyncBadgeMode = useMemo((): TechnicianSyncBadgeMode => {
+    if (!wo) return "offline-draft-supported"
+    if (!online) return "saved-locally"
+    if (offlineDigest.status === "conflict") return "review-conflict"
+    if (offlineDigest.status === "failed") return "sync-failed"
+    if (offlineDigest.pending) return "sync-pending"
+    return "offline-draft-supported"
+  }, [wo, online, offlineDigest.status, offlineDigest.pending])
+
   if (!workOrderId) return null
 
   if (!wo) {
@@ -1952,6 +2136,21 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   }
 
   const currentStatus = (draft.status ?? wo.status) as WorkOrderStatus
+
+  async function openOfflineConflictReview() {
+    if (!activeOrgId || !drawerUserId || !wo) return
+    const sk = makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, wo.id)
+    setConflictDialogRecord((await getWorkOrderOfflineRecordForScope(sk)) ?? null)
+    setConflictDialogOpen(true)
+  }
+
+  async function discardOfflineDraftFromDialog() {
+    if (!activeOrgId || !drawerUserId || !wo) return
+    await deleteWorkOrderOfflineForScope(makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, wo.id))
+    await refreshOfflineDigest()
+    await loadWorkOrder()
+    onUpdated?.()
+  }
 
   const quoteHref = `/quotes?action=new-quote&customerId=${encodeURIComponent(wo.customerId)}&equipmentId=${encodeURIComponent(wo.equipmentId)}`
 
@@ -2352,19 +2551,47 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         }
       >
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
-          {wo ? <WorkOrderSyncPrepBanner /> : null}
+          {wo ? (
+            <WorkOrderSyncPrepBanner
+              networkOnline={online}
+              hasPendingOffline={offlineDigest.pending}
+              offlineStatus={
+                offlineDigest.status === "conflict" ||
+                offlineDigest.status === "failed" ||
+                offlineDigest.status === "syncing"
+                  ? offlineDigest.status
+                  : null
+              }
+            />
+          ) : null}
+          {wo && orgStatus === "ready" && activeOrgId && drawerUserId ? (
+            <WorkOrderOfflineSyncBar
+              organizationId={activeOrgId}
+              userId={drawerUserId}
+              workOrderId={wo.id}
+              workOrder={wo}
+              usesTasksTable={usesTasksTable}
+              usesPartsLineItems={usesPartsLineItems}
+              canEdit={woCanEdit}
+              onAfterChange={() => {
+                void loadWorkOrder()
+                onUpdated?.()
+              }}
+              onConflict={() => void openOfflineConflictReview()}
+            />
+          ) : null}
           {!editing && wo && !wo.isArchived && woCanEdit && (wo.status === "Open" || wo.status === "Scheduled") ? (
             <div className="lg:hidden shrink-0 border-b border-border bg-muted/25 dark:bg-muted/10 px-3 py-3 space-y-2">
               <div className="flex items-center justify-between gap-2 px-0.5">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Field status
                 </p>
-                <OnlineRequiredBadge />
+                <OnlineRequiredBadge mode={fieldTechnicianSyncBadgeMode} />
               </div>
               <Button
                 type="button"
                 className="h-12 w-full rounded-xl text-sm font-semibold gap-2 touch-manipulation"
-                title={SYNC_PREP_COPY.statusChangeRequiresNetwork}
+                title={!online ? undefined : SYNC_PREP_COPY.statusChangeRequiresNetwork}
                 disabled={quickStatusBusy}
                 onClick={() => void quickSetInProgressFromMobile()}
               >
@@ -2887,6 +3114,15 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           </div>
         </div>
       </DetailDrawer>
+
+      <WorkOrderOfflineConflictDialog
+        open={conflictDialogOpen}
+        onOpenChange={setConflictDialogOpen}
+        organizationId={activeOrgId}
+        workOrderId={wo.id}
+        record={conflictDialogRecord}
+        onDiscardLocal={() => discardOfflineDraftFromDialog()}
+      />
 
       {wo && activeOrgId && orgStatus === "ready" ? (
         <AddWorkOrderEquipmentModal

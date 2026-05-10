@@ -38,12 +38,12 @@ export function buildWorkOrderListSelect(opts: {
 
 /** Same fields as detail drawer but without `organization_id` (e.g. work order `/[id]` page). Declared before builders reference it. */
 export const WO_DETAIL_PAGE_SELECT_WITH_NUM =
-  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
+  "id, work_order_number, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
 
 export const WO_DETAIL_PAGE_SELECT = WO_DETAIL_PAGE_SELECT_WITH_NUM.replace("work_order_number, ", "")
 
 export const WO_DETAIL_SELECT_WITH_NUM =
-  "id, work_order_number, organization_id, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, created_by_pm_automation, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
+  "id, work_order_number, organization_id, customer_id, customer_location_id, equipment_id, title, status, priority, type, scheduled_on, scheduled_time, completed_at, assigned_user_id, assigned_technician_id, created_at, updated_at, invoice_number, total_labor_cents, total_parts_cents, notes, repair_log, maintenance_plan_id, calibration_template_id, created_by_pm_automation, signature_url, signature_captured_at, problem_reported, billable_to_customer, warranty_review_required, warranty_vendor_id, archived_at, billing_state"
 
 export const WO_DETAIL_SELECT = WO_DETAIL_SELECT_WITH_NUM.replace("work_order_number, ", "")
 
@@ -52,14 +52,18 @@ export function buildWorkOrderDetailSelect(opts: {
   includeWorkOrderNumber?: boolean
   includeAssignedTechnician?: boolean
   includeOperationalBillingColumns?: boolean
+  /** When false, omit `updated_at` (older DBs). */
+  includeUpdatedAt?: boolean
 }): string {
   const includeNum = opts.includeWorkOrderNumber !== false
   const includeTech = opts.includeAssignedTechnician !== false
   const includeBilling = opts.includeOperationalBillingColumns !== false
+  const includeUpdatedAt = opts.includeUpdatedAt !== false
   let s = WO_DETAIL_SELECT_WITH_NUM
   if (!includeNum) s = s.replace("work_order_number, ", "")
   if (!includeTech) s = s.replace(", assigned_technician_id", "")
   if (!includeBilling) s = stripOperationalBillingColumnsFromSelect(s)
+  if (!includeUpdatedAt) s = s.replace(", updated_at", "")
   return s
 }
 
@@ -68,14 +72,17 @@ export function buildWorkOrderDetailPageSelect(opts: {
   includeWorkOrderNumber?: boolean
   includeAssignedTechnician?: boolean
   includeOperationalBillingColumns?: boolean
+  includeUpdatedAt?: boolean
 }): string {
   const includeNum = opts.includeWorkOrderNumber !== false
   const includeTech = opts.includeAssignedTechnician !== false
   const includeBilling = opts.includeOperationalBillingColumns !== false
+  const includeUpdatedAt = opts.includeUpdatedAt !== false
   let s = WO_DETAIL_PAGE_SELECT_WITH_NUM
   if (!includeNum) s = s.replace("work_order_number, ", "")
   if (!includeTech) s = s.replace(", assigned_technician_id", "")
   if (!includeBilling) s = stripOperationalBillingColumnsFromSelect(s)
+  if (!includeUpdatedAt) s = s.replace(", updated_at", "")
   return s
 }
 

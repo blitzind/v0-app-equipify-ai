@@ -544,6 +544,8 @@ export interface WorkOrder {
   equipmentSerialNumber?: string | null
   /** True when created by nightly PM automation (`created_by_pm_automation`). */
   createdByPmAutomation?: boolean
+  /** Supabase `work_orders.updated_at` when selected (offline sync conflict detection). */
+  serverUpdatedAt?: string | null
   /** Signed URL for `signature_url` storage object (Supabase detail load only). */
   customerSignaturePreviewUrl?: string | null
   /** ISO timestamp from `signature_captured_at`. */

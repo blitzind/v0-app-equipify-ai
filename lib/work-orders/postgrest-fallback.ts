@@ -26,6 +26,15 @@ const OPERATIONAL_BILLING_KEYS = [
 ] as const
 
 /** Service lifecycle / warranty columns not present until migrations are applied. */
+/** `updated_at` on `work_orders` (used for offline sync conflict detection). */
+export function missingWorkOrderUpdatedAtColumn(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  const m = (error.message ?? "").toLowerCase()
+  if (!m.includes("updated_at")) return false
+  if (error.code === "42703") return true
+  return m.includes("does not exist") || m.includes("could not find")
+}
+
 export function missingOperationalBillingColumns(error: PostgrestError | null | undefined): boolean {
   if (!error) return false
   const m = (error.message ?? "").toLowerCase()

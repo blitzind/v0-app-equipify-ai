@@ -9,19 +9,22 @@ export const ONLINE_REQUIRED_LABEL = "Online required"
  */
 export const WORK_ORDER_TECHNICIAN_SYNC_PREP_AUDIT = {
   workOrderStatusUpdate: {
-    offlineReplayPlanned: false,
-    requiresLiveNetwork: true,
-    summary: "Status changes write to Supabase and may emit workflow events.",
+    offlineReplayPlanned: true,
+    requiresLiveNetwork: false,
+    summary:
+      "Open/Scheduled → In progress can be queued offline (Phase 53B) and replayed with manual Sync now when online.",
   },
   repairLogNotes: {
-    offlineReplayPlanned: false,
-    requiresLiveNetwork: true,
-    summary: "Notes and repair log fields save through authenticated Supabase updates.",
+    offlineReplayPlanned: true,
+    requiresLiveNetwork: false,
+    summary:
+      "Problem reported, diagnosis, technician notes, and internal notes can be drafted offline and replayed manually.",
   },
   tasks: {
-    offlineReplayPlanned: false,
+    offlineReplayPlanned: true,
     requiresLiveNetwork: true,
-    summary: "Task lists sync via work order task persistence (server-backed).",
+    summary:
+      "JSON repair_log tasks can be drafted offline when this job does not use server-backed task rows; otherwise online only.",
   },
   partsAndMaterials: {
     offlineReplayPlanned: false,
@@ -53,12 +56,12 @@ export const WORK_ORDER_TECHNICIAN_SYNC_PREP_AUDIT = {
 /** User-facing copy (centralized; no fake offline promises). */
 export const SYNC_PREP_COPY = {
   technicianQuickBarLead:
-    "Saving jobs, photos, signatures, tasks, and parts requires a connection. Offline queue is not active yet — if signal drops, reopen this job when online and retry any failed save.",
+    "Technician notes, problem text, JSON task checklists, and starting the job (Open/Scheduled → In progress) can be saved locally when offline — tap Sync when you have signal. Photos, signatures, parts, inventory, invoices, and AI still need a live connection.",
 
   workOrderDrawerBannerTitle: "Sync & offline",
 
   workOrderDrawerBannerBody:
-    "Work order changes still need an active session and network today. A future update will queue edits safely when you are offline; nothing is auto-synced in the background yet.",
+    "Technician-safe fields can be drafted offline and replayed with Sync now when you are back online. Nothing auto-syncs without your confirmation in this phase.",
 
   /** `title` / tooltip on buttons that hit the network */
   saveRequiresNetwork: "Online required — saves go to your workspace immediately.",
@@ -67,5 +70,22 @@ export const SYNC_PREP_COPY = {
 
   /** Desktop / hover */
   onlineRequiredTooltip:
-    "This action talks to Equipify right away. Offline queuing and background sync are planned but not enabled.",
+    "This action talks to Equipify right away. Technician notes and similar fields support an offline draft on this work order instead.",
+
+  offlineDraftSupportedLabel: "Offline draft supported",
+  offlineDraftSupportedTooltip:
+    "You can save these fields locally when offline, then use Sync now when you are online. Parts, photos, inventory, invoices, and AI stay online-only.",
+
+  savedLocallyLabel: "Saved locally",
+  savedLocallyTooltip: "Draft is stored on this device only (IndexedDB or small local fallback). Sync when online to apply it.",
+
+  syncPendingLabel: "Sync pending",
+  syncPendingTooltip: "A local technician draft is waiting. Use Sync now when you have a connection.",
+
+  reviewConflictLabel: "Review conflict",
+  reviewConflictTooltip:
+    "The server work order changed since this draft started. Open the sync bar to compare and discard or resolve.",
+
+  syncFailedLabel: "Sync failed",
+  syncFailedTooltip: "Replay failed — check the error on the sync bar and try again, or discard the local draft.",
 } as const

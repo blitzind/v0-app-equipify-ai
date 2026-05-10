@@ -10,6 +10,7 @@ import {
   missingAssignedTechnicianColumn,
   missingOperationalBillingColumns,
   missingWorkOrderNumberColumn,
+  missingWorkOrderUpdatedAtColumn,
 } from "@/lib/work-orders/postgrest-fallback"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { buildWorkOrderDetailSelect } from "@/lib/work-orders/supabase-select"
@@ -99,6 +100,7 @@ type WoRow = {
   assigned_user_id: string | null
   assigned_technician_id?: string | null
   created_at: string
+  updated_at?: string | null
   invoice_number: string | null
   total_labor_cents: number
   total_parts_cents: number
@@ -349,7 +351,12 @@ export async function loadWorkOrderDetailForOrg(
     by: "id" | "work_order_number"
     value: string | number
   }) {
-    async function runQuery(includeNum: boolean, includeTech: boolean, includeBilling: boolean) {
+    async function runQuery(
+      includeNum: boolean,
+      includeTech: boolean,
+      includeBilling: boolean,
+      includeUpdatedAt: boolean,
+    ) {
       let q = supabase
         .from("work_orders")
         .select(
@@ -357,6 +364,7 @@ export async function loadWorkOrderDetailForOrg(
             includeWorkOrderNumber: includeNum,
             includeAssignedTechnician: includeTech,
             includeOperationalBillingColumns: includeBilling,
+            includeUpdatedAt,
           }),
         )
         .eq("organization_id", organizationId)
@@ -370,24 +378,30 @@ export async function loadWorkOrderDetailForOrg(
     let includeNum = true
     let includeTech = true
     let includeBilling = true
-    let woRes = await runQuery(includeNum, includeTech, includeBilling)
+    let includeUpdatedAt = true
+    let woRes = await runQuery(includeNum, includeTech, includeBilling, includeUpdatedAt)
 
     for (;;) {
       const err = woRes.error
       if (!err) break
       if (missingWorkOrderNumberColumn(err) && includeNum) {
         includeNum = false
-        woRes = await runQuery(includeNum, includeTech, includeBilling)
+        woRes = await runQuery(includeNum, includeTech, includeBilling, includeUpdatedAt)
         continue
       }
       if (missingAssignedTechnicianColumn(err) && includeTech) {
         includeTech = false
-        woRes = await runQuery(includeNum, includeTech, includeBilling)
+        woRes = await runQuery(includeNum, includeTech, includeBilling, includeUpdatedAt)
         continue
       }
       if (missingOperationalBillingColumns(err) && includeBilling) {
         includeBilling = false
-        woRes = await runQuery(includeNum, includeTech, includeBilling)
+        woRes = await runQuery(includeNum, includeTech, includeBilling, includeUpdatedAt)
+        continue
+      }
+      if (missingWorkOrderUpdatedAtColumn(err) && includeUpdatedAt) {
+        includeUpdatedAt = false
+        woRes = await runQuery(includeNum, includeTech, includeBilling, includeUpdatedAt)
         continue
       }
       break
@@ -662,6 +676,7 @@ export async function loadWorkOrderDetailForOrg(
     equipmentCode: eqRow?.equipment_code?.trim() || null,
     equipmentSerialNumber: eqRow?.serial_number?.trim() || null,
     isArchived: Boolean(w.archived_at),
+    serverUpdatedAt: w.updated_at?.trim() || null,
   }
 
   return {
