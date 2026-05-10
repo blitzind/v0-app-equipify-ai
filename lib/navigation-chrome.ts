@@ -22,8 +22,8 @@ export const NAV_ROW_ACTIVE_SIDEBAR =
 export const NAV_ICON_INACTIVE_SIDEBAR =
   "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80"
 
-/** Active icon: light/white on dark blue active row (not brand orange). */
-export const NAV_ICON_ACTIVE_SIDEBAR = "text-white"
+/** Active icon: light blue on dark blue active row (orange is rail-only in app-sidebar). */
+export const NAV_ICON_ACTIVE_SIDEBAR = "text-blue-300"
 
 /**
  * Equipify brand orange — reserved for the active nav rail accent only

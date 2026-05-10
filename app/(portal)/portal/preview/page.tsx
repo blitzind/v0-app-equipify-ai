@@ -5,12 +5,11 @@ import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { StaffPortalPreview } from "@/components/portal/staff-portal-preview"
 import { pickPreferredDocumentLogoUrl } from "@/lib/organization/document-branding"
 import { loadStaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
+import { portalAccentCssVariables, resolvePortalPrimaryAccentHex } from "@/lib/portal/portal-theme-css"
+import { staffMayOpenPortalPreview } from "@/lib/portal/preview-access"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-/** Matches portal preview bridge: managers and above for the selected workspace. */
-const PREVIEW_BRIDGE_ROLES = new Set(["owner", "admin", "manager"])
 
 export default async function PortalStaffPreviewPage({
   searchParams,
@@ -40,15 +39,14 @@ export default async function PortalStaffPreviewPage({
   }
 
   const rawRole = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  const role = rawRole ?? ""
-  if (!PREVIEW_BRIDGE_ROLES.has(role)) {
+  if (!staffMayOpenPortalPreview(rawRole)) {
     redirect("/settings/portal")
   }
 
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "name, logo_url, document_logo_url, status, portal_certificate_release_mode, portal_consolidated_documents_default",
+      "name, logo_url, document_logo_url, primary_color, status, portal_certificate_release_mode, portal_consolidated_documents_default",
     )
     .eq("id", organizationId)
     .maybeSingle()
@@ -76,15 +74,19 @@ export default async function PortalStaffPreviewPage({
   })
 
   const orgRow = org as {
+    primary_color?: string | null
     portal_certificate_release_mode?: string | null
     portal_consolidated_documents_default?: boolean | null
   }
+
+  const portalAccentVars = portalAccentCssVariables(resolvePortalPrimaryAccentHex(orgRow.primary_color))
 
   return (
     <StaffPortalPreview
       organizationId={organizationId}
       organizationName={name}
       logoUrl={logoUrl}
+      portalAccentCssVariables={portalAccentVars}
       snapshot={snapshot}
       organizationPortalDefaults={{
         portalCertificateReleaseMode: orgRow.portal_certificate_release_mode ?? null,

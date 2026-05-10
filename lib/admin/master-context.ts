@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T20:34:17.679Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T20:41:17.257Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -175,6 +175,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Routes:** \`/portal/*\` (login, dashboard, equipment, work orders, invoices, quotes, certificates, maintenance, etc.)
 - **Purpose:** Customer self-service via magic-link / portal session, including secure documents and customer-safe service visit visibility.
 - **Status:** Core flows implemented; APIs under \`/api/portal/*\`; document library aggregates released invoices, quotes, certificates, service summaries, and uploaded files with search/filter UI; service visits show upcoming appointments and recent completed work without exposing dispatch internals or customer self-scheduling.
+- **Staff preview:** \`/portal/preview\` (after \`/api/portal/preview/start\`) — read-only snapshot for **owner/admin** (\`canManagePortalSettings\`); uses same dashboard/document bundle helpers as portal data paths; applies workspace logo + \`primary_color\` as portal CSS variables; does **not** set the portal session cookie. See \`docs/PORTAL_PREVIEW_CONTEXT.md\`.
 - **Gaps:** Portal reports page still mock/demo in places; document library could later add generated PDF downloads for invoice/quote detail pages.
 
 ### Platform admin

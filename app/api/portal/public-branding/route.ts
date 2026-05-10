@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   const { data: row, error } = await svc
     .from("organizations")
-    .select("name, logo_url, document_logo_url, status")
+    .select("name, logo_url, document_logo_url, primary_color, status")
     .eq("id", organizationId)
     .maybeSingle()
 
@@ -48,8 +48,12 @@ export async function GET(request: Request) {
     appLogo != null ? String(appLogo) : null,
   )
 
+  const primaryColorRaw = (row as { primary_color?: string | null }).primary_color
+
   return NextResponse.json({
     organizationName: name,
     logoUrl: branding,
+    /** Workspace brand accent (portal links, buttons); matches `organizations.primary_color`. */
+    primaryColor: primaryColorRaw != null && String(primaryColorRaw).trim() ? String(primaryColorRaw).trim() : null,
   })
 }

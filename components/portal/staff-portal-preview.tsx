@@ -169,12 +169,15 @@ export function StaffPortalPreview({
   organizationId,
   organizationName,
   logoUrl,
+  portalAccentCssVariables: accentVars,
   snapshot,
   organizationPortalDefaults,
 }: {
   organizationId: string
   organizationName: string
   logoUrl: string | null
+  /** Same `--portal-accent*` variables as the live portal shell (from `organizations.primary_color`). */
+  portalAccentCssVariables: Record<string, string>
   snapshot: StaffPortalPreviewSnapshot
   organizationPortalDefaults: {
     portalCertificateReleaseMode: string | null
@@ -209,7 +212,13 @@ export function StaffPortalPreview({
   const nextPlan = d?.nextScheduledService
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--portal-bg)" }}>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        background: "var(--portal-bg)",
+        ...accentVars,
+      }}
+    >
       <header
         className="sticky top-0 z-40 border-b"
         style={{ background: "var(--portal-surface)", borderColor: "var(--portal-border)" }}
@@ -243,6 +252,15 @@ export function StaffPortalPreview({
                   Portal settings
                 </Link>
               </Button>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1 text-xs font-medium underline-offset-4 hover:underline"
+                style={{ color: "var(--portal-nav-text)" }}
+                title="Leave preview and return to the staff app"
+              >
+                Exit to main app
+                <ArrowRight className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+              </Link>
             </div>
           </div>
 

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
+import { staffMayOpenPortalPreview } from "@/lib/portal/preview-access"
 
 export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-/** Matches portal-invites capability: staff who can manage portal settings may preview. */
-const PREVIEW_BRIDGE_ROLES = new Set(["owner", "admin", "manager"])
 
 function portalLoginUrl(request: NextRequest, extra: Record<string, string> = {}) {
   const u = new URL("/portal/login", request.url)
@@ -48,8 +46,7 @@ export async function GET(request: NextRequest) {
   }
 
   const rawRole = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  const role = rawRole ?? ""
-  if (!PREVIEW_BRIDGE_ROLES.has(role)) {
+  if (!staffMayOpenPortalPreview(rawRole)) {
     return NextResponse.redirect(
       portalLoginUrl(request, {
         next: "/portal/dashboard",
