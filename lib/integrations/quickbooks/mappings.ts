@@ -11,8 +11,23 @@ export async function upsertExternalMapping(params: {
   syncStatus: "pending" | "synced" | "error" | "stale"
   lastError?: string | null
   metadata?: Record<string, unknown>
+  /** When true, shallow-merge with existing metadata instead of replacing it. */
+  mergeMetadata?: boolean
 }): Promise<void> {
   const now = new Date().toISOString()
+  let metadata: Record<string, unknown> = params.metadata ?? {}
+  if (params.mergeMetadata) {
+    const { data: existing } = await params.svc
+      .from("external_sync_mappings")
+      .select("metadata")
+      .eq("organization_id", params.organizationId)
+      .eq("provider", "quickbooks_online")
+      .eq("entity_type", params.entityType)
+      .eq("internal_id", params.internalId)
+      .maybeSingle()
+    const prev = (existing?.metadata ?? {}) as Record<string, unknown>
+    metadata = { ...prev, ...metadata }
+  }
   await params.svc.from("external_sync_mappings").upsert(
     {
       organization_id: params.organizationId,
@@ -23,7 +38,7 @@ export async function upsertExternalMapping(params: {
       sync_status: params.syncStatus,
       last_synced_at: params.syncStatus === "synced" ? now : null,
       last_error: params.lastError?.slice(0, 2000) ?? null,
-      metadata: params.metadata ?? {},
+      metadata,
       updated_at: now,
     },
     { onConflict: "organization_id,provider,entity_type,internal_id" },

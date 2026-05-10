@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server"
 import { requireOrgIntegrationAdmin } from "@/lib/integrations/require-org-integration-admin"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { quickBooksOAuthConfigured } from "@/lib/integrations/quickbooks-env"
-import { runQuickBooksExportSync } from "@/lib/integrations/quickbooks/sync-runner"
+import {
+  runQuickBooksExportSync,
+  runQuickBooksPaymentStatusImportSync,
+} from "@/lib/integrations/quickbooks/sync-runner"
 
 export const runtime = "nodejs"
 
@@ -21,6 +25,9 @@ export async function GET(
 
   const gate = await requireOrgIntegrationAdmin(organizationId)
   if ("error" in gate) return gate.error
+
+  const financialGate = await requireAnyOrgPermission(organizationId, ["canViewBilling", "canViewFinancials"])
+  const showFinancialSyncDetail = !("error" in financialGate)
 
   const { data: integration, error: intErr } = await gate.svc
     .from("organization_integrations")
@@ -59,18 +66,35 @@ export async function GET(
 
   for (const row of mappingRows ?? []) {
     const t = (row as { entity_type?: string }).entity_type ?? "unknown"
+    if (!showFinancialSyncDetail && (t === "invoice" || t === "payment")) continue
     const ss = (row as { sync_status?: string }).sync_status ?? "unknown"
     mappingCounts[t] = (mappingCounts[t] ?? 0) + 1
     if (!syncStatusCounts[t]) syncStatusCounts[t] = {}
     syncStatusCounts[t][ss] = (syncStatusCounts[t][ss] ?? 0) + 1
   }
 
+  const integrationOut = integration
+    ? {
+        ...(integration as Record<string, unknown>),
+        ...(showFinancialSyncDetail ? {} : { last_sync_error: null }),
+      }
+    : null
+
+  const logsOut = showFinancialSyncDetail
+    ? (logs ?? [])
+    : (logs ?? []).map((row) => {
+        const r = row as Record<string, unknown>
+        const { detail, error_message: _em, ...rest } = r
+        return { ...rest, detail: null, error_message: null }
+      })
+
   return NextResponse.json({
     oauthEnvironmentConfigured: quickBooksOAuthConfigured(),
-    integration: integration ?? null,
-    recentSyncLogs: logs ?? [],
+    integration: integrationOut,
+    recentSyncLogs: logsOut,
     mappingCounts,
     syncStatusByEntity: syncStatusCounts,
+    financialSyncDetailVisible: showFinancialSyncDetail,
   })
 }
 
@@ -180,7 +204,10 @@ export async function POST(
   const gate = await requireOrgIntegrationAdmin(organizationId)
   if ("error" in gate) return gate.error
 
-  const body = (await request.json().catch(() => ({}))) as { kind?: string }
+  const body = (await request.json().catch(() => ({}))) as {
+    kind?: string
+    invoiceIds?: string[]
+  }
   const kind = typeof body.kind === "string" && SYNC_KINDS.has(body.kind) ? body.kind : "full_initial"
 
   const { data: integration } = await gate.svc
@@ -195,6 +222,42 @@ export async function POST(
       { error: "not_connected", message: "Connect QuickBooks before running a sync." },
       { status: 409 },
     )
+  }
+
+  if (kind === "payments") {
+    const fin = await requireAnyOrgPermission(organizationId, ["canViewBilling", "canViewFinancials"])
+    if ("error" in fin) return fin.error
+
+    const ids = Array.isArray(body.invoiceIds)
+      ? body.invoiceIds.filter((x): x is string => typeof x === "string" && UUID_RE.test(x))
+      : undefined
+
+    const result = await runQuickBooksPaymentStatusImportSync({
+      svc: gate.svc,
+      organizationId,
+      onlyInvoiceIds: ids?.length ? ids : undefined,
+    })
+
+    if (!result.ok) {
+      const status =
+        result.code === "not_connected" || result.code === "missing_realm" || result.code === "missing_tokens"
+          ? 409
+          : 502
+      return NextResponse.json(
+        { error: result.error, code: result.code ?? "sync_failed" },
+        { status },
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      syncLogId: result.syncLogId,
+      status: result.status,
+      recordsAttempted: result.recordsAttempted,
+      recordsSucceeded: result.recordsSucceeded,
+      errorMessage: result.errorMessage,
+      detail: result.detail,
+    })
   }
 
   const mappedKind: "customers" | "catalog_items" | "invoices" | "full_initial" =

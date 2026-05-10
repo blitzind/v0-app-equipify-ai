@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -69,8 +70,11 @@ function syncStatusBadgeClass(status: string): string {
 
 function QuickBooksIntegrationPageInner() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { toast } = useToast()
   const searchParams = useSearchParams()
+  const canRunFinancialSync =
+    Boolean(permissions.canViewBilling || permissions.canViewFinancials)
 
   const [loading, setLoading] = useState(true)
   const [oauthEnv, setOauthEnv] = useState(false)
@@ -80,6 +84,7 @@ function QuickBooksIntegrationPageInner() {
   const [syncStatusByEntity, setSyncStatusByEntity] = useState<Record<string, Record<string, number>>>({})
   const [actionBusy, setActionBusy] = useState<string | null>(null)
   const [autoSyncBusy, setAutoSyncBusy] = useState(false)
+  const [financialSyncVisible, setFinancialSyncVisible] = useState(false)
 
   const load = useCallback(async () => {
     if (orgStatus !== "ready" || !organizationId) {
@@ -100,6 +105,7 @@ function QuickBooksIntegrationPageInner() {
         recentSyncLogs?: SyncLogRow[]
         mappingCounts?: Record<string, number>
         syncStatusByEntity?: Record<string, Record<string, number>>
+        financialSyncDetailVisible?: boolean
         error?: string
       }
       if (!res.ok) {
@@ -110,6 +116,7 @@ function QuickBooksIntegrationPageInner() {
       setLogs(body.recentSyncLogs ?? [])
       setMappingCounts(body.mappingCounts ?? {})
       setSyncStatusByEntity(body.syncStatusByEntity ?? {})
+      setFinancialSyncVisible(Boolean(body.financialSyncDetailVisible))
     } catch (e) {
       toast({
         variant: "destructive",
@@ -161,6 +168,48 @@ function QuickBooksIntegrationPageInner() {
       toast({
         variant: "destructive",
         title: "Disconnect failed",
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  async function runPaymentStatusImport() {
+    if (!organizationId) return
+    setActionBusy("sync:payments")
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/integrations/quickbooks`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "payments" }),
+        },
+      )
+      const j = (await res.json()) as {
+        ok?: boolean
+        error?: string
+        recordsSucceeded?: number
+        recordsAttempted?: number
+        errorMessage?: string | null
+        status?: string
+      }
+      if (!res.ok) throw new Error(j.error ?? res.statusText)
+      const okMsg =
+        typeof j.recordsSucceeded === "number" && typeof j.recordsAttempted === "number"
+          ? `Checked ${j.recordsAttempted} mapped invoice(s); ${j.recordsSucceeded} updated (${j.status ?? "done"}).`
+          : "Payment status import finished."
+      toast({
+        title: "QuickBooks payment status",
+        description: j.errorMessage ? `${okMsg} ${j.errorMessage}` : okMsg,
+        variant: j.status === "failed" ? "destructive" : "default",
+      })
+      await load()
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Import failed",
         description: e instanceof Error ? e.message : String(e),
       })
     } finally {
@@ -410,9 +459,15 @@ function QuickBooksIntegrationPageInner() {
                 </div>
               ) : null}
 
-              {integration?.last_sync_error ? (
+              {financialSyncVisible && integration?.last_sync_error ? (
                 <p className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-md px-3 py-2">
                   {integration.last_sync_error}
+                </p>
+              ) : null}
+              {connected && !financialSyncVisible ? (
+                <p className="text-xs text-muted-foreground border border-border rounded-md px-3 py-2">
+                  Invoice and payment sync details, sync error text, and QuickBooks payment-status import require{" "}
+                  <span className="font-medium">billing or financial</span> permissions.
                 </p>
               ) : null}
 
@@ -509,13 +564,30 @@ function QuickBooksIntegrationPageInner() {
                 )}
                 Full sync
               </Button>
+              {canRunFinancialSync ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={actionBusy !== null}
+                  onClick={() => void runPaymentStatusImport()}
+                >
+                  {actionBusy === "sync:payments" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  Pull payment status
+                </Button>
+              ) : null}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs border border-border rounded-lg p-3 bg-muted/10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs border border-border rounded-lg p-3 bg-muted/10">
               {(
                 [
                   ["customers", "Customers"],
                   ["catalog_items", "Catalog"],
                   ["invoices", "Invoices"],
+                  ...(canRunFinancialSync ? ([["payments", "Payment status"]] as const) : []),
                 ] as const
               ).map(([kind, label]) => {
                 const last = lastLogForKind(logs, kind)
@@ -549,6 +621,11 @@ function QuickBooksIntegrationPageInner() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {!financialSyncVisible ? (
+            <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+              Invoice and payment mapping counts are hidden without billing/financial access.
+            </p>
+          ) : null}
           {Object.keys(mappingCounts).length === 0 ? (
             <p className="text-sm text-muted-foreground py-1">No mappings yet — run an export after connecting.</p>
           ) : (
@@ -589,6 +666,11 @@ function QuickBooksIntegrationPageInner() {
           <CardDescription>Status, record counts, and top errors from each run.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          {!financialSyncVisible ? (
+            <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2 mb-2">
+              Row-level sync errors are hidden without billing/financial access. Connection health above still applies.
+            </p>
+          ) : null}
           {logs.length === 0 ? (
             <p className="text-sm text-muted-foreground py-1">No sync runs recorded yet.</p>
           ) : (
@@ -614,10 +696,10 @@ function QuickBooksIntegrationPageInner() {
                         <CheckCircle2 className="w-3.5 h-3.5 text-[color:var(--status-success)] shrink-0" />
                       ) : null}
                     </div>
-                    {log.error_message ? (
+                    {financialSyncVisible && log.error_message ? (
                       <p className="text-destructive">{log.error_message}</p>
                     ) : null}
-                    {topErr ? (
+                    {financialSyncVisible && topErr ? (
                       <p className="text-muted-foreground border-t border-border pt-1 mt-0.5">
                         First row error: {topErr}
                       </p>

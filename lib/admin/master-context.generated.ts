@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 208,
+  apiRouteHandlers: 210,
   sqlMigrations: 141,
   dashboardPages: 59,
   componentsTsx: 224,
-  libTsFiles: 413,
+  libTsFiles: 414,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **208** |
+| API route handlers (\`app/api/**/route.ts\`) | **210** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **141** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
 | \`components/**/*.tsx\` | **224** |
-| \`lib/**/*.ts\` | **413** |
+| \`lib/**/*.ts\` | **414** |
 
 ### Vercel crons
 
@@ -123,6 +123,7 @@ organizations/[organizationId]/follow-up-tasks/[taskId]/regenerate-draft/route.t
 organizations/[organizationId]/follow-up-tasks/evaluate/route.ts
 organizations/[organizationId]/follow-up-tasks/route.ts
 organizations/[organizationId]/follow-up-tasks/stats/route.ts
+organizations/[organizationId]/integrations/quickbooks/apply-inbound-paid/route.ts
 organizations/[organizationId]/integrations/quickbooks/invoice-auto-sync/route.ts
 organizations/[organizationId]/integrations/quickbooks/route.ts
 organizations/[organizationId]/inventory/adjust/route.ts
@@ -147,6 +148,7 @@ organizations/[organizationId]/inventory/truck-transfer/route.ts
 organizations/[organizationId]/inventory/vehicle-stock/route.ts
 organizations/[organizationId]/invite-member/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/quickbooks-sync/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/async/route.ts
 organizations/[organizationId]/migration-imports/[jobId]/commit/route.ts

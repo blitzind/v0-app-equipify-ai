@@ -345,6 +345,63 @@ async function reconcileOrgInvoiceFromPayments(
   queueQuickBooksInvoiceAutoSync(organizationId, invoiceId)
 }
 
+/**
+ * Phase 40: apply QuickBooks inbound “fully paid” only when there are no Equipify payment rows
+ * (caller must run reconcile and confirm apply_available first).
+ */
+export async function markOrgInvoicePaidFromQuickBooksInbound(
+  supabase: SupabaseClient,
+  organizationId: string,
+  invoiceId: string,
+  paidOn: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const paidDate = paidOn.trim().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidDate)) {
+    return { ok: false, error: "Invalid paid date." }
+  }
+
+  const { data: inv, error: invErr } = await supabase
+    .from("org_invoices")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .eq("id", invoiceId)
+    .maybeSingle()
+
+  if (invErr || !inv) return { ok: false, error: "Invoice not found." }
+  const st = String((inv as { status: string }).status)
+  if (st === "void" || st === "draft") {
+    return { ok: false, error: "This invoice cannot be marked paid." }
+  }
+
+  const { count, error: cErr } = await supabase
+    .from("org_invoice_payments")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("invoice_id", invoiceId)
+
+  if (cErr) return { ok: false, error: cErr.message }
+  if ((count ?? 0) > 0) {
+    return { ok: false, error: "Invoice has recorded payments; reconcile manually before applying." }
+  }
+
+  const { error: upErr } = await supabase
+    .from("org_invoices")
+    .update({
+      status: "paid",
+      paid_at: paidDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("id", invoiceId)
+
+  if (upErr) return { ok: false, error: upErr.message }
+
+  await syncLinkedWorkOrdersBillingState(supabase, organizationId, invoiceId, "paid")
+  queueQuickBooksInvoiceAutoSync(organizationId, invoiceId)
+
+  return { ok: true }
+}
+
 export async function insertOrgInvoicePayment(
   supabase: SupabaseClient,
   args: {

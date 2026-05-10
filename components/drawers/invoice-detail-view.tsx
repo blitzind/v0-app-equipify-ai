@@ -1389,8 +1389,37 @@ type OrgPaymentRow = {
   created_by: string | null
 }
 
+type QuickBooksInvoiceSyncResponse = {
+  connected: boolean
+  integrationHealth: {
+    lastSuccessfulSyncAt: string | null
+    lastSyncAttemptAt: string | null
+    syncHealth: string
+    lastSyncError: string | null
+  } | null
+  invoice: {
+    quickBooksInvoiceId: string
+    syncStatus: string
+    lastError: string | null
+    lastSyncedAt: string | null
+    inbound: {
+      checkedAt: string
+      reviewState: string
+      reviewReason: string | null
+      qbFullyPaid: boolean
+      qbPartiallyPaid: boolean
+      suggestApplyPaidOn: string | null
+    } | null
+  } | null
+  payments: Array<{
+    paymentId: string
+    quickBooks: { state: string; lastError: string | null }
+  }>
+}
+
 function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
   const { permissions } = useOrgPermissions()
+  const { refreshInvoices } = useInvoices()
   const activeOrg = useActiveOrganization()
   const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
   const canEditPayments = permissions.canViewBilling && permissions.canEditInvoices
@@ -1486,6 +1515,81 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
           ? "danger"
           : "warning"
 
+  const canViewQbFinancialSync = permissions.canViewBilling || permissions.canViewFinancials
+
+  const [qbLoading, setQbLoading] = useState(false)
+  const [qbBusy, setQbBusy] = useState<string | null>(null)
+  const [qbPayload, setQbPayload] = useState<QuickBooksInvoiceSyncResponse | null>(null)
+  const [qbError, setQbError] = useState<string | null>(null)
+
+  const loadQuickBooksSync = useCallback(async () => {
+    if (!orgId || !canViewQbFinancialSync) return
+    setQbLoading(true)
+    setQbError(null)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/quickbooks-sync`,
+        { cache: "no-store" },
+      )
+      const body = (await res.json()) as QuickBooksInvoiceSyncResponse & { error?: string }
+      if (!res.ok) throw new Error(body.error ?? res.statusText)
+      setQbPayload(body)
+    } catch (e) {
+      setQbError(e instanceof Error ? e.message : String(e))
+      setQbPayload(null)
+    } finally {
+      setQbLoading(false)
+    }
+  }, [orgId, invoice.id, canViewQbFinancialSync])
+
+  useEffect(() => {
+    void loadQuickBooksSync()
+  }, [loadQuickBooksSync])
+
+  async function pullQuickBooksPaymentStatus() {
+    if (!orgId) return
+    setQbBusy("pull")
+    setQbError(null)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(orgId)}/integrations/quickbooks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "payments", invoiceIds: [invoice.id] }),
+      })
+      const body = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(body.error ?? res.statusText)
+      await loadQuickBooksSync()
+    } catch (e) {
+      setQbError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setQbBusy(null)
+    }
+  }
+
+  async function applyQuickBooksPaid() {
+    if (!orgId) return
+    setQbBusy("apply")
+    setQbError(null)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/integrations/quickbooks/apply-inbound-paid`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoiceId: invoice.id }),
+        },
+      )
+      const body = (await res.json()) as { error?: string; message?: string }
+      if (!res.ok) throw new Error(body.message ?? body.error ?? res.statusText)
+      await loadQuickBooksSync()
+      void refreshInvoices()
+    } catch (e) {
+      setQbError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setQbBusy(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1562,6 +1666,134 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
           </p>
         </div>
       </div>
+
+      {canViewQbFinancialSync ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-[color:var(--ds-info-border)]/40")}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">QuickBooks</p>
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[11px] gap-1"
+                disabled={qbLoading || qbBusy !== null || !orgId}
+                onClick={() => void loadQuickBooksSync()}
+              >
+                {qbLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Refresh
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-7 text-[11px] gap-1"
+                disabled={qbBusy !== null || !orgId || !qbPayload?.connected}
+                onClick={() => void pullQuickBooksPaymentStatus()}
+              >
+                {qbBusy === "pull" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Pull payment status
+              </Button>
+            </div>
+          </div>
+          {qbError ? (
+            <p className="text-[11px] text-destructive">{qbError}</p>
+          ) : null}
+          {qbLoading && !qbPayload ? (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Loading QuickBooks sync…
+            </p>
+          ) : null}
+          {qbPayload && !qbPayload.connected ? (
+            <p className="text-[11px] text-muted-foreground">QuickBooks is not connected for this workspace.</p>
+          ) : null}
+          {qbPayload?.connected && qbPayload.integrationHealth ? (
+            <div className="text-[10px] text-muted-foreground space-y-0.5">
+              <p>
+                Sync health:{" "}
+                <span className="font-medium text-foreground capitalize">{qbPayload.integrationHealth.syncHealth}</span>
+              </p>
+              <p className="tabular-nums">
+                Last success:{" "}
+                {qbPayload.integrationHealth.lastSuccessfulSyncAt
+                  ? new Date(qbPayload.integrationHealth.lastSuccessfulSyncAt).toLocaleString()
+                  : "—"}
+              </p>
+              {qbPayload.integrationHealth.lastSyncError ? (
+                <p className="text-destructive">{qbPayload.integrationHealth.lastSyncError}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {qbPayload?.invoice ? (
+            <div className="text-[11px] space-y-1 border-t border-border pt-2">
+              <p>
+                <span className="text-muted-foreground">Invoice in QuickBooks:</span>{" "}
+                <span className="font-mono">{qbPayload.invoice.quickBooksInvoiceId}</span> ·{" "}
+                <span className="capitalize">{qbPayload.invoice.syncStatus}</span>
+              </p>
+              {qbPayload.invoice.lastError ? (
+                <p className="text-destructive">{qbPayload.invoice.lastError}</p>
+              ) : null}
+              {qbPayload.invoice.inbound ? (
+                <div className="rounded-md bg-muted/40 px-2 py-1.5 space-y-1">
+                  <p className="text-muted-foreground">
+                    Payment status (last check{" "}
+                    {new Date(qbPayload.invoice.inbound.checkedAt).toLocaleString()}):{" "}
+                    {qbPayload.invoice.inbound.qbFullyPaid
+                      ? "QuickBooks shows paid in full."
+                      : qbPayload.invoice.inbound.qbPartiallyPaid
+                        ? "QuickBooks shows a partial payment / open balance."
+                        : "No mismatch detected or not applicable."}
+                  </p>
+                  {qbPayload.invoice.inbound.reviewState === "needs_review" && qbPayload.invoice.inbound.reviewReason ? (
+                    <p className="text-[color:var(--status-warning)] font-medium">
+                      Needs review — {qbPayload.invoice.inbound.reviewReason}
+                    </p>
+                  ) : null}
+                  {qbPayload.invoice.inbound.reviewState === "apply_available" ? (
+                    <p className="text-[color:var(--status-success)]">
+                      You can mark this invoice paid in Equipify to match QuickBooks (no recorded payments here).
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Run “Pull payment status” to compare balances.</p>
+              )}
+              {qbPayload.invoice.inbound?.reviewState === "apply_available" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-[11px] mt-1"
+                  disabled={qbBusy !== null}
+                  onClick={() => void applyQuickBooksPaid()}
+                >
+                  {qbBusy === "apply" ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Mark paid in Equipify (from QuickBooks)
+                </Button>
+              ) : null}
+            </div>
+          ) : qbPayload?.connected ? (
+            <p className="text-[11px] text-muted-foreground">This invoice has not been exported to QuickBooks yet.</p>
+          ) : null}
+          {qbPayload?.payments?.length ? (
+            <div className="text-[11px] border-t border-border pt-2 space-y-1">
+              <p className="font-medium text-foreground">Recorded payments vs QuickBooks</p>
+              <ul className="space-y-0.5">
+                {qbPayload.payments.map((p) => (
+                  <li key={p.paymentId} className="flex flex-wrap justify-between gap-2 text-muted-foreground">
+                    <span className="font-mono text-[10px]">{p.paymentId.slice(0, 8)}…</span>
+                    <span className="capitalize">
+                      {p.quickBooks.state === "not_tracked"
+                        ? "Not exported"
+                        : `QB mapping: ${p.quickBooks.state}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <Section title="Recorded payments">
         {loading ? (
