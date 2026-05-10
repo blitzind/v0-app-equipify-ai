@@ -48,6 +48,30 @@ export async function POST(
     return NextResponse.json({ message: "quantity must be positive." }, { status: 400 })
   }
 
+  const { data: wo } = await gate.svc
+    .from("work_orders")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", workOrderId)
+    .maybeSingle()
+  if (!wo) return NextResponse.json({ message: "Work order not found." }, { status: 404 })
+
+  const { data: cat } = await gate.svc
+    .from("catalog_items")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", catalogItemId)
+    .maybeSingle()
+  if (!cat) return NextResponse.json({ message: "Catalog item not found." }, { status: 404 })
+
+  const { data: locRow } = await gate.svc
+    .from("inventory_locations")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", locationId)
+    .maybeSingle()
+  if (!locRow) return NextResponse.json({ message: "Location not found." }, { status: 404 })
+
   const row = await ensureStockRow(gate.svc, organizationId, catalogItemId, locationId)
   const release = Math.min(row.quantity_allocated, qty)
   if (release <= 0) {

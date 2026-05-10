@@ -56,6 +56,14 @@ export async function POST(
     .maybeSingle()
   if (!wo) return NextResponse.json({ message: "Work order not found." }, { status: 404 })
 
+  const { data: locRow } = await gate.svc
+    .from("inventory_locations")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("id", locationId)
+    .maybeSingle()
+  if (!locRow) return NextResponse.json({ message: "Location not found." }, { status: 404 })
+
   const { data: cat } = await gate.svc
     .from("catalog_items")
     .select("id")

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { insertLedger } from "@/lib/inventory/inventory-mutations"
 import { requireOrgInventoryWrite } from "@/lib/inventory/require-org-inventory-access"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { hasOrgPermission } from "@/lib/permissions/model"
+import { resolveVehicleLocationIdForUser } from "@/lib/inventory/technician-truck"
 
 export const runtime = "nodejs"
 
@@ -30,6 +33,9 @@ export async function POST(
   if (!UUID_RE.test(organizationId)) {
     return NextResponse.json({ message: "Invalid organization." }, { status: 400 })
   }
+
+  const permissionGate = await requireOrgPermission(organizationId, "canConsumePartsOnWorkOrders")
+  if ("error" in permissionGate) return permissionGate.error
 
   const gate = await requireOrgInventoryWrite(organizationId, {
     capability: "canConsumePartsOnWorkOrders",
@@ -81,6 +87,20 @@ export async function POST(
   if (!cat) return NextResponse.json({ message: "Catalog item not found." }, { status: 404 })
   if (!loc) return NextResponse.json({ message: "Location not found." }, { status: 404 })
 
+  if (!hasOrgPermission(permissionGate.permissions, "canManageInventory")) {
+    const truckLoc = await resolveVehicleLocationIdForUser(gate.svc, organizationId, gate.userId)
+    if (!truckLoc || locationId !== truckLoc) {
+      return NextResponse.json(
+        { message: "You can only request restock for your assigned vehicle stock location." },
+        { status: 403 },
+      )
+    }
+  }
+
+  // `inventory_transactions.quantity` must be > 0 (DB check); use 1 when the request is open-ended.
+  const ledgerQuantity =
+    requestedQty != null && requestedQty > 0 ? requestedQty : 1
+
   const notes =
     typeof body.notes === "string" && body.notes.trim().length > 0
       ? body.notes.trim().slice(0, 500)
@@ -91,13 +111,14 @@ export async function POST(
     catalog_item_id: catalogItemId,
     location_id: locationId,
     transaction_type: "reorder_recorded",
-    quantity: requestedQty ?? 0,
+    quantity: ledgerQuantity,
     delta_on_hand: 0,
     delta_allocated: 0,
     notes,
     metadata: {
       restock_request: true,
       requested_quantity: requestedQty,
+      quantity_was_unspecified: requestedQty == null,
     },
     created_by: gate.userId,
   })

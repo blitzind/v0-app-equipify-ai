@@ -27,7 +27,7 @@ export async function GET(
   let query = gate.svc
     .from("inventory_transactions")
     .select(
-      "id, catalog_item_id, location_id, transaction_type, quantity, delta_on_hand, delta_allocated, correlation_id, work_order_id, purchase_order_id, invoice_id, counterparty_location_id, notes, created_at",
+      "id, catalog_item_id, location_id, transaction_type, quantity, delta_on_hand, delta_allocated, correlation_id, work_order_id, purchase_order_id, invoice_id, counterparty_location_id, notes, created_by, created_at",
     )
     .eq("organization_id", organizationId)
 

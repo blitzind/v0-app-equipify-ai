@@ -18,7 +18,7 @@ const TXN_TYPE_LABELS: Record<string, string> = {
   receive: "Received",
   allocate: "Allocated",
   deallocate: "Deallocated",
-  reorder_recorded: "Reorder recorded",
+  reorder_recorded: "Restock / reorder note (no stock change)",
 }
 
 /** Friendly label for an inventory transaction type. */

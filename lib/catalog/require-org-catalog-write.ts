@@ -3,19 +3,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import {
-  getOrgPermissionsForRole,
+  getEffectiveOrgPermissions,
   hasOrgPermission,
   normalizeOrgMemberRole,
   type OrgPermissionKey,
 } from "@/lib/permissions/model"
 
 /**
- * Phase 2 (Permissions): the catalog/inventory write gate is now driven by
- * the central `OrgPermissions` capability map instead of a hardcoded role
- * array. The default capability is `canManageInventory` (true for owner /
- * admin / manager — identical to the previous behaviour); callers may pass
- * a different key (e.g. `canManageCertificateTemplates`) to gate alternate
- * surfaces while still benefiting from the shared service-role wiring.
+ * Phase 2 (Permissions): capability checks use **effective** permissions (DB role +
+ * optional `permission_profile` / `permissions_json`), matching `requireOrgPermission`.
+ * Default capability is `canManageInventory`; callers may pass another key (e.g.
+ * `canConsumePartsOnWorkOrders` for consume/restock flows).
  */
 export async function requireOrgCatalogWrite(
   organizationId: string,
@@ -46,7 +44,7 @@ export async function requireOrgCatalogWrite(
   if (!platformAdmin) {
     const { data: mem, error: memErr } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("role, permission_profile, permissions_json")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")
@@ -71,7 +69,11 @@ export async function requireOrgCatalogWrite(
         ),
       }
     }
-    const perms = getOrgPermissionsForRole(role)
+    const perms = getEffectiveOrgPermissions({
+      role,
+      permissionProfile: (mem as { permission_profile?: string | null } | null)?.permission_profile ?? null,
+      permissionsJson: (mem as { permissions_json?: unknown } | null)?.permissions_json ?? null,
+    })
     if (!hasOrgPermission(perms, capability)) {
       return {
         error: NextResponse.json(

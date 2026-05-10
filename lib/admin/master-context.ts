@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:38:38.790Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:44:29.086Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -50,6 +50,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 57.4 — Settings wiring sprint:** See \`docs/SETTINGS_WIRING_AUDIT.md\` changelog. **Follow-up automation** settings + evaluate APIs accept \`canManageAutomations\` **or** \`canManageWorkspaceSettings\` (UI matches). **AI Ops digest** Route Handlers use \`requireOrgPermission\` / \`requireAnyOrgPermission\` instead of raw-role checks; digest PATCH shows an honest saved toast. **Integrations** hub fetches QuickBooks \`connection_status\` for a real Connected/Not connected pill; Stripe remains labeled as billing-only.
 - **Phase 57.5 — UI consistency polish:** Tightened inline empty/error patterns in high-traffic surfaces (global search panel, notifications dropdown, work order tasks card, reports analytics banner, technicians table empty row). Prefer icon + short title + helper line; for recoverable fetch failures add **Retry** next to the message. Full-page empty states continue to use \`components/ui/empty.tsx\` where already adopted.
 - **Phase 58.1 — Inventory workflow UX:** \`/inventory\` explains that **catalog items** (SKUs) are added/edited under \`/catalog\`; stock movements use capability-aligned controls (\`canManageInventory\` for receive/transfer/locations/thresholds/van assignment; \`canAdjustInventoryStock\` plus manage for adjustments; \`canConsumePartsOnWorkOrders\` for consume). Tab labels: Adjust/receive, Transfer stock, Consume parts & history, Van & truck stock, Reorder. **Archive item** on the catalog drawer confirms before hiding a SKU (no hard delete). Client no longer infers manage rights from raw manager roles alone for inventory mutations — it follows \`useOrgPermissions\` + platform admin.
+- **Phase 58.2 — Inventory operational validation:** \`requireOrgCatalogWrite\` / \`requireOrgInventoryWrite\` now use **effective** org permissions (same basis as \`requireOrgPermission\`), so catalog/inventory API gates honor \`permission_profile\` / \`permissions_json\`. **Restock request** enforces truck-only \`location_id\` for users without \`canManageInventory\`, and ledger \`quantity\` is always positive (DB constraint) — open-ended requests use nominal qty \`1\` with metadata. **Allocate/deallocate** validate location (and deallocate validates WO/catalog) org scope. **Vehicle stock** assignment requires a **vehicle** location type. Ledger API returns \`created_by\`; staff ledger table shows part, primary bin, and transfer counterparty bin names.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

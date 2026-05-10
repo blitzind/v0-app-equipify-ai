@@ -90,6 +90,7 @@ type TxRow = {
   location_id: string
   work_order_id: string | null
   purchase_order_id: string | null
+  counterparty_location_id: string | null
   notes: string | null
   created_at: string
 }
@@ -203,7 +204,7 @@ export default function InventoryPage() {
       setLocations(lj.locations ?? [])
       setStock(sj.stock ?? [])
       setLowStock(lowj.items ?? [])
-      setTransactions(txj.transactions ?? [])
+      setTransactions((txj.transactions ?? []) as TxRow[])
       setVehicleAssignments(vsj.assignments ?? [])
       const items = (cj.items ?? []) as Array<{ id: string; name: string; part_number?: string | null }>
       setCatalogParts(items.map((i) => ({ id: i.id, name: i.name, part_number: i.part_number ?? "" })))
@@ -1091,17 +1092,19 @@ export default function InventoryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>When</TableHead>
+                    <TableHead>Part</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Δ on-hand</TableHead>
                     <TableHead className="text-right">Δ alloc</TableHead>
+                    <TableHead>Other bin</TableHead>
                     <TableHead>Reference</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactions.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                         <span className="block max-w-md mx-auto space-y-2">
                           <span className="block text-foreground font-medium">No stock movements yet</span>
                           <span className="block text-xs leading-relaxed">
@@ -1115,6 +1118,14 @@ export default function InventoryPage() {
                     </TableRow>
                   )}
                   {transactions.map((t) => {
+                    const partLabel =
+                      catalogParts.find((c) => c.id === t.catalog_item_id)?.name ??
+                      stock.find((s) => s.catalog_item_id === t.catalog_item_id)?.item_name ??
+                      "Part"
+                    const locLabel = locations.find((l) => l.id === t.location_id)?.name ?? "This bin"
+                    const counterpartyLabel = t.counterparty_location_id
+                      ? (locations.find((l) => l.id === t.counterparty_location_id)?.name ?? "Other location")
+                      : null
                     const woMatch = t.work_order_id
                       ? recentWorkOrders.find((w) => w.id === t.work_order_id)
                       : null
@@ -1127,15 +1138,27 @@ export default function InventoryPage() {
                         <TableCell className="text-xs whitespace-nowrap">
                           {new Date(t.created_at).toLocaleString()}
                         </TableCell>
+                        <TableCell className="text-xs max-w-[140px]">
+                          <span className="font-medium text-foreground line-clamp-2">{partLabel}</span>
+                          <span className="block text-[10px] text-muted-foreground line-clamp-1">{locLabel}</span>
+                        </TableCell>
                         <TableCell className="text-xs">{formatTransactionType(t.transaction_type)}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.quantity}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.delta_on_hand}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.delta_allocated}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {counterpartyLabel ?? "—"}
+                        </TableCell>
                         <TableCell className="text-xs">
                           {woRef ? <span>{woRef}</span> : null}
                           {woRef && poRef ? <span className="mx-1 text-muted-foreground">·</span> : null}
                           {poRef ? <span className="text-muted-foreground">{poRef}</span> : null}
-                          {!woRef && !poRef ? <span className="text-muted-foreground">—</span> : null}
+                          {!woRef && !poRef && t.notes ? (
+                            <span className="text-muted-foreground line-clamp-2">{t.notes}</span>
+                          ) : null}
+                          {!woRef && !poRef && !t.notes ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     )

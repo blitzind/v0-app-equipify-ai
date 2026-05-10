@@ -98,6 +98,12 @@ export async function POST(
 
   if (!tech) return NextResponse.json({ message: "Technician not found." }, { status: 400 })
   if (!loc) return NextResponse.json({ message: "Location not found." }, { status: 400 })
+  if ((loc as { location_type?: string }).location_type !== "vehicle") {
+    return NextResponse.json(
+      { message: "inventory_location_id must be a vehicle (truck / van) location." },
+      { status: 400 },
+    )
+  }
 
   await gate.svc
     .from("technician_vehicle_stock")
