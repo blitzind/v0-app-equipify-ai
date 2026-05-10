@@ -31,8 +31,20 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 | Flow | Behavior |
 |------|----------|
 | `POST .../communications/{id}/send` | **Hand-off only:** `fetch` to existing live routes (`/api/email/invoice`, `/api/email/quote`, `/api/email/work-order-summary`, prospect follow-up). Does **not** call Resend itself. |
-| `POST .../communications/{eventId}/retry` | Placeholder / queued messaging; **no** Resend send in this phase (see route comments). |
+| `POST .../communications/{eventId}/retry` | **Replay hand-off:** same pattern as send — `fetch` to the live route with the user cookie, then settles the row to `sent` or `failed` in one request. Structured log line `source: "communication-retry"`. See retry matrix below. |
 | Draft compose | Creates `communication_events`; send path is hand-off above. |
+
+### Communications retry matrix (Phase 55.3)
+
+| Event / row shape | Live route | Notes |
+|-------------------|------------|--------|
+| `event_type = communication_draft` | Same as draft send (`planDraftHandoff`) | Invoice / quote / WO use Resend-backed routes; prospect uses log-only follow-up (no `sendEmail`). |
+| `invoice_email` + `related_entity_type = invoice` | `POST /api/email/invoice` | Template from legacy invoice route; `variant` from metadata or default `resend`. |
+| `quote_email` + quote link | `POST /api/email/quote` | Same. |
+| `work_order_summary_email` / `appointment_confirmation_email` + WO link | `POST /api/email/work-order-summary` | Variant derived from `event_type`. |
+| `prospect_followup_email`, AI Ops reminder metadata, digest/system rows, unrelated types | — | API returns `retry_unavailable` or `retry_blocked` with a clear message — no fake queue. |
+
+**Manual check:** fail a draft send (e.g. invalid env), hit Retry, confirm outbound Resend log + row `sent`, and a second timeline row from the live route when applicable.
 
 ---
 
@@ -91,6 +103,7 @@ Prerequisites: `RESEND_API_KEY`, `EMAIL_FROM_ADDRESS`, verified domain, `NEXT_PU
 | 8 | AI Ops digest | Trigger digest send (manual or cron) with recipients | `ai_ops_digest`; HTML + **text** footers absolute URLs |
 | 9 | Payment reminder | AI Ops confirmed reminder | `invoice_payment_reminder_ai_ops` |
 | 10 | Communications hand-off | Send draft for invoice/quote/WO | Same logs as underlying route; no duplicate Resend client |
+| 10b | Communications retry | Failed draft or failed `invoice_email` / `quote_email` / WO email → Retry | Same as underlying route; `communication-retry` log line; no row stuck in `queued` |
 | 11 | Missing env | Unset `RESEND_API_KEY`; attempt invoice send | 503, safe message, structured `outbound-email` log |
 | 12 | Bad recipient | Invalid `to` on send route | 400 from route validation before `sendEmail` |
 

@@ -187,13 +187,23 @@ export function FeedDetailDrawer({
         `/api/organizations/${encodeURIComponent(organizationId)}/communications/${encodeURIComponent(detail.id)}/retry`,
         { method: "POST" },
       )
-      const body = (await res.json()) as { ok?: boolean; message?: string; error?: string }
+      const body = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        error?: string
+        sentAt?: string
+      }
       if (!res.ok) throw new Error(body.message ?? body.error ?? "Retry failed.")
-      toast({ title: "Retry queued", description: body.message })
-      setRetryDoneAt(new Date().toISOString())
-      // Reflect the new status locally so the pill updates without
-      // needing to refetch.
-      setDetail({ ...detail, delivery_status: "queued", error_message: null })
+      const sentAt = typeof body.sentAt === "string" ? body.sentAt : new Date().toISOString()
+      toast({ title: "Retry sent", description: body.message })
+      setRetryDoneAt(sentAt)
+      setDetail({
+        ...detail,
+        delivery_status: "sent",
+        error_message: null,
+        sent_at: sentAt,
+        failed_at: null,
+      })
     } catch (e) {
       toast({
         title: "Retry failed",
@@ -678,7 +688,7 @@ export function FeedDetailDrawer({
               ) : (
                 <RefreshCw className="w-3.5 h-3.5" aria-hidden />
               )}
-              {retryDoneAt ? "Retry queued" : "Retry / resend"}
+              {retryDoneAt ? "Retried" : "Retry / resend"}
             </Button>
           ) : item &&
             (item.delivery_status === "queued" || item.delivery_status === "pending") &&

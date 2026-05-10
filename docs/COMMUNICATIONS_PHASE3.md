@@ -57,12 +57,21 @@ infrastructure.
 
 `POST /api/organizations/{orgId}/communications/{id}/retry`:
 
+- **Replays the send** the same way as draft hand-off: resolves a live
+  route via [`lib/communications/retry-handoff.ts`](../lib/communications/retry-handoff.ts)
+  (draft rows delegate to `planDraftHandoff`; canonical `invoice_email` /
+  `quote_email` / work-order event types use template-only replays without
+  reusing draft subject lines), then `fetch`es it with the caller’s cookie.
+  Rows settle to `sent` or `failed` in that request — they are not left
+  `queued` waiting for a webhook.
+- Returns `400` with `retry_unavailable` when the event cannot be replayed
+  (e.g. manual prospect log, AI Ops payment reminder).
 - Refuses retries while the row is still `queued` or `pending`
   (HTTP 409 `already_queued`).
 - 30 s cooldown between retry attempts (HTTP 429 `retry_cooldown`
   with `cooldownSecondsRemaining`).
-- Tracks `metadata.retry_count` so future provider sync work has a
-  basis for backoff or exhaustion logic.
+- Tracks `metadata.retry_count` and emits JSON logs with
+  `source: "communication-retry"` (organization id, event id, route, outcome).
 - Drawer UI now shows a friendlier failure block with a one-line
   hint via `explainFailure()` for common failure shapes (invalid
   recipient, rate limit, permission denied, archived record).
@@ -103,7 +112,8 @@ the shape so a future phase can land minimally and safely:
   upsert against `communication_events` rows by
   `provider_message_id`. Update `delivered_at`, `failed_at`,
   `error_message`, `metadata.bounce_reason`. The retry endpoint
-  already keys off `delivery_status='bounced'`.
+  accepts `delivery_status='bounced'` and replays the same live route
+  as for `failed` (see retry-handoff).
 - **Twilio sync** — same pattern for SMS (`MessageStatus`
   callbacks). Map `delivered`, `failed`, `undelivered` into the
   same `communication_events` columns. Provider message ID is

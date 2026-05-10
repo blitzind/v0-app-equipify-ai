@@ -1,25 +1,31 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { parseUuid } from "@/lib/email/route-auth"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
+import { planFailedDeliveryRetry } from "@/lib/communications/retry-handoff"
+import type { CommunicationEventRow } from "@/lib/notifications/types"
 
 export const runtime = "nodejs"
 
+function logCommunicationRetry(payload: Record<string, unknown>) {
+  try {
+    console.info(JSON.stringify({ source: "communication-retry", ...payload }))
+  } catch {
+    /* best-effort */
+  }
+}
+
 /**
- * Marks a failed/bounced delivery for retry (queue).
+ * Replays a failed or bounced outbound email by delegating to the same live
+ * routes as draft send hand-off, using the caller's session cookie.
  *
- * Communications Phase 2 — gated behind `canManageCommunications`
- * (owner/admin/manager) so techs and viewers can read the feed but
- * can't requeue customer-facing sends. The retry semantics stay
- * unchanged: we flip `delivery_status` back to `queued`, clear the
- * stored error, and stamp `metadata.retry_requested_at` /
- * `metadata.retry_requested_by`. Actual provider resend hooks
- * (Resend / Twilio) land in a later phase via webhook ingestion.
+ * Does not leave rows in `queued` without attempting a send: we transition
+ * queued → sent/failed in one request, like `.../communications/{id}/send`.
  */
 export async function POST(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ organizationId: string; eventId: string }> },
 ) {
   const { organizationId: rawOrg, eventId: rawEv } = await context.params
@@ -57,23 +63,25 @@ export async function POST(
     )
   }
 
-  const { data: ev, error: loadErr } = await supabase
+  const { data: evRaw, error: loadErr } = await supabase
     .from("communication_events")
-    .select("id, organization_id, metadata, delivery_status")
+    .select("*")
     .eq("id", eventId)
     .maybeSingle()
 
-  if (loadErr || !ev || (ev as { organization_id: string }).organization_id !== organizationId) {
+  if (loadErr || !evRaw || (evRaw as { organization_id: string }).organization_id !== organizationId) {
     return NextResponse.json({ error: "not_found", message: "Event not found." }, { status: 404 })
   }
 
-  const status = (ev as { delivery_status: string }).delivery_status
+  const ev = evRaw as CommunicationEventRow
+  const status = ev.delivery_status
+
   if (status === "queued" || status === "pending") {
     return NextResponse.json(
       {
         error: "already_queued",
         message:
-          "This delivery is already queued. Wait for it to settle before requesting another retry.",
+          "This delivery is already in flight. Wait for it to settle before requesting another retry.",
       },
       { status: 409 },
     )
@@ -82,23 +90,17 @@ export async function POST(
     return NextResponse.json(
       {
         error: "not_retriable",
-        message: "Only failed or bounced deliveries can be queued for retry.",
+        message: "Only failed or bounced deliveries can be retried.",
       },
       { status: 409 },
     )
   }
 
-  const meta = ((ev as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>
+  const meta = (ev.metadata ?? {}) as Record<string, unknown>
   const now = new Date().toISOString()
 
-  // Phase 3 — cooldown: refuse to re-queue if a retry was requested
-  // in the last RETRY_COOLDOWN_MS milliseconds. Prevents accidental
-  // double-clicks from spamming the future provider sync once it
-  // lands. The window is intentionally short — managers can always
-  // retry again after the cooldown expires.
   const RETRY_COOLDOWN_MS = 30_000
-  const lastRetryIso =
-    typeof meta.retry_requested_at === "string" ? (meta.retry_requested_at as string) : null
+  const lastRetryIso = typeof meta.retry_requested_at === "string" ? meta.retry_requested_at : null
   if (lastRetryIso) {
     const last = new Date(lastRetryIso).getTime()
     if (Number.isFinite(last) && Date.now() - last < RETRY_COOLDOWN_MS) {
@@ -117,31 +119,181 @@ export async function POST(
     }
   }
 
-  const retryCount = typeof meta.retry_count === "number" ? (meta.retry_count as number) : 0
+  const plan = planFailedDeliveryRetry(ev)
+  if (plan.kind === "unsupported") {
+    logCommunicationRetry({
+      organizationId,
+      eventId,
+      channel: ev.channel,
+      outcome: "blocked",
+      reason: "retry_unavailable",
+      detail: plan.reason,
+    })
+    return NextResponse.json(
+      { error: "retry_unavailable", message: plan.reason },
+      { status: 400 },
+    )
+  }
+  if (plan.kind === "missing_field") {
+    logCommunicationRetry({
+      organizationId,
+      eventId,
+      channel: ev.channel,
+      outcome: "blocked",
+      reason: plan.kind,
+      field: plan.field,
+      detail: plan.reason,
+    })
+    return NextResponse.json(
+      { error: "retry_blocked", message: plan.reason, field: plan.field },
+      { status: 400 },
+    )
+  }
 
-  const { error: upErr } = await supabase
+  const retryCount = typeof meta.retry_count === "number" ? meta.retry_count : 0
+  const metaQueued = {
+    ...meta,
+    retry_requested_at: now,
+    retry_requested_by: user.id,
+    retry_count: retryCount + 1,
+    retry_route: plan.target.path,
+    retry_route_label: plan.target.routeLabel,
+    retry_started_at: now,
+  }
+
+  const { data: locked, error: queueErr } = await supabase
     .from("communication_events")
     .update({
       delivery_status: "queued",
       error_message: null,
+      metadata: metaQueued,
+    })
+    .eq("id", eventId)
+    .eq("organization_id", organizationId)
+    .in("delivery_status", ["failed", "bounced"])
+    .select("id")
+    .maybeSingle()
+
+  if (queueErr) {
+    return NextResponse.json({ error: "update_failed", message: queueErr.message }, { status: 500 })
+  }
+  if (!locked) {
+    return NextResponse.json(
+      {
+        error: "already_queued",
+        message: "This delivery changed status while retrying. Refresh and try again if it still shows failed.",
+      },
+      { status: 409 },
+    )
+  }
+
+  const cookie = request.headers.get("cookie") ?? ""
+  const url = new URL(plan.target.path, request.nextUrl.origin).toString()
+
+  let liveOk = false
+  let liveStatus = 0
+  let liveBody: { ok?: boolean; message?: string; error?: string } = {}
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        cookie,
+      },
+      body: JSON.stringify(plan.target.payload),
+    })
+    liveStatus = res.status
+    try {
+      liveBody = (await res.json()) as typeof liveBody
+    } catch {
+      liveBody = {}
+    }
+    liveOk = res.ok && liveBody.ok !== false
+  } catch (e) {
+    liveBody = { error: "fetch_failed", message: e instanceof Error ? e.message : "Network error" }
+  }
+
+  if (liveOk) {
+    const sentAt = new Date().toISOString()
+    await supabase
+      .from("communication_events")
+      .update({
+        delivery_status: "sent",
+        error_message: null,
+        failed_at: null,
+        sent_at: sentAt,
+        metadata: {
+          ...metaQueued,
+          retry_completed_at: sentAt,
+          retry_http_status: liveStatus,
+        },
+      })
+      .eq("id", eventId)
+      .eq("organization_id", organizationId)
+
+    logCommunicationRetry({
+      organizationId,
+      eventId,
+      channel: ev.channel,
+      route: plan.target.path,
+      routeLabel: plan.target.routeLabel,
+      outcome: "sent",
+      httpStatus: liveStatus,
+      retryCount: retryCount + 1,
+    })
+
+    return NextResponse.json({
+      ok: true,
+      message:
+        liveBody.message ??
+        `Retried successfully via ${plan.target.routeLabel}. A new provider row may also appear in the feed.`,
+      route: plan.target.path,
+      sentAt,
+      retryCount: retryCount + 1,
+    })
+  }
+
+  const failedAt = new Date().toISOString()
+  const explanation =
+    liveBody.message ??
+    liveBody.error ??
+    `Live route returned HTTP ${liveStatus || "0"}. Check permissions, recipient, and record status.`
+
+  await supabase
+    .from("communication_events")
+    .update({
+      delivery_status: "failed",
+      error_message: explanation,
+      failed_at: failedAt,
       metadata: {
-        ...meta,
-        retry_requested_at: now,
-        retry_requested_by: user.id,
-        retry_count: retryCount + 1,
+        ...metaQueued,
+        retry_failed_at: failedAt,
+        retry_http_status: liveStatus,
       },
     })
     .eq("id", eventId)
     .eq("organization_id", organizationId)
 
-  if (upErr) {
-    return NextResponse.json({ error: "update_failed", message: upErr.message }, { status: 500 })
-  }
-
-  return NextResponse.json({
-    ok: true,
-    message:
-      "Retry queued. Provider webhooks will confirm delivery once Resend / Twilio sync is integrated.",
+  logCommunicationRetry({
+    organizationId,
+    eventId,
+    channel: ev.channel,
+    route: plan.target.path,
+    routeLabel: plan.target.routeLabel,
+    outcome: "failed",
+    httpStatus: liveStatus,
     retryCount: retryCount + 1,
+    error: explanation,
   })
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "live_send_failed",
+      message: explanation,
+      status: liveStatus,
+      retryCount: retryCount + 1,
+    },
+    { status: 502 },
+  )
 }

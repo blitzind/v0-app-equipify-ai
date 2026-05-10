@@ -300,7 +300,7 @@ export default function CommunicationsCenter() {
       toast({ title: "Retry failed", description: String(body.message ?? res.status), variant: "destructive" })
       return
     }
-    toast({ title: "Retry queued", description: body.message ?? "Delivery marked for retry." })
+    toast({ title: "Retry sent", description: body.message ?? "Delivery was retried." })
     void loadFailed()
     void loadMetrics()
     void loadActivity()
