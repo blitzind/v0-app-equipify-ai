@@ -324,6 +324,10 @@ export type WebhookLogPayload = {
   /** Resolved from Stripe price id → catalog (`lib/plans` / env overrides). */
   mappedPlanId?: string | null
   mappedBillingCycle?: string | null
+  /** Stripe `subscription.status` when a subscription object was loaded. */
+  stripeSubscriptionStatus?: string | null
+  /** Whether dispatch mutated state or intentionally skipped / ignored. */
+  dispatch?: "handled" | "ignored" | "skipped"
 }
 
 export type WebhookLogFn = (payload: WebhookLogPayload) => void
@@ -333,7 +337,13 @@ export async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
   log: WebhookLogFn,
 ): Promise<void> {
-  if (session.mode !== "subscription") return
+  if (session.mode !== "subscription") {
+    log({
+      message: "checkout.session.completed skipped (session.mode is not subscription)",
+      dispatch: "skipped",
+    })
+    return
+  }
 
   const custRef = session.customer
   const sessionCustomerId =
@@ -344,10 +354,12 @@ export async function handleCheckoutSessionCompleted(
   const organizationId = resolveOrganizationIdFromCheckout(session)
   if (!organizationId) {
     log({
-      message: "checkout.session.completed missing valid organizationId (metadata.organizationId / client_reference_id)",
+      message:
+        "checkout.session.completed missing valid organization metadata (organization_id / organizationId / client_reference_id)",
       organizationIdFound: false,
       subscriptionId: typeof session.subscription === "string" ? session.subscription : undefined,
       customerId: sessionCustomerId,
+      dispatch: "skipped",
     })
     return
   }
@@ -366,6 +378,7 @@ export async function handleCheckoutSessionCompleted(
       organizationIdFound: true,
       organizationId,
       customerId: sessionCustomerId,
+      dispatch: "skipped",
     })
     return
   }
@@ -390,6 +403,8 @@ export async function handleCheckoutSessionCompleted(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    stripeSubscriptionStatus: fullSub.status,
+    dispatch: "handled",
   })
 }
 
@@ -428,13 +443,15 @@ export async function handleSubscriptionEvent(
 
   if (!organizationId) {
     log({
-      message: `${eventType}: organization not found (metadata.organizationId missing, no DB match for subscription/customer)`,
+      message: `${eventType}: organization not found (metadata.organization_id missing, no DB match for subscription/customer)`,
       organizationIdFound: false,
       subscriptionId: subId,
       customerId: custId,
       stripePriceId: priceId,
       mappedPlanId: mapped?.planId ?? null,
       mappedBillingCycle: mapped?.billingCycle ?? null,
+      stripeSubscriptionStatus: fullSub.status,
+      dispatch: "skipped",
     })
     return
   }
@@ -448,11 +465,12 @@ export async function handleSubscriptionEvent(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    stripeSubscriptionStatus: fullSub.status,
   })
 
   await upsertOrganizationSubscriptionPatch(admin, organizationId, patch)
   log({
-    message: `${eventType} synced`,
+    message: `${eventType} synced — organization_subscriptions updated`,
     organizationIdFound: true,
     organizationId,
     subscriptionId: subId,
@@ -460,6 +478,8 @@ export async function handleSubscriptionEvent(
     stripePriceId: priceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    stripeSubscriptionStatus: patch.status != null ? String(patch.status) : fullSub.status,
+    dispatch: "handled",
   })
 }
 
@@ -475,10 +495,11 @@ export async function handleInvoicePaymentSucceeded(
 
   if (!found) {
     log({
-      message: "invoice.payment_succeeded: org row not found",
+      message: "invoice.payment_succeeded: org row not found (no subscription/customer match)",
       organizationIdFound: false,
       subscriptionId,
       customerId,
+      dispatch: "skipped",
     })
     return
   }
@@ -504,11 +525,13 @@ export async function handleInvoicePaymentSucceeded(
       mapped = getPlanFromStripePriceId(invoicePriceId)
     } catch {
       log({
-        message: "invoice.payment_succeeded: subscription retrieve failed; cleared payment_failed_at only",
+        message:
+          "invoice.payment_succeeded: subscription retrieve failed — entitlement refresh partial (payment_failed_at cleared only)",
         organizationIdFound: true,
         organizationId: found.organization_id,
         subscriptionId: sid,
         customerId: custNorm,
+        dispatch: "handled",
       })
     }
   }
@@ -523,6 +546,8 @@ export async function handleInvoicePaymentSucceeded(
     stripePriceId: invoicePriceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    stripeSubscriptionStatus: typeof patch.status === "string" ? patch.status : null,
+    dispatch: "handled",
   })
 }
 
@@ -538,10 +563,11 @@ export async function handleInvoicePaymentFailed(
 
   if (!found) {
     log({
-      message: "invoice.payment_failed: org row not found",
+      message: "invoice.payment_failed: org row not found (no subscription/customer match)",
       organizationIdFound: false,
       subscriptionId,
       customerId,
+      dispatch: "skipped",
     })
     return
   }
@@ -571,11 +597,14 @@ export async function handleInvoicePaymentFailed(
     } catch {
       patch.status = "past_due"
       log({
-        message: "invoice.payment_failed: subscription retrieve failed, forcing past_due",
+        message:
+          "invoice.payment_failed: subscription retrieve failed — entitlement refresh partial (status forced past_due)",
         organizationIdFound: true,
         organizationId: found.organization_id,
         subscriptionId: sid,
         customerId: custNorm,
+        stripeSubscriptionStatus: "past_due",
+        dispatch: "handled",
       })
     }
   } else {
@@ -592,6 +621,8 @@ export async function handleInvoicePaymentFailed(
     stripePriceId: invoicePriceId,
     mappedPlanId: mapped?.planId ?? null,
     mappedBillingCycle: mapped?.billingCycle ?? null,
+    stripeSubscriptionStatus: typeof patch.status === "string" ? patch.status : null,
+    dispatch: "handled",
   })
 }
 
@@ -622,6 +653,9 @@ export async function dispatchStripeWebhookEvent(
       await handleInvoicePaymentFailed(admin, event.data.object as Stripe.Invoice, log)
       return
     default:
-      log({ message: `unhandled event type: ${event.type}` })
+      log({
+        message: `unhandled Stripe event type — no Equipify handler (safe to ignore unless you add a product use case)`,
+        dispatch: "ignored",
+      })
   }
 }

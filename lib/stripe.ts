@@ -1,5 +1,6 @@
 import "server-only"
 import Stripe from "stripe"
+import { assertStripeSecretKeyMatchesDeployment } from "@/lib/billing/stripe-env"
 
 let cachedStripe: Stripe | null = null
 
@@ -9,8 +10,11 @@ export function getStripe(): Stripe {
 
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim()
   if (!secretKey) {
-    throw new Error("Missing STRIPE_SECRET_KEY")
+    throw new Error(
+      "STRIPE_SECRET_KEY is not set. Add it to the server environment (see docs/STRIPE_PRODUCTION_READINESS.md).",
+    )
   }
+  assertStripeSecretKeyMatchesDeployment(secretKey)
 
   cachedStripe = new Stripe(secretKey, {
     apiVersion: "2026-04-22.dahlia",

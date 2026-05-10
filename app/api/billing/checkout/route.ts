@@ -6,6 +6,11 @@ import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { isOrganizationArchived } from "@/lib/organizations/archive-status"
+import {
+  assertPublishableKeyMatchesDeployment,
+  isStripeLiveEnforced,
+  validateResolvedStripePriceIds,
+} from "@/lib/billing/stripe-env"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -92,6 +97,30 @@ export async function POST(request: Request) {
     request.headers.get("origin") ??
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
     "http://localhost:3000"
+
+  try {
+    assertPublishableKeyMatchesDeployment(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Stripe billing environment is misconfigured."
+    return NextResponse.json(
+      { error: "billing_misconfigured", message },
+      { status: 503 },
+    )
+  }
+
+  if (isStripeLiveEnforced()) {
+    const priceCheck = validateResolvedStripePriceIds()
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        {
+          error: "billing_misconfigured",
+          message: priceCheck.errors[0] ?? "Invalid Stripe price configuration.",
+          details: priceCheck.errors,
+        },
+        { status: 503 },
+      )
+    }
+  }
 
   const result = await createHostedSubscriptionCheckout({
     organizationId,
