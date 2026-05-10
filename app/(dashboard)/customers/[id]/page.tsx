@@ -54,6 +54,9 @@ import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
 import type { WarrantyCoverageLabel } from "@/lib/equipment-warranties/types"
 import { evaluateWarrantyCoverage } from "@/lib/equipment-warranties/eval"
 import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
+import type { ReplacementReadinessLabel } from "@/lib/equipment-replacement/types"
+import { evaluateReplacementReadiness } from "@/lib/equipment-replacement/eval"
+import { ReplacementReadinessBadge } from "@/components/equipment-replacement/replacement-readiness-badge"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
@@ -427,11 +430,13 @@ function EquipmentRow({
   customerName,
   serviceSiteLabel,
   warrantyLabel,
+  replacementLabel,
 }: {
   eq: Equipment
   customerName?: string
   serviceSiteLabel?: string | null
   warrantyLabel?: WarrantyCoverageLabel | null
+  replacementLabel?: ReplacementReadinessLabel | null
 }) {
   const daysToDue = Math.ceil(
     (new Date(eq.nextDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -460,6 +465,9 @@ function EquipmentRow({
             </Badge>
             {warrantyLabel ?
               <WarrantyCoverageBadge label={warrantyLabel} className="shrink-0" />
+            : null}
+            {replacementLabel && replacementLabel !== "healthy" ?
+              <ReplacementReadinessBadge label={replacementLabel} className="normal-case shrink-0" />
             : null}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -650,14 +658,14 @@ export default function CustomerDetailPage() {
     return customerEquipment.filter((e) => e.serviceSiteId === equipmentSiteFilter)
   }, [customerEquipment, equipmentSiteFilter])
 
-  const equipmentWarrantyLabelById = useMemo(() => {
+  const equipmentWarrantyEvalById = useMemo(() => {
     const byEq = new Map<string, EquipmentWarrantyRow[]>()
     for (const w of customerEquipmentWarranties) {
       const list = byEq.get(w.equipment_id) ?? []
       list.push(w)
       byEq.set(w.equipment_id, list)
     }
-    const map = new Map<string, WarrantyCoverageLabel>()
+    const map = new Map<string, ReturnType<typeof evaluateWarrantyCoverage>>()
     for (const eq of customerEquipment) {
       const ev = evaluateWarrantyCoverage({
         records: byEq.get(eq.id) ?? [],
@@ -667,10 +675,42 @@ export default function CustomerDetailPage() {
           manufacturerLabel: eq.manufacturer,
         },
       })
-      map.set(eq.id, ev.label)
+      map.set(eq.id, ev)
     }
     return map
   }, [customerEquipment, customerEquipmentWarranties])
+
+  const equipmentReplacementById = useMemo(() => {
+    const wosByEq = new Map<string, CustomerWoListRow[]>()
+    for (const w of customerWorkOrders) {
+      if (!w.equipment_id) continue
+      const list = wosByEq.get(w.equipment_id) ?? []
+      list.push(w)
+      wosByEq.set(w.equipment_id, list)
+    }
+    const map = new Map<string, ReturnType<typeof evaluateReplacementReadiness>>()
+    for (const eq of customerEquipment) {
+      const wEv = equipmentWarrantyEvalById.get(eq.id)
+      if (!wEv) continue
+      const plansForEq = customerPlans.filter((p) => p.equipment_id === eq.id)
+      map.set(
+        eq.id,
+        evaluateReplacementReadiness({
+          installDateYmd: eq.installDate?.trim() ? eq.installDate.slice(0, 10) : null,
+          equipmentStatus: eq.status,
+          warranty: wEv,
+          workOrders: (wosByEq.get(eq.id) ?? []).map((wo) => ({
+            created_at: wo.created_at,
+            completed_at: wo.completed_at,
+            status: wo.status,
+          })),
+          equipmentNextDueYmd: eq.nextDueDate?.trim() ? eq.nextDueDate.slice(0, 10) : null,
+          maintenancePlans: plansForEq.map((p) => ({ status: p.status, next_due_date: p.next_due_date })),
+        }),
+      )
+    }
+    return map
+  }, [customerEquipment, customerWorkOrders, customerPlans, equipmentWarrantyEvalById])
 
   useEffect(() => {
     if (!customer?.organizationId || customerEquipment.length === 0) {
@@ -2944,7 +2984,8 @@ export default function CustomerDetailPage() {
                   eq={eq}
                   customerName={customer?.company}
                   serviceSiteLabel={eq.serviceSiteId ? locationLabelById.get(eq.serviceSiteId) ?? null : null}
-                  warrantyLabel={equipmentWarrantyLabelById.get(eq.id) ?? null}
+                  warrantyLabel={equipmentWarrantyEvalById.get(eq.id)?.label ?? null}
+                  replacementLabel={equipmentReplacementById.get(eq.id)?.label ?? null}
                 />
               ))
               }

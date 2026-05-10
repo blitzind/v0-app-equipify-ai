@@ -63,6 +63,9 @@ import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
 import { evaluateWarrantyCoverage, formatWarrantyCoverageLabel } from "@/lib/equipment-warranties/eval"
 import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
 import { EquipmentWarrantyFormDialog } from "@/components/equipment-warranties/equipment-warranty-form-dialog"
+import { evaluateReplacementReadiness } from "@/lib/equipment-replacement/eval"
+import { ReplacementReadinessPanel } from "@/components/equipment-replacement/replacement-readiness-panel"
+import { ReplacementReadinessBadge } from "@/components/equipment-replacement/replacement-readiness-badge"
 
 type DbEquipmentRow = {
   id: string
@@ -771,6 +774,25 @@ export default function EquipmentDetailPage() {
     })
   }, [eq, warrantyRecords])
 
+  const replacementReadiness = useMemo(() => {
+    if (!eq || !warrantyEval) return null
+    return evaluateReplacementReadiness({
+      installDateYmd: eq.installDate?.trim() ? eq.installDate.slice(0, 10) : null,
+      equipmentStatus: eq.status,
+      warranty: warrantyEval,
+      workOrders: workOrders.map((w) => ({
+        created_at: w.created_at,
+        completed_at: w.completed_at,
+        status: w.status,
+      })),
+      equipmentNextDueYmd: eq.nextDueDate?.trim() ? eq.nextDueDate.slice(0, 10) : null,
+      maintenancePlans: plans.map((p) => ({
+        status: p.status,
+        next_due_date: p.next_due_date,
+      })),
+    })
+  }, [eq, warrantyEval, workOrders, plans])
+
   const warrantyDays = eq ? daysToDue(eq.warrantyExpiration) : 9999
   const warrantyHasDate = Boolean(eq?.warrantyExpiration?.trim())
   const warrantyKpi = warrantyEval ? formatWarrantyCoverageLabel(warrantyEval.label) : eq ? warrantyKpiLabel(warrantyDays, warrantyHasDate) : "—"
@@ -1455,8 +1477,25 @@ export default function EquipmentDetailPage() {
               variant="compact"
               summary={equipmentPmForecast}
               contractHint={equipmentPmContractHint}
+              replacementHintSlot={
+                replacementReadiness ?
+                  <div className="border-t border-border pt-2 mt-2 space-y-1">
+                    <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                      <span>Replacement readiness</span>
+                      <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      {replacementReadiness.reasons.slice(0, 2).join(" · ")}
+                    </p>
+                  </div>
+                : null
+              }
             />
           ) : null}
+
+          {replacementReadiness ?
+            <ReplacementReadinessPanel result={replacementReadiness} variant="card" />
+          : null}
 
           <Card className="border-border">
             <CardContent className="p-5 space-y-0">
@@ -1595,6 +1634,19 @@ export default function EquipmentDetailPage() {
               variant="compact"
               summary={equipmentPmForecast}
               contractHint={equipmentPmContractHint}
+              replacementHintSlot={
+                replacementReadiness ?
+                  <div className="border-t border-border pt-2 mt-2 space-y-1">
+                    <p className="text-[10px] font-semibold text-foreground flex flex-wrap items-center gap-2">
+                      <span>Replacement readiness</span>
+                      <ReplacementReadinessBadge label={replacementReadiness.label} className="normal-case" />
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      {replacementReadiness.reasons.slice(0, 2).join(" · ")}
+                    </p>
+                  </div>
+                : null
+              }
             />
           ) : null}
           <Card className="border-border">

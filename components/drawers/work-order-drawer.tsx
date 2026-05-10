@@ -122,6 +122,14 @@ import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contra
 import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
 import { evaluateWarrantyCoverage } from "@/lib/equipment-warranties/eval"
 import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
+import type { ReplacementReadinessResult } from "@/lib/equipment-replacement/types"
+import {
+  evaluateReplacementReadiness,
+  equipmentStatusDbToUi,
+  formatReplacementReadinessLabel,
+  REPLACEMENT_DISCLAIMER,
+} from "@/lib/equipment-replacement/eval"
+import { ReplacementReadinessBadge } from "@/components/equipment-replacement/replacement-readiness-badge"
 
 let toastCounter = 0
 
@@ -431,6 +439,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [schedulePeerRows, setSchedulePeerRows] = useState<ScheduleWarnPeer[] | null>(null)
   const [woContractEval, setWoContractEval] = useState<ReturnType<typeof evaluateSlaCoverageLabel> | null>(null)
   const [woWarrantyEval, setWoWarrantyEval] = useState<ReturnType<typeof evaluateWarrantyCoverage> | null>(null)
+  const [woReplacementReadiness, setWoReplacementReadiness] = useState<ReplacementReadinessResult | null>(null)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -592,13 +601,14 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   useEffect(() => {
     if (!wo?.equipmentId?.trim() || !activeOrgId || orgStatus !== "ready") {
       setWoWarrantyEval(null)
+      setWoReplacementReadiness(null)
       return
     }
     let cancelled = false
     void (async () => {
       const supabase = createBrowserSupabaseClient()
       const eid = wo.equipmentId.trim()
-      const [{ data: wRows }, { data: eqRow }] = await Promise.all([
+      const [{ data: wRows }, { data: eqRow }, { data: woHist }, { data: planRows }] = await Promise.all([
         supabase
           .from("org_equipment_warranties")
           .select("*")
@@ -606,10 +616,26 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           .eq("equipment_id", eid),
         supabase
           .from("equipment")
-          .select("warranty_start_date, warranty_expiration_date, warranty_expires_at, manufacturer")
+          .select(
+            "warranty_start_date, warranty_expiration_date, warranty_expires_at, manufacturer, install_date, next_due_at, status",
+          )
           .eq("organization_id", activeOrgId)
           .eq("id", eid)
           .maybeSingle(),
+        supabase
+          .from("work_orders")
+          .select("created_at, completed_at, status")
+          .eq("organization_id", activeOrgId)
+          .eq("equipment_id", eid)
+          .is("archived_at", null)
+          .order("created_at", { ascending: false })
+          .limit(300),
+        supabase
+          .from("maintenance_plans")
+          .select("status, next_due_date")
+          .eq("organization_id", activeOrgId)
+          .eq("equipment_id", eid)
+          .is("archived_at", null),
       ])
       if (cancelled) return
       const row = eqRow as {
@@ -617,6 +643,9 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         warranty_expiration_date?: string | null
         warranty_expires_at?: string | null
         manufacturer?: string | null
+        install_date?: string | null
+        next_due_at?: string | null
+        status?: string | null
       } | null
       const end = row?.warranty_expiration_date?.trim() || row?.warranty_expires_at?.trim() || null
       const start = row?.warranty_start_date?.trim() || null
@@ -632,6 +661,22 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           : null,
       })
       setWoWarrantyEval(ev)
+
+      const installYmd = row?.install_date?.trim() ? row.install_date.slice(0, 10) : null
+      const nextDueYmd = row?.next_due_at?.trim() ? row.next_due_at.slice(0, 10) : null
+      const eqStatusUi = equipmentStatusDbToUi(row?.status ?? undefined)
+      const woRowsMinimal =
+        (woHist ?? []) as Array<{ created_at: string; completed_at: string | null; status: string }>
+      const repl = evaluateReplacementReadiness({
+        warranty: ev,
+        installDateYmd: installYmd,
+        equipmentStatus: eqStatusUi,
+        workOrders: woRowsMinimal,
+        equipmentNextDueYmd: nextDueYmd,
+        maintenancePlans:
+          (planRows ?? []) as Array<{ status: string; next_due_date: string | null }>,
+      })
+      setWoReplacementReadiness(repl)
     })()
     return () => {
       cancelled = true
@@ -1839,6 +1884,23 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             </p>
           </div>
           <WarrantyCoverageBadge label={woWarrantyEval.label} />
+        </div>
+      : null}
+      {woReplacementReadiness && wo?.equipmentId?.trim() ?
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Replacement readiness
+            </p>
+            <ReplacementReadinessBadge label={woReplacementReadiness.label} className="normal-case" />
+          </div>
+          <p className="text-xs font-medium text-foreground">{formatReplacementReadinessLabel(woReplacementReadiness.label)}</p>
+          <ul className="text-[11px] text-muted-foreground space-y-0.5 list-disc pl-4">
+            {woReplacementReadiness.reasons.slice(0, 3).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-muted-foreground leading-snug">{REPLACEMENT_DISCLAIMER}</p>
         </div>
       : null}
       {dispatchState.dispatchIncomplete ? (

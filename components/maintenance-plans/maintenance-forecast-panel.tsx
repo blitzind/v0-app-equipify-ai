@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import type { MaintenanceForecastSummary } from "@/lib/maintenance-plans/forecast"
 import { BarChart3, Building2, Package } from "lucide-react"
@@ -27,12 +28,15 @@ export function MaintenanceForecastPanel({
   variant = "full",
   className,
   contractHint,
+  replacementHintSlot,
 }: {
   summary: MaintenanceForecastSummary
   variant?: "full" | "compact"
   className?: string
   /** Optional SLA / agreement context (no billing claims). */
   contractHint?: string | null
+  /** Optional deterministic replacement-readiness context (compact variant). */
+  replacementHintSlot?: ReactNode
 }) {
   const maxWeek = Math.max(1, ...summary.workloadWeeks.map((w) => w.count))
   const maxMonth = Math.max(1, ...summary.workloadMonths.map((m) => m.count))
@@ -68,6 +72,7 @@ export function MaintenanceForecastPanel({
         {contractHint?.trim() ? (
           <p className="text-[10px] text-muted-foreground border-t border-border pt-2">{contractHint}</p>
         ) : null}
+        {replacementHintSlot}
       </div>
     )
   }

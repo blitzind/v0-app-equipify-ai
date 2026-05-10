@@ -10,6 +10,11 @@ import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-ite
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
 import { evaluateWarrantyCoverage, formatWarrantyCoverageLabel } from "@/lib/equipment-warranties/eval"
+import {
+  evaluateReplacementReadiness,
+  equipmentStatusDbToUi,
+  portalReplacementPayload,
+} from "@/lib/equipment-replacement/eval"
 
 export const runtime = "nodejs"
 
@@ -77,6 +82,9 @@ export async function GET(
     warranty_expiration_date?: string | null
     warranty_expires_at?: string | null
     manufacturer?: string | null
+    install_date?: string | null
+    next_due_at?: string | null
+    status?: string | null
   }
   const endFallback =
     eqTyped.warranty_expiration_date?.trim() || eqTyped.warranty_expires_at?.trim() || null
@@ -89,15 +97,48 @@ export async function GET(
     },
   })
 
-  const { data: wos } = await svc
-    .from("work_orders")
-    .select("id, work_order_number, title, status, type, scheduled_on, completed_at, total_labor_cents, total_parts_cents")
-    .eq("organization_id", portalUser.organization_id)
-    .eq("customer_id", portalUser.customer_id)
-    .eq("equipment_id", equipmentId)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false })
-    .limit(25)
+  const [{ data: wos }, { data: woReplRows }, { data: planReplRows }] = await Promise.all([
+    svc
+      .from("work_orders")
+      .select(
+        "id, work_order_number, title, status, type, scheduled_on, completed_at, total_labor_cents, total_parts_cents",
+      )
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("equipment_id", equipmentId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25),
+    svc
+      .from("work_orders")
+      .select("created_at, completed_at, status")
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("equipment_id", equipmentId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(150),
+    svc
+      .from("maintenance_plans")
+      .select("status, next_due_date")
+      .eq("organization_id", portalUser.organization_id)
+      .eq("customer_id", portalUser.customer_id)
+      .eq("equipment_id", equipmentId)
+      .is("archived_at", null),
+  ])
+
+  const installYmd = eqTyped.install_date?.trim() ? eqTyped.install_date.slice(0, 10) : null
+  const nextDueYmd = eqTyped.next_due_at?.trim() ? eqTyped.next_due_at.slice(0, 10) : null
+  const replacementEval = evaluateReplacementReadiness({
+    warranty: warrantyEval,
+    installDateYmd: installYmd,
+    equipmentStatus: equipmentStatusDbToUi(eqTyped.status ?? undefined),
+    workOrders:
+      (woReplRows ?? []) as Array<{ created_at: string; completed_at: string | null; status: string }>,
+    equipmentNextDueYmd: nextDueYmd,
+    maintenancePlans:
+      (planReplRows ?? []) as Array<{ status: string; next_due_date: string | null }>,
+  })
 
   const woIds = (wos ?? []).map((w) => w.id as string)
 
@@ -179,5 +220,6 @@ export async function GET(
       provider: warrantyEval.provider,
       referenceNumber: warrantyEval.referenceNumber,
     },
+    replacementReadiness: portalReplacementPayload(replacementEval),
   })
 }
