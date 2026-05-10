@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { Check, Moon, Sun, Monitor, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkspaceAppearance } from "@/lib/workspace-appearance-context"
@@ -326,25 +327,17 @@ export default function GeneralPage() {
         </div>
       </SettingCard>
 
-      {/* Password */}
-      <SettingCard title="Password" description="Update your login password. You will be asked to verify your current password.">
-        <div className="flex flex-col gap-4 max-w-sm">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Current password</label>
-            <input type="password" placeholder="••••••••" className="input-base" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">New password</label>
-            <input type="password" placeholder="••••••••" className="input-base" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Confirm new password</label>
-            <input type="password" placeholder="••••••••" className="input-base" />
-          </div>
-          <div>
-            <Button size="sm" variant="outline">Update password</Button>
-          </div>
-        </div>
+      {/* Password — auth is Supabase; in-app change is not implemented */}
+      <SettingCard
+        title="Password"
+        description="Your password is managed by Supabase Auth. Changing it from Settings is not available yet."
+      >
+        <p className="text-sm text-muted-foreground max-w-md">
+          Use the sign-in page to authenticate. If you need to recover access, work with your workspace administrator or Equipify support — self-serve password reset from the app is planned.
+        </p>
+        <Button type="button" asChild variant="outline" size="sm" className="mt-4">
+          <Link href="/login">Open sign in</Link>
+        </Button>
       </SettingCard>
 
       {/* Save */}

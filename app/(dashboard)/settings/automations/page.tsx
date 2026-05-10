@@ -1,8 +1,8 @@
 "use client"
 
 import { Suspense, useState } from "react"
-import { Mail, Clock, Send, Eye, Edit3, Check, ChevronDown, ChevronUp, Zap } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Mail, Clock, Send, Eye, Edit3, ChevronDown, ChevronUp, Zap, Info } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import { WorkflowAutomationsSection } from "@/components/settings/workflow-automations-section"
 import { FollowUpAutomationSettingsSection } from "@/components/settings/follow-up-automation-settings"
@@ -108,16 +108,18 @@ const DAY_OPTIONS_AFTER  = [1, 2, 3, 5, 7, 10, 14, 21, 30]
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => { if (!disabled) onChange(!checked) }}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
+        "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent",
         "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
         checked ? "bg-primary" : "bg-border"
       )}
     >
@@ -130,21 +132,24 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   )
 }
 
-function NativeSelect({ value, onChange, children, className }: {
+function NativeSelect({ value, onChange, children, className, disabled }: {
   value: string
   onChange: (v: string) => void
   children: React.ReactNode
   className?: string
+  disabled?: boolean
 }) {
   return (
     <select
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
         "h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground",
         "focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary",
         "transition-colors appearance-none pr-7 bg-no-repeat",
         "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")] bg-[right_8px_center]",
+        disabled && "opacity-50 cursor-not-allowed bg-muted/50",
         className
       )}
     >
@@ -153,27 +158,28 @@ function NativeSelect({ value, onChange, children, className }: {
   )
 }
 
-function TimingRow({ timing, onChange, onRemove, canRemove }: {
+function TimingRow({ timing, onChange, onRemove, canRemove, disabled }: {
   timing: DayTiming
   onChange: (t: DayTiming) => void
   onRemove: () => void
   canRemove: boolean
+  disabled?: boolean
 }) {
   const dayOptions = timing.direction === "before" ? DAY_OPTIONS_BEFORE : DAY_OPTIONS_AFTER
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <NativeSelect value={String(timing.days)} onChange={(v) => onChange({ ...timing, days: Number(v) })} className="w-20">
+      <NativeSelect value={String(timing.days)} disabled={disabled} onChange={(v) => onChange({ ...timing, days: Number(v) })} className="w-20">
         {dayOptions.map((d) => <option key={d} value={d}>{d} {d === 1 ? "day" : "days"}</option>)}
       </NativeSelect>
-      <NativeSelect value={timing.direction} onChange={(v) => onChange({ ...timing, direction: v as "before" | "after" })} className="w-24">
+      <NativeSelect value={timing.direction} disabled={disabled} onChange={(v) => onChange({ ...timing, direction: v as "before" | "after" })} className="w-24">
         <option value="before">before</option>
         <option value="after">after</option>
       </NativeSelect>
       <span className="text-xs text-muted-foreground">due date at</span>
-      <NativeSelect value={timing.time} onChange={(v) => onChange({ ...timing, time: v })} className="w-24">
+      <NativeSelect value={timing.time} disabled={disabled} onChange={(v) => onChange({ ...timing, time: v })} className="w-24">
         {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
       </NativeSelect>
-      {canRemove && (
+      {canRemove && !disabled && (
         <button type="button" onClick={onRemove} className="text-[11px] font-medium text-muted-foreground hover:text-destructive transition-colors ml-1 cursor-pointer">
           Remove
         </button>
@@ -182,8 +188,9 @@ function TimingRow({ timing, onChange, onRemove, canRemove }: {
   )
 }
 
-function TemplateActions({ onPreview, onEdit, onTest }: {
+function TemplateActions({ onPreview, onEdit, onTest, disabled }: {
   onPreview: () => void; onEdit: () => void; onTest: () => void
+  disabled?: boolean
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -192,8 +199,17 @@ function TemplateActions({ onPreview, onEdit, onTest }: {
         { label: "Edit Template", icon: Edit3, fn: onEdit },
         { label: "Send Test Email", icon: Send, fn: onTest },
       ].map(({ label, icon: Icon, fn }) => (
-        <button key={label} type="button" onClick={fn}
-          className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors cursor-pointer">
+        <button
+          key={label}
+          type="button"
+          disabled={disabled}
+          onClick={fn}
+          title={disabled ? "Not available for this preview" : undefined}
+          className={cn(
+            "flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md border border-border bg-background transition-colors",
+            disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted cursor-pointer",
+          )}
+        >
           <Icon className="w-3 h-3" /> {label}
         </button>
       ))}
@@ -203,14 +219,12 @@ function TemplateActions({ onPreview, onEdit, onTest }: {
 
 // ─── Cadence card ─────────────────────────────────────────────────────────────
 
-function CadenceCard({ section, onChange }: {
+function CadenceCard({ section, onChange, previewOnly }: {
   section: CadenceSection
   onChange: (s: CadenceSection) => void
+  previewOnly?: boolean
 }) {
   const [expanded, setExpanded] = useState(true)
-  const [testSent, setTestSent] = useState(false)
-
-  function handleTest() { setTestSent(true); setTimeout(() => setTestSent(false), 2500) }
 
   function addTiming() {
     const last = section.timings[section.timings.length - 1]
@@ -241,7 +255,11 @@ function CadenceCard({ section, onChange }: {
           <p className="text-xs text-muted-foreground leading-snug mt-0.5">{section.description}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Toggle checked={section.enabled} onChange={(v) => onChange({ ...section, enabled: v })} />
+          <Toggle
+            checked={section.enabled}
+            disabled={previewOnly}
+            onChange={(v) => onChange({ ...section, enabled: v })}
+          />
           <button type="button" onClick={() => setExpanded((v) => !v)}
             className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-muted transition-colors cursor-pointer"
             aria-label={expanded ? "Collapse" : "Expand"}>
@@ -257,11 +275,21 @@ function CadenceCard({ section, onChange }: {
               <p className="text-xs font-semibold text-foreground mb-3">Send schedule</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-muted-foreground">Every</span>
-                <NativeSelect value={section.sendDay ?? "Thursday"} onChange={(v) => onChange({ ...section, sendDay: v })} className="w-32">
+                <NativeSelect
+                  value={section.sendDay ?? "Thursday"}
+                  disabled={previewOnly}
+                  onChange={(v) => onChange({ ...section, sendDay: v })}
+                  className="w-32"
+                >
                   {DAYS_OF_WEEK.map((d) => <option key={d} value={d}>{d}</option>)}
                 </NativeSelect>
                 <span className="text-xs text-muted-foreground">at</span>
-                <NativeSelect value={section.sendTime ?? "09:00"} onChange={(v) => onChange({ ...section, sendTime: v })} className="w-24">
+                <NativeSelect
+                  value={section.sendTime ?? "09:00"}
+                  disabled={previewOnly}
+                  onChange={(v) => onChange({ ...section, sendTime: v })}
+                  className="w-24"
+                >
                   {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </NativeSelect>
                 <span className="text-xs text-muted-foreground">covering the following week</span>
@@ -271,7 +299,7 @@ function CadenceCard({ section, onChange }: {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-semibold text-foreground">Timing</p>
-                {section.timings.length < 5 && (
+                {section.timings.length < 5 && !previewOnly && (
                   <button type="button" onClick={addTiming} className="text-[11px] font-medium text-primary hover:underline cursor-pointer">
                     + Add reminder
                   </button>
@@ -279,7 +307,14 @@ function CadenceCard({ section, onChange }: {
               </div>
               <div className="flex flex-col gap-2.5">
                 {section.timings.map((t, i) => (
-                  <TimingRow key={i} timing={t} onChange={(u) => updateTiming(i, u)} onRemove={() => removeTiming(i)} canRemove={section.timings.length > 1} />
+                  <TimingRow
+                    key={i}
+                    timing={t}
+                    disabled={previewOnly}
+                    onChange={(u) => updateTiming(i, u)}
+                    onRemove={() => removeTiming(i)}
+                    canRemove={section.timings.length > 1}
+                  />
                 ))}
               </div>
             </div>
@@ -287,18 +322,23 @@ function CadenceCard({ section, onChange }: {
 
           <div>
             <p className="text-xs font-semibold text-foreground mb-2">Email template</p>
-            <NativeSelect value={section.template} onChange={(v) => onChange({ ...section, template: v })} className="w-64">
+            <NativeSelect
+              value={section.template}
+              disabled={previewOnly}
+              onChange={(v) => onChange({ ...section, template: v })}
+              className="w-64"
+            >
               {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </NativeSelect>
           </div>
 
           <div>
-            <TemplateActions onPreview={() => {}} onEdit={() => {}} onTest={handleTest} />
-            {testSent && (
-              <p className="flex items-center gap-1.5 text-[11px] text-[oklch(0.42_0.17_145)] mt-2 font-medium">
-                <Check className="w-3 h-3" /> Test email sent to alex.johnson@acmecorp.com
-              </p>
-            )}
+            <TemplateActions
+              disabled={previewOnly}
+              onPreview={() => {}}
+              onEdit={() => {}}
+              onTest={() => {}}
+            />
           </div>
         </div>
       )}
@@ -309,15 +349,7 @@ function CadenceCard({ section, onChange }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AutomationsPage() {
-  const [sections, setSections] = useState<CadenceSection[]>(INITIAL_SECTIONS)
-  const [saved, setSaved] = useState(false)
-
-  function updateSection(id: string, updated: CadenceSection) {
-    setSections((prev) => prev.map((s) => s.id === id ? updated : s))
-  }
-
-  function handleSave() { setSaved(true); setTimeout(() => setSaved(false), 2500) }
-
+  const sections = INITIAL_SECTIONS
   const enabledCount = sections.filter((s) => s.enabled).length
 
   return (
@@ -344,22 +376,27 @@ export default function AutomationsPage() {
       </Suspense>
 
       <div className="border-t border-border pt-6 flex flex-col gap-4">
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Reminder email cadences are preview-only</AlertTitle>
+          <AlertDescription>
+            Cards below show planned scheduling UX; they are not saved to the server. Use <strong>Follow-up automation</strong> and <strong>Workflow automations</strong> above for settings that persist today.
+          </AlertDescription>
+        </Alert>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-foreground">Reminder emails</h3>
             <p className="text-sm text-muted-foreground">
-              Configure automated email cadences for reminders, follow-ups, and service notifications.
-              {" "}<span className="font-medium text-foreground">{enabledCount} of {sections.length}</span> cadences active.
+              Example layout for future cadences. In this preview,{" "}
+              <span className="font-medium text-foreground">{enabledCount} of {sections.length}</span>{" "}
+              cards are toggled on by default (not stored).
             </p>
           </div>
-          <Button size="sm" onClick={handleSave} className="shrink-0">
-            {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save changes"}
-          </Button>
         </div>
       </div>
 
       {sections.map((section) => (
-        <CadenceCard key={section.id} section={section} onChange={(u) => updateSection(section.id, u)} />
+        <CadenceCard key={section.id} section={section} previewOnly onChange={() => {}} />
       ))}
 
       {/* Global send window */}
@@ -367,11 +404,10 @@ export default function AutomationsPage() {
         <div className="flex items-start gap-3">
           <Clock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs font-semibold text-foreground">Global Send Window</p>
+            <p className="text-xs font-semibold text-foreground">Send window (preview copy)</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              All emails respect your workspace timezone (America/Los_Angeles) and are only sent between
-              8:00 AM and 6:00 PM on business days. Adjust in{" "}
-              <a href="/settings/workspace" className="text-primary hover:underline font-medium">Workspace Settings</a>.
+              Live email timing follows each automation&apos;s saved rules and your workspace timezone where applicable. Workspace branding and profile fields are under{" "}
+              <a href="/settings/workspace" className="text-primary hover:underline font-medium">Workspace</a>.
             </p>
           </div>
         </div>

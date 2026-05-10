@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:58:24.648Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:05:54.861Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -45,6 +45,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Middleware:** Session refresh; dashboard path prefixes protected; \`/portal/*\` uses portal cookie gate (except login); \`/admin\` loads only for platform admins (layout redirect).
 - **Tenant handling:** Active organization from membership (\`organization_members\`) + profile default org; almost all domain rows are scoped by \`organization_id\`.
 - **Phase 57.1 — Header search:** Desktop top bar uses \`GlobalSearchHeader\` → \`GET /api/organizations/{organizationId}/global-search?q=\` with \`requireOrgMemberSession\` and \`runOrgGlobalSearch\` (\`lib/global-search/run-global-search.ts\`). Results are grouped (customers, equipment, work orders; invoices if \`canViewFinancials\`; quotes if \`canViewQuotes\`; maintenance plans if \`canManageDispatch\`; roster profiles if technician permissions). Technician assigned-only scope uses \`loadAssignedWorkScope\` for customers/equipment/work orders. Mobile header has no search field (avoid non-functional stub).
+- **Phase 57.2 — Settings wiring honesty:** See \`docs/SETTINGS_WIRING_AUDIT.md\` for the full matrix. High-signal changes: \`/settings/security\` and \`/settings/api\` no longer show interactive demo MFA, sessions, or fake API keys; \`/settings/general\` drops a non-functional password form; \`/settings/notifications\` personal channel matrix and digest/quiet shells are read-only previews; \`/settings/automations\` “Reminder emails” cadence cards are preview-only (persisted automation is Follow-up + Workflow sections). Workspace “Contact support” links out instead of a disabled stub.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
@@ -264,6 +265,7 @@ ${MCG_SCAN_SECTION}
 
 ## Known Limitations / Technical Debt
 - Demo/mock layers (\`tenant-store\`, some portal pages) can drift from production RBAC.
+- Settings surfaces: personal notification channels and static reminder cadence cards are **not** persisted until dedicated APIs exist — see \`docs/SETTINGS_WIRING_AUDIT.md\`.
 - Integrations hub vs Settings connector truth mismatch for QuickBooks marketing status.
 - Workflow trigger coverage must stay aligned with DB constraint migrations.
 - Portal reports section partially mock until wired to live aggregates.

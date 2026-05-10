@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { Check, Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2, Info } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,16 +77,18 @@ const INITIAL_PREFS: NotifPreference[] = [
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => { if (!disabled) onChange(!checked) }}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
+        "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent",
         "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
         checked ? "bg-primary" : "bg-border"
       )}
     >
@@ -104,20 +105,12 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export default function NotificationsPage() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
-  const [prefs, setPrefs] = useState<NotifPreference[]>(INITIAL_PREFS)
-  const [saved, setSaved] = useState(false)
-  const [digestEmail, setDigestEmail] = useState(true)
-  const [digestFrequency, setDigestFrequency] = useState<"daily" | "weekly">("daily")
-  const [quietStart, setQuietStart] = useState("22:00")
-  const [quietEnd, setQuietEnd]   = useState("07:00")
-
-  function updateChannel(id: string, channel: keyof NotifPreference["channels"], value: boolean) {
-    setPrefs((prev) =>
-      prev.map((p) => p.id === id ? { ...p, channels: { ...p.channels, [channel]: value } } : p)
-    )
-  }
-
-  function handleSave() { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+  /** Design preview only — not persisted (Phase 57.2). */
+  const prefs = INITIAL_PREFS
+  const digestEmail = true
+  const digestFrequency: "daily" | "weekly" = "daily"
+  const quietStart = "22:00"
+  const quietEnd = "07:00"
 
   const TIMES = [
     "00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00",
@@ -135,20 +128,25 @@ export default function NotificationsPage() {
             <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose which alerts you receive and how they are delivered. These are personal settings — they only affect your account.
+            Internal escalation rules and the AI Ops digest below are saved to your workspace. The personal alert matrix is a design preview only.
           </p>
         </div>
-        <Button size="sm" onClick={handleSave} className="shrink-0">
-          {saved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save changes"}
-        </Button>
       </div>
 
-      {/* Alert matrix */}
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Personal channel preferences are not saved yet</AlertTitle>
+        <AlertDescription>
+          The alert matrix, email digest options, and quiet hours below illustrate planned behavior. Toggles are read-only until notification preferences are backed by the API.
+        </AlertDescription>
+      </Alert>
+
+      {/* Alert matrix (preview) */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Alert preferences</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Control which events trigger notifications and on which channels.
+            Planned: control which events trigger notifications and on which channels.
           </p>
         </div>
 
@@ -186,19 +184,22 @@ export default function NotificationsPage() {
                 <div className="w-16 flex justify-center">
                   <Toggle
                     checked={pref.channels.inApp}
-                    onChange={(v) => updateChannel(pref.id, "inApp", v)}
+                    onChange={() => {}}
+                    disabled
                   />
                 </div>
                 <div className="w-14 flex justify-center">
                   <Toggle
                     checked={pref.channels.email}
-                    onChange={(v) => updateChannel(pref.id, "email", v)}
+                    onChange={() => {}}
+                    disabled
                   />
                 </div>
                 <div className="w-12 flex justify-center">
                   <Toggle
                     checked={pref.channels.sms}
-                    onChange={(v) => updateChannel(pref.id, "sms", v)}
+                    onChange={() => {}}
+                    disabled
                   />
                 </div>
               </div>
@@ -214,7 +215,7 @@ export default function NotificationsPage() {
             <h3 className="text-sm font-semibold text-foreground">Email digest</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Receive a summary of activity instead of individual emails for each event.</p>
           </div>
-          <Toggle checked={digestEmail} onChange={setDigestEmail} />
+          <Toggle checked={digestEmail} onChange={() => {}} disabled />
         </div>
         {digestEmail && (
           <div className="px-6 py-4">
@@ -224,12 +225,12 @@ export default function NotificationsPage() {
                 <button
                   key={freq}
                   type="button"
-                  onClick={() => setDigestFrequency(freq)}
+                  disabled
                   className={cn(
-                    "px-4 py-2 rounded-lg border text-sm font-medium capitalize transition-all",
+                    "px-4 py-2 rounded-lg border text-sm font-medium capitalize transition-all opacity-50 cursor-not-allowed",
                     digestFrequency === freq
                       ? "border-primary bg-primary/8 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground"
+                      : "border-border text-muted-foreground"
                   )}
                 >
                   {freq}
@@ -250,16 +251,16 @@ export default function NotificationsPage() {
           <span className="text-sm text-muted-foreground">From</span>
           <select
             value={quietStart}
-            onChange={(e) => setQuietStart(e.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            disabled
+            className="h-8 rounded-md border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground cursor-not-allowed"
           >
             {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <span className="text-sm text-muted-foreground">to</span>
           <select
             value={quietEnd}
-            onChange={(e) => setQuietEnd(e.target.value)}
-            className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            disabled
+            className="h-8 rounded-md border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground cursor-not-allowed"
           >
             {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>

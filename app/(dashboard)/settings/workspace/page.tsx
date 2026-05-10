@@ -1110,8 +1110,10 @@ export default function WorkspacePage() {
               Workspace deletion is not available in the app. Contact support to archive or close an organization.
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" disabled className="shrink-0 border-muted text-muted-foreground">
-            Contact support
+          <Button type="button" variant="outline" size="sm" asChild className="shrink-0">
+            <a href="https://equipify.ai" target="_blank" rel="noopener noreferrer">
+              Contact Equipify
+            </a>
           </Button>
         </div>
       </SettingCard>
