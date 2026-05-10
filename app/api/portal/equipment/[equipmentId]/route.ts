@@ -8,6 +8,8 @@ import { requirePortalSession } from "@/lib/portal/require-portal-session"
 import { mapInvoiceStatus } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
+import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
+import { evaluateWarrantyCoverage, formatWarrantyCoverageLabel } from "@/lib/equipment-warranties/eval"
 
 export const runtime = "nodejs"
 
@@ -29,7 +31,7 @@ export async function GET(
   const { svc, portalUser } = ctx
 
   const selFull =
-    "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, next_calibration_due_at, location_label, notes"
+    "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, next_due_at, next_calibration_due_at, location_label, notes"
   const selFallback =
     "id, name, equipment_code, manufacturer, category, serial_number, status, install_date, warranty_expires_at, last_service_at, next_due_at, location_label, notes"
 
@@ -57,6 +59,35 @@ export async function GET(
   if (error || !eq) {
     return NextResponse.json({ error: "Equipment not found." }, { status: 404 })
   }
+
+  let warrantyRows: EquipmentWarrantyRow[] = []
+  const { data: wRows, error: wErr } = await svc
+    .from("org_equipment_warranties")
+    .select(
+      "id, organization_id, equipment_id, warranty_provider, start_date, end_date, status, coverage_summary, reference_number, created_at, updated_at",
+    )
+    .eq("organization_id", portalUser.organization_id)
+    .eq("equipment_id", equipmentId)
+  if (!wErr && wRows) {
+    warrantyRows = wRows as EquipmentWarrantyRow[]
+  }
+
+  const eqTyped = eq as {
+    warranty_start_date?: string | null
+    warranty_expiration_date?: string | null
+    warranty_expires_at?: string | null
+    manufacturer?: string | null
+  }
+  const endFallback =
+    eqTyped.warranty_expiration_date?.trim() || eqTyped.warranty_expires_at?.trim() || null
+  const warrantyEval = evaluateWarrantyCoverage({
+    records: warrantyRows,
+    equipmentFallback: {
+      start: eqTyped.warranty_start_date?.trim() ? eqTyped.warranty_start_date.slice(0, 10) : null,
+      end: endFallback ? endFallback.slice(0, 10) : null,
+      manufacturerLabel: eqTyped.manufacturer ?? null,
+    },
+  })
 
   const { data: wos } = await svc
     .from("work_orders")
@@ -128,7 +159,10 @@ export async function GET(
       serialNumber: (eq.serial_number as string | null) ?? null,
       statusLabel: mapEquipmentStatus(eq.status as string),
       installDate: (eq.install_date as string | null) ?? null,
-      warrantyExpiresAt: (eq.warranty_expires_at as string | null) ?? null,
+      warrantyExpiresAt:
+        (eq as { warranty_expiration_date?: string | null }).warranty_expiration_date?.trim() ||
+        (eq.warranty_expires_at as string | null) ||
+        null,
       lastServiceAt: (eq.last_service_at as string | null) ?? null,
       nextDueAt: (eq.next_due_at as string | null) ?? null,
       nextCalibrationDueAt: ((eq as { next_calibration_due_at?: string | null }).next_calibration_due_at as string | null) ?? null,
@@ -138,5 +172,12 @@ export async function GET(
     serviceHistory: history,
     certificates,
     invoices,
+    warrantySummary: {
+      label: formatWarrantyCoverageLabel(warrantyEval.label),
+      labelKey: warrantyEval.label,
+      endDate: warrantyEval.endDate,
+      provider: warrantyEval.provider,
+      referenceNumber: warrantyEval.referenceNumber,
+    },
   })
 }

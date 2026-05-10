@@ -50,6 +50,10 @@ import { intervalFromDb, planStatusDbToUi } from "@/lib/maintenance-plans/db-map
 import type { MaintenancePlanRow } from "@/lib/maintenance-plans/db-map"
 import { summarizeMaintenanceForecast } from "@/lib/maintenance-plans/forecast"
 import { MaintenanceForecastPanel } from "@/components/maintenance-plans/maintenance-forecast-panel"
+import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
+import type { WarrantyCoverageLabel } from "@/lib/equipment-warranties/types"
+import { evaluateWarrantyCoverage } from "@/lib/equipment-warranties/eval"
+import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
 import { MaintenancePlansBrandTile } from "@/lib/navigation/module-icons"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { CustomerCommunicationTimeline } from "@/components/communications/customer-communication-timeline"
@@ -301,6 +305,8 @@ function equipmentRowToUi(row: {
   location_label: string | null
   customer_location_id: string | null
   install_date: string | null
+  warranty_start_date: string | null
+  warranty_expiration_date: string | null
   warranty_expires_at: string | null
   last_service_at: string | null
   notes: string | null
@@ -322,7 +328,9 @@ function equipmentRowToUi(row: {
     subcategory: row.subcategory ?? undefined,
     serialNumber: row.serial_number ?? "",
     installDate: row.install_date ?? "",
-    warrantyExpiration: row.warranty_expires_at ?? "",
+    warrantyStartDate: row.warranty_start_date?.trim() ? row.warranty_start_date.slice(0, 10) : "",
+    warrantyExpiration:
+      row.warranty_expiration_date?.trim() || row.warranty_expires_at?.trim() || "",
     lastServiceDate: row.last_service_at ?? "",
     nextDueDate: row.next_due_at ? row.next_due_at.slice(0, 10) : "",
     nextCalibrationDue: row.next_calibration_due_at ? row.next_calibration_due_at.slice(0, 10) : undefined,
@@ -418,10 +426,12 @@ function EquipmentRow({
   eq,
   customerName,
   serviceSiteLabel,
+  warrantyLabel,
 }: {
   eq: Equipment
   customerName?: string
   serviceSiteLabel?: string | null
+  warrantyLabel?: WarrantyCoverageLabel | null
 }) {
   const daysToDue = Math.ceil(
     (new Date(eq.nextDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -448,6 +458,9 @@ function EquipmentRow({
             <Badge variant="secondary" className={cn("text-xs shrink-0", statusColors[eq.status])}>
               {eq.status}
             </Badge>
+            {warrantyLabel ?
+              <WarrantyCoverageBadge label={warrantyLabel} className="shrink-0" />
+            : null}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {getEquipmentSecondaryLine(
@@ -553,6 +566,7 @@ export default function CustomerDetailPage() {
   const [plansSectionLoading, setPlansSectionLoading] = useState(false)
 
   const [customerEquipment, setCustomerEquipment] = useState<Equipment[]>([])
+  const [customerEquipmentWarranties, setCustomerEquipmentWarranties] = useState<EquipmentWarrantyRow[]>([])
   const [customerWorkOrders, setCustomerWorkOrders] = useState<CustomerWoListRow[]>([])
   const [technicianScope, setTechnicianScope] = useState<AssignedWorkScope | null>(null)
   const [customerServiceRequests, setCustomerServiceRequests] = useState<CustomerServiceRequestRow[]>([])
@@ -635,6 +649,54 @@ export default function CustomerDetailPage() {
     }
     return customerEquipment.filter((e) => e.serviceSiteId === equipmentSiteFilter)
   }, [customerEquipment, equipmentSiteFilter])
+
+  const equipmentWarrantyLabelById = useMemo(() => {
+    const byEq = new Map<string, EquipmentWarrantyRow[]>()
+    for (const w of customerEquipmentWarranties) {
+      const list = byEq.get(w.equipment_id) ?? []
+      list.push(w)
+      byEq.set(w.equipment_id, list)
+    }
+    const map = new Map<string, WarrantyCoverageLabel>()
+    for (const eq of customerEquipment) {
+      const ev = evaluateWarrantyCoverage({
+        records: byEq.get(eq.id) ?? [],
+        equipmentFallback: {
+          start: eq.warrantyStartDate?.trim() ? eq.warrantyStartDate.slice(0, 10) : null,
+          end: eq.warrantyExpiration?.trim() ? eq.warrantyExpiration.slice(0, 10) : null,
+          manufacturerLabel: eq.manufacturer,
+        },
+      })
+      map.set(eq.id, ev.label)
+    }
+    return map
+  }, [customerEquipment, customerEquipmentWarranties])
+
+  useEffect(() => {
+    if (!customer?.organizationId || customerEquipment.length === 0) {
+      setCustomerEquipmentWarranties([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const ids = customerEquipment.map((e) => e.id)
+      const { data, error } = await supabase
+        .from("org_equipment_warranties")
+        .select("*")
+        .eq("organization_id", customer.organizationId)
+        .in("equipment_id", ids)
+      if (cancelled) return
+      if (error) {
+        setCustomerEquipmentWarranties([])
+        return
+      }
+      setCustomerEquipmentWarranties((data ?? []) as EquipmentWarrantyRow[])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [customer?.organizationId, customerEquipment])
 
   const filteredWorkOrders = useMemo(() => {
     if (workOrderSiteFilter === "all") return customerWorkOrders
@@ -1197,7 +1259,7 @@ export default function CustomerDetailPage() {
       let eqQuery = supabase
         .from("equipment")
         .select(
-          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, customer_location_id, install_date, warranty_expires_at, last_service_at, notes, created_at",
+          "id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, next_due_at, next_calibration_due_at, location_label, customer_location_id, install_date, warranty_start_date, warranty_expiration_date, warranty_expires_at, last_service_at, notes, created_at",
         )
         .eq("organization_id", customer.organizationId)
         .is("archived_at", null)
@@ -2882,6 +2944,7 @@ export default function CustomerDetailPage() {
                   eq={eq}
                   customerName={customer?.company}
                   serviceSiteLabel={eq.serviceSiteId ? locationLabelById.get(eq.serviceSiteId) ?? null : null}
+                  warrantyLabel={equipmentWarrantyLabelById.get(eq.id) ?? null}
                 />
               ))
               }

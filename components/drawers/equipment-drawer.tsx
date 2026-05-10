@@ -8,7 +8,12 @@ import { rowIsArchived } from "@/lib/archive-scope"
 import type { Equipment, ServiceHistoryEntry } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissionsOptional } from "@/lib/org-permissions-context"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
+import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
+import { evaluateWarrantyCoverage, formatWarrantyCoverageLabel } from "@/lib/equipment-warranties/eval"
+import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
+import { EquipmentWarrantyFormDialog } from "@/components/equipment-warranties/equipment-warranty-form-dialog"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { WO_LIST_SELECT, WO_LIST_SELECT_WITH_NUM } from "@/lib/work-orders/supabase-select"
@@ -408,6 +413,55 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
   const [planWoLoading, setPlanWoLoading] = useState(false)
   const [customerLocationOptions, setCustomerLocationOptions] = useState<Array<{ id: string; label: string }>>([])
   const [editCustomerLocationId, setEditCustomerLocationId] = useState("")
+  const [warrantyRecordsDrawer, setWarrantyRecordsDrawer] = useState<EquipmentWarrantyRow[]>([])
+  const [warrantyDrawerErr, setWarrantyDrawerErr] = useState<string | null>(null)
+  const [warrantyDrawerFormOpen, setWarrantyDrawerFormOpen] = useState(false)
+  const [warrantyDrawerEdit, setWarrantyDrawerEdit] = useState<EquipmentWarrantyRow | null>(null)
+  const [warrantyDrawerRefresh, setWarrantyDrawerRefresh] = useState(0)
+
+  const permissions = useOrgPermissionsOptional()
+  const canManageEquipmentWarranties = Boolean(permissions?.permissions.canManageDispatch)
+
+  const drawerWarrantyEval = useMemo(() => {
+    if (!eq) return null
+    return evaluateWarrantyCoverage({
+      records: warrantyRecordsDrawer,
+      equipmentFallback: {
+        start: eq.warrantyStartDate?.trim() ? eq.warrantyStartDate.slice(0, 10) : null,
+        end: eq.warrantyExpiration?.trim() ? eq.warrantyExpiration.slice(0, 10) : null,
+        manufacturerLabel: eq.manufacturer,
+      },
+    })
+  }, [eq, warrantyRecordsDrawer])
+
+  useEffect(() => {
+    if (!eq?.id || !activeOrgId || orgStatus !== "ready") {
+      setWarrantyRecordsDrawer([])
+      setWarrantyDrawerErr(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("org_equipment_warranties")
+        .select("*")
+        .eq("organization_id", activeOrgId)
+        .eq("equipment_id", eq.id)
+        .order("end_date", { ascending: false })
+      if (cancelled) return
+      if (error) {
+        setWarrantyRecordsDrawer([])
+        setWarrantyDrawerErr(error.message)
+        return
+      }
+      setWarrantyRecordsDrawer((data ?? []) as EquipmentWarrantyRow[])
+      setWarrantyDrawerErr(null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [eq?.id, activeOrgId, orgStatus, warrantyDrawerRefresh])
 
   const eqPlanIdsKey = useMemo(() => drawerPlans.map((p) => p.id).sort().join(","), [drawerPlans])
 
@@ -926,12 +980,16 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
           : "text-foreground"
   const currentStatus = (draft.status ?? eq.status) as Equipment["status"]
   const age = ageYears(eq.installDate)
-  const warrantyKpiDisplay = warrantyKpiLabel(warrantyDays, warrantyHasDate)
-  const warrantyKpiSub = !warrantyHasDate
-    ? "No warranty information added"
-    : warrantyDays < 0
-      ? `Expired ${fmtDate(eq.warrantyExpiration)}`
-      : `Ends ${fmtDate(eq.warrantyExpiration)}`
+  const warrantyKpiDisplay = drawerWarrantyEval
+    ? formatWarrantyCoverageLabel(drawerWarrantyEval.label)
+    : warrantyKpiLabel(warrantyDays, warrantyHasDate)
+  const warrantyKpiSub = drawerWarrantyEval?.endDate
+    ? `${drawerWarrantyEval.provider ? `${drawerWarrantyEval.provider} · ` : ""}Ends ${fmtDate(drawerWarrantyEval.endDate)}`
+    : !warrantyHasDate
+      ? "No warranty information added"
+      : warrantyDays < 0
+        ? `Expired ${fmtDate(eq.warrantyExpiration)}`
+        : `Ends ${fmtDate(eq.warrantyExpiration)}`
   const warrantyDirty =
     warrantyDraftStartDate !== (eq.warrantyStartDate ?? "") ||
     warrantyDraftExpirationDate !== (eq.warrantyExpiration ?? "")
@@ -1131,7 +1189,10 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                         label: "Warranty Status",
                         value: warrantyKpiDisplay,
                         sub: warrantyKpiSub,
-                        warn: warrantyHasDate && warrantyDays >= 0 && warrantyDays <= 90,
+                        warn: Boolean(
+                          drawerWarrantyEval?.label === "expiring_soon" ||
+                            (warrantyHasDate && warrantyDays >= 0 && warrantyDays <= 90),
+                        ),
                       },
                     ] as const
                   ).map(({ label, value, sub, warn }) => (
@@ -1595,7 +1656,7 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
 
               <div
                 className={cn(
-                  "rounded-xl border p-4 flex items-center gap-4",
+                  "rounded-xl border p-4 flex flex-wrap items-center gap-4 justify-between",
                   !warrantyHasDate
                     ? "bg-muted/30 border-border"
                     : warrantyDays < 0
@@ -1605,29 +1666,117 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
                         : "bg-[color:var(--status-success)]/8 border-[color:var(--status-success)]/25",
                 )}
               >
-                <Shield
-                  className={cn(
-                    "w-8 h-8 shrink-0",
-                    !warrantyHasDate
-                      ? "text-muted-foreground"
-                      : warrantyDays < 0
-                        ? "text-destructive"
-                        : warrantyDays <= 30
-                          ? "text-[color:var(--status-warning)]"
-                          : "text-[color:var(--status-success)]",
-                  )}
-                />
-                <div>
-                  <p className={cn("text-sm font-semibold", warrantyColor)}>{warrantyLabel}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {!warrantyHasDate
-                      ? "No warranty information added"
-                      : warrantyDays < 0
-                        ? "Warranty has expired. Equipment is out of coverage."
-                        : `Coverage ends ${fmtDate(eq.warrantyExpiration)}`}
-                  </p>
+                <div className="flex items-center gap-4 min-w-0">
+                  <Shield
+                    className={cn(
+                      "w-8 h-8 shrink-0",
+                      !warrantyHasDate
+                        ? "text-muted-foreground"
+                        : warrantyDays < 0
+                          ? "text-destructive"
+                          : warrantyDays <= 30
+                            ? "text-[color:var(--status-warning)]"
+                            : "text-[color:var(--status-success)]",
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <p className={cn("text-sm font-semibold", warrantyColor)}>{warrantyLabel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {!warrantyHasDate
+                        ? "No warranty information added"
+                        : warrantyDays < 0
+                          ? "Warranty has expired. Equipment is out of coverage."
+                          : `Coverage ends ${fmtDate(eq.warrantyExpiration)}`}
+                    </p>
+                  </div>
                 </div>
+                {drawerWarrantyEval ?
+                  <WarrantyCoverageBadge label={drawerWarrantyEval.label} className="shrink-0" />
+                : null}
               </div>
+
+              <DrawerSection title="Warranty records">
+                {warrantyDrawerErr ?
+                  <p className="text-xs text-destructive mb-2">{warrantyDrawerErr}</p>
+                : null}
+                <div className="flex justify-end mb-2">
+                  {canManageEquipmentWarranties ?
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        setWarrantyDrawerEdit(null)
+                        setWarrantyDrawerFormOpen(true)
+                      }}
+                    >
+                      Add record
+                    </Button>
+                  : null}
+                </div>
+                {warrantyRecordsDrawer.length === 0 ?
+                  <p className="text-xs text-muted-foreground">No structured warranty records.</p>
+                : (
+                  <ul className="space-y-2">
+                    {warrantyRecordsDrawer.map((w) => (
+                      <li
+                        key={w.id}
+                        className="rounded-lg border border-border bg-muted/15 px-3 py-2 text-xs flex flex-wrap justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground">{w.warranty_provider}</p>
+                          <p className="text-muted-foreground">
+                            {w.start_date ? `${w.start_date.slice(0, 10)} → ` : ""}
+                            {w.end_date.slice(0, 10)} · {w.status}
+                          </p>
+                        </div>
+                        {canManageEquipmentWarranties ?
+                          <div className="flex gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] px-2"
+                              onClick={() => {
+                                setWarrantyDrawerEdit(w)
+                                setWarrantyDrawerFormOpen(true)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] px-2 text-destructive"
+                              onClick={() => {
+                                if (!activeOrgId) return
+                                if (!globalThis.confirm("Remove this warranty record?")) return
+                                void (async () => {
+                                  const res = await fetch(
+                                    `/api/organizations/${encodeURIComponent(activeOrgId)}/equipment-warranties/${encodeURIComponent(w.id)}`,
+                                    { method: "DELETE" },
+                                  )
+                                  if (!res.ok) {
+                                    const j = (await res.json().catch(() => ({}))) as { error?: string }
+                                    globalThis.alert(j.error ?? "Could not remove.")
+                                    return
+                                  }
+                                  setWarrantyDrawerRefresh((n) => n + 1)
+                                  onUpdated?.()
+                                })()
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </DrawerSection>
 
               <DrawerSection title="Warranty details">
                 {warrantyEditing && warrantyDirty ? (
@@ -1745,6 +1894,23 @@ export function EquipmentDrawer({ equipmentId, onClose, onUpdated }: EquipmentDr
       </DetailDrawer>
 
       <DrawerToastStack toasts={toasts} onRemove={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+
+      {eq && activeOrgId ?
+        <EquipmentWarrantyFormDialog
+          open={warrantyDrawerFormOpen}
+          onOpenChange={(v) => {
+            setWarrantyDrawerFormOpen(v)
+            if (!v) setWarrantyDrawerEdit(null)
+          }}
+          organizationId={activeOrgId}
+          equipmentId={eq.id}
+          existing={warrantyDrawerEdit}
+          onSaved={() => {
+            setWarrantyDrawerRefresh((n) => n + 1)
+            onUpdated?.()
+          }}
+        />
+      : null}
     </>
   )
 }

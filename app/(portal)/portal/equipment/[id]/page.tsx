@@ -75,6 +75,13 @@ type DetailPayload = {
     issuedAt: string
     dueDate: string | null
   }>
+  warrantySummary?: {
+    label: string
+    labelKey: string
+    endDate: string | null
+    provider: string | null
+    referenceNumber: string | null
+  }
 }
 
 export default function PortalEquipmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -117,6 +124,18 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
   const days = daysUntil(eq.nextDueAt)
   const calDays = daysUntil(eq.nextCalibrationDueAt)
   const warrantyDays = daysUntil(eq.warrantyExpiresAt)
+  const wSum = data.warrantySummary
+  const warrantyTileValue =
+    wSum ?
+      `${wSum.label}${wSum.endDate ? ` · ${fmtDate(wSum.endDate)}` : ""}`
+    : warrantyDays != null && warrantyDays < 0 ?
+      "Expired"
+    : `Exp. ${fmtDate(eq.warrantyExpiresAt)}`
+  const warrantyTileWarn = Boolean(
+    wSum?.labelKey === "expiring_soon" ||
+      wSum?.labelKey === "warranty_expired" ||
+      (warrantyDays != null && (warrantyDays < 0 || warrantyDays <= 30)),
+  )
   const totalSpend = data.serviceHistory.reduce((s, h) => s + h.totalCents, 0)
   const lastService = data.serviceHistory.find((h) => h.completedAt)?.completedAt ?? eq.lastServiceAt
 
@@ -194,8 +213,8 @@ export default function PortalEquipmentDetailPage({ params }: { params: Promise<
                 {
                   icon: Shield,
                   label: "Warranty",
-                  value: warrantyDays != null && warrantyDays < 0 ? "Expired" : `Exp. ${fmtDate(eq.warrantyExpiresAt)}`,
-                  warn: warrantyDays != null && (warrantyDays < 0 || warrantyDays <= 30),
+                  value: warrantyTileValue,
+                  warn: warrantyTileWarn,
                 },
               ] as const
             ).map(({ icon: Icon, label, value, warn }) => (

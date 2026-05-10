@@ -59,6 +59,10 @@ import {
 import { SlaCoverageBadge, formatSlaCoverageLabel } from "@/components/service-contracts/sla-coverage-badge"
 import type { ServiceContractRow } from "@/lib/service-contracts/types"
 import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
+import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
+import { evaluateWarrantyCoverage, formatWarrantyCoverageLabel } from "@/lib/equipment-warranties/eval"
+import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
+import { EquipmentWarrantyFormDialog } from "@/components/equipment-warranties/equipment-warranty-form-dialog"
 
 type DbEquipmentRow = {
   id: string
@@ -74,6 +78,7 @@ type DbEquipmentRow = {
   install_date: string | null
   warranty_expires_at: string | null
   warranty_expiration_date: string | null
+  warranty_start_date: string | null
   last_service_at: string | null
   next_due_at: string | null
   next_calibration_due_at: string | null
@@ -269,6 +274,7 @@ function rowToEquipment(row: DbEquipmentRow, customerName: string): Equipment {
     subcategory: row.subcategory ?? undefined,
     serialNumber: row.serial_number ?? "",
     installDate: row.install_date ?? "",
+    warrantyStartDate: row.warranty_start_date?.trim() ? row.warranty_start_date.slice(0, 10) : "",
     warrantyExpiration: warranty,
     lastServiceDate: row.last_service_at ?? "",
     nextDueDate: row.next_due_at ?? "",
@@ -383,6 +389,7 @@ export default function EquipmentDetailPage() {
   const { permissions } = useOrgPermissions()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageEquipmentRecords = !assignedOnlyView
+  const canManageEquipmentWarranties = permissions.canManageDispatch
   const canViewEquipmentFinancials = permissions.canViewFinancials || permissions.canViewBilling || permissions.canViewQuotes
 
   const [loading, setLoading] = useState(true)
@@ -403,6 +410,11 @@ export default function EquipmentDetailPage() {
   const [equipmentContractEval, setEquipmentContractEval] = useState<ReturnType<
     typeof evaluateSlaCoverageLabel
   > | null>(null)
+  const [warrantyRecords, setWarrantyRecords] = useState<EquipmentWarrantyRow[]>([])
+  const [warrantyRecordsError, setWarrantyRecordsError] = useState<string | null>(null)
+  const [warrantyFormOpen, setWarrantyFormOpen] = useState(false)
+  const [warrantyEdit, setWarrantyEdit] = useState<EquipmentWarrantyRow | null>(null)
+  const [warrantyRefreshToken, setWarrantyRefreshToken] = useState(0)
 
   const load = useCallback(async () => {
     if (!id) {
@@ -461,7 +473,7 @@ export default function EquipmentDetailPage() {
       const { data: row, error } = await supabase
         .from("equipment")
         .select(
-          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, install_date, warranty_expires_at, warranty_expiration_date, last_service_at, next_due_at, next_calibration_due_at, calibration_interval_months, location_label, customer_location_id, notes",
+          "id, organization_id, customer_id, equipment_code, name, manufacturer, category, subcategory, serial_number, status, install_date, warranty_start_date, warranty_expires_at, warranty_expiration_date, last_service_at, next_due_at, next_calibration_due_at, calibration_interval_months, location_label, customer_location_id, notes",
         )
         .eq("id", id)
         .eq("organization_id", oid)
@@ -677,6 +689,39 @@ export default function EquipmentDetailPage() {
   }, [eq?.id, eq?.customerId, eq?.serviceSiteId, activeOrg.status, activeOrg.organizationId])
 
   useEffect(() => {
+    if (!eq?.id || activeOrg.status !== "ready" || !activeOrg.organizationId) {
+      setWarrantyRecords([])
+      setWarrantyRecordsError(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const { data, error } = await supabase
+        .from("org_equipment_warranties")
+        .select("*")
+        .eq("organization_id", activeOrg.organizationId)
+        .eq("equipment_id", eq.id)
+        .order("end_date", { ascending: false })
+      if (cancelled) return
+      if (error) {
+        setWarrantyRecords([])
+        setWarrantyRecordsError(
+          error.code === "42P01"
+            ? "Warranty records are unavailable until database migrations are applied."
+            : error.message,
+        )
+        return
+      }
+      setWarrantyRecords((data ?? []) as EquipmentWarrantyRow[])
+      setWarrantyRecordsError(null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [eq?.id, activeOrg.organizationId, activeOrg.status, warrantyRefreshToken])
+
+  useEffect(() => {
     void load()
   }, [load])
 
@@ -714,16 +759,31 @@ export default function EquipmentDetailPage() {
     () => workOrders.filter((w) => w.status === "completed" || w.status === "invoiced").length,
     [workOrders],
   )
+  const warrantyEval = useMemo(() => {
+    if (!eq) return null
+    return evaluateWarrantyCoverage({
+      records: warrantyRecords,
+      equipmentFallback: {
+        start: eq.warrantyStartDate?.trim() ? eq.warrantyStartDate.slice(0, 10) : null,
+        end: eq.warrantyExpiration?.trim() ? eq.warrantyExpiration.slice(0, 10) : null,
+        manufacturerLabel: eq.manufacturer,
+      },
+    })
+  }, [eq, warrantyRecords])
+
   const warrantyDays = eq ? daysToDue(eq.warrantyExpiration) : 9999
   const warrantyHasDate = Boolean(eq?.warrantyExpiration?.trim())
-  const warrantyKpi = eq ? warrantyKpiLabel(warrantyDays, warrantyHasDate) : "—"
+  const warrantyKpi = warrantyEval ? formatWarrantyCoverageLabel(warrantyEval.label) : eq ? warrantyKpiLabel(warrantyDays, warrantyHasDate) : "—"
   const warrantySub = !eq
     ? ""
+    : warrantyEval?.endDate
+      ? `${warrantyEval.provider ? `${warrantyEval.provider} · ` : ""}Ends ${fmtDate(warrantyEval.endDate)}`
     : !warrantyHasDate
-      ? "No expiration on file"
+      ? "No warranty coverage on file"
       : warrantyDays < 0
         ? `Expired ${fmtDate(eq.warrantyExpiration)}`
         : `Ends ${fmtDate(eq.warrantyExpiration)}`
+  const warrantyKpiWarn = Boolean(warrantyEval?.label === "expiring_soon")
 
   const equipmentLifecycleEvents = useMemo(() => {
     if (!eq) return []
@@ -1049,6 +1109,21 @@ export default function EquipmentDetailPage() {
   const quoteNew = `/quotes?action=new-quote&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
   const planNew = `/maintenance-plans?new=1&customerId=${encodeURIComponent(eq.customerId)}&equipmentId=${encodeURIComponent(eq.id)}`
 
+  async function handleDeleteWarranty(warrantyId: string) {
+    if (!activeOrg.organizationId) return
+    if (!globalThis.confirm("Remove this warranty record from the asset?")) return
+    const res = await fetch(
+      `/api/organizations/${encodeURIComponent(activeOrg.organizationId)}/equipment-warranties/${encodeURIComponent(warrantyId)}`,
+      { method: "DELETE" },
+    )
+    const j = (await res.json().catch(() => ({}))) as { error?: string }
+    if (!res.ok) {
+      globalThis.alert(j.error ?? "Could not remove warranty.")
+      return
+    }
+    setWarrantyRefreshToken((n) => n + 1)
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-2">
@@ -1181,7 +1256,7 @@ export default function EquipmentDetailPage() {
               label: "Warranty status",
               value: warrantyKpi,
               sub: warrantySub,
-              warn: warrantyHasDate && warrantyDays >= 0 && warrantyDays <= 90,
+              warn: warrantyKpiWarn,
             },
           ] as const
         ).map(({ label, value, sub, warn }) => (
@@ -1248,6 +1323,92 @@ export default function EquipmentDetailPage() {
                   </p>
                 </div>
                 <SlaCoverageBadge label={equipmentContractEval.label} />
+              </CardContent>
+            </Card>
+          : null}
+
+          {warrantyEval ?
+            <Card className="border-border shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Manufacturer / asset warranty
+                    </p>
+                    <p className="text-sm text-foreground mt-0.5">
+                      {warrantyEval.provider ?? "No provider on file"}
+                      {warrantyEval.referenceNumber ? ` · Ref ${warrantyEval.referenceNumber}` : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Records override equipment warranty dates when active. Operational view only — not a claims
+                      system.
+                    </p>
+                    {warrantyRecordsError ?
+                      <p className="text-xs text-destructive mt-2">{warrantyRecordsError}</p>
+                    : null}
+                  </div>
+                  <WarrantyCoverageBadge label={warrantyEval.label} />
+                </div>
+                {canManageEquipmentWarranties ?
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        setWarrantyEdit(null)
+                        setWarrantyFormOpen(true)
+                      }}
+                    >
+                      Add warranty record
+                    </Button>
+                  </div>
+                : null}
+                {warrantyRecords.length > 0 ?
+                  <ul className="text-xs space-y-2 border-t border-border pt-3">
+                    {warrantyRecords.slice(0, 4).map((w) => (
+                      <li key={w.id} className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          <span className="font-medium text-foreground">{w.warranty_provider}</span>
+                          {" · "}
+                          {w.end_date.slice(0, 10)}
+                          {w.status !== "active" ? ` · ${w.status}` : ""}
+                        </span>
+                        {canManageEquipmentWarranties ?
+                          <span className="flex gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] px-2"
+                              onClick={() => {
+                                setWarrantyEdit(w)
+                                setWarrantyFormOpen(true)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] px-2 text-destructive"
+                              onClick={() => void handleDeleteWarranty(w.id)}
+                            >
+                              Remove
+                            </Button>
+                          </span>
+                        : null}
+                      </li>
+                    ))}
+                  </ul>
+                : !warrantyRecordsError ?
+                  <p className="text-xs text-muted-foreground border-t border-border pt-3">
+                    No structured warranty records yet — asset warranty dates on the Warranty tab still apply when
+                    present.
+                  </p>
+                : null}
               </CardContent>
             </Card>
           : null}
@@ -1480,19 +1641,104 @@ export default function EquipmentDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="warranty" className="mt-4">
+        <TabsContent value="warranty" className="mt-4 space-y-4">
           <Card className="border-border">
             <CardContent className="p-5 space-y-4">
-              <DrawerSection title="Coverage">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Effective coverage</p>
+                {warrantyEval ? <WarrantyCoverageBadge label={warrantyEval.label} /> : null}
+              </div>
+              <DrawerSection title="Asset warranty dates (equipment profile)">
+                <DrawerRow
+                  label="Warranty start"
+                  value={eq.warrantyStartDate?.trim() ? fmtDate(eq.warrantyStartDate) : "—"}
+                />
                 <DrawerRow label="Expiration" value={warrantyHasDate ? fmtDate(eq.warrantyExpiration) : "—"} />
                 <DrawerRow
-                  label="Status"
+                  label="Profile status"
                   value={
                     !warrantyHasDate ? "Unknown" : warrantyDays < 0 ? "Expired" : warrantyDays <= 90 ? "Expiring soon" : "Active"
                   }
                 />
                 <DrawerRow label="Installed" value={fmtDate(eq.installDate)} />
               </DrawerSection>
+              {warrantyRecordsError ?
+                <p className="text-xs text-destructive">{warrantyRecordsError}</p>
+              : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Warranty records</p>
+                {canManageEquipmentWarranties ?
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => {
+                      setWarrantyEdit(null)
+                      setWarrantyFormOpen(true)
+                    }}
+                  >
+                    Add record
+                  </Button>
+                : null}
+              </div>
+              {warrantyRecords.length === 0 ?
+                <p className="text-xs text-muted-foreground">No structured warranty records for this asset.</p>
+              : (
+                <ul className="space-y-3">
+                  {warrantyRecords.map((w) => (
+                    <li
+                      key={w.id}
+                      className="rounded-lg border border-border bg-muted/20 p-3 text-xs space-y-1"
+                    >
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span className="font-medium text-foreground">{w.warranty_provider}</span>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {w.status}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground">
+                        {w.start_date ? `${w.start_date.slice(0, 10)} → ` : ""}
+                        {w.end_date.slice(0, 10)}
+                        {w.reference_number ? ` · Ref ${w.reference_number}` : ""}
+                      </p>
+                      {w.coverage_summary ?
+                        <p className="text-muted-foreground">{w.coverage_summary}</p>
+                      : null}
+                      {canManageEquipmentWarranties ?
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            onClick={() => {
+                              setWarrantyEdit(w)
+                              setWarrantyFormOpen(true)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px] text-destructive"
+                            onClick={() => void handleDeleteWarranty(w.id)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1509,6 +1755,20 @@ export default function EquipmentDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {activeOrg.organizationId ?
+        <EquipmentWarrantyFormDialog
+          open={warrantyFormOpen}
+          onOpenChange={(v) => {
+            setWarrantyFormOpen(v)
+            if (!v) setWarrantyEdit(null)
+          }}
+          organizationId={activeOrg.organizationId}
+          equipmentId={eq.id}
+          existing={warrantyEdit}
+          onSaved={() => setWarrantyRefreshToken((n) => n + 1)}
+        />
+      : null}
     </div>
   )
 }

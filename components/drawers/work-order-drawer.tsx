@@ -119,6 +119,9 @@ import {
 import { SlaCoverageBadge } from "@/components/service-contracts/sla-coverage-badge"
 import type { ServiceContractRow } from "@/lib/service-contracts/types"
 import { evaluateSlaCoverageLabel, pickBestContract } from "@/lib/service-contracts/coverage"
+import type { EquipmentWarrantyRow } from "@/lib/equipment-warranties/types"
+import { evaluateWarrantyCoverage } from "@/lib/equipment-warranties/eval"
+import { WarrantyCoverageBadge } from "@/components/equipment-warranties/warranty-coverage-badge"
 
 let toastCounter = 0
 
@@ -427,6 +430,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   /** Phase 35: same-calendar-day peers for soft scheduling warnings (org + technician scope). */
   const [schedulePeerRows, setSchedulePeerRows] = useState<ScheduleWarnPeer[] | null>(null)
   const [woContractEval, setWoContractEval] = useState<ReturnType<typeof evaluateSlaCoverageLabel> | null>(null)
+  const [woWarrantyEval, setWoWarrantyEval] = useState<ReturnType<typeof evaluateWarrantyCoverage> | null>(null)
 
   const loadWorkOrder = useCallback(async () => {
     if (!workOrderId) {
@@ -584,6 +588,55 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       cancelled = true
     }
   }, [wo?.id, wo?.customerId, wo?.equipmentId, activeOrgId, orgStatus])
+
+  useEffect(() => {
+    if (!wo?.equipmentId?.trim() || !activeOrgId || orgStatus !== "ready") {
+      setWoWarrantyEval(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const eid = wo.equipmentId.trim()
+      const [{ data: wRows }, { data: eqRow }] = await Promise.all([
+        supabase
+          .from("org_equipment_warranties")
+          .select("*")
+          .eq("organization_id", activeOrgId)
+          .eq("equipment_id", eid),
+        supabase
+          .from("equipment")
+          .select("warranty_start_date, warranty_expiration_date, warranty_expires_at, manufacturer")
+          .eq("organization_id", activeOrgId)
+          .eq("id", eid)
+          .maybeSingle(),
+      ])
+      if (cancelled) return
+      const row = eqRow as {
+        warranty_start_date?: string | null
+        warranty_expiration_date?: string | null
+        warranty_expires_at?: string | null
+        manufacturer?: string | null
+      } | null
+      const end = row?.warranty_expiration_date?.trim() || row?.warranty_expires_at?.trim() || null
+      const start = row?.warranty_start_date?.trim() || null
+      const ev = evaluateWarrantyCoverage({
+        records: (wRows ?? []) as EquipmentWarrantyRow[],
+        equipmentFallback:
+          end || start ?
+            {
+              start: start ? start.slice(0, 10) : null,
+              end: end ? end.slice(0, 10) : null,
+              manufacturerLabel: row?.manufacturer ?? null,
+            }
+          : null,
+      })
+      setWoWarrantyEval(ev)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wo?.id, wo?.equipmentId, activeOrgId, orgStatus])
 
   useEffect(() => {
     if (!wo || !activeOrgId || orgStatus !== "ready") {
@@ -1772,6 +1825,20 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             : <p className="text-xs text-muted-foreground">No active matching contract.</p>}
           </div>
           <SlaCoverageBadge label={woContractEval.label} />
+        </div>
+      : null}
+      {woWarrantyEval && wo?.equipmentId?.trim() ?
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Asset warranty
+            </p>
+            <p className="text-xs text-foreground truncate">
+              {woWarrantyEval.provider ?? "Coverage from asset profile"}
+              {woWarrantyEval.endDate ? ` · ends ${woWarrantyEval.endDate}` : ""}
+            </p>
+          </div>
+          <WarrantyCoverageBadge label={woWarrantyEval.label} />
         </div>
       : null}
       {dispatchState.dispatchIncomplete ? (
