@@ -3,9 +3,9 @@ import "server-only"
 import { redirect } from "next/navigation"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { pickPreferredDocumentLogoUrl } from "@/lib/organization/document-branding"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
+import { getOrganizationMemberRecord } from "@/lib/api/org-role"
 import { portalAccentCssVariables, resolvePortalPrimaryAccentHex } from "@/lib/portal/portal-theme-css"
-import { staffMayOpenPortalPreview } from "@/lib/portal/preview-access"
+import { staffMayOpenPortalPreviewFromMembership } from "@/lib/portal/preview-access"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
 import { loadStaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
@@ -64,8 +64,8 @@ export async function requireStaffPreviewContext(
     )
   }
 
-  const rawRole = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!staffMayOpenPortalPreview(rawRole)) {
+  const member = await getOrganizationMemberRecord(supabase, user.id, organizationId)
+  if (!staffMayOpenPortalPreviewFromMembership(member)) {
     redirect(`/portal/login?error=preview_forbidden&next=${encodeURIComponent("/portal/dashboard")}`)
   }
 

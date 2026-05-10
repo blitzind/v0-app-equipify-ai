@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { sha256Hex } from "@/lib/portal/token-hash"
 
@@ -9,14 +9,13 @@ export const runtime = "nodejs"
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-const INVITE_ROLES = new Set(["owner", "admin", "manager"])
-
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
 }
 
 /**
  * Staff-only: create or refresh a portal user and return a one-time invite URL for the customer.
+ * Gated by `canManagePortalSettings` (same as Settings → Customer Portal), including profile overlays.
  */
 export async function POST(
   request: Request,
@@ -27,26 +26,8 @@ export async function POST(
     return jsonError("Invalid organization.", 400)
   }
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.id) {
-    return jsonError("Sign in required.", 401)
-  }
-
-  const { data: mem } = await supabase
-    .from("organization_members")
-    .select("role")
-    .eq("organization_id", organizationId)
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle()
-
-  const role = (mem as { role?: string } | null)?.role ?? ""
-  if (!INVITE_ROLES.has(role)) {
-    return jsonError("Only owners, admins, and managers can invite portal users.", 403)
-  }
+  const gate = await requireOrgPermission(organizationId, "canManagePortalSettings")
+  if ("error" in gate) return gate.error
 
   let body: { customerId?: string; email?: string; displayName?: string | null }
   try {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import { staffMayOpenPortalPreview } from "@/lib/portal/preview-access"
+import { getOrganizationMemberRecord } from "@/lib/api/org-role"
+import { staffMayOpenPortalPreviewFromMembership } from "@/lib/portal/preview-access"
 
 export const runtime = "nodejs"
 
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(login)
   }
 
-  const rawRole = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!staffMayOpenPortalPreview(rawRole)) {
+  const member = await getOrganizationMemberRecord(supabase, user.id, organizationId)
+  if (!staffMayOpenPortalPreviewFromMembership(member)) {
     return NextResponse.redirect(
       portalLoginUrl(request, {
         next: "/portal/dashboard",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { PlanId } from "@/lib/plans"
@@ -171,28 +172,8 @@ export async function PATCH(
     documentLogoUrlIsNull: body.documentLogoUrl === null,
   })
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.email) {
-    return jsonError("unauthorized", "Sign in required.", 401)
-  }
-
-  const platformAdmin = isPlatformAdminEmail(user.email)
-
-  if (!platformAdmin) {
-    const { data: mem } = await supabase
-      .from("organization_members")
-      .select("role")
-      .eq("organization_id", organizationId)
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle()
-    if (!mem || (mem.role !== "owner" && mem.role !== "admin")) {
-      return jsonError("forbidden", "Only owners and admins can update workspace settings.", 403)
-    }
-  }
+  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  if ("error" in gate) return gate.error
 
   /** Persist with service role after authz — avoids RLS/session edge cases blocking updates. */
   let svc

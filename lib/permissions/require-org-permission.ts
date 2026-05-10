@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
+import { getOrganizationMemberRecord } from "@/lib/api/org-role"
 import {
-  getOrgPermissionsForRole,
+  getEffectiveOrgPermissions,
   normalizeOrgMemberRole,
   type OrgPermissionKey,
   type OrgPermissions,
@@ -22,9 +22,13 @@ export async function requireOrgMemberPermission(
   organizationId: string,
   key: OrgPermissionKey,
 ): Promise<{ ok: true; role: string | null; permissions: OrgPermissions } | { ok: false; response: NextResponse }> {
-  const rawRole = await getOrganizationMemberRole(supabase, userId, organizationId)
-  const mapped = normalizeOrgMemberRole(rawRole)
-  const permissions = getOrgPermissionsForRole(mapped)
+  const rec = await getOrganizationMemberRecord(supabase, userId, organizationId)
+  const rawRole = rec?.role ?? null
+  const permissions = getEffectiveOrgPermissions({
+    role: normalizeOrgMemberRole(rawRole),
+    permissionProfile: rec?.permission_profile,
+    permissionsJson: rec?.permissions_json,
+  })
   if (!permissions[key]) {
     return {
       ok: false,

@@ -10,11 +10,7 @@
 
 import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { getOrganizationMemberRole } from "@/lib/api/org-role"
-import {
-  getOrgPermissionsForRole,
-  normalizeOrgMemberRole,
-} from "@/lib/permissions/model"
+import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/api/require-org-permission"
 import { INVOICE_TERMS_CODES } from "@/lib/billing/invoice-terms"
 
 export const runtime = "nodejs"
@@ -26,24 +22,18 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function canEditBilling(role: string | null): boolean {
-  return getOrgPermissionsForRole(normalizeOrgMemberRole(role)).canEditOrgBilling
-}
-
 export async function GET(_request: Request, context: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.id) return jsonError("Unauthorized.", 401)
+  const gate = await requireAnyOrgPermission(organizationId, [
+    "canViewBilling",
+    "canViewFinancials",
+    "canEditInvoices",
+  ])
+  if ("error" in gate) return gate.error
 
-  const role = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!role) return jsonError("Forbidden.", 403)
-
-  const { data, error } = await supabase
+  const { data, error } = await gate.supabase
     .from("organizations")
     .select("default_invoice_terms_code")
     .eq("id", organizationId)
@@ -66,16 +56,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ organ
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) return jsonError("Invalid organization.", 400)
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user?.id) return jsonError("Unauthorized.", 401)
-
-  const role = await getOrganizationMemberRole(supabase, user.id, organizationId)
-  if (!canEditBilling(role)) {
-    return jsonError("Only owners and admins can change billing defaults.", 403)
-  }
+  const gate = await requireOrgPermission(organizationId, "canEditOrgBilling")
+  if ("error" in gate) return gate.error
 
   let body: { default_invoice_terms_code?: unknown }
   try {
@@ -98,7 +80,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ organ
     return jsonError("Invalid default_invoice_terms_code.", 400)
   }
 
-  const { error } = await supabase
+  const { error } = await gate.supabase
     .from("organizations")
     .update({
       default_invoice_terms_code: code,
