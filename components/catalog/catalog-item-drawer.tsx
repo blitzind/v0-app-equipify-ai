@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Archive,
   Upload,
+  Warehouse,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
@@ -45,6 +46,8 @@ import {
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useAdmin } from "@/lib/admin-store"
 import { AttachmentTypeIcon } from "@/components/attachments/attachment-preview"
 import { attachmentKindLabel, displayAttachmentFileName } from "@/lib/attachments/attachment-media-kind"
 
@@ -135,6 +138,20 @@ export function CatalogItemDrawer({
   onUpdated?: () => void
 }) {
   const { toast } = useToast()
+  const orgPerms = useOrgPermissions()
+  const { isPlatformAdmin } = useAdmin()
+  const invBridgeReady = orgPerms.status === "ready"
+  const canManageInventoryPerm = Boolean(orgPerms.permissions.canManageInventory || isPlatformAdmin)
+  const canAdjustInv = Boolean(orgPerms.permissions.canAdjustInventoryStock || isPlatformAdmin)
+  const canPostStockAdjustment = canManageInventoryPerm && canAdjustInv
+  const canConsumeOnWorkOrder = Boolean(orgPerms.permissions.canConsumePartsOnWorkOrders || isPlatformAdmin)
+  const showInventoryBridge =
+    invBridgeReady &&
+    (isPlatformAdmin ||
+      orgPerms.permissions.canManageInventory ||
+      orgPerms.permissions.canAdjustInventoryStock ||
+      orgPerms.permissions.canConsumePartsOnWorkOrders)
+
   const [tab, setTab] = useState<TabId>("overview")
   const [loading, setLoading] = useState(false)
   const [item, setItem] = useState<CatalogDetail | null>(null)
@@ -456,7 +473,70 @@ export function CatalogItemDrawer({
 
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
             {tab === "overview" && (
-              <div className={cn(DRAWER_NESTED_CARD, "p-4 space-y-4")}>
+              <>
+                {showInventoryBridge ? (
+                  <div
+                    className={cn(
+                      DRAWER_NESTED_CARD,
+                      "p-4 space-y-3 border-sky-500/20 bg-sky-500/[0.06] dark:bg-sky-500/10",
+                    )}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-sky-500/25 bg-background/80">
+                        <Warehouse className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-xs font-medium text-foreground">Manage stock quantities</p>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          <span className="text-foreground/90">Catalog</span> is for part names, numbers, and pricing.{" "}
+                          <span className="text-foreground/90">Inventory</span> is where you receive, transfer, adjust, or
+                          consume on-hand counts. Jump there with this SKU pre-selected when you have access.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" className="h-8 text-xs gap-1" asChild>
+                        <Link href={`/inventory?tab=overview&itemId=${encodeURIComponent(item.id)}`}>
+                          View on-hand
+                          <ExternalLink className="h-3 w-3 opacity-70" />
+                        </Link>
+                      </Button>
+                      {canManageInventoryPerm ? (
+                        <>
+                          <Button size="sm" variant="outline" className="h-8 text-xs gap-1" asChild>
+                            <Link href={`/inventory?tab=adjust&itemId=${encodeURIComponent(item.id)}`}>
+                              Receive stock
+                              <ExternalLink className="h-3 w-3 opacity-70" />
+                            </Link>
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs gap-1" asChild>
+                            <Link href={`/inventory?tab=transfer&itemId=${encodeURIComponent(item.id)}`}>
+                              Transfer stock
+                              <ExternalLink className="h-3 w-3 opacity-70" />
+                            </Link>
+                          </Button>
+                        </>
+                      ) : null}
+                      {canPostStockAdjustment ? (
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1" asChild>
+                          <Link href={`/inventory?tab=adjust&itemId=${encodeURIComponent(item.id)}`}>
+                            Adjust counts
+                            <ExternalLink className="h-3 w-3 opacity-70" />
+                          </Link>
+                        </Button>
+                      ) : null}
+                      {canConsumeOnWorkOrder ? (
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1" asChild>
+                          <Link href={`/inventory?tab=history&itemId=${encodeURIComponent(item.id)}`}>
+                            Consume on work order
+                            <ExternalLink className="h-3 w-3 opacity-70" />
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                <div className={cn(DRAWER_NESTED_CARD, "p-4 space-y-4")}>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {(item.source_type ?? "manual") === "imported" && "Imported from a price list · "}
                   {(item.source_type ?? "manual") === "ai_generated" && "AI-sourced row · "}
@@ -600,6 +680,7 @@ export function CatalogItemDrawer({
                   </div>
                 ) : null}
               </div>
+              </>
             )}
 
             {tab === "pricing" && (

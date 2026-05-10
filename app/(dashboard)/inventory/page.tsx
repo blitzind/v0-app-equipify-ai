@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Package, Plus, Truck, Warehouse } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
@@ -135,11 +136,14 @@ const INV_FIELD = "space-y-1.5 min-w-0"
 /** CTA: no `ml-auto` — sits next to the last input on desktop, full-width on mobile. */
 const INV_SUBMIT_CLASS = "h-9 w-full sm:w-auto"
 
-export default function InventoryPage() {
+function InventoryPageInner() {
   const { toast } = useToast()
   const { isPlatformAdmin } = useAdmin()
   const { organizationId, status } = useActiveOrganization()
   const orgPerms = useOrgPermissions()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
   // `canManageInventory` matches `requireOrgInventoryWrite` (receive, transfer,
   // locations, thresholds, vehicle assignment). Adjust also requires
   // `canAdjustInventoryStock` on the server — mirror both on the client.
@@ -344,6 +348,8 @@ export default function InventoryPage() {
     "all" | "vehicle_only" | "vehicle_needs_restock"
   >("all")
   const [myVehicleLocId, setMyVehicleLocId] = useState<string | null>(null)
+  const [invMainTab, setInvMainTab] = useState<string>("overview")
+  const [inventoryItemFocus, setInventoryItemFocus] = useState<string | null>(null)
 
   const [retCatalog, setRetCatalog] = useState("")
   const [retWarehouse, setRetWarehouse] = useState("")
@@ -420,6 +426,59 @@ export default function InventoryPage() {
     })
   }, [stock, locations, stockTableFilter])
 
+  const overviewStockRows = useMemo(() => {
+    if (!inventoryItemFocus) return filteredStockRows
+    return filteredStockRows.filter((r) => r.catalog_item_id === inventoryItemFocus)
+  }, [filteredStockRows, inventoryItemFocus])
+
+  const focusedCatalogLabel = useMemo(() => {
+    if (!inventoryItemFocus) return null
+    const row = stock.find((s) => s.catalog_item_id === inventoryItemFocus)
+    const fromCat = catalogParts.find((c) => c.id === inventoryItemFocus)
+    return (
+      row?.item_name?.trim() ||
+      fromCat?.name?.trim() ||
+      fromCat?.part_number?.trim() ||
+      "this catalog item"
+    )
+  }, [inventoryItemFocus, stock, catalogParts])
+
+  useEffect(() => {
+    if (loading) return
+
+    const tabParam = searchParams.get("tab")?.trim() ?? ""
+    const validTabs = new Set(["overview", "adjust", "transfer", "history", "vans", "reorder"])
+    if (tabParam === "stock") {
+      setInvMainTab("overview")
+    } else if (validTabs.has(tabParam)) {
+      setInvMainTab(tabParam)
+    }
+
+    const itemParam = searchParams.get("itemId")?.trim() ?? ""
+    if (!itemParam) {
+      setInventoryItemFocus(null)
+      return
+    }
+    if (catalogParts.length === 0) return
+    if (catalogParts.some((c) => c.id === itemParam)) {
+      setInventoryItemFocus(itemParam)
+      setAdjCatalog(itemParam)
+      setRcvCatalog(itemParam)
+      setXfCatalog(itemParam)
+      setConCatalog(itemParam)
+    } else {
+      setInventoryItemFocus(null)
+    }
+  }, [loading, searchParams, catalogParts])
+
+  const clearInventoryItemDeepLink = useCallback(() => {
+    const p = new URLSearchParams(searchParams.toString())
+    p.delete("itemId")
+    const qs = p.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+    setInventoryItemFocus(null)
+  }, [searchParams, pathname, router])
+
   useEffect(() => {
     if (!organizationId || status !== "ready" || !baseUrl) return
     let cancelled = false
@@ -464,18 +523,22 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="rounded-lg border border-border/80 bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
         <p className="leading-relaxed">
-          <span className="font-medium text-foreground">Parts live in Catalog.</span>{" "}
+          <span className="font-medium text-foreground">Catalog</span> is where you create and edit part / SKU details
+          (name, number, pricing).{" "}
           <Link href="/catalog" className="text-primary underline-offset-4 hover:underline">
-            Add or edit items
+            Open Catalog
           </Link>{" "}
-          there, then use the tabs below to <strong className="text-foreground">receive</strong>,{" "}
-          <strong className="text-foreground">transfer</strong>, <strong className="text-foreground">adjust</strong>, or{" "}
-          <strong className="text-foreground">consume</strong> stock. To hide a SKU from default lists,{" "}
+          to change those fields. <span className="font-medium text-foreground">Inventory</span> is where you manage
+          quantities: use <strong className="text-foreground">Adjust / receive</strong>,{" "}
+          <strong className="text-foreground">Transfer stock</strong>, or{" "}
+          <strong className="text-foreground">Consume parts &amp; history</strong> to change on-hand counts. From a catalog
+          item drawer, use <strong className="text-foreground">Manage stock quantities</strong> to jump here with that
+          SKU pre-selected. To hide a SKU from default lists,{" "}
           <strong className="text-foreground">archive the catalog item</strong> from its drawer — nothing is hard-deleted.
         </p>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={invMainTab} onValueChange={setInvMainTab} className="space-y-4">
         {/* Tabs + primary CTA on one row (desktop); stack/wrap cleanly on narrow viewports */}
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
           <TabsList className="flex h-auto w-full flex-wrap gap-1 justify-start sm:min-w-0 sm:flex-1">
@@ -631,7 +694,22 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
             </CardHeader>
-            <CardContent className="pt-0 overflow-x-auto">
+            <CardContent className="pt-0 overflow-x-auto space-y-3">
+              {inventoryItemFocus ? (
+                <div className="flex flex-col gap-2 rounded-md border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-muted-foreground leading-snug">
+                    Showing on-hand for{" "}
+                    <span className="font-medium text-foreground">{focusedCatalogLabel}</span>
+                    {stockTableFilter !== "all" ? (
+                      <span className="text-muted-foreground"> (location filter still applies)</span>
+                    ) : null}
+                    .
+                  </p>
+                  <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={clearInventoryItemDeepLink}>
+                    Show all parts
+                  </Button>
+                </div>
+              ) : null}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -645,20 +723,36 @@ export default function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStockRows.length === 0 && (
+                  {overviewStockRows.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                         {stock.length === 0 ? (
                           <span className="block max-w-md mx-auto space-y-2">
                             <span className="block text-foreground font-medium">No on-hand balances yet</span>
                             <span className="block text-xs leading-relaxed">
-                              Add parts in{" "}
+                              Create and edit SKUs in{" "}
                               <Link href="/catalog" className="text-primary underline-offset-4 hover:underline">
                                 Catalog
                               </Link>
-                              , then open <strong className="text-foreground">Adjust / receive</strong> to{" "}
+                              , then use <strong className="text-foreground">Adjust / receive</strong> to{" "}
                               <strong className="text-foreground">Receive stock</strong> or{" "}
                               <strong className="text-foreground">Adjust stock</strong> at a location.
+                            </span>
+                          </span>
+                        ) : inventoryItemFocus ? (
+                          <span className="block max-w-md mx-auto space-y-2 text-xs leading-relaxed">
+                            <span className="block text-foreground font-medium text-sm">No stock rows for this SKU</span>
+                            <span>
+                              There is no on-hand row for this item at the current location filter, or you have not
+                              received it yet. Use{" "}
+                              <button
+                                type="button"
+                                className="text-primary underline-offset-4 hover:underline font-medium"
+                                onClick={() => setInvMainTab("adjust")}
+                              >
+                                Adjust / receive
+                              </button>{" "}
+                              to receive or adjust quantities.
                             </span>
                           </span>
                         ) : (
@@ -667,7 +761,7 @@ export default function InventoryPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {filteredStockRows.map((r) => {
+                  {overviewStockRows.map((r) => {
                     const loc = locations.find((l) => l.id === r.location_id)
                     const isVehicle = loc?.location_type === "vehicle"
                     const techName = isVehicle
@@ -1554,5 +1648,20 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          Loading inventory…
+        </div>
+      }
+    >
+      <InventoryPageInner />
+    </Suspense>
   )
 }
