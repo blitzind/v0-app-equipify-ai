@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import Link from "next/link"
+import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { useInvoices } from "@/lib/quote-invoice-store"
@@ -2998,7 +2999,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
       {/* ── Toasts ─────────────────────────────────────────────────────────── */}
       {toasts.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-[70] flex flex-col gap-2 pointer-events-none">
+        <div className={cn(BR_STACK_CLEAR_AIDEN, "z-[200] flex flex-col gap-2 pointer-events-none")}>
           {toasts.map((t) => (
             <div
               key={t.id}

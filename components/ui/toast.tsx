@@ -16,7 +16,9 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      'fixed top-0 z-[300] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]',
+      /* sm+: anchor above AIden — uses --aiden-launcher-* from app/globals.css */
+      'fixed top-0 z-[300] flex max-h-screen w-full flex-col-reverse p-4 sm:top-auto sm:flex-col md:max-w-[420px]',
+      'sm:right-4 lg:right-6 sm:!bottom-[calc(env(safe-area-inset-bottom,0px)+1rem+var(--aiden-launcher-bottom)+var(--aiden-launcher-btn-height)+var(--aiden-launcher-clearance-gap))]',
       className,
     )}
     {...props}

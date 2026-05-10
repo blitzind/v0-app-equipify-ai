@@ -10,6 +10,7 @@ import {
   shouldShowBillingWarning,
 } from "@/lib/billing/access"
 import { getTrialDaysRemaining, isTrialActive } from "@/lib/billing/subscriptions"
+import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 
 /**
@@ -104,7 +105,12 @@ export function BillingWarningBanner() {
       </div>
 
       {showStickyTrialPrompt && (
-        <div className="fixed z-[230] right-3 bottom-3 sm:right-5 sm:bottom-5 max-w-[310px] rounded-lg border border-[color:var(--status-warning)] bg-background shadow-lg p-3">
+        <div
+          className={cn(
+            BR_STACK_CLEAR_AIDEN,
+            "z-[230] max-w-[310px] rounded-lg border border-[color:var(--status-warning)] bg-background shadow-lg p-3",
+          )}
+        >
           <p className="text-xs text-foreground leading-relaxed">
             Your trial ends soon. Choose a plan to keep access.
           </p>

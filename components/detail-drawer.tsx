@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useLayoutEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { X, ChevronRight, ExternalLink, CheckCircle2, Clock, AlertTriangle, Download, FileText, Printer } from "lucide-react"
+import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -354,7 +355,7 @@ export interface ToastItem { id: number; message: string; type?: "success" | "in
 
 export function DrawerToastStack({ toasts, onRemove }: { toasts: ToastItem[]; onRemove: (id: number) => void }) {
   return (
-    <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-[200] flex flex-col gap-2 pointer-events-none" aria-live="polite">
+    <div className={cn(BR_STACK_CLEAR_AIDEN, "z-[200] flex flex-col gap-2 pointer-events-none")} aria-live="polite">
       {toasts.map((t) => (
         <div
           key={t.id}

@@ -9,6 +9,7 @@ import { toastRecordEligibilityBlocked } from "@/lib/billing/guard-toast"
 import { Button } from "@/components/ui/button"
 import { CalendarPlus, CheckCircle2, X } from "lucide-react"
 import { DRAWER_PANEL_SURFACE } from "@/components/detail-drawer"
+import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { formatCustomerLocationSelectLabel } from "@/lib/customer-locations/format"
@@ -588,7 +589,12 @@ export function AddEquipmentModal({
 
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[240] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium bg-[color:var(--status-success)] text-white animate-in slide-in-from-right-4 fade-in duration-200">
+        <div
+          className={cn(
+            BR_STACK_CLEAR_AIDEN,
+            "z-[240] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium bg-[color:var(--status-success)] text-white animate-in slide-in-from-right-4 fade-in duration-200",
+          )}
+        >
           {toastMsg}
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import type { Technician, TechStatus, TechSkill } from "@/lib/mock-data"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -259,7 +260,7 @@ interface ToastMsg { id: number; message: string; type: "success" | "info" }
 
 function ToastStack({ toasts, onRemove }: { toasts: ToastMsg[]; onRemove: (id: number) => void }) {
   return (
-    <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 pointer-events-none">
+    <div className={cn(BR_STACK_CLEAR_AIDEN, "z-[200] flex flex-col gap-2 pointer-events-none")}>
       {toasts.map((t) => (
         <div
           key={t.id}

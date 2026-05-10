@@ -20,6 +20,7 @@ export function AidenChatLauncher() {
       {/*
         z-[95]: above mobile bottom nav (z-[80]/[91]), below Sheet/drawer stacks (z-[100]+).
         bottom-24 on small screens clears the fixed nav + FAB (matches PageShell pb-24); lg+ uses compact inset.
+        If you change offsets or button height, update `--aiden-launcher-*` in app/globals.css (Phase 56.6).
         Layout imports this module statically so production never depends on a separate dynamic chunk for the button.
       */}
       <div className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6">

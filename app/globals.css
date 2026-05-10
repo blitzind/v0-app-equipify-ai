@@ -55,6 +55,21 @@
   /* AI accent: aliases to brand blue */
   --ai-purple: oklch(0.56 0.21 231);
   --ai-purple-fg: oklch(0.99 0 0);
+
+  /*
+   * AIden launcher footprint (Phase 56.6) — keep in sync with
+   * `components/aiden/aiden-chat-launcher.tsx` (bottom-24 / lg:bottom-6, h-12).
+   * Used by `.br-stack-clear-aiden` and Radix toast viewport offset on dashboard.
+   */
+  --aiden-launcher-bottom: 6rem; /* bottom-24 below lg */
+  --aiden-launcher-btn-height: 3rem; /* h-12 */
+  --aiden-launcher-clearance-gap: 0.75rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --aiden-launcher-bottom: 1.5rem; /* lg:bottom-6 */
+  }
 }
 
 /* Dark theme: canvas `#0B111E`; surfaces `#121B2C`; borders `#25324C`; list-hover `#111724` via `--accent`. Slide-over: `DRAWER_PANEL_SURFACE`. Sidebar: `#0F172A` in `app-sidebar`. */
@@ -285,6 +300,29 @@
     background-color: var(--ds-accent-bg);
     color:            var(--ds-accent-text);
     border-color:     var(--ds-accent-border);
+  }
+
+  /*
+   * Fixed bottom-right stacks (drawer toasts, inline success banners) — sit above
+   * the AIden launcher without changing its position. Pair with z-index on the element.
+   */
+  .br-stack-clear-aiden {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--aiden-launcher-bottom) + var(--aiden-launcher-btn-height) +
+        var(--aiden-launcher-clearance-gap)
+    );
+  }
+  @media (min-width: 640px) {
+    .br-stack-clear-aiden {
+      right: 1.25rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .br-stack-clear-aiden {
+      right: 1.5rem;
+    }
   }
 
   /* ── Alert / callout rows ─────────────────────────────────────────────────
