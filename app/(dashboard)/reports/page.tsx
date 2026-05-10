@@ -23,6 +23,8 @@ import {
   type EquipmentCategoryBreakdownRow,
 } from "@/lib/equipment/intelligence-rollup"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
+import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 const woByTypeFallback = [
   { type: "Repair", count: 98, fill: "var(--color-chart-1)" },
@@ -208,6 +210,7 @@ function reportToCsvRows(a: ReportAnalyticsResponse): string[][] {
 export default function ReportsPage() {
   const dash = useSupabaseDashboard()
   const activeOrg = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const { revenueData, repeatRepairs: wrRepeat, expiringWarranties: wrWarranty } = useWorkspaceData()
 
   const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
@@ -829,6 +832,16 @@ export default function ReportsPage() {
           <p className={`text-xs -mt-2 print:hidden ${analyticsError ? "text-destructive" : "text-muted-foreground"}`}>
             {analyticsLoading ? "Loading filtered analytics…" : analyticsError}
           </p>
+        )}
+
+        {(permissions.canViewBilling || permissions.canViewFinancials) && (
+          <FinancialInvoiceReportSection
+            organizationId={orgId}
+            variant="synced"
+            syncedFrom={from}
+            syncedTo={to}
+            syncedCustomerId={customerId}
+          />
         )}
 
         {useLive && (

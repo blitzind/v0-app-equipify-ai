@@ -32,6 +32,7 @@ import { PermissionGate } from "@/components/permissions/permission-gate"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { paymentAllocationUiLabel } from "@/lib/billing/invoice-payment-allocation"
+import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -348,6 +349,10 @@ function InvoicesPageInner() {
       ) : null}
 
       <InvoiceStatCards invoices={invoicesForStats} />
+
+      {activeOrgStatus === "ready" && activeOrgId ? (
+        <FinancialInvoiceReportSection organizationId={activeOrgId} variant="standalone" />
+      ) : null}
 
       {loading && invoices.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-6 py-16 text-center text-sm text-muted-foreground">
