@@ -18,6 +18,7 @@ import { AssignTechnicianDialog } from "@/components/work-orders/assign-technici
 import { repairLogJsonForPersist } from "@/lib/work-orders/parse-repair-log"
 import {
   deleteWorkOrderAttachment,
+  isWorkOrderPhotoCategoryMime,
   persistWorkOrderCustomerSignature,
   replaceWorkOrderLineItems,
   replaceWorkOrderTasks,
@@ -115,6 +116,11 @@ import {
 } from "@/lib/work-orders/offline/types"
 import { ONLINE_REQUIRED_LABEL, SYNC_PREP_COPY } from "@/lib/sync-prep"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
+import { useWorkOrderOfflinePendingPhotoPreviews } from "@/hooks/use-work-order-offline-pending-photo-previews"
+import {
+  appendWorkOrderOfflinePhotoQueue,
+  removeWorkOrderOfflineQueuedPhoto,
+} from "@/lib/work-orders/offline/offline-photo-queue"
 import { deriveOperationalBadgesForDrawer } from "@/lib/dispatch/operational-badges"
 import { deriveDispatchState } from "@/lib/dispatch/dispatch-state"
 import {
@@ -480,6 +486,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   }>({ pending: false })
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false)
   const [conflictDialogRecord, setConflictDialogRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
+
+  const pendingOfflinePhotoPreviews = useWorkOrderOfflinePendingPhotoPreviews(activeOrgId, drawerUserId, wo?.id ?? null)
 
   const refreshOfflineDigest = useCallback(async () => {
     if (!activeOrgId || !drawerUserId || !workOrderId) {
@@ -1963,10 +1971,65 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     }
   }
 
+  async function handleRemovePendingOfflinePhoto(localId: string) {
+    if (!wo || !activeOrgId || !drawerUserId) return
+    if (!window.confirm("Remove this photo from the offline queue? It will be deleted from this device.")) return
+    await removeWorkOrderOfflineQueuedPhoto({
+      organizationId: activeOrgId,
+      userId: drawerUserId,
+      workOrder: wo,
+      dbNotes,
+      localId,
+    })
+    pushToast({ title: "Removed from queue" })
+    await refreshOfflineDigest()
+  }
+
   async function handleAttachmentUpload(files: FileList) {
     if (!wo || !activeOrgId) return
     const list = Array.from(files)
     if (list.length === 0) return
+
+    if (!online) {
+      if (!drawerUserId) {
+        pushToast({ variant: "destructive", title: "Not signed in", description: "Sign in to save photos offline." })
+        return
+      }
+      const images = list.filter((f) => isWorkOrderPhotoCategoryMime(f.type))
+      const nonImages = list.filter((f) => !isWorkOrderPhotoCategoryMime(f.type))
+      if (nonImages.length > 0) {
+        pushToast({
+          variant: "destructive",
+          title: ONLINE_REQUIRED_LABEL,
+          description:
+            nonImages.length === list.length
+              ? "Documents and PDFs need a connection. You can queue photos (JPEG, PNG, WebP, GIF) offline."
+              : `${nonImages.length} non-image file(s) skipped — only photos can be queued offline.`,
+        })
+      }
+      if (images.length === 0) return
+      const r = await appendWorkOrderOfflinePhotoQueue({
+        organizationId: activeOrgId,
+        userId: drawerUserId,
+        workOrder: wo,
+        dbNotes,
+        files: images,
+      })
+      if (!r.ok) {
+        pushToast({ variant: "destructive", title: "Could not queue photos", description: r.message })
+        return
+      }
+      pushToast({
+        title: "Photos saved on device",
+        description:
+          r.count === 1
+            ? "Tap Sync now when online to upload to the work order."
+            : `${r.count} photos queued — use Sync when you have signal.`,
+      })
+      await refreshOfflineDigest()
+      return
+    }
+
     const supabase = createBrowserSupabaseClient()
     setAttachmentUploading(true)
     setAttachmentUploadProgress(0)
@@ -2947,6 +3010,11 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             attachmentUploading={attachmentUploading}
             attachmentUploadProgress={attachmentUploadProgress}
             attachmentUploadStatusLabel={attachmentUploadLabel}
+            pendingOfflinePhotos={pendingOfflinePhotoPreviews}
+            onRemovePendingOfflinePhoto={(id) => void handleRemovePendingOfflinePhoto(id)}
+            attachmentsOfflineExplainer={
+              !online && woCanEdit ? SYNC_PREP_COPY.workOrderOfflinePhotoQueueHint : null
+            }
             tasks={tabTasks}
             onTasksChange={setTabTasks}
             tasksTabToolbar={

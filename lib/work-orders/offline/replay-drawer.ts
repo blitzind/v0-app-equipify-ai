@@ -3,7 +3,19 @@ import type { RepairLog, WorkOrder, WorkOrderStatus } from "@/lib/mock-data"
 import { parseRepairLog, repairLogJsonForPersist } from "@/lib/work-orders/parse-repair-log"
 import { workOrderAssignmentColumns } from "@/lib/work-orders/assignment-payload"
 import { repairLogFingerprintFromWorkOrder } from "./repair-log-fingerprint"
-import type { WorkOrderOfflineBundlePayload, WorkOrderOfflineOutboxRecord } from "./types"
+import { offlineBundleHasIntent } from "./merge-bundle"
+import { uploadWorkOrderAttachment } from "@/lib/work-orders/work-order-tab-data"
+import {
+  deletePendingPhotoBlob,
+  deleteWorkOrderOfflineForScope,
+  getWorkOrderPendingPhotoBlob,
+  putWorkOrderOfflineRecord,
+} from "./idb-store"
+import type {
+  WorkOrderOfflineBundlePayload,
+  WorkOrderOfflineOutboxRecord,
+  WorkOrderOfflinePendingPhotoMeta,
+} from "./types"
 
 function dbStatusToUi(s: string): WorkOrderStatus {
   switch (s) {
@@ -112,7 +124,64 @@ export async function replayWorkOrderOfflineBundle(args: {
     return { ok: false, conflict: true, serverUpdatedAt: baseline.updatedAt }
   }
 
-  const payload = record.payload as WorkOrderOfflineBundlePayload
+  const scopeKey = record.scopeKey
+  const rawMetas = record.payload.pendingPhotos ?? []
+  const viableMetas: WorkOrderOfflinePendingPhotoMeta[] = []
+  for (const meta of rawMetas) {
+    const blob = await getWorkOrderPendingPhotoBlob(scopeKey, meta.localId)
+    if (blob) viableMetas.push(meta)
+  }
+
+  const compactedPayload: WorkOrderOfflineBundlePayload = {
+    ...(record.payload as WorkOrderOfflineBundlePayload),
+    pendingPhotos: viableMetas,
+  }
+  if (!offlineBundleHasIntent(compactedPayload)) {
+    await deleteWorkOrderOfflineForScope(scopeKey)
+    return { ok: true }
+  }
+  if (viableMetas.length !== rawMetas.length) {
+    await putWorkOrderOfflineRecord({
+      ...record,
+      payload: compactedPayload,
+      updatedAtIso: new Date().toISOString(),
+    })
+  }
+
+  const pendingPhotos = [...viableMetas]
+  if (pendingPhotos.length > 0) {
+    for (let i = 0; i < pendingPhotos.length; i++) {
+      const meta = pendingPhotos[i]!
+      const blob = await getWorkOrderPendingPhotoBlob(scopeKey, meta.localId)
+      if (!blob) {
+        continue
+      }
+      try {
+        const file = new File([blob], meta.fileName, { type: meta.mimeType })
+        await uploadWorkOrderAttachment(supabase, organizationId, workOrder.id, file)
+        await deletePendingPhotoBlob(scopeKey, meta.localId)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const stillPending = [meta, ...pendingPhotos.slice(i + 1)]
+        await putWorkOrderOfflineRecord({
+          ...record,
+          payload: {
+            ...compactedPayload,
+            pendingPhotos: stillPending,
+          },
+          status: "failed",
+          lastError: msg,
+          updatedAtIso: new Date().toISOString(),
+        })
+        return { ok: false, conflict: false, message: msg }
+      }
+    }
+  }
+
+  const payload: WorkOrderOfflineBundlePayload = {
+    ...compactedPayload,
+    pendingPhotos: [],
+  }
 
   if (payload.tasks !== null && usesTasksTable) {
     return {
@@ -140,6 +209,10 @@ export async function replayWorkOrderOfflineBundle(args: {
 
   const touchRepairLog = Boolean(payload.repair) || (payload.tasks !== null && !usesTasksTable)
   const touchProblemNotes = Boolean(payload.repair)
+
+  if (!offlineBundleHasIntent(payload)) {
+    return { ok: true }
+  }
 
   const update: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -212,10 +285,18 @@ export async function replayWorkOrderOfflineBundle(args: {
 
     return { ok: true }
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await putWorkOrderOfflineRecord({
+      ...record,
+      payload,
+      status: "failed",
+      lastError: msg,
+      updatedAtIso: new Date().toISOString(),
+    })
     return {
       ok: false,
       conflict: false,
-      message: e instanceof Error ? e.message : String(e),
+      message: msg,
     }
   }
 }

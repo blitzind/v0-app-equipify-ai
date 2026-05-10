@@ -119,6 +119,12 @@ export function WorkOrderOfflineConflictDialog({
             {payload?.statusInProgress ? (
               <p className="text-amber-800 dark:text-amber-200 font-medium">Includes: mark job in progress</p>
             ) : null}
+            {(payload?.pendingPhotos?.length ?? 0) > 0 ? (
+              <p className="text-sky-800 dark:text-sky-200 pt-1 font-medium">
+                {payload!.pendingPhotos!.length} technician photo(s) queued on this device (not on the server until you
+                sync successfully — discard deletes them from this device).
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">

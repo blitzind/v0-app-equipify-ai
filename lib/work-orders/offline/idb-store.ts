@@ -2,8 +2,9 @@ import { bumpWorkOrderOfflineListeners } from "./broadcast"
 import { makeOutboxBundleId, type WorkOrderOfflineOutboxRecord } from "./types"
 
 const DB_NAME = "equipify-work-order-offline-v1"
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE = "outbox"
+const PHOTO_STORE = "pendingPhotoBlobs"
 const LS_PREFIX = "equipify-wo-offline-v1::"
 
 function lsKeyForScope(scopeKey: string): string {
@@ -34,6 +35,17 @@ function txDone(tx: IDBTransaction): Promise<void> {
   })
 }
 
+export function pendingPhotoBlobRowId(scopeKey: string, localId: string): string {
+  return `${scopeKey}::${localId}`
+}
+
+type PendingPhotoBlobRow = {
+  id: string
+  scopeKey: string
+  localId: string
+  blob: Blob
+}
+
 export async function openWorkOrderOfflineDb(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     throw new Error("IndexedDB is not available in this environment.")
@@ -49,8 +61,103 @@ export async function openWorkOrderOfflineDb(): Promise<IDBDatabase> {
         store.createIndex("scopeKey", "scopeKey", { unique: false })
         store.createIndex("status", "status", { unique: false })
       }
+      if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+        const ps = db.createObjectStore(PHOTO_STORE, { keyPath: "id" })
+        ps.createIndex("scopeKey", "scopeKey", { unique: false })
+      }
     }
   })
+}
+
+export async function putWorkOrderPendingPhotoBlob(args: {
+  scopeKey: string
+  localId: string
+  blob: Blob
+}): Promise<boolean> {
+  try {
+    const db = await openWorkOrderOfflineDb()
+    if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+      db.close()
+      return false
+    }
+    const id = pendingPhotoBlobRowId(args.scopeKey, args.localId)
+    const row: PendingPhotoBlobRow = {
+      id,
+      scopeKey: args.scopeKey,
+      localId: args.localId,
+      blob: args.blob,
+    }
+    const tx = db.transaction(PHOTO_STORE, "readwrite")
+    tx.objectStore(PHOTO_STORE).put(row)
+    await txDone(tx)
+    db.close()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getWorkOrderPendingPhotoBlob(scopeKey: string, localId: string): Promise<Blob | null> {
+  try {
+    const db = await openWorkOrderOfflineDb()
+    if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+      db.close()
+      return null
+    }
+    const id = pendingPhotoBlobRowId(scopeKey, localId)
+    const tx = db.transaction(PHOTO_STORE, "readonly")
+    const row = (await reqToPromise(tx.objectStore(PHOTO_STORE).get(id))) as PendingPhotoBlobRow | undefined
+    await txDone(tx)
+    db.close()
+    return row?.blob ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function deletePendingPhotoBlob(scopeKey: string, localId: string): Promise<void> {
+  try {
+    const db = await openWorkOrderOfflineDb()
+    if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+      db.close()
+      return
+    }
+    const id = pendingPhotoBlobRowId(scopeKey, localId)
+    const tx = db.transaction(PHOTO_STORE, "readwrite")
+    tx.objectStore(PHOTO_STORE).delete(id)
+    await txDone(tx)
+    db.close()
+  } catch {
+    // ignore
+  }
+}
+
+export async function deleteAllPendingPhotoBlobsForScope(scopeKey: string): Promise<void> {
+  try {
+    const db = await openWorkOrderOfflineDb()
+    if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+      db.close()
+      return
+    }
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE, "readwrite")
+      const store = tx.objectStore(PHOTO_STORE)
+      const idx = store.index("scopeKey")
+      const req = idx.openCursor(IDBKeyRange.only(scopeKey))
+      req.onerror = () => reject(req.error ?? new Error("cursor failed"))
+      req.onsuccess = () => {
+        const cursor = req.result
+        if (!cursor) return
+        cursor.delete()
+        cursor.continue()
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error("tx failed"))
+    })
+    db.close()
+  } catch {
+    // ignore
+  }
 }
 
 export async function putWorkOrderOfflineRecord(record: WorkOrderOfflineOutboxRecord): Promise<void> {
@@ -88,6 +195,7 @@ export async function getWorkOrderOfflineRecordForScope(scopeKey: string): Promi
 }
 
 export async function deleteWorkOrderOfflineForScope(scopeKey: string): Promise<void> {
+  await deleteAllPendingPhotoBlobsForScope(scopeKey)
   const id = makeOutboxBundleId(scopeKey)
   try {
     const db = await openWorkOrderOfflineDb()

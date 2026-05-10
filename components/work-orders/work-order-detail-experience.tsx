@@ -369,6 +369,9 @@ function PhotoSection({
   onRemoveAttachmentPhoto,
   onRemoveLegacyPhoto,
   onRemoveDocument,
+  pendingOfflinePhotos,
+  onRemovePendingOfflinePhoto,
+  attachmentsOfflineExplainer,
 }: {
   photos: string[]
   /** Parallel to `photos`: set when the URL comes from `work_order_attachments`. */
@@ -384,6 +387,9 @@ function PhotoSection({
   onRemoveAttachmentPhoto?: (attachmentId: string) => void | Promise<void>
   onRemoveLegacyPhoto?: (index: number) => void
   onRemoveDocument?: (attachmentId: string) => void | Promise<void>
+  pendingOfflinePhotos?: Array<{ localId: string; url: string; name: string }>
+  onRemovePendingOfflinePhoto?: (localId: string) => void | Promise<void>
+  attachmentsOfflineExplainer?: string | null
 }) {
   function handleFileLegacy(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -464,6 +470,49 @@ function PhotoSection({
               onChange={showUploader ? handleUpload : handleFileLegacy}
             />
           </label>
+          {attachmentsOfflineExplainer ? (
+            <p
+              role="note"
+              className="text-[11px] text-amber-950 dark:text-amber-100 leading-snug border border-amber-500/35 rounded-lg bg-amber-500/10 px-3 py-2 max-w-xl"
+            >
+              {attachmentsOfflineExplainer}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {pendingOfflinePhotos && pendingOfflinePhotos.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            On this device (pending sync)
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {pendingOfflinePhotos.map((p) => (
+              <div
+                key={p.localId}
+                className="relative group w-28 h-28 rounded-lg overflow-hidden border border-sky-500/40 bg-muted ring-2 ring-sky-500/20"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={p.name} className="w-full h-full object-cover" title={p.name} />
+                <Badge
+                  variant="secondary"
+                  className="absolute bottom-1 left-1 text-[9px] px-1 py-0 h-4 bg-sky-950/85 text-sky-50 border-0"
+                >
+                  Pending
+                </Badge>
+                {editable && onRemovePendingOfflinePhoto ? (
+                  <button
+                    type="button"
+                    onClick={() => void onRemovePendingOfflinePhoto(p.localId)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Remove queued photo ${p.name}`}
+                  >
+                    <X className="w-3 h-3" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -704,6 +753,11 @@ export interface WorkOrderDetailExperienceProps {
   /** 0–100 while a batch upload is in progress. */
   attachmentUploadProgress?: number | null
   attachmentUploadStatusLabel?: string
+  /** Phase 59.2 — device-only previews until Sync now uploads to Supabase. */
+  pendingOfflinePhotos?: Array<{ localId: string; url: string; name: string }>
+  onRemovePendingOfflinePhoto?: (localId: string) => void | Promise<void>
+  /** Shown under the attachment uploader when offline queue applies (e.g. sync-prep copy). */
+  attachmentsOfflineExplainer?: string | null
   tasks: { id: string; label: string; done: boolean; description?: string }[]
   onTasksChange: (tasks: { id: string; label: string; done: boolean; description?: string }[]) => void
   /** Legacy repair_log canvas data URL or `"SIGNED"` marker (shown if no storage preview). */
@@ -818,6 +872,9 @@ export function WorkOrderDetailExperience({
   attachmentUploading,
   attachmentUploadProgress,
   attachmentUploadStatusLabel,
+  pendingOfflinePhotos,
+  onRemovePendingOfflinePhoto,
+  attachmentsOfflineExplainer,
   tasks,
   onTasksChange,
   sigData,
@@ -1899,6 +1956,9 @@ export function WorkOrderDetailExperience({
               onRemoveAttachmentPhoto={onRemoveAttachmentPhoto}
               onRemoveLegacyPhoto={onRemoveLegacyPhoto}
               onRemoveDocument={onRemoveDocument}
+              pendingOfflinePhotos={pendingOfflinePhotos}
+              onRemovePendingOfflinePhoto={onRemovePendingOfflinePhoto}
+              attachmentsOfflineExplainer={attachmentsOfflineExplainer}
             />
             <div className="mt-4">
               <DocumentAttachmentsPanel

@@ -32,9 +32,10 @@ export const WORK_ORDER_TECHNICIAN_SYNC_PREP_AUDIT = {
     summary: "Parts lines and catalog actions require server validation and RLS.",
   },
   photosAndFiles: {
-    offlineReplayPlanned: false,
+    offlineReplayPlanned: true,
     requiresLiveNetwork: true,
-    summary: "Attachments upload to storage with signed/authenticated requests.",
+    summary:
+      "Work-order technician photos (JPEG/PNG/WebP/GIF only) can be queued on-device (IndexedDB) and uploaded with manual Sync now (Phase 59.2). PDFs, linked org documents, certificates, and portal releases stay online-only.",
   },
   customerSignature: {
     offlineReplayPlanned: false,
@@ -56,7 +57,7 @@ export const WORK_ORDER_TECHNICIAN_SYNC_PREP_AUDIT = {
 /** User-facing copy (centralized; no fake offline promises). */
 export const SYNC_PREP_COPY = {
   technicianQuickBarLead:
-    "Technician notes, problem text, JSON task checklists, and starting the job (Open/Scheduled → In progress) can be saved locally when offline — tap Sync when you have signal. Photos, signatures, parts, inventory, invoices, and AI still need a live connection.",
+    "Technician notes, problem text, JSON task checklists, starting the job (Open/Scheduled → In progress), and work-order photos (JPEG/PNG/WebP/GIF) can be saved on-device when offline — tap Sync when you have signal. PDFs/documents in the same uploader need a connection. Signatures, parts, inventory, invoices, and AI still need a live connection.",
 
   workOrderDrawerBannerTitle: "Sync & offline",
 
@@ -113,4 +114,8 @@ export const SYNC_PREP_COPY = {
   /** Inline when offline + editing + labor/parts/signature differs from server */
   workOrderFullPageOfflineUnsafeEditingNote:
     "You have unsaved labor, parts, or signature changes. Those cannot be saved offline — they are only sent when you are online.",
+
+  /** Phase 59.2 — offline technician photo queue */
+  workOrderOfflinePhotoQueueHint:
+    "Photos (JPEG, PNG, WebP, GIF) can be saved on this device while offline and upload when you tap Sync now. PDFs and other documents still need a connection. Queued photos are not on the server until sync completes.",
 } as const

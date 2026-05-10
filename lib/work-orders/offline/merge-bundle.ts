@@ -6,7 +6,13 @@ import {
   makeWorkOrderOfflineScopeKey,
   type WorkOrderOfflineBundlePayload,
   type WorkOrderOfflineOutboxRecord,
+  type WorkOrderOfflinePendingPhotoMeta,
 } from "./types"
+
+export type WorkOrderOfflineBundleMergePatch = Partial<WorkOrderOfflineBundlePayload> & {
+  appendPendingPhotos?: WorkOrderOfflinePendingPhotoMeta[]
+  removePendingPhotoLocalIds?: string[]
+}
 
 function uiStatusToDb(s: WorkOrderStatus): string {
   const m: Record<WorkOrderStatus, string> = {
@@ -41,6 +47,7 @@ export function offlineBundleHasIntent(p: WorkOrderOfflineBundlePayload): boolea
   if (p.statusInProgress) return true
   if (p.repair !== null) return true
   if (p.tasks !== null) return true
+  if ((p.pendingPhotos?.length ?? 0) > 0) return true
   return false
 }
 
@@ -50,7 +57,7 @@ export function mergeTechnicianOfflineBundle(args: {
   userId: string
   workOrder: WorkOrder
   dbNotes: string
-  patch: Partial<WorkOrderOfflineBundlePayload>
+  patch: WorkOrderOfflineBundleMergePatch
 }): WorkOrderOfflineOutboxRecord | null {
   const { existing, organizationId, userId, workOrder, dbNotes, patch } = args
   const scopeKey = makeWorkOrderOfflineScopeKey(organizationId, userId, workOrder.id)
@@ -59,11 +66,21 @@ export function mergeTechnicianOfflineBundle(args: {
     repair: null,
     tasks: null,
     statusInProgress: false,
+    pendingPhotos: [],
+  }
+  let nextPhotos = [...(prev.pendingPhotos ?? [])]
+  if (patch.removePendingPhotoLocalIds?.length) {
+    const rm = new Set(patch.removePendingPhotoLocalIds)
+    nextPhotos = nextPhotos.filter((p) => !rm.has(p.localId))
+  }
+  if (patch.appendPendingPhotos?.length) {
+    nextPhotos = [...nextPhotos, ...patch.appendPendingPhotos]
   }
   const next: WorkOrderOfflineBundlePayload = {
     repair: patch.repair !== undefined ? patch.repair : prev.repair,
     tasks: patch.tasks !== undefined ? patch.tasks : prev.tasks,
     statusInProgress: patch.statusInProgress !== undefined ? patch.statusInProgress : prev.statusInProgress,
+    pendingPhotos: patch.pendingPhotos !== undefined ? (patch.pendingPhotos ?? []) : nextPhotos,
   }
   if (!offlineBundleHasIntent(next)) return null
 

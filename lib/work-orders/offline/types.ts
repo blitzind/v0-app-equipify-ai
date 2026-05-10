@@ -7,6 +7,15 @@ export type WorkOrderOfflineOutboxStatus =
   | "synced"
   | "conflict"
 
+/** Metadata for technician photos queued on-device (blobs in IndexedDB; Phase 59.2). */
+export type WorkOrderOfflinePendingPhotoMeta = {
+  localId: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  queuedAtIso: string
+}
+
 /** Single bundle per work order scope — one replay applies all queued technician-safe edits. */
 export type WorkOrderOfflineBundlePayload = {
   repair: {
@@ -19,6 +28,11 @@ export type WorkOrderOfflineBundlePayload = {
   tasks: Array<{ id: string; label: string; done: boolean; description?: string }> | null
   /** Open/Scheduled → in_progress */
   statusInProgress: boolean
+  /**
+   * Technician images only — blobs stored separately in IndexedDB (`pendingPhotoBlobs`).
+   * Sync now uploads these via `uploadWorkOrderAttachment` before applying repair/status payload.
+   */
+  pendingPhotos?: WorkOrderOfflinePendingPhotoMeta[]
 }
 
 export type WorkOrderOfflineOutboxRecord = {

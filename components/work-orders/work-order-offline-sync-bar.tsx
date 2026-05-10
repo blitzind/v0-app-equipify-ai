@@ -76,6 +76,7 @@ export function WorkOrderOfflineSyncBar({
 
   const pending = record ? filterPendingOfflineRecords([record]) : []
   const hasPending = pending.length > 0
+  const pendingPhotoCount = record?.payload.pendingPhotos?.length ?? 0
   const status = record?.status
   const showBar = !online || hasPending || status === "conflict" || status === "failed"
 
@@ -128,12 +129,15 @@ export function WorkOrderOfflineSyncBar({
         description: "Review local vs server, then discard or retry after resolving.",
       })
     } else {
-      await putWorkOrderOfflineRecord({
-        ...rec,
-        status: "failed",
-        lastError: result.message,
-        updatedAtIso: new Date().toISOString(),
-      })
+      const fresh = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? rec
+      if (fresh.status === "syncing") {
+        await putWorkOrderOfflineRecord({
+          ...fresh,
+          status: "failed",
+          lastError: result.message,
+          updatedAtIso: new Date().toISOString(),
+        })
+      }
       await refresh()
       toast({
         variant: "destructive",
@@ -162,8 +166,14 @@ export function WorkOrderOfflineSyncBar({
     >
       {!online ? <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden /> : null}
       <span className="font-semibold text-foreground">{label}</span>
+      {hasPending && !online && pendingPhotoCount > 0 ? (
+        <span className="text-muted-foreground">· {pendingPhotoCount} photo(s) pending upload</span>
+      ) : null}
       {hasPending && online && status !== "conflict" ? (
-        <span className="text-muted-foreground">· Local technician draft queued ({pending.length})</span>
+        <span className="text-muted-foreground">
+          · Local technician draft queued ({pending.length}
+          {pendingPhotoCount > 0 ? ` · ${pendingPhotoCount} photo(s) pending upload` : ""})
+        </span>
       ) : null}
       {record?.lastError && status === "failed" ? (
         <span className="min-w-0 truncate text-destructive">{record.lastError}</span>
