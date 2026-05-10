@@ -10,6 +10,8 @@ export type WorkOrderSyncPrepBannerProps = {
   networkOnline?: boolean
   /** Pending local technician bundle for this work order. */
   hasPendingOffline?: boolean
+  /** Queued image count (device-only until Sync now). */
+  pendingPhotoCount?: number
   offlineStatus?: "queued" | "failed" | "conflict" | "syncing" | null
 }
 
@@ -20,30 +22,41 @@ export function WorkOrderSyncPrepBanner({
   className,
   networkOnline = true,
   hasPendingOffline = false,
+  pendingPhotoCount = 0,
   offlineStatus = null,
 }: WorkOrderSyncPrepBannerProps) {
+  const photoBit =
+    pendingPhotoCount > 0
+      ? pendingPhotoCount === 1
+        ? " · 1 photo waiting to upload"
+        : ` · ${pendingPhotoCount} photos waiting to upload`
+      : ""
+
   const stateLine = (() => {
-    if (!networkOnline) return "Offline — technician drafts can still be saved on this device."
-    if (offlineStatus === "conflict") return "Review conflict — server changed since your draft started."
-    if (offlineStatus === "failed") return "Last sync failed — open the sync bar to retry or discard."
-    if (hasPendingOffline) return "Sync pending — use Sync now when you are ready (no auto-sync)."
-    return "Online — technician-safe fields support offline drafts when signal drops."
+    if (!networkOnline)
+      return `No connection — technician-safe edits still save on this device.${photoBit}`
+    if (offlineStatus === "conflict") return `Compare versions — server changed since this draft.${photoBit}`
+    if (offlineStatus === "failed")
+      return `Last send didn’t finish — use the bar above to retry or clear the device draft.${photoBit}`
+    if (offlineStatus === "syncing") return `Sending to server — keep this screen open.${photoBit}`
+    if (hasPendingOffline) return `Not on server yet — tap Sync now when you’re ready.${photoBit}`
+    return `Connected — drafts can be saved on device if you lose signal.${photoBit}`
   })()
 
   return (
     <div
       role="note"
       className={cn(
-        "lg:hidden shrink-0 border-b border-border bg-muted/25 dark:bg-muted/10 px-3 py-2.5",
+        "lg:hidden shrink-0 border-b border-border bg-muted/25 dark:bg-muted/10 px-3 py-2",
         className,
       )}
     >
-      <div className="flex gap-2.5 text-[11px] text-muted-foreground leading-snug">
+      <div className="flex gap-2 text-[11px] text-muted-foreground leading-snug">
         <Info className="w-4 h-4 shrink-0 text-primary mt-0.5" aria-hidden />
-        <div className="min-w-0 space-y-1">
+        <div className="min-w-0 space-y-0.5">
           <p className="font-semibold text-foreground text-xs">{SYNC_PREP_COPY.workOrderDrawerBannerTitle}</p>
           <p>{SYNC_PREP_COPY.workOrderDrawerBannerBody}</p>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-0.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/90 pt-0.5 border-t border-border/60 mt-1">
             {stateLine}
           </p>
         </div>

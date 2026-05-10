@@ -1,6 +1,13 @@
-# Work order offline — operational validation (Phase 59.3)
+# Work order offline — operational validation & UX
 
-This document describes **validation and hardening** for the technician offline bundle (Phase 53+), full-page parity (59.1), and offline photo queue (59.2). It is not a product spec for new offline features.
+This document covers **Phase 59.3 validation** (replay, multi-tab, diagnostics) and **Phase 59.4 UX** (copy, banners, sync bar clarity) for the technician offline bundle (Phase 53+), full-page parity (59.1), and offline photo queue (59.2). It is not a spec for new offline features.
+
+## Phase 59.4 — UX (summary)
+
+- Copy emphasizes **device vs server**, **pending upload**, and **retry** without alarming reds for recoverable states.
+- Mobile **Sync prep banner** can mention how many photos are queued (from client digest).
+- **Technician mobile quick bar** shows green Wi‑Fi when online and amber Wi‑Fi off when offline, with matching lead text.
+- See `lib/sync-prep/constants.ts` (`SYNC_PREP_COPY.*`) and components listed in **Key files** below.
 
 ## Intended behavior
 
@@ -47,4 +54,8 @@ This document describes **validation and hardening** for the technician offline 
 - `lib/work-orders/offline/sync-lock.ts` — replay lock wrapper.
 - `lib/work-orders/offline/replay-drawer.ts` — replay + fresh reads on failure paths.
 - `lib/work-orders/offline/broadcast.ts` — cross-tab bump.
-- `components/work-orders/work-order-offline-sync-bar.tsx` — sync UX + diagnostics.
+- `lib/work-orders/offline/offline-relative-time.ts` — “saved just now” / relative labels (59.4).
+- `lib/sync-prep/constants.ts` — `SYNC_PREP_COPY` user-facing strings.
+- `components/work-orders/work-order-offline-sync-bar.tsx` — sync status + actions.
+- `components/sync-prep/work-order-sync-prep-banner.tsx` — mobile status line.
+- `components/technician/technician-mobile-quick-bar.tsx` — field quick actions + offline hint.

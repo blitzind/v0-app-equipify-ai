@@ -482,7 +482,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [offlineDigest, setOfflineDigest] = useState<{
     status?: WorkOrderOfflineOutboxRecord["status"]
     pending: boolean
-  }>({ pending: false })
+    pendingPhotoCount: number
+  }>({ pending: false, pendingPhotoCount: 0 })
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false)
   const [conflictDialogRecord, setConflictDialogRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
 
@@ -490,7 +491,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   const refreshOfflineDigest = useCallback(async () => {
     if (!activeOrgId || !drawerUserId || !workOrderId) {
-      setOfflineDigest({ pending: false })
+      setOfflineDigest({ pending: false, pendingPhotoCount: 0 })
       return
     }
     const sk = makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, workOrderId)
@@ -498,6 +499,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     setOfflineDigest({
       status: r?.status,
       pending: r ? filterPendingOfflineRecords([r]).length > 0 : false,
+      pendingPhotoCount: r?.payload.pendingPhotos?.length ?? 0,
     })
   }, [activeOrgId, drawerUserId, workOrderId])
 
@@ -2020,7 +2022,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   async function handleRemovePendingOfflinePhoto(localId: string) {
     if (!wo || !activeOrgId || !drawerUserId) return
-    if (!window.confirm("Remove this photo from the offline queue? It will be deleted from this device.")) return
+    if (!window.confirm(SYNC_PREP_COPY.workOrderOfflineRemovePhotoConfirm)) return
     await removeWorkOrderOfflineQueuedPhoto({
       organizationId: activeOrgId,
       userId: drawerUserId,
@@ -2219,9 +2221,12 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
 
   const fieldTechnicianSyncBadgeMode = useMemo((): TechnicianSyncBadgeMode => {
     if (!wo) return "offline-draft-supported"
-    if (!online) return "saved-locally"
+    if (!online) {
+      return offlineDigest.pending ? "sync-pending" : "offline-draft-supported"
+    }
     if (offlineDigest.status === "conflict") return "review-conflict"
     if (offlineDigest.status === "failed") return "sync-failed"
+    if (offlineDigest.status === "syncing") return "syncing"
     if (offlineDigest.pending) return "sync-pending"
     return "offline-draft-supported"
   }, [wo, online, offlineDigest.status, offlineDigest.pending])
@@ -2665,6 +2670,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
             <WorkOrderSyncPrepBanner
               networkOnline={online}
               hasPendingOffline={offlineDigest.pending}
+              pendingPhotoCount={offlineDigest.pendingPhotoCount}
               offlineStatus={
                 offlineDigest.status === "conflict" ||
                 offlineDigest.status === "failed" ||
@@ -3189,6 +3195,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           {!editing && !wo.isArchived ? (
             <TechnicianMobileQuickBar
               stickyDock
+              networkOnline={online}
               phone={primaryPhone}
               navigateQuery={navigateQuery}
               showComplete={["Open", "Scheduled", "In Progress"].includes(wo.status)}

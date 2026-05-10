@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, RefreshCw, Trash2, WifiOff } from "lucide-react"
+import { Loader2, RefreshCw, Trash2, Wifi, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -13,12 +13,14 @@ import {
   getWorkOrderOfflineRecordForScope,
   putWorkOrderOfflineRecord,
 } from "@/lib/work-orders/offline/idb-store"
+import { formatOfflineRelativeUpdated } from "@/lib/work-orders/offline/offline-relative-time"
 import { makeWorkOrderOfflineScopeKey } from "@/lib/work-orders/offline/types"
 import { replayWorkOrderOfflineBundle } from "@/lib/work-orders/offline/replay-drawer"
 import { formatWorkOrderOfflineReplayError } from "@/lib/work-orders/offline/replay-errors"
 import { withWorkOrderOfflineReplayLock } from "@/lib/work-orders/offline/sync-lock"
 import type { WorkOrder } from "@/lib/mock-data"
 import { useToast } from "@/hooks/use-toast"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 
 export type WorkOrderOfflineSyncBarProps = {
   organizationId: string | null
@@ -93,13 +95,15 @@ export function WorkOrderOfflineSyncBar({
 
   if (!showBar) return null
 
+  const draftUpdatedRel = record?.updatedAtIso ? formatOfflineRelativeUpdated(record.updatedAtIso) : ""
+
   const label = (() => {
-    if (!online) return "Offline"
-    if (status === "conflict") return "Review conflict"
-    if (status === "failed") return "Sync failed"
-    if (isReplayInProgress) return "Syncing…"
-    if (hasActionablePending) return "Sync pending"
-    return "Saved locally"
+    if (!online) return "No connection"
+    if (status === "conflict") return SYNC_PREP_COPY.reviewConflictLabel
+    if (status === "failed") return SYNC_PREP_COPY.syncFailedLabel
+    if (isReplayInProgress) return SYNC_PREP_COPY.syncInProgressLabel
+    if (hasActionablePending) return SYNC_PREP_COPY.syncPendingLabel
+    return SYNC_PREP_COPY.savedLocallyLabel
   })()
 
   async function handleSyncNow() {
@@ -140,7 +144,10 @@ export function WorkOrderOfflineSyncBar({
 
         if (result.ok) {
           await deleteWorkOrderOfflineForScope(scopeKey)
-          toast({ title: "Synced", description: "Local draft was applied to the work order." })
+          toast({
+            title: "Synced",
+            description: "Your device draft is now on the work order.",
+          })
           onAfterChange?.()
         } else if (result.conflict) {
           const base = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? recForReplay
@@ -151,11 +158,10 @@ export function WorkOrderOfflineSyncBar({
             updatedAtIso: new Date().toISOString(),
             lastError: null,
           })
-          onConflict?.("Server copy changed since this draft started.")
+          onConflict?.(SYNC_PREP_COPY.workOrderConflictDialogIntro)
           toast({
-            variant: "destructive",
-            title: "Sync paused — conflict",
-            description: "Review local vs server, then discard or retry after resolving.",
+            title: SYNC_PREP_COPY.workOrderSyncConflictToastTitle,
+            description: SYNC_PREP_COPY.workOrderSyncConflictToastBody,
           })
         } else {
           const fresh = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? recForReplay
@@ -168,8 +174,7 @@ export function WorkOrderOfflineSyncBar({
             })
           }
           toast({
-            variant: "destructive",
-            title: "Sync failed",
+            title: "Couldn’t finish sync",
             description: formatWorkOrderOfflineReplayError(result.message),
           })
         }
@@ -185,7 +190,10 @@ export function WorkOrderOfflineSyncBar({
     if (!scopeKey || isReplayInProgress) return
     await deleteWorkOrderOfflineForScope(scopeKey)
     await refresh()
-    toast({ title: "Local draft discarded" })
+    toast({
+      title: "Device draft cleared",
+      description: "Local changes were removed from this device. The server work order was not deleted.",
+    })
     onAfterChange?.()
   }
 
@@ -196,41 +204,56 @@ export function WorkOrderOfflineSyncBar({
     <div
       role="status"
       className={cn(
-        "flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground",
+        "flex flex-col gap-1.5 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:py-2",
         className,
       )}
     >
-      {!online ? <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden /> : null}
-      <span className="font-semibold text-foreground">{label}</span>
-      {hasActionablePending && !online && pendingPhotoCount > 0 ? (
-        <span className="text-muted-foreground">· {pendingPhotoCount} photo(s) pending upload</span>
-      ) : null}
-      {hasActionablePending && online && status !== "conflict" ? (
-        <span className="text-muted-foreground">
-          · Stored on this device — local technician draft ({pending.length}
-          {pendingPhotoCount > 0 ? ` · ${pendingPhotoCount} photo(s) pending upload` : ""})
-        </span>
-      ) : null}
-      {isReplayInProgress ? (
-        <span className="text-muted-foreground">· Finishing sync — please keep this tab open</span>
-      ) : null}
-      {record?.lastSyncAttemptAtIso && status === "failed" ? (
-        <span className="text-muted-foreground">
-          · Last sync attempt: {formatLocalSyncAttempt(record.lastSyncAttemptAtIso)}
-        </span>
-      ) : null}
-      {record?.lastError && status === "failed" ? (
-        <span className="min-w-0 truncate text-destructive" title={record.lastError}>
-          {record.lastError}
-        </span>
-      ) : null}
-      {status === "failed" && online ? (
-        <span className="text-muted-foreground">· Fix the issue if you can, then tap Sync now again</span>
-      ) : null}
-      <div className="ml-auto flex flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {online ? (
+          <Wifi className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden />
+        ) : (
+          <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+        )}
+        <span className="font-semibold text-foreground">{label}</span>
+        {hasActionablePending && draftUpdatedRel ? (
+          <span className="text-muted-foreground">· Saved on device {draftUpdatedRel}</span>
+        ) : null}
+        {hasActionablePending && pendingPhotoCount > 0 ? (
+          <span className="text-muted-foreground">
+            · {pendingPhotoCount === 1 ? "1 photo pending upload" : `${pendingPhotoCount} photos pending upload`}
+          </span>
+        ) : null}
+        {hasActionablePending && online && status !== "conflict" ? (
+          <span className="hidden text-muted-foreground sm:inline">
+            · Not on the server until you sync
+          </span>
+        ) : null}
+        {!online && hasActionablePending ? (
+          <span className="text-muted-foreground">· Will send when you’re back online</span>
+        ) : null}
+        {isReplayInProgress ? (
+          <span className="text-muted-foreground">· Keep this tab open</span>
+        ) : null}
+        {record?.lastSyncAttemptAtIso && status === "failed" ? (
+          <span className="text-muted-foreground">
+            · Last try {formatLocalSyncAttempt(record.lastSyncAttemptAtIso)}
+          </span>
+        ) : null}
+        {record?.lastError && status === "failed" ? (
+          <span className="min-w-0 basis-full truncate text-amber-900 dark:text-amber-200 sm:basis-auto" title={record.lastError}>
+            {record.lastError}
+          </span>
+        ) : null}
+        {status === "failed" && online ? (
+          <span className="basis-full text-muted-foreground sm:basis-auto">
+            When you’re ready, tap Sync now again — your draft stays on this device.
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
         {status === "conflict" ? (
           <Button type="button" size="sm" variant="secondary" className="h-7 text-[11px]" onClick={() => onConflict?.()}>
-            Review conflict
+            Review
           </Button>
         ) : null}
         {canSyncNow ? (
@@ -239,6 +262,7 @@ export function WorkOrderOfflineSyncBar({
             size="sm"
             variant="default"
             className="h-7 text-[11px] gap-1"
+            title={SYNC_PREP_COPY.workOrderSyncBarSyncNowTooltip}
             disabled={syncBusy}
             onClick={() => void handleSyncNow()}
           >
@@ -252,11 +276,12 @@ export function WorkOrderOfflineSyncBar({
             size="sm"
             variant="outline"
             className="h-7 text-[11px] gap-1"
+            title={SYNC_PREP_COPY.workOrderSyncBarDiscardTooltip}
             disabled={syncBusy}
             onClick={() => void handleDiscard()}
           >
             <Trash2 className="h-3 w-3" />
-            Discard
+            Clear device draft
           </Button>
         ) : null}
       </div>

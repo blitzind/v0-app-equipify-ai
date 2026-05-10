@@ -56,13 +56,18 @@ export const WORK_ORDER_TECHNICIAN_SYNC_PREP_AUDIT = {
 
 /** User-facing copy (centralized; no fake offline promises). */
 export const SYNC_PREP_COPY = {
-  technicianQuickBarLead:
-    "Technician notes, problem text, JSON task checklists, starting the job (Open/Scheduled → In progress), and work-order photos (JPEG/PNG/WebP/GIF) can be saved on-device when offline — tap Sync when you have signal. PDFs/documents in the same uploader need a connection. Signatures, parts, inventory, invoices, and AI still need a live connection.",
+  /** Mobile quick bar when browser reports online */
+  technicianQuickBarLeadOnline:
+    "Notes, problem text, tasks (when allowed), starting the job, and work-order photos can be saved on this device if signal drops — then tap Sync now. PDFs in the same picker need Wi‑Fi or data. Signatures, parts, labor, billing, and AI need a connection.",
+
+  /** Mobile quick bar when browser reports offline */
+  technicianQuickBarLeadOffline:
+    "You’re offline. Technician-safe edits and photos save on this device; tap Sync now when you’re back online. Signatures, parts, labor, and billing still need a connection — those edits stay in the form until then.",
 
   workOrderDrawerBannerTitle: "Sync & offline",
 
   workOrderDrawerBannerBody:
-    "Technician-safe fields can be drafted offline and replayed with Sync now when you are back online. Nothing auto-syncs without your confirmation in this phase.",
+    "Technician-safe fields can be saved on this device when you’re offline. When you’re online, tap Sync now to send them to the server — nothing syncs automatically.",
 
   /** `title` / tooltip on buttons that hit the network */
   saveRequiresNetwork: "Online required — saves go to your workspace immediately.",
@@ -77,47 +82,81 @@ export const SYNC_PREP_COPY = {
   offlineDraftSupportedTooltip:
     "You can save these fields locally when offline, then use Sync now when you are online. Parts, photos, inventory, invoices, and AI stay online-only.",
 
-  savedLocallyLabel: "Saved locally",
-  savedLocallyTooltip: "Draft is stored on this device only (IndexedDB or small local fallback). Sync when online to apply it.",
+  savedLocallyLabel: "Saved on device",
+  savedLocallyTooltip:
+    "Stored only on this phone or tablet (not on the server yet). When you have signal, open the sync bar and tap Sync now.",
 
-  syncPendingLabel: "Sync pending",
-  syncPendingTooltip: "A local technician draft is waiting. Use Sync now when you have a connection.",
+  syncPendingLabel: "Needs sync",
+  syncPendingTooltip:
+    "This job has changes saved on the device that are not on the server yet. Tap Sync now when you’re online.",
 
-  reviewConflictLabel: "Review conflict",
+  syncInProgressLabel: "Syncing…",
+  syncInProgressTooltip: "Sending your draft to the server. Keep this screen open until it finishes.",
+
+  reviewConflictLabel: "Compare versions",
   reviewConflictTooltip:
-    "The server work order changed since this draft started. Open the sync bar to compare and discard or resolve.",
+    "The server copy changed while you had a local draft. Open the dialog to compare — nothing is overwritten until you choose.",
 
-  syncFailedLabel: "Sync failed",
-  syncFailedTooltip: "Replay failed — check the error on the sync bar and try again, or discard the local draft.",
+  syncFailedLabel: "Sync paused",
+  syncFailedTooltip:
+    "Last send didn’t finish. Check the message in the sync bar, fix connection or access if needed, then tap Sync again. Your draft stays on this device.",
 
   /** Full work order profile page (`/work-orders/[id]`) — Phase 53C */
   workOrderFullPageOfflineHint:
-    "Technician notes, problem text, and JSON tasks (when allowed) can be saved on this device while offline. Billing, labor/parts totals, inventory, file uploads, and AI still require a connection.",
+    "While offline you can save technician notes, problem text, and JSON tasks (when your org allows) on this device. Labor, parts, billing totals, signatures, inventory, PDFs, and AI still need Wi‑Fi or data — those fields stay visible in the form but won’t reach the server until you reconnect.",
 
   /** Save changes — desktop + mobile footer when offline */
   workOrderFullPageOfflineSaveButtonTooltip:
-    "Saves problem text, diagnosis, technician notes, internal notes, and JSON tasks (when allowed) on this device. Labor, parts lines, and customer signatures need a connection and stay unsaved until you are online.",
+    "Saves technician-safe fields on this device (not the server yet). Labor, parts, and signatures need a connection and remain unsaved until you’re online.",
 
-  workOrderFullPageTechnicianSavedLocalTitle: "Technician fields saved locally",
+  /** Primary button label when saving offline on full page */
+  workOrderFullPageOfflineSaveButtonLabel: "Save on this device",
+
+  workOrderFullPageTechnicianSavedLocalTitle: "Saved on this device",
   workOrderFullPageTechnicianSavedLocalBody:
-    "Billing, inventory, file uploads, and AI still require a connection before they sync to your workspace.",
+    "Not on the server yet — use Sync now when you’re online. Labor, parts, signatures, billing, and AI still need a connection.",
 
   /** Same session also had labor/parts/signature edits — those stay local-only in the form until online */
   workOrderFullPageSplitOfflineSaveTitle: "Technician fields saved locally",
   workOrderFullPageSplitOfflineSaveBody:
-    "Labor, parts lines, and customer signatures were not saved offline. Stay in edit mode to keep working, then save those when you have a connection.",
+    "Labor, parts, and signatures weren’t saved on the device — they’re still in the form. Reconnect to send them to the server.",
 
-  workOrderFullPageUnsafeOfflineTitle: "Online required",
+  workOrderFullPageUnsafeOfflineTitle: "Needs connection",
   workOrderFullPageUnsafeOfflineBody:
-    "Labor, parts lines, and signatures were not saved. Reconnect to save those changes, or use Sync now after saving technician fields locally.",
+    "Labor, parts, and signatures need Wi‑Fi or data. Your technician edits can still be saved on this device; reconnect to save the rest.",
 
   /** Inline when offline + editing + labor/parts/signature differs from server */
   workOrderFullPageOfflineUnsafeEditingNote:
-    "You have unsaved labor, parts, or signature changes. Those cannot be saved offline — they are only sent when you are online.",
+    "Labor, parts, or signature changes are still on screen but can’t be saved offline. They’ll send when you’re back online.",
 
   /** Phase 59.2 — offline technician photo queue */
   workOrderOfflinePhotoQueueHint:
-    "Photos (JPEG, PNG, WebP, GIF) can be saved on this device while offline and upload when you tap Sync now. PDFs and other documents still need a connection. Queued photos are not on the server until sync completes.",
+    "Image photos (JPEG, PNG, WebP, GIF) can queue on this device and upload with Sync now. PDFs and documents need a connection. Queued photos are not in the cloud until sync succeeds.",
+
+  /** Phase 59.4 — sync bar / conflict UX */
+  workOrderSyncBarDiscardTooltip:
+    "Remove the device-only draft and queued photos from this tablet or phone. The server copy is not deleted.",
+
+  workOrderSyncBarSyncNowTooltip: "Send everything in this draft to the server (text, tasks, status, queued photos).",
+
+  workOrderConflictDialogTitle: "Compare versions",
+  workOrderConflictDialogIntro:
+    "The server was updated after this draft started, so Equipify won’t overwrite it automatically. Review both sides, then sync again after aligning, or clear only the copy on this device.",
+
+  workOrderConflictDialogFooterHint:
+    "Closing keeps your draft on this device. Discard only removes the local copy and queued photos here — it does not delete the server work order.",
+
+  workOrderConflictDiscardLabel: "Clear draft on this device",
+
+  workOrderSyncConflictToastTitle: "Sync paused — versions differ",
+  workOrderSyncConflictToastBody: "Compare the two copies in Review, then adjust the job or clear the device draft.",
+
+  workOrderOfflineRemovePhotoConfirm:
+    "Remove this photo from the queue on this device? It won’t be uploaded unless you add it again.",
+
+  workOrderPendingPhotosSectionTitle: "On this device (not uploaded yet)",
+
+  workOrderPendingPhotosBadge: "Pending upload",
 
   /** Phase 59.3 — queue blocked while another tab syncs or conflict is open */
   workOrderOfflineQueueBlockedSyncingTitle: "Sync in progress",

@@ -36,6 +36,7 @@ import {
   Boxes,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 import type { Part, RepairLog, WorkOrder, WorkOrderPriority, WorkOrderStatus } from "@/lib/mock-data"
 import type {
   WorkOrderCertificateStatus,
@@ -473,7 +474,7 @@ function PhotoSection({
           {attachmentsOfflineExplainer ? (
             <p
               role="note"
-              className="text-[11px] text-amber-950 dark:text-amber-100 leading-snug border border-amber-500/35 rounded-lg bg-amber-500/10 px-3 py-2 max-w-xl"
+              className="text-[11px] text-muted-foreground leading-snug border border-sky-500/25 rounded-lg bg-sky-500/5 dark:bg-sky-950/20 px-3 py-2 max-w-xl"
             >
               {attachmentsOfflineExplainer}
             </p>
@@ -483,31 +484,31 @@ function PhotoSection({
 
       {pendingOfflinePhotos && pendingOfflinePhotos.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            On this device (pending sync)
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground leading-snug">
+            {SYNC_PREP_COPY.workOrderPendingPhotosSectionTitle}
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {pendingOfflinePhotos.map((p) => (
               <div
                 key={p.localId}
-                className="relative group w-28 h-28 rounded-lg overflow-hidden border border-sky-500/40 bg-muted ring-2 ring-sky-500/20"
+                className="relative group w-[6.5rem] h-[6.5rem] sm:w-28 sm:h-28 rounded-lg overflow-hidden border border-sky-500/40 bg-muted ring-1 ring-sky-500/25"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.url} alt={p.name} className="w-full h-full object-cover" title={p.name} />
                 <Badge
                   variant="secondary"
-                  className="absolute bottom-1 left-1 text-[9px] px-1 py-0 h-4 bg-sky-950/85 text-sky-50 border-0"
+                  className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate text-[9px] px-1 py-0 h-4 bg-sky-950/85 text-sky-50 border-0"
                 >
-                  Pending
+                  {SYNC_PREP_COPY.workOrderPendingPhotosBadge}
                 </Badge>
                 {editable && onRemovePendingOfflinePhoto ? (
                   <button
                     type="button"
                     onClick={() => void onRemovePendingOfflinePhoto(p.localId)}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 min-h-8 min-w-8 sm:min-h-0 sm:min-w-0 sm:w-5 sm:h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     aria-label={`Remove queued photo ${p.name}`}
                   >
-                    <X className="w-3 h-3" aria-hidden />
+                    <X className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden />
                   </button>
                 ) : null}
               </div>

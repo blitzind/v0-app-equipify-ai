@@ -17,6 +17,7 @@ import {
   type WorkOrderOfflineServerBaseline,
 } from "@/lib/work-orders/offline/replay-drawer"
 import type { WorkOrderOfflineBundlePayload, WorkOrderOfflineOutboxRecord } from "@/lib/work-orders/offline/types"
+import { SYNC_PREP_COPY } from "@/lib/sync-prep"
 
 function baselineRepairSummary(b: WorkOrderOfflineServerBaseline): {
   problem: string
@@ -79,10 +80,9 @@ export function WorkOrderOfflineConflictDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Review conflict</DialogTitle>
+          <DialogTitle>{SYNC_PREP_COPY.workOrderConflictDialogTitle}</DialogTitle>
           <DialogDescription>
-            {intro ??
-              "The work order changed on the server after this draft started. Compare copies — sync will not overwrite the server automatically."}
+            {intro ?? SYNC_PREP_COPY.workOrderConflictDialogIntro}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,9 +120,9 @@ export function WorkOrderOfflineConflictDialog({
               <p className="text-amber-800 dark:text-amber-200 font-medium">Includes: mark job in progress</p>
             ) : null}
             {(payload?.pendingPhotos?.length ?? 0) > 0 ? (
-              <p className="text-sky-800 dark:text-sky-200 pt-1 font-medium">
-                {payload!.pendingPhotos!.length} technician photo(s) queued on this device (not on the server until you
-                sync successfully — discard deletes them from this device).
+              <p className="text-sky-800 dark:text-sky-200 pt-1 font-medium leading-snug">
+                {payload!.pendingPhotos!.length} photo(s) are on this device only — they upload when Sync now succeeds.
+                Clearing the device draft removes them here; it does not change the server job.
               </p>
             ) : null}
           </div>
@@ -158,16 +158,18 @@ export function WorkOrderOfflineConflictDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <p className="text-[11px] text-muted-foreground leading-snug px-0.5">{SYNC_PREP_COPY.workOrderConflictDialogFooterHint}</p>
+        <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Done for now
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant="outline"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10"
             onClick={() => void onDiscardLocal().then(() => onOpenChange(false))}
           >
-            Discard local draft
+            {SYNC_PREP_COPY.workOrderConflictDiscardLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

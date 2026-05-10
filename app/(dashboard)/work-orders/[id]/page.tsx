@@ -183,7 +183,8 @@ export default function WorkOrderDetailPage() {
   const [pageOfflineDigest, setPageOfflineDigest] = useState<{
     status?: WorkOrderOfflineOutboxRecord["status"]
     pending: boolean
-  }>({ pending: false })
+    pendingPhotoCount: number
+  }>({ pending: false, pendingPhotoCount: 0 })
   const [pageConflictOpen, setPageConflictOpen] = useState(false)
   const [pageConflictRecord, setPageConflictRecord] = useState<WorkOrderOfflineOutboxRecord | null>(null)
   const [pageOfflineFormEpoch, setPageOfflineFormEpoch] = useState(0)
@@ -337,7 +338,7 @@ export default function WorkOrderDetailPage() {
 
   const refreshPageOfflineDigest = useCallback(async () => {
     if (!activeOrg.organizationId || !pageUserId || !workOrderRouteId) {
-      setPageOfflineDigest({ pending: false })
+      setPageOfflineDigest({ pending: false, pendingPhotoCount: 0 })
       return
     }
     const sk = makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, workOrderRouteId)
@@ -345,6 +346,7 @@ export default function WorkOrderDetailPage() {
     setPageOfflineDigest({
       status: r?.status,
       pending: r ? filterPendingOfflineRecords([r]).length > 0 : false,
+      pendingPhotoCount: r?.payload.pendingPhotos?.length ?? 0,
     })
   }, [activeOrg.organizationId, pageUserId, workOrderRouteId])
 
@@ -1117,7 +1119,7 @@ export default function WorkOrderDetailPage() {
 
   async function handleRemovePendingOfflinePhoto(localId: string) {
     if (!activeOrg.organizationId || !pageUserId) return
-    if (!window.confirm("Remove this photo from the offline queue? It will be deleted from this device.")) return
+    if (!window.confirm(SYNC_PREP_COPY.workOrderOfflineRemovePhotoConfirm)) return
     await removeWorkOrderOfflineQueuedPhoto({
       organizationId: activeOrg.organizationId,
       userId: pageUserId,
@@ -1413,7 +1415,7 @@ export default function WorkOrderDetailPage() {
                 onClick={() => void handleSave()}
               >
                 <Save className="w-3.5 h-3.5 mr-1.5" />
-                Save changes
+                {!online ? SYNC_PREP_COPY.workOrderFullPageOfflineSaveButtonLabel : "Save changes"}
               </Button>
             </>
           )}
@@ -1423,6 +1425,7 @@ export default function WorkOrderDetailPage() {
       <WorkOrderSyncPrepBanner
         networkOnline={online}
         hasPendingOffline={pageOfflineDigest.pending}
+        pendingPhotoCount={pageOfflineDigest.pendingPhotoCount}
         offlineStatus={
           pageOfflineDigest.status === "conflict" ||
           pageOfflineDigest.status === "failed" ||
@@ -1685,6 +1688,7 @@ export default function WorkOrderDetailPage() {
       {!editing && !workOrder.isArchived ? (
         <TechnicianMobileQuickBar
           fixedAboveMobileNav
+          networkOnline={online}
           phone={primaryPhone}
           navigateQuery={navigateQuery}
           showComplete={["Open", "Scheduled", "In Progress"].includes(workOrder.status)}
@@ -1715,7 +1719,7 @@ export default function WorkOrderDetailPage() {
             onClick={() => void handleSave()}
           >
             <Save className="w-3.5 h-3.5 mr-1.5" />
-            Save repair log
+            {!online ? SYNC_PREP_COPY.workOrderFullPageOfflineSaveButtonLabel : "Save repair log"}
           </Button>
         </div>
       )}

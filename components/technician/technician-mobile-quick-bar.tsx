@@ -10,6 +10,7 @@ import {
   PenLine,
   StickyNote,
   FileBadge2,
+  Wifi,
   WifiOff,
   Hammer,
   Package,
@@ -58,6 +59,8 @@ export type TechnicianMobileQuickBarProps = {
   fixedAboveMobileNav?: boolean
   /** Pin to bottom of viewport inside scroll parents (drawer body). */
   stickyDock?: boolean
+  /** Drives hint icon + lead copy (Phase 59.4). */
+  networkOnline?: boolean
   className?: string
   disabled?: boolean
 }
@@ -80,6 +83,7 @@ export function TechnicianMobileQuickBar({
   showCertificatesShortcut,
   fixedAboveMobileNav,
   stickyDock,
+  networkOnline = true,
   className,
   disabled,
 }: TechnicianMobileQuickBarProps) {
@@ -100,11 +104,17 @@ export function TechnicianMobileQuickBar({
     className,
   )
 
+  const lead = networkOnline ? SYNC_PREP_COPY.technicianQuickBarLeadOnline : SYNC_PREP_COPY.technicianQuickBarLeadOffline
+
   return (
     <div className={wrapClass} role="toolbar" aria-label="Field technician quick actions">
-      <p className="mx-auto max-w-lg px-2 pb-1.5 text-center text-[10px] leading-snug text-muted-foreground flex items-start justify-center gap-1.5">
-        <WifiOff className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" aria-hidden />
-        <span>{SYNC_PREP_COPY.technicianQuickBarLead}</span>
+      <p className="mx-auto max-w-lg px-2 pb-1 text-center text-[10px] leading-snug text-muted-foreground flex items-start justify-center gap-1.5">
+        {networkOnline ? (
+          <Wifi className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400 opacity-90" aria-hidden />
+        ) : (
+          <WifiOff className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-700 dark:text-amber-300 opacity-90" aria-hidden />
+        )}
+        <span>{lead}</span>
       </p>
       <input
         ref={fileRef}

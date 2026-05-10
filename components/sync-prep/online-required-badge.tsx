@@ -10,6 +10,7 @@ export type TechnicianSyncBadgeMode =
   | "offline-draft-supported"
   | "saved-locally"
   | "sync-pending"
+  | "syncing"
   | "review-conflict"
   | "sync-failed"
 
@@ -20,8 +21,9 @@ const MODE_STYLES: Record<TechnicianSyncBadgeMode, string> = {
     "border-emerald-600/35 text-emerald-900 dark:text-emerald-100 bg-emerald-500/5",
   "saved-locally": "border-sky-600/35 text-sky-900 dark:text-sky-100 bg-sky-500/5",
   "sync-pending": "border-violet-600/35 text-violet-900 dark:text-violet-100 bg-violet-500/5",
-  "review-conflict": "border-destructive/40 text-destructive bg-destructive/5",
-  "sync-failed": "border-destructive/40 text-destructive bg-destructive/5",
+  syncing: "border-blue-600/35 text-blue-900 dark:text-blue-100 bg-blue-500/5",
+  "review-conflict": "border-amber-600/40 text-amber-900 dark:text-amber-100 bg-amber-500/8",
+  "sync-failed": "border-amber-600/40 text-amber-900 dark:text-amber-100 bg-amber-500/8",
 }
 
 function modeLabel(mode: TechnicianSyncBadgeMode): string {
@@ -32,6 +34,8 @@ function modeLabel(mode: TechnicianSyncBadgeMode): string {
       return SYNC_PREP_COPY.savedLocallyLabel
     case "sync-pending":
       return SYNC_PREP_COPY.syncPendingLabel
+    case "syncing":
+      return SYNC_PREP_COPY.syncInProgressLabel
     case "review-conflict":
       return SYNC_PREP_COPY.reviewConflictLabel
     case "sync-failed":
@@ -49,6 +53,8 @@ function modeTooltip(mode: TechnicianSyncBadgeMode): string {
       return SYNC_PREP_COPY.savedLocallyTooltip
     case "sync-pending":
       return SYNC_PREP_COPY.syncPendingTooltip
+    case "syncing":
+      return SYNC_PREP_COPY.syncInProgressTooltip
     case "review-conflict":
       return SYNC_PREP_COPY.reviewConflictTooltip
     case "sync-failed":
