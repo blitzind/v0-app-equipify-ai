@@ -65,14 +65,13 @@ import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-
 import { WorkOrderOfflineConflictDialog } from "@/components/work-orders/work-order-offline-conflict-dialog"
 import { WorkOrderOfflineSyncBar } from "@/components/work-orders/work-order-offline-sync-bar"
 import { useNetworkStatus } from "@/hooks/use-network-status"
-import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import { subscribeWorkOrderOfflineBump } from "@/lib/work-orders/offline/broadcast"
 import {
   deleteWorkOrderOfflineForScope,
   filterPendingOfflineRecords,
   getWorkOrderOfflineRecordForScope,
-  putWorkOrderOfflineRecord,
 } from "@/lib/work-orders/offline/idb-store"
-import { mergeTechnicianOfflineBundle } from "@/lib/work-orders/offline/merge-bundle"
+import { putOfflineBundleMergePatch } from "@/lib/work-orders/offline/concurrency-put"
 import {
   makeWorkOrderOfflineScopeKey,
   type WorkOrderOfflineBundlePayload,
@@ -354,36 +353,27 @@ export default function WorkOrderDetailPage() {
   }, [refreshPageOfflineDigest])
 
   useEffect(() => {
-    const fn = () => void refreshPageOfflineDigest()
-    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
-    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
+    return subscribeWorkOrderOfflineBump(() => {
+      void refreshPageOfflineDigest()
+      setPageOfflineFormEpoch((n) => n + 1)
+    })
   }, [refreshPageOfflineDigest])
 
-  useEffect(() => {
-    const fn = () => setPageOfflineFormEpoch((n) => n + 1)
-    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
-    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
-  }, [])
-
   const queuePageOfflineBundle = useCallback(
-    async (patch: Partial<WorkOrderOfflineBundlePayload>): Promise<boolean> => {
+    async (patch: Partial<WorkOrderOfflineBundlePayload>) => {
       const snapshot = dbWo ?? storeWo
-      if (!activeOrg.organizationId || !pageUserId || !snapshot?.id) return false
-      const existing = await getWorkOrderOfflineRecordForScope(
-        makeWorkOrderOfflineScopeKey(activeOrg.organizationId, pageUserId, snapshot.id),
-      )
-      const next = mergeTechnicianOfflineBundle({
-        existing,
+      if (!activeOrg.organizationId || !pageUserId || !snapshot?.id) {
+        return { ok: false as const, reason: "no_changes" as const }
+      }
+      const r = await putOfflineBundleMergePatch({
         organizationId: activeOrg.organizationId,
         userId: pageUserId,
         workOrder: snapshot,
         dbNotes: serverInternalNotes,
         patch,
       })
-      if (!next) return false
-      await putWorkOrderOfflineRecord(next)
-      await refreshPageOfflineDigest()
-      return true
+      if (r.ok) await refreshPageOfflineDigest()
+      return r
     },
     [activeOrg.organizationId, pageUserId, dbWo, storeWo, serverInternalNotes, refreshPageOfflineDigest],
   )
@@ -657,13 +647,27 @@ export default function WorkOrderDetailPage() {
         }
         return
       }
-      const ok = await queuePageOfflineBundle(patch)
-      if (!ok) {
-        toast({
-          variant: "destructive",
-          title: "Could not save locally",
-          description: "Try again when signed in and this job is loaded.",
-        })
+      const qr = await queuePageOfflineBundle(patch)
+      if (!qr.ok) {
+        if (qr.reason === "syncing") {
+          toast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+          })
+        } else if (qr.reason === "conflict") {
+          toast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+          })
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again when signed in and this job is loaded.",
+          })
+        }
         return
       }
       if (unsafeDirty) {
@@ -796,11 +800,23 @@ export default function WorkOrderDetailPage() {
     }
     if (!online) {
       if (next === "In Progress" && (workOrder.status === "Open" || workOrder.status === "Scheduled")) {
-        const ok = await queuePageOfflineBundle({ statusInProgress: true })
-        if (ok) {
+        const qr = await queuePageOfflineBundle({ statusInProgress: true })
+        if (qr.ok) {
           toast({
             title: SYNC_PREP_COPY.savedLocallyLabel,
             description: SYNC_PREP_COPY.workOrderFullPageTechnicianSavedLocalBody,
+          })
+        } else if (qr.reason === "syncing") {
+          toast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+          })
+        } else if (qr.reason === "conflict") {
+          toast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
           })
         } else {
           toast({
@@ -1014,13 +1030,27 @@ export default function WorkOrderDetailPage() {
       }
       setTasksSaving(true)
       try {
-        const ok = await queuePageOfflineBundle({ tasks: normalized })
-        if (!ok) {
-          toast({
-            variant: "destructive",
-            title: "Could not save locally",
-            description: "Try again when signed in and this job is loaded.",
-          })
+        const qr = await queuePageOfflineBundle({ tasks: normalized })
+        if (!qr.ok) {
+          if (qr.reason === "syncing") {
+            toast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+            })
+          } else if (qr.reason === "conflict") {
+            toast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+            })
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Could not save locally",
+              description: "Try again when signed in and this job is loaded.",
+            })
+          }
           return
         }
         setSavedTasks(cloneTasks(normalized))

@@ -1,6 +1,12 @@
 import { bumpWorkOrderOfflineListeners } from "./broadcast"
 import { makeOutboxBundleId, type WorkOrderOfflineOutboxRecord } from "./types"
 
+function idbDebugLog(context: string, err: unknown): void {
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`[equipify-work-order-offline] ${context}`, err)
+  }
+}
+
 const DB_NAME = "equipify-work-order-offline-v1"
 const DB_VERSION = 2
 const STORE = "outbox"
@@ -92,7 +98,8 @@ export async function putWorkOrderPendingPhotoBlob(args: {
     await txDone(tx)
     db.close()
     return true
-  } catch {
+  } catch (e) {
+    idbDebugLog("putWorkOrderPendingPhotoBlob", e)
     return false
   }
 }
@@ -110,7 +117,8 @@ export async function getWorkOrderPendingPhotoBlob(scopeKey: string, localId: st
     await txDone(tx)
     db.close()
     return row?.blob ?? null
-  } catch {
+  } catch (e) {
+    idbDebugLog("getWorkOrderPendingPhotoBlob", e)
     return null
   }
 }
@@ -127,8 +135,8 @@ export async function deletePendingPhotoBlob(scopeKey: string, localId: string):
     tx.objectStore(PHOTO_STORE).delete(id)
     await txDone(tx)
     db.close()
-  } catch {
-    // ignore
+  } catch (e) {
+    idbDebugLog("deletePendingPhotoBlob", e)
   }
 }
 
@@ -155,8 +163,8 @@ export async function deleteAllPendingPhotoBlobsForScope(scopeKey: string): Prom
       tx.onerror = () => reject(tx.error ?? new Error("tx failed"))
     })
     db.close()
-  } catch {
-    // ignore
+  } catch (e) {
+    idbDebugLog("deleteAllPendingPhotoBlobsForScope", e)
   }
 }
 
@@ -167,11 +175,12 @@ export async function putWorkOrderOfflineRecord(record: WorkOrderOfflineOutboxRe
     tx.objectStore(STORE).put(record)
     await txDone(tx)
     db.close()
-  } catch {
+  } catch (e) {
+    idbDebugLog("putWorkOrderOfflineRecord(idb)", e)
     try {
       localStorage.setItem(lsKeyForScope(record.scopeKey), JSON.stringify(record))
-    } catch {
-      // ignore quota / private mode
+    } catch (lsErr) {
+      idbDebugLog("putWorkOrderOfflineRecord(localStorage-fallback)", lsErr)
     }
   }
   bumpWorkOrderOfflineListeners()
@@ -186,8 +195,8 @@ export async function getWorkOrderOfflineRecordForScope(scopeKey: string): Promi
     await txDone(tx)
     db.close()
     if (rec) return rec as WorkOrderOfflineOutboxRecord
-  } catch {
-    // fall through to localStorage
+  } catch (e) {
+    idbDebugLog("getWorkOrderOfflineRecordForScope(idb)", e)
   }
   return safeParseRecord(
     typeof localStorage !== "undefined" ? localStorage.getItem(lsKeyForScope(scopeKey)) : null,
@@ -203,13 +212,13 @@ export async function deleteWorkOrderOfflineForScope(scopeKey: string): Promise<
     tx.objectStore(STORE).delete(id)
     await txDone(tx)
     db.close()
-  } catch {
-    // ignore
+  } catch (e) {
+    idbDebugLog("deleteWorkOrderOfflineForScope(idb)", e)
   }
   try {
     localStorage.removeItem(lsKeyForScope(scopeKey))
-  } catch {
-    // ignore
+  } catch (e) {
+    idbDebugLog("deleteWorkOrderOfflineForScope(localStorage)", e)
   }
   bumpWorkOrderOfflineListeners()
 }

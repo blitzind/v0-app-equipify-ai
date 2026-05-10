@@ -101,14 +101,13 @@ import { WorkOrderSyncPrepBanner } from "@/components/sync-prep/work-order-sync-
 import { WorkOrderOfflineConflictDialog } from "@/components/work-orders/work-order-offline-conflict-dialog"
 import { WorkOrderOfflineSyncBar } from "@/components/work-orders/work-order-offline-sync-bar"
 import { useNetworkStatus } from "@/hooks/use-network-status"
-import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import { subscribeWorkOrderOfflineBump } from "@/lib/work-orders/offline/broadcast"
+import { putOfflineBundleMergePatch } from "@/lib/work-orders/offline/concurrency-put"
 import {
   deleteWorkOrderOfflineForScope,
   filterPendingOfflineRecords,
   getWorkOrderOfflineRecordForScope,
-  putWorkOrderOfflineRecord,
 } from "@/lib/work-orders/offline/idb-store"
-import { mergeTechnicianOfflineBundle } from "@/lib/work-orders/offline/merge-bundle"
 import {
   makeWorkOrderOfflineScopeKey,
   type WorkOrderOfflineBundlePayload,
@@ -506,34 +505,26 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     void refreshOfflineDigest()
   }, [refreshOfflineDigest, workOrderId])
 
-  useEffect(() => {
-    const fn = () => void refreshOfflineDigest()
-    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
-    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, fn)
-  }, [refreshOfflineDigest])
+  useEffect(() => subscribeWorkOrderOfflineBump(() => void refreshOfflineDigest()), [refreshOfflineDigest])
 
   const queueOfflineBundle = useCallback(
-    async (patch: Partial<WorkOrderOfflineBundlePayload>): Promise<boolean> => {
-      if (!wo || !activeOrgId || !drawerUserId) return false
-      const existing = await getWorkOrderOfflineRecordForScope(
-        makeWorkOrderOfflineScopeKey(activeOrgId, drawerUserId, wo.id),
-      )
-      const next = mergeTechnicianOfflineBundle({
-        existing,
+    async (patch: Partial<WorkOrderOfflineBundlePayload>) => {
+      if (!wo || !activeOrgId || !drawerUserId) return { ok: false as const, reason: "no_changes" as const }
+      const r = await putOfflineBundleMergePatch({
         organizationId: activeOrgId,
         userId: drawerUserId,
         workOrder: wo,
         dbNotes,
         patch,
       })
-      if (!next) return false
-      await putWorkOrderOfflineRecord(next)
-      await refreshOfflineDigest()
-      pushToast({
-        title: "Saved locally",
-        description: "Sync when you are back online — use Sync now in the bar above.",
-      })
-      return true
+      if (r.ok) {
+        await refreshOfflineDigest()
+        pushToast({
+          title: "Saved locally",
+          description: "Sync when you are back online — use Sync now in the bar above.",
+        })
+      }
+      return r
     },
     [wo, activeOrgId, drawerUserId, dbNotes, refreshOfflineDigest, pushToast],
   )
@@ -1269,7 +1260,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!wo || !activeOrgId) return
     if (!online) {
       if (!woCanEdit) return
-      const ok = await queueOfflineBundle({
+      const qr = await queueOfflineBundle({
         repair: {
           problemReported: problemReportedDraft,
           diagnosis: notesDiagnosis,
@@ -1277,12 +1268,26 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           notesInternal,
         },
       })
-      if (!ok) {
-        pushToast({
-          variant: "destructive",
-          title: "Could not save locally",
-          description: "Try again or reconnect to save to the server.",
-        })
+      if (!qr.ok) {
+        if (qr.reason === "syncing") {
+          pushToast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+          })
+        } else if (qr.reason === "conflict") {
+          pushToast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+          })
+        } else {
+          pushToast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again or reconnect to save to the server.",
+          })
+        }
       }
       return
     }
@@ -1321,7 +1326,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!wo || !activeOrgId) return false
     if (!online) {
       if (!woCanEdit) return false
-      const ok = await queueOfflineBundle({
+      const qr = await queueOfflineBundle({
         repair: {
           problemReported: problemReportedDraft,
           diagnosis: notesDiagnosis,
@@ -1329,14 +1334,28 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           notesInternal,
         },
       })
-      if (!ok) {
-        pushToast({
-          variant: "destructive",
-          title: "Could not save locally",
-          description: "Try again or reconnect to save to the server.",
-        })
+      if (!qr.ok) {
+        if (qr.reason === "syncing") {
+          pushToast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+          })
+        } else if (qr.reason === "conflict") {
+          pushToast({
+            variant: "destructive",
+            title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+            description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+          })
+        } else {
+          pushToast({
+            variant: "destructive",
+            title: "Could not save locally",
+            description: "Try again or reconnect to save to the server.",
+          })
+        }
       }
-      return ok
+      return qr.ok
     }
     const supabase = createBrowserSupabaseClient()
     setNotesSaving(true)
@@ -1466,13 +1485,27 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       }
       setTasksSaving(true)
       try {
-        const ok = await queueOfflineBundle({ tasks: normalized })
-        if (!ok) {
-          pushToast({
-            variant: "destructive",
-            title: "Could not save locally",
-            description: "Try again or reconnect to save to the server.",
-          })
+        const qr = await queueOfflineBundle({ tasks: normalized })
+        if (!qr.ok) {
+          if (qr.reason === "syncing") {
+            pushToast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+            })
+          } else if (qr.reason === "conflict") {
+            pushToast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+            })
+          } else {
+            pushToast({
+              variant: "destructive",
+              title: "Could not save locally",
+              description: "Try again or reconnect to save to the server.",
+            })
+          }
         }
       } finally {
         setTasksSaving(false)
@@ -1682,13 +1715,27 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     if (!online) {
       setQuickStatusBusy(true)
       try {
-        const ok = await queueOfflineBundle({ statusInProgress: true })
-        if (!ok) {
-          pushToast({
-            variant: "destructive",
-            title: "Could not save locally",
-            description: "Try again or reconnect to update status on the server.",
-          })
+        const qr = await queueOfflineBundle({ statusInProgress: true })
+        if (!qr.ok) {
+          if (qr.reason === "syncing") {
+            pushToast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedSyncingBody,
+            })
+          } else if (qr.reason === "conflict") {
+            pushToast({
+              variant: "destructive",
+              title: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictTitle,
+              description: SYNC_PREP_COPY.workOrderOfflineQueueBlockedConflictBody,
+            })
+          } else {
+            pushToast({
+              variant: "destructive",
+              title: "Could not save locally",
+              description: "Try again or reconnect to update status on the server.",
+            })
+          }
         }
       } finally {
         setQuickStatusBusy(false)

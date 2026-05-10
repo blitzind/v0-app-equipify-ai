@@ -8,6 +8,7 @@ import { uploadWorkOrderAttachment } from "@/lib/work-orders/work-order-tab-data
 import {
   deletePendingPhotoBlob,
   deleteWorkOrderOfflineForScope,
+  getWorkOrderOfflineRecordForScope,
   getWorkOrderPendingPhotoBlob,
   putWorkOrderOfflineRecord,
 } from "./idb-store"
@@ -95,12 +96,11 @@ export async function replayWorkOrderOfflineBundle(args: {
   supabase: SupabaseClient
   organizationId: string
   workOrder: WorkOrder
-  notesColumn: string
   usesTasksTable: boolean
   usesPartsLineItems: boolean
   record: WorkOrderOfflineOutboxRecord
 }): Promise<ReplayDrawerResult> {
-  const { supabase, organizationId, workOrder, notesColumn, usesTasksTable, usesPartsLineItems, record } = args
+  const { supabase, organizationId, workOrder, usesTasksTable, usesPartsLineItems, record } = args
 
   if (record.actionKind !== "wo_technician_bundle") {
     return { ok: false, conflict: false, message: "Unsupported offline action." }
@@ -141,8 +141,9 @@ export async function replayWorkOrderOfflineBundle(args: {
     return { ok: true }
   }
   if (viableMetas.length !== rawMetas.length) {
+    const freshRow = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? record
     await putWorkOrderOfflineRecord({
-      ...record,
+      ...freshRow,
       payload: compactedPayload,
       updatedAtIso: new Date().toISOString(),
     })
@@ -163,9 +164,11 @@ export async function replayWorkOrderOfflineBundle(args: {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         const stillPending = [meta, ...pendingPhotos.slice(i + 1)]
+        const freshRow = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? record
         await putWorkOrderOfflineRecord({
-          ...record,
+          ...freshRow,
           payload: {
+            ...freshRow.payload,
             ...compactedPayload,
             pendingPhotos: stillPending,
           },
@@ -286,8 +289,9 @@ export async function replayWorkOrderOfflineBundle(args: {
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const freshRow = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? record
     await putWorkOrderOfflineRecord({
-      ...record,
+      ...freshRow,
       payload,
       status: "failed",
       lastError: msg,

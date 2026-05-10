@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import { subscribeWorkOrderOfflineBump } from "@/lib/work-orders/offline/broadcast"
 import { getWorkOrderOfflineRecordForScope, getWorkOrderPendingPhotoBlob } from "@/lib/work-orders/offline/idb-store"
 import { makeWorkOrderOfflineScopeKey } from "@/lib/work-orders/offline/types"
 
@@ -75,11 +75,10 @@ export function useWorkOrderOfflinePendingPhotoPreviews(
     }
 
     void load()
-    const onBump = () => void load()
-    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, onBump)
+    const unsub = subscribeWorkOrderOfflineBump(() => void load())
     return () => {
       alive = false
-      window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, onBump)
+      unsub()
       urlsRef.current.forEach((u) => {
         try {
           URL.revokeObjectURL(u)

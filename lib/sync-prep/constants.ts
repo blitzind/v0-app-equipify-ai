@@ -118,4 +118,13 @@ export const SYNC_PREP_COPY = {
   /** Phase 59.2 — offline technician photo queue */
   workOrderOfflinePhotoQueueHint:
     "Photos (JPEG, PNG, WebP, GIF) can be saved on this device while offline and upload when you tap Sync now. PDFs and other documents still need a connection. Queued photos are not on the server until sync completes.",
+
+  /** Phase 59.3 — queue blocked while another tab syncs or conflict is open */
+  workOrderOfflineQueueBlockedSyncingTitle: "Sync in progress",
+  workOrderOfflineQueueBlockedSyncingBody:
+    "Another tab or window is applying this draft. Wait for Sync now to finish, then save again.",
+
+  workOrderOfflineQueueBlockedConflictTitle: "Resolve conflict first",
+  workOrderOfflineQueueBlockedConflictBody:
+    "Open Review conflict on the sync bar and discard or fix the draft before adding more offline changes.",
 } as const

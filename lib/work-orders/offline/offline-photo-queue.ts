@@ -2,12 +2,11 @@ import { isWorkOrderPhotoCategoryMime, WO_ATTACHMENT_MAX_BYTES } from "@/lib/wor
 import type { WorkOrder } from "@/lib/mock-data"
 import {
   getWorkOrderOfflineRecordForScope,
-  putWorkOrderOfflineRecord,
   putWorkOrderPendingPhotoBlob,
   deletePendingPhotoBlob,
   deleteWorkOrderOfflineForScope,
 } from "./idb-store"
-import { mergeTechnicianOfflineBundle } from "./merge-bundle"
+import { putOfflineBundleMergePatch } from "./concurrency-put"
 import { makeWorkOrderOfflineScopeKey, type WorkOrderOfflinePendingPhotoMeta } from "./types"
 
 /** Safer default than server max — keeps offline queue smaller on shared tablets. */
@@ -81,8 +80,7 @@ export async function appendWorkOrderOfflinePhotoQueue(args: {
     })
   }
 
-  const next = mergeTechnicianOfflineBundle({
-    existing,
+  const put = await putOfflineBundleMergePatch({
     organizationId,
     userId,
     workOrder,
@@ -90,14 +88,19 @@ export async function appendWorkOrderOfflinePhotoQueue(args: {
     patch: { appendPendingPhotos: metas },
   })
 
-  if (!next) {
+  if (!put.ok) {
     for (const id of storedLocalIds) {
       await deletePendingPhotoBlob(scopeKey, id)
     }
-    return { ok: false, message: "Could not update offline draft." }
+    const message =
+      put.reason === "syncing"
+        ? "Sync is in progress — wait for it to finish, then add photos again."
+        : put.reason === "conflict"
+          ? "Resolve the server conflict before adding more offline photos."
+          : "Could not update offline draft."
+    return { ok: false, message }
   }
 
-  await putWorkOrderOfflineRecord(next)
   return { ok: true, count: metas.length }
 }
 
@@ -109,20 +112,19 @@ export async function removeWorkOrderOfflineQueuedPhoto(args: {
   localId: string
 }): Promise<void> {
   const scopeKey = makeWorkOrderOfflineScopeKey(args.organizationId, args.userId, args.workOrder.id)
-  const existing = await getWorkOrderOfflineRecordForScope(scopeKey)
-  const next = mergeTechnicianOfflineBundle({
-    existing,
+  const put = await putOfflineBundleMergePatch({
     organizationId: args.organizationId,
     userId: args.userId,
     workOrder: args.workOrder,
     dbNotes: args.dbNotes,
     patch: { removePendingPhotoLocalIds: [args.localId] },
   })
-  if (!next) {
-    await deleteWorkOrderOfflineForScope(scopeKey)
+  if (put.ok) {
     await deletePendingPhotoBlob(scopeKey, args.localId)
     return
   }
-  await putWorkOrderOfflineRecord(next)
-  await deletePendingPhotoBlob(scopeKey, args.localId)
+  if (put.reason === "no_changes") {
+    await deleteWorkOrderOfflineForScope(scopeKey)
+    await deletePendingPhotoBlob(scopeKey, args.localId)
+  }
 }

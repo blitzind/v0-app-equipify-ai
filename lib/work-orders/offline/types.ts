@@ -54,6 +54,8 @@ export type WorkOrderOfflineOutboxRecord = {
   createdAtIso: string
   updatedAtIso: string
   lastError: string | null
+  /** Set when entering `syncing` (manual Sync now) for diagnostics only. */
+  lastSyncAttemptAtIso?: string | null
   conflictServerUpdatedAt?: string | null
 }
 

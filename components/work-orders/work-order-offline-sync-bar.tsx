@@ -1,12 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Loader2, RefreshCw, Trash2, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useNetworkStatus } from "@/hooks/use-network-status"
-import { WORK_ORDER_OFFLINE_BUMP_EVENT } from "@/lib/work-orders/offline/broadcast"
+import { subscribeWorkOrderOfflineBump } from "@/lib/work-orders/offline/broadcast"
 import {
   deleteWorkOrderOfflineForScope,
   filterPendingOfflineRecords,
@@ -15,6 +15,8 @@ import {
 } from "@/lib/work-orders/offline/idb-store"
 import { makeWorkOrderOfflineScopeKey } from "@/lib/work-orders/offline/types"
 import { replayWorkOrderOfflineBundle } from "@/lib/work-orders/offline/replay-drawer"
+import { formatWorkOrderOfflineReplayError } from "@/lib/work-orders/offline/replay-errors"
+import { withWorkOrderOfflineReplayLock } from "@/lib/work-orders/offline/sync-lock"
 import type { WorkOrder } from "@/lib/mock-data"
 import { useToast } from "@/hooks/use-toast"
 
@@ -33,6 +35,16 @@ export type WorkOrderOfflineSyncBarProps = {
   className?: string
 }
 
+function formatLocalSyncAttempt(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+  } catch {
+    return iso
+  }
+}
+
 export function WorkOrderOfflineSyncBar({
   organizationId,
   userId,
@@ -49,6 +61,7 @@ export function WorkOrderOfflineSyncBar({
   const { toast } = useToast()
   const [record, setRecord] = useState<Awaited<ReturnType<typeof getWorkOrderOfflineRecordForScope>>>(undefined)
   const [syncBusy, setSyncBusy] = useState(false)
+  const syncInFlightRef = useRef(false)
 
   const scopeKey =
     organizationId && userId && workOrderId ? makeWorkOrderOfflineScopeKey(organizationId, userId, workOrderId) : null
@@ -66,19 +79,17 @@ export function WorkOrderOfflineSyncBar({
     void refresh()
   }, [refresh])
 
-  useEffect(() => {
-    const onBump = () => void refresh()
-    window.addEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, onBump)
-    return () => window.removeEventListener(WORK_ORDER_OFFLINE_BUMP_EVENT, onBump)
-  }, [refresh])
+  useEffect(() => subscribeWorkOrderOfflineBump(() => void refresh()), [refresh])
 
   if (!scopeKey || !canEdit || !workOrder) return null
 
   const pending = record ? filterPendingOfflineRecords([record]) : []
-  const hasPending = pending.length > 0
-  const pendingPhotoCount = record?.payload.pendingPhotos?.length ?? 0
   const status = record?.status
-  const showBar = !online || hasPending || status === "conflict" || status === "failed"
+  const isReplayInProgress = status === "syncing"
+  const hasActionablePending = pending.length > 0
+  const pendingPhotoCount = record?.payload.pendingPhotos?.length ?? 0
+  const showBar =
+    !online || hasActionablePending || status === "conflict" || status === "failed" || isReplayInProgress
 
   if (!showBar) return null
 
@@ -86,75 +97,100 @@ export function WorkOrderOfflineSyncBar({
     if (!online) return "Offline"
     if (status === "conflict") return "Review conflict"
     if (status === "failed") return "Sync failed"
-    if (status === "syncing") return "Syncing…"
-    if (hasPending) return "Sync pending"
+    if (isReplayInProgress) return "Syncing…"
+    if (hasActionablePending) return "Sync pending"
     return "Saved locally"
   })()
 
   async function handleSyncNow() {
     if (!organizationId || !workOrder || !scopeKey || !online) return
-    const rec = await getWorkOrderOfflineRecordForScope(scopeKey)
-    if (!rec || !filterPendingOfflineRecords([rec]).length) return
+    if (syncInFlightRef.current || syncBusy) return
+
+    const rec0 = await getWorkOrderOfflineRecordForScope(scopeKey)
+    if (!rec0 || !filterPendingOfflineRecords([rec0]).length) return
+
+    syncInFlightRef.current = true
     setSyncBusy(true)
-    await putWorkOrderOfflineRecord({ ...rec, status: "syncing", updatedAtIso: new Date().toISOString() })
-    await refresh()
-    const supabase = createBrowserSupabaseClient()
-    const latest = { ...rec, status: "syncing" as const }
-    const result = await replayWorkOrderOfflineBundle({
-      supabase,
-      organizationId,
-      workOrder,
-      usesTasksTable,
-      usesPartsLineItems,
-      record: latest,
-    })
-    if (result.ok) {
-      await deleteWorkOrderOfflineForScope(scopeKey)
-      await refresh()
-      toast({ title: "Synced", description: "Local draft was applied to the work order." })
-      onAfterChange?.()
-    } else if (result.conflict) {
-      await putWorkOrderOfflineRecord({
-        ...rec,
-        status: "conflict",
-        conflictServerUpdatedAt: result.serverUpdatedAt,
-        updatedAtIso: new Date().toISOString(),
-        lastError: null,
-      })
-      await refresh()
-      onConflict?.("Server copy changed since this draft started.")
-      toast({
-        variant: "destructive",
-        title: "Sync paused — conflict",
-        description: "Review local vs server, then discard or retry after resolving.",
-      })
-    } else {
-      const fresh = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? rec
-      if (fresh.status === "syncing") {
+    try {
+      await withWorkOrderOfflineReplayLock(scopeKey, async () => {
+        const rec = await getWorkOrderOfflineRecordForScope(scopeKey)
+        if (!rec || !filterPendingOfflineRecords([rec]).length) return
+
+        const attemptIso = new Date().toISOString()
         await putWorkOrderOfflineRecord({
-          ...fresh,
-          status: "failed",
-          lastError: result.message,
-          updatedAtIso: new Date().toISOString(),
+          ...rec,
+          status: "syncing",
+          updatedAtIso: attemptIso,
+          lastSyncAttemptAtIso: attemptIso,
+          lastError: null,
         })
-      }
-      await refresh()
-      toast({
-        variant: "destructive",
-        title: "Sync failed",
-        description: result.message,
+
+        const recForReplay = await getWorkOrderOfflineRecordForScope(scopeKey)
+        if (!recForReplay || recForReplay.status !== "syncing") return
+
+        const supabase = createBrowserSupabaseClient()
+        const result = await replayWorkOrderOfflineBundle({
+          supabase,
+          organizationId,
+          workOrder,
+          usesTasksTable,
+          usesPartsLineItems,
+          record: recForReplay,
+        })
+
+        if (result.ok) {
+          await deleteWorkOrderOfflineForScope(scopeKey)
+          toast({ title: "Synced", description: "Local draft was applied to the work order." })
+          onAfterChange?.()
+        } else if (result.conflict) {
+          const base = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? recForReplay
+          await putWorkOrderOfflineRecord({
+            ...base,
+            status: "conflict",
+            conflictServerUpdatedAt: result.serverUpdatedAt,
+            updatedAtIso: new Date().toISOString(),
+            lastError: null,
+          })
+          onConflict?.("Server copy changed since this draft started.")
+          toast({
+            variant: "destructive",
+            title: "Sync paused — conflict",
+            description: "Review local vs server, then discard or retry after resolving.",
+          })
+        } else {
+          const fresh = (await getWorkOrderOfflineRecordForScope(scopeKey)) ?? recForReplay
+          if (fresh.status === "syncing") {
+            await putWorkOrderOfflineRecord({
+              ...fresh,
+              status: "failed",
+              lastError: result.message,
+              updatedAtIso: new Date().toISOString(),
+            })
+          }
+          toast({
+            variant: "destructive",
+            title: "Sync failed",
+            description: formatWorkOrderOfflineReplayError(result.message),
+          })
+        }
       })
+    } finally {
+      syncInFlightRef.current = false
+      setSyncBusy(false)
+      await refresh()
     }
-    setSyncBusy(false)
   }
 
   async function handleDiscard() {
-    if (!scopeKey) return
+    if (!scopeKey || isReplayInProgress) return
     await deleteWorkOrderOfflineForScope(scopeKey)
     await refresh()
     toast({ title: "Local draft discarded" })
     onAfterChange?.()
   }
+
+  const canSyncNow = hasActionablePending && online && status !== "conflict" && !isReplayInProgress
+  const canDiscard = (hasActionablePending || status === "conflict" || status === "failed") && !isReplayInProgress
 
   return (
     <div
@@ -166,17 +202,30 @@ export function WorkOrderOfflineSyncBar({
     >
       {!online ? <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden /> : null}
       <span className="font-semibold text-foreground">{label}</span>
-      {hasPending && !online && pendingPhotoCount > 0 ? (
+      {hasActionablePending && !online && pendingPhotoCount > 0 ? (
         <span className="text-muted-foreground">· {pendingPhotoCount} photo(s) pending upload</span>
       ) : null}
-      {hasPending && online && status !== "conflict" ? (
+      {hasActionablePending && online && status !== "conflict" ? (
         <span className="text-muted-foreground">
-          · Local technician draft queued ({pending.length}
+          · Stored on this device — local technician draft ({pending.length}
           {pendingPhotoCount > 0 ? ` · ${pendingPhotoCount} photo(s) pending upload` : ""})
         </span>
       ) : null}
+      {isReplayInProgress ? (
+        <span className="text-muted-foreground">· Finishing sync — please keep this tab open</span>
+      ) : null}
+      {record?.lastSyncAttemptAtIso && status === "failed" ? (
+        <span className="text-muted-foreground">
+          · Last sync attempt: {formatLocalSyncAttempt(record.lastSyncAttemptAtIso)}
+        </span>
+      ) : null}
       {record?.lastError && status === "failed" ? (
-        <span className="min-w-0 truncate text-destructive">{record.lastError}</span>
+        <span className="min-w-0 truncate text-destructive" title={record.lastError}>
+          {record.lastError}
+        </span>
+      ) : null}
+      {status === "failed" && online ? (
+        <span className="text-muted-foreground">· Fix the issue if you can, then tap Sync now again</span>
       ) : null}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
         {status === "conflict" ? (
@@ -184,7 +233,7 @@ export function WorkOrderOfflineSyncBar({
             Review conflict
           </Button>
         ) : null}
-        {hasPending && online && status !== "conflict" ? (
+        {canSyncNow ? (
           <Button
             type="button"
             size="sm"
@@ -197,7 +246,7 @@ export function WorkOrderOfflineSyncBar({
             Sync now
           </Button>
         ) : null}
-        {hasPending || status === "conflict" || status === "failed" ? (
+        {canDiscard ? (
           <Button
             type="button"
             size="sm"
