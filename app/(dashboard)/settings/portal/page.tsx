@@ -239,13 +239,14 @@ export default function PortalSettingsPage() {
       })
       return
     }
-    const url = `/api/portal/preview/start?organizationId=${encodeURIComponent(organizationId.trim())}`
-    const win = window.open(url, "_blank", "noopener,noreferrer")
+    const oid = organizationId.trim()
+    const bridgeUrl = `${window.location.origin}/api/portal/preview/start?organizationId=${encodeURIComponent(oid)}`
+    const win = window.open(bridgeUrl, "_blank", "noopener,noreferrer")
     if (!win) {
       toast({
         variant: "destructive",
         title: "Popup blocked",
-        description: "Allow popups for this site to open the portal preview, or copy the preview URL from your browser's address bar after clicking again.",
+        description: `Allow popups for this site, or open this URL manually (same-tab is fine): ${bridgeUrl}`,
       })
     }
   }, [orgStatus, organizationId, toast])

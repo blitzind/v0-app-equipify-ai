@@ -40,6 +40,7 @@ Staff **Settings → Customer Portal** mixes persisted workspace defaults with c
 5. **Misleading controls** — Confirm Portal page does **not** offer fake save for modules/login/email/domain; those show as planned or point to Workspace.
 6. **Authorization** — Non–portal-settings role cannot open PATCH endpoints (403).
 7. **Login** — Magic link sign-in still works; optional `?organizationId=` on login only affects accent when branding API returns `primaryColor`.
+8. **Staff preview navigation (Phase 56.3)** — From Settings → Preview Portal, open preview; use top nav to visit `/portal/preview/invoices`, work orders, documents, etc.; confirm quote actions stay disabled and downloads are not offered without a customer session.
 
 ## Related docs
 

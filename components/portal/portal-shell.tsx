@@ -14,11 +14,9 @@ import {
   FileText,
   Folder,
   UserCog,
-  Bell,
   Inbox,
   LogOut,
   ChevronDown,
-  Settings,
   ShieldCheck,
 } from "lucide-react"
 import {
@@ -139,18 +137,6 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="relative flex items-center justify-center w-8 h-8 rounded-md transition-colors hover:bg-[--portal-hover]"
-              aria-label="Notifications"
-            >
-              <Bell size={16} style={{ color: "var(--portal-nav-icon)" }} />
-              <span
-                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-                style={{ background: "var(--portal-accent)" }}
-              />
-            </button>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -177,12 +163,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem asChild>
                   <Link href="/portal/account" className="flex items-center gap-2">
-                    <UserCog size={14} /> Account &amp; Contacts
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/portal/dashboard" className="flex items-center gap-2">
-                    <Settings size={14} /> Settings
+                    <UserCog size={14} /> Account &amp; contacts
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

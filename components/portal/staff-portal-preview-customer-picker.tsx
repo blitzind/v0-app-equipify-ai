@@ -35,7 +35,7 @@ export function StaffPortalPreviewCustomerPicker({
       style={{ borderColor: "var(--portal-border)", background: "var(--portal-surface-2)" }}
     >
       <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--portal-nav-text)" }}>
-        Preview as customer
+        View as customer
       </span>
       <div className="relative min-w-0">
         <select

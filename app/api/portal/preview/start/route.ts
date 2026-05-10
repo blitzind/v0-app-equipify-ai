@@ -25,6 +25,8 @@ function portalLoginUrl(request: NextRequest, extra: Record<string, string> = {}
  */
 export async function GET(request: NextRequest) {
   const organizationId = request.nextUrl.searchParams.get("organizationId")?.trim() ?? ""
+  const customerIdParam = request.nextUrl.searchParams.get("customerId")?.trim() ?? ""
+
   if (!UUID_RE.test(organizationId)) {
     return NextResponse.redirect(
       portalLoginUrl(request, {
@@ -57,5 +59,8 @@ export async function GET(request: NextRequest) {
 
   const previewUrl = new URL("/portal/preview", request.url)
   previewUrl.searchParams.set("organizationId", organizationId)
+  if (UUID_RE.test(customerIdParam)) {
+    previewUrl.searchParams.set("customerId", customerIdParam)
+  }
   return NextResponse.redirect(previewUrl)
 }

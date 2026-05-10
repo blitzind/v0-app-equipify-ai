@@ -16,11 +16,11 @@ Staff-facing **portal preview** (`/portal/preview`) shows a read-only snapshot o
 | Aspect | Real customer | Staff preview |
 | --- | --- | --- |
 | Auth | Portal cookie | Dashboard Supabase session (`createServerSupabaseClient`) |
-| Entry | Invite / login | `GET /api/portal/preview/start?organizationId=` → redirect |
-| Data path | Portal APIs + `requirePortalSession` | Server page uses **service role** only **after** membership checks; queries always filtered by `organizationId` + selected `customerId` |
-| UI shell | `PortalSessionProvider` + `PortalShell` | Custom `StaffPortalPreview` (single scrollable page, anchor “nav”) — **not** every sub-route |
+| Entry | Invite / login | `GET /api/portal/preview/start?organizationId=` (optional `customerId`) → redirect |
+| Data path | Portal APIs + `requirePortalSession` | Server pages use **service role** only **after** `staffMayOpenPortalPreview` + org row checks; queries filtered by `organizationId` + selected `customerId` (same helpers as portal where applicable) |
+| UI shell | `PortalSessionProvider` + `PortalShell` | **`StaffPreviewFrame`** + route-based pages under **`/portal/preview/*`** (mirrors customer nav; not cookie-authenticated) |
 | Branding accent | **`organizations.primary_color`** via bootstrap → `PortalShell` (`portal-theme-css.ts`) | Same inline `--portal-accent*` tokens as authenticated portal |
-| Actions | Pay, request service, downloads (per rules) | Disabled / explanatory copy; no portal cookie ⇒ no customer API writes |
+| Actions | Pay, request service, downloads (per rules) | **No** portal cookie: list/read-only views where implemented; **no** quote approve/decline, **no** file downloads, **no** service-request list (portal-user-scoped), **no** fabricated reports |
 
 Preview **does not** bypass tenant isolation: invalid `organizationId` / `customerId` → redirect or empty snapshot; no cross-org reads.
 
@@ -29,7 +29,7 @@ Preview **does not** bypass tenant isolation: invalid `organizationId` / `custom
 - **`staffMayOpenPortalPreview`** (`lib/portal/preview-access.ts`): requires `canManagePortalSettings` (default matrix: **owner** and **admin** only). Managers no longer match the old hard-coded role set — align with Settings → Customer Portal edit permission.
 - Enforced in:
   - `app/api/portal/preview/start/route.ts`
-  - `app/(portal)/portal/preview/page.tsx`
+  - `app/(portal)/portal/preview/page.tsx` and **`app/(portal)/portal/preview/*/page.tsx`** via **`requireStaffPreviewContext`** (`lib/portal/staff-preview-load.ts`)
 - Unauthenticated users hitting preview are redirected to staff `/login?next=…` (existing behavior).
 
 ## Branding / settings alignment
@@ -41,6 +41,18 @@ Preview **does not** bypass tenant isolation: invalid `organizationId` / `custom
 ## Public branding API
 
 `GET /api/portal/public-branding?organizationId=` returns `organizationName`, `logoUrl`, and **`primaryColor`**. **`/portal/login?organizationId=<uuid>`** applies those accent variables on the login page only (public, org-scoped; no secrets). Other login entry paths keep global accent until the customer signs in.
+
+## Phase 56.2B (portal UI placeholder cleanup)
+
+Removed inert notification and fake profile affordances from **`PortalShell`** and **`StaffPreviewFrame`**; fixed misleading user-menu “Settings” entry. See **`docs/PORTAL_UI_HONESTY.md`**.
+
+## Phase 56.3 (full-navigation preview)
+
+- **Model:** Option **B** — explicit **`/portal/preview/...`** routes (staff dashboard session + `canManagePortalSettings`), **not** a temporary portal cookie and **not** impersonation.
+- **Shared chrome:** `StaffPreviewFrame` — banner, customer picker, nav links with `organizationId` + `customerId` query params, exit to staff app.
+- **Supported read-only sections:** overview (`/portal/preview`), invoices, work orders, equipment, quotes (actions **forced off**), documents (list only), certificates (list only), maintenance, plus informational pages for service requests, reports, and account.
+- **Blocked / informational:** quote approve/decline; `/api/portal/*` downloads without session; service-request **rows** (API filters by `portal_user_id`); reports (still mock in live app — preview explains); account edits.
+- **Popup fallback:** Settings → Customer Portal shows the full **`/api/portal/preview/start?...`** URL in the toast when the browser blocks `window.open`.
 
 ## Follow-ups (non-goals for 56.1)
 
