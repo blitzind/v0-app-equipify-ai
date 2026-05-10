@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:14:13.371Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:24:16.612Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -123,6 +123,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Route:** \`/invoices\`
 - **Purpose:** Invoicing, send email routes, QuickBooks export when connected, and invoice-linked document/certificate visibility.
 - **Tables:** \`org_invoices\` family.
+- **Customer-facing display (Phase 56.4):** Staff invoice preview uses stored subtotal (\`amount_cents\`), tax only when \`tax_amount_cents\` is non-zero, grand total from \`amount_cents + tax_amount_cents\`, and payment rows from \`org_invoice_payments\` when hydrated. Portal invoice detail (\`/api/portal/invoices/[id]\`) returns sanitized line items plus billing snapshot fields from the invoice row. Invoice customer emails use the same grand total and optional subtotal/tax lines (no recalculated tax).
 - **Gaps:** Payment allocation vs QB; automatic due dates; jurisdiction tax.
 
 ### Purchase Orders & Vendors

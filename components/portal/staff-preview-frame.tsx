@@ -26,14 +26,8 @@ import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { StaffPortalPreviewCustomerPicker } from "@/components/portal/staff-portal-preview-customer-picker"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"
+import { buildStaffPreviewHref } from "@/lib/portal/staff-preview-href"
 import { cn } from "@/lib/utils"
-
-export function buildStaffPreviewHref(organizationId: string, customerId: string | null, path: string) {
-  const q = new URLSearchParams()
-  q.set("organizationId", organizationId)
-  if (customerId) q.set("customerId", customerId)
-  return `${path}?${q.toString()}`
-}
 
 const PREVIEW_NAV: Array<{ path: string; label: string; icon: ElementType }> = [
   { path: "/portal/preview", label: "Overview", icon: LayoutDashboard },

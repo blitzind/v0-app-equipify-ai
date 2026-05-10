@@ -37,12 +37,25 @@ type WoRow = {
   technicianName: string | null
 }
 
+type PortalInvoiceLine = {
+  description: string
+  qty: number
+  unitCents: number
+  lineTotalCents: number
+  sku: string | null
+  itemType: string | null
+}
+
 type DetailPayload = {
   invoice: {
     id: string
     invoiceNumber: string
     title: string
     amountCents: number
+    subtotalCents?: number
+    taxCents?: number | null
+    taxLabel?: string | null
+    grandTotalCents?: number
     totalDueCents?: number
     totalPaidCents?: number
     balanceDueCents?: number
@@ -57,6 +70,11 @@ type DetailPayload = {
     portalCertificateReleaseOverride: string | null
     termsCode: string | null
     termsCustomDays: number | null
+    lineItems?: PortalInvoiceLine[]
+    billingName?: string | null
+    billingEmail?: string | null
+    billingPhone?: string | null
+    billingAddressFormatted?: string | null
   }
   workOrders: WoRow[]
   certificates: CertItem[]
@@ -104,10 +122,14 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
 
   const inv = data.invoice
   const overdue = inv.status === "overdue"
-  const totalDue = inv.totalDueCents ?? inv.amountCents
+  const totalDue = inv.totalDueCents ?? inv.grandTotalCents ?? inv.amountCents
   const totalPaid = inv.totalPaidCents ?? 0
   const balanceDue = inv.balanceDueCents ?? (inv.status === "paid" ? 0 : totalDue)
   const paymentLabel = inv.paymentStatusLabel ?? inv.statusLabel
+  const lineItems = inv.lineItems ?? []
+  const subtotalCents = inv.subtotalCents ?? inv.amountCents
+  const taxCents = inv.taxCents
+  const showTax = taxCents != null && taxCents > 0
 
   return (
     <div className="space-y-6">
@@ -180,6 +202,94 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
                 Payment: {paymentLabel}
               </span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="portal-card p-5 space-y-5">
+        <div>
+          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--portal-foreground)" }}>
+            Bill to
+          </h2>
+          {inv.billingName?.trim() || inv.billingAddressFormatted?.trim() || inv.billingEmail?.trim() || inv.billingPhone?.trim() ? (
+            <div className="text-sm space-y-1" style={{ color: "var(--portal-nav-text)" }}>
+              {inv.billingName?.trim() ? <p style={{ color: "var(--portal-foreground)" }}>{inv.billingName.trim()}</p> : null}
+              {inv.billingAddressFormatted?.trim() ? <p className="whitespace-pre-line">{inv.billingAddressFormatted.trim()}</p> : null}
+              {inv.billingEmail?.trim() ? <p>{inv.billingEmail.trim()}</p> : null}
+              {inv.billingPhone?.trim() ? <p>{inv.billingPhone.trim()}</p> : null}
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              Billing details are taken from your account profile on file with your service provider.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--portal-foreground)" }}>
+            Line items
+          </h2>
+          {lineItems.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              This invoice does not list individual lines — totals below reflect the invoice on file.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--portal-border-light)" }}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--portal-nav-text)", background: "var(--portal-accent-muted)" }}>
+                    <th className="px-3 py-2 font-medium">Description</th>
+                    <th className="px-3 py-2 font-medium text-right w-16">Qty</th>
+                    <th className="px-3 py-2 font-medium text-right w-28">Rate</th>
+                    <th className="px-3 py-2 font-medium text-right w-28">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.map((row, idx) => (
+                    <tr key={`${row.description}-${idx}`} className="border-t" style={{ borderColor: "var(--portal-border-light)" }}>
+                      <td className="px-3 py-2 align-top" style={{ color: "var(--portal-foreground)" }}>
+                        <span className="font-medium">{row.description}</span>
+                        {row.itemType ? (
+                          <span className="block text-[11px] mt-0.5" style={{ color: "var(--portal-nav-text)" }}>
+                            {row.itemType}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--portal-nav-text)" }}>
+                        {row.qty}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--portal-nav-text)" }}>
+                        {fmtCurrency(row.unitCents)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium" style={{ color: "var(--portal-foreground)" }}>
+                        {fmtCurrency(row.lineTotalCents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-1 border-t space-y-2" style={{ borderColor: "var(--portal-border-light)" }}>
+          <div className="flex justify-between text-sm" style={{ color: "var(--portal-nav-text)" }}>
+            <span>Subtotal</span>
+            <span className="tabular-nums font-medium" style={{ color: "var(--portal-foreground)" }}>
+              {fmtCurrency(subtotalCents)}
+            </span>
+          </div>
+          {showTax ? (
+            <div className="flex justify-between text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              <span>{inv.taxLabel?.trim() || "Tax"}</span>
+              <span className="tabular-nums font-medium" style={{ color: "var(--portal-foreground)" }}>
+                {fmtCurrency(taxCents ?? 0)}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex justify-between text-base font-semibold pt-1 border-t" style={{ color: "var(--portal-foreground)", borderColor: "var(--portal-border-light)" }}>
+            <span>Invoice total</span>
+            <span className="tabular-nums">{fmtCurrency(totalDue)}</span>
           </div>
         </div>
       </div>

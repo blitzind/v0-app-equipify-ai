@@ -5,6 +5,12 @@ import { buildPortalInvoicePaymentSummary } from "@/lib/portal/invoice-payment-s
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
+import { parseLineItems } from "@/lib/org-quotes-invoices/map"
+import {
+  formatInvoiceBillingAddressLines,
+  grandTotalCentsFromInvoiceRow,
+  invoiceTaxRowLabel,
+} from "@/lib/billing/invoice-financial-display"
 
 export const runtime = "nodejs"
 
@@ -33,7 +39,7 @@ export async function GET(
   const custId = portalUser.customer_id
 
   const selFull =
-    "id, invoice_number, title, amount_cents, tax_amount_cents, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, terms_code, terms_custom_days, created_at"
+    "id, invoice_number, title, amount_cents, tax_amount_cents, tax_rate_percent, status, issued_at, paid_at, due_date, equipment_id, work_order_id, calibration_record_id, portal_certificate_release_override, terms_code, terms_custom_days, created_at, line_items, billing_name, billing_contact_email, billing_contact_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country"
 
   let invRes = await svc
     .from("org_invoices")
@@ -47,7 +53,7 @@ export async function GET(
     invRes = await svc
       .from("org_invoices")
       .select(
-        "id, invoice_number, title, amount_cents, tax_amount_cents, status, issued_at, paid_at, equipment_id, work_order_id, created_at",
+        "id, invoice_number, title, amount_cents, tax_amount_cents, status, issued_at, paid_at, equipment_id, work_order_id, created_at, line_items",
       )
       .eq("organization_id", orgId)
       .eq("customer_id", custId)
@@ -243,12 +249,58 @@ export async function GET(
 
   const releaseOverride = inv.portal_certificate_release_override as string | null | undefined
 
+  const rawLines = inv.line_items
+  const parsedItems = parseLineItems(rawLines)
+  const lineItemsOut = parsedItems.map((row) => {
+    const qty = row.qty
+    const unit = row.unit
+    const lineTotalCents = Math.round(qty * unit * 100)
+    return {
+      description: row.description?.trim() ? row.description.trim() : "Line item",
+      qty,
+      unitCents: Math.round(unit * 100),
+      lineTotalCents,
+      sku: row.sku?.trim() || null,
+      itemType: row.item_type?.trim() || null,
+    }
+  })
+
+  const subtotalCents = Math.round(Number(inv.amount_cents) || 0)
+  const taxCentsRaw = inv.tax_amount_cents as number | null | undefined
+  const taxCents = taxCentsRaw == null ? null : Math.round(Number(taxCentsRaw))
+  const taxLabel =
+    taxCents != null && taxCents !== 0 ?
+      invoiceTaxRowLabel({
+        taxRatePercent:
+          inv.tax_rate_percent == null ? null : Number(inv.tax_rate_percent as number | string),
+      })
+    : null
+
+  const billingName = (inv.billing_name as string | null | undefined)?.trim() || null
+  const billingEmail = (inv.billing_contact_email as string | null | undefined)?.trim() || null
+  const billingPhone = (inv.billing_contact_phone as string | null | undefined)?.trim() || null
+  const billingAddressFormatted = formatInvoiceBillingAddressLines({
+    billing_address_line1: inv.billing_address_line1 as string | null | undefined,
+    billing_address_line2: inv.billing_address_line2 as string | null | undefined,
+    billing_city: inv.billing_city as string | null | undefined,
+    billing_state: inv.billing_state as string | null | undefined,
+    billing_postal_code: inv.billing_postal_code as string | null | undefined,
+    billing_country: inv.billing_country as string | null | undefined,
+  })
+
   return NextResponse.json({
     invoice: {
       id: inv.id as string,
       invoiceNumber: inv.invoice_number as string,
       title: inv.title as string,
       amountCents: inv.amount_cents as number,
+      subtotalCents,
+      taxCents,
+      taxLabel,
+      grandTotalCents: grandTotalCentsFromInvoiceRow({
+        amount_cents: inv.amount_cents as number,
+        tax_amount_cents: inv.tax_amount_cents as number | null | undefined,
+      }),
       totalDueCents: paymentSummary.totalDueCents,
       totalPaidCents: paymentSummary.totalPaidCents,
       balanceDueCents: paymentSummary.balanceDueCents,
@@ -263,6 +315,11 @@ export async function GET(
       portalCertificateReleaseOverride: releaseOverride ?? null,
       termsCode: (inv.terms_code as string | null) ?? null,
       termsCustomDays: (inv.terms_custom_days as number | null) ?? null,
+      lineItems: lineItemsOut,
+      billingName,
+      billingEmail,
+      billingPhone,
+      billingAddressFormatted: billingAddressFormatted.trim() ? billingAddressFormatted : null,
     },
     workOrders: workOrdersOut,
     certificates,

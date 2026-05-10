@@ -18,6 +18,7 @@ export type InvoiceEmailArgs = {
   organizationName: string
   customerName: string
   invoiceLabel: string
+  /** Primary currency line in the summary (typically invoice grand total). */
   amountLabel: string
   dueDateLabel: string
   issuedDateLabel: string
@@ -27,18 +28,32 @@ export type InvoiceEmailArgs = {
   messagePlain?: string
   /** From compose modal — overrides default subject when set. */
   subjectOverride?: string
+  /** Optional breakdown when tax is stored on the invoice row. */
+  subtotalLabel?: string | null
+  taxLineLabel?: string | null
+  /** When set, emphasized as the invoice total (defaults to `amountLabel`). */
+  totalLabel?: string | null
 }
 
 export function buildInvoiceEmailContent(args: InvoiceEmailArgs): { subject: string; html: string; text: string } {
   const portal =
     args.portalPlaceholder?.trim() ||
     "A secure payment link will be included here once your workspace connects billing links."
-  const defaultSubject = `Invoice ${args.invoiceLabel} — ${args.amountLabel} due ${args.dueDateLabel}`
+  const totalStr = (args.totalLabel?.trim() || args.amountLabel).trim()
+  const defaultSubject = `Invoice ${args.invoiceLabel} — ${totalStr} due ${args.dueDateLabel}`
   const subject = args.subjectOverride?.trim() || defaultSubject
+  const moneyLines: string[] = []
+  if (args.subtotalLabel?.trim()) {
+    moneyLines.push(`<li>Subtotal: ${escapeHtml(args.subtotalLabel.trim())}</li>`)
+  }
+  if (args.taxLineLabel?.trim()) {
+    moneyLines.push(`<li>${escapeHtml(args.taxLineLabel.trim())}</li>`)
+  }
+  moneyLines.push(`<li>Invoice total: <strong>${escapeHtml(totalStr)}</strong></li>`)
   const intro = `<p>Dear ${escapeHtml(args.customerName)},</p>
 <p>Your invoice <strong>${escapeHtml(args.invoiceLabel)}</strong> from <strong>${escapeHtml(args.organizationName)}</strong> is ready.</p>
 <ul style="padding-left:18px;margin:12px 0;">
-<li>Amount: <strong>${escapeHtml(args.amountLabel)}</strong></li>
+${moneyLines.join("\n")}
 <li>Due: ${escapeHtml(args.dueDateLabel)}</li>
 <li>Issued: ${escapeHtml(args.issuedDateLabel)}</li>
 ${args.equipmentSummary ? `<li>${escapeHtml(args.equipmentSummary)}</li>` : ""}
@@ -59,7 +74,9 @@ ${args.equipmentSummary ? `<li>${escapeHtml(args.equipmentSummary)}</li>` : ""}
     `Dear ${args.customerName},`,
     "",
     `Invoice ${args.invoiceLabel} from ${args.organizationName}`,
-    `Amount: ${args.amountLabel}`,
+    ...(args.subtotalLabel?.trim() ? [`Subtotal: ${args.subtotalLabel.trim()}`] : []),
+    ...(args.taxLineLabel?.trim() ? [args.taxLineLabel.trim()] : []),
+    `Invoice total: ${totalStr}`,
     `Due: ${args.dueDateLabel}`,
     args.equipmentSummary ?? "",
     "",
@@ -80,6 +97,7 @@ export type InvoiceCustomerEmailArgs = {
   organizationName: string
   customerName: string
   invoiceLabel: string
+  /** Shown in the summary; use grand total including tax. */
   amountLabel: string
   dueDateLabel: string
   issuedDateLabel: string
@@ -88,6 +106,9 @@ export type InvoiceCustomerEmailArgs = {
   messagePlain?: string
   subjectOverride?: string
   paymentPlaceholder?: string
+  subtotalLabel?: string | null
+  taxLineLabel?: string | null
+  totalLabel?: string | null
   /** When a calibration record exists for this invoice / work order. */
   certificate?: {
     included: boolean
@@ -108,11 +129,16 @@ export function buildInvoiceCustomerEmailContent(args: InvoiceCustomerEmailArgs)
   const defaultSubject = `Invoice ${args.invoiceLabel} from ${args.organizationName}`
   const subject = args.subjectOverride?.trim() || defaultSubject
 
-  const listItems = [
-    `<li>Amount due: <strong>${escapeHtml(args.amountLabel)}</strong></li>`,
-    `<li>Due date: ${escapeHtml(args.dueDateLabel)}</li>`,
-    `<li>Issued: ${escapeHtml(args.issuedDateLabel)}</li>`,
-  ]
+  const totalStr = (args.totalLabel?.trim() || args.amountLabel).trim()
+  const listItems: string[] = []
+  if (args.subtotalLabel?.trim()) {
+    listItems.push(`<li>Subtotal: ${escapeHtml(args.subtotalLabel.trim())}</li>`)
+  }
+  if (args.taxLineLabel?.trim()) {
+    listItems.push(`<li>${escapeHtml(args.taxLineLabel.trim())}</li>`)
+  }
+  listItems.push(`<li>Invoice total: <strong>${escapeHtml(totalStr)}</strong></li>`)
+  listItems.push(`<li>Due date: ${escapeHtml(args.dueDateLabel)}</li>`, `<li>Issued: ${escapeHtml(args.issuedDateLabel)}</li>`)
   if (args.workOrderLabel?.trim()) {
     listItems.push(`<li>Work order: <strong>${escapeHtml(args.workOrderLabel.trim())}</strong></li>`)
   }
@@ -178,7 +204,9 @@ ${args.certificatesList
     `Dear ${args.customerName},`,
     "",
     `Invoice ${args.invoiceLabel} from ${args.organizationName}`,
-    `Amount due: ${args.amountLabel}`,
+    ...(args.subtotalLabel?.trim() ? [`Subtotal: ${args.subtotalLabel.trim()}`] : []),
+    ...(args.taxLineLabel?.trim() ? [args.taxLineLabel.trim()] : []),
+    `Invoice total: ${totalStr}`,
     `Due: ${args.dueDateLabel}`,
     `Issued: ${args.issuedDateLabel}`,
   ]

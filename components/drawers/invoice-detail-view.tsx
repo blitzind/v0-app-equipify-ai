@@ -61,6 +61,13 @@ import {
   paymentAllocationUiLabel,
 } from "@/lib/billing/invoice-payment-allocation"
 import {
+  invoiceGrandTotalDollarsDisplay,
+  invoiceStoredSubtotalDollars,
+  invoiceTaxDollars,
+  invoiceTaxRowLabel,
+  shouldShowInvoiceTaxRows,
+} from "@/lib/billing/invoice-financial-display"
+import {
   Mail, MessageSquare, Link2, Download, Save, CreditCard, CheckCircle2,
   Ban, Copy, Repeat, Paperclip, FileSignature, StickyNote, ClipboardList,
   ChevronDown, X, Check, Pencil, Plus, Trash2, AlertTriangle, DollarSign,
@@ -96,9 +103,7 @@ function fmtCurrency(n: number) {
 }
 
 function invoiceGrandTotalDollars(inv: AdminInvoice): number {
-  if (inv.invoiceTotalCents != null) return inv.invoiceTotalCents / 100
-  const sub = inv.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  return sub + (inv.taxAmount ?? 0)
+  return invoiceGrandTotalDollarsDisplay(inv)
 }
 
 function daysOverdue(dueDate: string): number {
@@ -385,13 +390,26 @@ function InvoicePreview({
   documentBranding: OrganizationDocumentBranding
 }) {
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
-  const subtotal  = invoice.lineItems.reduce((s, i) => s + i.qty * i.unit, 0)
-  const taxAmt    = settings.showTax ? invoice.taxAmount ?? 0 : 0
-  const total     = subtotal + taxAmt
-  const amountDue = invoice.status === "Paid" ? 0 : total
+  const storedSubtotal = invoiceStoredSubtotalDollars(invoice)
+  const taxAmt = settings.showTax ? invoiceTaxDollars(invoice) : 0
+  const showTaxRows = settings.showTax && shouldShowInvoiceTaxRows(invoice)
+  const total = invoiceGrandTotalDollarsDisplay(invoice)
+  const totalPaid =
+    invoice.totalPaidCents != null ? invoice.totalPaidCents / 100 : invoice.status === "Paid" ? total : 0
+  const amountDue =
+    invoice.balanceDueCents != null
+      ? Math.max(0, invoice.balanceDueCents / 100)
+      : invoice.status === "Paid"
+        ? 0
+        : total
 
   const isBold    = settings.invoiceTheme === "bold"
   const isMinimal = settings.invoiceTheme === "minimal"
+  const linkedWo = invoice.linkedWorkOrderIds?.length
+    ? invoice.linkedWorkOrderIds
+    : invoice.workOrderId
+      ? [invoice.workOrderId]
+      : []
 
   const wrapClass = device === "mobile"  ? "max-w-[320px]"
                   : device === "tablet"  ? "max-w-[480px]"
@@ -421,6 +439,7 @@ function InvoicePreview({
               <div className="mt-2 flex flex-col items-end gap-0.5">
                 <span className={cn("text-[10px]", isBold ? "text-white/70" : "text-gray-500")}>Date: {fmtDate(invoice.issueDate)}</span>
                 <span className={cn("text-[10px]", isBold ? "text-white/70" : "text-gray-500")}>Due: {fmtDate(invoice.dueDate)}</span>
+                <span className={cn("text-[10px]", isBold ? "text-white/70" : "text-gray-500")}>Status: {invoice.status}</span>
                 {settings.paymentTerms && (
                   <span className={cn("text-[10px]", isBold ? "text-white/70" : "text-gray-500")}>Terms: {settings.paymentTerms}</span>
                 )}
@@ -437,26 +456,24 @@ function InvoicePreview({
             {invoiceBillingAddressLine(invoice) ? (
               <p className="text-[10px] text-gray-500 mt-0.5">{invoiceBillingAddressLine(invoice)}</p>
             ) : null}
-            {settings.showCustomerEmail && (
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {invoice.billingContactEmail || `ap@${invoice.customerName.toLowerCase().replace(/\s+/g, "")}.example.com`}
-              </p>
-            )}
-            {settings.showCustomerPhone && (
-              <p className="text-[10px] text-gray-500">
-                {invoice.billingContactPhone || `(555) 010-${invoice.customerId.slice(-4)}`}
-              </p>
-            )}
+            {settings.showCustomerEmail && invoice.billingContactEmail?.trim() ? (
+              <p className="text-[10px] text-gray-500 mt-0.5">{invoice.billingContactEmail.trim()}</p>
+            ) : null}
+            {settings.showCustomerPhone && invoice.billingContactPhone?.trim() ? (
+              <p className="text-[10px] text-gray-500">{invoice.billingContactPhone.trim()}</p>
+            ) : null}
             {invoice.poNumber ? (
               <p className="text-[10px] text-gray-500 mt-0.5">PO: {invoice.poNumber}</p>
             ) : null}
           </div>
           {settings.showServiceAddress && (
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Service Address</p>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Service / equipment</p>
               <p className="text-xs font-semibold text-gray-900">{invoice.customerName}</p>
               <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
-                1200 Commerce Dr<br />Industrial Park, TX 78744
+                {invoice.equipmentName?.trim()
+                  ? invoice.equipmentName.trim()
+                  : "Equipment and on-site details follow the linked work order(s)."}
               </p>
             </div>
           )}
@@ -475,13 +492,13 @@ function InvoicePreview({
               {settings.showServiceLocation && (
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-0.5">Location</span>
-                  <span className="text-[10px] text-gray-700">Main Facility — Bay 4</span>
+                  <span className="text-[10px] text-gray-700">—</span>
                 </div>
               )}
               {settings.showTeamMembers && (
                 <div>
                   <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-0.5">Technician</span>
-                  <span className="text-[10px] text-gray-700">Marcus Webb</span>
+                  <span className="text-[10px] text-gray-700">—</span>
                 </div>
               )}
               {settings.showServiceDate && (
@@ -496,10 +513,14 @@ function InvoicePreview({
                   <span className="text-[10px] text-gray-700">{invoice.createdBy}</span>
                 </div>
               )}
-              {invoice.workOrderId && (
+              {linkedWo.length > 0 && (
                 <div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-0.5">Work Order</span>
-                  <span className="text-[10px] font-mono text-gray-700">{getWorkOrderDisplay({ id: invoice.workOrderId })}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-0.5">
+                    Work order{linkedWo.length > 1 ? "s" : ""}
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-700 leading-relaxed">
+                    {linkedWo.map((id) => getWorkOrderDisplay({ id })).join(", ")}
+                  </span>
                 </div>
               )}
             </div>
@@ -520,22 +541,50 @@ function InvoicePreview({
                 </tr>
               </thead>
               <tbody>
-                {invoice.lineItems.map((item, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    {settings.showLineItemNames && (
-                      <td className="py-2.5 pr-4">
-                        <p className="text-xs text-gray-800 font-medium">{item.description}</p>
-                        {settings.showLineItemDescriptions && (
-                          <p className="text-[10px] text-gray-400 mt-0.5">Equipment maintenance service</p>
-                        )}
-                      </td>
-                    )}
-                    {settings.showSku       && <td className="py-2.5 text-[10px] font-mono text-gray-400">SKU-{(1000 + i).toString()}</td>}
-                    {settings.showQty       && <td className="py-2.5 text-right text-[10px] text-gray-600">{item.qty}</td>}
-                    {settings.showUnitPrice && <td className="py-2.5 text-right text-[10px] text-gray-600">{fmtCurrency(item.unit)}</td>}
-                    {settings.showTotalPrice && <td className="py-2.5 text-right text-[10px] font-semibold text-gray-800">{fmtCurrency(item.qty * item.unit)}</td>}
+                {invoice.lineItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={Math.max(
+                        1,
+                        (settings.showLineItemNames ? 1 : 0) +
+                          (settings.showSku ? 1 : 0) +
+                          (settings.showQty ? 1 : 0) +
+                          (settings.showUnitPrice ? 1 : 0) +
+                          (settings.showTotalPrice ? 1 : 0),
+                      )}
+                      className="py-4 text-[10px] text-gray-500 italic"
+                    >
+                      No line items on this invoice — totals reflect the stored invoice amounts.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  invoice.lineItems.map((item, i) => (
+                    <tr key={i} className="border-b border-gray-100">
+                      {settings.showLineItemNames && (
+                        <td className="py-2.5 pr-4">
+                          <p className="text-xs text-gray-800 font-medium">{item.description || "—"}</p>
+                          {settings.showLineItemDescriptions && item.item_type?.trim() ? (
+                            <p className="text-[10px] text-gray-400 mt-0.5">{item.item_type.trim()}</p>
+                          ) : null}
+                        </td>
+                      )}
+                      {settings.showSku && (
+                        <td className="py-2.5 text-[10px] font-mono text-gray-400">
+                          {item.sku?.trim() || "—"}
+                        </td>
+                      )}
+                      {settings.showQty && <td className="py-2.5 text-right text-[10px] text-gray-600">{item.qty}</td>}
+                      {settings.showUnitPrice && (
+                        <td className="py-2.5 text-right text-[10px] text-gray-600">{fmtCurrency(item.unit)}</td>
+                      )}
+                      {settings.showTotalPrice && (
+                        <td className="py-2.5 text-right text-[10px] font-semibold text-gray-800">
+                          {fmtCurrency(item.qty * item.unit)}
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
 
@@ -544,18 +593,14 @@ function InvoicePreview({
               {settings.showSubtotal && (
                 <div className="flex items-center gap-8 text-xs">
                   <span className="text-gray-500 font-medium">Subtotal</span>
-                  <span className="w-24 text-right text-gray-700">{fmtCurrency(subtotal)}</span>
+                  <span className="w-24 text-right text-gray-700">{fmtCurrency(storedSubtotal)}</span>
                 </div>
               )}
-              {settings.showTax && (
+              {showTaxRows && (
                 <div className="flex items-center gap-8 text-xs">
-                  <span className="text-gray-500 font-medium">Tax (8.75%)</span>
-                  <span className="w-24 text-right text-gray-700">{fmtCurrency(taxAmt)}</span>
-                </div>
-              )}
-              {settings.showTotalTax && settings.showTax && (
-                <div className="flex items-center gap-8 text-xs border-t border-gray-200 pt-1 mt-0.5">
-                  <span className="text-gray-500 font-medium">Total Tax</span>
+                  <span className="text-gray-500 font-medium">
+                    {settings.showTotalTax ? "Total tax" : invoiceTaxRowLabel(invoice)}
+                  </span>
                   <span className="w-24 text-right text-gray-700">{fmtCurrency(taxAmt)}</span>
                 </div>
               )}
@@ -565,17 +610,30 @@ function InvoicePreview({
                   {fmtCurrency(total)}
                 </span>
               </div>
-              {invoice.status === "Paid" ? (
+              {totalPaid > 0 ? (
                 <div className="flex items-center gap-8 text-xs">
-                  <span className="text-green-600 font-semibold">Amount Paid</span>
-                  <span className="w-24 text-right text-green-600 font-semibold">{fmtCurrency(total)}</span>
+                  <span className="text-green-600 font-semibold">Amount paid</span>
+                  <span className="w-24 text-right text-green-600 font-semibold tabular-nums">{fmtCurrency(totalPaid)}</span>
                 </div>
-              ) : (
-                <div className="flex items-center gap-8 text-xs">
-                  <span className="text-[color:var(--status-warning)] font-semibold">Amount Due</span>
-                  <span className="w-24 text-right text-[color:var(--status-warning)] font-bold tabular-nums">{fmtCurrency(amountDue)}</span>
-                </div>
-              )}
+              ) : null}
+              <div className="flex items-center gap-8 text-xs">
+                <span
+                  className={cn(
+                    "font-semibold",
+                    amountDue <= 0 ? "text-green-600" : "text-[color:var(--status-warning)]",
+                  )}
+                >
+                  {amountDue <= 0 ? "Balance" : "Balance due"}
+                </span>
+                <span
+                  className={cn(
+                    "w-24 text-right font-bold tabular-nums",
+                    amountDue <= 0 ? "text-green-600" : "text-[color:var(--status-warning)]",
+                  )}
+                >
+                  {fmtCurrency(amountDue)}
+                </span>
+              </div>
             </div>
           </div>
         )}

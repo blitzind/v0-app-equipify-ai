@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   Wrench,
 } from "lucide-react"
-import { buildStaffPreviewHref } from "@/components/portal/staff-preview-frame"
+import { buildStaffPreviewHref } from "@/lib/portal/staff-preview-href"
 import { modeLabel } from "@/lib/portal/certificate-release-staff"
 import { normalizeReleaseMode } from "@/lib/portal/certificate-release"
 import type { StaffPortalPreviewSnapshot } from "@/lib/portal/staff-portal-preview-data"

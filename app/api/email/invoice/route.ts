@@ -8,6 +8,11 @@ import { requireOrgPermission } from "@/lib/api/require-org-permission"
 import { invoiceStatusUiToDb } from "@/lib/org-quotes-invoices/map"
 import type { InvoiceStatus } from "@/lib/mock-data"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
+import {
+  formatUsdFromCents,
+  grandTotalCentsFromInvoiceRow,
+  invoiceTaxRowLabel,
+} from "@/lib/billing/invoice-financial-display"
 
 type Body = {
   organizationId?: string
@@ -60,7 +65,7 @@ export async function POST(request: Request) {
   const { data: inv, error: invErr } = await supabase
     .from("org_invoices")
     .select(
-      "id, customer_id, equipment_id, invoice_number, title, amount_cents, status, due_date, issued_at, archived_at",
+      "id, customer_id, equipment_id, invoice_number, title, amount_cents, tax_amount_cents, tax_rate_percent, status, due_date, issued_at, archived_at",
     )
     .eq("id", invoiceId)
     .eq("organization_id", organizationId)
@@ -101,7 +106,21 @@ export async function POST(request: Request) {
 
   const invoiceLabel = String((inv as { invoice_number?: string }).invoice_number ?? "").trim() || "Invoice"
   const amountCents = Number((inv as { amount_cents?: number }).amount_cents ?? 0)
-  const amountLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amountCents / 100)
+  const taxCentsRaw = (inv as { tax_amount_cents?: number | null }).tax_amount_cents
+  const taxCents = taxCentsRaw == null ? null : Math.round(Number(taxCentsRaw))
+  const grandTotalCents = grandTotalCentsFromInvoiceRow({
+    amount_cents: amountCents,
+    tax_amount_cents: taxCentsRaw,
+  })
+  const subtotalLabel = formatUsdFromCents(amountCents)
+  const totalLabel = formatUsdFromCents(grandTotalCents)
+  const taxRateRaw = (inv as { tax_rate_percent?: number | string | null }).tax_rate_percent
+  const taxLineLabel =
+    taxCents != null && taxCents > 0 ?
+      `${invoiceTaxRowLabel({
+        taxRatePercent: taxRateRaw == null ? null : Number(taxRateRaw),
+      })}: ${formatUsdFromCents(taxCents)}`
+    : null
   const dueRaw = (inv as { due_date?: string | null }).due_date
   const dueDateLabel = dueRaw
     ? new Date(dueRaw + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -118,12 +137,15 @@ export async function POST(request: Request) {
     organizationName,
     customerName,
     invoiceLabel,
-    amountLabel,
+    amountLabel: totalLabel,
     dueDateLabel,
     issuedDateLabel,
     equipmentSummary,
     messagePlain,
     subjectOverride,
+    subtotalLabel: taxLineLabel ? subtotalLabel : null,
+    taxLineLabel,
+    totalLabel,
   })
 
   const sendResult = await sendEmail({
