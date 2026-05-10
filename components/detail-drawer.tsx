@@ -214,14 +214,16 @@ export function DetailDrawer({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors touch-manipulation lg:min-h-9 lg:min-w-9"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5 lg:w-4 lg:h-4" />
         </button>
       </div>
 
       {actions && (
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] shrink-0 flex-wrap">{actions}</div>
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] shrink-0 flex-wrap [&_button]:min-h-11 [&_button]:touch-manipulation lg:[&_button]:min-h-9">
+          {actions}
+        </div>
       )}
 
       <div

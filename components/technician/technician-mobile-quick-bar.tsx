@@ -11,6 +11,8 @@ import {
   StickyNote,
   FileBadge2,
   WifiOff,
+  Hammer,
+  Package,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -43,6 +45,10 @@ export type TechnicianMobileQuickBarProps = {
   onSignature?: () => void
   /** Jump to technician notes tab + section. */
   onTechnicianNotes?: () => void
+  /** Jump to tasks tab. */
+  onTasks?: () => void
+  /** Jump to parts / materials tab. */
+  onParts?: () => void
   /** Jump to certificates tab (e.g. calibration workflow). */
   onCertificates?: () => void
   /** Show certificates shortcut (hide when no cert workflow). */
@@ -67,6 +73,8 @@ export function TechnicianMobileQuickBar({
   onPhotoFiles,
   onSignature,
   onTechnicianNotes,
+  onTasks,
+  onParts,
   onCertificates,
   showCertificatesShortcut,
   fixedAboveMobileNav,
@@ -80,7 +88,7 @@ export function TechnicianMobileQuickBar({
   const maps = navigateQuery?.trim() ? mapsSearchUrl(navigateQuery.trim()) : null
 
   const btnClass =
-    "h-11 min-w-[2.75rem] px-1.5 sm:px-2 flex flex-col items-center justify-center gap-0.5 rounded-xl border border-border bg-card text-[10px] font-medium text-foreground shadow-sm active:scale-[0.98] transition-transform disabled:opacity-40 disabled:pointer-events-none touch-manipulation"
+    "h-[3.25rem] min-h-[48px] min-w-0 px-1 sm:px-1.5 flex flex-col items-center justify-center gap-0.5 rounded-xl border border-border bg-card text-[10px] font-medium text-foreground shadow-sm active:scale-[0.98] transition-transform disabled:opacity-40 disabled:pointer-events-none touch-manipulation"
 
   const wrapClass = cn(
     "lg:hidden border-t border-border bg-background/95 backdrop-blur-md",
@@ -112,8 +120,8 @@ export function TechnicianMobileQuickBar({
           e.target.value = ""
         }}
       />
-      <div className="mx-auto flex max-w-lg flex-col gap-2">
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+      <div className="mx-auto flex max-w-lg flex-col gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {tel ? (
             <a href={tel} className={cn(btnClass, "hover:bg-muted/80")}>
               <Phone className="h-5 w-5 text-primary" aria-hidden />
@@ -139,14 +147,16 @@ export function TechnicianMobileQuickBar({
           {maps ? (
             <a href={maps} target="_blank" rel="noopener noreferrer" className={cn(btnClass, "hover:bg-muted/80")}>
               <Navigation className="h-5 w-5 text-primary" aria-hidden />
-              Navigate
+              Map
             </a>
           ) : (
             <span className={cn(btnClass, "text-muted-foreground")} aria-disabled title="Add a job location to navigate">
               <Navigation className="h-5 w-5 opacity-40" aria-hidden />
-              Navigate
+              Map
             </span>
           )}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             className={cn(btnClass, "hover:bg-muted/80")}
@@ -156,7 +166,6 @@ export function TechnicianMobileQuickBar({
             <Camera className="h-5 w-5 text-primary" aria-hidden />
             Photo
           </button>
-
           <button
             type="button"
             className={cn(btnClass, "hover:bg-muted/80")}
@@ -174,6 +183,26 @@ export function TechnicianMobileQuickBar({
           >
             <StickyNote className="h-5 w-5 text-primary" aria-hidden />
             Notes
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            className={cn(btnClass, "hover:bg-muted/80")}
+            disabled={disabled || !onTasks}
+            onClick={() => onTasks?.()}
+          >
+            <Hammer className="h-5 w-5 text-primary" aria-hidden />
+            Tasks
+          </button>
+          <button
+            type="button"
+            className={cn(btnClass, "hover:bg-muted/80")}
+            disabled={disabled || !onParts}
+            onClick={() => onParts?.()}
+          >
+            <Package className="h-5 w-5 text-primary" aria-hidden />
+            Parts
           </button>
           {showCertificatesShortcut ? (
             <button
@@ -197,7 +226,7 @@ export function TechnicianMobileQuickBar({
           <Button
             type="button"
             variant="default"
-            className="h-12 w-full gap-2 rounded-xl text-sm font-semibold shadow-md touch-manipulation"
+            className="h-12 min-h-[48px] w-full gap-2 rounded-xl text-sm font-semibold shadow-md touch-manipulation"
             disabled={disabled}
             onClick={() => onComplete()}
           >
@@ -205,8 +234,8 @@ export function TechnicianMobileQuickBar({
             Complete job
           </Button>
         ) : (
-          <div className="flex h-11 items-center justify-center rounded-xl border border-dashed border-border text-[11px] text-muted-foreground">
-            <CheckCircle2 className="mr-2 h-4 w-4 opacity-40" aria-hidden />
+          <div className="flex min-h-[48px] items-center justify-center rounded-xl border border-dashed border-border px-2 text-[11px] text-muted-foreground text-center">
+            <CheckCircle2 className="mr-2 h-4 w-4 shrink-0 opacity-40" aria-hidden />
             Job completed or closed — no complete action
           </div>
         )}

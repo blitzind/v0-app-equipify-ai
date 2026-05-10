@@ -22,7 +22,7 @@ export function TechnicianTodayMobileCard() {
         </div>
         <Link
           href="/technicians/today"
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm touch-manipulation active:opacity-90"
+          className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-primary px-4 py-2.5 min-h-11 text-xs font-semibold text-primary-foreground shadow-sm touch-manipulation active:opacity-90"
         >
           Open
           <ChevronRight className="h-4 w-4" aria-hidden />

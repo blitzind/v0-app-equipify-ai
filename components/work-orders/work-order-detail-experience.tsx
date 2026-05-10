@@ -918,7 +918,7 @@ export function WorkOrderDetailExperience({
       : cn("text-xs font-medium gap-1.5 whitespace-nowrap shrink-0", extra)
 
   const tabScrollWrapClass = isDrawer
-    ? "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5 space-y-5"
+    ? "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-4 sm:px-5 sm:py-5 space-y-4 sm:space-y-5"
     : undefined
 
   return (
@@ -1448,7 +1448,14 @@ export function WorkOrderDetailExperience({
             <div className="rounded-xl border border-border bg-muted/15 px-4 py-3 space-y-2">{postCompletionActions}</div>
           ) : null}
 
-          <div className={cn("grid", isDrawer ? "grid-cols-2 lg:grid-cols-4 gap-2" : "grid-cols-2 lg:grid-cols-4 gap-3")}>
+          <div
+            className={cn(
+              "grid",
+              isDrawer
+                ? "grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-2"
+                : "grid-cols-2 lg:grid-cols-4 gap-3",
+            )}
+          >
             {isDrawer ? (
               <>
                 <div className={kpiCellClass}>

@@ -85,6 +85,7 @@ import {
   History,
   UserPlus,
   ChevronDown,
+  PlayCircle,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import { useTenant } from "@/lib/tenant-store"
@@ -436,6 +437,7 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
   const [notesSaving, setNotesSaving] = useState(false)
   const [problemReportedDraft, setProblemReportedDraft] = useState("")
   const [problemSaving, setProblemSaving] = useState(false)
+  const [quickStatusBusy, setQuickStatusBusy] = useState(false)
   const [draftLaborDollars, setDraftLaborDollars] = useState("")
   const [draftPartsDollars, setDraftPartsDollars] = useState("")
   const [equipmentAssets, setEquipmentAssets] = useState<WorkOrderEquipmentAsset[]>([])
@@ -1502,6 +1504,70 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
     onUpdated?.()
   }
 
+  /** Mobile-only shortcut: Open/Scheduled → In progress (same workflow side-effects as status change in save edit). */
+  async function quickSetInProgressFromMobile() {
+    if (!wo || !activeOrgId || !woCanEdit || wo.isArchived) return
+    const cur = wo.status
+    if (cur !== "Open" && cur !== "Scheduled") return
+    setQuickStatusBusy(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const tid = wo.technicianId === "unassigned" ? null : wo.technicianId
+      const assign = await workOrderAssignmentColumns(supabase, activeOrgId, tid)
+      const prevStatusDb = uiStatusToDb(cur)
+      const nextStatusDb = "in_progress"
+      const { error } = await supabase
+        .from("work_orders")
+        .update({
+          status: nextStatusDb,
+          updated_at: new Date().toISOString(),
+          ...assign,
+        })
+        .eq("id", wo.id)
+        .eq("organization_id", activeOrgId)
+
+      if (error) {
+        pushToast({
+          variant: "destructive",
+          title: "Could not update status",
+          description: error.message,
+        })
+        return
+      }
+
+      if (prevStatusDb !== nextStatusDb) {
+        const woCtx = {
+          id: wo.id,
+          status: nextStatusDb,
+          priority: uiPriorityToDb(wo.priority),
+          customer_id: wo.customerId,
+          equipment_id: wo.equipmentId,
+          assigned_user_id: assign.assigned_user_id,
+          assigned_technician_id: assign.assigned_technician_id,
+        }
+        void fetch(`/api/organizations/${activeOrgId}/workflows/emit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trigger_type: "work_order_status_changed",
+            source_type: "work_order",
+            source_id: wo.id,
+            context: {
+              work_order: woCtx,
+              previous_work_order: { status: prevStatusDb },
+            },
+          }),
+        }).catch(() => {})
+      }
+
+      pushToast({ title: "Status updated", description: "Job marked in progress." })
+      await loadWorkOrder()
+      onUpdated?.()
+    } finally {
+      setQuickStatusBusy(false)
+    }
+  }
+
   async function handleCustomerSignatureSave(blob: Blob, name: string) {
     if (!wo || !activeOrgId) return
     const supabase = createBrowserSupabaseClient()
@@ -2274,6 +2340,30 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
         }
       >
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+          {!editing && wo && !wo.isArchived && woCanEdit && (wo.status === "Open" || wo.status === "Scheduled") ? (
+            <div className="lg:hidden shrink-0 border-b border-border bg-muted/25 dark:bg-muted/10 px-3 py-3 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5">
+                Field status
+              </p>
+              <Button
+                type="button"
+                className="h-12 w-full rounded-xl text-sm font-semibold gap-2 touch-manipulation"
+                disabled={quickStatusBusy}
+                onClick={() => void quickSetInProgressFromMobile()}
+              >
+                {quickStatusBusy ? (
+                  <Loader2 className="h-5 w-5 animate-spin shrink-0" aria-hidden />
+                ) : (
+                  <PlayCircle className="h-5 w-5 shrink-0" aria-hidden />
+                )}
+                Start job · In progress
+              </Button>
+              <p className="text-[10px] text-muted-foreground text-center leading-snug px-1">
+                Other statuses: use <span className="font-medium text-foreground">Edit</span> in the header. Finish with{" "}
+                <span className="font-medium text-foreground">Complete job</span> below.
+              </p>
+            </div>
+          ) : null}
           {editing && (
             <div className="max-h-[42vh] shrink-0 space-y-4 overflow-y-auto border-b border-border px-5 py-4">
               <DrawerSection title="Job settings">
@@ -2769,6 +2859,8 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   })
                 })
               }}
+              onTasks={() => handleDrawerTabChange("tasks")}
+              onParts={() => handleDrawerTabChange("parts")}
               onCertificates={() => handleDrawerTabChange("certificates")}
               showCertificatesShortcut={
                 Boolean(wo.calibrationTemplateId) || equipmentAssets.length > 0

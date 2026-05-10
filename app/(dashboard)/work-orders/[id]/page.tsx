@@ -310,12 +310,14 @@ export default function WorkOrderDetailPage() {
     return [wo?.customerName, wo?.location].filter(Boolean).join(" ").trim()
   }, [wo?.customerName, wo?.location])
 
-  const mobileJumpToSection = useCallback((tab: string, sectionId: string) => {
+  const mobileJumpToSection = useCallback((tab: string, sectionId?: string | null) => {
     setPageWoTab(tab)
+    const id = sectionId?.trim()
+    if (!id) return
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.setTimeout(() => {
-          document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "center" })
+          document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" })
         }, 100)
       })
     })
@@ -846,11 +848,11 @@ export default function WorkOrderDetailPage() {
 
   return (
     <div className="flex flex-col gap-4 max-w-5xl mx-auto max-lg:pb-[min(40vh,14rem)]">
-      <div className="flex flex-wrap items-center gap-2 justify-between">
+      <div className="flex flex-wrap items-center gap-2 justify-between max-lg:flex-col max-lg:items-stretch">
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/work-orders">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <ChevronLeft className="w-4 h-4" />
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 touch-manipulation lg:h-8 lg:w-8">
+              <ChevronLeft className="w-5 h-5 lg:w-4 lg:h-4" />
             </Button>
           </Link>
           {saved && (
@@ -860,20 +862,25 @@ export default function WorkOrderDetailPage() {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 max-lg:w-full max-lg:flex-col max-lg:items-stretch">
           {!editing ? (
             <>
               {nextStatus[workOrder.status] && (
                 <Button
                   variant="outline"
                   size="sm"
+                  className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
                   onClick={() => void handleStatusAdvance(nextStatus[workOrder.status]!)}
                 >
                   Move to {nextStatus[workOrder.status]}
                 </Button>
               )}
               {["Open", "Scheduled", "In Progress"].includes(workOrder.status) && (
-                <Button size="sm" onClick={() => setEditing(true)}>
+                <Button
+                  size="sm"
+                  className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
+                  onClick={() => setEditing(true)}
+                >
                   <PenLine className="w-3.5 h-3.5 mr-1.5" />
                   Edit repair log
                 </Button>
@@ -881,10 +888,19 @@ export default function WorkOrderDetailPage() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
+                onClick={() => setEditing(false)}
+              >
                 Cancel
               </Button>
-              <Button size="sm" onClick={() => void handleSave()}>
+              <Button
+                size="sm"
+                className="min-h-11 w-full touch-manipulation sm:min-h-9 sm:w-auto"
+                onClick={() => void handleSave()}
+              >
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Save changes
               </Button>
@@ -1099,6 +1115,8 @@ export default function WorkOrderDetailPage() {
           onPhotoFiles={(files) => void handleAttachmentUpload(files)}
           onSignature={() => mobileJumpToSection("overview", "customer-signature-section")}
           onTechnicianNotes={() => mobileJumpToSection("notes", "technician-notes-section")}
+          onTasks={() => mobileJumpToSection("tasks")}
+          onParts={() => mobileJumpToSection("parts")}
           onCertificates={() => setPageWoTab("certificates")}
           showCertificatesShortcut={
             Boolean(workOrder.calibrationTemplateId) || equipmentAssets.length > 0

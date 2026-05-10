@@ -8,13 +8,13 @@ export const TAB_HOVER_INACTIVE_DARK = "dark:hover:bg-[#13233F]/28 dark:hover:te
 
 /** Radix `TabsList`: drawer/detail horizontal tab strip (scroll, bottom border) */
 export const tabsListDrawerRowClassName = cn(
-  "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-1 rounded-none border-0 border-b border-border dark:border-[#25324C] p-0 shrink-0 z-[11] px-5 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+  "h-auto min-h-0 w-full flex flex-nowrap overflow-x-auto overflow-y-hidden overscroll-x-contain justify-start gap-1 rounded-none border-0 border-b border-border dark:border-[#25324C] p-0 shrink-0 z-[11] px-3 py-1.5 sm:px-5 sm:py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory",
 )
 
 /** Radix `TabsTrigger`: drawer / detail row tabs (replaces gray underline) */
 export function tabsTriggerDrawerRowClassName(extra?: string) {
   return cn(
-    "grow-0 basis-auto rounded-md border border-transparent px-3 py-2.5 shadow-none outline-none",
+    "grow-0 basis-auto rounded-md border border-transparent px-3 py-2.5 min-h-[44px] inline-flex items-center justify-center gap-1.5 sm:min-h-0 shadow-none outline-none snap-start",
     "text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-150",
     "text-muted-foreground hover:text-foreground",
     TAB_HOVER_INACTIVE_DARK,

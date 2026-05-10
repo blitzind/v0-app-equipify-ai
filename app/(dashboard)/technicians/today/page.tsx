@@ -207,7 +207,7 @@ export default function TechnicianTodayPage() {
             without a scheduled date.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="shrink-0" asChild>
+        <Button variant="outline" size="default" className="shrink-0 min-h-11 px-4 touch-manipulation lg:min-h-9 lg:size-sm" asChild>
           <Link href="/work-orders">All work orders</Link>
         </Button>
       </div>
@@ -238,7 +238,7 @@ export default function TechnicianTodayPage() {
                     key={r.id}
                     href={woLink(r.id)}
                     className={cn(
-                      "flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm",
+                      "flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-4 min-h-[4.5rem] text-left shadow-sm",
                       "active:scale-[0.99] transition-transform touch-manipulation",
                     )}
                   >
@@ -282,7 +282,7 @@ export default function TechnicianTodayPage() {
                     key={r.id}
                     href={woLink(r.id)}
                     className={cn(
-                      "flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 text-left shadow-sm",
+                      "flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-4 min-h-[4.5rem] text-left shadow-sm",
                       "active:scale-[0.99] transition-transform touch-manipulation",
                     )}
                   >

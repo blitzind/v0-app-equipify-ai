@@ -220,11 +220,11 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
-                className="flex items-center gap-3 py-3.5 transition-colors"
+                className="flex items-center gap-3 min-h-[48px] py-3.5 transition-colors touch-manipulation"
                 style={active ? { color: ACCENT } : undefined}
               >
                 <item.icon
-                  className="w-4 h-4 shrink-0"
+                  className="w-5 h-5 shrink-0"
                   style={{ color: active ? ACCENT : "var(--muted-foreground)" }}
                 />
                 <span className={cn("text-sm", active && "font-semibold")}>{item.label}</span>
@@ -300,11 +300,11 @@ export function MobileBottomNav() {
                   <button
                     key="more"
                     onClick={() => setMoreOpen(true)}
-                    className="flex flex-col items-center gap-1 px-3 py-1 min-w-[52px] active:opacity-70 transition-opacity"
+                    className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 min-h-[52px] min-w-[56px] rounded-xl active:opacity-70 transition-opacity touch-manipulation"
                     aria-label="More"
                   >
-                    <Icon className="w-5 h-5" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
-                    <span className="text-[10px] font-medium" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>More</span>
+                    <Icon className="w-6 h-6" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
+                    <span className="text-[10px] font-medium leading-none" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>More</span>
                   </button>
                 )
               }
@@ -314,11 +314,11 @@ export function MobileBottomNav() {
                 <Link
                   key={href}
                   href={href}
-                  className="flex flex-col items-center gap-1 px-3 py-1 min-w-[52px] active:opacity-70 transition-opacity"
+                  className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 min-h-[52px] min-w-[56px] rounded-xl active:opacity-70 transition-opacity touch-manipulation"
                   aria-label={label}
                 >
-                  <Icon className="w-5 h-5" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
-                  <span className="text-[10px] font-medium" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>{label}</span>
+                  <Icon className="w-6 h-6" style={{ color: active ? ACCENT : "var(--muted-foreground)" }} />
+                  <span className="text-[10px] font-medium leading-none" style={{ color: active ? ACCENT : "var(--muted-foreground)" }}>{label}</span>
                 </Link>
               )
             })}

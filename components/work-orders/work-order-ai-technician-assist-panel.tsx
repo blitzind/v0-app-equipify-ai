@@ -167,7 +167,7 @@ export function WorkOrderAiTechnicianAssistPanel(props: {
       id="work-order-ai-technician-assist-panel"
       className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
     >
-      <div className="border-b border-border bg-muted/25 dark:bg-muted/10 px-4 py-3 flex flex-wrap items-start justify-between gap-2">
+      <div className="border-b border-border bg-muted/25 dark:bg-muted/10 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             AI technician guidance
@@ -185,12 +185,12 @@ export function WorkOrderAiTechnicianAssistPanel(props: {
             AI draft — human review required
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
+        <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto sm:flex-row sm:flex-wrap">
           <Button
             type="button"
             size="sm"
             variant="secondary"
-            className="h-8 gap-1.5 text-xs"
+            className="h-11 gap-1.5 text-xs w-full sm:h-8 sm:w-auto touch-manipulation"
             disabled={disabled || generating}
             onClick={() => void runGenerate()}
           >
@@ -202,7 +202,7 @@ export function WorkOrderAiTechnicianAssistPanel(props: {
               type="button"
               size="sm"
               variant="outline"
-              className="h-8 gap-1.5 text-xs"
+              className="h-11 gap-1.5 text-xs w-full sm:h-8 sm:w-auto touch-manipulation"
               disabled={copyBusy}
               onClick={() => void copyText("All sections", formatTechnicianGuidancePlainText(guidance))}
             >

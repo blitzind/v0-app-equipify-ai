@@ -267,7 +267,7 @@ function KanbanCard({ wo, onOpen }: { wo: WorkOrder; onOpen: () => void }) {
           onOpen()
         }
       }}
-      className="touch-manipulation bg-card border border-border rounded-lg p-3.5 hover:border-primary/40 hover:shadow-sm active:scale-[0.99] transition-all cursor-pointer group"
+      className="touch-manipulation bg-card border border-border rounded-xl p-4 min-h-[5.5rem] hover:border-primary/40 hover:shadow-sm active:scale-[0.99] transition-all cursor-pointer group"
     >
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="text-xs font-mono text-muted-foreground">{getWorkOrderDisplay(wo)}</span>
@@ -433,6 +433,55 @@ const KanbanView = forwardRef<
   )
 })
 
+// ─── Mobile list (table data, card layout — avoids wide horizontal scroll) ─────
+
+function MobileWorkOrderRowCard({ wo, onOpen }: { wo: WorkOrder; onOpen: (id: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(wo.id)}
+      className="w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm touch-manipulation min-h-[4.75rem] active:scale-[0.99] transition-transform flex flex-col gap-2"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-mono text-xs text-primary shrink-0">{getWorkOrderDisplay(wo)}</span>
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          <StatusBadge status={wo.status} />
+          {wo.isArchived ? (
+            <Badge variant="outline" className="text-[9px] font-semibold px-1.5 py-0 h-5 bg-muted text-muted-foreground border-border">
+              Archived
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+      <p className="text-sm font-medium text-foreground line-clamp-2 leading-snug">{wo.description}</p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span className="truncate max-w-[55%]">{wo.customerName}</span>
+        <span className="text-border">·</span>
+        <span className="truncate">{wo.equipmentName}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <PriorityDot priority={wo.priority} />
+          <span className={cn(PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
+        </span>
+        <span className="text-border">·</span>
+        <span>{formatDate(wo.scheduledDate)}</span>
+        <span className="text-border">·</span>
+        <span className="inline-flex items-center gap-1 min-w-0">
+          <TechnicianAvatar
+            userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+            name={wo.technicianName}
+            initials={initialsFromTechName(wo.technicianName)}
+            avatarUrl={wo.technicianAvatarUrl}
+            size="xs"
+          />
+          <span className="truncate">{wo.technicianName}</span>
+        </span>
+      </div>
+    </button>
+  )
+}
+
 // ─── Table view ───────────────────────────────────────────────────────────────
 
 function TableView({
@@ -461,78 +510,90 @@ function TableView({
   }
 
   return (
-    <div className="ds-table-surface">
-      <Table>
-        <TableHeader>
-          <TableRow className="ds-table-header-row-subtle">
-            <TableHead className="w-28"><SortHeader label="ID" col="id" /></TableHead>
-            <TableHead><SortHeader label="Customer" col="customerName" /></TableHead>
-            <TableHead>Equipment</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead><SortHeader label="Priority" col="priority" /></TableHead>
-            <TableHead><SortHeader label="Status" col="status" /></TableHead>
-            <TableHead>Technician</TableHead>
-            <TableHead><SortHeader label="Scheduled" col="scheduledDate" /></TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {workOrders.map((wo) => (
-            <TableRow key={wo.id} className="ds-hover-list-row cursor-pointer" onClick={() => onOpen(wo.id)}>
-              <TableCell>
-                <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
-              </TableCell>
-              <TableCell className="font-medium text-sm">{wo.customerName}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{wo.equipmentName}</TableCell>
-              <TableCell>
-                <span className="text-xs text-muted-foreground">{wo.type}</span>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1.5">
-                  <PriorityDot priority={wo.priority} />
-                  <span className={cn("text-xs", PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap items-center gap-1">
-                  <StatusBadge status={wo.status} />
-                  {wo.isArchived ? (
-                    <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
-                      Archived
-                    </Badge>
-                  ) : null}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-                  <TechnicianAvatar
-                    userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
-                    name={wo.technicianName}
-                    initials={initialsFromTechName(wo.technicianName)}
-                    avatarUrl={wo.technicianAvatarUrl}
-                    size="sm"
-                  />
-                  <span className="truncate">{wo.technicianName}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{formatDate(wo.scheduledDate)}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => onOpen(wo.id)}>
-                  <Arrow className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
-                </button>
-              </TableCell>
+    <>
+      <div className="hidden md:block ds-table-surface">
+        <Table>
+          <TableHeader>
+            <TableRow className="ds-table-header-row-subtle">
+              <TableHead className="w-28"><SortHeader label="ID" col="id" /></TableHead>
+              <TableHead><SortHeader label="Customer" col="customerName" /></TableHead>
+              <TableHead>Equipment</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead><SortHeader label="Priority" col="priority" /></TableHead>
+              <TableHead><SortHeader label="Status" col="status" /></TableHead>
+              <TableHead>Technician</TableHead>
+              <TableHead><SortHeader label="Scheduled" col="scheduledDate" /></TableHead>
+              <TableHead className="w-10" />
             </TableRow>
-          ))}
-          {workOrders.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground text-sm py-12">
-                No work orders match your filters.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {workOrders.map((wo) => (
+              <TableRow key={wo.id} className="ds-hover-list-row cursor-pointer" onClick={() => onOpen(wo.id)}>
+                <TableCell>
+                  <span className="font-mono text-xs text-primary hover:underline">{getWorkOrderDisplay(wo)}</span>
+                </TableCell>
+                <TableCell className="font-medium text-sm">{wo.customerName}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{wo.equipmentName}</TableCell>
+                <TableCell>
+                  <span className="text-xs text-muted-foreground">{wo.type}</span>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <PriorityDot priority={wo.priority} />
+                    <span className={cn("text-xs", PRIORITY_STYLE[wo.priority])}>{wo.priority}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <StatusBadge status={wo.status} />
+                    {wo.isArchived ? (
+                      <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
+                        Archived
+                      </Badge>
+                    ) : null}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                    <TechnicianAvatar
+                      userId={wo.technicianId === "unassigned" ? "—" : wo.technicianId}
+                      name={wo.technicianName}
+                      initials={initialsFromTechName(wo.technicianName)}
+                      avatarUrl={wo.technicianAvatarUrl}
+                      size="sm"
+                    />
+                    <span className="truncate">{wo.technicianName}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{formatDate(wo.scheduledDate)}</TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onOpen(wo.id)}>
+                    <Arrow className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+                  </button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {workOrders.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center text-muted-foreground text-sm py-12">
+                  No work orders match your filters.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="md:hidden flex flex-col gap-2 min-w-0">
+        {workOrders.length === 0 ? (
+          <p className="text-center text-muted-foreground text-sm py-12 rounded-xl border border-dashed border-border">
+            No work orders match your filters.
+          </p>
+        ) : (
+          workOrders.map((wo) => <MobileWorkOrderRowCard key={wo.id} wo={wo} onOpen={onOpen} />)
+        )}
+      </div>
+    </>
   )
 }
 
@@ -1211,7 +1272,7 @@ function WorkOrdersPageInner() {
             type="button"
             onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
             className={cn(
-              "flex w-full flex-col gap-0.5 rounded-lg border bg-card p-3 text-left transition-all hover:border-primary/40",
+              "flex w-full flex-col gap-0.5 rounded-lg border bg-card p-3 min-h-[52px] text-left transition-all hover:border-primary/40 touch-manipulation sm:min-h-0",
               statusFilter === s && "border-primary ring-1 ring-primary/20",
             )}
           >
