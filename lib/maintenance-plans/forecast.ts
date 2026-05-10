@@ -54,15 +54,17 @@ export function isForecastEligiblePlan(row: MaintenanceForecastPlanInput): boole
 }
 
 export function maintenancePlanToForecastInput(p: MaintenancePlan): MaintenanceForecastPlanInput {
+  const statusUi = p?.status ?? "Active"
+  const nextRaw = typeof p?.nextDueDate === "string" ? p.nextDueDate.trim() : ""
   return {
-    id: p.id,
-    status: planStatusUiToDb(p.status),
-    next_due_date: p.nextDueDate?.trim() ? p.nextDueDate.trim() : null,
-    is_archived: p.isArchived === true,
-    customer_id: p.customerId,
-    customer_name: p.customerName,
-    equipment_id: p.equipmentId?.trim() ? p.equipmentId : null,
-    equipment_name: p.equipmentName,
+    id: p?.id ?? "",
+    status: planStatusUiToDb(statusUi),
+    next_due_date: nextRaw || null,
+    is_archived: p?.isArchived === true,
+    customer_id: p?.customerId ?? "",
+    customer_name: p?.customerName ?? "",
+    equipment_id: p?.equipmentId?.trim() ? p.equipmentId.trim() : null,
+    equipment_name: p?.equipmentName ?? "",
   }
 }
 
@@ -130,14 +132,15 @@ function weekLabel(weekStart: string, weekEnd: string): string {
 }
 
 export function summarizeMaintenanceForecast(
-  rows: MaintenanceForecastPlanInput[],
+  rows: MaintenanceForecastPlanInput[] | null | undefined,
   options?: { todayYmd?: string; weeksAhead?: number; monthsAhead?: number },
 ): MaintenanceForecastSummary {
+  const safeRows = Array.isArray(rows) ? rows : []
   const today = options?.todayYmd ?? utcTodayYmd()
   const weeksAhead = options?.weeksAhead ?? 8
   const monthsAhead = options?.monthsAhead ?? 6
 
-  const eligible = rows.filter(isForecastEligiblePlan)
+  const eligible = safeRows.filter((r) => Boolean(r?.id?.trim()) && isForecastEligiblePlan(r))
 
   const exclusive: Record<DueWindowKey, number> = {
     overdue: 0,

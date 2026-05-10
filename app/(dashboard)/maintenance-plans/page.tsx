@@ -130,16 +130,20 @@ const CHANNEL_CONFIG: Record<NotificationChannel, { Icon: React.ElementType; col
   "Internal Alert": { Icon: MonitorCheck,  color: "ds-icon-accent" },
 }
 
-function daysUntil(dateStr: string): number {
-  const due = new Date(dateStr)
+function daysUntil(dateStr: string | undefined | null): number {
+  const raw = typeof dateStr === "string" ? dateStr.trim() : ""
+  if (!raw) return Number.NaN
+  const due = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`)
+  if (Number.isNaN(due.getTime())) return Number.NaN
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function urgencyClass(days: number): string {
-  if (days < 0)   return "ds-text-danger font-semibold"
-  if (days <= 7)  return "ds-text-danger font-medium"
+  if (Number.isNaN(days)) return "text-muted-foreground"
+  if (days < 0) return "ds-text-danger font-semibold"
+  if (days <= 7) return "ds-text-danger font-medium"
   if (days <= 14) return "ds-text-warning font-medium"
   if (days <= 30) return "ds-text-warning"
   return "text-muted-foreground"
@@ -184,7 +188,8 @@ function formatShortDate(iso: string) {
 }
 
 function formatDays(days: number): string {
-  if (days < 0)  return `${Math.abs(days)}d overdue`
+  if (Number.isNaN(days)) return "No due date"
+  if (days < 0) return `${Math.abs(days)}d overdue`
   if (days === 0) return "Due today"
   if (days === 1) return "Due tomorrow"
   return `Due in ${days}d`
@@ -326,9 +331,8 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
 
   async function handleToggleRule(ruleId: string) {
     setDetailError(null)
-    const updated = plan.notificationRules.map((r) =>
-      r.id === ruleId ? { ...r, enabled: !r.enabled } : r
-    )
+    const baseRules = Array.isArray(plan.notificationRules) ? plan.notificationRules : []
+    const updated = baseRules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r))
     const res = await updateRules(plan.id, updated)
     if (res.error) setDetailError(res.error)
   }
@@ -455,7 +459,8 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
 
   const groupedRules = useMemo(() => {
     const map: Record<NotificationTriggerDays, NotificationRule[]> = { 30: [], 14: [], 7: [], 1: [] }
-    plan.notificationRules.forEach((r) => {
+    const rules = Array.isArray(plan.notificationRules) ? plan.notificationRules : []
+    rules.forEach((r) => {
       map[r.triggerDays] = [...(map[r.triggerDays] || []), r]
     })
     return map
@@ -1031,7 +1036,8 @@ function StatusBadge({ status }: { status: PlanStatus }) {
 function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => void }) {
   const days = daysUntil(plan.nextDueDate)
   const accent = planDueAccent(days)
-  const activeRules = plan.notificationRules.filter((r) => r.enabled).length
+  const activeRules = (Array.isArray(plan.notificationRules) ? plan.notificationRules : []).filter((r) => r.enabled)
+    .length
 
   return (
     <button
@@ -1076,7 +1082,9 @@ function PlanCard({ plan, onClick }: { plan: MaintenancePlan; onClick: () => voi
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs text-muted-foreground">Services</span>
-          <span className="text-xs font-medium text-foreground">{plan.services.length} items</span>
+          <span className="text-xs font-medium text-foreground">
+            {(Array.isArray(plan.services) ? plan.services : []).length} items
+          </span>
         </div>
       </div>
 
@@ -1212,7 +1220,10 @@ function MaintenancePlansPageInner() {
     return plans.filter((p) => {
       if (statusFilter !== "All" && p.status !== statusFilter) return false
       if (intervalFilter !== "All" && p.interval !== intervalFilter) return false
-      if (q && !p.name.toLowerCase().includes(q) && !p.customerName.toLowerCase().includes(q) && !p.equipmentName.toLowerCase().includes(q)) return false
+      const name = (p.name ?? "").toLowerCase()
+      const cust = (p.customerName ?? "").toLowerCase()
+      const eq = (p.equipmentName ?? "").toLowerCase()
+      if (q && !name.includes(q) && !cust.includes(q) && !eq.includes(q)) return false
       return true
     })
   }, [plans, search, statusFilter, intervalFilter])
@@ -1220,19 +1231,39 @@ function MaintenancePlansPageInner() {
   const plansForStats = useMemo(() => plans.filter((p) => !p.isArchived), [plans])
 
   const stats = useMemo(() => {
-    const active   = plansForStats.filter((p) => p.status === "Active").length
-    const due7     = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 7).length
-    const due30    = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 30).length
-    const due90    = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) <= 90).length
-    const overdue  = plansForStats.filter((p) => p.status === "Active" && daysUntil(p.nextDueDate) < 0).length
-    const autoWo   = plansForStats.filter((p) => p.autoCreateWorkOrder).length
-    return { active, due7, due30, due60, due90, overdue, autoWo }
+    const active = plansForStats.filter((p) => p.status === "Active").length
+    const due7 = plansForStats.filter((p) => {
+      if (p.status !== "Active") return false
+      const d = daysUntil(p.nextDueDate)
+      return !Number.isNaN(d) && d <= 7
+    }).length
+    const due30 = plansForStats.filter((p) => {
+      if (p.status !== "Active") return false
+      const d = daysUntil(p.nextDueDate)
+      return !Number.isNaN(d) && d <= 30
+    }).length
+    const due90 = plansForStats.filter((p) => {
+      if (p.status !== "Active") return false
+      const d = daysUntil(p.nextDueDate)
+      return !Number.isNaN(d) && d <= 90
+    }).length
+    const overdue = plansForStats.filter((p) => {
+      if (p.status !== "Active") return false
+      const d = daysUntil(p.nextDueDate)
+      return !Number.isNaN(d) && d < 0
+    }).length
+    const autoWo = plansForStats.filter((p) => p.autoCreateWorkOrder).length
+    return { active, due7, due30, due90, overdue, autoWo }
   }, [plansForStats])
 
-  const forecastSummary = useMemo(
-    () => summarizeMaintenanceForecast(plans.map(maintenancePlanToForecastInput)),
-    [plans],
-  )
+  const forecastSummary = useMemo(() => {
+    try {
+      const rows = Array.isArray(plans) ? plans.map(maintenancePlanToForecastInput) : []
+      return summarizeMaintenanceForecast(rows)
+    } catch {
+      return summarizeMaintenanceForecast([])
+    }
+  }, [plans])
 
   const initialLoading = loading && plans.length === 0
   const listEmpty = !loading && plans.length === 0

@@ -17,13 +17,18 @@ export function filterMaintenancePlansForAssignedScope(
   const scope = args.scope
   if (!scope) return []
 
+  const customerIds = scope.customerIds ?? []
+  const equipmentIds = scope.equipmentIds ?? []
+  const technicianIds = scope.technicianIds ?? []
+
   return plans.filter((plan) => {
-    if (scope.customerIds.includes(plan.customerId)) return true
-    if (plan.equipmentId?.trim() && scope.equipmentIds.includes(plan.equipmentId.trim())) return true
+    const cid = plan.customerId ?? ""
+    if (cid && customerIds.includes(cid)) return true
+    if (plan.equipmentId?.trim() && equipmentIds.includes(plan.equipmentId.trim())) return true
     const tid = plan.technicianId?.trim()
     if (tid) {
       if (tid === args.userId) return true
-      if (scope.technicianIds.includes(tid)) return true
+      if (technicianIds.includes(tid)) return true
     }
     return false
   })

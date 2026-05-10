@@ -23,6 +23,16 @@ function BarRow({ label, count, max }: { label: string; count: number; max: numb
   )
 }
 
+const EMPTY_EXCLUSIVE = {
+  overdue: 0,
+  d0_7: 0,
+  d8_30: 0,
+  d31_60: 0,
+  d61_90: 0,
+  beyond_90: 0,
+  no_date: 0,
+}
+
 export function MaintenanceForecastPanel({
   summary,
   variant = "full",
@@ -30,7 +40,7 @@ export function MaintenanceForecastPanel({
   contractHint,
   replacementHintSlot,
 }: {
-  summary: MaintenanceForecastSummary
+  summary: MaintenanceForecastSummary | null | undefined
   variant?: "full" | "compact"
   className?: string
   /** Optional SLA / agreement context (no billing claims). */
@@ -38,8 +48,16 @@ export function MaintenanceForecastPanel({
   /** Optional deterministic replacement-readiness context (compact variant). */
   replacementHintSlot?: ReactNode
 }) {
-  const maxWeek = Math.max(1, ...summary.workloadWeeks.map((w) => w.count))
-  const maxMonth = Math.max(1, ...summary.workloadMonths.map((m) => m.count))
+  const exclusive = summary?.exclusive ?? EMPTY_EXCLUSIVE
+  const cumulative = summary?.cumulative ?? { within7: 0, within30: 0, within60: 0, within90: 0 }
+  const workloadWeeks = Array.isArray(summary?.workloadWeeks) ? summary.workloadWeeks : []
+  const workloadMonths = Array.isArray(summary?.workloadMonths) ? summary.workloadMonths : []
+  const byCustomer = Array.isArray(summary?.byCustomer) ? summary.byCustomer : []
+  const byEquipment = Array.isArray(summary?.byEquipment) ? summary.byEquipment : []
+  const forecastableCount = typeof summary?.forecastableCount === "number" ? summary.forecastableCount : 0
+
+  const maxWeek = Math.max(1, ...workloadWeeks.map((w) => w.count))
+  const maxMonth = Math.max(1, ...workloadMonths.map((m) => m.count))
 
   if (variant === "compact") {
     return (
@@ -55,10 +73,10 @@ export function MaintenanceForecastPanel({
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
           {[
-            { label: "Overdue", value: summary.exclusive.overdue, tone: "text-destructive" },
-            { label: "≤7 days", value: summary.cumulative.within7, tone: "text-foreground" },
-            { label: "≤30 days", value: summary.cumulative.within30, tone: "text-foreground" },
-            { label: "≤90 days", value: summary.cumulative.within90, tone: "text-muted-foreground" },
+            { label: "Overdue", value: exclusive.overdue, tone: "text-destructive" },
+            { label: "≤7 days", value: cumulative.within7, tone: "text-foreground" },
+            { label: "≤30 days", value: cumulative.within30, tone: "text-foreground" },
+            { label: "≤90 days", value: cumulative.within90, tone: "text-muted-foreground" },
           ].map((c) => (
             <div key={c.label} className="rounded-md border border-border/80 bg-background/80 py-2 px-1">
               <p className={cn("text-lg font-bold tabular-nums", c.tone)}>{c.value}</p>
@@ -86,7 +104,7 @@ export function MaintenanceForecastPanel({
             <h3 className="text-sm font-semibold text-foreground">Maintenance forecast</h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {summary.forecastableCount} active plan{summary.forecastableCount === 1 ? "" : "s"} with scheduled due
+            {forecastableCount} active plan{forecastableCount === 1 ? "" : "s"} with scheduled due
             dates. Workload buckets use calendar weeks (Mon–Sun) and calendar months.
           </p>
         </div>
@@ -98,12 +116,12 @@ export function MaintenanceForecastPanel({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {(
               [
-                ["Overdue", summary.exclusive.overdue],
-                ["0–7 days", summary.exclusive.d0_7],
-                ["8–30 days", summary.exclusive.d8_30],
-                ["31–60 days", summary.exclusive.d31_60],
-                ["61–90 days", summary.exclusive.d61_90],
-                ["90+ days", summary.exclusive.beyond_90],
+                ["Overdue", exclusive.overdue],
+                ["0–7 days", exclusive.d0_7],
+                ["8–30 days", exclusive.d8_30],
+                ["31–60 days", exclusive.d31_60],
+                ["61–90 days", exclusive.d61_90],
+                ["90+ days", exclusive.beyond_90],
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="rounded-md border border-border px-3 py-2">
@@ -113,8 +131,8 @@ export function MaintenanceForecastPanel({
             ))}
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Cumulative (includes overdue): ≤7d: {summary.cumulative.within7} · ≤30d: {summary.cumulative.within30} ·
-            ≤60d: {summary.cumulative.within60} · ≤90d: {summary.cumulative.within90}
+            Cumulative (includes overdue): ≤7d: {cumulative.within7} · ≤30d: {cumulative.within30} · ≤60d:{" "}
+            {cumulative.within60} · ≤90d: {cumulative.within90}
           </p>
         </div>
 
@@ -123,7 +141,7 @@ export function MaintenanceForecastPanel({
             Workload — next 8 weeks
           </p>
           <div className="space-y-2.5">
-            {summary.workloadWeeks.map((w) => (
+            {workloadWeeks.map((w) => (
               <BarRow key={w.weekStart} label={w.label} count={w.count} max={maxWeek} />
             ))}
           </div>
@@ -134,21 +152,21 @@ export function MaintenanceForecastPanel({
             Workload — next 6 months
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
-            {summary.workloadMonths.map((m) => (
+            {workloadMonths.map((m) => (
               <BarRow key={m.monthKey} label={m.label} count={m.count} max={maxMonth} />
             ))}
           </div>
         </div>
 
-        {(summary.byCustomer.length > 0 || summary.byEquipment.length > 0) && (
+        {(byCustomer.length > 0 || byEquipment.length > 0) && (
           <div className="lg:col-span-2 grid md:grid-cols-2 gap-4">
-            {summary.byCustomer.length > 0 ? (
+            {byCustomer.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5" /> Top customers (90d horizon)
                 </p>
                 <ul className="text-xs space-y-1.5">
-                  {summary.byCustomer.slice(0, 6).map((r) => (
+                  {byCustomer.slice(0, 6).map((r) => (
                     <li key={r.customerId} className="flex justify-between gap-2">
                       <span className="truncate text-foreground">{r.name}</span>
                       <span className="text-muted-foreground tabular-nums shrink-0">
@@ -161,13 +179,13 @@ export function MaintenanceForecastPanel({
                 </ul>
               </div>
             ) : null}
-            {summary.byEquipment.length > 0 ? (
+            {byEquipment.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5" /> Top equipment (90d horizon)
                 </p>
                 <ul className="text-xs space-y-1.5">
-                  {summary.byEquipment.slice(0, 6).map((r) => (
+                  {byEquipment.slice(0, 6).map((r) => (
                     <li key={r.equipmentId} className="flex justify-between gap-2">
                       <span className="truncate text-foreground">{r.name}</span>
                       <span className="text-muted-foreground tabular-nums shrink-0">
