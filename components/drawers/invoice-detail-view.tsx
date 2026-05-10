@@ -1989,10 +1989,12 @@ function FilesTab({ invoice }: { invoice: AdminInvoice }) {
           invoiceId={invoice.id}
         />
       ) : (
-        <div className="rounded-lg border-2 border-dashed border-border py-10 text-center">
-          <FileText className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground font-medium">No files attached</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Upload certificates and documents to attach to this invoice.</p>
+        <div className="rounded-lg border-2 border-dashed border-border py-10 text-center bg-muted/10">
+          <FileText className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" aria-hidden />
+          <p className="text-sm text-muted-foreground font-medium">No equipment-linked certificates in this panel</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 max-w-sm mx-auto leading-snug">
+            Use <span className="font-medium text-foreground/80">Invoice attachments</span> above for files, or attach certificates from the equipment record.
+          </p>
         </div>
       )}
     </div>

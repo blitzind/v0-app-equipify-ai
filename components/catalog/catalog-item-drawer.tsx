@@ -12,7 +12,6 @@ import {
   Sparkles,
   ExternalLink,
   Archive,
-  FileText,
   Upload,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -36,6 +35,8 @@ import {
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { AttachmentTypeIcon } from "@/components/attachments/attachment-preview"
+import { attachmentKindLabel, displayAttachmentFileName } from "@/lib/attachments/attachment-media-kind"
 
 type CatalogDetail = {
   id: string
@@ -942,34 +943,43 @@ export function CatalogItemDrawer({
                 </div>
                 <ul className="space-y-2 text-sm">
                   {attachments.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No files attached.</p>
+                    <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-3 py-4 text-center text-xs text-muted-foreground">
+                      No files attached to this catalog item.
+                    </div>
                   ) : (
-                    attachments.map((a) => (
-                      <li
-                        key={a.id}
-                        className="flex items-center justify-between gap-2 border border-border rounded-lg px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{a.file_name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {a.category.replace(/_/g, " ")} · {fmtDate(a.uploaded_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="shrink-0 h-8 gap-1"
-                          onClick={() => void signedDownload(a.storage_path)}
+                    attachments.map((a) => {
+                      const label = displayAttachmentFileName(a.file_name)
+                      return (
+                        <li
+                          key={a.id}
+                          className="flex items-center justify-between gap-2 border border-border rounded-lg px-3 py-2 bg-muted/10"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          Open
-                        </Button>
-                      </li>
-                    ))
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <AttachmentTypeIcon mimeType="" fileName={a.file_name} />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-foreground" title={a.file_name}>
+                                {label}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {attachmentKindLabel("", a.file_name)} · {a.category.replace(/_/g, " ")} ·{" "}
+                                {fmtDate(a.uploaded_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="shrink-0 h-8 gap-1"
+                            aria-label={`Open ${label}`}
+                            onClick={() => void signedDownload(a.storage_path)}
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                            Open
+                          </Button>
+                        </li>
+                      )
+                    })
                   )}
                 </ul>
               </div>

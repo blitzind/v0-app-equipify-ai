@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:31:28.862Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T21:38:33.492Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -69,6 +69,9 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Key UI:** Customer drawers, lists.
 - **Tables:** \`customers\`, \`customer_contacts\`, \`customer_locations\`.
 - **Gaps:** Parent/child hierarchy, CSV import, billing-address sophistication (see Priorities).
+
+### Attachments (drawer UX)
+- **Phase 56.7:** Shared file presentation uses \`lib/attachments/attachment-media-kind.ts\` (MIME + extension classification, friendly labels) and \`components/attachments/attachment-preview.tsx\` (thumbnail for images with safe fallback, type icon tile). Primary surfaces: \`DocumentAttachmentsPanel\`, work order attachment lists, certificate attachment card, catalog item files tab.
 
 ### Equipment
 - **Routes:** \`/equipment\`, \`/equipment/[id]\`

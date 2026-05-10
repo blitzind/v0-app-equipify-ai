@@ -13,7 +13,7 @@
  */
 
 import * as React from "react"
-import { FileText, Loader2, Paperclip, Shield, Trash2, Upload } from "lucide-react"
+import { ExternalLink, Loader2, Paperclip, Shield, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -35,6 +35,8 @@ import {
   type CertificateAttachment,
   type CertificateAttachmentCategory,
 } from "@/lib/certificates/certificate-attachments"
+import { AttachmentTypeIcon } from "@/components/attachments/attachment-preview"
+import { attachmentKindLabel, displayAttachmentFileName } from "@/lib/attachments/attachment-media-kind"
 
 export type CertificateAttachmentsCardProps = {
   organizationId: string
@@ -391,25 +393,32 @@ export function CertificateAttachmentsCard({
       {loading ? (
         <p className="text-xs text-muted-foreground py-2">Loading attachments…</p>
       ) : visible.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">
-          No attachments yet. PDF, PNG, JPEG, or WEBP up to{" "}
-          {Math.round(CERT_ATTACH_MAX_BYTES / (1024 * 1024))} MB.
-        </p>
+        <div className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-3 py-4 text-center">
+          <p className="text-xs font-medium text-muted-foreground">No certificate files yet</p>
+          <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+            PDF, PNG, JPEG, or WEBP up to {Math.round(CERT_ATTACH_MAX_BYTES / (1024 * 1024))} MB.
+          </p>
+        </div>
       ) : (
         <ul className="divide-y divide-border/60 -mx-1">
-          {visible.map((att) => (
+          {visible.map((att) => {
+            const label = displayAttachmentFileName(att.fileName)
+            return (
             <li key={att.id} className="flex items-center gap-3 px-1 py-2">
-              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+              <AttachmentTypeIcon mimeType={att.fileType} fileName={att.fileName} />
               <div className="min-w-0 flex-1">
                 <button
                   type="button"
                   onClick={() => void handleOpen(att)}
-                  className="block text-xs font-medium text-foreground hover:text-primary truncate text-left"
+                  className="block text-xs font-medium text-foreground hover:text-primary truncate text-left w-full"
                   title={att.fileName}
+                  aria-label={`Open ${label}`}
                 >
-                  {att.fileName}
+                  {label}
                 </button>
                 <p className="text-[10px] text-muted-foreground truncate">
+                  {attachmentKindLabel(att.fileType, att.fileName)}
+                  <span className="mx-1">·</span>
                   {att.title?.trim() || (att.category === "external_calibration" ? "External calibration" : "Supplementary")}
                   <span className="mx-1">·</span>
                   {formatAttachmentSize(att.fileSizeBytes)}
@@ -436,6 +445,7 @@ export function CertificateAttachmentsCard({
                     onChange={(e) => void handleVisibility(att, e.target.value as AttachmentVisibilityScope)}
                     className="hidden rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground sm:block"
                     title={visibilityLabel(att.visibilityScope)}
+                    aria-label={`Visibility for ${label}`}
                     disabled={busy}
                   >
                     {VISIBILITY_OPTIONS.map((option) => (
@@ -449,8 +459,20 @@ export function CertificateAttachmentsCard({
                 )
               ) : null}
               {openingId === att.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-              ) : null}
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" aria-hidden />
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-muted-foreground shrink-0"
+                  disabled={busy}
+                  aria-label={`Open ${label}`}
+                  onClick={() => void handleOpen(att)}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                </Button>
+              )}
               {canManage ? (
                 <Button
                   type="button"
@@ -458,14 +480,15 @@ export function CertificateAttachmentsCard({
                   variant="ghost"
                   className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
                   disabled={busy}
-                  aria-label={`Delete ${att.fileName}`}
+                  aria-label={`Delete ${label}`}
                   onClick={() => void handleDelete(att)}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden />
                 </Button>
               ) : null}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>

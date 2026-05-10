@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Download, FileText, Loader2, Paperclip, Trash2, UploadCloud } from "lucide-react"
+import { Download, ImageIcon, Loader2, Paperclip, Trash2, UploadCloud } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import {
@@ -12,6 +12,9 @@ import {
   type AttachmentVisibilityScope,
   type DocumentAttachmentRow,
 } from "@/lib/attachments/document-attachments"
+import { attachmentKindLabel, displayAttachmentFileName, isImageMime } from "@/lib/attachments/attachment-media-kind"
+import { AttachmentPreview } from "@/components/attachments/attachment-preview"
+import { Button } from "@/components/ui/button"
 
 type Props = {
   entityType: AttachmentEntityType
@@ -44,15 +47,6 @@ const VISIBILITY_OPTIONS: Array<{ value: AttachmentVisibilityScope; label: strin
 function dateLabel(value: string) {
   if (!value) return "-"
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-function mimeLabel(value: string) {
-  if (value === "application/pdf") return "PDF"
-  if (value.startsWith("image/")) return value.replace("image/", "").toUpperCase()
-  if (value.includes("word")) return "DOC"
-  if (value.includes("sheet") || value.includes("excel")) return "XLS"
-  if (value === "text/plain") return "TXT"
-  return "File"
 }
 
 export function DocumentAttachmentsPanel({
@@ -160,7 +154,7 @@ export function DocumentAttachmentsPanel({
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         </div>
-        <Paperclip className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
@@ -217,49 +211,73 @@ export function DocumentAttachmentsPanel({
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading attachments...
           </div>
         ) : attachments.length === 0 ? (
-          <div className="px-3 py-6 text-center">
-            <FileText className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
-            <p className="text-xs font-medium text-muted-foreground">No attachments yet</p>
+          <div className="px-3 py-8 text-center border-dashed">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground">
+              <ImageIcon className="h-5 w-5" aria-hidden />
+            </div>
+            <p className="text-xs font-medium text-foreground">No attachments yet</p>
+            <p className="mt-1 text-[11px] text-muted-foreground leading-snug max-w-xs mx-auto">
+              Upload PDFs, photos, or documents. Files stay private; downloads use signed links.
+            </p>
           </div>
         ) : (
-          attachments.map((attachment) => (
-            <div key={attachment.id} className="flex items-center gap-3 bg-background px-3 py-2.5">
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-foreground">{attachment.file_name}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {mimeLabel(attachment.mime_type)} · {formatAttachmentSize(attachment.file_size_bytes)} · {dateLabel(attachment.uploaded_at)}
-                </p>
+          attachments.map((attachment) => {
+            const label = displayAttachmentFileName(attachment.file_name)
+            const downloadHref = organizationId ? `/api/organizations/${organizationId}/attachments/${attachment.id}` : "#"
+            const thumb = isImageMime(attachment.mime_type) ? downloadHref : null
+            return (
+              <div
+                key={attachment.id}
+                className="flex items-center gap-3 bg-muted/15 px-3 py-2.5 transition-colors hover:bg-muted/25"
+              >
+                <AttachmentPreview
+                  mimeType={attachment.mime_type}
+                  fileName={attachment.file_name}
+                  thumbnailSrc={thumb}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground" title={attachment.file_name}>
+                    {label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {attachmentKindLabel(attachment.mime_type, attachment.file_name)} ·{" "}
+                    {formatAttachmentSize(attachment.file_size_bytes)} · {dateLabel(attachment.uploaded_at)}
+                  </p>
+                </div>
+                <select
+                  value={attachment.visibility_scope}
+                  onChange={(e) => void updateVisibility(attachment.id, e.target.value as AttachmentVisibilityScope)}
+                  className="hidden rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground sm:block"
+                  title={visibilityLabel(attachment.visibility_scope)}
+                  aria-label="Attachment visibility"
+                >
+                  {VISIBILITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <Button variant="ghost" size="icon-sm" className="shrink-0 h-8 w-8 text-muted-foreground" asChild>
+                  <a
+                    href={downloadHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Download ${label}`}
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove ${label}`}
+                  onClick={() => void remove(attachment.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                </Button>
               </div>
-              <select
-                value={attachment.visibility_scope}
-                onChange={(e) => void updateVisibility(attachment.id, e.target.value as AttachmentVisibilityScope)}
-                className="hidden rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground sm:block"
-                title={visibilityLabel(attachment.visibility_scope)}
-              >
-                {VISIBILITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <a
-                href={organizationId ? `/api/organizations/${organizationId}/attachments/${attachment.id}` : "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Download"
-              >
-                <Download className="h-3.5 w-3.5" />
-              </a>
-              <button
-                type="button"
-                onClick={() => void remove(attachment.id)}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                title="Remove"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </section>

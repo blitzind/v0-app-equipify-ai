@@ -20,8 +20,6 @@ import {
   AlertTriangle,
   X,
   ExternalLink,
-  Download,
-  File,
   Upload,
   ClipboardList,
   Hammer,
@@ -71,6 +69,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DocumentAttachmentsPanel } from "@/components/attachments/document-attachments-panel"
+import { AttachmentPreview } from "@/components/attachments/attachment-preview"
+import {
+  attachmentKindLabel,
+  displayAttachmentFileName,
+  isImageMime,
+} from "@/lib/attachments/attachment-media-kind"
 
 // ─── Styles (match existing WO page) ─────────────────────────────────────────
 
@@ -131,14 +135,6 @@ function formatFileSize(bytes: number | null | undefined): string {
   if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`
   const mb = kb / 1024
   return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`
-}
-
-function documentAttachmentIcon(fileType: string) {
-  const t = fileType.toLowerCase()
-  if (t === "application/pdf" || t.includes("pdf")) {
-    return <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-  }
-  return <File className="w-4 h-4 shrink-0 text-muted-foreground" />
 }
 
 function initialsFromTechnicianName(name: string): string {
@@ -480,25 +476,26 @@ function PhotoSection({
               className="relative group w-28 h-28 rounded-lg overflow-hidden border border-border bg-muted"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
+              <img src={src} alt={`Work order photo ${i + 1}`} className="w-full h-full object-cover" />
               {editable && (
                 <button
                   type="button"
                   onClick={() => removeAt(i)}
                   className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Remove photo ${i + 1}`}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3 h-3" aria-hidden />
                 </button>
               )}
             </div>
           ))}
         </div>
-        {photos.length === 0 && !editable && (
-          <p className="text-sm text-muted-foreground mt-2">No images yet.</p>
-        )}
-        {photos.length === 0 && editable && (
+        {photos.length === 0 && !editable ? (
+          <p className="text-sm text-muted-foreground mt-2">No photos attached yet.</p>
+        ) : null}
+        {photos.length === 0 && editable ? (
           <p className="text-sm text-muted-foreground mt-2">No photos yet. Use the upload area above.</p>
-        )}
+        ) : null}
       </div>
 
       {docList.length > 0 || editable ? (
@@ -510,47 +507,54 @@ function PhotoSection({
             </p>
           ) : (
             <ul className="space-y-2">
-              {docList.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 bg-muted/20"
-                >
-                  <div className="min-w-0 flex items-center gap-2.5">
-                    {documentAttachmentIcon(d.fileType)}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{d.fileName}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatFileSize(d.fileSizeBytes)} · {formatDateTime(d.uploadedAt)}
-                      </p>
+              {docList.map((d) => {
+                const label = displayAttachmentFileName(d.fileName)
+                const thumb = isImageMime(d.fileType) ? d.url : null
+                return (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 bg-muted/20"
+                  >
+                    <div className="min-w-0 flex items-center gap-2.5">
+                      <AttachmentPreview mimeType={d.fileType} fileName={d.fileName} thumbnailSrc={thumb} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate" title={d.fileName}>
+                          {label}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {attachmentKindLabel(d.fileType, d.fileName)} · {formatFileSize(d.fileSizeBytes)} ·{" "}
+                          {formatDateTime(d.uploadedAt)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <Button type="button" variant="ghost" size="icon-sm" className="h-8 w-8" asChild>
-                      <a
-                        href={d.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open or download"
-                        aria-label="Open or download"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                    </Button>
-                    {editable && onRemoveDocument ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => void onRemoveDocument(d.id)}
-                        aria-label="Delete attachment"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button type="button" variant="ghost" size="icon-sm" className="h-8 w-8" asChild>
+                        <a
+                          href={d.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open in new tab"
+                          aria-label={`Open or download ${label}`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+                        </a>
                       </Button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+                      {editable && onRemoveDocument ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => void onRemoveDocument(d.id)}
+                          aria-label={`Remove ${label}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
