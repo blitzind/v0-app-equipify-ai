@@ -383,9 +383,9 @@ export function InventoryReorderCenter({ organizationId, onInventoryMutated }: I
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Reorder Center</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Reorder</h2>
           <p className="text-sm text-muted-foreground">
-            Warehouse coverage, truck restock, and internal draft PO prep — nothing is sent to vendors automatically.
+            Low-stock coverage, truck restock, restock requests, and internal draft PO prep — nothing is sent to vendors automatically.
           </p>
         </div>
         <Button
@@ -473,7 +473,13 @@ export function InventoryReorderCenter({ organizationId, onInventoryMutated }: I
         </CardHeader>
         <CardContent className="pt-0">
           {restockRequests.length === 0 ?
-            <p className="text-sm text-muted-foreground py-2">No pending requests in view.</p>
+            <div className="py-4 text-sm text-muted-foreground space-y-1.5">
+              <p className="font-medium text-foreground">No open restock requests</p>
+              <p className="text-xs leading-relaxed">
+                Technicians with a truck assignment can file a request from <strong className="text-foreground">Request restock</strong> above.
+                Managers follow up with <strong className="text-foreground">Transfer stock</strong> or purchasing.
+              </p>
+            </div>
           : <Table>
               <TableHeader>
                 <TableRow>
@@ -601,7 +607,7 @@ export function InventoryReorderCenter({ organizationId, onInventoryMutated }: I
                     <TableCell className="text-right">
                       {cap?.can_transfer_truck ?
                         <Button type="button" size="sm" variant="secondary" onClick={() => openTransfer(r)}>
-                          Transfer…
+                          Transfer stock…
                         </Button>
                       : null}
                     </TableCell>
@@ -620,7 +626,10 @@ export function InventoryReorderCenter({ organizationId, onInventoryMutated }: I
               <Boxes className="w-4 h-4" />
               Items without reorder points
             </CardTitle>
-            <CardDescription>Positive on-hand but no threshold — configure under stock adjustments.</CardDescription>
+            <CardDescription>
+              Positive on-hand but no reorder point — set <strong className="text-foreground">Reorder alerts</strong> on the Inventory{" "}
+              <strong className="text-foreground">Overview</strong> tab.
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-0 overflow-x-auto">
             <Table>
@@ -791,6 +800,23 @@ export function InventoryReorderCenter({ organizationId, onInventoryMutated }: I
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {warehouseLowOrOut.length === 0 &&
+      truckRestock.length === 0 &&
+      missingReorderPoints.length === 0 &&
+      vendorPoSuggestions.length === 0 &&
+      restockRequests.length === 0 ? (
+        <Card className="border-dashed border-border/80 bg-muted/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">All clear in this view</CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              No warehouse or truck rows need attention in the reorder lists right now. If parts still feel light on
+              hand, confirm catalog items exist, then use <strong className="text-foreground">Receive stock</strong> or set{" "}
+              <strong className="text-foreground">Reorder alerts</strong> on Inventory Overview so future shortages surface here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
     </div>
   )
 }

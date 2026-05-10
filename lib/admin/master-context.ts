@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:24:31.428Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T22:38:38.790Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -49,6 +49,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 57.3 — Permission enforcement alignment:** See \`docs/PERMISSIONS_ENFORCEMENT_AUDIT.md\`. Server gates now use \`getOrganizationMemberRecord\` + effective capabilities for **staff portal preview**; **portal invites** require \`canManagePortalSettings\` (not a loose manager role list); **workspace PATCH** uses \`canManageWorkspaceSettings\` (fixes manager vs owner/admin-only raw check); **default invoice terms** GET/PATCH use financial/billing capabilities. Legacy \`requireOrgMemberPermission\` (rarely used) resolves effective permissions.
 - **Phase 57.4 — Settings wiring sprint:** See \`docs/SETTINGS_WIRING_AUDIT.md\` changelog. **Follow-up automation** settings + evaluate APIs accept \`canManageAutomations\` **or** \`canManageWorkspaceSettings\` (UI matches). **AI Ops digest** Route Handlers use \`requireOrgPermission\` / \`requireAnyOrgPermission\` instead of raw-role checks; digest PATCH shows an honest saved toast. **Integrations** hub fetches QuickBooks \`connection_status\` for a real Connected/Not connected pill; Stripe remains labeled as billing-only.
 - **Phase 57.5 — UI consistency polish:** Tightened inline empty/error patterns in high-traffic surfaces (global search panel, notifications dropdown, work order tasks card, reports analytics banner, technicians table empty row). Prefer icon + short title + helper line; for recoverable fetch failures add **Retry** next to the message. Full-page empty states continue to use \`components/ui/empty.tsx\` where already adopted.
+- **Phase 58.1 — Inventory workflow UX:** \`/inventory\` explains that **catalog items** (SKUs) are added/edited under \`/catalog\`; stock movements use capability-aligned controls (\`canManageInventory\` for receive/transfer/locations/thresholds/van assignment; \`canAdjustInventoryStock\` plus manage for adjustments; \`canConsumePartsOnWorkOrders\` for consume). Tab labels: Adjust/receive, Transfer stock, Consume parts & history, Van & truck stock, Reorder. **Archive item** on the catalog drawer confirms before hiding a SKU (no hard delete). Client no longer infers manage rights from raw manager roles alone for inventory mutations — it follows \`useOrgPermissions\` + platform admin.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
@@ -142,9 +143,10 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Inventory
 - **Route:** \`/inventory\`
-- **Purpose:** Stock, locations, allocate/receive/consume/transfer/adjust, low stock.
+- **Purpose:** Stock by location; receive, transfer, adjust, consume on work orders; low stock / reorder center; technician van bins.
 - **Status:** Implemented (many \`/api/organizations/.../inventory/*\` routes).
-- **Gaps:** Operational polish, reorder workflows.
+- **UX map (Phase 58.1):** Add/edit **parts** in \`/catalog\` (drawer: **Archive item** with confirm — archival, not delete). **Receive stock** / **Adjust stock** on Adjust/receive tab. **Transfer stock** on its tab (and technician “return” uses the same transfer API). **Consume part** under Consume parts & history. **Reorder alerts** on Overview; **Reorder** tab for restock workflows and draft PO suggestions. Van locations: **Add location** (toolbar) + **Van & truck stock** assignments.
+- **Gaps:** Deeper procurement automation; barcode scanning (out of scope for 58.1).
 
 ### Catalog & imports
 - **Routes:** \`/catalog\`, \`/catalog/import\`; APIs for \`catalog_items\`, \`price_list_imports\`, AI extraction jobs.

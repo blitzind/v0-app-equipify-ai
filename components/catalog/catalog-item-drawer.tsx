@@ -21,6 +21,16 @@ import { DetailDrawer } from "@/components/detail-drawer"
 import { DRAWER_NESTED_CARD } from "@/components/detail-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -131,6 +141,7 @@ export function CatalogItemDrawer({
   const [draft, setDraft] = useState<Partial<CatalogDetail>>({})
   const [saving, setSaving] = useState(false)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
 
   const [usageLoading, setUsageLoading] = useState(false)
   const [usage, setUsage] = useState<{
@@ -358,6 +369,7 @@ export function CatalogItemDrawer({
   const relatedStr = (compat.related_catalog_item_ids ?? []).join(", ")
 
   return (
+    <>
     <DetailDrawer
       open={open && Boolean(itemId)}
       onClose={onClose}
@@ -399,11 +411,17 @@ export function CatalogItemDrawer({
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs gap-1"
-                onClick={() => void patch({ archived: !item.archived_at })}
+                onClick={() => {
+                  if (item.archived_at) {
+                    void patch({ archived: false })
+                    return
+                  }
+                  setArchiveConfirmOpen(true)
+                }}
                 disabled={saving}
               >
                 <Archive className="w-3.5 h-3.5" />
-                {item.archived_at ? "Restore" : "Archive"}
+                {item.archived_at ? "Restore item" : "Archive item"}
               </Button>
             ) : null}
           </div>
@@ -1045,5 +1063,34 @@ export function CatalogItemDrawer({
         </div>
       )}
     </DetailDrawer>
+
+    <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Archive this catalog item?</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <span className="block">
+              Archiving hides the SKU from default catalog lists. Historical quotes, work orders, and inventory ledger
+              rows are not deleted.
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              You can restore the item later with <strong className="text-foreground">Restore item</strong>.
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setArchiveConfirmOpen(false)
+              void patch({ archived: true })
+            }}
+          >
+            Archive item
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

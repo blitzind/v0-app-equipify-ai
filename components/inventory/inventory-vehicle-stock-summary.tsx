@@ -69,7 +69,21 @@ export function InventoryVehicleStockSummary({
   className,
 }: InventoryVehicleStockSummaryProps) {
   const vehicles = locations.filter((l) => l.is_active && l.location_type === "vehicle")
-  if (vehicles.length === 0) return null
+  if (vehicles.length === 0) {
+    return (
+      <Card className={cn("gap-2 py-4 border-dashed border-border/80 bg-muted/10", className)}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Truck className="w-4 h-4" /> Vehicle stock
+          </CardTitle>
+          <CardDescription className="text-xs">
+            No vehicle-type locations yet. Inventory managers can add one with <strong className="text-foreground">Add location</strong>{" "}
+            (type: vehicle), then assign technicians on <strong className="text-foreground">Van &amp; truck stock</strong>.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
 
   // Map technician name by location id (the assignment table maps a vehicle
   // location → primary technician). When a vehicle has no assignment we

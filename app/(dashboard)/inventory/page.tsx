@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, Package, Truck, Warehouse } from "lucide-react"
+import Link from "next/link"
+import { Loader2, Package, Plus, Truck, Warehouse } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -52,9 +53,7 @@ import { InventoryOverviewKpis } from "@/components/inventory/inventory-overview
 import { InventoryReorderCenter } from "@/components/inventory/inventory-reorder-center"
 import { InventoryVehicleStockSummary } from "@/components/inventory/inventory-vehicle-stock-summary"
 import { InventoryRecentActivityCard } from "@/components/inventory/inventory-recent-activity-card"
-import { isLowStock, stockTone } from "@/lib/inventory/format"
-
-const MANAGER_ROLES = new Set(["owner", "admin", "manager"])
+import { formatTransactionType, isLowStock, stockTone } from "@/lib/inventory/format"
 
 type LocationRow = {
   id: string
@@ -140,16 +139,15 @@ export default function InventoryPage() {
   const { isPlatformAdmin } = useAdmin()
   const { organizationId, status } = useActiveOrganization()
   const orgPerms = useOrgPermissions()
-  const [canManage, setCanManage] = useState(false)
-  // Inventory adjust is gated by `canAdjustInventoryStock` server-side; we
-  // mirror that on the client so non-managers see the restricted notice
-  // instead of a button that 403s. `canManageInventory` covers
-  // receive/transfer/thresholds/locations/vehicle assignment.
+  // `canManageInventory` matches `requireOrgInventoryWrite` (receive, transfer,
+  // locations, thresholds, vehicle assignment). Adjust also requires
+  // `canAdjustInventoryStock` on the server — mirror both on the client.
   const canAdjust = Boolean(orgPerms.permissions.canAdjustInventoryStock || isPlatformAdmin)
   const canConsumeOnWorkOrder = Boolean(
     orgPerms.permissions.canConsumePartsOnWorkOrders || isPlatformAdmin,
   )
   const canManageInventoryPerm = Boolean(orgPerms.permissions.canManageInventory || isPlatformAdmin)
+  const canPostStockAdjustment = canManageInventoryPerm && canAdjust
 
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -279,36 +277,6 @@ export default function InventoryPage() {
   }, [load])
 
   useEffect(() => {
-    if (!organizationId || status !== "ready") {
-      setCanManage(false)
-      return
-    }
-    let cancelled = false
-    ;(async () => {
-      if (isPlatformAdmin) {
-        if (!cancelled) setCanManage(true)
-        return
-      }
-      const supabase = createBrowserSupabaseClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user?.id || cancelled) return
-      const { data: mem } = await supabase
-        .from("organization_members")
-        .select("role")
-        .eq("organization_id", organizationId)
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .maybeSingle()
-      if (!cancelled) setCanManage(MANAGER_ROLES.has((mem?.role as string) ?? ""))
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [organizationId, status, isPlatformAdmin])
-
-  useEffect(() => {
     if (!organizationId || status !== "ready") return
     let cancelled = false
     ;(async () => {
@@ -381,7 +349,7 @@ export default function InventoryPage() {
   const [retQty, setRetQty] = useState("1")
 
   async function submitThresholds() {
-    if (!canManage || !baseUrl) return
+    if (!canManageInventoryPerm || !baseUrl) return
     try {
       await postJson(`${baseUrl}/inventory/thresholds`, {
         stock_id: thrStock,
@@ -396,7 +364,7 @@ export default function InventoryPage() {
   }
 
   async function submitAdjustment() {
-    if (!canAdjust || !baseUrl) return
+    if (!canPostStockAdjustment || !baseUrl) return
     try {
       await postJson(`${baseUrl}/inventory/adjust`, {
         catalog_item_id: adjCatalog,
@@ -412,7 +380,7 @@ export default function InventoryPage() {
   }
 
   async function submitVanAssign() {
-    if (!canManage || !baseUrl) return
+    if (!canManageInventoryPerm || !baseUrl) return
     try {
       await postJson(`${baseUrl}/inventory/vehicle-stock`, {
         technician_id: vanTech,
@@ -493,22 +461,41 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="rounded-lg border border-border/80 bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+        <p className="leading-relaxed">
+          <span className="font-medium text-foreground">Parts live in Catalog.</span>{" "}
+          <Link href="/catalog" className="text-primary underline-offset-4 hover:underline">
+            Add or edit items
+          </Link>{" "}
+          there, then use the tabs below to <strong className="text-foreground">receive</strong>,{" "}
+          <strong className="text-foreground">transfer</strong>, <strong className="text-foreground">adjust</strong>, or{" "}
+          <strong className="text-foreground">consume</strong> stock. To hide a SKU from default lists,{" "}
+          <strong className="text-foreground">archive the catalog item</strong> from its drawer — nothing is hard-deleted.
+        </p>
+      </div>
+
       <Tabs defaultValue="overview" className="space-y-4">
         {/* Tabs + primary CTA on one row (desktop); stack/wrap cleanly on narrow viewports */}
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
           <TabsList className="flex h-auto w-full flex-wrap gap-1 justify-start sm:min-w-0 sm:flex-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="adjust">Stock adjustments</TabsTrigger>
-            <TabsTrigger value="transfer">Transfers</TabsTrigger>
-            <TabsTrigger value="history">Consumption &amp; history</TabsTrigger>
-            <TabsTrigger value="vans">Van inventory</TabsTrigger>
-            <TabsTrigger value="reorder">Reorder Center</TabsTrigger>
+            <TabsTrigger value="adjust">Adjust / receive</TabsTrigger>
+            <TabsTrigger value="transfer">Transfer stock</TabsTrigger>
+            <TabsTrigger value="history">Consume parts &amp; history</TabsTrigger>
+            <TabsTrigger value="vans">Van &amp; truck stock</TabsTrigger>
+            <TabsTrigger value="reorder">Reorder</TabsTrigger>
           </TabsList>
-          {canManage ? (
-            <div className="flex w-full shrink-0 justify-end sm:w-auto">
+          {canManageInventoryPerm ? (
+            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+              <Button type="button" size="sm" variant="outline" className="gap-2 w-full sm:w-auto" asChild>
+                <Link href="/catalog">
+                  <Plus className="size-4 shrink-0" />
+                  Add catalog item
+                </Link>
+              </Button>
               <Button type="button" size="sm" className="gap-2 w-full sm:w-auto" onClick={() => setLocOpen(true)}>
                 <Warehouse className="size-4 shrink-0" />
-                <span className="hidden sm:inline">New location</span>
+                <span className="hidden sm:inline">Add location</span>
                 <span className="sm:hidden">Location</span>
               </Button>
             </div>
@@ -546,11 +533,11 @@ export default function InventoryPage() {
             }
           />
 
-          {!canManage ? (
+          {!canManageInventoryPerm ? (
             <RestrictedNotice
               capability="canManageInventory"
-              title="Inventory edits are restricted to your role"
-              body="You can view stock balances, low-stock alerts, and recent activity. Ask an owner, admin, or manager to record stock movements on your behalf."
+              title="Inventory edits are restricted for your account"
+              body="You can view stock balances, low-stock alerts, and recent activity when your role allows. Ask someone with inventory management access to receive, transfer, or adjust stock for you."
             />
           ) : null}
 
@@ -560,15 +547,27 @@ export default function InventoryPage() {
             vehicleAssignments={vehicleAssignments}
           />
 
-          {lowStock.length > 0 && (
-            <Card className={cn(INV_CARD_CLASS, "border-amber-500/30 bg-amber-500/5")}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Low stock alerts</CardTitle>
-                <CardDescription className="text-xs">
-                  Available quantity is at or below the reorder point for these SKU / location pairs.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
+          <Card
+            className={cn(
+              INV_CARD_CLASS,
+              lowStock.length > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-dashed border-border/80 bg-muted/10",
+            )}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Low stock alerts</CardTitle>
+              <CardDescription className="text-xs">
+                {lowStock.length > 0
+                  ? "Available quantity is at or below the reorder point for these SKU / location pairs."
+                  : "Nothing is below its reorder point right now. Set reorder thresholds in Overview (below) or jump to the Reorder tab for purchasing-style workflows."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {lowStock.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  When a part hits its threshold, it will appear here and in the{" "}
+                  <strong className="text-foreground">Reorder</strong> tab.
+                </p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -589,9 +588,9 @@ export default function InventoryPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           <InventoryRecentActivityCard
             transactions={transactions}
@@ -647,10 +646,23 @@ export default function InventoryPage() {
                 <TableBody>
                   {filteredStockRows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-sm text-muted-foreground py-8 text-center">
-                        {stock.length === 0
-                          ? "No stock rows yet. Receive or adjust stock to create balances."
-                          : "No rows match this filter."}
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                        {stock.length === 0 ? (
+                          <span className="block max-w-md mx-auto space-y-2">
+                            <span className="block text-foreground font-medium">No on-hand balances yet</span>
+                            <span className="block text-xs leading-relaxed">
+                              Add parts in{" "}
+                              <Link href="/catalog" className="text-primary underline-offset-4 hover:underline">
+                                Catalog
+                              </Link>
+                              , then open <strong className="text-foreground">Adjust / receive</strong> to{" "}
+                              <strong className="text-foreground">Receive stock</strong> or{" "}
+                              <strong className="text-foreground">Adjust stock</strong> at a location.
+                            </span>
+                          </span>
+                        ) : (
+                          "No rows match this filter."
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
@@ -720,12 +732,12 @@ export default function InventoryPage() {
             </CardContent>
           </Card>
 
-          {canManage && (
+          {canManageInventoryPerm && (
             <Card className={INV_CARD_CLASS}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Reorder thresholds</CardTitle>
+                <CardTitle className="text-sm">Reorder alerts (thresholds)</CardTitle>
                 <CardDescription className="text-xs">
-                  Set alerts per stock row (requires existing balance row).
+                  Set when to flag low stock per SKU and location (needs an existing on-hand row).
                 </CardDescription>
               </CardHeader>
               <CardContent className={INV_FORM_GROUP}>
@@ -766,7 +778,7 @@ export default function InventoryPage() {
                     />
                   </div>
                   <Button type="button" size="sm" className={INV_SUBMIT_CLASS} onClick={submitThresholds}>
-                    Save
+                    Save thresholds
                   </Button>
                 </div>
               </CardContent>
@@ -775,18 +787,24 @@ export default function InventoryPage() {
         </TabsContent>
 
         <TabsContent value="adjust" className="space-y-4">
+          {canManageInventoryPerm && !canAdjust ? (
+            <p className="text-xs text-amber-900 dark:text-amber-100 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2">
+              Your permissions allow receiving and transferring stock, but not count adjustments. Ask someone with{" "}
+              <strong className="font-semibold">adjust inventory</strong> access if you need cycle-count corrections.
+            </p>
+          ) : null}
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Adjust on-hand</CardTitle>
+              <CardTitle className="text-sm">Adjust stock</CardTitle>
               <CardDescription className="text-xs">
-                Increase or decrease counts at a location (cycle counts, corrections).
+                Increase or decrease on-hand at a location (cycle counts, corrections, write-offs).
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
               <div className={INV_FORM_ROW}>
                 <div className={cn(INV_FIELD, "sm:basis-[15rem]")}>
                   <Label className="text-xs">Catalog item</Label>
-                  <Select value={adjCatalog} onValueChange={setAdjCatalog} disabled={!canManage}>
+                  <Select value={adjCatalog} onValueChange={setAdjCatalog} disabled={!canPostStockAdjustment}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Select part…" />
                     </SelectTrigger>
@@ -801,7 +819,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
                   <Label className="text-xs">Location</Label>
-                  <Select value={adjLoc} onValueChange={setAdjLoc} disabled={!canManage}>
+                  <Select value={adjLoc} onValueChange={setAdjLoc} disabled={!canPostStockAdjustment}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Location…" />
                     </SelectTrigger>
@@ -818,7 +836,11 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[8rem]")}>
                   <Label className="text-xs">Direction</Label>
-                  <Select value={adjDir} onValueChange={(v) => setAdjDir(v as "in" | "out")} disabled={!canManage}>
+                  <Select
+                    value={adjDir}
+                    onValueChange={(v) => setAdjDir(v as "in" | "out")}
+                    disabled={!canPostStockAdjustment}
+                  >
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -835,14 +857,20 @@ export default function InventoryPage() {
                     onChange={(e) => setAdjQty(e.target.value)}
                     className="h-9 text-xs"
                     inputMode="numeric"
-                    disabled={!canManage}
+                    disabled={!canPostStockAdjustment}
                   />
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canAdjust || !adjCatalog || !adjLoc || !Number.isFinite(Number(adjQty)) || Number(adjQty) <= 0}
+                  disabled={
+                    !canPostStockAdjustment ||
+                    !adjCatalog ||
+                    !adjLoc ||
+                    !Number.isFinite(Number(adjQty)) ||
+                    Number(adjQty) <= 0
+                  }
                   onClick={() => {
                     // Decreases are destructive (cycle counts that drop on-hand,
                     // write-offs). We always confirm those; increases apply
@@ -854,7 +882,7 @@ export default function InventoryPage() {
                     void submitAdjustment()
                   }}
                 >
-                  Apply adjustment
+                  Apply stock adjustment
                 </Button>
               </div>
             </CardContent>
@@ -862,16 +890,16 @@ export default function InventoryPage() {
 
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Receive against PO (optional)</CardTitle>
+              <CardTitle className="text-sm">Receive stock</CardTitle>
               <CardDescription className="text-xs">
-                Increases on-hand; links to purchase order when provided.
+                Increase on-hand when shipment arrives. Optionally link an internal purchase order reference.
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
               <div className={INV_FORM_ROW}>
                 <div className={cn(INV_FIELD, "sm:basis-[15rem]")}>
                   <Label className="text-xs">Catalog item</Label>
-                  <Select value={rcvCatalog} onValueChange={setRcvCatalog} disabled={!canManage}>
+                  <Select value={rcvCatalog} onValueChange={setRcvCatalog} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Part…" />
                     </SelectTrigger>
@@ -886,7 +914,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
                   <Label className="text-xs">Location</Label>
-                  <Select value={rcvLoc} onValueChange={setRcvLoc} disabled={!canManage}>
+                  <Select value={rcvLoc} onValueChange={setRcvLoc} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Warehouse…" />
                     </SelectTrigger>
@@ -908,7 +936,7 @@ export default function InventoryPage() {
                     onChange={(e) => setRcvQty(e.target.value)}
                     className="h-9 text-xs"
                     inputMode="numeric"
-                    disabled={!canManage}
+                    disabled={!canManageInventoryPerm}
                   />
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[10rem]")}>
@@ -920,14 +948,14 @@ export default function InventoryPage() {
                     onChange={(e) => setRcvPo(e.target.value)}
                     className="h-9 text-xs font-mono"
                     placeholder="PO id"
-                    disabled={!canManage}
+                    disabled={!canManageInventoryPerm}
                   />
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canManage}
+                  disabled={!canManageInventoryPerm}
                   onClick={async () => {
                     if (!baseUrl) return
                     try {
@@ -944,7 +972,7 @@ export default function InventoryPage() {
                     }
                   }}
                 >
-                  Receive
+                  Receive stock
                 </Button>
               </div>
             </CardContent>
@@ -954,17 +982,17 @@ export default function InventoryPage() {
         <TabsContent value="transfer" className="space-y-4">
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Transfer between locations</CardTitle>
+              <CardTitle className="text-sm">Transfer stock</CardTitle>
               <CardDescription className="text-xs">
-                Moves available quantity from a warehouse, vehicle, or job site to another
-                location. Both rows must already exist (or will be created with zero on-hand).
+                Move quantity between bins (warehouse, vehicle, job site, staging). Destination rows are created at
+                zero if needed.
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
               <div className={INV_FORM_ROW}>
                 <div className={cn(INV_FIELD, "sm:basis-[15rem]")}>
                   <Label className="text-xs">Catalog item</Label>
-                  <Select value={xfCatalog} onValueChange={setXfCatalog} disabled={!canManage}>
+                  <Select value={xfCatalog} onValueChange={setXfCatalog} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Part…" />
                     </SelectTrigger>
@@ -979,7 +1007,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
                   <Label className="text-xs">Source location</Label>
-                  <Select value={xfFrom} onValueChange={setXfFrom} disabled={!canManage}>
+                  <Select value={xfFrom} onValueChange={setXfFrom} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Where the parts are now…" />
                     </SelectTrigger>
@@ -996,7 +1024,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
                   <Label className="text-xs">Destination location</Label>
-                  <Select value={xfTo} onValueChange={setXfTo} disabled={!canManage}>
+                  <Select value={xfTo} onValueChange={setXfTo} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Where they're going…" />
                     </SelectTrigger>
@@ -1018,14 +1046,14 @@ export default function InventoryPage() {
                     onChange={(e) => setXfQty(e.target.value)}
                     className="h-9 text-xs"
                     inputMode="numeric"
-                    disabled={!canManage}
+                    disabled={!canManageInventoryPerm}
                   />
                 </div>
                 <Button
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canManage}
+                  disabled={!canManageInventoryPerm}
                   onClick={async () => {
                     if (!baseUrl) return
                     try {
@@ -1035,14 +1063,14 @@ export default function InventoryPage() {
                         to_location_id: xfTo,
                         quantity: Number(xfQty),
                       })
-                      toast({ title: "Transfer completed" })
+                      toast({ title: "Stock transferred" })
                       void load()
                     } catch (e) {
                       toast({ title: e instanceof Error ? e.message : "Failed", variant: "destructive" })
                     }
                   }}
                 >
-                  Transfer
+                  Transfer stock
                 </Button>
               </div>
             </CardContent>
@@ -1052,10 +1080,10 @@ export default function InventoryPage() {
         <TabsContent value="history" className="space-y-4">
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Ledger</CardTitle>
+              <CardTitle className="text-sm">Stock movement history</CardTitle>
               <CardDescription className="text-xs">
-                Consumption rows reference work orders. Filter mentally by type &mdash; use{" "}
-                <strong>consume</strong> for parts used on jobs.
+                Immutable ledger of receives, transfers, adjustments, and parts consumed on work orders. Use{" "}
+                <strong className="text-foreground">Consume part</strong> below to record usage against a job.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0 overflow-x-auto">
@@ -1073,8 +1101,16 @@ export default function InventoryPage() {
                 <TableBody>
                   {transactions.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-sm text-muted-foreground py-8 text-center">
-                        No inventory transactions yet.
+                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                        <span className="block max-w-md mx-auto space-y-2">
+                          <span className="block text-foreground font-medium">No stock movements yet</span>
+                          <span className="block text-xs leading-relaxed">
+                            Record a <strong className="text-foreground">Receive stock</strong> or{" "}
+                            <strong className="text-foreground">Adjust stock</strong> action under{" "}
+                            <strong className="text-foreground">Adjust / receive</strong>, or{" "}
+                            <strong className="text-foreground">Transfer stock</strong> between locations.
+                          </span>
+                        </span>
                       </TableCell>
                     </TableRow>
                   )}
@@ -1091,7 +1127,7 @@ export default function InventoryPage() {
                         <TableCell className="text-xs whitespace-nowrap">
                           {new Date(t.created_at).toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-xs font-mono">{t.transaction_type}</TableCell>
+                        <TableCell className="text-xs">{formatTransactionType(t.transaction_type)}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.quantity}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.delta_on_hand}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs">{t.delta_allocated}</TableCell>
@@ -1111,10 +1147,10 @@ export default function InventoryPage() {
 
           <Card className={INV_CARD_CLASS}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Consume on work order</CardTitle>
+              <CardTitle className="text-sm">Consume part on work order</CardTitle>
               <CardDescription className="text-xs">
-                Pulls physical stock and releases allocation when applicable. Pick the work order from the list
-                — no UUID copy/paste required.
+                Reduce on-hand for a job: pick the work order and the source bin. Allocations are released when
+                applicable.
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
@@ -1155,7 +1191,7 @@ export default function InventoryPage() {
                   </Select>
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[12rem]")}>
-                  <Label className="text-xs">Part</Label>
+                  <Label className="text-xs">Catalog item</Label>
                   <Select value={conCatalog} onValueChange={setConCatalog} disabled={!canConsumeOnWorkOrder}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Catalog…" />
@@ -1210,14 +1246,14 @@ export default function InventoryPage() {
                         location_id: conLoc,
                         quantity: Number(conQty),
                       })
-                      toast({ title: "Consumption recorded" })
+                      toast({ title: "Part consumption recorded" })
                       void load()
                     } catch (e) {
                       toast({ title: e instanceof Error ? e.message : "Failed", variant: "destructive" })
                     }
                   }}
                 >
-                  Record consumption
+                  Consume part
                 </Button>
               </div>
             </CardContent>
@@ -1231,15 +1267,15 @@ export default function InventoryPage() {
                 <Truck className="w-4 h-4" /> Technician vehicle bins
               </CardTitle>
               <CardDescription className="text-xs">
-                Assign a technician to the inventory location that represents their van. Stock for that location
-                appears in <strong>Overview</strong>.
+                Link each technician to the vehicle bin that holds their truck stock. Balances show on{" "}
+                <strong className="text-foreground">Overview</strong> and in transfers.
               </CardDescription>
             </CardHeader>
             <CardContent className={INV_FORM_GROUP}>
               <div className={INV_FORM_ROW}>
                 <div className={cn(INV_FIELD, "sm:basis-[14rem]")}>
                   <Label className="text-xs">Technician</Label>
-                  <Select value={vanTech} onValueChange={setVanTech} disabled={!canManage}>
+                  <Select value={vanTech} onValueChange={setVanTech} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Select technician…" />
                     </SelectTrigger>
@@ -1254,7 +1290,7 @@ export default function InventoryPage() {
                 </div>
                 <div className={cn(INV_FIELD, "sm:basis-[14rem]")}>
                   <Label className="text-xs">Vehicle location</Label>
-                  <Select value={vanLoc} onValueChange={setVanLoc} disabled={!canManage}>
+                  <Select value={vanLoc} onValueChange={setVanLoc} disabled={!canManageInventoryPerm}>
                     <SelectTrigger className="h-9 w-full text-xs">
                       <SelectValue placeholder="Van location…" />
                     </SelectTrigger>
@@ -1271,7 +1307,7 @@ export default function InventoryPage() {
                   type="button"
                   size="sm"
                   className={INV_SUBMIT_CLASS}
-                  disabled={!canManage}
+                  disabled={!canManageInventoryPerm}
                   onClick={submitVanAssign}
                 >
                   Save assignment
@@ -1295,8 +1331,15 @@ export default function InventoryPage() {
                 <TableBody>
                   {vehicleAssignments.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={2} className="text-sm text-muted-foreground py-6 text-center">
-                        No van inventory assignments yet.
+                      <TableCell colSpan={2} className="py-6 text-center text-sm text-muted-foreground">
+                        <span className="block max-w-md mx-auto space-y-1.5">
+                          <span className="block text-foreground font-medium">No technician ↔ van links yet</span>
+                          <span className="block text-xs leading-relaxed">
+                            Add a <strong className="text-foreground">vehicle</strong> location with{" "}
+                            <strong className="text-foreground">Add location</strong>, then choose the technician and bin
+                            above.
+                          </span>
+                        </span>
                       </TableCell>
                     </TableRow>
                   )}
@@ -1316,14 +1359,15 @@ export default function InventoryPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Return parts to warehouse</CardTitle>
                 <CardDescription className="text-xs">
-                  Move quantity from your assigned van bin back to a storeroom or staging shelf (same ledger as a
-                  transfer). Managers can use <strong>Transfers</strong> for any locations.
+                  <strong className="text-foreground">Transfer stock</strong> from your assigned van bin to a storeroom
+                  or staging shelf (same API as Transfer stock). Managers can move between any locations from the{" "}
+                  <strong className="text-foreground">Transfer stock</strong> tab.
                 </CardDescription>
               </CardHeader>
               <CardContent className={INV_FORM_GROUP}>
                 <div className={INV_FORM_ROW}>
                   <div className={cn(INV_FIELD, "sm:basis-[15rem]")}>
-                    <Label className="text-xs">Part</Label>
+                    <Label className="text-xs">Catalog item</Label>
                     <Select value={retCatalog} onValueChange={setRetCatalog}>
                       <SelectTrigger className="h-9 w-full text-xs">
                         <SelectValue placeholder="Select stocked line…" />
@@ -1387,7 +1431,7 @@ export default function InventoryPage() {
                           quantity: Number(retQty),
                           notes: "Technician return to warehouse",
                         })
-                        toast({ title: "Transfer recorded", description: "Stock moved off your truck." })
+                        toast({ title: "Stock transferred", description: "Moved from your van bin to the warehouse." })
                         setRetQty("1")
                         void load()
                       } catch (e) {
@@ -1398,7 +1442,7 @@ export default function InventoryPage() {
                       }
                     }}
                   >
-                    Return stock
+                    Transfer stock
                   </Button>
                 </div>
               </CardContent>
@@ -1414,24 +1458,21 @@ export default function InventoryPage() {
       <AlertDialog open={adjConfirmOpen} onOpenChange={setAdjConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm stock decrease</AlertDialogTitle>
+            <AlertDialogTitle>Confirm adjust stock (decrease)</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <span className="block">
-                You&apos;re about to decrease on-hand quantity by{" "}
-                <span className="font-semibold tabular-nums">{adjQty}</span> for the selected
+                On-hand will drop by <span className="font-semibold tabular-nums">{adjQty}</span> at the selected
                 location.
               </span>
               <span className="block text-xs text-muted-foreground">
-                Stock adjustments are logged on the inventory ledger and cannot be edited
-                directly. For incorrect counts, apply an offsetting increase later.
+                Adjustments are written to the ledger and cannot be edited in place — use another stock adjustment if
+                you need to correct a mistake.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void submitAdjustment()}>
-              Apply decrease
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => void submitAdjustment()}>Apply stock adjustment</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1439,7 +1480,7 @@ export default function InventoryPage() {
       <Dialog open={locOpen} onOpenChange={setLocOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New inventory location</DialogTitle>
+            <DialogTitle>Add inventory location</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">

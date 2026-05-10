@@ -72,9 +72,14 @@ export function InventoryRecentActivityCard({
       </CardHeader>
       <CardContent className="pt-0">
         {visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">
-            No inventory transactions yet.
-          </p>
+          <div className="py-6 text-center text-sm text-muted-foreground space-y-2 px-2">
+            <p className="font-medium text-foreground">No recent movements</p>
+            <p className="text-xs leading-relaxed max-w-sm mx-auto">
+              After you <strong className="text-foreground">receive</strong>, <strong className="text-foreground">transfer</strong>,{" "}
+              <strong className="text-foreground">adjust</strong>, or <strong className="text-foreground">consume</strong> stock, the latest
+              lines will show here. Open <strong className="text-foreground">Consume parts &amp; history</strong> for the full ledger.
+            </p>
+          </div>
         ) : (
           <ul className="divide-y divide-border">
             {visible.map((t) => {
