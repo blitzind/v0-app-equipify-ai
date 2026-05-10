@@ -1,6 +1,6 @@
 # Outbound email infrastructure (Phase 55.1)
 
-Equipify uses **one** outbound path: [Resend](https://resend.com) via `sendEmail()` in `lib/email/resend.ts`. There is no parallel SMTP client or second mailer.
+Equipify uses **one** outbound path: [Resend](https://resend.com) via `sendEmail()` in `lib/email/resend.ts`. There is no parallel SMTP client or second mailer for transactional sends. A future **Gmail mailbox** integration (OAuth, user identity) is documented separately and does **not** replace this path — see [GMAIL_INTEGRATION.md](./GMAIL_INTEGRATION.md).
 
 ## Architecture
 

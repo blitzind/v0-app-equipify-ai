@@ -25,6 +25,16 @@ End-to-end inventory of **actual** Resend sends and related behaviors. All live 
 
 **Centralized compliance:** Every row above calls `sendEmail()`; there is **no** second Resend client or direct `resend.emails.send` outside `lib/email/resend.ts`.
 
+### Gmail vs Resend (Phase 55.5)
+
+| | **Resend (today)** | **Gmail (planned)** |
+|--|-------------------|---------------------|
+| Role | System transactional email for Equipify (`sendEmail()`). | Future **mailbox** integration for user/org identity (send-as, threads, optional sync). |
+| Status | Live when env configured. | **Not implemented** — catalog “Coming soon” only; see [GMAIL_INTEGRATION.md](./GMAIL_INTEGRATION.md). |
+| OAuth / tokens | API key server-side only. | Would use Google OAuth **server-only** token storage when built — not in this repo yet. |
+
+**Policy:** Do not route signup, invoice, quote, invite, or other system-critical transactional sends through Gmail unless product explicitly changes that.
+
 ---
 
 ## 2. Communications module (no duplicate sender)

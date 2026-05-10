@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T20:10:37.745Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-10T20:15:42.797Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -37,7 +37,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Auth:** Supabase Auth sessions; middleware refreshes session; dashboard routes protected; portal uses signed cookie session (\`/portal/*\`).
 - **Billing:** Stripe (checkout + webhooks), plan entitlements and usage limits in app logic.
 - **Deploy:** Vercel (\`vercel.json\` cron schedules). Analytics: Vercel Analytics package present.
-- **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; many other integrations listed on the marketing-style Integrations page are placeholders.
+- **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; marketing **Integrations** catalog entries (Gmail, Calendar, etc.) are mostly **coming soon** — see \`docs/GMAIL_INTEGRATION.md\` for Gmail vs Resend boundaries; **no Gmail OAuth** in app code today.
 
 ## App Architecture
 - **Route groups:** \`app/(dashboard)\` staff UI; \`app/(portal)\` customer portal; \`app/(admin)\` platform admin (\`/admin/*\`), gated by platform-admin identity server-side.

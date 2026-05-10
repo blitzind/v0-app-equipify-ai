@@ -81,7 +81,8 @@ const INTEGRATIONS: Integration[] = [
   {
     id: "gmail",
     name: "Gmail",
-    description: "Send quotes, invoices, and notifications.",
+    description:
+      "Future: connect a Google mailbox for staff send-from-Gmail and optional thread visibility. Customer invoices, quotes, and system emails stay on Equipify’s email service (Resend) — Gmail will not replace that path unless we scope it later.",
     status: "coming_soon",
     category: "Communication",
     logoLetter: "G",
