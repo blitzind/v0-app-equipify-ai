@@ -500,6 +500,10 @@ export interface RepairLog {
   signedAt: string
   /** Optional checklist persisted in `repair_log` JSON or `work_order_tasks`. */
   tasks?: { id: string; label: string; done: boolean; description?: string }[]
+  /** Staff-facing service summary (human-approved; may originate from AI). */
+  internalServiceSummary?: string
+  /** Customer-safe summary for external comms (never auto-sent). */
+  customerServiceSummary?: string
 }
 
 export interface WorkOrder {

@@ -52,12 +52,14 @@ import {
   WorkOrderDetailExperience,
   buildWorkOrderActivityItems,
 } from "@/components/work-orders/work-order-detail-experience"
+import { WorkOrderAiServiceSummaryPanel } from "@/components/work-orders/work-order-ai-service-summary-panel"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { TechnicianMobileQuickBar } from "@/components/technician/technician-mobile-quick-bar"
 import { AidenProductivitySection } from "@/components/aiden/aiden-productivity-section"
 import { useCustomerPrimaryPhone } from "@/hooks/use-customer-primary-phone"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 
 function uiStatusToDb(s: WorkOrderStatus): string {
   const m: Record<WorkOrderStatus, string> = {
@@ -107,6 +109,7 @@ export default function WorkOrderDetailPage() {
   const router = useRouter()
   const { toast } = useToast()
   const activeOrg = useActiveOrganization()
+  const { permissions: orgPermissions, status: orgPermStatus } = useOrgPermissions()
   const { getById, updateStatus, updateRepairLog, updateWorkOrder } = useWorkOrders()
 
   const storeWo = getById(workOrderRouteId)
@@ -387,6 +390,7 @@ export default function WorkOrderDetailPage() {
   const partsCost = parts.reduce((s, p) => s + p.quantity * p.unitCost, 0)
   const laborCost = laborHours * LABOR_RATE
   const editable = editing && ["Open", "Scheduled", "In Progress"].includes(workOrder.status)
+  const woCanEdit = orgPermStatus !== "loading" && orgPermissions.canEditWorkOrders
 
   async function persistUpdate(payload: Record<string, unknown>) {
     if (!activeOrg.organizationId) {
@@ -412,6 +416,7 @@ export default function WorkOrderDetailPage() {
       problem_reported: problemReported.trim() || null,
       repair_log: repairLogJsonForPersist(
         {
+          ...workOrder.repairLog,
           problemReported,
           diagnosis,
           partsUsed: usesPartsLineItems ? [] : parts,
@@ -556,6 +561,7 @@ export default function WorkOrderDetailPage() {
     if (!activeOrg.organizationId) return
     const supabase = createBrowserSupabaseClient()
     const repairLogPayload: RepairLog = {
+      ...workOrder.repairLog,
       problemReported,
       diagnosis,
       partsUsed: usesPartsLineItems ? workOrder.repairLog.partsUsed : parts,
@@ -995,6 +1001,29 @@ export default function WorkOrderDetailPage() {
               </div>
             </div>
           ) : null
+        }
+        notesTabFooterSlot={
+          activeOrg.status === "ready" && activeOrg.organizationId && woCanEdit ?
+            <WorkOrderAiServiceSummaryPanel
+              organizationId={activeOrg.organizationId}
+              workOrderId={workOrder.id}
+              workOrderArchived={Boolean(workOrder.isArchived)}
+              canEdit={woCanEdit}
+              savedInternal={workOrder.repairLog.internalServiceSummary}
+              savedCustomer={workOrder.repairLog.customerServiceSummary}
+              onPersistSummaries={async (patch) => {
+                if (!activeOrg.organizationId || workOrder.isArchived || !woCanEdit) return false
+                const merged: RepairLog = { ...workOrder.repairLog, ...patch }
+                return persistUpdate({
+                  repair_log: repairLogJsonForPersist(merged, {
+                    stripTasks: usesTasksTable,
+                    stripParts: usesPartsLineItems,
+                  }),
+                  updated_at: new Date().toISOString(),
+                })
+              }}
+            />
+          : null
         }
         equipmentAssets={equipmentAssets}
         onNavigateToCertificateForEquipment={(eqId) => {

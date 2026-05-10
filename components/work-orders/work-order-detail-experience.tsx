@@ -754,6 +754,8 @@ export interface WorkOrderDetailExperienceProps {
   laborTabToolbar?: ReactNode
   /** Inserted above Notes sections (e.g. drawer inline notes save bar). */
   notesTabToolbar?: ReactNode
+  /** After internal notes (e.g. AI service summary drafts). */
+  notesTabFooterSlot?: ReactNode
   /** Optional calibration/certificate tab content. */
   certificateTabContent?: ReactNode
   /** Optional toolbar shown above certificate content. */
@@ -846,6 +848,7 @@ export function WorkOrderDetailExperience({
   tasksTabToolbar,
   laborTabToolbar,
   notesTabToolbar,
+  notesTabFooterSlot,
   certificateTabContent,
   certificateTabToolbar,
   notesFieldsEditable = false,
@@ -1932,6 +1935,7 @@ export function WorkOrderDetailExperience({
               </p>
             )}
           </Section>
+          {notesTabFooterSlot ? <div className="pt-1">{notesTabFooterSlot}</div> : null}
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4 mt-0">

@@ -42,6 +42,7 @@ import {
   WorkOrderDetailExperience,
   buildWorkOrderActivityItems,
 } from "@/components/work-orders/work-order-detail-experience"
+import { WorkOrderAiServiceSummaryPanel } from "@/components/work-orders/work-order-ai-service-summary-panel"
 import { AddWorkOrderEquipmentModal } from "@/components/work-orders/add-work-order-equipment-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
@@ -1221,6 +1222,39 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
       return false
     } finally {
       setNotesSaving(false)
+    }
+  }
+
+  async function persistServiceSummaries(patch: {
+    internalServiceSummary?: string
+    customerServiceSummary?: string
+  }): Promise<boolean> {
+    if (!wo || !activeOrgId || wo.isArchived) return false
+    const supabase = createBrowserSupabaseClient()
+    try {
+      const repairPayload: RepairLog = { ...wo.repairLog, ...patch }
+      const { error } = await supabase
+        .from("work_orders")
+        .update({
+          repair_log: repairLogJsonForPersist(repairPayload, {
+            stripTasks: usesTasksTable,
+            stripParts: usesPartsLineItems,
+          }),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", wo.id)
+        .eq("organization_id", activeOrgId)
+      if (error) throw new Error(error.message)
+      await loadWorkOrder()
+      onUpdated?.()
+      return true
+    } catch (e) {
+      pushToast({
+        variant: "destructive",
+        title: "Could not save summary",
+        description: e instanceof Error ? e.message : String(e),
+      })
+      return false
     }
   }
 
@@ -2618,6 +2652,19 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
                   </div>
                 </div>
               ) : null
+            }
+            notesTabFooterSlot={
+              orgStatus === "ready" && activeOrgId && wo.id && woCanEdit ?
+                <WorkOrderAiServiceSummaryPanel
+                  organizationId={activeOrgId}
+                  workOrderId={wo.id}
+                  workOrderArchived={Boolean(wo.isArchived)}
+                  canEdit={woCanEdit}
+                  savedInternal={wo.repairLog.internalServiceSummary}
+                  savedCustomer={wo.repairLog.customerServiceSummary}
+                  onPersistSummaries={persistServiceSummaries}
+                />
+              : null
             }
             equipmentAssets={equipmentAssets}
             onNavigateToCertificateForEquipment={(eqId) => {

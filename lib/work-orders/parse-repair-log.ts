@@ -58,11 +58,13 @@ export function parseRepairLog(raw: unknown): RepairLog {
     signedBy: typeof o.signedBy === "string" ? o.signedBy : "",
     signedAt: typeof o.signedAt === "string" ? o.signedAt : "",
     tasks,
+    ...(typeof o.internalServiceSummary === "string" ? { internalServiceSummary: o.internalServiceSummary } : {}),
+    ...(typeof o.customerServiceSummary === "string" ? { customerServiceSummary: o.customerServiceSummary } : {}),
   }
 }
 
 export function serializeRepairLog(rl: RepairLog): Record<string, unknown> {
-  return {
+  const base: Record<string, unknown> = {
     problemReported: rl.problemReported,
     diagnosis: rl.diagnosis,
     partsUsed: rl.partsUsed,
@@ -74,6 +76,13 @@ export function serializeRepairLog(rl: RepairLog): Record<string, unknown> {
     signedAt: rl.signedAt,
     tasks: rl.tasks ?? [],
   }
+  if (typeof rl.internalServiceSummary === "string") {
+    base.internalServiceSummary = rl.internalServiceSummary
+  }
+  if (typeof rl.customerServiceSummary === "string") {
+    base.customerServiceSummary = rl.customerServiceSummary
+  }
+  return base
 }
 
 /** Optional strips keep `repair_log` JSON from duplicating data now stored in dedicated tables. */

@@ -13,6 +13,7 @@ import { priceListAiResponseSchema } from "@/lib/catalog/import-types"
 import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-schema"
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
+import { WorkOrderServiceSummaryAiSchema } from "@/lib/work-orders/service-summary-ai-schema"
 import { getIndustryLens } from "@/lib/ai/mock-industry-lens"
 import {
   EMPTY_TRIAL_OPERATIONAL_SNAPSHOT,
@@ -503,11 +504,19 @@ export async function buildMockStructuredOutput<T>(params: {
   }
 
   if (params.task === "work_order_summary") {
-    rawObj = {
-      summary: "Trial preview — concise recap of the job context for handoff.",
-      checklist: ["Safety review", "Customer sign-off"],
-      risks: [],
-    }
+    const snippet = pickUserSnippet(input)
+    const customerSafe = /customer_safe/i.test(snippet)
+    rawObj = customerSafe ?
+      {
+        summary:
+          "Trial preview — customer-facing recap of the visit. No pricing or internal-only notes are included; confirm facts before sending.",
+        highlights: ["Work completed during the visit", "Equipment returned to normal service"],
+      }
+    : {
+        summary:
+          "Trial preview — internal handoff summary from the job context. Technicians should confirm details before sharing externally.",
+        highlights: ["Review operating conditions noted in the record", "Capture any follow-ups in Equipify"],
+      }
   }
 
   if (params.task === "OCR_cleanup") {
@@ -559,6 +568,17 @@ export async function buildMockStructuredOutput<T>(params: {
     }
     if (!schemaResult.ok && params.task === "aiden_safe_action_prepare") {
       const normalized = SafeActionPrepareAnswerSchema.safeParse(rawObj)
+      if (normalized.success) {
+        rawText = JSON.stringify(normalized.data)
+        schemaResult = await parseWithSchemaSafe(rawText, params.schema)
+      }
+    }
+    if (!schemaResult.ok && params.task === "work_order_summary") {
+      const o = (rawObj ?? {}) as Record<string, unknown>
+      const summary = typeof o.summary === "string" ? o.summary : ""
+      const highlightsRaw = o.highlights ?? o.checklist
+      const highlights = Array.isArray(highlightsRaw) ? highlightsRaw.filter((x): x is string => typeof x === "string") : undefined
+      const normalized = WorkOrderServiceSummaryAiSchema.safeParse({ summary, highlights })
       if (normalized.success) {
         rawText = JSON.stringify(normalized.data)
         schemaResult = await parseWithSchemaSafe(rawText, params.schema)
