@@ -1,7 +1,7 @@
 /**
  * Portal UI tokens — maps workspace `organizations.primary_color` into the same
  * `--portal-accent*` CSS variables the live customer portal uses (`app/globals.css`).
- * Used by staff preview and (optionally) login when org branding is known.
+ * Used by staff preview, authenticated `PortalShell` (bootstrap), and optional login `?organizationId=`.
  */
 
 const DEFAULT_PORTAL_ACCENT = "#2563eb"

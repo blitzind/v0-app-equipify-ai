@@ -31,6 +31,7 @@ import {
 import { PortalWorkspaceBrand } from "@/components/portal/portal-workspace-brand"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
 import { usePortalSession } from "@/components/portal/portal-session-context"
+import { portalAccentCssVariables } from "@/lib/portal/portal-theme-css"
 
 const NAV_ITEMS = [
   { href: "/portal/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -84,6 +85,13 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
 
   const initials = bootstrap?.initials ?? "?"
 
+  const portalAccentInline = useMemo(() => {
+    if (!bootstrap) return {}
+    const raw = bootstrap.portalPrimaryColor?.trim()
+    if (!raw) return {}
+    return portalAccentCssVariables(raw)
+  }, [bootstrap])
+
   async function handleLogout() {
     await fetch("/api/portal/session/logout", { method: "POST" })
     router.replace("/portal/login")
@@ -91,7 +99,13 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--portal-bg)" }}>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        background: "var(--portal-bg)",
+        ...portalAccentInline,
+      }}
+    >
       <header
         className="sticky top-0 z-40 border-b"
         style={{ background: "var(--portal-surface)", borderColor: "var(--portal-border)" }}

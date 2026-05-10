@@ -12,6 +12,11 @@ export type PortalBootstrap = {
   organizationName: string
   /** Workspace branding — document logo preferred, then app logo */
   workspaceLogoUrl: string | null
+  /**
+   * `organizations.primary_color` when set — shell maps to `--portal-accent*` via
+   * `portalAccentCssVariables`. Null/empty: inherit `globals.css` defaults.
+   */
+  portalPrimaryColor: string | null
   customerCompanyName: string
   features: { onlinePayments: boolean }
 }

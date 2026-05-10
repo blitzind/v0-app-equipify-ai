@@ -16,7 +16,7 @@ export async function GET() {
   const [{ data: org }, { data: customer }] = await Promise.all([
     svc
       .from("organizations")
-      .select("name, logo_url, document_logo_url")
+      .select("name, logo_url, document_logo_url, primary_color")
       .eq("id", portalUser.organization_id)
       .maybeSingle(),
     svc
@@ -39,11 +39,18 @@ export async function GET() {
     .map((p) => p[0]!.toUpperCase())
     .join("") || "?"
 
-  const orgRow = org as { name?: string; logo_url?: string | null; document_logo_url?: string | null } | null
+  const orgRow = org as {
+    name?: string
+    logo_url?: string | null
+    document_logo_url?: string | null
+    primary_color?: string | null
+  } | null
   const workspaceLogoUrl = pickPreferredDocumentLogoUrl(
     orgRow?.document_logo_url ?? null,
     orgRow?.logo_url ?? null,
   )
+  const portalPrimaryColorRaw = orgRow?.primary_color != null ? String(orgRow.primary_color).trim() : ""
+  const portalPrimaryColor = portalPrimaryColorRaw.length > 0 ? portalPrimaryColorRaw : null
 
   return NextResponse.json({
     portalUserId: portalUser.id,
@@ -54,6 +61,8 @@ export async function GET() {
     initials,
     organizationName: orgRow?.name?.trim() || "Organization",
     workspaceLogoUrl,
+    /** Workspace brand accent (same row staff preview uses); null → shell uses global portal defaults. */
+    portalPrimaryColor,
     customerCompanyName: (customer as { company_name?: string } | null)?.company_name ?? "Customer",
     features: {
       onlinePayments: false,

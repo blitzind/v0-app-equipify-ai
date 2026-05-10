@@ -7,6 +7,7 @@ import { ArrowRight, KeyRound, Mail, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
+import { portalAccentCssVariables } from "@/lib/portal/portal-theme-css"
 
 /**
  * Hex used by the main app sidebar (`components/app-sidebar.tsx` line ~396).
@@ -14,6 +15,9 @@ import { ProvidedByEquipify } from "@/components/portal/provided-by-equipify"
  * when the marketing site / portal-bg tokens shift.
  */
 const APP_SIDEBAR_BG = "#0F172A"
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const NOTICE_COPY: Record<string, string> = {
   no_staff_portal:
@@ -37,6 +41,7 @@ function PortalLoginInner() {
   const [manualToken, setManualToken] = useState("")
   const [showTokenForm, setShowTokenForm] = useState(false)
   const [configStatus, setConfigStatus] = useState<ConfigStatus>({ kind: "ok" })
+  const [publicAccentVars, setPublicAccentVars] = useState<Record<string, string>>({})
 
   const isProd = useMemo(() => process.env.NODE_ENV === "production", [])
 
@@ -58,6 +63,33 @@ function PortalLoginInner() {
       setInfo(NOTICE_COPY[n]!)
     }
   }, [searchParams, isProd])
+
+  /** Optional `?organizationId=` — public branding accent only (no auth secrets). */
+  useEffect(() => {
+    const orgId = searchParams.get("organizationId")?.trim() ?? ""
+    if (!UUID_RE.test(orgId)) {
+      setPublicAccentVars({})
+      return
+    }
+    let cancelled = false
+    void fetch(`/api/portal/public-branding?organizationId=${encodeURIComponent(orgId)}`)
+      .then(async (r) => {
+        if (!r.ok) return null
+        return (await r.json().catch(() => null)) as { primaryColor?: string | null } | null
+      })
+      .then((j) => {
+        if (cancelled || !j) return
+        const hex = j.primaryColor?.trim()
+        if (!hex) {
+          setPublicAccentVars({})
+          return
+        }
+        setPublicAccentVars(portalAccentCssVariables(hex))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const token = searchParams.get("token")
@@ -112,7 +144,10 @@ function PortalLoginInner() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-start px-4 py-8 sm:py-12"
-      style={{ background: "var(--portal-bg)" }}
+      style={{
+        background: "var(--portal-bg)",
+        ...publicAccentVars,
+      }}
     >
       <main
         className="w-full max-w-[440px] rounded-2xl overflow-hidden border shadow-xl"
