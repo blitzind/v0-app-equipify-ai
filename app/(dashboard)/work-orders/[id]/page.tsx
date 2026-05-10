@@ -53,6 +53,7 @@ import {
   buildWorkOrderActivityItems,
 } from "@/components/work-orders/work-order-detail-experience"
 import { WorkOrderAiServiceSummaryPanel } from "@/components/work-orders/work-order-ai-service-summary-panel"
+import { WorkOrderAiPartsSuggestionsPanel } from "@/components/work-orders/work-order-ai-parts-suggestions-panel"
 import { WorkOrderAiTechnicianAssistPanel } from "@/components/work-orders/work-order-ai-technician-assist-panel"
 import { useToast } from "@/hooks/use-toast"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
@@ -952,12 +953,22 @@ export default function WorkOrderDetailPage() {
         planServices={planServices}
         activityItems={buildWorkOrderActivityItems(workOrder)}
         partsTabLeadSlot={
-          activeOrg.organizationId ? (
-            <WorkOrderTruckConsumeCard
-              organizationId={activeOrg.organizationId}
-              workOrderId={workOrder.id}
-            />
-          ) : null
+          activeOrg.organizationId ?
+            <>
+              {activeOrg.status === "ready" && woCanEdit ?
+                <WorkOrderAiPartsSuggestionsPanel
+                  organizationId={activeOrg.organizationId}
+                  workOrderId={workOrder.id}
+                  workOrderArchived={Boolean(workOrder.isArchived)}
+                  canEdit={woCanEdit}
+                />
+              : null}
+              <WorkOrderTruckConsumeCard
+                organizationId={activeOrg.organizationId}
+                workOrderId={workOrder.id}
+              />
+            </>
+          : null
         }
         problemReported={problemReported}
         onProblemReportedChange={setProblemReported}

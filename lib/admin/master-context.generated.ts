@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 217,
+  apiRouteHandlers: 218,
   sqlMigrations: 143,
   dashboardPages: 59,
-  componentsTsx: 235,
-  libTsFiles: 429,
+  componentsTsx: 236,
+  libTsFiles: 431,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **217** |
+| API route handlers (\`app/api/**/route.ts\`) | **218** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **143** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
-| \`components/**/*.tsx\` | **235** |
-| \`lib/**/*.ts\` | **429** |
+| \`components/**/*.tsx\` | **236** |
+| \`lib/**/*.ts\` | **431** |
 
 ### Vercel crons
 
@@ -190,6 +190,7 @@ organizations/[organizationId]/service-requests/route.ts
 organizations/[organizationId]/service-requests/stats/route.ts
 organizations/[organizationId]/technician-skill-tags/[tagId]/route.ts
 organizations/[organizationId]/technician-skill-tags/route.ts
+organizations/[organizationId]/work-orders/[workOrderId]/ai-parts-suggestions/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-service-summary/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-technician-assist/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/duplicate/route.ts

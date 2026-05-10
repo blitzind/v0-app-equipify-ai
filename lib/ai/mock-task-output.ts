@@ -14,6 +14,7 @@ import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-sc
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
 import type { AiTaskId, AiTaskInput } from "@/lib/ai/types"
 import { WorkOrderServiceSummaryAiSchema } from "@/lib/work-orders/service-summary-ai-schema"
+import { WorkOrderPartsSuggestAiSchema } from "@/lib/work-orders/parts-suggest-schema"
 import { WorkOrderTechnicianAssistAiSchema } from "@/lib/work-orders/technician-assist-schema"
 import { getIndustryLens } from "@/lib/ai/mock-industry-lens"
 import {
@@ -544,6 +545,35 @@ export async function buildMockStructuredOutput<T>(params: {
     }
   }
 
+  if (params.task === "work_order_parts_suggest") {
+    rawObj = {
+      suggestions: [
+        {
+          name: "Trial preview — primary service filter (generic)",
+          itemKind: "part",
+          confidence: "medium",
+          reasoning:
+            "Illustrative row for trial — live AI would tailor this to the equipment and problem in the work order context.",
+          catalogMatch: null,
+        },
+        {
+          name: "Trial preview — hand tools for the asset class",
+          itemKind: "tool",
+          confidence: "low",
+          reasoning: "Confirm specific sizes and torque requirements on site before use.",
+          catalogMatch: null,
+        },
+        {
+          name: "Trial preview — shop towels / cleanup consumables",
+          itemKind: "consumable",
+          confidence: "low",
+          reasoning: "Common for fluid-handling jobs; adjust to your site SOP.",
+          catalogMatch: null,
+        },
+      ],
+    }
+  }
+
   if (params.task === "OCR_cleanup") {
     rawObj = {
       cleanedText: snippet ? snippet.slice(0, 2000) : "Trial preview — cleaned text would appear here.",
@@ -611,6 +641,13 @@ export async function buildMockStructuredOutput<T>(params: {
     }
     if (!schemaResult.ok && params.task === "work_order_technician_assist") {
       const normalized = WorkOrderTechnicianAssistAiSchema.safeParse(rawObj)
+      if (normalized.success) {
+        rawText = JSON.stringify(normalized.data)
+        schemaResult = await parseWithSchemaSafe(rawText, params.schema)
+      }
+    }
+    if (!schemaResult.ok && params.task === "work_order_parts_suggest") {
+      const normalized = WorkOrderPartsSuggestAiSchema.safeParse(rawObj)
       if (normalized.success) {
         rawText = JSON.stringify(normalized.data)
         schemaResult = await parseWithSchemaSafe(rawText, params.schema)
