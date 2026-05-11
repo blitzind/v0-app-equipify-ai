@@ -1482,6 +1482,7 @@ function PaymentsTab({
   const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
   const canEditPayments = permissions.canViewBilling && permissions.canEditInvoices
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
+  const [blitzpayUnavailableReason, setBlitzpayUnavailableReason] = useState<string | null>(null)
   type BlitzpayActivityRow = {
     attemptNo: number
     paymentSource: "staff_dashboard" | "customer_portal"
@@ -1569,6 +1570,7 @@ function PaymentsTab({
     invoice.status !== "Void" &&
     invoice.status !== "Draft" &&
     invoice.status !== "Paid"
+  const canViewBlitzpayPayCard = permissions.canEditInvoices || permissions.canViewFinancials
 
   const allocLabel =
     invoice.paymentAllocationState != null
@@ -1618,32 +1620,62 @@ function PaymentsTab({
   }, [orgId, invoice.id, invoice.totalPaidCents])
 
   useEffect(() => {
-    if (!canStartBlitzpayPay || !orgId) {
+    if (!canViewBlitzpayPayCard || !orgId) {
       setBlitzpayPricingPreview(null)
+      setBlitzpayUnavailableReason(null)
+      return
+    }
+    const invoicePaid =
+      invoice.status === "Paid" ||
+      (invoice.balanceDueCents != null ? invoice.balanceDueCents <= 0 : balance <= 0)
+    if (invoicePaid) {
+      setBlitzpayPricingPreview(null)
+      setBlitzpayUnavailableReason("This invoice is already paid.")
+      return
+    }
+    const notEligible = invoice.isArchived || invoice.status === "Void" || invoice.status === "Draft" || balance <= 0
+    if (notEligible) {
+      setBlitzpayPricingPreview(null)
+      setBlitzpayUnavailableReason("This invoice is not eligible for online payment.")
       return
     }
     let cancelled = false
+    setBlitzpayUnavailableReason(null)
     void (async () => {
       try {
         const res = await fetch(
           `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
           { method: "GET", credentials: "include", cache: "no-store" },
         )
-        const body = (await res.json()) as { pricing?: typeof blitzpayPricingPreview }
-        if (!cancelled && res.ok) {
+        const body = (await res.json()) as { pricing?: typeof blitzpayPricingPreview; error?: string; message?: string }
+        if (cancelled) return
+        if (res.ok) {
           const p = (body.pricing ?? null) as typeof blitzpayPricingPreview
           setBlitzpayPricingPreview(p)
+          setBlitzpayUnavailableReason(null)
           const first = p?.availablePaymentMethods?.[0]?.type
           if (first === "card" || first === "us_bank_account") setBlitzpaySelectedMethod(first)
+          return
+        }
+        setBlitzpayPricingPreview(null)
+        if (body.error === "org_pay_disabled" || body.error === "feature_disabled") {
+          setBlitzpayUnavailableReason("BlitzPay is not enabled for this workspace.")
+        } else if (body.error === "connect_not_ready") {
+          setBlitzpayUnavailableReason("Stripe onboarding is not complete.")
+        } else {
+          setBlitzpayUnavailableReason("This invoice is not eligible for online payment.")
         }
       } catch {
-        if (!cancelled) setBlitzpayPricingPreview(null)
+        if (!cancelled) {
+          setBlitzpayPricingPreview(null)
+          setBlitzpayUnavailableReason("BlitzPay is not enabled for this workspace.")
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [canStartBlitzpayPay, orgId, invoice.id, balance])
+  }, [canViewBlitzpayPayCard, orgId, invoice.id, balance, invoice.balanceDueCents, invoice.status, invoice.isArchived])
 
   useEffect(() => {
     if (!orgId || !canViewBlitzpayActivity) {
@@ -1915,13 +1947,11 @@ function PaymentsTab({
         </div>
       </div>
 
-      {canStartBlitzpayPay && orgId ? (
+      {canViewBlitzpayPayCard && orgId ? (
         <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
           <p className="text-xs font-semibold">BlitzPay</p>
           <p className="text-[10px] text-muted-foreground">
-            Opens Stripe Checkout on your connected account (test mode friendly). Requires env{" "}
-            <span className="font-mono">BLITZPAY_INVOICE_PAY_ENABLED=true</span> and org BlitzPay pay enabled in
-            settings.
+            Let customers pay this invoice online through secure hosted checkout.
           </p>
           {blitzpayPricingPreview ? (
             <div className="rounded-md border border-border/80 p-2 space-y-1 text-[10px]">
@@ -1982,46 +2012,50 @@ function PaymentsTab({
               ) : null}
             </div>
           ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="h-8 text-[11px] gap-1.5"
-            disabled={blitzpayBusy}
-            onClick={() => {
-              void (async () => {
-                setBlitzpayBusy(true)
-                try {
-                  const res = await fetch(
-                    `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
-                    {
-                      method: "POST",
-                      credentials: "include",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ paymentMethodType: blitzpaySelectedMethod }),
-                    },
-                  )
-                  const body = (await res.json()) as { error?: string; message?: string; url?: string }
-                  if (!res.ok) {
-                    pushToast(body.message ?? body.error ?? "Could not start BlitzPay checkout.", "error")
-                    return
+          {blitzpayUnavailableReason ? (
+            <p className="text-[11px] text-muted-foreground">{blitzpayUnavailableReason}</p>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-8 text-[11px] gap-1.5"
+              disabled={blitzpayBusy}
+              onClick={() => {
+                void (async () => {
+                  setBlitzpayBusy(true)
+                  try {
+                    const res = await fetch(
+                      `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
+                      {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymentMethodType: blitzpaySelectedMethod }),
+                      },
+                    )
+                    const body = (await res.json()) as { error?: string; message?: string; url?: string }
+                    if (!res.ok) {
+                      pushToast(body.message ?? body.error ?? "Could not start BlitzPay checkout.", "error")
+                      return
+                    }
+                    if (body.url) {
+                      window.location.assign(body.url)
+                    } else {
+                      pushToast("Checkout URL missing.", "error")
+                    }
+                  } catch (e) {
+                    pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                  } finally {
+                    setBlitzpayBusy(false)
                   }
-                  if (body.url) {
-                    window.location.assign(body.url)
-                  } else {
-                    pushToast("Checkout URL missing.", "error")
-                  }
-                } catch (e) {
-                  pushToast(e instanceof Error ? e.message : "Network error.", "error")
-                } finally {
-                  setBlitzpayBusy(false)
-                }
-              })()
-            }}
-          >
-            {blitzpayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-            Pay with BlitzPay (hosted)
-          </Button>
+                })()
+              }}
+            >
+              {blitzpayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+              Pay with BlitzPay (hosted)
+            </Button>
+          )}
         </div>
       ) : null}
 
