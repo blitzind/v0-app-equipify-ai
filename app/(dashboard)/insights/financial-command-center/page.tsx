@@ -17,7 +17,7 @@ export default function FinancialCommandCenterPage() {
   if (!canView) {
     return (
       <div className="max-w-lg mx-auto py-12 px-4">
-        <div className="rounded-lg border border-border bg-muted/20 p-6 flex gap-3">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] flex gap-3">
           <AlertTriangle className="h-5 w-5 text-[color:var(--status-warning)] shrink-0 mt-0.5" aria-hidden />
           <div className="space-y-2 text-sm">
             <p className="font-semibold">Financial command center is restricted</p>
@@ -34,21 +34,18 @@ export default function FinancialCommandCenterPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4 space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">BlitzPay financial command center</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Owner view of receivables, payables, treasury, credits, and forecasts. Also available under{" "}
-          <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline">
-            Settings → Payments
-          </Link>
-          . Executive health (deterministic, no AI) is anchored at{" "}
-          <Link href="/settings/payments#blitzpay-executive-dashboard-anchor" className="text-primary underline-offset-2 hover:underline">
-            Settings → Payments → Executive business health
-          </Link>
-          .
-        </p>
-      </div>
+    <div className="flex flex-col gap-5">
+      <p className="text-xs text-muted-foreground leading-relaxed max-w-4xl">
+        The same command center lives under{" "}
+        <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline">
+          Settings → Payments
+        </Link>
+        . Executive business health (deterministic, no AI) is at{" "}
+        <Link href="/settings/payments#blitzpay-executive-dashboard-anchor" className="text-primary underline-offset-2 hover:underline">
+          Settings → Payments → Executive business health
+        </Link>
+        .
+      </p>
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
     </div>

@@ -40,6 +40,11 @@ type NavItem = {
   anyOf?: (keyof OrgPermissions)[]
   /** Renders the row in a disabled "coming soon" style. */
   comingSoon?: boolean
+  /**
+   * `exact` = only this href (or same path + query) is active — child paths like
+   * `/insights/financial-command-center` do not match `/insights` (avoids double-highlight).
+   */
+  activeMatch?: "exact" | "prefix"
 }
 
 type NavGroup = {
@@ -126,6 +131,7 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Sparkles,
         highlight: true,
         anyOf: ["canViewInsights"],
+        activeMatch: "exact",
       },
       {
         label: "AI Operations",
@@ -259,9 +265,12 @@ function writeCollapsedGroups(set: Set<string>) {
 }
 
 /** Active match — copies the rule used for individual rows so headers and rows agree. */
-function isItemActive(pathname: string, href: string): boolean {
+function isItemActive(pathname: string, href: string, item?: Pick<NavItem, "activeMatch">): boolean {
   if (!href) return false
   if (href === "/") return pathname === "/"
+  if (item?.activeMatch === "exact") {
+    return pathname === href || pathname.startsWith(href + "?")
+  }
   return pathname === href || pathname.startsWith(href + "/") || pathname.startsWith(href + "?")
 }
 
@@ -409,7 +418,7 @@ function SidebarBody({
       const next = new Set(prev)
       for (const group of visibleGroups) {
         if (!next.has(group.id)) continue
-        const owns = group.items.some((item) => isItemActive(pathname, item.href))
+        const owns = group.items.some((item) => isItemActive(pathname, item.href, item))
         if (owns) {
           next.delete(group.id)
           mutated = true
@@ -628,7 +637,7 @@ function SidebarBody({
         ) : null}
         {visibleGroups.map((group, gi) => {
           const groupCollapsed = collapsedGroups.has(group.id)
-          const groupHasActive = group.items.some((item) => isItemActive(pathname, item.href))
+          const groupHasActive = group.items.some((item) => isItemActive(pathname, item.href, item))
           return (
             <div key={group.id} className={cn("w-full", gi > 0 && (isCollapsed ? "mt-3" : "mt-3"))}>
               {/* Collapsible category header — desktop only when sidebar is open */}
@@ -672,8 +681,8 @@ function SidebarBody({
                 hidden={!isCollapsed && groupCollapsed}
                 className={cn("space-y-0.5", isCollapsed && "flex flex-col items-stretch")}
               >
-                {group.items.map(({ label, href, icon: Icon, highlight, comingSoon }) => {
-                  const active = isItemActive(pathname, href)
+                {group.items.map(({ label, href, icon: Icon, highlight, comingSoon, activeMatch }) => {
+                  const active = isItemActive(pathname, href, { activeMatch })
                   if (comingSoon) {
                     return (
                       <div

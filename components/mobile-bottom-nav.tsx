@@ -23,6 +23,8 @@ const ACCENT = "#f59f1c"
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/"
+  // `/insights` hub only — do not treat `/insights/financial-command-center` as Insights (matches desktop nav).
+  if (href === "/insights") return pathname === "/insights" || pathname.startsWith("/insights?")
   return pathname.startsWith(href)
 }
 

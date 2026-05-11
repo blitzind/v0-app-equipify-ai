@@ -68,7 +68,12 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
   if (!organizationId || !orgReady) return null
 
   return (
-    <div className="rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-4">
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-card px-3 py-4 sm:px-5 sm:py-5 space-y-4",
+        "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-[color:var(--primary)] shrink-0" aria-hidden />

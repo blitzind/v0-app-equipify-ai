@@ -14,7 +14,9 @@ import {
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
   CalendarRange, Store, Package, Upload, Bell,
   Warehouse,
+  Landmark,
 } from "lucide-react"
+import Image from "next/image"
 import type { LucideIcon } from "lucide-react"
 import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
 
@@ -25,6 +27,10 @@ interface RouteMeta {
   subtitle: string
   icon: LucideIcon
   cta?: { label: string; href?: string }
+  /** Optional right-side mark in the title card (e.g. partner brand). */
+  heroAccessory?: "blitzpay-wordmark"
+  /** When true, subtitle wraps like Settings hero instead of a single-line clamp. */
+  heroSubtitleMultiline?: boolean
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
@@ -140,6 +146,14 @@ const ROUTE_META: Record<string, RouteMeta> = {
       "Track customer emails, reminders, delivery status, quote follow-ups, invoice notifications, and automated outreach activity.",
     icon: Bell,
   },
+  "/insights/financial-command-center": {
+    title: "BlitzPay Financial Command Center",
+    subtitle:
+      "Monitor receivables, cash flow, treasury activity, collections, forecasts, and financial operations health across your business.",
+    icon: Landmark,
+    heroAccessory: "blitzpay-wordmark",
+    heroSubtitleMultiline: true,
+  },
 }
 
 // Routes that render their own full-bleed hero — PageHero is suppressed.
@@ -167,10 +181,12 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/portal": "#2563EB",
   "/integrations": "#2563EB",
   "/communications": "#6366F1",
+  "/insights/financial-command-center": "#f59f1c",
 }
 
 function getFeatureIconColor(pathname: string): string {
   if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
+  if (pathname.startsWith("/insights/financial-command-center")) return "#f59f1c"
   if (pathname.startsWith("/customers/")) return "#2563EB"
   if (pathname.startsWith("/technicians/today")) return "#4F46E5"
   if (pathname.startsWith("/work-orders/")) return "#22C55E"
@@ -209,15 +225,20 @@ function PageHero({
   icon: Icon,
   featureColor,
   pathname,
+  heroAccessory,
+  heroSubtitleMultiline,
 }: {
   title: string
   subtitle: string
   icon: LucideIcon
   featureColor: string
   pathname: string
+  heroAccessory?: RouteMeta["heroAccessory"]
+  heroSubtitleMultiline?: boolean
 }) {
   const maintenancePlansHero = pathname === "/maintenance-plans"
   const isSettingsArea = pathname.startsWith("/settings/")
+  const multilineSubtitle = Boolean(isSettingsArea || heroSubtitleMultiline)
   return (
     <div
       className={cn(
@@ -227,43 +248,57 @@ function PageHero({
     >
       <div
         className={cn(
-          "flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6",
+          "flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 bg-card border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] px-4 sm:px-6",
           isSettingsArea ? "py-4 sm:py-6" : "py-4 sm:py-5",
         )}
       >
-        {maintenancePlansHero ? (
-          <MaintenancePlansBrandTile size="md" />
-        ) : (
-        <div
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
-          style={{
-            backgroundColor: `color-mix(in srgb, ${featureColor} 14%, var(--card))`,
-            borderColor: `color-mix(in srgb, ${featureColor} 24%, var(--border))`,
-          }}
-        >
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: featureColor }} />
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
+          {maintenancePlansHero ? (
+            <MaintenancePlansBrandTile size="md" />
+          ) : (
+            <div
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${featureColor} 14%, var(--card))`,
+                borderColor: `color-mix(in srgb, ${featureColor} 24%, var(--border))`,
+              }}
+            >
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: featureColor }} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1
+              className={cn(
+                "font-semibold text-foreground tracking-tight leading-tight text-balance",
+                isSettingsArea ? "text-lg sm:text-xl" : "text-base sm:text-lg",
+              )}
+            >
+              {title}
+            </h1>
+            <p
+              className={cn(
+                "text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed",
+                multilineSubtitle
+                  ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
+                  : "text-xs sm:text-sm line-clamp-1",
+              )}
+            >
+              {subtitle}
+            </p>
+          </div>
         </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <h1
-            className={cn(
-              "font-semibold text-foreground tracking-tight leading-tight text-balance",
-              isSettingsArea ? "text-lg sm:text-xl" : "text-base sm:text-lg",
-            )}
-          >
-            {title}
-          </h1>
-          <p
-            className={cn(
-              "text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed",
-              isSettingsArea
-                ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
-                : "text-xs sm:text-sm line-clamp-1",
-            )}
-          >
-            {subtitle}
-          </p>
-        </div>
+        {heroAccessory === "blitzpay-wordmark" ? (
+          <div className="flex shrink-0 items-center justify-start sm:justify-end pl-12 sm:pl-0">
+            <Image
+              src="/blitzpay-wordmark.png"
+              alt="BlitzPay"
+              width={220}
+              height={48}
+              className="h-7 w-auto max-w-[min(200px,42vw)] sm:h-8 sm:max-w-[220px] object-contain object-left sm:object-right opacity-95"
+              priority
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -297,6 +332,8 @@ export function PageShell({ children }: { children: React.ReactNode }) {
           icon={meta.icon}
           featureColor={getFeatureIconColor(pathname)}
           pathname={pathname}
+          heroAccessory={meta.heroAccessory}
+          heroSubtitleMultiline={meta.heroSubtitleMultiline}
         />
       )}
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16">
