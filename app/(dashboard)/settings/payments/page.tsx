@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
+import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
 import { cn } from "@/lib/utils"
@@ -59,7 +60,10 @@ function BlitzPaySettingsPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { organizationId, status: orgStatus } = useActiveOrganization()
-  const { rawRole, status: permStatus } = useOrgPermissions()
+  const orgPermissions = useOrgPermissions()
+  const { rawRole, status: permStatus } = orgPermissions
+  const canEditOrgInvoiceDefaults =
+    orgPermissions.status === "ready" && orgPermissions.has("canEditOrgBilling")
   const { isPlatformAdmin } = useAdmin()
   const returnHandled = useRef(false)
 
@@ -222,9 +226,17 @@ function BlitzPaySettingsPageInner() {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       <div>
+        <h1 className="text-lg font-semibold text-foreground">Payments</h1>
+        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+          Connect BlitzPay to accept customer payments, and set workspace-wide payment terms for{" "}
+          <strong className="font-medium text-foreground/90">customer invoices</strong> you create in Equipify.
+        </p>
+      </div>
+
+      <div>
         <div className="flex items-center gap-2">
           <Wallet className="w-5 h-5 text-primary" aria-hidden />
-          <h1 className="text-lg font-semibold text-foreground">BlitzPay</h1>
+          <h2 className="text-base font-semibold text-foreground">BlitzPay</h2>
         </div>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
           Accept card and ACH payments through Equipify using BlitzPay. This step connects your workspace to a Stripe
@@ -332,6 +344,11 @@ function BlitzPaySettingsPageInner() {
           </div>
         )}
       </div>
+
+      <WorkspaceInvoiceDefaultsCard
+        organizationId={organizationId}
+        canEdit={canEditOrgInvoiceDefaults}
+      />
     </div>
   )
 }

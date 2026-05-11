@@ -2,6 +2,7 @@
 
 import { Suspense } from "react"
 import { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js"
@@ -42,7 +43,6 @@ import {
   ONBOARDING_INTENDED_PLAN_STORAGE_KEY,
   parseOnboardingPlan,
 } from "@/lib/onboarding-intent"
-import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { MISSING_SUBSCRIPTION_BILLING_NOTE } from "@/lib/billing/access"
 
@@ -584,13 +584,16 @@ function BillingPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Equipify account billing — distinct from customer invoice defaults below */}
+      {/* Equipify account subscription billing — customer invoice defaults live under Settings → Payments */}
       <div className="rounded-lg border border-border bg-muted/15 px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">Equipify subscription & account billing</h2>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
           Manage your workspace plan, Stripe payment method, and Equipify subscription invoices. Defaults for{" "}
-          <strong className="font-medium text-foreground/90">customer invoices</strong> you issue in the field are in{" "}
-          <span className="whitespace-nowrap">Invoice payment defaults</span> at the bottom of this page.
+          <strong className="font-medium text-foreground/90">customer invoices</strong> you issue in Equipify live under{" "}
+          <Link href="/settings/payments" className="text-primary font-medium underline-offset-4 hover:underline">
+            Settings → Payments
+          </Link>{" "}
+          (<span className="whitespace-nowrap">Invoice payment defaults</span>).
         </p>
       </div>
 
@@ -1291,12 +1294,6 @@ function BillingPageContent() {
           </div>
         )}
       </div>
-
-      {/* ── Workspace operational: customer invoice payment defaults (Invoicing Phase 3) ── */}
-      <WorkspaceInvoiceDefaultsCard
-        organizationId={orgStatus === "ready" ? organizationId : null}
-        canEdit={canEditOrgInvoiceDefaults}
-      />
 
       {setupOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">

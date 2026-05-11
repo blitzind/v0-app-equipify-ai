@@ -3,7 +3,7 @@
 /**
  * Invoicing Phase 3 — Workspace invoice defaults editor.
  *
- * Drops onto Settings → Billing. Reads / writes
+ * Used on Settings → Payments. Reads / writes
  * `organizations.default_invoice_terms_code` via the new
  * `/api/organizations/[organizationId]/billing/default-invoice-terms` route.
  *
@@ -138,7 +138,8 @@ export function WorkspaceInvoiceDefaultsCard({
         <h3 className="text-sm font-semibold text-foreground">Invoice payment defaults</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Workspace-wide payment terms for <strong className="font-medium text-foreground/90">customer invoices</strong> you create
-          in Equipify — not your Equipify subscription billing above. Customers can override this on their record.
+          in Equipify — separate from your Equipify workspace subscription under Settings → Billing. Customers can override this on
+          their record.
         </p>
       </div>
       <div className="px-6 py-5 space-y-3">
