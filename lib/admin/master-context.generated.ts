@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 243,
-  sqlMigrations: 157,
+  apiRouteHandlers: 248,
+  sqlMigrations: 158,
   dashboardPages: 60,
   componentsTsx: 254,
-  libTsFiles: 534,
+  libTsFiles: 538,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **243** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **157** |
+| API route handlers (\`app/api/**/route.ts\`) | **248** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **158** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **534** |
+| \`lib/**/*.ts\` | **538** |
 
 ### Vercel crons
 
@@ -40,6 +40,7 @@ blitzpay/webhook/route.ts
 certificates/import-template/route.ts
 cron/ai-ops-digest/route.ts
 cron/blitzpay-reminders/route.ts
+cron/blitzpay-scheduled-payments/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
@@ -121,6 +122,7 @@ organizations/[organizationId]/communications/suggestions/route.ts
 organizations/[organizationId]/communications/templates/[templateId]/route.ts
 organizations/[organizationId]/communications/templates/preview/route.ts
 organizations/[organizationId]/communications/templates/route.ts
+organizations/[organizationId]/customers/[customerId]/blitzpay/revoke-autopay/route.ts
 organizations/[organizationId]/customers/[customerId]/contact-email/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/[locationId]/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
@@ -172,6 +174,8 @@ organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-link/route.
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/resend-receipt/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/scheduled-payments/[scheduleId]/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/scheduled-payments/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/quickbooks-sync/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
@@ -255,6 +259,7 @@ portal/documents/route.ts
 portal/equipment/[equipmentId]/route.ts
 portal/equipment/route.ts
 portal/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
+portal/invoices/[invoiceId]/blitzpay/scheduled-payments/route.ts
 portal/invoices/[invoiceId]/route.ts
 portal/invoices/route.ts
 portal/locations/route.ts

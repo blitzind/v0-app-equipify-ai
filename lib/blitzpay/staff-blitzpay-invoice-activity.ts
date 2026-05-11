@@ -5,6 +5,8 @@ import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 
 export type StaffBlitzpayAttemptActivityItem = {
   attemptNo: number
+  /** Raw DB channel (checkout, portal_link, scheduled_off_session, …). */
+  attemptChannel: string
   /** staff_dashboard | customer_portal */
   paymentSource: "staff_dashboard" | "customer_portal"
   /** pending | succeeded | failed | canceled | expired */
@@ -36,7 +38,8 @@ function mapAttemptToDisplayStatus(row: {
 }
 
 function paymentSourceFromChannel(channel: string): "staff_dashboard" | "customer_portal" {
-  return channel === "portal_link" ? "customer_portal" : "staff_dashboard"
+  if (channel === "portal_link" || channel === "scheduled_off_session") return "customer_portal"
+  return "staff_dashboard"
 }
 
 function tailFromStripeId(id: string | null | undefined, n: number): string | null {
@@ -100,6 +103,7 @@ export async function fetchStaffBlitzpayInvoiceAttemptActivity(
     const amountCents = pi?.amount_cents != null ? Math.round(Number(pi.amount_cents)) : null
     return {
       attemptNo: r.attempt_no,
+      attemptChannel: r.channel,
       paymentSource: paymentSourceFromChannel(r.channel),
       displayStatus: mapAttemptToDisplayStatus({ status: r.status, failure_code: r.failure_code }),
       attemptStatusRaw: r.status,

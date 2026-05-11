@@ -5,7 +5,7 @@ import { supabaseForBlitzPayOrgWrite } from "@/lib/blitzpay/org-write-client"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { ensureBlitzPayOrgSettings } from "@/lib/blitzpay/payment-repository"
 import { DEFAULT_BLITZPAY_DISCLOSURE_COPY } from "@/lib/blitzpay/convenience-fees"
-import { picksPlatformManagedFeeFields } from "@/lib/blitzpay/blitzpay-settings-policy"
+import { picksPlatformManagedFeeFields, picksPlatformOnlyOrgSettings } from "@/lib/blitzpay/blitzpay-settings-policy"
 
 export const runtime = "nodejs"
 
@@ -45,6 +45,10 @@ export async function GET(
         "blitzpay_ach_convenience_fee_enabled",
         "blitzpay_ach_processing_timeline_copy",
         "blitzpay_allow_save_payment_methods",
+        "blitzpay_partial_payments_enabled",
+        "blitzpay_partial_payment_min_cents",
+        "blitzpay_platform_partial_payments_allowed",
+        "blitzpay_scheduled_payments_enabled",
       ].join(", "),
     )
     .eq("organization_id", gate.organizationId)
@@ -80,6 +84,10 @@ export async function PATCH(
     blitzpay_ach_convenience_fee_enabled?: boolean
     blitzpay_ach_processing_timeline_copy?: string
     blitzpay_allow_save_payment_methods?: boolean
+    blitzpay_partial_payments_enabled?: boolean
+    blitzpay_partial_payment_min_cents?: number
+    blitzpay_platform_partial_payments_allowed?: boolean
+    blitzpay_scheduled_payments_enabled?: boolean
   }
   try {
     body = (await request.json()) as typeof body
@@ -94,6 +102,14 @@ export async function PATCH(
         403,
         "forbidden_fee_controls",
         "BlitzPay convenience fee policy is managed by Equipify and cannot be edited at workspace level.",
+      )
+    }
+    const platformOnly = picksPlatformOnlyOrgSettings(body as Record<string, unknown>)
+    if (platformOnly.length > 0) {
+      return jsonError(
+        403,
+        "forbidden_platform_controls",
+        "This BlitzPay setting is managed by Equipify and cannot be edited at workspace level.",
       )
     }
   }
@@ -122,6 +138,11 @@ export async function PATCH(
     return jsonError(400, "invalid_payment_methods", "Enable at least one payment method (card or ACH).")
   }
 
+  const partialMin =
+    Number.isFinite(body.blitzpay_partial_payment_min_cents) ?
+      Math.max(50, Math.round(Number(body.blitzpay_partial_payment_min_cents)))
+    : 50
+
   const patchBase = {
     blitzpay_invoice_pay_enabled: Boolean(body.blitzpay_invoice_pay_enabled),
     blitzpay_payment_method_card_enabled: cardEnabled,
@@ -131,6 +152,9 @@ export async function PATCH(
         ? body.blitzpay_ach_processing_timeline_copy.trim()
         : "Bank (ACH) payments can take 3-5 business days to settle.",
     blitzpay_allow_save_payment_methods: body.blitzpay_allow_save_payment_methods !== false,
+    blitzpay_partial_payments_enabled: Boolean(body.blitzpay_partial_payments_enabled),
+    blitzpay_partial_payment_min_cents: partialMin,
+    blitzpay_scheduled_payments_enabled: body.blitzpay_scheduled_payments_enabled !== false,
     updated_at: new Date().toISOString(),
   }
   const patch = gate.platformAdmin
@@ -143,6 +167,7 @@ export async function PATCH(
           body.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(body.blitzpay_fee_cap_cents))),
         blitzpay_fee_disclosure_copy: disclosure,
         blitzpay_ach_convenience_fee_enabled: Boolean(body.blitzpay_ach_convenience_fee_enabled),
+        blitzpay_platform_partial_payments_allowed: body.blitzpay_platform_partial_payments_allowed !== false,
       }
     : patchBase
 
@@ -164,6 +189,10 @@ export async function PATCH(
         "blitzpay_ach_convenience_fee_enabled",
         "blitzpay_ach_processing_timeline_copy",
         "blitzpay_allow_save_payment_methods",
+        "blitzpay_partial_payments_enabled",
+        "blitzpay_partial_payment_min_cents",
+        "blitzpay_platform_partial_payments_allowed",
+        "blitzpay_scheduled_payments_enabled",
       ].join(", "),
     )
     .maybeSingle()

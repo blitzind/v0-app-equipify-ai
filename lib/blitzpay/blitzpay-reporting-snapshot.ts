@@ -156,7 +156,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     if (error) throw new Error(error.message)
     for (const r of data ?? []) {
       const ch = String((r as { channel: string }).channel || "")
-      if (ch === "portal_link") portalCompleted += 1
+      if (ch === "portal_link" || ch === "scheduled_off_session") portalCompleted += 1
       else staffCompleted += 1
     }
   }

@@ -5,6 +5,7 @@ import type Stripe from "stripe"
 import type { BlitzpayPaymentMethodType } from "@/lib/blitzpay/payment-domain"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { evaluateBlitzpayAutopayEligibility } from "@/lib/blitzpay/blitzpay-autopay-foundation"
+import { BLITZPAY_AUTOPAY_CONSENT_COPY_VERSION } from "@/lib/blitzpay/blitzpay-consent-copy"
 
 function toMethodType(v: string | null | undefined): BlitzpayPaymentMethodType | null {
   if (v === "card" || v === "us_bank_account") return v
@@ -40,6 +41,43 @@ export async function upsertBlitzpayCustomerPaymentProfile(
   })
 
   const now = new Date().toISOString()
+  const consentActive = input.offSessionAuthorized && input.hasDefaultPaymentMethod
+  const { data: existing } = await admin
+    .from("blitzpay_customer_payment_profiles")
+    .select(
+      "autopay_authorization_status, autopay_authorized_method_type, autopay_consent_at, autopay_consent_source, autopay_consent_copy_version, autopay_revoked_at",
+    )
+    .eq("organization_id", input.organizationId)
+    .eq("customer_id", input.customerId)
+    .maybeSingle()
+  const ex = existing as {
+    autopay_authorization_status?: string | null
+    autopay_authorized_method_type?: string | null
+    autopay_consent_at?: string | null
+    autopay_consent_source?: string | null
+    autopay_consent_copy_version?: string | null
+    autopay_revoked_at?: string | null
+  } | null
+
+  const authFields =
+    consentActive ?
+      {
+        autopay_authorization_status: "active" as const,
+        autopay_authorized_method_type: input.paymentMethodType,
+        autopay_consent_at: now,
+        autopay_consent_source: "checkout_off_session",
+        autopay_consent_copy_version: BLITZPAY_AUTOPAY_CONSENT_COPY_VERSION,
+        autopay_revoked_at: null,
+      }
+    : {
+        autopay_authorization_status: (ex?.autopay_authorization_status ?? "none") as "none" | "active" | "revoked",
+        autopay_authorized_method_type: ex?.autopay_authorized_method_type ?? null,
+        autopay_consent_at: ex?.autopay_consent_at ?? null,
+        autopay_consent_source: ex?.autopay_consent_source ?? null,
+        autopay_consent_copy_version: ex?.autopay_consent_copy_version ?? null,
+        autopay_revoked_at: ex?.autopay_revoked_at ?? null,
+      }
+
   const row = {
     organization_id: input.organizationId,
     customer_id: input.customerId,
@@ -51,6 +89,7 @@ export async function upsertBlitzpayCustomerPaymentProfile(
     save_payment_method_opt_in: input.savePaymentMethodOptIn,
     off_session_authorized: input.offSessionAuthorized,
     autopay_eligible: autopay.eligible,
+    ...authFields,
     last_blitzpay_payment_intent_id: input.blitzpayPaymentIntentId,
     last_used_at: now,
     metadata: input.metadata ?? {},

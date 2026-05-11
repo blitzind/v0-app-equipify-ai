@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { Suspense, use, useEffect, useState } from "react"
+import { Suspense, use, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronLeft, Clock, Download, ExternalLink, Loader2, Lock, Receipt, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
+import { BLITZPAY_FUTURE_PAYMENT_AUTHORIZATION_COPY } from "@/lib/blitzpay/blitzpay-consent-copy"
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—"
@@ -16,6 +17,14 @@ function fmtDate(d: string | null | undefined) {
 
 function fmtCurrency(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
+}
+
+function parseUsdToCents(raw: string): number | null {
+  const t = raw.trim()
+  if (!t) return null
+  const n = Number(t.replace(/[^0-9.]/g, ""))
+  if (!Number.isFinite(n)) return null
+  return Math.round(n * 100)
 }
 
 type CertItem = {
@@ -55,6 +64,8 @@ type PortalBlitzpayHostedCheckoutPayload = {
 
 type BlitzpayPricingPreview = {
   invoiceBalanceCents: number
+  paymentTowardInvoiceCents?: number
+  remainingBalanceAfterPaymentCents?: number
   convenienceFeeCents: number
   totalChargeCents: number
   appliesToCustomer: boolean
@@ -68,6 +79,14 @@ type BlitzpayPricingPreview = {
     disclosureCopy: string
     timelineCopy: string | null
   }>
+  phase2k?: {
+    partialPayments: { effective: boolean; minCents: number }
+    scheduledPaymentsEnabled: boolean
+    savedPaymentProfile: boolean
+    autopayAuthorization: { status: string; methodType: string | null; consentAt: string | null; revokedAt: string | null }
+    scheduled: Array<{ id: string; scheduledFor: string; invoicePortionCents: number; status: string; createdByKind: string }>
+    blitzpayPartialPaymentHistory: Array<{ paidOn: string; amountCents: number; referenceDisplay: string | null }>
+  } | null
 }
 
 type PortalPaymentHistoryItem = {
@@ -142,6 +161,21 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
   const [pricing, setPricing] = useState<BlitzpayPricingPreview | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"card" | "us_bank_account">("card")
+  const [portalPayPortionDollars, setPortalPayPortionDollars] = useState("")
+  const [blitzpayAuthAck, setBlitzpayAuthAck] = useState(false)
+  const [scheduleForLocal, setScheduleForLocal] = useState("")
+  const [schedulePortionDollars, setSchedulePortionDollars] = useState("")
+  const [scheduleConsentAck, setScheduleConsentAck] = useState(false)
+  const [scheduleBusy, setScheduleBusy] = useState(false)
+  const [scheduleMsg, setScheduleMsg] = useState<string | null>(null)
+
+  const partialEffective = Boolean(pricing?.phase2k?.partialPayments.effective)
+  const portalPortionCentsQuery = useMemo(() => {
+    if (!partialEffective) return ""
+    const c = parseUsdToCents(portalPayPortionDollars)
+    if (c == null || c < 50) return ""
+    return `?invoicePortionCents=${encodeURIComponent(String(c))}`
+  }, [partialEffective, portalPayPortionDollars])
 
   useEffect(() => {
     const b = searchParams.get("blitzpay")
@@ -205,25 +239,25 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   }, [invoiceId])
 
   useEffect(() => {
-    fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay`, {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    })
+    let cancelled = false
+    const url = `/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay${portalPortionCentsQuery}`
+    void fetch(url, { method: "GET", credentials: "include", cache: "no-store" })
       .then(async (r) => {
         const j = (await r.json()) as { pricing?: BlitzpayPricingPreview }
         if (!r.ok || !j.pricing) return null
         return j.pricing
       })
       .then((p) => {
-        if (p) {
-          setPricing(p)
-          const first = p.availablePaymentMethods?.[0]?.type
-          if (first === "card" || first === "us_bank_account") setSelectedPaymentMethod(first)
-        }
+        if (cancelled || !p) return
+        setPricing(p)
+        const first = p.availablePaymentMethods?.[0]?.type
+        if (first === "card" || first === "us_bank_account") setSelectedPaymentMethod(first)
       })
       .catch(() => {})
-  }, [invoiceId])
+    return () => {
+      cancelled = true
+    }
+  }, [invoiceId, portalPortionCentsQuery])
 
   if (error) {
     return (
@@ -264,6 +298,14 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const meetsCardMinimum = balanceDue >= 50
   const workspaceReady = blitzpay?.hostedCheckoutAvailable === true
   const activeMethodPricing = pricing?.availablePaymentMethods?.find((m) => m.type === selectedPaymentMethod)
+  const payTowardCents = pricing?.paymentTowardInvoiceCents ?? pricing?.invoiceBalanceCents
+  const remainingAfterPay = pricing?.remainingBalanceAfterPaymentCents
+  const saveEligible = pricing?.savePaymentMethodEligible !== false
+  const consentRequiredForPay = saveEligible && !blitzpayAuthAck
+  const canSchedule =
+    Boolean(pricing?.phase2k?.scheduledPaymentsEnabled) &&
+    Boolean(pricing?.phase2k?.savedPaymentProfile) &&
+    pricing?.phase2k?.autopayAuthorization?.status === "active"
 
   return (
     <div className="space-y-6">
@@ -590,10 +632,40 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
                   </div>
                 </div>
               ) : null}
+              {partialEffective ? (
+                <label className="block space-y-0.5 pb-1">
+                  <span style={{ color: "var(--portal-nav-text)" }}>Pay toward invoice (optional)</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={`Full balance (${fmtCurrency(pricing.invoiceBalanceCents)})`}
+                    value={portalPayPortionDollars}
+                    onChange={(e) => setPortalPayPortionDollars(e.target.value)}
+                    className="w-full rounded border px-2 py-1 text-[12px] bg-transparent"
+                    style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-foreground)" }}
+                  />
+                  <span className="text-[10px]" style={{ color: "var(--portal-nav-text)" }}>
+                    Minimum {fmtCurrency(pricing.phase2k?.partialPayments.minCents ?? 50)} when paying less than the full
+                    balance.
+                  </span>
+                </label>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span style={{ color: "var(--portal-nav-text)" }}>Invoice balance</span>
                 <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.invoiceBalanceCents)}</span>
               </div>
+              {payTowardCents != null && payTowardCents !== pricing.invoiceBalanceCents ? (
+                <div className="flex items-center justify-between">
+                  <span style={{ color: "var(--portal-nav-text)" }}>This payment toward invoice</span>
+                  <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(payTowardCents)}</span>
+                </div>
+              ) : null}
+              {remainingAfterPay != null && payTowardCents != null && payTowardCents < pricing.invoiceBalanceCents ? (
+                <div className="flex items-center justify-between">
+                  <span style={{ color: "var(--portal-nav-text)" }}>Estimated remaining balance</span>
+                  <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(remainingAfterPay)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span style={{ color: "var(--portal-nav-text)" }}>Processing fee</span>
                 <span style={{ color: "var(--portal-foreground)" }}>
@@ -619,6 +691,17 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
               ) : null}
             </div>
           ) : null}
+          {saveEligible && pricing ? (
+            <label className="flex items-start gap-2 text-xs leading-snug cursor-pointer" style={{ color: "var(--portal-nav-text)" }}>
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={blitzpayAuthAck}
+                onChange={(e) => setBlitzpayAuthAck(e.target.checked)}
+              />
+              <span>{BLITZPAY_FUTURE_PAYMENT_AUTHORIZATION_COPY}</span>
+            </label>
+          ) : null}
           {fullyPaid ? (
             <p className="text-sm font-medium" style={{ color: "var(--portal-success)" }}>
               This invoice is already paid — no balance is due.
@@ -642,17 +725,29 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
                 type="button"
                 size="sm"
                 className="w-fit gap-1.5"
-                disabled={blitzpayBusy}
+                disabled={blitzpayBusy || consentRequiredForPay}
+                title={consentRequiredForPay ? "Confirm authorization above to continue." : undefined}
                 onClick={() => {
                   setPrepareError(null)
                   void (async () => {
                     setBlitzpayBusy(true)
                     try {
+                      const portionBody =
+                        partialEffective ?
+                          (() => {
+                            const c = parseUsdToCents(portalPayPortionDollars)
+                            return c != null && c >= 50 ? { invoicePortionCents: c } : {}
+                          })()
+                        : {}
                       const res = await fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay`, {
                         method: "POST",
                         credentials: "include",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ paymentMethodType: selectedPaymentMethod }),
+                        body: JSON.stringify({
+                          paymentMethodType: selectedPaymentMethod,
+                          acknowledgeFuturePaymentAuthorization: blitzpayAuthAck,
+                          ...portionBody,
+                        }),
                       })
                       const body = (await res.json()) as { error?: string; message?: string; url?: string }
                       if (!res.ok) {
@@ -677,6 +772,146 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
               </Button>
             </div>
           )}
+          {pricing?.phase2k ? (
+            <div className="rounded-md border px-3 py-2 text-[11px] space-y-1 mt-2" style={{ borderColor: "var(--portal-border-light)" }}>
+              <p className="font-semibold" style={{ color: "var(--portal-foreground)" }}>
+                Saved pay &amp; scheduling
+              </p>
+              <p style={{ color: "var(--portal-nav-text)" }}>
+                Saved payment method on file:{" "}
+                <span style={{ color: "var(--portal-foreground)" }}>{pricing.phase2k.savedPaymentProfile ? "Yes" : "No"}</span>
+                {" · "}
+                Future payment authorization:{" "}
+                <span style={{ color: "var(--portal-foreground)" }}>
+                  {pricing.phase2k.autopayAuthorization.status === "active" ? "Active" : "Not active"}
+                </span>
+              </p>
+              {pricing.phase2k.scheduled.length > 0 ? (
+                <div style={{ color: "var(--portal-nav-text)" }}>
+                  <p className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                    Upcoming scheduled payments
+                  </p>
+                  <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                    {pricing.phase2k.scheduled.map((s) => (
+                      <li key={s.id}>
+                        {new Date(s.scheduledFor).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {fmtCurrency(s.invoicePortionCents)} · {s.status}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {!fullyPaid && !blockedStatus && workspaceReady && meetsCardMinimum && canSchedule && pricing ? (
+            <div className="rounded-md border px-3 py-2 text-xs space-y-2 mt-2" style={{ borderColor: "var(--portal-border-light)" }}>
+              <p className="font-semibold" style={{ color: "var(--portal-foreground)" }}>Schedule a payment</p>
+              <p style={{ color: "var(--portal-nav-text)" }}>
+                Charges the saved default payment method on the date you pick. You can ask your service provider to cancel a
+                pending schedule.
+              </p>
+              {scheduleMsg ? <p className="text-sm text-destructive">{scheduleMsg}</p> : null}
+              <label className="block space-y-0.5">
+                <span style={{ color: "var(--portal-nav-text)" }}>Run on (local time)</span>
+                <input
+                  type="datetime-local"
+                  value={scheduleForLocal}
+                  onChange={(e) => setScheduleForLocal(e.target.value)}
+                  className="w-full max-w-xs rounded border px-2 py-1 text-[12px] bg-transparent"
+                  style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-foreground)" }}
+                />
+              </label>
+              <label className="block space-y-0.5">
+                <span style={{ color: "var(--portal-nav-text)" }}>Amount (leave blank for full balance)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={fmtCurrency(balanceDue)}
+                  value={schedulePortionDollars}
+                  onChange={(e) => setSchedulePortionDollars(e.target.value)}
+                  className="w-full max-w-xs rounded border px-2 py-1 text-[12px] bg-transparent"
+                  style={{ borderColor: "var(--portal-border-light)", color: "var(--portal-foreground)" }}
+                />
+              </label>
+              <label className="flex items-start gap-2 leading-snug cursor-pointer" style={{ color: "var(--portal-nav-text)" }}>
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={scheduleConsentAck}
+                  onChange={(e) => setScheduleConsentAck(e.target.checked)}
+                />
+                <span>
+                  I confirm this one-time scheduled charge for the amount and date above, using my saved payment method on
+                  file with my service provider.
+                </span>
+              </label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-fit gap-1.5"
+                disabled={scheduleBusy || !scheduleForLocal.trim() || !scheduleConsentAck}
+                onClick={() => {
+                  setScheduleMsg(null)
+                  void (async () => {
+                    setScheduleBusy(true)
+                    try {
+                      const when = new Date(scheduleForLocal)
+                      if (!Number.isFinite(when.getTime())) {
+                        setScheduleMsg("Pick a valid date and time.")
+                        return
+                      }
+                      const parsed = parseUsdToCents(schedulePortionDollars)
+                      const portion =
+                        parsed != null && parsed >= 50 ? parsed
+                        : balanceDue >= 50 ? balanceDue
+                        : 0
+                      const res = await fetch(
+                        `/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/scheduled-payments`,
+                        {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            scheduledFor: when.toISOString(),
+                            invoicePortionCents: portion,
+                            scheduleConsentAcknowledged: true,
+                          }),
+                        },
+                      )
+                      const body = (await res.json()) as { error?: string; message?: string }
+                      if (!res.ok) {
+                        setScheduleMsg(body.message ?? body.error ?? "Could not schedule payment.")
+                        return
+                      }
+                      setScheduleMsg("Scheduled. You will receive email confirmation when the charge completes.")
+                      setScheduleForLocal("")
+                      setSchedulePortionDollars("")
+                      setScheduleConsentAck(false)
+                      const r2 = await fetch(
+                        `/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay${portalPortionCentsQuery}`,
+                        { method: "GET", credentials: "include", cache: "no-store" },
+                      )
+                      const j2 = (await r2.json()) as { pricing?: BlitzpayPricingPreview }
+                      if (r2.ok && j2.pricing) setPricing(j2.pricing)
+                    } catch (e) {
+                      setScheduleMsg(e instanceof Error ? e.message : "Network error.")
+                    } finally {
+                      setScheduleBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {scheduleBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+                Save schedule
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

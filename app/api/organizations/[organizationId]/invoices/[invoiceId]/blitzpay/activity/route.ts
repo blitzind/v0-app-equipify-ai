@@ -9,6 +9,7 @@ import {
 import { isOutboundEmailConfigured } from "@/lib/email/config"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 import { fetchBlitzpayInvoiceCollectionsView } from "@/lib/blitzpay/blitzpay-collections"
+import { fetchBlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
 
 export const runtime = "nodejs"
 
@@ -43,17 +44,24 @@ export async function GET(
   if (drift) return drift
 
   try {
-    const [attempts, refunds, disputes, collections] = await Promise.all([
+    const [{ data: invRow }, attempts, refunds, disputes, collections] = await Promise.all([
+      admin.from("org_invoices").select("customer_id").eq("organization_id", organizationId).eq("id", invoiceId).maybeSingle(),
       fetchStaffBlitzpayInvoiceAttemptActivity(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceRefunds(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceDisputes(admin, organizationId, invoiceId),
       fetchBlitzpayInvoiceCollectionsView(admin, organizationId, invoiceId),
     ])
+    const custId = String((invRow as { customer_id?: string | null } | null)?.customer_id ?? "")
+    let phase2k = null as Awaited<ReturnType<typeof fetchBlitzpayInvoicePhase2kDashboard>> | null
+    if (UUID_RE.test(custId)) {
+      phase2k = await fetchBlitzpayInvoicePhase2kDashboard(admin, organizationId, invoiceId, custId)
+    }
     return NextResponse.json({
       attempts,
       refunds,
       disputes,
       collections,
+      phase2k,
       outboundEmail: { configured: isOutboundEmailConfigured() },
     })
   } catch (e) {

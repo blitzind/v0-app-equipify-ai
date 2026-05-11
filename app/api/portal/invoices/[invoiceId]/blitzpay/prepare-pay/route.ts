@@ -43,11 +43,21 @@ export async function POST(
   if (drift) return drift
 
   let preferredPaymentMethodType: "card" | "us_bank_account" | undefined
+  let invoicePortionCents: number | null | undefined
+  let acknowledgeFuturePaymentAuthorization: boolean | undefined
   try {
-    const body = (await request.json()) as { paymentMethodType?: string }
+    const body = (await request.json()) as {
+      paymentMethodType?: string
+      invoicePortionCents?: number | null
+      acknowledgeFuturePaymentAuthorization?: boolean
+    }
     if (body.paymentMethodType === "card" || body.paymentMethodType === "us_bank_account") {
       preferredPaymentMethodType = body.paymentMethodType
     }
+    if (body.invoicePortionCents != null && Number.isFinite(Number(body.invoicePortionCents))) {
+      invoicePortionCents = Math.round(Number(body.invoicePortionCents))
+    }
+    acknowledgeFuturePaymentAuthorization = Boolean(body.acknowledgeFuturePaymentAuthorization)
   } catch {
     preferredPaymentMethodType = undefined
   }
@@ -65,6 +75,8 @@ export async function POST(
     portalCustomerId,
     returnUrls: { successUrl, cancelUrl },
     preferredPaymentMethodType,
+    invoicePortionCents,
+    acknowledgeFuturePaymentAuthorization,
   })
 
   if (!result.ok) {
@@ -80,7 +92,7 @@ export async function POST(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ invoiceId: string }> },
 ) {
   const portalCtx = await requirePortalSession()
@@ -92,6 +104,12 @@ export async function GET(
   const organizationId = portalCtx.portalUser.organization_id
   const portalUserId = portalCtx.portalUser.id
   const portalCustomerId = portalCtx.portalUser.customer_id
+
+  const portionParam = new URL(request.url).searchParams.get("invoicePortionCents")
+  const invoicePortionCents =
+    portionParam != null && portionParam !== "" && Number.isFinite(Number(portionParam)) ?
+      Math.round(Number(portionParam))
+    : undefined
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
@@ -113,6 +131,7 @@ export async function GET(
     portalUserId,
     portalCustomerId,
     returnUrls: { successUrl: "", cancelUrl: "" },
+    invoicePortionCents,
   })
   if (!preview.ok) {
     return NextResponse.json({ error: preview.code, message: preview.message }, { status: preview.status })

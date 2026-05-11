@@ -43,6 +43,7 @@ export async function completeBlitzpayPaymentIntentSucceeded(
   const meta = parseBlitzpayInvoiceMetadata(pi.metadata as Record<string, string> | undefined)
   if (!meta || meta.organizationId !== row.organization_id) return
   if (!row.org_invoice_id) return
+  const scheduledPaymentId = meta.scheduledPaymentId
 
   const stripePmType =
     typeof pi.payment_method === "object" && pi.payment_method ?
@@ -99,7 +100,7 @@ export async function completeBlitzpayPaymentIntentSucceeded(
       paidOn,
       paymentMethod: "card",
       reference: ref,
-      note: "BlitzPay (Stripe Checkout)",
+      note: scheduledPaymentId ? "BlitzPay (scheduled payment)" : "BlitzPay (Stripe Checkout)",
       createdByUserId: null,
     })
     if (ins.error) {
@@ -150,6 +151,19 @@ export async function completeBlitzpayPaymentIntentSucceeded(
     }
   }
 
+  if (scheduledPaymentId) {
+    const nowIso = new Date().toISOString()
+    await admin
+      .from("blitzpay_scheduled_invoice_payments")
+      .update({
+        status: "succeeded",
+        processed_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", scheduledPaymentId)
+      .eq("organization_id", row.organization_id)
+  }
+
   await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
     status: "completed",
     failureCode: null,
@@ -163,14 +177,32 @@ export async function completeBlitzpayPaymentIntentFailed(
   const raw = await fetchBlitzpayPaymentIntentByStripeId(admin, pi.id)
   if (!raw) return
   const row = raw as BlitzpayPiRow
+  const meta = parseBlitzpayInvoiceMetadata(pi.metadata as Record<string, string> | undefined)
+  const scheduledPaymentId = meta?.scheduledPaymentId ?? null
   const code =
     pi.last_payment_error && typeof pi.last_payment_error === "object" && "code" in pi.last_payment_error
       ? String((pi.last_payment_error as { code?: string }).code ?? "")
       : null
+  const errMsg =
+    pi.last_payment_error && typeof pi.last_payment_error === "object" && "message" in pi.last_payment_error
+      ? String((pi.last_payment_error as { message?: string }).message ?? "")
+      : ""
   await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
     status: "failed",
     failureCode: code,
   })
+  if (scheduledPaymentId) {
+    const nowIso = new Date().toISOString()
+    await admin
+      .from("blitzpay_scheduled_invoice_payments")
+      .update({
+        status: "failed",
+        last_error: (errMsg || code || "payment_failed").slice(0, 2000),
+        updated_at: nowIso,
+      })
+      .eq("id", scheduledPaymentId)
+      .eq("organization_id", row.organization_id)
+  }
 }
 
 export async function completeBlitzpayPaymentIntentCanceled(
@@ -180,8 +212,22 @@ export async function completeBlitzpayPaymentIntentCanceled(
   const raw = await fetchBlitzpayPaymentIntentByStripeId(admin, pi.id)
   if (!raw) return
   const row = raw as BlitzpayPiRow
+  const meta = parseBlitzpayInvoiceMetadata(pi.metadata as Record<string, string> | undefined)
+  const scheduledPaymentId = meta?.scheduledPaymentId ?? null
   await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
     status: "expired",
     failureCode: "canceled",
   })
+  if (scheduledPaymentId) {
+    const nowIso = new Date().toISOString()
+    await admin
+      .from("blitzpay_scheduled_invoice_payments")
+      .update({
+        status: "failed",
+        last_error: "canceled",
+        updated_at: nowIso,
+      })
+      .eq("id", scheduledPaymentId)
+      .eq("organization_id", row.organization_id)
+  }
 }

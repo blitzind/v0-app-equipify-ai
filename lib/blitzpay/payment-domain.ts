@@ -24,7 +24,12 @@ export const BLITZPAY_INVOICE_PAY_ATTEMPT_STATUSES = [
 
 export type BlitzpayInvoicePaymentAttemptStatus = (typeof BLITZPAY_INVOICE_PAY_ATTEMPT_STATUSES)[number]
 
-export const BLITZPAY_INVOICE_PAY_CHANNELS = ["checkout", "payment_element", "portal_link"] as const
+export const BLITZPAY_INVOICE_PAY_CHANNELS = [
+  "checkout",
+  "payment_element",
+  "portal_link",
+  "scheduled_off_session",
+] as const
 
 export type BlitzpayInvoicePayChannel = (typeof BLITZPAY_INVOICE_PAY_CHANNELS)[number]
 

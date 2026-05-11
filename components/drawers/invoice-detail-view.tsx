@@ -75,6 +75,7 @@ import {
   ChevronDown, X, Check, Pencil, Plus, Trash2, AlertTriangle, DollarSign,
   Sparkles, RefreshCw, ThumbsUp, ThumbsDown, ShieldAlert, Monitor, Tablet,
   Loader2,
+  Clock,
   Smartphone, FileText, Settings, Eye, EyeOff, Building2, SlidersHorizontal,
   ExternalLink,
   Archive,
@@ -102,6 +103,14 @@ function fmtCurrency(n: number) {
     currency: "USD",
     maximumFractionDigits: 2,
   }).format(n)
+}
+
+function parseUsdToCents(raw: string): number | null {
+  const t = raw.trim()
+  if (!t) return null
+  const n = Number(t.replace(/[^0-9.]/g, ""))
+  if (!Number.isFinite(n)) return null
+  return Math.round(n * 100)
 }
 
 function invoiceGrandTotalDollars(inv: AdminInvoice): number {
@@ -1467,6 +1476,20 @@ type QuickBooksInvoiceSyncResponse = {
   }>
 }
 
+type BlitzpayPhase2kDash = {
+  partialPayments: { orgEnabled: boolean; platformAllowed: boolean; effective: boolean; minCents: number }
+  scheduledPaymentsEnabled: boolean
+  savedPaymentProfile: boolean
+  autopayAuthorization: {
+    status: "none" | "active" | "revoked"
+    methodType: string | null
+    consentAt: string | null
+    revokedAt: string | null
+  }
+  scheduled: Array<{ id: string; scheduledFor: string; invoicePortionCents: number; status: string; createdByKind: string }>
+  blitzpayPartialPaymentHistory: Array<{ paidOn: string; amountCents: number; referenceDisplay: string | null }>
+}
+
 function PaymentsTab({
   invoice,
   pushToast,
@@ -1485,6 +1508,7 @@ function PaymentsTab({
   const [blitzpayUnavailableReason, setBlitzpayUnavailableReason] = useState<string | null>(null)
   type BlitzpayActivityRow = {
     attemptNo: number
+    attemptChannel?: string
     paymentSource: "staff_dashboard" | "customer_portal"
     displayStatus: "pending" | "succeeded" | "failed" | "canceled" | "expired"
     attemptStatusRaw: string
@@ -1499,6 +1523,8 @@ function PaymentsTab({
   const [blitzpayActivity, setBlitzpayActivity] = useState<BlitzpayActivityRow[]>([])
   const [blitzpayPricingPreview, setBlitzpayPricingPreview] = useState<{
     invoiceBalanceCents: number
+    paymentTowardInvoiceCents?: number
+    remainingBalanceAfterPaymentCents?: number
     convenienceFeeCents: number
     totalChargeCents: number
     appliesToCustomer: boolean
@@ -1511,6 +1537,7 @@ function PaymentsTab({
       disclosureCopy: string
       timelineCopy: string | null
     }>
+    phase2k?: BlitzpayPhase2kDash | null
   } | null>(null)
   const [blitzpaySelectedMethod, setBlitzpaySelectedMethod] = useState<"card" | "us_bank_account">("card")
   const [blitzpayOutboundEmailConfigured, setBlitzpayOutboundEmailConfigured] = useState(false)
@@ -1544,6 +1571,16 @@ function PaymentsTab({
     } | null
     insights: Array<{ key: string; title: string; detail: string }>
   } | null>(null)
+  const [blitzpayPhase2k, setBlitzpayPhase2k] = useState<BlitzpayPhase2kDash | null>(null)
+  const [blitzpayStaffPortionDollars, setBlitzpayStaffPortionDollars] = useState("")
+  const [blitzpayActivityRefresh, setBlitzpayActivityRefresh] = useState(0)
+  const [blitzpayScheduleCancelBusy, setBlitzpayScheduleCancelBusy] = useState<string | null>(null)
+  const [blitzpayRevokeAutopayBusy, setBlitzpayRevokeAutopayBusy] = useState(false)
+  const [staffSchedMsg, setStaffSchedMsg] = useState<string | null>(null)
+  const [staffSchedForLocal, setStaffSchedForLocal] = useState("")
+  const [staffSchedPortionDollars, setStaffSchedPortionDollars] = useState("")
+  const [staffSchedConsent, setStaffSchedConsent] = useState(false)
+  const [staffSchedBusy, setStaffSchedBusy] = useState(false)
   const [blitzpayPaymentLinkBusy, setBlitzpayPaymentLinkBusy] = useState(false)
   type BlitzpayRefundActivityRow = {
     orgInvoicePaymentId: string
@@ -1572,6 +1609,13 @@ function PaymentsTab({
   const [diagBody, setDiagBody] = useState("")
   const [diagLoading, setDiagLoading] = useState(false)
   const canViewBlitzpayActivity = permissions.canEditInvoices || permissions.canViewFinancials
+
+  const staffPreparePortionQuery = useMemo(() => {
+    if (!blitzpayPricingPreview?.phase2k?.partialPayments.effective) return ""
+    const c = parseUsdToCents(blitzpayStaffPortionDollars)
+    if (c == null || c < 50) return ""
+    return `?invoicePortionCents=${encodeURIComponent(String(c))}`
+  }, [blitzpayPricingPreview?.phase2k?.partialPayments.effective, blitzpayStaffPortionDollars])
 
   const succeededRefundCentsByPayment = useMemo(() => {
     const m = new Map<string, number>()
@@ -1673,7 +1717,7 @@ function PaymentsTab({
     void (async () => {
       try {
         const res = await fetch(
-          `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
+          `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay${staffPreparePortionQuery}`,
           { method: "GET", credentials: "include", cache: "no-store" },
         )
         const body = (await res.json()) as { pricing?: typeof blitzpayPricingPreview; error?: string; message?: string }
@@ -1704,7 +1748,16 @@ function PaymentsTab({
     return () => {
       cancelled = true
     }
-  }, [canViewBlitzpayPayCard, orgId, invoice.id, balance, invoice.balanceDueCents, invoice.status, invoice.isArchived])
+  }, [
+    canViewBlitzpayPayCard,
+    orgId,
+    invoice.id,
+    balance,
+    invoice.balanceDueCents,
+    invoice.status,
+    invoice.isArchived,
+    staffPreparePortionQuery,
+  ])
 
   useEffect(() => {
     if (!orgId || !canViewBlitzpayActivity) {
@@ -1727,6 +1780,7 @@ function PaymentsTab({
           refunds?: BlitzpayRefundActivityRow[]
           disputes?: BlitzpayDisputeActivityRow[]
           collections?: typeof blitzpayCollections
+          phase2k?: BlitzpayPhase2kDash | null
           outboundEmail?: { configured?: boolean }
           error?: string
           message?: string
@@ -1738,12 +1792,14 @@ function PaymentsTab({
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
           setBlitzpayCollections(null)
+          setBlitzpayPhase2k(null)
           setBlitzpayOutboundEmailConfigured(false)
         } else {
           setBlitzpayActivity(body.attempts ?? [])
           setBlitzpayRefunds(body.refunds ?? [])
           setBlitzpayDisputes(body.disputes ?? [])
           setBlitzpayCollections((body.collections ?? null) as typeof blitzpayCollections)
+          setBlitzpayPhase2k((body.phase2k ?? null) as BlitzpayPhase2kDash | null)
           setBlitzpayOutboundEmailConfigured(Boolean(body.outboundEmail?.configured))
         }
       } catch (e) {
@@ -1753,6 +1809,7 @@ function PaymentsTab({
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
           setBlitzpayCollections(null)
+          setBlitzpayPhase2k(null)
           setBlitzpayOutboundEmailConfigured(false)
         }
       } finally {
@@ -1762,7 +1819,7 @@ function PaymentsTab({
     return () => {
       cancelled = true
     }
-  }, [orgId, invoice.id, canViewBlitzpayActivity, invoice.totalPaidCents])
+  }, [orgId, invoice.id, canViewBlitzpayActivity, invoice.totalPaidCents, blitzpayActivityRefresh])
 
   useEffect(() => {
     if (!diagOpen || !orgId) return
@@ -2008,10 +2065,44 @@ function PaymentsTab({
                   </div>
                 </div>
               ) : null}
+              {blitzpayPricingPreview.phase2k?.partialPayments.effective ? (
+                <label className="block space-y-0.5 pb-1">
+                  <span className="text-muted-foreground">Pay toward invoice (optional)</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={blitzpayStaffPortionDollars}
+                    onChange={(e) => setBlitzpayStaffPortionDollars(e.target.value)}
+                    className="w-full max-w-[220px] rounded border border-border bg-background px-2 py-1 text-[11px]"
+                    placeholder={`Full balance (${fmtCurrency(blitzpayPricingPreview.invoiceBalanceCents / 100)})`}
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Min. {fmtCurrency((blitzpayPricingPreview.phase2k?.partialPayments.minCents ?? 50) / 100)} when paying
+                    less than full balance.
+                  </span>
+                </label>
+              ) : null}
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Invoice balance</span>
                 <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.invoiceBalanceCents / 100)}</span>
               </div>
+              {blitzpayPricingPreview.paymentTowardInvoiceCents != null &&
+              blitzpayPricingPreview.paymentTowardInvoiceCents !== blitzpayPricingPreview.invoiceBalanceCents ? (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>This checkout toward invoice</span>
+                  <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.paymentTowardInvoiceCents / 100)}</span>
+                </div>
+              ) : null}
+              {blitzpayPricingPreview.remainingBalanceAfterPaymentCents != null &&
+              blitzpayPricingPreview.paymentTowardInvoiceCents != null &&
+              blitzpayPricingPreview.paymentTowardInvoiceCents < blitzpayPricingPreview.invoiceBalanceCents ? (
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Est. remaining after this payment</span>
+                  <span className="text-foreground">
+                    {fmtCurrency(blitzpayPricingPreview.remainingBalanceAfterPaymentCents / 100)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Processing fee</span>
                 <span className="text-foreground">
@@ -2064,7 +2155,14 @@ function PaymentsTab({
                         method: "POST",
                         credentials: "include",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ paymentMethodType: blitzpaySelectedMethod }),
+                        body: JSON.stringify({
+                          paymentMethodType: blitzpaySelectedMethod,
+                          ...(() => {
+                            if (!blitzpayPricingPreview?.phase2k?.partialPayments.effective) return {}
+                            const c = parseUsdToCents(blitzpayStaffPortionDollars)
+                            return c != null && c >= 50 ? { invoicePortionCents: c } : {}
+                          })(),
+                        }),
                       },
                     )
                     const body = (await res.json()) as { error?: string; message?: string; url?: string }
@@ -2089,6 +2187,233 @@ function PaymentsTab({
               Pay with BlitzPay (hosted)
             </Button>
           )}
+        </div>
+      ) : null}
+
+      {canViewBlitzpayActivity && orgId && blitzpayPhase2k ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">BlitzPay autopay &amp; schedules</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Saved profile and customer authorization for future off-session charges. Scheduled rows run through Stripe on the
+            saved default payment method.
+          </p>
+          <div className="text-[10px] space-y-1 rounded-md border border-border/80 p-2">
+            <p>
+              <span className="text-muted-foreground">Saved payment profile: </span>
+              <span className="font-medium text-foreground">{blitzpayPhase2k.savedPaymentProfile ? "On file" : "Not on file"}</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Future payment authorization: </span>
+              <span className="font-medium text-foreground">
+                {blitzpayPhase2k.autopayAuthorization.status === "active" ? "Active" : "Not active"}
+                {blitzpayPhase2k.autopayAuthorization.methodType ?
+                  ` (${blitzpayPhase2k.autopayAuthorization.methodType.replace(/_/g, " ")})`
+                : ""}
+              </span>
+              {blitzpayPhase2k.autopayAuthorization.consentAt ?
+                <span className="text-muted-foreground"> · consented {fmtDate(blitzpayPhase2k.autopayAuthorization.consentAt)}</span>
+              : null}
+            </p>
+            {(permissions.canEditInvoices || permissions.canViewFinancials) &&
+            blitzpayPhase2k.autopayAuthorization.status === "active" &&
+            invoice.customerId ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] mt-1"
+                disabled={blitzpayRevokeAutopayBusy}
+                onClick={() => {
+                  void (async () => {
+                    setBlitzpayRevokeAutopayBusy(true)
+                    try {
+                      const res = await fetch(
+                        `/api/organizations/${encodeURIComponent(orgId)}/customers/${encodeURIComponent(invoice.customerId)}/blitzpay/revoke-autopay`,
+                        { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } },
+                      )
+                      const body = (await res.json()) as { error?: string; message?: string }
+                      if (!res.ok) {
+                        pushToast(body.message ?? body.error ?? "Could not revoke authorization.", "error")
+                        return
+                      }
+                      pushToast("Future payment authorization revoked for this customer.", "success")
+                      setBlitzpayActivityRefresh((n) => n + 1)
+                    } catch (e) {
+                      pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                    } finally {
+                      setBlitzpayRevokeAutopayBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {blitzpayRevokeAutopayBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                Revoke customer authorization
+              </Button>
+            ) : null}
+          </div>
+          {blitzpayPhase2k.scheduled.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-foreground">Pending / processing schedules</p>
+              <ul className="space-y-1 text-[10px]">
+                {blitzpayPhase2k.scheduled.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded border border-border/60 px-2 py-1"
+                  >
+                    <span className="text-muted-foreground">
+                      {new Date(s.scheduledFor).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {fmtCurrency(s.invoicePortionCents / 100)} · {s.status}
+                    </span>
+                    {permissions.canEditInvoices && s.status === "pending" ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        disabled={blitzpayScheduleCancelBusy === s.id}
+                        onClick={() => {
+                          void (async () => {
+                            setBlitzpayScheduleCancelBusy(s.id)
+                            try {
+                              const res = await fetch(
+                                `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/scheduled-payments/${encodeURIComponent(s.id)}?reason=staff_cancelled`,
+                                { method: "DELETE", credentials: "include" },
+                              )
+                              const body = (await res.json()) as { error?: string; message?: string }
+                              if (!res.ok) {
+                                pushToast(body.message ?? body.error ?? "Could not cancel schedule.", "error")
+                                return
+                              }
+                              pushToast("Scheduled payment cancelled.", "success")
+                              setBlitzpayActivityRefresh((n) => n + 1)
+                            } catch (e) {
+                              pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                            } finally {
+                              setBlitzpayScheduleCancelBusy(null)
+                            }
+                          })()
+                        }}
+                      >
+                        {blitzpayScheduleCancelBusy === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Cancel"}
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">No upcoming scheduled payments for this invoice.</p>
+          )}
+          {blitzpayPhase2k.blitzpayPartialPaymentHistory.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold text-foreground">Recent BlitzPay card/ACH portions (reference only)</p>
+              <ul className="text-[10px] text-muted-foreground space-y-0.5">
+                {blitzpayPhase2k.blitzpayPartialPaymentHistory.slice(0, 8).map((h, i) => (
+                  <li key={`${h.paidOn}-${i}`}>
+                    {fmtDate(h.paidOn)} · {fmtCurrency(h.amountCents / 100)}
+                    {h.referenceDisplay ? ` · ${h.referenceDisplay}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {(permissions.canEditInvoices || permissions.canViewFinancials) &&
+          blitzpayPhase2k.scheduledPaymentsEnabled &&
+          blitzpayPhase2k.savedPaymentProfile &&
+          blitzpayPhase2k.autopayAuthorization.status === "active" &&
+          canStartBlitzpayPay ? (
+            <div className="rounded-md border border-dashed border-border p-2 space-y-2 text-[10px]">
+              <p className="font-semibold text-foreground">Schedule payment (staff)</p>
+              {staffSchedMsg ? <p className="text-destructive">{staffSchedMsg}</p> : null}
+              <label className="block space-y-0.5">
+                <span className="text-muted-foreground">Run on (local)</span>
+                <input
+                  type="datetime-local"
+                  value={staffSchedForLocal}
+                  onChange={(e) => setStaffSchedForLocal(e.target.value)}
+                  className="w-full max-w-[220px] rounded border border-border bg-background px-2 py-1 text-[11px]"
+                />
+              </label>
+              <label className="block space-y-0.5">
+                <span className="text-muted-foreground">Amount (blank = full balance)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={fmtCurrency(balance)}
+                  value={staffSchedPortionDollars}
+                  onChange={(e) => setStaffSchedPortionDollars(e.target.value)}
+                  className="w-full max-w-[220px] rounded border border-border bg-background px-2 py-1 text-[11px]"
+                />
+              </label>
+              <label className="flex items-start gap-2 leading-snug cursor-pointer text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={staffSchedConsent}
+                  onChange={(e) => setStaffSchedConsent(e.target.checked)}
+                />
+                <span>Customer consents to this one-time scheduled charge on the date above using their saved payment method.</span>
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-7 text-[10px] gap-1"
+                disabled={staffSchedBusy || !staffSchedForLocal.trim() || !staffSchedConsent}
+                onClick={() => {
+                  setStaffSchedMsg(null)
+                  void (async () => {
+                    setStaffSchedBusy(true)
+                    try {
+                      const when = new Date(staffSchedForLocal)
+                      if (!Number.isFinite(when.getTime())) {
+                        setStaffSchedMsg("Invalid schedule time.")
+                        return
+                      }
+                      const centsBal = Math.round(balance * 100)
+                      const parsed = parseUsdToCents(staffSchedPortionDollars)
+                      const portion = parsed != null && parsed >= 50 ? parsed : centsBal >= 50 ? centsBal : 0
+                      const res = await fetch(
+                        `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/scheduled-payments`,
+                        {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            scheduledFor: when.toISOString(),
+                            invoicePortionCents: portion,
+                            scheduleConsentAcknowledged: true,
+                          }),
+                        },
+                      )
+                      const body = (await res.json()) as { error?: string; message?: string }
+                      if (!res.ok) {
+                        setStaffSchedMsg(body.message ?? body.error ?? "Could not create schedule.")
+                        return
+                      }
+                      pushToast("Scheduled payment saved.", "success")
+                      setStaffSchedForLocal("")
+                      setStaffSchedPortionDollars("")
+                      setStaffSchedConsent(false)
+                      setBlitzpayActivityRefresh((n) => n + 1)
+                    } catch (e) {
+                      setStaffSchedMsg(e instanceof Error ? e.message : "Network error.")
+                    } finally {
+                      setStaffSchedBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {staffSchedBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                Create schedule
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -2132,7 +2457,9 @@ function PaymentsTab({
                 <tbody>
                   {blitzpayActivity.map((a) => {
                     const src =
-                      a.paymentSource === "customer_portal" ? "Customer portal" : "Staff (dashboard)"
+                      a.attemptChannel === "scheduled_off_session" ? "Scheduled payment"
+                      : a.paymentSource === "customer_portal" ? "Customer portal"
+                      : "Staff (dashboard)"
                     const stLabel =
                       a.displayStatus === "succeeded"
                         ? "Succeeded"

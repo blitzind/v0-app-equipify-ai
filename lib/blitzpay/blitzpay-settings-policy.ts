@@ -7,6 +7,8 @@ export const BLITZPAY_PLATFORM_MANAGED_FEE_FIELDS = [
   "blitzpay_ach_convenience_fee_enabled",
 ] as const
 
+export const BLITZPAY_PLATFORM_ONLY_ORG_SETTINGS = ["blitzpay_platform_partial_payments_allowed"] as const
+
 export type BlitzpaySettingsPatchBody = Partial<
   Record<
     | "blitzpay_invoice_pay_enabled"
@@ -27,6 +29,14 @@ export type BlitzpaySettingsPatchBody = Partial<
 export function picksPlatformManagedFeeFields(body: BlitzpaySettingsPatchBody): string[] {
   const keys: string[] = []
   for (const field of BLITZPAY_PLATFORM_MANAGED_FEE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) keys.push(field)
+  }
+  return keys
+}
+
+export function picksPlatformOnlyOrgSettings(body: Record<string, unknown>): string[] {
+  const keys: string[] = []
+  for (const field of BLITZPAY_PLATFORM_ONLY_ORG_SETTINGS) {
     if (Object.prototype.hasOwnProperty.call(body, field)) keys.push(field)
   }
   return keys

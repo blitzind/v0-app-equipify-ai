@@ -639,6 +639,29 @@ Use this as a **checklist** when coding — not exhaustive.
 6. Replaying reminder runs does not duplicate the same reminder kind for the same invoice window.  
 7. Portal entry from payment-link keeps customer experience limited to safe hosted invoice pay flow.
 
+### 12.12 Phase 2K (autopay authorization, scheduled invoice payments, partial payments)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260918120000_blitzpay_phase_2k_autopay_schedule_partial.sql` — org toggles for partial + scheduled pay; autopay authorization columns on `blitzpay_customer_payment_profiles`; `blitzpay_autopay_consent_events` and `blitzpay_scheduled_invoice_payments`; attempt channel `scheduled_off_session`; timeline event types for schedule/autopay. |
+| **Consent & copy** | `lib/blitzpay/blitzpay-consent-copy.ts` — version token `BLITZPAY_AUTOPAY_CONSENT_COPY_VERSION` and customer-facing `BLITZPAY_FUTURE_PAYMENT_AUTHORIZATION_COPY`. Portal **POST** `prepare-pay` requires `acknowledgeFuturePaymentAuthorization` when save-methods are allowed. |
+| **Partial math** | `lib/blitzpay/blitzpay-phase2k-partial-math.ts` — `effectivePartialPaymentsEnabled`, `clampInvoicePortionCents`, `remainingBalanceAfterPortion`, `buildScheduledExecutionStripeIdempotencyKey`. Org + platform flags gate partial pay; minimum portion defaults to 50¢. |
+| **Prepare / preview** | `previewBlitzpayInvoiceHostedCheckout` / `prepareBlitzpayInvoiceHostedCheckout` accept optional `invoicePortionCents`; preview returns `paymentTowardInvoiceCents`, `remainingBalanceAfterPaymentCents`, and `phase2k` dashboard payload. **GET** prepare-pay (staff + portal) supports `?invoicePortionCents=` for repricing. |
+| **Scheduled execution** | `lib/blitzpay/blitzpay-scheduled-payments.ts` — create/cancel schedule; `runBlitzpayScheduledPaymentsDue` locks `pending` → `processing`, validates invoice balance + active autopay + default PM with Stripe, creates off-session PI with stable Stripe idempotency key `blitzpay:scheduled_pi:v1:{scheduleId}`; failures upsert recovery case + `logCommunicationEvent`. `POST /api/cron/blitzpay-scheduled-payments` (CRON_SECRET). |
+| **Webhooks** | Completion handler updates `blitzpay_scheduled_invoice_payments` when PI metadata includes `scheduled_payment_id`. |
+| **Staff / portal UI** | Invoice Payments tab: Phase 2K summary (profile, authorization, schedules, partial history), cancel pending schedule, staff schedule form with consent checkbox, revoke autopay. Attempt table labels `scheduled_off_session` as “Scheduled payment”. Portal: optional partial amount, authorization checkbox when save-methods on, read-only schedule status + schedule form when eligible. |
+| **Settings** | `PATCH /api/organizations/[organizationId]/blitzpay/settings` exposes partial + schedule toggles; `blitzpay_platform_partial_payments_allowed` is **platform-admin only** (`picksPlatformOnlyOrgSettings`). |
+
+#### Manual test checklist (Phase 2K)
+
+1. With partial payments disabled, Checkout preview and charge always target **full** balance due.  
+2. With partial enabled (org + platform), portal/staff preview shows **toward invoice**, **fee**, and **remaining** when a portion is set.  
+3. Customer cannot start portal Checkout with save-methods on until **authorization** checkbox is checked.  
+4. Creating a schedule requires saved profile + **active** autopay authorization + schedule consent; server rejects ineligible invoices.  
+5. Cron run on a due schedule is **idempotent** (second pass skips non-pending rows).  
+6. Successful scheduled payment still triggers receipt path like other succeeded intents; failure surfaces recovery/notification (not silent).  
+7. Staff can **cancel** a pending schedule and **revoke** autopay; raw Stripe PM ids never appear in API/UI payloads tested here.
+
 ---
 
-*Phase 2A–2J vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2K vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

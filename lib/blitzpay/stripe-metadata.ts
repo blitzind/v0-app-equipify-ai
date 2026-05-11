@@ -10,6 +10,8 @@ export const BLITZPAY_METADATA_ORG_INVOICE_ID_KEY = "org_invoice_id"
 export const BLITZPAY_METADATA_FEE_POLICY_VERSION_KEY = "fee_policy_version"
 /** Distinguishes staff dashboard prepare vs customer portal (Phase 2C). */
 export const BLITZPAY_METADATA_PAYMENT_SOURCE_KEY = "payment_source"
+/** When set, successful PI completion marks this scheduled row succeeded/failed. */
+export const BLITZPAY_METADATA_SCHEDULED_PAYMENT_ID_KEY = "scheduled_payment_id"
 
 export type BlitzpayInvoicePaymentSource = "staff_dashboard" | "customer_portal"
 
@@ -18,6 +20,7 @@ export function blitzpayInvoicePaymentMetadata(input: {
   orgInvoiceId: string
   feePolicyVersion: string
   paymentSource?: BlitzpayInvoicePaymentSource
+  scheduledPaymentId?: string | null
 }): Record<string, string> {
   assertUuid(input.organizationId, "organizationId")
   assertUuid(input.orgInvoiceId, "orgInvoiceId")
@@ -29,12 +32,17 @@ export function blitzpayInvoicePaymentMetadata(input: {
   if (src && src !== "staff_dashboard" && src !== "customer_portal") {
     throw new Error("paymentSource must be staff_dashboard or customer_portal")
   }
+  const sched = input.scheduledPaymentId?.trim() ?? ""
+  if (sched && !UUID_RE.test(sched)) {
+    throw new Error("scheduledPaymentId must be a UUID when provided")
+  }
   return {
     [BLITZPAY_METADATA_PURPOSE_KEY]: BLITZPAY_METADATA_PURPOSE_INVOICE,
     [BLITZPAY_METADATA_ORG_ID_KEY]: input.organizationId,
     [BLITZPAY_METADATA_ORG_INVOICE_ID_KEY]: input.orgInvoiceId,
     [BLITZPAY_METADATA_FEE_POLICY_VERSION_KEY]: v,
     ...(src ? { [BLITZPAY_METADATA_PAYMENT_SOURCE_KEY]: src } : {}),
+    ...(sched ? { [BLITZPAY_METADATA_SCHEDULED_PAYMENT_ID_KEY]: sched } : {}),
   }
 }
 
@@ -43,6 +51,7 @@ export type BlitzpayInvoiceStripeMetadata = {
   orgInvoiceId: string
   feePolicyVersion: string | null
   paymentSource: BlitzpayInvoicePaymentSource | null
+  scheduledPaymentId: string | null
 }
 
 /** Accepts Stripe Metadata or a plain record (webhook / API). */
@@ -59,10 +68,13 @@ export function parseBlitzpayInvoiceMetadata(
   const psRaw = metadata[BLITZPAY_METADATA_PAYMENT_SOURCE_KEY]?.trim() ?? ""
   const paymentSource: BlitzpayInvoicePaymentSource | null =
     psRaw === "staff_dashboard" || psRaw === "customer_portal" ? psRaw : null
+  const schedRaw = metadata[BLITZPAY_METADATA_SCHEDULED_PAYMENT_ID_KEY]?.trim() ?? ""
+  const scheduledPaymentId = UUID_RE.test(schedRaw) ? schedRaw : null
   return {
     organizationId,
     orgInvoiceId,
     feePolicyVersion: feePolicyVersion && feePolicyVersion.length <= 64 ? feePolicyVersion : null,
     paymentSource,
+    scheduledPaymentId,
   }
 }

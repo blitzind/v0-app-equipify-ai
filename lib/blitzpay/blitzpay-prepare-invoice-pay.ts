@@ -22,6 +22,8 @@ import {
 } from "@/lib/blitzpay/payment-repository"
 import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
+import { fetchBlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
+import type { BlitzpayInvoicePhase2kDashboard } from "@/lib/blitzpay/blitzpay-invoice-phase2k-dashboard"
 import { DEFAULT_BLITZPAY_FEE_POLICY_VERSION } from "@/lib/blitzpay/payment-domain"
 import type { BlitzpayInvoicePayChannel } from "@/lib/blitzpay/payment-domain"
 import type { BlitzpayPaymentMethodType } from "@/lib/blitzpay/payment-domain"
@@ -31,6 +33,11 @@ import {
   type BlitzpayConvenienceFeeSettings,
   type BlitzpayConvenienceFeePreview,
 } from "@/lib/blitzpay/convenience-fees"
+import {
+  clampInvoicePortionCents,
+  effectivePartialPaymentsEnabled,
+  remainingBalanceAfterPortion,
+} from "@/lib/blitzpay/blitzpay-phase2k-partial-math"
 
 export type PrepareBlitzpayInvoicePayResult = {
   url: string
@@ -40,7 +47,12 @@ export type PrepareBlitzpayInvoicePayResult = {
 }
 
 export type BlitzpayCheckoutDisclosurePreview = {
+  /** Full invoice balance due before this checkout (unchanged semantics for callers). */
   invoiceBalanceCents: number
+  /** Portion of the invoice balance this checkout pays toward (full balance unless partial pay is enabled). */
+  paymentTowardInvoiceCents: number
+  /** Invoice balance remaining after this payment succeeds (estimate; excludes concurrent payments). */
+  remainingBalanceAfterPaymentCents: number
   convenienceFeeCents: number
   totalChargeCents: number
   appliesToCustomer: boolean
@@ -57,6 +69,7 @@ export type BlitzpayCheckoutDisclosurePreview = {
     disclosureCopy: string
     timelineCopy: string | null
   }>
+  phase2k: BlitzpayInvoicePhase2kDashboard | null
 }
 
 type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
@@ -66,6 +79,10 @@ type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
   initiatedBy: "staff_dashboard"
   userId: string
   preferredPaymentMethodType?: BlitzpayPaymentMethodType
+  /** When partial payments are enabled, pay up to this amount toward the invoice (cents). */
+  invoicePortionCents?: number | null
+  /** Required when saving a payment method for future use from the portal. */
+  acknowledgeFuturePaymentAuthorization?: boolean
 }
 
 type PrepareBlitzpayInvoiceHostedCheckoutPortalInput = {
@@ -77,6 +94,8 @@ type PrepareBlitzpayInvoiceHostedCheckoutPortalInput = {
   portalCustomerId: string
   returnUrls: { successUrl: string; cancelUrl: string }
   preferredPaymentMethodType?: BlitzpayPaymentMethodType
+  invoicePortionCents?: number | null
+  acknowledgeFuturePaymentAuthorization?: boolean
 }
 
 export type PrepareBlitzpayInvoiceHostedCheckoutInput =
@@ -129,6 +148,7 @@ async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInp
       inv: Awaited<ReturnType<typeof loadInvoiceForBlitzpayPay>>
       paidSum: number
       balanceDue: number
+      checkoutInvoicePortionCents: number
     }
   | { error: { ok: false; status: number; code: string; message: string } }
 > {
@@ -206,12 +226,46 @@ async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInp
     }
   }
 
+  const partialPolicy = {
+    orgPartialEnabled: Boolean((settings as { blitzpay_partial_payments_enabled?: boolean }).blitzpay_partial_payments_enabled),
+    platformPartialAllowed:
+      (settings as { blitzpay_platform_partial_payments_allowed?: boolean }).blitzpay_platform_partial_payments_allowed !== false,
+    minPortionCents: Math.max(50, Math.round(Number((settings as { blitzpay_partial_payment_min_cents?: number }).blitzpay_partial_payment_min_cents ?? 50))),
+  }
+  const partialOn = effectivePartialPaymentsEnabled(partialPolicy)
+  const portionRaw = "invoicePortionCents" in input ? input.invoicePortionCents : undefined
+  const portionClamp = clampInvoicePortionCents({
+    balanceDueCents: balanceDue,
+    requestedPortionCents: portionRaw,
+    partialEnabled: partialOn,
+    minPortionCents: partialPolicy.minPortionCents,
+  })
+  if (!portionClamp.ok) {
+    const code = portionClamp.code
+    const map: Record<string, string> = {
+      balance_below_minimum: "Balance due is too low for this payment amount.",
+      partial_not_allowed: "Partial online payments are not enabled for this workspace.",
+      portion_below_minimum: portionClamp.message,
+      portion_exceeds_balance: portionClamp.message,
+    }
+    return {
+      error: {
+        ok: false,
+        status: 409,
+        code,
+        message: map[code] ?? portionClamp.message,
+      },
+    }
+  }
+  const checkoutInvoicePortionCents = portionClamp.portionCents
+
   return {
     settings: settings as Record<string, unknown>,
     orgRow: orgRow as { stripe_connect_account_id?: string | null; stripe_charges_enabled?: boolean; stripe_connect_status?: string | null; stripe_payouts_enabled?: boolean | null },
     inv,
     paidSum,
     balanceDue,
+    checkoutInvoicePortionCents,
   }
 }
 
@@ -227,9 +281,11 @@ export async function previewBlitzpayInvoiceHostedCheckout(
   const convenience = convenienceSettingsFromRow(ctx.settings)
   const methods = enabledPaymentMethodsFromSettings(ctx.settings)
   const achTimeline = achTimelineCopyFromSettings(ctx.settings)
+  const portion = ctx.checkoutInvoicePortionCents
+  const remainingAfter = remainingBalanceAfterPortion(ctx.balanceDue, portion)
   const methodPreviews = methods.map((method) => {
     const p = computeBlitzpayConvenienceFeePreview({
-      invoiceBalanceCents: ctx.balanceDue,
+      invoiceBalanceCents: portion,
       settings: convenience,
       paymentMethodType: method,
       achConvenienceFeeEnabled: Boolean(ctx.settings.blitzpay_ach_convenience_fee_enabled),
@@ -244,10 +300,21 @@ export async function previewBlitzpayInvoiceHostedCheckout(
     }
   })
   const defaultMethod = methodPreviews[0]
+  let phase2k: BlitzpayInvoicePhase2kDashboard | null = null
+  if (ctx.inv.customer_id) {
+    phase2k = await fetchBlitzpayInvoicePhase2kDashboard(
+      input.admin,
+      input.organizationId,
+      input.invoiceId,
+      ctx.inv.customer_id,
+    )
+  }
   return {
     ok: true,
     data: {
       invoiceBalanceCents: ctx.balanceDue,
+      paymentTowardInvoiceCents: portion,
+      remainingBalanceAfterPaymentCents: remainingAfter,
       convenienceFeeCents: defaultMethod.convenienceFeeCents,
       totalChargeCents: defaultMethod.totalChargeCents,
       appliesToCustomer: defaultMethod.convenienceFeeCents > 0,
@@ -257,6 +324,7 @@ export async function previewBlitzpayInvoiceHostedCheckout(
       connectStatus: typeof ctx.orgRow.stripe_connect_status === "string" ? ctx.orgRow.stripe_connect_status : null,
       savePaymentMethodEligible: Boolean(ctx.settings.blitzpay_allow_save_payment_methods ?? true),
       availablePaymentMethods: methodPreviews,
+      phase2k,
     },
   }
 }
@@ -266,8 +334,10 @@ function buildPreparePayAttemptToken(input: PrepareBlitzpayInvoiceHostedCheckout
   if (input.initiatedBy === "staff_dashboard") {
     return randomUUID()
   }
+  const portion =
+    "invoicePortionCents" in input && input.invoicePortionCents != null ? Math.round(Number(input.invoicePortionCents)) : 0
   const h = createHash("sha256")
-    .update(`blitzpay_portal_prepare:${input.portalUserId}:${nonce}`)
+    .update(`blitzpay_portal_prepare:${input.portalUserId}:${portion}:${nonce}`)
     .digest("hex")
     .slice(0, 24)
   return `pt_${h}_${nonce}`
@@ -330,9 +400,21 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   const settings = await fetchBlitzpayOrgSettingsRow(admin, organizationId)
   const loaded = await loadPrepareContext(input)
   if ("error" in loaded) return loaded.error
-  const { orgRow, inv, balanceDue } = loaded
+  const { orgRow, inv, balanceDue, checkoutInvoicePortionCents } = loaded
+  const portion = checkoutInvoicePortionCents
   if (!settings) {
     return { ok: false, status: 500, code: "settings_missing", message: "BlitzPay settings are unavailable." }
+  }
+  if (input.initiatedBy === "customer_portal") {
+    const allowSave = Boolean((settings as Record<string, unknown>).blitzpay_allow_save_payment_methods ?? true)
+    if (allowSave && !input.acknowledgeFuturePaymentAuthorization) {
+      return {
+        ok: false,
+        status: 400,
+        code: "consent_required",
+        message: "Confirm future payment authorization before continuing to Stripe Checkout.",
+      }
+    }
   }
   const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
   const enabledMethods = enabledPaymentMethodsFromSettings(settings as Record<string, unknown>)
@@ -341,9 +423,11 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       input.preferredPaymentMethodType
     : enabledMethods[0]
   const checkoutMethodTypes = input.preferredPaymentMethodType ? [selectedMethod] : enabledMethods
-  const allowSavePaymentMethod = Boolean((settings as Record<string, unknown>).blitzpay_allow_save_payment_methods ?? true)
+  const allowSavePaymentMethod =
+    Boolean((settings as Record<string, unknown>).blitzpay_allow_save_payment_methods ?? true) &&
+    (input.initiatedBy !== "customer_portal" || Boolean(input.acknowledgeFuturePaymentAuthorization))
   const conveniencePreview = computeBlitzpayConvenienceFeePreview({
-    invoiceBalanceCents: balanceDue,
+    invoiceBalanceCents: portion,
     settings: convenienceSettingsFromRow(settings as Record<string, unknown>),
     paymentMethodType: selectedMethod,
     achConvenienceFeeEnabled: Boolean((settings as Record<string, unknown>).blitzpay_ach_convenience_fee_enabled),
@@ -461,11 +545,11 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       stripePaymentIntentId: stripePiId,
       stripeCheckoutSessionId: session.id,
       status: "requires_payment_method",
-      amountCents: BigInt(balanceDue),
+      amountCents: BigInt(portion),
       currency: "usd",
       applicationFeeCents: breakdown.computedTotalApplicationFeeCents,
       convenienceFeeCents: BigInt(conveniencePreview.convenienceFeeCents),
-      invoiceAmountCents: BigInt(balanceDue),
+      invoiceAmountCents: BigInt(portion),
       orgInvoiceId: invoiceId,
       customerId: inv.customer_id,
       idempotencyKey,

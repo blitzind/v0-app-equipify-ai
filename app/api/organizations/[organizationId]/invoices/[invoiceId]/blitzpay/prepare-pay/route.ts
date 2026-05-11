@@ -34,10 +34,14 @@ export async function POST(
   if (drift) return drift
 
   let preferredPaymentMethodType: "card" | "us_bank_account" | undefined
+  let invoicePortionCents: number | null | undefined
   try {
-    const body = (await request.json()) as { paymentMethodType?: string }
+    const body = (await request.json()) as { paymentMethodType?: string; invoicePortionCents?: number | null }
     if (body.paymentMethodType === "card" || body.paymentMethodType === "us_bank_account") {
       preferredPaymentMethodType = body.paymentMethodType
+    }
+    if (body.invoicePortionCents != null && Number.isFinite(Number(body.invoicePortionCents))) {
+      invoicePortionCents = Math.round(Number(body.invoicePortionCents))
     }
   } catch {
     preferredPaymentMethodType = undefined
@@ -50,6 +54,7 @@ export async function POST(
     initiatedBy: "staff_dashboard",
     userId: gate.userId,
     preferredPaymentMethodType,
+    invoicePortionCents,
   })
 
   if (!result.ok) {
@@ -68,12 +73,18 @@ export async function POST(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
   const gate = await requireAnyOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
   if ("error" in gate) return gate.error
+
+  const portionParam = new URL(request.url).searchParams.get("invoicePortionCents")
+  const invoicePortionCents =
+    portionParam != null && portionParam !== "" && Number.isFinite(Number(portionParam)) ?
+      Math.round(Number(portionParam))
+    : undefined
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
@@ -93,6 +104,7 @@ export async function GET(
     invoiceId,
     initiatedBy: "staff_dashboard",
     userId: gate.userId,
+    invoicePortionCents,
   })
   if (!preview.ok) {
     return NextResponse.json({ error: preview.code, message: preview.message }, { status: preview.status })

@@ -140,3 +140,65 @@ export async function createBlitzpayConnectRefund(params: {
     idempotencyKey: params.idempotencyKey,
   })
 }
+
+/** Default PaymentMethod id on the connected-account Customer (Stripe-hosted), or null. */
+export async function fetchBlitzpayConnectCustomerDefaultPaymentMethodId(params: {
+  stripeConnectAccountId: string
+  stripeCustomerId: string
+}): Promise<string | null> {
+  const stripe = getStripe()
+  const cust = await stripe.customers.retrieve(
+    params.stripeCustomerId,
+    { expand: ["invoice_settings.default_payment_method"] },
+    { stripeAccount: params.stripeConnectAccountId },
+  )
+  if (cust.deleted) return null
+  const c = cust as Stripe.Customer
+  const invPm = c.invoice_settings?.default_payment_method
+  if (typeof invPm === "string" && invPm.startsWith("pm_")) return invPm
+  if (invPm && typeof invPm === "object" && "id" in invPm) {
+    const id = String((invPm as Stripe.PaymentMethod).id ?? "")
+    return id.startsWith("pm_") ? id : null
+  }
+  return null
+}
+
+/**
+ * Off-session PaymentIntent on the connected account (scheduled pay).
+ * Caller must validate consent, balance, and default payment method availability.
+ */
+export async function createBlitzpayOffSessionInvoicePaymentIntent(params: {
+  stripeConnectAccountId: string
+  stripeCustomerId: string
+  stripePaymentMethodId: string
+  amountCents: number
+  applicationFeeCents: number
+  currency: string
+  metadata: Record<string, string>
+  idempotencyKey: string
+}): Promise<Stripe.PaymentIntent> {
+  const stripe = getStripe()
+  const c = params.currency.trim().toLowerCase()
+  if (!Number.isInteger(params.amountCents) || params.amountCents < 50) {
+    throw new Error("amount_cents must be an integer >= 50 (Stripe USD minimum).")
+  }
+  if (!Number.isInteger(params.applicationFeeCents) || params.applicationFeeCents < 0) {
+    throw new Error("application_fee_cents must be a non-negative integer.")
+  }
+  if (params.applicationFeeCents > params.amountCents) {
+    throw new Error("application_fee_cents cannot exceed amount_cents.")
+  }
+  return stripe.paymentIntents.create(
+    {
+      amount: params.amountCents,
+      currency: c,
+      customer: params.stripeCustomerId,
+      payment_method: params.stripePaymentMethodId,
+      off_session: true,
+      confirm: true,
+      application_fee_amount: params.applicationFeeCents,
+      metadata: params.metadata,
+    },
+    { stripeAccount: params.stripeConnectAccountId, idempotencyKey: params.idempotencyKey },
+  )
+}
