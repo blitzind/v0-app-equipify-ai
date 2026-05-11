@@ -145,7 +145,7 @@ export const PLANS: Plan[] = [
       "Smart Dispatch Optimization",
       "Technician Utilization Insights",
       "Weekly Executive AI Reports",
-      "Unlimited AI Usage",
+      "Higher included monthly AI allowance (see Settings → AI usage)",
     ],
     capabilities: ["aiden_actions"],
   },

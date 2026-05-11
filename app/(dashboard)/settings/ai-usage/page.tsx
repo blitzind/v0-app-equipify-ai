@@ -248,8 +248,8 @@ export default function AiUsageSettingsPage() {
             title: "Invalid budget",
             description:
               viewerRole === "member"
-                ? "Enter a non-negative AI token budget or leave blank for unlimited."
-                : "Enter a non-negative dollar amount or leave blank for unlimited.",
+                ? "Enter a non-negative AI token budget, or leave blank to clear the workspace cap (plan allowance still applies)."
+                : "Enter a non-negative dollar amount, or leave blank to clear the workspace cap (plan allowance still applies).",
           })
           setSaving(false)
           return
@@ -333,8 +333,7 @@ export default function AiUsageSettingsPage() {
     ? Object.entries(summary!.byProviderModel).sort((a, b) => b[1].estimatedCostUsd - a[1].estimatedCostUsd)
     : []
 
-  const budgetUsdDisplay =
-    budgetCents != null ? money.format(budgetCents / 100) : "No limit"
+  const budgetUsdDisplay = budgetCents != null ? money.format(budgetCents / 100) : "No workspace cap"
   const mtdCents = Math.round(mtdUsd * 100)
   const budgetExceeded =
     isAdmin && budgetCents != null && budgetCents > 0 && mtdCents >= budgetCents
@@ -413,7 +412,13 @@ export default function AiUsageSettingsPage() {
                   {isAdmin ? "Included guidance (month, internal est.)" : "Included AI tokens (month, approx.)"}
                 </p>
                 <p className="text-base font-semibold tabular-nums mt-0.5">
-                  {isAdmin ? money.format(includedUsd) : includedTokensApprox.toLocaleString()}
+                  {isAdmin
+                    ? includedCents > 0
+                      ? money.format(includedUsd)
+                      : "See billing or your agreement"
+                    : includedTokensApprox > 0
+                      ? includedTokensApprox.toLocaleString()
+                      : "See billing or your agreement"}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1">
                   {isAdmin
@@ -427,13 +432,19 @@ export default function AiUsageSettingsPage() {
                 </p>
                 <p className="text-base font-semibold tabular-nums mt-0.5">
                   {isAdmin ? (
-                    <>
-                      {money.format(mtdUsd)} / {money.format(includedUsd)}
-                    </>
-                  ) : (
+                    includedCents > 0 ? (
+                      <>
+                        {money.format(mtdUsd)} / {money.format(includedUsd)}
+                      </>
+                    ) : (
+                      <>{money.format(mtdUsd)} (included allowance unavailable)</>
+                    )
+                  ) : includedTokensApprox > 0 ? (
                     <>
                       {memberMtdTokens.toLocaleString()} / {includedTokensApprox.toLocaleString()}
                     </>
+                  ) : (
+                    <>{memberMtdTokens.toLocaleString()} (included allowance unavailable)</>
                   )}
                 </p>
                 {isAdmin && includedCents > 0 ? (
@@ -601,7 +612,9 @@ export default function AiUsageSettingsPage() {
       {isAdmin && budgetExceeded ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           Month-to-date spend has reached or exceeded the configured monthly budget
-          {enforcementMode === "block" ? " — new AI requests are blocked until the budget is raised or the month rolls over." : " — new requests still run, but usage is over budget (warn mode)."}
+          {enforcementMode === "block"
+            ? " — new AI requests are blocked until the budget is raised or the month rolls over."
+            : " — new requests can still run; self-serve billing does not add automatic AI overage charges. Sustained high usage may be reviewed."}
         </div>
       ) : null}
 
@@ -618,7 +631,9 @@ export default function AiUsageSettingsPage() {
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Budget & enforcement</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Owners, admins, and managers can set a soft monthly cap. Leave budget empty for no limit.
+            Owners, admins, and managers can set an optional workspace cap on estimated AI spend (or token budget for
+            members). Leaving it empty means no extra workspace cap — your plan&apos;s included allowance still applies,
+            and you choose below whether to warn or block when a cap is set.
           </p>
         </div>
         <div className="p-4 space-y-4">
@@ -631,7 +646,7 @@ export default function AiUsageSettingsPage() {
                 type="text"
                 inputMode={isAdmin ? "decimal" : "numeric"}
                 className="input-base w-full"
-                placeholder="Unlimited"
+                placeholder="Optional cap"
                 value={budgetInput}
                 onChange={(e) => setBudgetInput(e.target.value)}
                 disabled={!canEditBudget}
@@ -645,17 +660,41 @@ export default function AiUsageSettingsPage() {
                 onChange={(e) => setModeInput(e.target.value as "warn" | "block")}
                 disabled={!canEditBudget}
               >
-                <option value="warn">Warn (allow overage, log only)</option>
-                <option value="block">Block (reject new AI calls)</option>
+                <option value="warn">Warn — usage may continue past the workspace cap</option>
+                <option value="block">Block — stop new AI requests at the workspace cap</option>
               </select>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Current cap:{" "}
+            Current workspace cap:{" "}
             <span className="font-medium text-foreground">
-              {isAdmin ? budgetUsdDisplay : memberCapTokens != null ? memberCapTokens.toLocaleString() + " AI tokens" : "No limit"}
+              {isAdmin
+                ? budgetUsdDisplay
+                : memberCapTokens != null
+                  ? memberCapTokens.toLocaleString() + " AI tokens"
+                  : "No workspace cap"}
             </span>{" "}
-            · Mode: <span className="font-medium text-foreground">{enforcementMode}</span>
+            · When cap is set:{" "}
+            <span className="font-medium text-foreground">
+              {enforcementMode === "block" ? "Block new AI requests at the cap" : "Warn — usage may continue"}
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+            <span className="font-medium text-foreground">
+              {modeInput === "block" ? "When you choose Block:" : "When you choose Warn:"}
+            </span>{" "}
+            {modeInput === "block" ? (
+              <>
+                New AI requests stop once month-to-date usage reaches the workspace cap you set above. Your
+                plan&apos;s included allowance is unchanged; this is an extra safety rail you control.
+              </>
+            ) : (
+              <>
+                Usage can continue past the workspace cap. Self-serve subscriptions do not automatically add AI overage
+                charges to your bill — sustained high usage may be reviewed. If you have a custom agreement, any extra
+                charges follow that contract, not this screen. Pick Block if you want a hard stop instead.
+              </>
+            )}
           </p>
           {canEditBudget ? (
             <Button type="button" size="sm" onClick={() => void handleSaveBudget()} disabled={saving}>
