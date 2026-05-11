@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
 import { gateDemoDataManagement } from "@/lib/demo-data/access"
+import { REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE } from "@/lib/demo-data/remove-sample-confirmation"
 import { resetSampleDataForOrganization } from "@/lib/demo-data/reset-sample-data"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-
-const CONFIRM_PHRASE = "RESET_SAMPLE_DATA"
 
 type Body = {
   organizationId?: string
@@ -23,10 +22,10 @@ export async function POST(request: Request) {
     const organizationId = typeof body.organizationId === "string" ? body.organizationId.trim() : ""
     const confirmation = typeof body.confirmation === "string" ? body.confirmation.trim() : ""
 
-    if (confirmation !== CONFIRM_PHRASE) {
+    if (confirmation !== REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE) {
       return NextResponse.json(
         {
-          message: `Type ${CONFIRM_PHRASE} exactly to confirm deletion of sample-marked rows.`,
+          message: `Type the phrase "${REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE}" exactly (all caps) to confirm removal of sample-only records.`,
         },
         { status: 400 },
       )

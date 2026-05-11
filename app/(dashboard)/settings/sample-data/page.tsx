@@ -24,9 +24,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE, describeSampleRemovalSuccess } from "@/lib/demo-data/remove-sample-confirmation"
 import { normalizeIndustryKey, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
-
-const RESET_CONFIRM = "RESET_SAMPLE_DATA"
 
 function SettingCard({
   title,
@@ -194,18 +193,24 @@ export default function SampleDataSettingsPage() {
       if (!res.ok) {
         toast({
           variant: "destructive",
-          title: "Reset failed",
+          title: "Could not remove sample data",
           description: json.message ?? res.statusText,
         })
         return
       }
-      toast({
-        title: "Sample data removed",
-        description: "Rows marked as sample were deleted. Billing, team, and settings were not changed.",
-      })
       setResetOpen(false)
       setResetPhrase("")
+      toast({
+        title: "Sample data removed",
+        description: describeSampleRemovalSuccess(json.summary),
+      })
       await loadStatus()
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Could not remove sample data",
+        description: e instanceof Error ? e.message : "Something went wrong. Please try again.",
+      })
     } finally {
       setResetLoading(false)
     }
@@ -261,7 +266,7 @@ export default function SampleDataSettingsPage() {
 
       <SettingCard
         title="Sample & demo data"
-        description="Loads or clears demo-only rows for this workspace. Records you create yourself stay in place — only rows created as examples are removed on reset."
+        description="Loads or clears demo-only rows for this workspace. Records you create yourself stay in place — only rows created as examples are removed when you choose Remove sample data."
       >
         {statusLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -345,7 +350,7 @@ export default function SampleDataSettingsPage() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Import uses the same industry bundles as first-time workspace setup. Your workspace must have no
-                customer rows except after a full sample reset (or a brand-new workspace).
+                customer rows except after sample data is fully removed (or a brand-new workspace).
               </p>
             </div>
 
@@ -363,17 +368,24 @@ export default function SampleDataSettingsPage() {
                 }}
                 disabled={resetLoading}
               >
-                Reset sample data…
+                Remove sample data…
               </Button>
             </div>
           </div>
         )}
       </SettingCard>
 
-      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={resetOpen}
+        onOpenChange={(open) => {
+          if (!open && resetLoading) return
+          setResetOpen(open)
+          if (!open) setResetPhrase("")
+        }}
+      >
+        <AlertDialogContent aria-busy={resetLoading}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete sample-marked data?</AlertDialogTitle>
+            <AlertDialogTitle>Remove sample data?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
@@ -385,33 +397,45 @@ export default function SampleDataSettingsPage() {
                   place.
                 </p>
                 <p>
-                  Re-import after a reset is safe and repeatable: the importer clears prior sample markers first. You
-                  can run it again whenever you want a fresh practice dataset — it does not duplicate your real records.
+                  Re-importing a practice bundle afterward is safe: the importer clears prior sample markers first. It
+                  does not duplicate your real records.
                 </p>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">Confirmation phrase</label>
+                  <label htmlFor="sample-data-remove-confirm" className="block text-xs font-medium text-foreground mb-1">
+                    Type this phrase to confirm
+                  </label>
                   <Input
+                    id="sample-data-remove-confirm"
                     value={resetPhrase}
                     onChange={(e) => setResetPhrase(e.target.value)}
-                    placeholder={RESET_CONFIRM}
+                    placeholder={REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE}
                     autoComplete="off"
+                    disabled={resetLoading}
+                    aria-invalid={resetPhrase.length > 0 && resetPhrase.trim() !== REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE}
                   />
-                  <p className="text-[11px] mt-1">
-                    Type <code className="font-mono bg-muted px-1 rounded">{RESET_CONFIRM}</code> to confirm.
+                  <p className="text-[11px] mt-1.5 text-muted-foreground">
+                    Enter{" "}
+                    <span className="font-semibold text-foreground tracking-wide">
+                      {REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE}
+                    </span>{" "}
+                    using all capital letters, with a single space between the last two words.
                   </p>
                 </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={resetLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel type="button" disabled={resetLoading}>
+              Cancel
+            </AlertDialogCancel>
             <Button
+              type="button"
               variant="destructive"
-              disabled={resetLoading || resetPhrase.trim() !== RESET_CONFIRM}
+              disabled={resetLoading || resetPhrase.trim() !== REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE}
               onClick={() => void handleReset()}
             >
-              {resetLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Reset sample data
+              {resetLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden /> : null}
+              Remove sample data
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

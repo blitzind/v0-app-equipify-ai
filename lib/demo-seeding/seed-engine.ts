@@ -142,7 +142,7 @@ export async function seedDemoForIndustry(args: SeedArgs): Promise<SeedResult> {
       )
     }
     if ((sampleCustomers ?? 0) > 0) {
-      throw new Error("Sample rows are still present. Run “Reset sample data” before importing again.")
+      throw new Error("Sample rows are still present. Remove sample data under Settings before importing again.")
     }
   } else {
     // Onboarding path. Decide between skip / fresh / resume.

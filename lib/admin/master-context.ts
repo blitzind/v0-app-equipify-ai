@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T13:59:55.211Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T14:10:27.382Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -75,6 +75,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 63.6 — AI usage limits & overage copy:** Scale marketing no longer claims **unlimited** AI (\`lib/plans.ts\`); Settings → **AI usage** clarifies optional **workspace** caps vs plan **included** allowance (\`PLAN_AI_INCLUDED_MONTHLY_BUDGET_USD\`), replaces "Warn, allow overage" framing with billing-safe language (no implied free unlimited usage; self-serve does not auto-add overage charges; custom contracts follow the agreement), and tightens banners/toasts/placeholders. No enforcement logic or entitlement changes.
 - **Phase 63.7 — Industry sample data expansion:** First-signup and **Settings → Sample data** import share \`seedDemoForIndustry\` / \`executeDemoSeed\`. All industries now seed scaled **vendors, catalog, quotes, invoices, purchase orders, prospects, inventory locations + on-hand stock, communication_events**, and **AI Ops** lifecycle/events (keys prefixed \`demo_seed_\` for safe reset). **Technician skill tags** from the industry profile use \`is_sample\` (\`20260812200001_technician_skill_tags_is_sample.sql\`). Targets live in \`lib/demo-seeding/industry-sample-packs.ts\`; biomedical keeps a richer bundle. Reset deletes \`EQ-DEMO-LOC%\` demo warehouses in addition to legacy \`PBS-SEED%\`. Doc: \`docs/SAMPLE_DATA_AND_FIRST_SIGNUP_SEEDING.md\`.
 - **Phase 63.8 — First-run experience & launchpad:** **Dashboard** \`DashboardLaunchpad\` reads \`GET /api/organizations/{organizationId}/first-run\` (membership gate only) for head-count completion against **non-sample** rows (invoices: non-draft). **Welcome modal** (\`FirstRunWelcomeGate\`) shows once per user per org when sample content is present and \`equipify_welcome_ack_org_ids\` (Auth \`user_metadata\`) does not include the org. **Dismiss / restore launchpad** uses \`equipify_launchpad_hidden_org_ids\`; **PATCH** \`/first-run\` merges via service-role \`auth.admin.updateUserById\` (self-only). **Industry copy** from \`lib/first-run/launchpad-copy.ts\`; **step applicability** from \`lib/first-run/launchpad-eligibility.ts\` (no fake completion). **Settings → Sample data** clarifies modules, reset safety, idempotent re-import, and “Show checklist on dashboard” for owners/admins (+ platform admins). Doc: \`docs/FIRST_RUN_EXPERIENCE_AND_LAUNCHPAD.md\`.
+- **Phase 63.9 — Sample data removal UX:** **Settings → Sample data** destructive flow uses the confirmation phrase **REMOVE SAMPLE DATA** (\`lib/demo-data/remove-sample-confirmation.ts\`, shared with \`POST /api/demo-data/reset\`), **Remove sample data** button labeling, controlled \`AlertDialog\` close (block cancel/escape while the POST runs), and a success toast fed by \`resetSampleDataForOrganization\` summary counts.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

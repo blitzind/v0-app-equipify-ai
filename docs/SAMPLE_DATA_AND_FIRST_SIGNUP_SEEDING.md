@@ -57,7 +57,7 @@ The **Equipment types** screen (`lib/equipment-type-store.tsx`) uses **in-browse
 
 ## Reset behavior
 
-`POST /api/demo-data/reset` with confirmation phrase **`RESET_SAMPLE_DATA`** deletes only:
+`POST /api/demo-data/reset` with confirmation phrase **`REMOVE SAMPLE DATA`** (all caps, single space; shared constant `REMOVE_SAMPLE_DATA_CONFIRMATION_PHRASE` in `lib/demo-data/remove-sample-confirmation.ts`) deletes only:
 
 - Rows with `is_sample = true` on applicable tables.  
 - `inventory_locations` whose `code` matches **`PBS-SEED%`** or **`EQ-DEMO-LOC%`**.  
