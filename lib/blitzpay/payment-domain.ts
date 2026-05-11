@@ -38,6 +38,9 @@ export const BLITZPAY_LEDGER_ENTRY_TYPES = [
 
 export type BlitzpayLedgerEntryType = (typeof BLITZPAY_LEDGER_ENTRY_TYPES)[number]
 
+export const BLITZPAY_PAYMENT_METHOD_TYPES = ["card", "us_bank_account"] as const
+export type BlitzpayPaymentMethodType = (typeof BLITZPAY_PAYMENT_METHOD_TYPES)[number]
+
 export const BLITZPAY_CONVENIENCE_FEE_MODES = [
   "none",
   "pass_stripe_cost_estimate",

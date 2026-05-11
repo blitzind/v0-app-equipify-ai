@@ -7,6 +7,7 @@ import type {
   BlitzpayInvoicePayChannel,
   BlitzpayInvoicePaymentAttemptStatus,
   BlitzpayLedgerEntryType,
+  BlitzpayPaymentMethodType,
 } from "@/lib/blitzpay/payment-domain"
 import { computeBlitzpayApplicationFeeBreakdown, type BlitzpayFeeInputs } from "@/lib/blitzpay/fees"
 
@@ -88,6 +89,10 @@ export type CreateBlitzpayPaymentIntentInput = {
   customerId?: string | null
   idempotencyKey: string
   metadata?: Record<string, unknown>
+  paymentMethodType?: BlitzpayPaymentMethodType | null
+  stripePaymentMethodId?: string | null
+  stripeCustomerId?: string | null
+  savePaymentMethodRequested?: boolean
 }
 
 export async function createBlitzpayPaymentIntentRecord(
@@ -132,6 +137,10 @@ export async function createBlitzpayPaymentIntentRecord(
     customer_id: input.customerId ?? null,
     idempotency_key: input.idempotencyKey,
     metadata: input.metadata ?? {},
+    payment_method_type: input.paymentMethodType ?? null,
+    stripe_payment_method_id: input.stripePaymentMethodId ?? null,
+    stripe_customer_id: input.stripeCustomerId ?? null,
+    save_payment_method_requested: Boolean(input.savePaymentMethodRequested),
   }
 
   const { data, error } = await admin.from("blitzpay_payment_intents").insert(row).select("id").single()
@@ -344,6 +353,30 @@ export async function fetchBlitzpayPaymentIntentByStripeId(
     .maybeSingle()
   if (error) throw new Error(error.message)
   return data ?? null
+}
+
+export async function updateBlitzpayPaymentIntentMethodDetails(
+  admin: SupabaseClient,
+  stripePaymentIntentId: string,
+  patch: {
+    paymentMethodType?: BlitzpayPaymentMethodType | null
+    stripePaymentMethodId?: string | null
+    stripeCustomerId?: string | null
+    achSettlementState?: "pending" | "settled" | "failed" | null
+  },
+): Promise<void> {
+  const row = {
+    payment_method_type: patch.paymentMethodType ?? null,
+    stripe_payment_method_id: patch.stripePaymentMethodId ?? null,
+    stripe_customer_id: patch.stripeCustomerId ?? null,
+    ach_settlement_state: patch.achSettlementState ?? null,
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await admin
+    .from("blitzpay_payment_intents")
+    .update(row)
+    .eq("stripe_payment_intent_id", stripePaymentIntentId)
+  if (error) throw new Error(error.message)
 }
 
 export async function updateBlitzpayInvoicePaymentAttemptsForInternalIntent(

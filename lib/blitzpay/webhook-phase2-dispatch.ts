@@ -19,10 +19,17 @@ async function refreshBlitzpayPaymentIntentMirror(
   eventCreatedMs: number,
 ): Promise<void> {
   const lastAt = new Date(eventCreatedMs * 1000).toISOString()
+  const achFlow = Array.isArray(pi.payment_method_types) && pi.payment_method_types.includes("us_bank_account")
+  const achSettlementState = achFlow ? (pi.status === "succeeded" ? "settled" : "pending") : null
   const { error } = await admin
     .from("blitzpay_payment_intents")
     .update({
       status: pi.status,
+      payment_method_type:
+        achFlow ? "us_bank_account"
+        : Array.isArray(pi.payment_method_types) && pi.payment_method_types.includes("card") ? "card"
+        : null,
+      ach_settlement_state: achSettlementState,
       last_stripe_event_at: lastAt,
       updated_at: new Date().toISOString(),
     })

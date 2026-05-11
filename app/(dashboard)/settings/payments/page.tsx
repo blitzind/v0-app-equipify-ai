@@ -34,6 +34,11 @@ type BlitzPayStatusPayload = {
     blitzpay_fee_percentage_snapshot?: number
     blitzpay_fee_cap_cents?: number | null
     blitzpay_fee_disclosure_copy?: string
+    blitzpay_payment_method_card_enabled?: boolean
+    blitzpay_payment_method_ach_enabled?: boolean
+    blitzpay_ach_convenience_fee_enabled?: boolean
+    blitzpay_ach_processing_timeline_copy?: string
+    blitzpay_allow_save_payment_methods?: boolean
   } | null
   payoutVisibility?: {
     estimatedNetPayoutCents: number
@@ -43,7 +48,14 @@ type BlitzPayStatusPayload = {
     reportingSource?: "balance_transactions" | "estimate"
     paidOutToBankCents?: number
     connectedAccountNetActivityCents?: number | null
+    paymentMethodMix?: { card: number; us_bank_account: number; unknown: number }
+    achSettlement?: { pending: number; settled: number; failed: number }
     payoutStatus: string
+  } | null
+  storedPaymentProfiles?: {
+    totalProfiles: number
+    withDefaultMethod: number
+    lastUsedMethodMix: { card: number; us_bank_account: number; unknown: number }
   } | null
   stripeMode?: "test" | "live" | "unknown"
 }
@@ -140,6 +152,11 @@ function BlitzPaySettingsPageInner() {
   const [feeDisclosure, setFeeDisclosure] = useState(
     "A processing fee is applied for online card payments.",
   )
+  const [cardEnabled, setCardEnabled] = useState(true)
+  const [achEnabled, setAchEnabled] = useState(false)
+  const [achFeeEnabled, setAchFeeEnabled] = useState(false)
+  const [achTimelineCopy, setAchTimelineCopy] = useState("Bank (ACH) payments can take 3-5 business days to settle.")
+  const [saveMethodsEnabled, setSaveMethodsEnabled] = useState(true)
 
   const loadStatus = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") {
@@ -171,6 +188,13 @@ function BlitzPaySettingsPageInner() {
         setFeeDisclosure(
           (s.blitzpay_fee_disclosure_copy ?? "A processing fee is applied for online card payments.").trim(),
         )
+        setCardEnabled(s.blitzpay_payment_method_card_enabled !== false)
+        setAchEnabled(Boolean(s.blitzpay_payment_method_ach_enabled))
+        setAchFeeEnabled(Boolean(s.blitzpay_ach_convenience_fee_enabled))
+        setAchTimelineCopy(
+          (s.blitzpay_ach_processing_timeline_copy ?? "Bank (ACH) payments can take 3-5 business days to settle.").trim(),
+        )
+        setSaveMethodsEnabled(s.blitzpay_allow_save_payment_methods !== false)
       }
     } finally {
       setLoading(false)
@@ -339,6 +363,11 @@ function BlitzPaySettingsPageInner() {
           blitzpay_fee_mode: passFees ? "customer_pass_through" : "merchant_absorbs",
           blitzpay_fee_percentage_snapshot: Number(feePct),
           blitzpay_fee_disclosure_copy: feeDisclosure,
+          blitzpay_payment_method_card_enabled: cardEnabled,
+          blitzpay_payment_method_ach_enabled: achEnabled,
+          blitzpay_ach_convenience_fee_enabled: achFeeEnabled,
+          blitzpay_ach_processing_timeline_copy: achTimelineCopy,
+          blitzpay_allow_save_payment_methods: saveMethodsEnabled,
         }),
       })
       const j = (await res.json()) as { error?: string; message?: string }
@@ -532,6 +561,56 @@ function BlitzPaySettingsPageInner() {
               ) : null}
 
               <p className="text-xs font-semibold">Convenience fee settings</p>
+              <p className="text-xs font-semibold">Accepted payment methods</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={cardEnabled}
+                  onChange={(e) => setCardEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Card
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={achEnabled}
+                  onChange={(e) => setAchEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Bank transfer (ACH)
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={saveMethodsEnabled}
+                  onChange={(e) => setSaveMethodsEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Allow Checkout to save payment methods for future invoices
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={achFeeEnabled}
+                  onChange={(e) => setAchFeeEnabled(e.target.checked)}
+                  disabled={!canConfigure || !achEnabled}
+                />
+                Apply convenience fees to ACH
+              </label>
+              <label className="text-xs text-muted-foreground block">
+                ACH timing guidance
+                <input
+                  className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                  value={achTimelineCopy}
+                  onChange={(e) => setAchTimelineCopy(e.target.value)}
+                  disabled={!canConfigure || !achEnabled}
+                />
+              </label>
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
@@ -579,6 +658,18 @@ function BlitzPaySettingsPageInner() {
                       )}
                     </p>
                   ) : null}
+                  {bp?.payoutVisibility?.paymentMethodMix ? (
+                    <p className="text-[11px] mt-0.5">
+                      Method mix — card: {bp.payoutVisibility.paymentMethodMix.card}, ACH:{" "}
+                      {bp.payoutVisibility.paymentMethodMix.us_bank_account}
+                    </p>
+                  ) : null}
+                  {bp?.payoutVisibility?.achSettlement ? (
+                    <p className="text-[11px] mt-0.5">
+                      ACH states — pending: {bp.payoutVisibility.achSettlement.pending}, settled:{" "}
+                      {bp.payoutVisibility.achSettlement.settled}
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <label className="text-xs text-muted-foreground block">
@@ -597,6 +688,18 @@ function BlitzPaySettingsPageInner() {
                 {saveFeesBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Save fee settings
               </Button>
+              {bp?.storedPaymentProfiles ? (
+                <div className="rounded-md border border-border/80 p-2 text-[11px] space-y-0.5">
+                  <p className="font-medium text-foreground">Stored payment profiles (staff)</p>
+                  <p className="text-muted-foreground">
+                    Profiles: {bp.storedPaymentProfiles.totalProfiles} · with default: {bp.storedPaymentProfiles.withDefaultMethod}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Last used mix — card: {bp.storedPaymentProfiles.lastUsedMethodMix.card}, ACH:{" "}
+                    {bp.storedPaymentProfiles.lastUsedMethodMix.us_bank_account}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {canViewPayoutLedger && hasAccount ? (

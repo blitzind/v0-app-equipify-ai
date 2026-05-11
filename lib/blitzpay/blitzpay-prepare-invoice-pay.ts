@@ -24,6 +24,7 @@ import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
 import { DEFAULT_BLITZPAY_FEE_POLICY_VERSION } from "@/lib/blitzpay/payment-domain"
 import type { BlitzpayInvoicePayChannel } from "@/lib/blitzpay/payment-domain"
+import type { BlitzpayPaymentMethodType } from "@/lib/blitzpay/payment-domain"
 import {
   computeBlitzpayConvenienceFeePreview,
   DEFAULT_BLITZPAY_DISCLOSURE_COPY,
@@ -47,6 +48,15 @@ export type BlitzpayCheckoutDisclosurePreview = {
   connectChargesEnabled: boolean
   connectPayoutsEnabled: boolean
   connectStatus: string | null
+  savePaymentMethodEligible: boolean
+  availablePaymentMethods: Array<{
+    type: BlitzpayPaymentMethodType
+    label: string
+    convenienceFeeCents: number
+    totalChargeCents: number
+    disclosureCopy: string
+    timelineCopy: string | null
+  }>
 }
 
 type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
@@ -55,6 +65,7 @@ type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
   invoiceId: string
   initiatedBy: "staff_dashboard"
   userId: string
+  preferredPaymentMethodType?: BlitzpayPaymentMethodType
 }
 
 type PrepareBlitzpayInvoiceHostedCheckoutPortalInput = {
@@ -65,6 +76,7 @@ type PrepareBlitzpayInvoiceHostedCheckoutPortalInput = {
   portalUserId: string
   portalCustomerId: string
   returnUrls: { successUrl: string; cancelUrl: string }
+  preferredPaymentMethodType?: BlitzpayPaymentMethodType
 }
 
 export type PrepareBlitzpayInvoiceHostedCheckoutInput =
@@ -93,6 +105,21 @@ function convenienceSettingsFromRow(settings: Record<string, unknown>): Blitzpay
       settings.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(settings.blitzpay_fee_cap_cents))),
     disclosureCopy: disclosure,
   }
+}
+
+function enabledPaymentMethodsFromSettings(settings: Record<string, unknown>): BlitzpayPaymentMethodType[] {
+  const cardEnabled = settings.blitzpay_payment_method_card_enabled !== false
+  const achEnabled = Boolean(settings.blitzpay_payment_method_ach_enabled)
+  const methods: BlitzpayPaymentMethodType[] = []
+  if (cardEnabled) methods.push("card")
+  if (achEnabled) methods.push("us_bank_account")
+  if (methods.length === 0) methods.push("card")
+  return methods
+}
+
+function achTimelineCopyFromSettings(settings: Record<string, unknown>): string {
+  const raw = String(settings.blitzpay_ach_processing_timeline_copy ?? "").trim()
+  return raw.length > 0 ? raw : "Bank (ACH) payments can take 3-5 business days to settle."
 }
 
 async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInput): Promise<
@@ -197,17 +224,39 @@ export async function previewBlitzpayInvoiceHostedCheckout(
   const ctx = await loadPrepareContext(input)
   if ("error" in ctx) return ctx.error
 
-  const pricing = computeBlitzpayConvenienceFeePreview({
-    invoiceBalanceCents: ctx.balanceDue,
-    settings: convenienceSettingsFromRow(ctx.settings),
+  const convenience = convenienceSettingsFromRow(ctx.settings)
+  const methods = enabledPaymentMethodsFromSettings(ctx.settings)
+  const achTimeline = achTimelineCopyFromSettings(ctx.settings)
+  const methodPreviews = methods.map((method) => {
+    const p = computeBlitzpayConvenienceFeePreview({
+      invoiceBalanceCents: ctx.balanceDue,
+      settings: convenience,
+      paymentMethodType: method,
+      achConvenienceFeeEnabled: Boolean(ctx.settings.blitzpay_ach_convenience_fee_enabled),
+    })
+    return {
+      type: method,
+      label: method === "card" ? "Card" : "Bank transfer (ACH)",
+      convenienceFeeCents: p.convenienceFeeCents,
+      totalChargeCents: p.totalChargeCents,
+      disclosureCopy: p.disclosureCopy,
+      timelineCopy: method === "us_bank_account" ? achTimeline : null,
+    }
   })
+  const defaultMethod = methodPreviews[0]
   return {
     ok: true,
     data: {
-      ...pricing,
+      invoiceBalanceCents: ctx.balanceDue,
+      convenienceFeeCents: defaultMethod.convenienceFeeCents,
+      totalChargeCents: defaultMethod.totalChargeCents,
+      appliesToCustomer: defaultMethod.convenienceFeeCents > 0,
+      disclosureCopy: defaultMethod.disclosureCopy,
       connectChargesEnabled: Boolean(ctx.orgRow.stripe_charges_enabled),
       connectPayoutsEnabled: Boolean(ctx.orgRow.stripe_payouts_enabled),
       connectStatus: typeof ctx.orgRow.stripe_connect_status === "string" ? ctx.orgRow.stripe_connect_status : null,
+      savePaymentMethodEligible: Boolean(ctx.settings.blitzpay_allow_save_payment_methods ?? true),
+      availablePaymentMethods: methodPreviews,
     },
   }
 }
@@ -286,9 +335,18 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     return { ok: false, status: 500, code: "settings_missing", message: "BlitzPay settings are unavailable." }
   }
   const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
+  const enabledMethods = enabledPaymentMethodsFromSettings(settings as Record<string, unknown>)
+  const selectedMethod =
+    input.preferredPaymentMethodType && enabledMethods.includes(input.preferredPaymentMethodType) ?
+      input.preferredPaymentMethodType
+    : enabledMethods[0]
+  const checkoutMethodTypes = input.preferredPaymentMethodType ? [selectedMethod] : enabledMethods
+  const allowSavePaymentMethod = Boolean((settings as Record<string, unknown>).blitzpay_allow_save_payment_methods ?? true)
   const conveniencePreview = computeBlitzpayConvenienceFeePreview({
     invoiceBalanceCents: balanceDue,
     settings: convenienceSettingsFromRow(settings as Record<string, unknown>),
+    paymentMethodType: selectedMethod,
+    achConvenienceFeeEnabled: Boolean((settings as Record<string, unknown>).blitzpay_ach_convenience_fee_enabled),
   })
 
   const s = settings as {
@@ -346,6 +404,17 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     : `${origin}/invoices?blitzpay=1&status=cancel&invoiceId=${encodeURIComponent(invoiceId)}`
 
   const productName = `Invoice ${inv.invoice_number} — ${inv.title}`.slice(0, 120)
+  let savedStripeCustomerId: string | null = null
+  if (inv.customer_id) {
+    const { data: profile } = await admin
+      .from("blitzpay_customer_payment_profiles")
+      .select("stripe_customer_id")
+      .eq("organization_id", organizationId)
+      .eq("customer_id", inv.customer_id)
+      .maybeSingle()
+    const candidate = (profile as { stripe_customer_id?: string | null } | null)?.stripe_customer_id
+    savedStripeCustomerId = candidate ? String(candidate).trim() : null
+  }
 
   let session: Awaited<ReturnType<typeof createBlitzpayInvoiceCheckoutSession>>
   try {
@@ -360,6 +429,9 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       paymentIntentMetadata: meta,
       sessionMetadata: meta,
       idempotencyKey,
+      paymentMethodTypes: checkoutMethodTypes,
+      stripeCustomerId: savedStripeCustomerId,
+      savePaymentMethodForFutureUse: allowSavePaymentMethod,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -398,6 +470,9 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       customerId: inv.customer_id,
       idempotencyKey,
       metadata: { ...meta, stripe_checkout_session_id: session.id },
+      paymentMethodType: selectedMethod,
+      stripeCustomerId: savedStripeCustomerId,
+      savePaymentMethodRequested: allowSavePaymentMethod,
     })
 
     await createBlitzpayFeeSnapshot(admin, {

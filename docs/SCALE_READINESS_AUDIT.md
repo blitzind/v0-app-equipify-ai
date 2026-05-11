@@ -167,6 +167,12 @@ Evidence from migrations under `supabase/migrations/`:
 - Staff/portal prepare-pay preview endpoints provide pricing disclosure before redirect, reducing charge-surprise support incidents.
 - Reporting adds estimated Stripe fee / net payout fields; still estimate-based and not a full payout-ledger sync.
 
+### 8.6 BlitzPay Phase 2I (multi-method + ACH + stored payment profiles)
+
+- Checkout now supports org-configurable payment method capability (`card`, `us_bank_account`) while keeping Stripe-hosted collection.
+- ACH timeline and convenience-fee behavior are configurable at org level; fee math must remain method-aware to avoid customer-facing mismatches.
+- Stored payment profile records should remain reference-only (`stripe_customer_id`, method type flags) with no local PAN/bank account details.
+
 ---
 
 ## 9. AI / Usage Scale Risks

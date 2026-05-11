@@ -7,9 +7,11 @@ import { parseBlitzpayInvoiceMetadata } from "@/lib/blitzpay/stripe-metadata"
 import {
   appendBlitzpayLedgerEntry,
   fetchBlitzpayPaymentIntentByStripeId,
+  updateBlitzpayPaymentIntentMethodDetails,
   updateBlitzpayInvoicePaymentAttemptsForInternalIntent,
 } from "@/lib/blitzpay/payment-repository"
 import { dispatchBlitzpayPaymentReceiptEmails } from "@/lib/blitzpay/blitzpay-receipt-email-dispatch"
+import { syncBlitzpayCustomerPaymentProfileFromPaymentIntent } from "@/lib/blitzpay/blitzpay-payment-profiles"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -22,6 +24,11 @@ type BlitzpayPiRow = {
   invoice_amount_cents: string | null
   amount_cents: string
   currency: string
+  customer_id: string | null
+  stripe_connect_account_id: string
+  stripe_customer_id: string | null
+  save_payment_method_requested: boolean
+  payment_method_type: string | null
 }
 
 export async function completeBlitzpayPaymentIntentSucceeded(
@@ -36,6 +43,27 @@ export async function completeBlitzpayPaymentIntentSucceeded(
   const meta = parseBlitzpayInvoiceMetadata(pi.metadata as Record<string, string> | undefined)
   if (!meta || meta.organizationId !== row.organization_id) return
   if (!row.org_invoice_id) return
+
+  const stripePmType =
+    typeof pi.payment_method === "object" && pi.payment_method ?
+      (pi.payment_method as Stripe.PaymentMethod).type
+    : null
+  const stripePmId =
+    typeof pi.payment_method === "string" ? pi.payment_method
+    : pi.payment_method && typeof pi.payment_method === "object" ? pi.payment_method.id
+    : null
+  const stripeCustomer =
+    typeof pi.customer === "string" ? pi.customer
+    : pi.customer && typeof pi.customer === "object" ? pi.customer.id
+    : row.stripe_customer_id
+  await updateBlitzpayPaymentIntentMethodDetails(admin, pi.id, {
+    paymentMethodType: stripePmType === "card" || stripePmType === "us_bank_account" ? stripePmType : null,
+    stripePaymentMethodId: stripePmId,
+    stripeCustomerId: stripeCustomer,
+    achSettlementState:
+      stripePmType === "us_bank_account" ? (pi.status === "succeeded" ? "settled" : "pending") : null,
+  })
+  await syncBlitzpayCustomerPaymentProfileFromPaymentIntent(admin, row, pi)
 
   const ref = blitzpayPiReference(pi.id)
   const { count, error: cErr } = await admin

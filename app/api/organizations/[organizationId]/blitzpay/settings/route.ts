@@ -39,6 +39,11 @@ export async function GET(
         "blitzpay_fee_percentage_snapshot",
         "blitzpay_fee_cap_cents",
         "blitzpay_fee_disclosure_copy",
+        "blitzpay_payment_method_card_enabled",
+        "blitzpay_payment_method_ach_enabled",
+        "blitzpay_ach_convenience_fee_enabled",
+        "blitzpay_ach_processing_timeline_copy",
+        "blitzpay_allow_save_payment_methods",
       ].join(", "),
     )
     .eq("organization_id", gate.organizationId)
@@ -69,6 +74,11 @@ export async function PATCH(
     blitzpay_fee_percentage_snapshot?: number
     blitzpay_fee_cap_cents?: number | null
     blitzpay_fee_disclosure_copy?: string
+    blitzpay_payment_method_card_enabled?: boolean
+    blitzpay_payment_method_ach_enabled?: boolean
+    blitzpay_ach_convenience_fee_enabled?: boolean
+    blitzpay_ach_processing_timeline_copy?: string
+    blitzpay_allow_save_payment_methods?: boolean
   }
   try {
     body = (await request.json()) as typeof body
@@ -94,6 +104,11 @@ export async function PATCH(
       "Add customer-facing processing-fee disclosure copy before enabling pass-through fees.",
     )
   }
+  const cardEnabled = body.blitzpay_payment_method_card_enabled !== false
+  const achEnabled = Boolean(body.blitzpay_payment_method_ach_enabled)
+  if (!cardEnabled && !achEnabled) {
+    return jsonError(400, "invalid_payment_methods", "Enable at least one payment method (card or ACH).")
+  }
 
   const patch = {
     blitzpay_invoice_pay_enabled: Boolean(body.blitzpay_invoice_pay_enabled),
@@ -103,6 +118,14 @@ export async function PATCH(
     blitzpay_fee_cap_cents:
       body.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(body.blitzpay_fee_cap_cents))),
     blitzpay_fee_disclosure_copy: disclosure,
+    blitzpay_payment_method_card_enabled: cardEnabled,
+    blitzpay_payment_method_ach_enabled: achEnabled,
+    blitzpay_ach_convenience_fee_enabled: Boolean(body.blitzpay_ach_convenience_fee_enabled),
+    blitzpay_ach_processing_timeline_copy:
+      typeof body.blitzpay_ach_processing_timeline_copy === "string" && body.blitzpay_ach_processing_timeline_copy.trim()
+        ? body.blitzpay_ach_processing_timeline_copy.trim()
+        : "Bank (ACH) payments can take 3-5 business days to settle.",
+    blitzpay_allow_save_payment_methods: body.blitzpay_allow_save_payment_methods !== false,
     updated_at: new Date().toISOString(),
   }
 
@@ -119,6 +142,11 @@ export async function PATCH(
         "blitzpay_fee_percentage_snapshot",
         "blitzpay_fee_cap_cents",
         "blitzpay_fee_disclosure_copy",
+        "blitzpay_payment_method_card_enabled",
+        "blitzpay_payment_method_ach_enabled",
+        "blitzpay_ach_convenience_fee_enabled",
+        "blitzpay_ach_processing_timeline_copy",
+        "blitzpay_allow_save_payment_methods",
       ].join(", "),
     )
     .maybeSingle()

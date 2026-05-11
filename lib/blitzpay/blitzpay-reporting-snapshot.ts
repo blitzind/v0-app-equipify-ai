@@ -21,6 +21,8 @@ export type BlitzpayOrgReportingSnapshot = {
   connectedAccountNetActivityCents: number | null
   onlinePaymentCount: number
   paymentSourceSplit: { customer_portal: number; staff_dashboard: number }
+  paymentMethodMix: { card: number; us_bank_account: number; unknown: number }
+  achSettlement: { pending: number; settled: number; failed: number }
 }
 
 /**
@@ -64,6 +66,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let estimatedStripeFeesCents = 0
   let refundedFeesCents = 0
   let onlinePaymentCount = 0
+  const paymentMethodMix = { card: 0, us_bank_account: 0, unknown: 0 }
+  const achSettlement = { pending: 0, settled: 0, failed: 0 }
   {
     let q = admin.from("org_invoice_payments").select("id, reference").eq("organization_id", organizationId)
     if (sinceIso) q = q.gte("created_at", sinceIso)
@@ -80,15 +84,27 @@ export async function fetchBlitzpayOrgReportingSnapshot(
       if (piIds.length > 0) {
         const { data: pis, error: piErr } = await admin
           .from("blitzpay_payment_intents")
-          .select("stripe_payment_intent_id, amount_cents, convenience_fee_cents")
+          .select("stripe_payment_intent_id, amount_cents, convenience_fee_cents, payment_method_type, ach_settlement_state")
           .eq("organization_id", organizationId)
           .in("stripe_payment_intent_id", piIds)
         if (piErr) throw new Error(piErr.message)
-        for (const p of (pis ?? []) as Array<{ amount_cents: string | number; convenience_fee_cents: string | number }>) {
+        for (const p of (pis ?? []) as Array<{
+          amount_cents: string | number
+          convenience_fee_cents: string | number
+          payment_method_type?: string | null
+          ach_settlement_state?: string | null
+        }>) {
           const amt = Math.max(0, Math.round(Number(p.amount_cents)))
           const conv = Math.max(0, Math.round(Number(p.convenience_fee_cents)))
           convenienceFeeCollectedCents += conv
           estimatedStripeFeesCents += Math.round(amt * 0.029) + 30
+          if (p.payment_method_type === "card") paymentMethodMix.card += 1
+          else if (p.payment_method_type === "us_bank_account") {
+            paymentMethodMix.us_bank_account += 1
+            if (p.ach_settlement_state === "settled") achSettlement.settled += 1
+            else if (p.ach_settlement_state === "failed") achSettlement.failed += 1
+            else achSettlement.pending += 1
+          } else paymentMethodMix.unknown += 1
         }
       }
     }
@@ -169,5 +185,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
       customer_portal: portalCompleted,
       staff_dashboard: staffCompleted,
     },
+    paymentMethodMix,
+    achSettlement,
   }
 }

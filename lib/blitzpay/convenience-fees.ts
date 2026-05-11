@@ -1,4 +1,5 @@
 import { assertNonNegativeCents } from "@/lib/blitzpay/money"
+import type { BlitzpayPaymentMethodType } from "@/lib/blitzpay/payment-domain"
 
 export type BlitzpayFeeMode = "merchant_absorbs" | "customer_pass_through" | "customer_partial_pass_through"
 
@@ -29,12 +30,17 @@ function roundCentsFromPercent(baseCents: number, percent: number): number {
 export function computeBlitzpayConvenienceFeePreview(args: {
   invoiceBalanceCents: number
   settings: BlitzpayConvenienceFeeSettings
+  paymentMethodType?: BlitzpayPaymentMethodType
+  achConvenienceFeeEnabled?: boolean
 }): BlitzpayConvenienceFeePreview {
   const balance = Math.max(0, Math.round(args.invoiceBalanceCents))
   assertNonNegativeCents(BigInt(balance), "invoiceBalanceCents")
 
   const settings = args.settings
+  const method = args.paymentMethodType ?? "card"
+  const achFeeAllowed = args.achConvenienceFeeEnabled === true
   const applies =
+    (method !== "us_bank_account" || achFeeAllowed) &&
     settings.passProcessingFeesToCustomer &&
     (settings.feeMode === "customer_pass_through" || settings.feeMode === "customer_partial_pass_through")
 

@@ -59,6 +59,15 @@ type BlitzpayPricingPreview = {
   totalChargeCents: number
   appliesToCustomer: boolean
   disclosureCopy: string
+  savePaymentMethodEligible?: boolean
+  availablePaymentMethods?: Array<{
+    type: "card" | "us_bank_account"
+    label: string
+    convenienceFeeCents: number
+    totalChargeCents: number
+    disclosureCopy: string
+    timelineCopy: string | null
+  }>
 }
 
 type PortalPaymentHistoryItem = {
@@ -132,6 +141,7 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const [prepareError, setPrepareError] = useState<string | null>(null)
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
   const [pricing, setPricing] = useState<BlitzpayPricingPreview | null>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"card" | "us_bank_account">("card")
 
   useEffect(() => {
     const b = searchParams.get("blitzpay")
@@ -206,7 +216,11 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
         return j.pricing
       })
       .then((p) => {
-        if (p) setPricing(p)
+        if (p) {
+          setPricing(p)
+          const first = p.availablePaymentMethods?.[0]?.type
+          if (first === "card" || first === "us_bank_account") setSelectedPaymentMethod(first)
+        }
       })
       .catch(() => {})
   }, [invoiceId])
@@ -249,6 +263,7 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const blockedStatus = stRaw === "draft" || stRaw === "void"
   const meetsCardMinimum = balanceDue >= 50
   const workspaceReady = blitzpay?.hostedCheckoutAvailable === true
+  const activeMethodPricing = pricing?.availablePaymentMethods?.find((m) => m.type === selectedPaymentMethod)
 
   return (
     <div className="space-y-6">
@@ -549,28 +564,59 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
           </h2>
           {prepareError ? <p className="text-sm text-destructive">{prepareError}</p> : null}
           <p className="text-xs leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
-            Secure card payment through Stripe Checkout on your service provider&apos;s connected account. Final
-            confirmation may take a moment after you return from Stripe.
+            Secure Stripe-hosted payment on your service provider&apos;s connected account. Card and ACH availability is
+            controlled by your service provider. Final confirmation may take a moment after you return from Stripe.
           </p>
           {pricing ? (
             <div className="rounded-md border px-3 py-2 text-xs space-y-1" style={{ borderColor: "var(--portal-border-light)" }}>
+              {pricing.availablePaymentMethods && pricing.availablePaymentMethods.length > 0 ? (
+                <div className="space-y-1 pb-1">
+                  <p style={{ color: "var(--portal-nav-text)" }}>Choose payment method</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pricing.availablePaymentMethods.map((m) => (
+                      <button
+                        key={m.type}
+                        type="button"
+                        className="rounded border px-2 py-1 text-[11px]"
+                        style={{
+                          borderColor: selectedPaymentMethod === m.type ? "var(--portal-accent)" : "var(--portal-border-light)",
+                          color: selectedPaymentMethod === m.type ? "var(--portal-accent)" : "var(--portal-foreground)",
+                        }}
+                        onClick={() => setSelectedPaymentMethod(m.type)}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span style={{ color: "var(--portal-nav-text)" }}>Invoice balance</span>
                 <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.invoiceBalanceCents)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span style={{ color: "var(--portal-nav-text)" }}>Processing fee</span>
-                <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.convenienceFeeCents)}</span>
+                <span style={{ color: "var(--portal-foreground)" }}>
+                  {fmtCurrency(activeMethodPricing?.convenienceFeeCents ?? pricing.convenienceFeeCents)}
+                </span>
               </div>
               <div className="flex items-center justify-between font-semibold">
                 <span style={{ color: "var(--portal-foreground)" }}>Total charged</span>
-                <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.totalChargeCents)}</span>
+                <span style={{ color: "var(--portal-foreground)" }}>
+                  {fmtCurrency(activeMethodPricing?.totalChargeCents ?? pricing.totalChargeCents)}
+                </span>
               </div>
-              {pricing.appliesToCustomer ? (
-                <p style={{ color: "var(--portal-nav-text)" }}>{pricing.disclosureCopy}</p>
+              {(activeMethodPricing?.convenienceFeeCents ?? pricing.convenienceFeeCents) > 0 ? (
+                <p style={{ color: "var(--portal-nav-text)" }}>{activeMethodPricing?.disclosureCopy ?? pricing.disclosureCopy}</p>
               ) : (
                 <p style={{ color: "var(--portal-nav-text)" }}>Your service provider is absorbing processing costs for this payment.</p>
               )}
+              {selectedPaymentMethod === "us_bank_account" ? (
+                <p style={{ color: "var(--portal-nav-text)" }}>
+                  {pricing.availablePaymentMethods?.find((m) => m.type === "us_bank_account")?.timelineCopy ??
+                    "Bank (ACH) payments can take multiple business days to settle."}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {fullyPaid ? (
@@ -605,6 +651,8 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
                       const res = await fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay`, {
                         method: "POST",
                         credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymentMethodType: selectedPaymentMethod }),
                       })
                       const body = (await res.json()) as { error?: string; message?: string; url?: string }
                       if (!res.ok) {

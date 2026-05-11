@@ -3,6 +3,7 @@ import { requireOrgMemberSession } from "@/lib/api/require-org-permission"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
+import { fetchBlitzpayStoredPaymentProfilesSummary } from "@/lib/blitzpay/blitzpay-payment-profiles"
 
 export const runtime = "nodejs"
 
@@ -66,18 +67,30 @@ export async function GET(
         "blitzpay_fee_percentage_snapshot",
         "blitzpay_fee_cap_cents",
         "blitzpay_fee_disclosure_copy",
+        "blitzpay_payment_method_card_enabled",
+        "blitzpay_payment_method_ach_enabled",
+        "blitzpay_ach_convenience_fee_enabled",
+        "blitzpay_ach_processing_timeline_copy",
+        "blitzpay_allow_save_payment_methods",
       ].join(", "),
     )
     .eq("organization_id", organizationId)
     .maybeSingle()
 
   let reporting: Awaited<ReturnType<typeof fetchBlitzpayOrgReportingSnapshot>> | null = null
+  let profileSummary: Awaited<ReturnType<typeof fetchBlitzpayStoredPaymentProfilesSummary>> | null = null
   try {
     const admin = createServiceRoleSupabaseClient()
     const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
-    reporting = await fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso })
+    const [reportingRes, profileRes] = await Promise.all([
+      fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
+      fetchBlitzpayStoredPaymentProfilesSummary(admin, organizationId),
+    ])
+    reporting = reportingRes
+    profileSummary = profileRes
   } catch {
     reporting = null
+    profileSummary = null
   }
 
   const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim() ?? ""
@@ -97,11 +110,14 @@ export async function GET(
             reportingSource: reporting.reportingSource,
             paidOutToBankCents: reporting.paidOutToBankCents,
             connectedAccountNetActivityCents: reporting.connectedAccountNetActivityCents,
+            paymentMethodMix: reporting.paymentMethodMix,
+            achSettlement: reporting.achSettlement,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",
           }
         : null,
+      storedPaymentProfiles: profileSummary,
       stripeMode,
     },
   })

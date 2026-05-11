@@ -1502,7 +1502,16 @@ function PaymentsTab({
     totalChargeCents: number
     appliesToCustomer: boolean
     disclosureCopy: string
+    availablePaymentMethods?: Array<{
+      type: "card" | "us_bank_account"
+      label: string
+      convenienceFeeCents: number
+      totalChargeCents: number
+      disclosureCopy: string
+      timelineCopy: string | null
+    }>
   } | null>(null)
+  const [blitzpaySelectedMethod, setBlitzpaySelectedMethod] = useState<"card" | "us_bank_account">("card")
   const [blitzpayOutboundEmailConfigured, setBlitzpayOutboundEmailConfigured] = useState(false)
   const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
   const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
@@ -1622,7 +1631,10 @@ function PaymentsTab({
         )
         const body = (await res.json()) as { pricing?: typeof blitzpayPricingPreview }
         if (!cancelled && res.ok) {
-          setBlitzpayPricingPreview((body.pricing ?? null) as typeof blitzpayPricingPreview)
+          const p = (body.pricing ?? null) as typeof blitzpayPricingPreview
+          setBlitzpayPricingPreview(p)
+          const first = p?.availablePaymentMethods?.[0]?.type
+          if (first === "card" || first === "us_bank_account") setBlitzpaySelectedMethod(first)
         }
       } catch {
         if (!cancelled) setBlitzpayPricingPreview(null)
@@ -1913,23 +1925,61 @@ function PaymentsTab({
           </p>
           {blitzpayPricingPreview ? (
             <div className="rounded-md border border-border/80 p-2 space-y-1 text-[10px]">
+              {blitzpayPricingPreview.availablePaymentMethods && blitzpayPricingPreview.availablePaymentMethods.length > 0 ? (
+                <div className="space-y-1 pb-1">
+                  <p className="text-muted-foreground">Payment method</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {blitzpayPricingPreview.availablePaymentMethods.map((m) => (
+                      <button
+                        key={m.type}
+                        type="button"
+                        className={cn(
+                          "rounded border px-2 py-0.5",
+                          blitzpaySelectedMethod === m.type ? "border-primary text-primary" : "border-border text-foreground",
+                        )}
+                        onClick={() => setBlitzpaySelectedMethod(m.type)}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Invoice balance</span>
                 <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.invoiceBalanceCents / 100)}</span>
               </div>
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>Processing fee</span>
-                <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.convenienceFeeCents / 100)}</span>
+                <span className="text-foreground">
+                  {fmtCurrency(
+                    (blitzpayPricingPreview.availablePaymentMethods?.find((m) => m.type === blitzpaySelectedMethod)
+                      ?.convenienceFeeCents ?? blitzpayPricingPreview.convenienceFeeCents) / 100,
+                  )}
+                </span>
               </div>
               <div className="flex items-center justify-between font-semibold text-foreground">
                 <span>Total charged</span>
-                <span>{fmtCurrency(blitzpayPricingPreview.totalChargeCents / 100)}</span>
+                <span>
+                  {fmtCurrency(
+                    (blitzpayPricingPreview.availablePaymentMethods?.find((m) => m.type === blitzpaySelectedMethod)
+                      ?.totalChargeCents ?? blitzpayPricingPreview.totalChargeCents) / 100,
+                  )}
+                </span>
               </div>
               <p className="text-muted-foreground">
-                {blitzpayPricingPreview.appliesToCustomer
-                  ? blitzpayPricingPreview.disclosureCopy
+                {(blitzpayPricingPreview.availablePaymentMethods?.find((m) => m.type === blitzpaySelectedMethod)
+                  ?.convenienceFeeCents ?? blitzpayPricingPreview.convenienceFeeCents) > 0
+                  ? (blitzpayPricingPreview.availablePaymentMethods?.find((m) => m.type === blitzpaySelectedMethod)
+                      ?.disclosureCopy ?? blitzpayPricingPreview.disclosureCopy)
                   : "Merchant is absorbing processing costs for this payment."}
               </p>
+              {blitzpaySelectedMethod === "us_bank_account" ? (
+                <p className="text-muted-foreground">
+                  {blitzpayPricingPreview.availablePaymentMethods?.find((m) => m.type === "us_bank_account")?.timelineCopy ??
+                    "ACH payments can take multiple business days to settle."}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <Button
@@ -1944,7 +1994,12 @@ function PaymentsTab({
                 try {
                   const res = await fetch(
                     `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
-                    { method: "POST", credentials: "include" },
+                    {
+                      method: "POST",
+                      credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ paymentMethodType: blitzpaySelectedMethod }),
+                    },
                   )
                   const body = (await res.json()) as { error?: string; message?: string; url?: string }
                   if (!res.ok) {

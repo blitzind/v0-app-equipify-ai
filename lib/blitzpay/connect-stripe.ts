@@ -67,6 +67,9 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
   paymentIntentMetadata: Record<string, string>
   sessionMetadata: Record<string, string>
   idempotencyKey: string
+  paymentMethodTypes: Array<"card" | "us_bank_account">
+  stripeCustomerId?: string | null
+  savePaymentMethodForFutureUse?: boolean
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe()
   const c = params.currency.trim().toLowerCase()
@@ -83,6 +86,9 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
   return stripe.checkout.sessions.create(
     {
       mode: "payment",
+      payment_method_types: params.paymentMethodTypes,
+      customer: params.stripeCustomerId ?? undefined,
+      customer_creation: params.stripeCustomerId ? undefined : "always",
       line_items: [
         {
           price_data: {
@@ -96,6 +102,7 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
       payment_intent_data: {
         application_fee_amount: params.applicationFeeCents,
         metadata: params.paymentIntentMetadata,
+        setup_future_usage: params.savePaymentMethodForFutureUse ? "off_session" : undefined,
       },
       metadata: params.sessionMetadata,
       success_url: params.successUrl,

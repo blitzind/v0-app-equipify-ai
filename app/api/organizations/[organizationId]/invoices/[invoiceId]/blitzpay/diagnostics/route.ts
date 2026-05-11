@@ -8,6 +8,7 @@ import {
 } from "@/lib/blitzpay/staff-blitzpay-invoice-support"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
+import { fetchBlitzpayStoredPaymentProfilesSummary } from "@/lib/blitzpay/blitzpay-payment-profiles"
 
 export const runtime = "nodejs"
 
@@ -44,13 +45,14 @@ export async function GET(
   const since = new URL(request.url).searchParams.get("since")?.trim() || null
 
   try {
-    const [diagnostics, refunds, disputes, orgSnapshot] = await Promise.all([
+    const [diagnostics, refunds, disputes, orgSnapshot, profiles] = await Promise.all([
       fetchStaffBlitzpayInvoiceDiagnostics(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceRefunds(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceDisputes(admin, organizationId, invoiceId),
       fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso: since }),
+      fetchBlitzpayStoredPaymentProfilesSummary(admin, organizationId),
     ])
-    return NextResponse.json({ diagnostics, refunds, disputes, orgReporting: orgSnapshot })
+    return NextResponse.json({ diagnostics, refunds, disputes, orgReporting: orgSnapshot, storedPaymentProfiles: profiles })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json(

@@ -10,7 +10,7 @@ import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-h
 export const runtime = "nodejs"
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ organizationId: string; invoiceId: string }> },
 ) {
   const { organizationId, invoiceId } = await context.params
@@ -33,12 +33,23 @@ export async function POST(
   )
   if (drift) return drift
 
+  let preferredPaymentMethodType: "card" | "us_bank_account" | undefined
+  try {
+    const body = (await request.json()) as { paymentMethodType?: string }
+    if (body.paymentMethodType === "card" || body.paymentMethodType === "us_bank_account") {
+      preferredPaymentMethodType = body.paymentMethodType
+    }
+  } catch {
+    preferredPaymentMethodType = undefined
+  }
+
   const result = await prepareBlitzpayInvoiceHostedCheckout({
     admin,
     organizationId,
     invoiceId,
     initiatedBy: "staff_dashboard",
     userId: gate.userId,
+    preferredPaymentMethodType,
   })
 
   if (!result.ok) {

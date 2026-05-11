@@ -548,7 +548,7 @@ Use this as a **checklist** when coding — not exhaustive.
 
 | Area | Details |
 |------|---------|
-| **Helper** | `lib/blitzpay/blitzpay-schema-health.ts` — service-role probes for onboarding diagnostic columns on `organizations` and for core BlitzPay tables (`blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_invoice_refunds`, `blitzpay_invoice_disputes`, `blitzpay_webhook_inbox`, `blitzpay_payouts`, `blitzpay_balance_transactions`, `blitzpay_reconciliation_runs`). Results are cached ~60s. |
+| **Helper** | `lib/blitzpay/blitzpay-schema-health.ts` — service-role probes for onboarding diagnostic columns on `organizations` and for core BlitzPay tables (`blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_invoice_refunds`, `blitzpay_invoice_disputes`, `blitzpay_webhook_inbox`, `blitzpay_payouts`, `blitzpay_balance_transactions`, `blitzpay_reconciliation_runs`, `blitzpay_customer_payment_profiles`). Results are cached ~60s. |
 | **Routes** | BlitzPay **status**, **enable**, **sync**, **account-link**, invoice **activity**, **diagnostics**, **prepare-pay** (staff + portal), **refund**, **resend-receipt**, and **payout-ledger** call the guard first. On drift, APIs return **503** with `error: "blitzpay_schema_incomplete"` and a stable `message` for UI (not raw PostgREST text). |
 | **Logs** | `source: "blitzpay-schema-health"` JSON logs include `missing` (e.g. `table:blitzpay_invoice_refunds` or `organizations.blitzpay_last_onboarding_attempt_at`) and a short `detail` from Postgres/PostgREST. |
 | **Fix** | Point the app at the correct Supabase project and **apply pending migrations** (`supabase db push` / CI migration pipeline). The guard only treats **known** missing-relation/column signals as drift; other failures still surface from the underlying handlers. |
@@ -594,6 +594,28 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Staff with financial permissions see payout ledger + diagnostics reconciliation; **portal** APIs unchanged (no payout payloads).  
 6. **prepare-pay** / invoice pay flow still succeeds (schema guard includes new tables).
 
+### 12.10 Phase 2I (multi-method, ACH foundation, stored payment profiles)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260916110000_blitzpay_phase_2i_multi_method_profiles.sql` adds org method toggles (`card`, `us_bank_account`), ACH timeline/fee knobs, save-method toggle, PaymentIntent method metadata columns, and `blitzpay_customer_payment_profiles` (org+customer unique, Stripe reference-only). |
+| **Checkout architecture** | `prepareBlitzpayInvoiceHostedCheckout` now returns `availablePaymentMethods` + ACH timing + save-method eligibility in preview. POST accepts optional `paymentMethodType` to pin Stripe Checkout to the selected method and keep fee disclosure aligned. |
+| **Stripe safety** | Stripe-hosted collection remains required (no local bank/PAN storage). Checkout session uses `payment_method_types`, `customer_creation`, and optional `setup_future_usage=off_session` when org allows save-method foundation. |
+| **Stored profiles** | `lib/blitzpay/blitzpay-payment-profiles.ts` upserts reference-only profile rows from succeeded PaymentIntents (`stripe_customer_id`, last/default method type flags, off-session authorization markers, autopay-eligibility foundation bit). |
+| **Autopay foundations** | `lib/blitzpay/blitzpay-autopay-foundation.ts` exposes pure eligibility hooks for future off-session invoice charging. No automatic charging or recurring billing is enabled in this phase. |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds method mix (`card` vs `us_bank_account`) and ACH settlement state counters (pending/settled/failed). Status endpoint includes stored-profile summary for staff/admin visibility. |
+| **UI** | Portal and staff payment UX show method options and ACH timing copy before redirect. Settings → Payments adds method toggles, ACH fee/timeline controls, and stored-profile counts. Portal does not expose payment-method management surfaces. |
+| **Tests** | `pnpm test:blitzpay-phase-2i` and updated 2G fee tests for ACH fee gating. |
+
+#### Manual test checklist (Phase 2I)
+
+1. Card-only org still shows card checkout flow unchanged.  
+2. ACH-enabled org shows ACH option in portal/staff payment preview before redirect.  
+3. ACH timing copy appears for ACH selection.  
+4. Completed payment upserts/updates a stored payment profile row without exposing raw PM ids in portal payloads.  
+5. Webhook replay keeps profile rows stable (upsert on org+customer).  
+6. Refund/dispute/payout reconciliation paths still operate and existing tests stay green.
+
 ---
 
-*Phase 2A–2H vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + merchant controls + payout ledger) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2I vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + merchant controls + payout ledger + multi-method foundations) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

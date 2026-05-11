@@ -49,7 +49,25 @@ function testCapAndDeterminism() {
   assert.equal(a.totalChargeCents, b.totalChargeCents)
 }
 
+function testAchFeeDisabledByDefault() {
+  const p = computeBlitzpayConvenienceFeePreview({
+    invoiceBalanceCents: 10000,
+    settings: {
+      passProcessingFeesToCustomer: true,
+      feeMode: "customer_pass_through",
+      feePercentageSnapshot: 3,
+      feeCapCents: null,
+      disclosureCopy: "A processing fee is applied for online card payments.",
+    },
+    paymentMethodType: "us_bank_account",
+    achConvenienceFeeEnabled: false,
+  })
+  assert.equal(p.convenienceFeeCents, 0)
+  assert.equal(p.totalChargeCents, 10000)
+}
+
 testOffMerchantAbsorbs()
 testOnPassThrough()
 testCapAndDeterminism()
+testAchFeeDisabledByDefault()
 console.log("blitzpay phase 2g tests passed")
