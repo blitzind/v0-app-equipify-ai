@@ -26,6 +26,11 @@ type IntelligencePayload = {
     workOrderCollectPaymentLinksWindowCount: number
     openRecoveryCasesCount: number
     treasuryEstimateUpcomingTransferCents?: number
+    recurringPlannedInflow30dCents: number
+    recurringStabilityScore0to100: number
+    autopayAdoptionPct: number
+    churnRiskScore0to100: number
+    projectedRenewalRevenue90dCents: number
   }
   forecasts: {
     next7DaysExpectedCents: number
@@ -142,6 +147,11 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
             <Metric label="Payment links (window)" value={String(data.dashboard.paymentLinksCreatedWindowCount)} />
             <Metric label="Work-order collect links" value={String(data.dashboard.workOrderCollectPaymentLinksWindowCount)} />
             <Metric label="Open recovery cases" value={String(data.dashboard.openRecoveryCasesCount)} />
+            <Metric label="Planned renewals (30d)" value={fmtMoney(data.dashboard.recurringPlannedInflow30dCents)} />
+            <Metric label="Recurring stability score" value={`${data.dashboard.recurringStabilityScore0to100}/100`} />
+            <Metric label="Autopay adoption" value={`${data.dashboard.autopayAdoptionPct}%`} />
+            <Metric label="Churn-risk (renewal hygiene)" value={`${data.dashboard.churnRiskScore0to100}/100`} />
+            <Metric label="Projected renewals (90d)" value={fmtMoney(data.dashboard.projectedRenewalRevenue90dCents)} />
           </div>
 
           <div className="rounded-md border border-border/70 bg-background/60 px-2 py-2 space-y-1">

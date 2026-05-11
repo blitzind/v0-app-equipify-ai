@@ -96,6 +96,26 @@ export function BlitzpayCollectionsCopilotPanel({ organizationId, orgReady }: Pr
             <Button asChild variant="secondary" size="sm" className="h-7 text-[11px]">
               <Link href="/communications">Communications</Link>
             </Button>
+            <Button asChild variant="secondary" size="sm" className="h-7 text-[11px]">
+              <Link href="/settings/payments#blitzpay-recurring-revenue-anchor">Recurring revenue</Link>
+            </Button>
+          </div>
+
+          <div className="rounded-md border border-border bg-background/60 p-3 space-y-2">
+            <p className="text-[11px] font-semibold">Recurring cash &amp; renewals (collections lens)</p>
+            <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
+              <li>Recurring cash stability score: {data.recurringCollectionsSignals.recurringCashStabilityScore0to100}/100</li>
+              <li>Renewal recovery opportunity (heuristic): {fmtMoney(data.recurringCollectionsSignals.renewalRecoveryOpportunityCents)}</li>
+              <li>Autopay timing risk exposure (heuristic): {fmtMoney(data.recurringCollectionsSignals.autopayRiskExposureCents)}</li>
+              <li>Churn-adjusted forecast signal: {data.recurringCollectionsSignals.churnAdjustedForecastSignal}</li>
+            </ul>
+            {data.recurringCollectionsSignals.notes.length > 0 ? (
+              <ul className="text-[10px] text-muted-foreground space-y-0.5 list-disc pl-4 border-t border-border pt-2 mt-2">
+                {data.recurringCollectionsSignals.notes.map((n) => (
+                  <li key={n.slice(0, 80)}>{n}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

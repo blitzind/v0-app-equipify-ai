@@ -14,6 +14,7 @@ import {
   type BlitzpayPayoutSpeedLane,
 } from "@/lib/blitzpay/blitzpay-treasury-math"
 import { buildBlitzpayTreasuryInsights } from "@/lib/blitzpay/blitzpay-treasury-insights"
+import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
 
 const BT_PAGE = 800
 
@@ -228,6 +229,12 @@ export type BlitzpayTreasuryDashboardPayload = BlitzpayTreasuryMetricsCore & {
   insights: ReturnType<typeof buildBlitzpayTreasuryInsights>
   /** ISO when `blitzpay_org_balances` was last computed (after refresh). */
   orgBalanceRowComputedAt: string | null
+  /** Phase 2W — bounded recurring cash confidence (no payment processor identifiers). */
+  recurringCashSignals?: {
+    stabilityScore0to100: number
+    plannedRecurringInflow30dCents: number
+    summaryNote: string
+  }
 }
 
 export async function persistBlitzpayOrgTreasury(
@@ -387,6 +394,18 @@ export async function fetchBlitzpayTreasuryDashboard(
 
   const achPending = options?.achPendingCount ?? 0
 
+  let recurringCashSignals: BlitzpayTreasuryDashboardPayload["recurringCashSignals"]
+  try {
+    const rm = await fetchBlitzpayRecurringRevenueMetrics(admin, organizationId, {})
+    recurringCashSignals = {
+      stabilityScore0to100: rm.recurringStabilityScore0to100,
+      plannedRecurringInflow30dCents: rm.recurringPlannedInflow30dCents,
+      summaryNote: rm.treasuryConfidenceNote,
+    }
+  } catch {
+    recurringCashSignals = undefined
+  }
+
   const insights = buildBlitzpayTreasuryInsights({
     avgPayoutDelayDays: metrics.avgPayoutDelayDays,
     avgPayoutDelayBaselineDays: 3,
@@ -406,5 +425,6 @@ export async function fetchBlitzpayTreasuryDashboard(
     recentPayouts,
     insights,
     orgBalanceRowComputedAt,
+    recurringCashSignals,
   }
 }

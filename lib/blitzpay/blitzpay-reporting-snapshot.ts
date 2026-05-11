@@ -6,6 +6,7 @@ import { fetchApReportingExtras } from "@/lib/blitzpay/blitzpay-vendor-payables"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
 import { fetchBlitzpayCollectionsAccelerationMetrics } from "@/lib/blitzpay/blitzpay-collections-acceleration-metrics"
+import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
 export type BlitzpayOrgReportingSnapshot = {
@@ -89,6 +90,18 @@ export type BlitzpayOrgReportingSnapshot = {
   reminderConversionRatePct: number
   fieldCollectionRecoveryRatePct: number
   workOrdersWithCollectibleBalancesCount: number
+  /** Phase 2W — recurring revenue / renewal signals (bounded reads). */
+  blitzpayRecurringPlannedInflow30dCents: number
+  blitzpayRecurringPlannedInflow90dCents: number
+  blitzpayAnnualizedRecurringRunRateProxyCents: number
+  blitzpayRecurringMixOfWindowPct: number
+  blitzpayAutopayAdoptionPct: number
+  blitzpayRenewalSuccessProxyPct: number
+  blitzpayChurnRiskScore0to100: number
+  blitzpayRecurringStabilityScore0to100: number
+  blitzpayProjectedRenewalRevenue90dCents: number
+  blitzpayRenewalRecoveryOpportunityCents: number
+  blitzpayAutopayRiskExposureCents: number
 }
 
 /**
@@ -468,6 +481,61 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* sandboxes without full BlitzPay schema */
   }
 
+  const todayYmdForRecurring = new Date().toISOString().slice(0, 10)
+  let overdueInvoiceCountApprox = 0
+  {
+    const { count: oc, error: ocErr } = await admin
+      .from("org_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .not("due_date", "is", null)
+      .lt("due_date", todayYmdForRecurring)
+      .in("status", ["sent", "unpaid", "overdue"])
+    if (!ocErr && oc != null) overdueInvoiceCountApprox = oc
+  }
+
+  const reportingWindowDaysRec = sinceIso
+    ? Math.min(90, Math.max(7, Math.round((Date.now() - Date.parse(sinceIso)) / 86400_000)))
+    : 30
+
+  let blitzpayRecurringPlannedInflow30dCents = 0
+  let blitzpayRecurringPlannedInflow90dCents = 0
+  let blitzpayAnnualizedRecurringRunRateProxyCents = 0
+  let blitzpayRecurringMixOfWindowPct = 0
+  let blitzpayAutopayAdoptionPct = 0
+  let blitzpayRenewalSuccessProxyPct = 0
+  let blitzpayChurnRiskScore0to100 = 0
+  let blitzpayRecurringStabilityScore0to100 = 0
+  let blitzpayProjectedRenewalRevenue90dCents = 0
+  let blitzpayRenewalRecoveryOpportunityCents = 0
+  let blitzpayAutopayRiskExposureCents = 0
+  try {
+    const r = await fetchBlitzpayRecurringRevenueMetrics(admin, organizationId, {
+      reportingWindowDays: reportingWindowDaysRec,
+      grossCollectedWindowCents: gross,
+      overdueInvoiceCount: overdueInvoiceCountApprox,
+    })
+    blitzpayRecurringPlannedInflow30dCents = r.recurringPlannedInflow30dCents
+    blitzpayRecurringPlannedInflow90dCents = r.recurringPlannedInflow90dCents
+    blitzpayAnnualizedRecurringRunRateProxyCents = r.annualizedRecurringRunRateProxyCents
+    blitzpayRecurringMixOfWindowPct = r.recurringMixOfCollectedWindowPct
+    blitzpayAutopayAdoptionPct = r.autopayAdoptionPct
+    blitzpayRenewalSuccessProxyPct = r.renewalSuccessProxyPct
+    blitzpayChurnRiskScore0to100 = r.churnRiskScore0to100
+    blitzpayRecurringStabilityScore0to100 = r.recurringStabilityScore0to100
+    blitzpayProjectedRenewalRevenue90dCents = r.projectedRenewalRevenue90dCents
+    blitzpayRenewalRecoveryOpportunityCents = Math.min(
+      r.projectedRenewalRevenue90dCents,
+      Math.round(estimatedRecoverableOverdueCents * 0.3 + r.recurringPlannedInflow30dCents * 0.12),
+    )
+    blitzpayAutopayRiskExposureCents = Math.min(
+      estimatedRecoverableOverdueCents,
+      Math.round(r.failedRenewalExposureCents + r.recurringPlannedInflow30dCents * (1 - r.autopayAdoptionPct / 100)),
+    )
+  } catch {
+    /* recurring reads optional in partial sandboxes */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -528,5 +596,16 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     reminderConversionRatePct,
     fieldCollectionRecoveryRatePct,
     workOrdersWithCollectibleBalancesCount,
+    blitzpayRecurringPlannedInflow30dCents,
+    blitzpayRecurringPlannedInflow90dCents,
+    blitzpayAnnualizedRecurringRunRateProxyCents,
+    blitzpayRecurringMixOfWindowPct,
+    blitzpayAutopayAdoptionPct,
+    blitzpayRenewalSuccessProxyPct,
+    blitzpayChurnRiskScore0to100,
+    blitzpayRecurringStabilityScore0to100,
+    blitzpayProjectedRenewalRevenue90dCents,
+    blitzpayRenewalRecoveryOpportunityCents,
+    blitzpayAutopayRiskExposureCents,
   }
 }

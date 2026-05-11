@@ -14,7 +14,7 @@ import {
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
   CalendarRange, Store, Package, Upload, Bell,
   Warehouse,
-  Landmark,
+  CreditCard,
 } from "lucide-react"
 import Image from "next/image"
 import type { LucideIcon } from "lucide-react"
@@ -150,7 +150,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "BlitzPay Financial Command Center",
     subtitle:
       "Monitor receivables, cash flow, treasury activity, collections, forecasts, and financial operations health across your business.",
-    icon: Landmark,
+    icon: CreditCard,
     heroAccessory: "blitzpay-wordmark",
     heroSubtitleMultiline: true,
   },
@@ -181,12 +181,12 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/portal": "#2563EB",
   "/integrations": "#2563EB",
   "/communications": "#6366F1",
-  "/insights/financial-command-center": "#f59f1c",
+  "/insights/financial-command-center": "#16a34a",
 }
 
 function getFeatureIconColor(pathname: string): string {
   if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
-  if (pathname.startsWith("/insights/financial-command-center")) return "#f59f1c"
+  if (pathname.startsWith("/insights/financial-command-center")) return "#16a34a"
   if (pathname.startsWith("/customers/")) return "#2563EB"
   if (pathname.startsWith("/technicians/today")) return "#4F46E5"
   if (pathname.startsWith("/work-orders/")) return "#22C55E"
@@ -237,6 +237,7 @@ function PageHero({
   heroSubtitleMultiline?: boolean
 }) {
   const maintenancePlansHero = pathname === "/maintenance-plans"
+  const blitzPayFinancialHero = pathname === "/insights/financial-command-center"
   const isSettingsArea = pathname.startsWith("/settings/")
   const multilineSubtitle = Boolean(isSettingsArea || heroSubtitleMultiline)
   return (
@@ -255,6 +256,10 @@ function PageHero({
         <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
           {maintenancePlansHero ? (
             <MaintenancePlansBrandTile size="md" />
+          ) : blitzPayFinancialHero ? (
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-green-200 bg-green-500/10 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-green-600" aria-hidden />
+            </div>
           ) : (
             <div
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
@@ -288,13 +293,13 @@ function PageHero({
           </div>
         </div>
         {heroAccessory === "blitzpay-wordmark" ? (
-          <div className="flex shrink-0 items-center justify-start sm:justify-end pl-12 sm:pl-0">
+          <div className="flex shrink-0 items-center justify-start bg-transparent sm:justify-end pl-12 sm:pl-0">
             <Image
-              src="/blitzpay-wordmark.png"
+              src="/blitzpay-wordmark-transparent.png"
               alt="BlitzPay"
               width={220}
               height={48}
-              className="h-7 w-auto max-w-[min(200px,42vw)] sm:h-8 sm:max-w-[220px] object-contain object-left sm:object-right opacity-95"
+              className="h-7 w-auto max-w-[min(200px,42vw)] sm:h-8 sm:max-w-[220px] object-contain object-left sm:object-right opacity-95 bg-transparent"
               priority
             />
           </div>

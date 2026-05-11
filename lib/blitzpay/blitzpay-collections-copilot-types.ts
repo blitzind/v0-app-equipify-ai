@@ -34,6 +34,14 @@ export type CollectionsCopilotRecoveryForecast = {
   next14dScheduledFieldOpportunityCents: number
 }
 
+export type BlitzpayRecurringCollectionsSignals = {
+  recurringCashStabilityScore0to100: number
+  renewalRecoveryOpportunityCents: number
+  autopayRiskExposureCents: number
+  churnAdjustedForecastSignal: "supportive" | "neutral" | "pressure"
+  notes: string[]
+}
+
 export type BlitzpayCollectionsCopilotPayload = {
   reportingWindowDays: number
   generatedAt: string
@@ -69,4 +77,6 @@ export type BlitzpayCollectionsCopilotPayload = {
     technicianAssistedRecoveryRatePct: number
     reminderConversionRatePct: number
   }
+  /** Phase 2W — recurring cash signals for collections prioritization. */
+  recurringCollectionsSignals: BlitzpayRecurringCollectionsSignals
 }

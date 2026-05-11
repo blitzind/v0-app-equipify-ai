@@ -50,6 +50,18 @@ export type BlitzpayOrgRevenueIntelligence = {
     workOrdersWithCollectibleBalancesCount: number
     paymentMethodMix: { card: number; us_bank_account: number; unknown: number }
     customerWalletSpendableCreditTotalCents: number
+    /** Phase 2W — recurring revenue / renewals (from reporting snapshot, bounded). */
+    recurringPlannedInflow30dCents: number
+    recurringPlannedInflow90dCents: number
+    annualizedRecurringRunRateProxyCents: number
+    recurringMixOfCollectedWindowPct: number
+    autopayAdoptionPct: number
+    renewalSuccessProxyPct: number
+    churnRiskScore0to100: number
+    recurringStabilityScore0to100: number
+    projectedRenewalRevenue90dCents: number
+    renewalRecoveryOpportunityCents: number
+    autopayRiskExposureCents: number
   }
   forecasts: ReturnType<typeof buildBlitzpayForecastHorizonsCents> & {
     achPendingSettlementCents: number
@@ -305,6 +317,15 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
     estimateDepositPipelineCents60: dep,
   })
 
+  const recurringStability = reporting.blitzpayRecurringStabilityScore0to100
+  const recurring30 = reporting.blitzpayRecurringPlannedInflow30dCents
+  const churnAdjBump30 = Math.round(recurring30 * 0.06 * (recurringStability / 100))
+  const horizonsChurnAdjusted = {
+    next7DaysExpectedCents: horizons.next7DaysExpectedCents + Math.round(recurring30 * 0.02 * (recurringStability / 100)),
+    next30DaysExpectedCents: horizons.next30DaysExpectedCents + churnAdjBump30,
+    next60DaysExpectedCents: horizons.next60DaysExpectedCents + Math.round(recurring30 * 0.1 * (recurringStability / 100)),
+  }
+
   const ach = reporting.achSettlement
   const achTotal = ach.pending + ach.settled + ach.failed
   const achSettledRatio = achTotal === 0 ? 1 : ach.settled / achTotal
@@ -353,9 +374,20 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
       workOrdersWithCollectibleBalancesCount: reporting.workOrdersWithCollectibleBalancesCount,
       paymentMethodMix: reporting.paymentMethodMix,
       customerWalletSpendableCreditTotalCents: reporting.customerWalletSpendableCreditTotalCents,
+      recurringPlannedInflow30dCents: reporting.blitzpayRecurringPlannedInflow30dCents,
+      recurringPlannedInflow90dCents: reporting.blitzpayRecurringPlannedInflow90dCents,
+      annualizedRecurringRunRateProxyCents: reporting.blitzpayAnnualizedRecurringRunRateProxyCents,
+      recurringMixOfCollectedWindowPct: reporting.blitzpayRecurringMixOfWindowPct,
+      autopayAdoptionPct: reporting.blitzpayAutopayAdoptionPct,
+      renewalSuccessProxyPct: reporting.blitzpayRenewalSuccessProxyPct,
+      churnRiskScore0to100: reporting.blitzpayChurnRiskScore0to100,
+      recurringStabilityScore0to100: reporting.blitzpayRecurringStabilityScore0to100,
+      projectedRenewalRevenue90dCents: reporting.blitzpayProjectedRenewalRevenue90dCents,
+      renewalRecoveryOpportunityCents: reporting.blitzpayRenewalRecoveryOpportunityCents,
+      autopayRiskExposureCents: reporting.blitzpayAutopayRiskExposureCents,
     },
     forecasts: {
-      ...horizons,
+      ...horizonsChurnAdjusted,
       achPendingSettlementCents: achPending,
       overdueRecoveryExpectedCents,
     },

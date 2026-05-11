@@ -32,6 +32,9 @@ type CommandCenterPayload = {
     payoutPressureCents: number
     workOrderPaymentLinksWindowCount: number
     abandonedCheckoutInvoices: number
+    recurringStabilityScore0to100: number
+    plannedRecurringInflow30dCents: number
+    autopayAdoptionPct: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -150,6 +153,9 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Held reserve / target", v: `${fmtMoney(data.tiles.treasuryHeldReserveCents)} / ${fmtMoney(data.tiles.reserveTargetCents)}` },
               { k: "WO pay links (window)", v: String(data.tiles.workOrderPaymentLinksWindowCount) },
               { k: "Abandoned checkouts", v: String(data.tiles.abandonedCheckoutInvoices) },
+              { k: "Recurring cash stability", v: `${data.tiles.recurringStabilityScore0to100}/100` },
+              { k: "Planned renewals (30d)", v: fmtMoney(data.tiles.plannedRecurringInflow30dCents) },
+              { k: "Autopay adoption (profiles)", v: `${data.tiles.autopayAdoptionPct}%` },
             ].map((x) => (
               <div key={x.k} className="rounded border border-border/70 bg-background/40 px-2 py-1.5">
                 <p className="text-[9px] text-muted-foreground uppercase leading-tight">{x.k}</p>

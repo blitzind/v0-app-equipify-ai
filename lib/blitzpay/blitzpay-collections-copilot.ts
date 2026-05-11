@@ -18,6 +18,8 @@ import {
 } from "@/lib/billing/invoice-payment-allocation"
 import { fetchBlitzpayOrgRevenueIntelligence } from "@/lib/blitzpay/blitzpay-revenue-intelligence"
 import { fetchBlitzpayCollectionsAccelerationMetrics } from "@/lib/blitzpay/blitzpay-collections-acceleration-metrics"
+import { buildRecurringCollectionsCopilotSlice } from "@/lib/blitzpay/blitzpay-recurring-collections-bridge"
+import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
 
 const PRIORITY_SCAN = 60
 const REMINDER_CHUNK = 40
@@ -48,6 +50,17 @@ export async function fetchBlitzpayCollectionsCopilot(
     fetchCustomerPaymentBehaviorSummary(admin, organizationId),
   ])
 
+  const recurringMetrics = await fetchBlitzpayRecurringRevenueMetrics(admin, organizationId, {
+    reportingWindowDays,
+    grossCollectedWindowCents: intelligence.dashboard.grossCollectedWindowCents,
+    overdueInvoiceCount: intelligence.dashboard.overdueInvoiceCount,
+  })
+  const recurringCollectionsSignals = buildRecurringCollectionsCopilotSlice({
+    metrics: recurringMetrics,
+    overdueCollectibleCents: intelligence.dashboard.overdueCollectibleCents,
+    reminderEffectivenessRatePct: intelligence.collections.reminderEffectivenessRatePct,
+  })
+
   const d = intelligence.dashboard
   const c = intelligence.collections
   const reportingPulse = { reminderEffectivenessRatePct: c.reminderEffectivenessRatePct }
@@ -61,7 +74,7 @@ export async function fetchBlitzpayCollectionsCopilot(
 
   const { data: overdueInv, error: invErr } = await admin
     .from("org_invoices")
-    .select("id, customer_id, status, amount_cents, tax_amount_cents, due_date, work_order_id, updated_at")
+    .select("id, customer_id, status, amount_cents, tax_amount_cents, due_date, work_order_id")
     .eq("organization_id", organizationId)
     .not("due_date", "is", null)
     .lt("due_date", today)
@@ -358,6 +371,7 @@ export async function fetchBlitzpayCollectionsCopilot(
       technicianAssistedRecoveryRatePct: accel.technicianAssistedRecoveryRatePct,
       reminderConversionRatePct: accel.reminderConversionRatePct,
     },
+    recurringCollectionsSignals,
   }
 }
 

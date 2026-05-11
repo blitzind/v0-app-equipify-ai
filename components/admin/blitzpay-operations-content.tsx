@@ -29,6 +29,18 @@ type CollectionsPlatformRollup = {
   topRiskThemes: string[]
 }
 
+type RecurringRevenuePlatformRollup = {
+  reportingWindowDays: number
+  generatedAt: string
+  orgsSampled: number
+  averagePlannedRecurring30dCents: number
+  averageAutopayAdoptionPct: number
+  averageRenewalSuccessProxyPct: number
+  averageChurnRiskScore0to100: number
+  orgsWithFailedRenewalsApprox: number
+  topOperationalThemes: string[]
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -102,6 +114,7 @@ export function BlitzpayOperationsContent() {
   const [commandRollup, setCommandRollup] = useState<CommandCenterPlatformRollup | null>(null)
   const [healthRollup, setHealthRollup] = useState<BusinessHealthPlatformRollup | null>(null)
   const [collectionsRollup, setCollectionsRollup] = useState<CollectionsPlatformRollup | null>(null)
+  const [recurringRollup, setRecurringRollup] = useState<RecurringRevenuePlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -140,16 +153,18 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3, r4] = await Promise.all([
+        const [r1, r2, r3, r4, r5] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/collections-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/recurring-revenue-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
         const j3 = (await r3.json()) as { rollup?: BusinessHealthPlatformRollup }
         const j4 = (await r4.json()) as { rollup?: CollectionsPlatformRollup }
+        const j5 = (await r5.json()) as { rollup?: RecurringRevenuePlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
@@ -158,11 +173,14 @@ export function BlitzpayOperationsContent() {
         else setHealthRollup(null)
         if (r4.ok) setCollectionsRollup(j4.rollup ?? null)
         else setCollectionsRollup(null)
+        if (r5.ok) setRecurringRollup(j5.rollup ?? null)
+        else setRecurringRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
         setHealthRollup(null)
         setCollectionsRollup(null)
+        setRecurringRollup(null)
       }
     })()
   }, [])
@@ -490,6 +508,50 @@ export function BlitzpayOperationsContent() {
               <p className="font-semibold mb-1">Operational risk themes</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {collectionsRollup.topRiskThemes.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {recurringRollup && recurringRollup.orgsSampled > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Recurring revenue & renewals (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled {recurringRollup.orgsSampled} Connect workspaces ({recurringRollup.reportingWindowDays}d). Averages are
+            directional; bounded reads only.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg planned renewals (30d)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(recurringRollup.averagePlannedRecurring30dCents)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg autopay adoption %</p>
+              <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageAutopayAdoptionPct}%</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg renewal success proxy %</p>
+              <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageRenewalSuccessProxyPct}%</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg churn-risk score</p>
+              <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageChurnRiskScore0to100}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Orgs w/ failed renewals</p>
+              <p className="text-lg font-semibold tabular-nums">{recurringRollup.orgsWithFailedRenewalsApprox}</p>
+            </div>
+          </div>
+          {recurringRollup.topOperationalThemes.length > 0 ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-[11px]">
+              <p className="font-semibold mb-1">Themes</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {recurringRollup.topOperationalThemes.map((b) => (
                   <li key={b}>{b}</li>
                 ))}
               </ul>

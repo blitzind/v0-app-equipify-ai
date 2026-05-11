@@ -48,7 +48,7 @@ export async function fetchCustomerPaymentBehaviorSummary(
     .from("org_invoices")
     .select("id, customer_id, status, amount_cents, tax_amount_cents, due_date, paid_at")
     .eq("organization_id", organizationId)
-    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(INVOICE_SCAN_LIMIT)
   if (error) throw new Error(error.message)
 

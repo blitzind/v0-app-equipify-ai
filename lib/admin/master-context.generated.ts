@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 282,
+  apiRouteHandlers: 284,
   sqlMigrations: 165,
   dashboardPages: 61,
-  componentsTsx: 264,
-  libTsFiles: 587,
+  componentsTsx: 265,
+  libTsFiles: 594,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **282** |
+| API route handlers (\`app/api/**/route.ts\`) | **284** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **165** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **61** |
-| \`components/**/*.tsx\` | **264** |
-| \`lib/**/*.ts\` | **587** |
+| \`components/**/*.tsx\` | **265** |
+| \`lib/**/*.ts\` | **594** |
 
 ### Vercel crons
 
@@ -105,6 +105,7 @@ organizations/[organizationId]/blitzpay/financing/summary/route.ts
 organizations/[organizationId]/blitzpay/launch-readiness/route.ts
 organizations/[organizationId]/blitzpay/payment-plans/[planId]/link-work-order/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
+organizations/[organizationId]/blitzpay/recurring-revenue/route.ts
 organizations/[organizationId]/blitzpay/revenue-intelligence/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
@@ -271,6 +272,7 @@ platform/blitzpay/business-health-rollup/route.ts
 platform/blitzpay/collections-rollup/route.ts
 platform/blitzpay/command-center-rollup/route.ts
 platform/blitzpay/operations/route.ts
+platform/blitzpay/recurring-revenue-rollup/route.ts
 platform/blitzpay/reminder-dispatch/route.ts
 platform/blitzpay/reminder-runs/route.ts
 platform/blitzpay/revenue-rollup/route.ts

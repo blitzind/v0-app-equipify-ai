@@ -885,6 +885,25 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **BlitzPay Ops** — collections rollup renders when sampled orgs exist.  
 4. Customer portal: confirm no collections-copilot API paths.
 
+### 12.24 Phase 2W (recurring revenue, membership renewals, service agreements — deterministic, staff-only)
+
+| Area | Details |
+|------|---------|
+| **Pure libs** | `blitzpay-recurring-autopay-rules.ts` — deterministic retry schedule math + idempotency key namespace for renewal retries (documentation / future wiring; existing scheduled payment runner unchanged). `blitzpay-renewal-forecast.ts` — maintenance/contract window counters + projected inflow helper. `blitzpay-membership-health.ts` — churn-risk scoring + retention recommendation strings. `blitzpay-recurring-revenue-types.ts` — client-safe payload types. `blitzpay-recurring-collections-bridge.ts` — pure mapping into collections copilot signals (no `server-only`). |
+| **Server** | `blitzpay-recurring-billing.ts` — `fetchBlitzpayRecurringRevenueMetrics` + `fetchBlitzpayRecurringRevenuePulse` + `buildRecurringCollectionsCopilotSlice` with **capped** reads across `maintenance_plans`, `org_service_contracts`, `blitzpay_scheduled_invoice_payments`, `blitzpay_customer_payment_profiles`, and active installment slices. `blitzpay-platform-recurring-revenue-rollup.ts` — **≤12** Connect org sample averages for BlitzPay Ops. |
+| **Reporting / intelligence / health** | `fetchBlitzpayOrgReportingSnapshot` adds Phase 2W cents/% fields (planned recurring 30/90d, ARR proxy, mix %, autopay adoption, renewal success proxy, churn risk, stability score, projected renewal 90d, recovery opportunity heuristics). `fetchBlitzpayOrgRevenueIntelligence` mirrors them on `dashboard` and applies a **small churn-adjusted bump** to forecast horizons from recurring stability + planned 30d inflows. `fetchBlitzpayBusinessHealth` surfaces the same facts. `fetchBlitzpayTreasuryDashboard` adds optional `recurringCashSignals` (stability + planned 30d + confidence note). `fetchBlitzpayCollectionsCopilot` adds `recurringCollectionsSignals`. |
+| **APIs** | `GET …/blitzpay/recurring-revenue?windowDays=` — `canViewFinancialReports` **or** `canViewFinancials` + schema guard. `GET /api/platform/blitzpay/recurring-revenue-rollup` — platform admins only. |
+| **UX** | `BlitzpayRecurringRevenuePanel` — **Settings → Payments** and **Insights → Financial command center** (`#blitzpay-recurring-revenue-anchor`). Command center tiles + revenue intelligence metrics + executive dashboard facts + treasury panel strip. **Admin → BlitzPay Ops** recurring rollup card. Collections copilot links to recurring anchor. |
+| **Portal** | No customer portal routes or bootstrap references `recurring-revenue` / `recurring-revenue-rollup`. |
+| **Tests** | `pnpm test:blitzpay-phase-2w` — retry schedule determinism, idempotency key shape, churn/membership math, renewal forecast helper, copilot slice, API gate strings, bounded caps, portal isolation, no `pi_`/`sub_` in Phase 2W libs. |
+
+#### Manual test checklist (Phase 2W)
+
+1. Financial role: **Settings → Payments** — recurring revenue panel loads; refresh works; drilldowns stay in-app.  
+2. **Insights → Financial command center** — panel appears above collections copilot.  
+3. Platform admin: **BlitzPay Ops** — recurring rollup renders when sampled orgs exist.  
+4. Customer portal: confirm no recurring-revenue API paths.
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

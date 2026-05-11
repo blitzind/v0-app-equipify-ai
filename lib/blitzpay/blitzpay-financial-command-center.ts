@@ -45,6 +45,9 @@ export type BlitzpayFinancialCommandCenterPayload = {
     payoutPressureCents: number
     workOrderPaymentLinksWindowCount: number
     abandonedCheckoutInvoices: number
+    recurringStabilityScore0to100: number
+    plannedRecurringInflow30dCents: number
+    autopayAdoptionPct: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -183,6 +186,9 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       payoutPressureCents: payoutPressure,
       workOrderPaymentLinksWindowCount: d.workOrderCollectPaymentLinksWindowCount,
       abandonedCheckoutInvoices: d.abandonedCheckoutInvoices,
+      recurringStabilityScore0to100: d.recurringStabilityScore0to100,
+      plannedRecurringInflow30dCents: d.recurringPlannedInflow30dCents,
+      autopayAdoptionPct: d.autopayAdoptionPct,
     },
     combinedForecast,
     scorecards,

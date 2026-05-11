@@ -143,6 +143,12 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
                 <li>Reminder conversion (dispatch success): {data.facts.reminderConversionRatePct}%</li>
                 <li>Field recovery share of overdue: {data.facts.fieldCollectionRecoveryRatePct}%</li>
                 <li>Work orders with collectible balance (upcoming visits): {data.facts.workOrdersWithCollectibleBalancesCount}</li>
+                <li>Planned recurring inflows (30d): {fmtMoney(data.facts.recurringPlannedInflow30dCents)}</li>
+                <li>Recurring cash stability score: {data.facts.recurringStabilityScore0to100}/100</li>
+                <li>Autopay adoption (saved profiles): {data.facts.autopayAdoptionPct}%</li>
+                <li>Renewal success proxy (scheduled): {data.facts.renewalSuccessProxyPct}%</li>
+                <li>Churn-risk score (renewal hygiene): {data.facts.churnRiskScore0to100}/100</li>
+                <li>Projected renewal-style revenue (90d): {fmtMoney(data.facts.projectedRenewalRevenue90dCents)}</li>
               </ul>
             </div>
           </div>

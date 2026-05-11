@@ -65,5 +65,14 @@ export type BlitzpayBusinessHealthPayload = {
     reminderConversionRatePct: number
     fieldCollectionRecoveryRatePct: number
     workOrdersWithCollectibleBalancesCount: number
+    /** Phase 2W — recurring revenue / renewal stability (bounded). */
+    recurringPlannedInflow30dCents: number
+    recurringStabilityScore0to100: number
+    autopayAdoptionPct: number
+    renewalSuccessProxyPct: number
+    churnRiskScore0to100: number
+    projectedRenewalRevenue90dCents: number
+    renewalRecoveryOpportunityCents: number
+    autopayRiskExposureCents: number
   }
 }

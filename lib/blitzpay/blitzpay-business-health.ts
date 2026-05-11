@@ -315,6 +315,14 @@ export async function fetchBlitzpayBusinessHealth(
       reminderConversionRatePct: d.reminderConversionRatePct,
       fieldCollectionRecoveryRatePct: d.fieldCollectionRecoveryRatePct,
       workOrdersWithCollectibleBalancesCount: d.workOrdersWithCollectibleBalancesCount,
+      recurringPlannedInflow30dCents: d.recurringPlannedInflow30dCents,
+      recurringStabilityScore0to100: d.recurringStabilityScore0to100,
+      autopayAdoptionPct: d.autopayAdoptionPct,
+      renewalSuccessProxyPct: d.renewalSuccessProxyPct,
+      churnRiskScore0to100: d.churnRiskScore0to100,
+      projectedRenewalRevenue90dCents: d.projectedRenewalRevenue90dCents,
+      renewalRecoveryOpportunityCents: d.renewalRecoveryOpportunityCents,
+      autopayRiskExposureCents: d.autopayRiskExposureCents,
     },
   }
 }
