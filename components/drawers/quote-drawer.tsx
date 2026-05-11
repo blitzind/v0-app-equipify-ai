@@ -81,6 +81,8 @@ const STATUS_CONFIG: Record<QuoteStatus, { className: string }> = {
 
 const ALL_STATUSES: QuoteStatus[] = ["Draft", "Sent", "Pending Approval", "Approved", "Declined", "Expired"]
 
+const ALL_BLITZPAY_QUOTE_DEPOSIT_MODES = ["none", "acceptance", "fixed", "percentage", "full_prepay"] as const
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string) {
@@ -90,6 +92,21 @@ function fmtDate(d: string) {
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
+}
+
+function fmtCents(cents: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
+}
+
+type QuoteStaffBlitzpayPricing = {
+  depositTargetCents: number
+  depositCollectedCents: number
+  remainingQuoteCents: number
+  convenienceFeeCents: number
+  totalChargeCents: number
+  disclosureCopy: string
+  financingReady: boolean
+  financingMessage: string
 }
 
 function quoteDrawerTitle(q: AdminQuote): string {
@@ -545,6 +562,8 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   // Phase 2 (Permissions): hide quote mutation actions for non-edit roles.
   const { permissions: quoteOrgPermissions } = useOrgPermissions()
   const canEditQuotes = quoteOrgPermissions.canEditQuotes
+  const canStaffBlitzpayQuote =
+    quoteOrgPermissions.canEditQuotes && quoteOrgPermissions.canViewFinancials
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<AdminQuote>>({})
@@ -559,6 +578,10 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [restoreBusy, setRestoreBusy] = useState(false)
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
+  const [blitzpayQuotePricing, setBlitzpayQuotePricing] = useState<QuoteStaffBlitzpayPricing | null>(null)
+  const [blitzpayQuoteLinks, setBlitzpayQuoteLinks] = useState<Array<{ id: string; status: string }>>([])
+  const [blitzpayQuoteBusy, setBlitzpayQuoteBusy] = useState(false)
+  const [blitzpayPctDraft, setBlitzpayPctDraft] = useState("")
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
 
@@ -610,7 +633,37 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     setEditing(false)
     setDraft({})
     setDraftItems([])
+    setBlitzpayPctDraft("")
   }, [quoteId])
+
+  useEffect(() => {
+    if (!quote || !activeOrgId || orgStatus !== "ready" || !canStaffBlitzpayQuote || quote.isArchived) {
+      setBlitzpayQuotePricing(null)
+      setBlitzpayQuoteLinks([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const [prRes, liRes] = await Promise.all([
+        fetch(
+          `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/prepare-pay`,
+        ),
+        fetch(
+          `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/payment-link`,
+        ),
+      ])
+      const prJson = (await prRes.json().catch(() => ({}))) as { pricing?: QuoteStaffBlitzpayPricing }
+      const liJson = (await liRes.json().catch(() => ({}))) as { links?: Array<{ id: string; status: string }> }
+      if (cancelled) return
+      if (prRes.ok && prJson.pricing) setBlitzpayQuotePricing(prJson.pricing)
+      else setBlitzpayQuotePricing(null)
+      if (liRes.ok && Array.isArray(liJson.links)) setBlitzpayQuoteLinks(liJson.links.map((l) => ({ id: l.id, status: l.status })))
+      else setBlitzpayQuoteLinks([])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [quote, activeOrgId, orgStatus, canStaffBlitzpayQuote])
 
   function toast(message: string, tone: "success" | "info" = "success") {
     const id = ++toastCounter
@@ -625,8 +678,17 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       expiresDate: quote.expiresDate,
       notes: quote.notes,
       internalNotes: quote.internalNotes ?? "",
+      blitzpayDepositMode: quote.blitzpayDepositMode ?? "none",
+      blitzpayDepositFixedCents: quote.blitzpayDepositFixedCents ?? null,
+      blitzpayDepositPercentageBps: quote.blitzpayDepositPercentageBps ?? null,
+      blitzpayFinancingReady: quote.blitzpayFinancingReady ?? false,
     })
     setDraftItems(quote.lineItems.map((li) => ({ ...li })))
+    setBlitzpayPctDraft(
+      quote.blitzpayDepositPercentageBps != null && Number(quote.blitzpayDepositPercentageBps) > 0
+        ? String(Number(quote.blitzpayDepositPercentageBps) / 100)
+        : "",
+    )
     setEditing(true)
   }
 
@@ -635,6 +697,7 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
     setDraft({})
     setDraftItems([])
     setCatalogPickerOpen(false)
+    setBlitzpayPctDraft("")
   }
 
   function appendCatalogLineFromPicker(row: CatalogListItemRow, qty: number) {
@@ -659,6 +722,19 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       return row
     })
     const nextStatus = (draft.status ?? quote.status) as QuoteStatus
+    const depMode = (draft.blitzpayDepositMode ?? quote.blitzpayDepositMode ?? "none") as
+      | "none"
+      | "acceptance"
+      | "fixed"
+      | "percentage"
+      | "full_prepay"
+    let pctBps: number | null = draft.blitzpayDepositPercentageBps ?? quote.blitzpayDepositPercentageBps ?? null
+    if (depMode === "percentage") {
+      const n = Number(blitzpayPctDraft.trim())
+      if (Number.isFinite(n) && n > 0 && n <= 100) {
+        pctBps = Math.round(n * 100)
+      }
+    }
     const patch: Parameters<typeof updateOrgQuote>[3] = {
       status: nextStatus,
       expiresAt: draft.expiresDate ?? quote.expiresDate,
@@ -666,6 +742,12 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       internalNotes: internal || undefined,
       lineItems,
       amountCents: Math.round(newTotal * 100),
+      blitzpayDepositMode: depMode,
+      blitzpayDepositFixedCents:
+        draft.blitzpayDepositFixedCents !== undefined ? draft.blitzpayDepositFixedCents : quote.blitzpayDepositFixedCents ?? null,
+      blitzpayDepositPercentageBps:
+        depMode === "percentage" ? pctBps : draft.blitzpayDepositPercentageBps ?? quote.blitzpayDepositPercentageBps ?? null,
+      blitzpayFinancingReady: draft.blitzpayFinancingReady ?? quote.blitzpayFinancingReady ?? false,
     }
     if (nextStatus === "Sent" && !quote.sentDate) {
       patch.sentAt = new Date().toISOString()
@@ -879,7 +961,29 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       toast(`Could not create invoice: ${error}`, "info")
       return
     }
-    toast("Invoice created from quote")
+    if (id && activeOrgId) {
+      try {
+        const cr = await fetch(
+          `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/apply-deposit-credit`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ invoiceId: id }),
+          },
+        )
+        const cj = (await cr.json().catch(() => ({}))) as { appliedCents?: number; message?: string }
+        if (cr.ok && typeof cj.appliedCents === "number" && cj.appliedCents > 0) {
+          toast(`Invoice created; applied $${(cj.appliedCents / 100).toFixed(2)} estimate deposit credit.`)
+        } else {
+          toast("Invoice created from quote")
+        }
+      } catch {
+        toast("Invoice created from quote")
+      }
+      await refreshQuotes()
+    } else {
+      toast("Invoice created from quote")
+    }
     if (id) onClose()
   }
 
@@ -930,6 +1034,61 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       setDraftItems(scaledItems)
     }
     toast(`Pricing updated to ${fmtCurrency(amount)} — review and save`)
+  }
+
+  async function staffQuoteBlitzpayHostedCheckout() {
+    if (!quote || !activeOrgId) return
+    setBlitzpayQuoteBusy(true)
+    try {
+      const r = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/prepare-pay`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+      )
+      const j = (await r.json().catch(() => ({}))) as { url?: string; message?: string }
+      if (!r.ok) {
+        toast(typeof j.message === "string" ? j.message : "Could not start checkout.", "info")
+        return
+      }
+      if (typeof j.url === "string" && j.url) {
+        window.location.href = j.url
+      } else {
+        toast("Checkout URL missing.", "info")
+      }
+    } finally {
+      setBlitzpayQuoteBusy(false)
+    }
+  }
+
+  async function staffCreateQuoteBlitzpayPaymentLink() {
+    if (!quote || !activeOrgId) return
+    setBlitzpayQuoteBusy(true)
+    try {
+      const r = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/payment-link`,
+        { method: "POST" },
+      )
+      const j = (await r.json().catch(() => ({}))) as { link?: { url?: string }; message?: string; error?: string }
+      if (!r.ok) {
+        toast(typeof j.message === "string" ? j.message : "Could not create payment link.", "info")
+        return
+      }
+      const url = j.link?.url
+      if (typeof url === "string" && url) {
+        await navigator.clipboard.writeText(url).catch(() => {})
+        toast("Payment link copied to clipboard.")
+      } else {
+        toast("Payment link created.")
+      }
+      const liRes = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/quotes/${encodeURIComponent(quote.id)}/blitzpay/payment-link`,
+      )
+      const liJson = (await liRes.json().catch(() => ({}))) as { links?: Array<{ id: string; status: string }> }
+      if (liRes.ok && Array.isArray(liJson.links)) {
+        setBlitzpayQuoteLinks(liJson.links.map((l) => ({ id: l.id, status: l.status })))
+      }
+    } finally {
+      setBlitzpayQuoteBusy(false)
+    }
   }
 
   if (!quote) return null
@@ -1200,6 +1359,161 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
               )}
             </div>
           </DrawerSection>
+
+          {canStaffBlitzpayQuote && orgStatus === "ready" && activeOrgId && !quote.isArchived ? (
+            <DrawerSection title="BlitzPay (estimate)">
+              <div className={cn(DRAWER_NESTED_CARD, "space-y-3 p-4 text-xs")}>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Hosted checkout for deposits or full prepay. Deposits book to the estimate ledger and can be applied as
+                  invoice credit when you convert to billing.
+                </p>
+                {editing ? (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Deposit mode</p>
+                    <EditSelect
+                      value={String(draft.blitzpayDepositMode ?? quote.blitzpayDepositMode ?? "none")}
+                      onChange={(v) =>
+                        setField(
+                          "blitzpayDepositMode",
+                          v as NonNullable<AdminQuote["blitzpayDepositMode"]>,
+                        )
+                      }
+                      options={[...ALL_BLITZPAY_QUOTE_DEPOSIT_MODES]}
+                    />
+                    {(draft.blitzpayDepositMode ?? quote.blitzpayDepositMode) === "fixed" ||
+                    (draft.blitzpayDepositMode ?? quote.blitzpayDepositMode) === "acceptance" ? (
+                      <label className="block space-y-1">
+                        <span className="text-[10px] text-muted-foreground">Fixed deposit (cents, min 50)</span>
+                        <EditInput
+                          type="number"
+                          value={
+                            draft.blitzpayDepositFixedCents != null
+                              ? String(draft.blitzpayDepositFixedCents)
+                              : quote.blitzpayDepositFixedCents != null
+                                ? String(quote.blitzpayDepositFixedCents)
+                                : ""
+                          }
+                          onChange={(v) => {
+                            const t = v.trim()
+                            if (!t) {
+                              setField("blitzpayDepositFixedCents", null)
+                              return
+                            }
+                            const n = Math.round(Number(t))
+                            setField("blitzpayDepositFixedCents", Number.isFinite(n) ? n : null)
+                          }}
+                        />
+                      </label>
+                    ) : null}
+                    {(draft.blitzpayDepositMode ?? quote.blitzpayDepositMode) === "percentage" ? (
+                      <label className="block space-y-1">
+                        <span className="text-[10px] text-muted-foreground">Deposit percent (1–100)</span>
+                        <EditInput
+                          type="number"
+                          value={blitzpayPctDraft}
+                          onChange={(v) => setBlitzpayPctDraft(v)}
+                        />
+                      </label>
+                    ) : null}
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(draft.blitzpayFinancingReady ?? quote.blitzpayFinancingReady)}
+                        onChange={(e) => setField("blitzpayFinancingReady", e.target.checked)}
+                      />
+                      <span>Financing-ready flag (messaging only; no lending integrations yet)</span>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-1 text-[11px]">
+                    <DrawerRow label="Deposit mode" value={quote.blitzpayDepositMode ?? "none"} />
+                    <DrawerRow
+                      label="Deposit collected"
+                      value={fmtCents(quote.blitzpayDepositCollectedCents ?? 0)}
+                    />
+                    <DrawerRow
+                      label="Remaining on quote"
+                      value={fmtCents(quote.blitzpayRemainingQuoteCents ?? Math.round(quote.amount * 100))}
+                    />
+                    <DrawerRow
+                      label="Financing-ready"
+                      value={quote.blitzpayFinancingReady ? "Yes" : "No"}
+                    />
+                    {quote.blitzpayConvertedInvoiceId ? (
+                      <DrawerRow
+                        label="Converted invoice"
+                        value={
+                          <Link
+                            className="text-primary hover:underline"
+                            href={`/invoices?open=${encodeURIComponent(quote.blitzpayConvertedInvoiceId)}`}
+                          >
+                            Open invoice
+                          </Link>
+                        }
+                      />
+                    ) : null}
+                  </div>
+                )}
+                {blitzpayQuotePricing ? (
+                  <div className="rounded-md border border-border/80 p-2 space-y-1 text-[11px]">
+                    <p className="font-semibold text-foreground">Next checkout preview</p>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Collectible now</span>
+                      <span className="tabular-nums">{fmtCents(blitzpayQuotePricing.depositTargetCents)}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Est. processing fee</span>
+                      <span className="tabular-nums">{fmtCents(blitzpayQuotePricing.convenienceFeeCents)}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Customer pays</span>
+                      <span className="tabular-nums font-medium">{fmtCents(blitzpayQuotePricing.totalChargeCents)}</span>
+                    </div>
+                    <p className="text-muted-foreground pt-1 leading-relaxed">{blitzpayQuotePricing.financingMessage}</p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    Pricing preview unavailable (check BlitzPay is on, Connect is ready, and deposit mode is valid).
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    className="h-8 text-xs"
+                    disabled={blitzpayQuoteBusy || (quote.blitzpayDepositMode ?? "none") === "none"}
+                    onClick={() => void staffQuoteBlitzpayHostedCheckout()}
+                  >
+                    {blitzpayQuoteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Open hosted checkout"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={blitzpayQuoteBusy || (quote.blitzpayDepositMode ?? "none") === "none"}
+                    onClick={() => void staffCreateQuoteBlitzpayPaymentLink()}
+                  >
+                    Create payment link
+                  </Button>
+                </div>
+                {blitzpayQuoteLinks.length > 0 ? (
+                  <div className="space-y-1 pt-2 border-t border-border/60">
+                    <p className="text-[10px] font-semibold text-muted-foreground">Recent links</p>
+                    <ul className="space-y-1 font-mono text-[10px]">
+                      {blitzpayQuoteLinks.slice(0, 5).map((l) => (
+                        <li key={l.id} className="flex justify-between gap-2">
+                          <span className="truncate">{l.id.slice(0, 8)}…</span>
+                          <span className="shrink-0 text-muted-foreground">{l.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </DrawerSection>
+          ) : null}
 
           {quote.customerPortalDecisionAt || quote.portalCustomerNote?.trim() ? (
             <DrawerSection title="Customer approval (portal)">

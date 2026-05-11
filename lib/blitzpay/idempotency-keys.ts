@@ -26,3 +26,17 @@ export function buildBlitzPayPaymentIntentIdempotencyKey(input: {
   }
   return `blitzpay:pi:v1:${input.organizationId}:${input.orgInvoiceId}:${token}`
 }
+
+export function buildBlitzPayQuotePaymentIntentIdempotencyKey(input: {
+  organizationId: string
+  orgQuoteId: string
+  attemptToken: string
+}): string {
+  assertUuid(input.organizationId, "organizationId")
+  assertUuid(input.orgQuoteId, "orgQuoteId")
+  const token = input.attemptToken.trim()
+  if (!ATTEMPT_TOKEN_RE.test(token)) {
+    throw new Error("attemptToken must be 8–128 chars [a-zA-Z0-9:_-]")
+  }
+  return `blitzpay:pi_quote:v1:${input.organizationId}:${input.orgQuoteId}:${token}`
+}

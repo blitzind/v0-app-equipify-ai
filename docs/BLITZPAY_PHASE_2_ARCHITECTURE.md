@@ -683,6 +683,30 @@ Use this as a **checklist** when coding — not exhaustive.
 5. **Launch readiness** differs for workspace admin vs platform admin (extra env rows).  
 6. Settings **operational alerts** surface schema and webhook signals without exposing fee policy internals.
 
+### 12.14 Phase 2M (estimates, deposits, financing foundations)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260920120000_blitzpay_phase_2m_estimates_deposits.sql` — `org_quotes` deposit mode (`none`, `acceptance`, `fixed`, `percentage`, `full_prepay`), fixed/% fields, collected + target cents, `blitzpay_converted_invoice_id`, financing flag + JSON metadata; `blitzpay_payment_intents.org_quote_id`; `blitzpay_payment_links` / `blitzpay_invoice_payment_attempts` / `blitzpay_ledger_entries` XOR invoice vs quote targets. |
+| **Deposit math** | `lib/blitzpay/blitzpay-estimate-deposit-math.ts` — pure target + remaining balance helpers. |
+| **Prepare / hosted checkout** | `lib/blitzpay/blitzpay-prepare-quote-pay.ts` — `previewBlitzpayQuoteHostedCheckout` / `prepareBlitzpayQuoteHostedCheckout` (staff + portal); Stripe metadata `blitzpay-estimate-stripe-metadata`; ledger completion `webhook-estimate-deposit-completion.ts` with `revenue_recognition: "estimate_deposit"` (does not replace invoice revenue). |
+| **Invoice credit** | `lib/blitzpay/blitzpay-quote-deposit-apply.ts` — idempotent `org_invoice_payments` row keyed by `blitzpay_quote_deposit_apply:{quoteId}`; `POST .../quotes/[quoteId]/blitzpay/apply-deposit-credit` after **estimate → invoice** conversion. |
+| **Refunds** | `applyBlitzpayStripeRefundToQuoteDeposit` routes quote-only intents; decrements `blitzpay_deposit_collected_cents` when applicable. |
+| **Payment links** | `createBlitzpayQuotePaymentLink`; `resolveBlitzpayPaymentLinkToken` returns `kind: "invoice" \| "quote"`; portal `/portal/pay/[token]` redirects to invoice or **quote** detail with `blitzpay_link=1`. |
+| **APIs** | Org: `GET/POST .../quotes/[quoteId]/blitzpay/prepare-pay`, `GET/POST .../payment-link`, `POST .../apply-deposit-credit`, `POST .../payment-links/[linkId]` (revoke/expire/regenerate). Portal: `GET /api/portal/quotes/[quoteId]`, `GET/POST .../blitzpay/prepare-pay`. |
+| **UX** | Portal quote detail (`/portal/quotes/[quoteId]`) shows estimate total, deposit, remaining, fee preview, financing-ready copy. Staff **quote drawer** shows BlitzPay block (mode, collected, remaining, financing flag, hosted checkout + payment link). |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `estimateDepositCapturedCents`, `invoiceStylePaymentCapturedCents`, `quotesWithBlitzpayDepositCollected`, `financingReadyQuotesCount` (estimate deposit volume is split from invoice-style captured ledger rows). |
+| **Tests** | `pnpm test:blitzpay-phase-2m` — deposit math, apply reference stability, static route/source checks. |
+
+#### Manual test checklist (Phase 2M)
+
+1. Staff sets deposit mode on a quote; **preview** shows correct deposit + fee before redirect.  
+2. Customer completes hosted checkout; `blitzpay_deposit_collected_cents` increases once (webhook idempotent).  
+3. **Convert to invoice** applies deposit credit without duplicate `org_invoice_payments` rows on retry.  
+4. **Payment link** for a quote opens portal quote pay flow (not invoice).  
+5. Refund on a quote-only PI reduces collected deposit when ledger rules allow.  
+6. Reporting snapshot shows estimate deposit volume separately from invoice-style captures.
+
 ---
 
-*Phase 2A–2L vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2M vertical slice for hosted invoice pay + estimate deposits + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

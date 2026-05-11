@@ -7,6 +7,10 @@ import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-re
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
   grossProcessedVolumeCents: number
+  /** `payment_captured` ledger rows tagged as estimate deposits (not invoice service revenue). */
+  estimateDepositCapturedCents: number
+  /** `payment_captured` excluding estimate-deposit recognition (invoice path + legacy rows without tag). */
+  invoiceStylePaymentCapturedCents: number
   refundedVolumeCents: number
   netCollectedCents: number
   convenienceFeeCollectedCents: number
@@ -23,6 +27,10 @@ export type BlitzpayOrgReportingSnapshot = {
   paymentSourceSplit: { customer_portal: number; staff_dashboard: number }
   paymentMethodMix: { card: number; us_bank_account: number; unknown: number }
   achSettlement: { pending: number; settled: number; failed: number }
+  /** Quotes with any BlitzPay deposit collected (current totals; not window-scoped). */
+  quotesWithBlitzpayDepositCollected: number
+  /** Quotes flagged financing-ready (current rows; not window-scoped). */
+  financingReadyQuotesCount: number
 }
 
 /**
@@ -37,17 +45,24 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   const sinceIso = options?.sinceIso?.trim() ? options.sinceIso.trim() : null
 
   let gross = 0
+  let estimateDepositCapturedCents = 0
   {
     let q = admin
       .from("blitzpay_ledger_entries")
-      .select("amount_cents")
+      .select("amount_cents, metadata")
       .eq("organization_id", organizationId)
       .eq("entry_type", "payment_captured")
     if (sinceIso) q = q.gte("created_at", sinceIso)
     const { data, error } = await q
     if (error) throw new Error(error.message)
-    gross = (data ?? []).reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
+    const rows = (data ?? []) as Array<{ amount_cents: number; metadata?: Record<string, unknown> | null }>
+    gross = rows.reduce((s, r) => s + Math.round(Number(r.amount_cents)), 0)
+    estimateDepositCapturedCents = rows.reduce((s, r) => {
+      const tag = String((r.metadata as { revenue_recognition?: string } | null)?.revenue_recognition ?? "")
+      return s + (tag === "estimate_deposit" ? Math.round(Number(r.amount_cents)) : 0)
+    }, 0)
   }
+  const invoiceStylePaymentCapturedCents = Math.max(0, gross - estimateDepositCapturedCents)
 
   let refunded = 0
   {
@@ -168,9 +183,28 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     ? Math.max(0, balanceTxTotals.sumNetCents)
     : Math.max(0, gross - refunded - estimatedStripeFeesCents + refundedFeesCents)
 
+  let quotesWithBlitzpayDepositCollected = 0
+  let financingReadyQuotesCount = 0
+  {
+    const { data: qRows, error: qErr } = await admin
+      .from("org_quotes")
+      .select("blitzpay_deposit_collected_cents, blitzpay_financing_ready")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+    if (!qErr && qRows) {
+      for (const r of qRows as Array<{ blitzpay_deposit_collected_cents?: number | string; blitzpay_financing_ready?: boolean | null }>) {
+        const c = Math.max(0, Math.round(Number(r.blitzpay_deposit_collected_cents ?? 0)))
+        if (c > 0) quotesWithBlitzpayDepositCollected += 1
+        if (Boolean(r.blitzpay_financing_ready)) financingReadyQuotesCount += 1
+      }
+    }
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
+    estimateDepositCapturedCents,
+    invoiceStylePaymentCapturedCents,
     refundedVolumeCents: refunded,
     netCollectedCents: Math.max(0, gross - refunded),
     convenienceFeeCollectedCents,
@@ -187,5 +221,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     },
     paymentMethodMix,
     achSettlement,
+    quotesWithBlitzpayDepositCollected,
+    financingReadyQuotesCount,
   }
 }

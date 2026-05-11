@@ -69,6 +69,7 @@ export async function createBlitzpayPaymentLink(
     .insert({
       organization_id: input.organizationId,
       org_invoice_id: input.invoiceId,
+      org_quote_id: null,
       customer_id: input.customerId,
       created_by_user_id: input.createdByUserId,
       token_hash: tokenHash,
@@ -85,21 +86,66 @@ export async function createBlitzpayPaymentLink(
   return { id, url, token }
 }
 
+export async function createBlitzpayQuotePaymentLink(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    quoteId: string
+    customerId: string
+    createdByUserId: string | null
+    expiresAt?: string | null
+    metadata?: Record<string, unknown>
+  },
+): Promise<{ id: string; url: string; token: string }> {
+  assertUuid(input.organizationId, "organizationId")
+  assertUuid(input.quoteId, "quoteId")
+  assertUuid(input.customerId, "customerId")
+  const token = `bpl_${randomBytes(24).toString("base64url")}`
+  const tokenHash = sha256Hex(token)
+  const now = new Date().toISOString()
+  const { data, error } = await admin
+    .from("blitzpay_payment_links")
+    .insert({
+      organization_id: input.organizationId,
+      org_invoice_id: null,
+      org_quote_id: input.quoteId,
+      customer_id: input.customerId,
+      created_by_user_id: input.createdByUserId,
+      token_hash: tokenHash,
+      expires_at: input.expiresAt ?? null,
+      metadata: input.metadata ?? {},
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single()
+  if (error) throw new Error(error.message)
+  const id = (data as { id: string }).id
+  const url = `${getPublicAppOrigin().replace(/\/+$/, "")}/portal/pay/${encodeURIComponent(token)}`
+  return { id, url, token }
+}
+
+export type ResolvedBlitzpayPaymentLink =
+  | { ok: true; kind: "invoice"; organizationId: string; invoiceId: string; customerId: string; linkId: string }
+  | { ok: true; kind: "quote"; organizationId: string; quoteId: string; customerId: string; linkId: string }
+  | { ok: false; reason: string }
+
 export async function resolveBlitzpayPaymentLinkToken(
   admin: SupabaseClient,
   token: string,
-): Promise<{ ok: true; organizationId: string; invoiceId: string; customerId: string; linkId: string } | { ok: false; reason: string }> {
+): Promise<ResolvedBlitzpayPaymentLink> {
   const tokenHash = sha256Hex(token.trim())
   const { data, error } = await admin
     .from("blitzpay_payment_links")
-    .select("id, organization_id, org_invoice_id, customer_id, status, expires_at, use_count")
+    .select("id, organization_id, org_invoice_id, org_quote_id, customer_id, status, expires_at, use_count")
     .eq("token_hash", tokenHash)
     .maybeSingle()
   if (error || !data) return { ok: false, reason: "invalid_or_expired" }
   const row = data as {
     id: string
     organization_id: string
-    org_invoice_id: string
+    org_invoice_id: string | null
+    org_quote_id: string | null
     customer_id: string
     status: string
     expires_at: string | null
@@ -107,6 +153,11 @@ export async function resolveBlitzpayPaymentLinkToken(
   }
   if (row.status !== "active") return { ok: false, reason: "inactive" }
   if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" }
+  const invId = row.org_invoice_id ? String(row.org_invoice_id) : ""
+  const quoteId = row.org_quote_id ? String(row.org_quote_id) : ""
+  if ((!invId && !quoteId) || (invId && quoteId)) {
+    return { ok: false, reason: "invalid_or_expired" }
+  }
   const { error: upErr } = await admin
     .from("blitzpay_payment_links")
     .update({
@@ -116,10 +167,21 @@ export async function resolveBlitzpayPaymentLinkToken(
     })
     .eq("id", row.id)
   if (upErr) throw new Error(upErr.message)
+  if (invId) {
+    return {
+      ok: true,
+      kind: "invoice",
+      organizationId: row.organization_id,
+      invoiceId: invId,
+      customerId: row.customer_id,
+      linkId: row.id,
+    }
+  }
   return {
     ok: true,
+    kind: "quote",
     organizationId: row.organization_id,
-    invoiceId: row.org_invoice_id,
+    quoteId,
     customerId: row.customer_id,
     linkId: row.id,
   }

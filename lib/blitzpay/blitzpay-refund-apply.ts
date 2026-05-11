@@ -161,8 +161,13 @@ export async function applyBlitzpayStripeRefundToInvoiceIfEligible(
     id: string
     organization_id: string
     org_invoice_id: string | null
+    org_quote_id?: string | null
     currency: string
   }
+  if (piRow.org_quote_id && !piRow.org_invoice_id) {
+    return applyBlitzpayStripeRefundToQuoteDeposit(admin, stripeRefund, piRow)
+  }
+
   if (!piRow.org_invoice_id || piRow.organization_id.length === 0) return { applied: false, duplicate: false }
 
   const pay = await resolveBlitzpayOrgInvoicePaymentForPi(
@@ -202,4 +207,59 @@ export async function applyBlitzpayStripeRefundToInvoiceIfEligible(
     staffUserId: null,
     idempotencyKey: null,
   })
+}
+
+/**
+ * Webhook refund path for estimate deposits (no org_invoice_payments row).
+ * Idempotent via ledger (organization_id, entry_type, stripe_object_id) on Stripe refund id.
+ */
+export async function applyBlitzpayStripeRefundToQuoteDeposit(
+  admin: SupabaseClient,
+  stripeRefund: Stripe.Refund,
+  piRow: {
+    id: string
+    organization_id: string
+    org_quote_id: string
+    currency: string
+  },
+): Promise<{ applied: boolean; duplicate: boolean }> {
+  if (stripeRefund.status !== "succeeded") {
+    return { applied: false, duplicate: false }
+  }
+  const stripeAmount = Math.round(Number(stripeRefund.amount ?? 0))
+  if (stripeAmount <= 0) return { applied: false, duplicate: false }
+
+  const led = await appendBlitzpayLedgerEntry(admin, {
+    organizationId: piRow.organization_id,
+    entryType: "refund",
+    amountCents: BigInt(stripeAmount),
+    currency: stripeRefund.currency || piRow.currency || "usd",
+    stripeObjectId: stripeRefund.id,
+    blitzpayPaymentIntentId: piRow.id,
+    orgInvoiceId: null,
+    orgQuoteId: piRow.org_quote_id,
+    metadata: { revenue_recognition: "estimate_deposit_refund" },
+  })
+
+  if (led.duplicate) {
+    return { applied: false, duplicate: true }
+  }
+
+  const { data: cur, error: curErr } = await admin
+    .from("org_quotes")
+    .select("blitzpay_deposit_collected_cents")
+    .eq("id", piRow.org_quote_id)
+    .eq("organization_id", piRow.organization_id)
+    .maybeSingle()
+  if (!curErr && cur) {
+    const prev = Math.max(0, Math.round(Number((cur as { blitzpay_deposit_collected_cents?: number }).blitzpay_deposit_collected_cents ?? 0)))
+    const next = Math.max(0, prev - stripeAmount)
+    await admin
+      .from("org_quotes")
+      .update({ blitzpay_deposit_collected_cents: next })
+      .eq("id", piRow.org_quote_id)
+      .eq("organization_id", piRow.organization_id)
+  }
+
+  return { applied: true, duplicate: false }
 }

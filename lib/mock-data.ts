@@ -1604,6 +1604,18 @@ export interface AdminQuote {
   customerPortalDecisionAt?: string | null
   /** Customer message from portal (e.g. decline reason); staff notes stay in `notes`. */
   portalCustomerNote?: string | null
+  /** BlitzPay Phase 2M — estimate deposit configuration (DB `blitzpay_deposit_*`). */
+  blitzpayDepositMode?: "none" | "acceptance" | "fixed" | "percentage" | "full_prepay"
+  blitzpayDepositFixedCents?: number | null
+  blitzpayDepositPercentageBps?: number | null
+  /** Sum of succeeded BlitzPay estimate deposits for this quote (cents). */
+  blitzpayDepositCollectedCents?: number
+  /** When set, last invoice this quote’s deposit was applied toward (conversion linkage). */
+  blitzpayConvertedInvoiceId?: string | null
+  /** Provider flag: UI may show financing-ready messaging (no integrations yet). */
+  blitzpayFinancingReady?: boolean
+  /** Quote total minus BlitzPay deposits collected (cents). */
+  blitzpayRemainingQuoteCents?: number
 }
 
 export const adminQuotes: AdminQuote[] = [

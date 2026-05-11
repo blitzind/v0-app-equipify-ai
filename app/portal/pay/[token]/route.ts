@@ -23,7 +23,11 @@ export async function GET(
   if (!resolved.ok) {
     return NextResponse.redirect(new URL("/portal/login?error=invalid_payment_link", request.url))
   }
-  const target = new URL(`/portal/invoices/${encodeURIComponent(resolved.invoiceId)}`, request.url)
+  const path =
+    resolved.kind === "invoice"
+      ? `/portal/invoices/${encodeURIComponent(resolved.invoiceId)}`
+      : `/portal/quotes/${encodeURIComponent(resolved.quoteId)}`
+  const target = new URL(path, request.url)
   target.searchParams.set("blitzpay_link", "1")
   return NextResponse.redirect(target)
 }

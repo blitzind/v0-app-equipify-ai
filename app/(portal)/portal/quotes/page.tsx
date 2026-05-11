@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { FilePen, FileX2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -180,6 +181,9 @@ export default function PortalQuotesPage() {
                   >
                     {fmtCurrency(q.amountCents)}
                   </span>
+                  <Button type="button" size="sm" variant="outline" className="text-xs min-h-[36px]" asChild>
+                    <Link href={`/portal/quotes/${encodeURIComponent(q.id)}`}>View & pay</Link>
+                  </Button>
                   <Button
                     type="button"
                     size="sm"

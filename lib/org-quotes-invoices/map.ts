@@ -1,5 +1,6 @@
 import type { AdminInvoice, AdminQuote, InvoiceStatus, QuoteStatus } from "@/lib/mock-data"
 import { rowIsArchived } from "@/lib/archive-scope"
+import { quoteRemainingAfterDepositCents } from "@/lib/blitzpay/blitzpay-estimate-deposit-math"
 import type { InvoicePaymentAllocationState } from "@/lib/billing/invoice-payment-allocation"
 
 export type OrgQuoteRow = {
@@ -25,6 +26,14 @@ export type OrgQuoteRow = {
   customer_portal_decision_at?: string | null
   archived_by?: string | null
   archive_reason?: string | null
+  blitzpay_deposit_mode?: string | null
+  blitzpay_deposit_fixed_cents?: number | null
+  blitzpay_deposit_percentage_bps?: number | null
+  blitzpay_deposit_collected_cents?: number | null
+  blitzpay_deposit_target_cents?: number | null
+  blitzpay_converted_invoice_id?: string | null
+  blitzpay_financing_ready?: boolean | null
+  blitzpay_financing_metadata?: unknown
 }
 
 export type OrgInvoiceRow = {
@@ -235,7 +244,30 @@ export function mapOrgQuoteToAdmin(
     isArchived: rowIsArchived(row.archived_at),
     customerPortalDecisionAt: row.customer_portal_decision_at ?? null,
     portalCustomerNote: row.portal_customer_note?.trim() ? row.portal_customer_note.trim() : null,
+    blitzpayDepositMode: normalizeBlitzpayQuoteDepositMode(row.blitzpay_deposit_mode),
+    blitzpayDepositFixedCents:
+      row.blitzpay_deposit_fixed_cents == null ? null : Math.round(Number(row.blitzpay_deposit_fixed_cents)),
+    blitzpayDepositPercentageBps:
+      row.blitzpay_deposit_percentage_bps == null ? null : Math.round(Number(row.blitzpay_deposit_percentage_bps)),
+    blitzpayDepositCollectedCents: Math.max(
+      0,
+      Math.round(Number(row.blitzpay_deposit_collected_cents ?? 0)),
+    ),
+    blitzpayConvertedInvoiceId: row.blitzpay_converted_invoice_id ? String(row.blitzpay_converted_invoice_id) : null,
+    blitzpayFinancingReady: Boolean(row.blitzpay_financing_ready),
+    blitzpayRemainingQuoteCents: quoteRemainingAfterDepositCents(
+      Math.round(row.amount_cents),
+      Math.max(0, Math.round(Number(row.blitzpay_deposit_collected_cents ?? 0))),
+    ),
   }
+}
+
+function normalizeBlitzpayQuoteDepositMode(
+  raw: string | null | undefined,
+): "none" | "acceptance" | "fixed" | "percentage" | "full_prepay" {
+  const s = String(raw ?? "none").toLowerCase()
+  if (s === "acceptance" || s === "fixed" || s === "percentage" || s === "full_prepay") return s
+  return "none"
 }
 
 export function mapOrgInvoiceToAdmin(

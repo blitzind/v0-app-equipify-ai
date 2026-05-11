@@ -3,7 +3,9 @@ import "server-only"
 import type Stripe from "stripe"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { insertOrgInvoicePaymentWithActor } from "@/lib/org-quotes-invoices/repository"
+import { parseBlitzpayEstimateMetadata } from "@/lib/blitzpay/blitzpay-estimate-stripe-metadata"
 import { parseBlitzpayInvoiceMetadata } from "@/lib/blitzpay/stripe-metadata"
+import { completeBlitzpayEstimateDepositPaymentIntentSucceeded } from "@/lib/blitzpay/webhook-estimate-deposit-completion"
 import {
   appendBlitzpayLedgerEntry,
   fetchBlitzpayPaymentIntentByStripeId,
@@ -20,6 +22,7 @@ function blitzpayPiReference(piId: string): string {
 type BlitzpayPiRow = {
   id: string
   organization_id: string
+  org_quote_id?: string | null
   org_invoice_id: string | null
   invoice_amount_cents: string | null
   amount_cents: string
@@ -40,6 +43,12 @@ export async function completeBlitzpayPaymentIntentSucceeded(
   if (!raw) return
 
   const row = raw as BlitzpayPiRow
+  const estMeta = parseBlitzpayEstimateMetadata(pi.metadata as Record<string, string> | undefined)
+  if (estMeta && estMeta.organizationId === row.organization_id && row.org_quote_id === estMeta.orgQuoteId) {
+    await completeBlitzpayEstimateDepositPaymentIntentSucceeded(admin, pi, row, eventCreatedMs, estMeta)
+    return
+  }
+
   const meta = parseBlitzpayInvoiceMetadata(pi.metadata as Record<string, string> | undefined)
   if (!meta || meta.organizationId !== row.organization_id) return
   if (!row.org_invoice_id) return

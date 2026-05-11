@@ -19,7 +19,7 @@ const ORG_BLITZPAY_DIAGNOSTIC_COLUMNS = [
 
 const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> = [
   { name: "blitzpay_org_settings", select: "organization_id" },
-  { name: "blitzpay_payment_intents", select: "id" },
+  { name: "blitzpay_payment_intents", select: "id, org_invoice_id, org_quote_id" },
   { name: "blitzpay_invoice_payment_attempts", select: "id" },
   { name: "blitzpay_fee_snapshots", select: "id" },
   { name: "blitzpay_invoice_refunds", select: "id" },
@@ -29,7 +29,7 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_balance_transactions", select: "id" },
   { name: "blitzpay_reconciliation_runs", select: "id" },
   { name: "blitzpay_customer_payment_profiles", select: "id" },
-  { name: "blitzpay_payment_links", select: "id" },
+  { name: "blitzpay_payment_links", select: "id, org_invoice_id, org_quote_id" },
   { name: "blitzpay_payment_reminders", select: "id" },
   { name: "blitzpay_reminder_runs", select: "id" },
   { name: "blitzpay_recovery_cases", select: "id" },

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 253,
-  sqlMigrations: 159,
+  apiRouteHandlers: 259,
+  sqlMigrations: 160,
   dashboardPages: 60,
   componentsTsx: 255,
-  libTsFiles: 542,
+  libTsFiles: 547,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **253** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **159** |
+| API route handlers (\`app/api/**/route.ts\`) | **259** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **160** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **255** |
-| \`lib/**/*.ts\` | **542** |
+| \`lib/**/*.ts\` | **547** |
 
 ### Vercel crons
 
@@ -207,6 +207,10 @@ organizations/[organizationId]/prospects/[prospectId]/follow-up/route.ts
 organizations/[organizationId]/prospects/[prospectId]/route.ts
 organizations/[organizationId]/prospects/[prospectId]/timeline/route.ts
 organizations/[organizationId]/prospects/route.ts
+organizations/[organizationId]/quotes/[quoteId]/blitzpay/apply-deposit-credit/route.ts
+organizations/[organizationId]/quotes/[quoteId]/blitzpay/payment-link/route.ts
+organizations/[organizationId]/quotes/[quoteId]/blitzpay/payment-links/[linkId]/route.ts
+organizations/[organizationId]/quotes/[quoteId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/reports/analytics/route.ts
 organizations/[organizationId]/reports/financial-invoices/route.ts
 organizations/[organizationId]/seat-metrics/route.ts
@@ -272,7 +276,9 @@ portal/maintenance/route.ts
 portal/preview/start/route.ts
 portal/public-branding/route.ts
 portal/quotes/[quoteId]/approve/route.ts
+portal/quotes/[quoteId]/blitzpay/prepare-pay/route.ts
 portal/quotes/[quoteId]/decline/route.ts
+portal/quotes/[quoteId]/route.ts
 portal/quotes/route.ts
 portal/service-contracts/route.ts
 portal/service-requests/route.ts

@@ -32,6 +32,23 @@ async function assertInvoiceInOrganization(
   }
 }
 
+async function assertQuoteInOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+  orgQuoteId: string,
+): Promise<void> {
+  const { data, error } = await admin
+    .from("org_quotes")
+    .select("id, organization_id")
+    .eq("id", orgQuoteId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  const row = data as { organization_id?: string } | null
+  if (!row || row.organization_id !== organizationId) {
+    throw new Error("org_quote_not_in_organization")
+  }
+}
+
 async function assertCustomerInOrganization(
   admin: SupabaseClient,
   organizationId: string,
@@ -86,6 +103,7 @@ export type CreateBlitzpayPaymentIntentInput = {
   convenienceFeeCents?: bigint
   invoiceAmountCents?: bigint | null
   orgInvoiceId?: string | null
+  orgQuoteId?: string | null
   customerId?: string | null
   idempotencyKey: string
   metadata?: Record<string, unknown>
@@ -104,6 +122,10 @@ export async function createBlitzpayPaymentIntentRecord(
   if (input.orgInvoiceId) {
     assertUuid(input.orgInvoiceId, "orgInvoiceId")
     await assertInvoiceInOrganization(admin, input.organizationId, input.orgInvoiceId)
+  }
+  if (input.orgQuoteId) {
+    assertUuid(input.orgQuoteId, "orgQuoteId")
+    await assertQuoteInOrganization(admin, input.organizationId, input.orgQuoteId)
   }
   if (input.customerId) {
     assertUuid(input.customerId, "customerId")
@@ -134,6 +156,7 @@ export async function createBlitzpayPaymentIntentRecord(
     invoice_amount_cents:
       input.invoiceAmountCents == null ? null : input.invoiceAmountCents.toString(),
     org_invoice_id: input.orgInvoiceId ?? null,
+    org_quote_id: input.orgQuoteId ?? null,
     customer_id: input.customerId ?? null,
     idempotency_key: input.idempotencyKey,
     metadata: input.metadata ?? {},
@@ -182,9 +205,30 @@ export async function nextBlitzpayInvoicePaymentAttemptNo(
   return max + 1
 }
 
+export async function nextBlitzpayQuotePaymentAttemptNo(
+  admin: SupabaseClient,
+  organizationId: string,
+  orgQuoteId: string,
+): Promise<number> {
+  assertUuid(organizationId, "organizationId")
+  assertUuid(orgQuoteId, "orgQuoteId")
+  const { data, error } = await admin
+    .from("blitzpay_invoice_payment_attempts")
+    .select("attempt_no")
+    .eq("organization_id", organizationId)
+    .eq("org_quote_id", orgQuoteId)
+    .order("attempt_no", { ascending: false })
+    .limit(1)
+
+  if (error) throw new Error(error.message)
+  const max = (data as { attempt_no?: number }[] | null)?.[0]?.attempt_no ?? 0
+  return max + 1
+}
+
 export type CreateBlitzpayInvoicePaymentAttemptInput = {
   organizationId: string
-  orgInvoiceId: string
+  orgInvoiceId?: string | null
+  orgQuoteId?: string | null
   blitzpayPaymentIntentId?: string | null
   attemptNo: number
   channel: BlitzpayInvoicePayChannel
@@ -199,12 +243,24 @@ export async function createBlitzpayInvoicePaymentAttempt(
   input: CreateBlitzpayInvoicePaymentAttemptInput,
 ): Promise<{ id: string }> {
   assertUuid(input.organizationId, "organizationId")
-  assertUuid(input.orgInvoiceId, "orgInvoiceId")
-  await assertInvoiceInOrganization(admin, input.organizationId, input.orgInvoiceId)
+  const hasInv = Boolean(input.orgInvoiceId)
+  const hasQuote = Boolean(input.orgQuoteId)
+  if (hasInv === hasQuote) {
+    throw new Error("Exactly one of orgInvoiceId or orgQuoteId is required for payment attempts.")
+  }
+  if (input.orgInvoiceId) {
+    assertUuid(input.orgInvoiceId, "orgInvoiceId")
+    await assertInvoiceInOrganization(admin, input.organizationId, input.orgInvoiceId)
+  }
+  if (input.orgQuoteId) {
+    assertUuid(input.orgQuoteId, "orgQuoteId")
+    await assertQuoteInOrganization(admin, input.organizationId, input.orgQuoteId)
+  }
 
   const row = {
     organization_id: input.organizationId,
-    org_invoice_id: input.orgInvoiceId,
+    org_invoice_id: input.orgInvoiceId ?? null,
+    org_quote_id: input.orgQuoteId ?? null,
     blitzpay_payment_intent_id: input.blitzpayPaymentIntentId ?? null,
     attempt_no: input.attemptNo,
     channel: input.channel,
@@ -276,6 +332,7 @@ export type AppendBlitzpayLedgerEntryInput = {
   stripeObjectId?: string | null
   blitzpayPaymentIntentId?: string | null
   orgInvoiceId?: string | null
+  orgQuoteId?: string | null
   metadata?: Record<string, unknown>
 }
 
@@ -288,6 +345,10 @@ export async function appendBlitzpayLedgerEntry(
     assertUuid(input.orgInvoiceId, "orgInvoiceId")
     await assertInvoiceInOrganization(admin, input.organizationId, input.orgInvoiceId)
   }
+  if (input.orgQuoteId) {
+    assertUuid(input.orgQuoteId, "orgQuoteId")
+    await assertQuoteInOrganization(admin, input.organizationId, input.orgQuoteId)
+  }
 
   const row = {
     organization_id: input.organizationId,
@@ -297,6 +358,7 @@ export async function appendBlitzpayLedgerEntry(
     stripe_object_id: input.stripeObjectId ?? null,
     blitzpay_payment_intent_id: input.blitzpayPaymentIntentId ?? null,
     org_invoice_id: input.orgInvoiceId ?? null,
+    org_quote_id: input.orgQuoteId ?? null,
     metadata: input.metadata ?? {},
   }
 

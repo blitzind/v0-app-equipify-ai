@@ -116,3 +116,33 @@ export async function tryConsumeBlitzpayPreparePaySlots(
 
   return { ok: true }
 }
+
+export async function tryConsumeBlitzpayPreparePaySlotsQuote(
+  admin: SupabaseClient,
+  ctx: { organizationId: string; quoteId: string; userId: string },
+): Promise<{ ok: true } | { ok: false; reason: "org" | "invoice" | "user" }> {
+  const orgMax = parsePositiveInt(process.env.BLITZPAY_RATE_PREPARE_PER_ORG_PER_MIN, 20)
+  const quoteMax = parsePositiveInt(process.env.BLITZPAY_RATE_PREPARE_PER_INVOICE_PER_MIN, 8)
+  const userMax = parsePositiveInt(process.env.BLITZPAY_RATE_PREPARE_PER_USER_PER_MIN, 10)
+
+  const orgOk = await tryConsumeOneBucket(admin, ctx.organizationId, "blitzpay_prepare_pay:org", orgMax)
+  if (!orgOk) return { ok: false, reason: "org" }
+
+  const quoteOk = await tryConsumeOneBucket(
+    admin,
+    ctx.organizationId,
+    `blitzpay_prepare_pay:quote:${ctx.quoteId}`,
+    quoteMax,
+  )
+  if (!quoteOk) return { ok: false, reason: "invoice" }
+
+  const userOk = await tryConsumeOneBucket(
+    admin,
+    ctx.organizationId,
+    `blitzpay_prepare_pay:user:${ctx.userId}`,
+    userMax,
+  )
+  if (!userOk) return { ok: false, reason: "user" }
+
+  return { ok: true }
+}

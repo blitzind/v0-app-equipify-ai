@@ -623,6 +623,10 @@ export async function updateOrgQuote(
     equipmentId: string | null
     workOrderId: string | null
     sentAt: string | null
+    blitzpayDepositMode?: "none" | "acceptance" | "fixed" | "percentage" | "full_prepay"
+    blitzpayDepositFixedCents?: number | null
+    blitzpayDepositPercentageBps?: number | null
+    blitzpayFinancingReady?: boolean
   }>,
 ): Promise<{ error?: string }> {
   const row: Record<string, unknown> = {}
@@ -637,6 +641,14 @@ export async function updateOrgQuote(
   if (patch.equipmentId !== undefined) row.equipment_id = patch.equipmentId
   if (patch.workOrderId !== undefined) row.work_order_id = patch.workOrderId || null
   if (patch.sentAt !== undefined) row.sent_at = patch.sentAt
+  if (patch.blitzpayDepositMode !== undefined) row.blitzpay_deposit_mode = patch.blitzpayDepositMode
+  if (patch.blitzpayDepositFixedCents !== undefined) {
+    row.blitzpay_deposit_fixed_cents = patch.blitzpayDepositFixedCents
+  }
+  if (patch.blitzpayDepositPercentageBps !== undefined) {
+    row.blitzpay_deposit_percentage_bps = patch.blitzpayDepositPercentageBps
+  }
+  if (patch.blitzpayFinancingReady !== undefined) row.blitzpay_financing_ready = patch.blitzpayFinancingReady
 
   if (Object.keys(row).length === 0) return {}
 
