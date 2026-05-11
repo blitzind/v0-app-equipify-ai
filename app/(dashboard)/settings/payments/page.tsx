@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, CheckCircle2, Circle, Info, Loader2, RefreshCw, ShieldAlert, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -73,7 +74,6 @@ type BlitzpayLaunchChecklistItem = {
   label: string
   ok: boolean
   detail: string
-  platformOnly?: boolean
 }
 
 type PayoutLedgerPanelPayload = {
@@ -175,6 +175,8 @@ function BlitzPaySettingsPageInner() {
   const [launchLoading, setLaunchLoading] = useState(false)
   const [launchItems, setLaunchItems] = useState<BlitzpayLaunchChecklistItem[] | null>(null)
   const [launchScore, setLaunchScore] = useState<{ passed: number; total: number } | null>(null)
+  const [launchPresentation, setLaunchPresentation] = useState<{ statusPhrase: string; subline: string } | null>(null)
+  const [launchTechnicalItems, setLaunchTechnicalItems] = useState<BlitzpayLaunchChecklistItem[] | null>(null)
 
   const loadStatus = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") {
@@ -226,6 +228,8 @@ function BlitzPaySettingsPageInner() {
     if (!organizationId || orgStatus !== "ready" || !canConfigure) {
       setLaunchItems(null)
       setLaunchScore(null)
+      setLaunchPresentation(null)
+      setLaunchTechnicalItems(null)
       return
     }
     setLaunchLoading(true)
@@ -237,15 +241,21 @@ function BlitzPaySettingsPageInner() {
       const j = (await res.json()) as {
         checklist?: BlitzpayLaunchChecklistItem[]
         score?: { passed: number; total: number }
+        presentation?: { statusPhrase: string; subline: string }
+        technicalDiagnostics?: BlitzpayLaunchChecklistItem[]
         message?: string
       }
       if (!res.ok) {
         setLaunchItems(null)
         setLaunchScore(null)
+        setLaunchPresentation(null)
+        setLaunchTechnicalItems(null)
         return
       }
       setLaunchItems(j.checklist ?? null)
       setLaunchScore(j.score ?? null)
+      setLaunchPresentation(j.presentation ?? null)
+      setLaunchTechnicalItems(Array.isArray(j.technicalDiagnostics) ? j.technicalDiagnostics : null)
     } finally {
       setLaunchLoading(false)
     }
@@ -822,8 +832,8 @@ function BlitzPaySettingsPageInner() {
                     </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Workspace-level checks for hosted pay, Connect, outbound mail, reminders, and a recorded successful
-                    capture. Platform-only items appear when a platform admin opens this page for the workspace.
+                    High-level checks before you take live payments: platform readiness, your Stripe connection, invoice
+                    pay settings, email, reminders, and a successful test charge.
                   </p>
                   {launchLoading && !launchItems ? (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
@@ -831,9 +841,14 @@ function BlitzPaySettingsPageInner() {
                     </p>
                   ) : launchScore && launchItems && launchItems.length > 0 ? (
                     <>
-                      <p className="text-[11px] font-medium text-foreground">
-                        Score: {launchScore.passed}/{launchScore.total} passed
-                      </p>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
+                          Launch readiness: {launchPresentation?.statusPhrase ?? "—"}
+                        </p>
+                        {launchPresentation?.subline ? (
+                          <p className="text-[11px] text-muted-foreground">{launchPresentation.subline}</p>
+                        ) : null}
+                      </div>
                       <ul className="space-y-1.5">
                         {launchItems.map((item) => (
                           <li key={item.id} className="flex items-start gap-2 text-[11px]">
@@ -849,6 +864,36 @@ function BlitzPaySettingsPageInner() {
                           </li>
                         ))}
                       </ul>
+                      {launchTechnicalItems && launchTechnicalItems.length > 0 ? (
+                        <details className="rounded-md border border-border/80 bg-muted/20 px-2 py-1.5 text-[11px]">
+                          <summary className="cursor-pointer font-medium text-foreground select-none">
+                            Technical details (Equipify platform)
+                          </summary>
+                          <p className="text-muted-foreground mt-1.5 mb-1 leading-relaxed">
+                            Environment variables, schema probe output, and migration-related signals. For full org-wide
+                            tools open{" "}
+                            <Link href="/admin" className="text-primary underline-offset-2 hover:underline">
+                              Admin → BlitzPay Ops
+                            </Link>{" "}
+                            and select the BlitzPay Ops tab.
+                          </p>
+                          <ul className="space-y-1 border-t border-border/60 pt-1.5 mt-1.5">
+                            {launchTechnicalItems.map((item) => (
+                              <li key={item.id} className="flex items-start gap-2 font-mono text-[10px] leading-snug">
+                                {item.ok ? (
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                                ) : (
+                                  <Circle className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+                                )}
+                                <span>
+                                  <span className="font-medium text-foreground">{item.label}</span>
+                                  <span className="text-muted-foreground"> — {item.detail}</span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
                     </>
                   ) : (
                     <p className="text-[11px] text-muted-foreground">Checklist unavailable.</p>

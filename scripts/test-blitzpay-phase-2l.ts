@@ -9,8 +9,11 @@ import { fileURLToPath } from "node:url"
 
 import { blitzpayReminderDispatchTrigger } from "../lib/blitzpay/blitzpay-reminder-dispatch-trigger"
 import {
-  buildBlitzpayLaunchReadinessChecklist,
+  buildBlitzpayLaunchTechnicalDiagnostics,
+  buildBlitzpayLaunchWorkspaceChecklist,
   blitzpayLaunchReadinessScore,
+  blitzpayLaunchReadinessStatusPhrase,
+  blitzpayLaunchReadinessSubline,
 } from "../lib/blitzpay/blitzpay-launch-readiness"
 import { isPlatformAdminEmail } from "../lib/platform-admin-policy"
 
@@ -28,7 +31,7 @@ function testReminderTriggerSelection() {
   assert.equal(blitzpayReminderDispatchTrigger(undefined), "cron")
 }
 
-function testLaunchReadinessAudience() {
+function testLaunchWorkspaceChecklistNoRawEnvLabels() {
   const base = {
     platformInvoicePayEnv: true,
     schemaHealthy: true,
@@ -44,28 +47,53 @@ function testLaunchReadinessAudience() {
     hasSuccessfulTestCapture: true,
   } as const
 
-  const orgItems = buildBlitzpayLaunchReadinessChecklist({ ...base, audience: "organization" })
-  const platItems = buildBlitzpayLaunchReadinessChecklist({ ...base, audience: "platform" })
-  assert.ok(platItems.length > orgItems.length, "platform checklist should include env-only rows")
-  assert.ok(!orgItems.some((i) => i.platformOnly), "org audience should strip platformOnly rows")
+  const items = buildBlitzpayLaunchWorkspaceChecklist({ ...base })
+  assert.equal(items.length, 10)
+  const joined = items.map((i) => `${i.label} ${i.detail}`).join(" ")
+  assert.doesNotMatch(joined, /BLITZPAY_INVOICE_PAY_ENABLED/)
+  assert.doesNotMatch(joined, /STRIPE_BLITZPAY_WEBHOOK_SECRET/)
+  assert.doesNotMatch(joined, /CRON_SECRET/)
 
-  const s = blitzpayLaunchReadinessScore(orgItems)
-  assert.equal(s.total, orgItems.length)
-  assert.ok(s.passed <= s.total)
+  const s = blitzpayLaunchReadinessScore(items)
+  assert.equal(s.total, 10)
+  assert.equal(s.passed, 10)
+  assert.equal(blitzpayLaunchReadinessStatusPhrase(items), "Ready to go")
+  assert.match(blitzpayLaunchReadinessSubline(items), /10 of 10/)
 
-  const offReminders = buildBlitzpayLaunchReadinessChecklist({
-    ...base,
-    audience: "organization",
-    orgRemindersEnabled: false,
+  const tech = buildBlitzpayLaunchTechnicalDiagnostics({
+    platformInvoicePayEnv: true,
+    webhookSecretConfigured: true,
+    cronSecretConfigured: true,
+    schemaHealthy: true,
+    schemaDiagnosticDetail: "ok",
   })
-  const rem = offReminders.find((i) => i.id === "reminders")
+  assert.ok(tech.some((r) => r.label === "BLITZPAY_INVOICE_PAY_ENABLED"))
+  assert.ok(tech.some((r) => r.label === "STRIPE_BLITZPAY_WEBHOOK_SECRET"))
+}
+
+function testRemindersRow() {
+  const base = {
+    platformInvoicePayEnv: true,
+    schemaHealthy: true,
+    webhookSecretConfigured: true,
+    cronSecretConfigured: true,
+    stripeConnectAccountPresent: true,
+    stripeChargesEnabled: true,
+    orgBlitzpayInvoicePayEnabled: true,
+    orgCardOrAchEnabled: true,
+    orgRemindersEnabled: false,
+    orgReceiptEmailsEnabled: true,
+    outboundEmailConfigured: true,
+    hasSuccessfulTestCapture: true,
+  } as const
+  const items = buildBlitzpayLaunchWorkspaceChecklist(base)
+  const rem = items.find((i) => i.id === "reminders")
   assert.ok(rem)
   assert.equal(rem.ok, false)
 }
 
 function testRolloutHostedPayGate() {
-  const items = buildBlitzpayLaunchReadinessChecklist({
-    audience: "organization",
+  const items = buildBlitzpayLaunchWorkspaceChecklist({
     platformInvoicePayEnv: false,
     schemaHealthy: true,
     webhookSecretConfigured: true,
@@ -79,9 +107,17 @@ function testRolloutHostedPayGate() {
     outboundEmailConfigured: true,
     hasSuccessfulTestCapture: false,
   })
-  const hosted = items.find((i) => i.id === "hosted_pay")
+  const hosted = items.find((i) => i.id === "online_invoice_payments")
   assert.ok(hosted)
   assert.equal(hosted.ok, false)
+}
+
+function testLaunchReadinessApiShape() {
+  const src = read("app/api/organizations/[organizationId]/blitzpay/launch-readiness/route.ts")
+  assert.match(src, /buildBlitzpayLaunchWorkspaceChecklist/)
+  assert.match(src, /buildBlitzpayLaunchTechnicalDiagnostics/)
+  assert.match(src, /presentation:/)
+  assert.match(src, /technicalDiagnostics/)
 }
 
 function testPlatformAdminGateSource() {
@@ -113,8 +149,10 @@ function testPlatformAdminEmailEnv() {
 }
 
 testReminderTriggerSelection()
-testLaunchReadinessAudience()
+testLaunchWorkspaceChecklistNoRawEnvLabels()
+testRemindersRow()
 testRolloutHostedPayGate()
+testLaunchReadinessApiShape()
 testPlatformAdminGateSource()
 testPaymentLinkRouteGate()
 testPlatformAdminEmailEnv()

@@ -2,19 +2,35 @@ import { NextResponse } from "next/server"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { gateBlitzPayManagement } from "@/lib/blitzpay/access"
-import { blitzpaySchemaGuardNextResponse, runBlitzpaySchemaHealthCheckCached } from "@/lib/blitzpay/blitzpay-schema-health"
+import {
+  blitzpaySchemaGuardNextResponse,
+  runBlitzpaySchemaHealthCheckCached,
+  type BlitzpaySchemaHealthResult,
+} from "@/lib/blitzpay/blitzpay-schema-health"
 import { ensureBlitzPayOrgSettings } from "@/lib/blitzpay/payment-repository"
 import { isBlitzPayInvoicePayEnabledEnv } from "@/lib/blitzpay/phase2-feature-flag"
 import { isOutboundEmailConfigured } from "@/lib/email/config"
 import {
-  buildBlitzpayLaunchReadinessChecklist,
+  buildBlitzpayLaunchTechnicalDiagnostics,
+  buildBlitzpayLaunchWorkspaceChecklist,
   blitzpayLaunchReadinessScore,
+  blitzpayLaunchReadinessStatusPhrase,
+  blitzpayLaunchReadinessSubline,
 } from "@/lib/blitzpay/blitzpay-launch-readiness"
 
 export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function schemaHealthTechnicalDetail(schema: BlitzpaySchemaHealthResult): string {
+  if (schema.ok) return "PostgREST probe: organizations BlitzPay columns + critical BlitzPay tables responded."
+  if (schema.kind === "schema_incomplete") {
+    return `schema_incomplete · missing: ${schema.missing} · ${schema.detail}`
+  }
+  const code = "code" in schema && schema.code ? ` · code: ${schema.code}` : ""
+  return `check_failed · ${schema.detail}${code}`
+}
 
 export async function GET(
   _request: Request,
@@ -87,9 +103,7 @@ export async function GET(
 
   const card = s?.blitzpay_payment_method_card_enabled !== false
   const ach = Boolean(s?.blitzpay_payment_method_ach_enabled)
-  const audience = gate.platformAdmin ? "platform" : "organization"
-  const items = buildBlitzpayLaunchReadinessChecklist({
-    audience,
+  const workspaceArgs = {
     platformInvoicePayEnv: isBlitzPayInvoicePayEnabledEnv(),
     schemaHealthy: schemaHealth.ok,
     webhookSecretConfigured: Boolean(process.env.STRIPE_BLITZPAY_WEBHOOK_SECRET?.trim()),
@@ -102,11 +116,25 @@ export async function GET(
     orgReceiptEmailsEnabled: s?.blitzpay_receipt_emails_enabled !== false,
     outboundEmailConfigured: isOutboundEmailConfigured(),
     hasSuccessfulTestCapture: (successCount ?? 0) > 0,
-  })
+  }
+  const checklist = buildBlitzpayLaunchWorkspaceChecklist(workspaceArgs)
+  const technicalDiagnostics = gate.platformAdmin
+    ? buildBlitzpayLaunchTechnicalDiagnostics({
+        platformInvoicePayEnv: workspaceArgs.platformInvoicePayEnv,
+        webhookSecretConfigured: workspaceArgs.webhookSecretConfigured,
+        cronSecretConfigured: workspaceArgs.cronSecretConfigured,
+        schemaHealthy: schemaHealth.ok,
+        schemaDiagnosticDetail: schemaHealthTechnicalDetail(schemaHealth),
+      })
+    : undefined
 
   return NextResponse.json({
-    checklist: items,
-    score: blitzpayLaunchReadinessScore(items),
-    audience,
+    checklist,
+    score: blitzpayLaunchReadinessScore(checklist),
+    presentation: {
+      statusPhrase: blitzpayLaunchReadinessStatusPhrase(checklist),
+      subline: blitzpayLaunchReadinessSubline(checklist),
+    },
+    technicalDiagnostics,
   })
 }

@@ -670,8 +670,8 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Platform admin** | `GET /api/platform/blitzpay/operations` aggregates enabled orgs, volume, failed attempts, disputes/refunds, webhook dead rows (24h), reminder health, stale Connect sync, schema health, and computed **alerts**. Platform Admin UI tab **BlitzPay Ops** (`components/admin/blitzpay-operations-content.tsx`) surfaces the summary, alert strip, dry-run / manual reminder dispatch (`POST /api/platform/blitzpay/reminder-dispatch`), and run history (`GET /api/platform/blitzpay/reminder-runs`). |
 | **Reminder controls** | `runBlitzpayReminderDispatch(admin, { dryRun, manual })` — dry run records a `dry_run` trigger row and skips writes/sends; manual platform POST always passes `manual: true`. Cron `POST /api/cron/blitzpay-reminders` keeps default cron trigger. |
 | **Payment links** | `POST .../blitzpay/payment-links/[linkId]` with `action: revoke \| expire \| regenerate` — staff (`canEditInvoices`); regenerate expires the prior link then mints a new hashed token; response returns `{ url }` once for clipboard copy only. |
-| **Org rollout & staff UX** | `PATCH .../blitzpay/settings` includes reminder + receipt email toggles (not fee policy). `GET .../blitzpay/status` adds `operationalAlerts` (schema, platform-wide dead webhooks count, Connect charges readiness). Settings → Payments shows alerts, toggles, and **launch readiness** from `GET .../blitzpay/launch-readiness` (org vs platform audience via `gateBlitzPayManagement`). |
-| **Launch checklist** | Pure builder `lib/blitzpay/blitzpay-launch-readiness.ts` — env, schema, webhook secret, cron secret, Connect, hosted pay, methods, receipts, reminders, test capture. |
+| **Org rollout & staff UX** | `PATCH .../blitzpay/settings` includes reminder + receipt email toggles (not fee policy). `GET .../blitzpay/status` adds `operationalAlerts` (schema, platform-wide dead webhooks count, Connect charges readiness). Settings → Payments shows alerts, toggles, and **launch readiness** from `GET .../blitzpay/launch-readiness` (gated by `gateBlitzPayManagement`). |
+| **Launch checklist** | `lib/blitzpay/blitzpay-launch-readiness.ts` — **`buildBlitzpayLaunchWorkspaceChecklist`**: product copy only (no raw env var names) for workspace owners/admins. **`buildBlitzpayLaunchTechnicalDiagnostics`**: env keys + schema probe text, returned as `technicalDiagnostics` **only** when the caller is a platform admin. Response includes `presentation` (`statusPhrase`, `subline`) for “Launch readiness: …” UI. |
 | **Tests** | `pnpm test:blitzpay-phase-2l` — launch checklist / rollout expectations, reminder trigger selection, static checks that platform routes enforce `isPlatformAdminEmail`, payment-link route gates `canEditInvoices`. |
 
 #### Manual test checklist (Phase 2L)
@@ -680,7 +680,7 @@ Use this as a **checklist** when coding — not exhaustive.
 2. Platform admin **dry run** increments `blitzpay_reminder_runs` with `trigger=dry_run` and does not send mail.  
 3. **Revoke / expire** updates link status; **regenerate** leaves only one active link and copies the new URL once.  
 4. Org owners toggle **reminders** and **receipt emails**; reminder dispatch skips disabled orgs; receipt dispatch can mark `skipped_org_disabled`.  
-5. **Launch readiness** differs for workspace admin vs platform admin (extra env rows).  
+5. **Launch readiness** shows the same friendly checklist to workspace admins and platform admins; platform admins also receive `technicalDiagnostics` and can expand **Technical details** on Settings → Payments or use **Admin → BlitzPay Ops**.  
 6. Settings **operational alerts** surface schema and webhook signals without exposing fee policy internals.
 
 ### 12.14 Phase 2M (estimates, deposits, financing foundations)
@@ -747,6 +747,26 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Portal quote shows **Payment options** when org financing is on; copy stays non-committal (not a credit offer).  
 4. Reporting / status includes new **payoutVisibility** fields when migrations are applied.
 
+### 12.17 Phase 2P (work order BlitzPay panel, field collection, WO-linked plans)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260923210000_blitzpay_phase_2p_work_order_collection.sql` — `work_orders.blitzpay_field_invoice_later_at` (technician “invoice by email later” preference); index `idx_blitzpay_payment_plans_org_work_order` for `(organization_id, work_order_id)` lookups. |
+| **Permissions** | `canAssistBlitzpayCollection` — work-order scoped **collection** (copy/create hosted pay links, open checkout URL, mark invoice-later). Does **not** grant refunds, disputes, fee settings, or wallet apply (those stay on `canEditInvoices` / `canViewFinancials` combinations as before). |
+| **Server** | `fetchWorkOrderBlitzpaySummary` aggregates linked invoices/quotes, wallet buckets (no Stripe ids), payment plans (including `work_order_id`), sanitized recent payments (`displayReference` only), payment link activity rows, financing session counts. `assertInvoiceLinkedToWorkOrder` guards collect routes. |
+| **APIs** | `GET …/work-orders/[workOrderId]/blitzpay/summary` (`canViewFinancials` **or** `canAssistBlitzpayCollection`); `POST …/collect/payment-link` (metadata `source: "work_order_collect"`); `POST …/collect/open-checkout` returns **`{ url }` only** in field mode (no `checkoutSessionId`); `POST …/field-invoice-later`; `POST …/blitzpay/payment-plans/[planId]/link-work-order` (`canEditInvoices` + `canViewFinancials`). Invoice `POST …/blitzpay/payment-plan` accepts optional `workOrderId` when the invoice is linked to that WO. |
+| **UX** | Work order drawer → **BlitzPay** compact section (`WorkOrderBlitzpayPanel`): balances, estimates/deposits, wallet visibility, apply-credit (edit invoice + view financials only), installment progress, staff “attach plan” by UUID, field-safe pay actions + QR hint (`mailto` / copy / hosted tab). |
+| **Reporting** | Snapshot adds `blitzpayWorkOrderCollectPaymentLinksWindowCount` (payment links with `metadata @> { source: "work_order_collect" }`) and `workOrdersFieldInvoiceLaterWindowCount`; exposed on `GET …/blitzpay/status` `payoutVisibility`. |
+| **Tests** | `pnpm test:blitzpay-phase-2p` — static wiring, permission matrix spot checks, no raw Stripe strings in work-order summary module, field checkout JSON shape. |
+
+#### Manual test checklist (Phase 2P)
+
+1. Open a work order with a linked invoice — **BlitzPay** section loads; balances match invoice tab (no Stripe ids in the payload).  
+2. As **technician** with assist permission: create pay link, open checkout (response has URL only), mark **invoice later** — no wallet apply or plan attach UI.  
+3. As **billing staff**: apply wallet credit to a linked invoice from the panel; idempotency replay does not double-apply.  
+4. Attach an existing plan UUID whose invoice is linked to the WO — `work_order_id` updates on the plan row.  
+5. Reporting / status shows new **payoutVisibility** counters after activity in the window.
+
 ---
 
-*Phase 2A–2O vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2P vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + **work-order-native collection** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

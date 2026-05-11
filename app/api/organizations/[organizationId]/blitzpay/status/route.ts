@@ -173,6 +173,8 @@ export async function GET(
             blitzpayFinancingSessionsCreatedWindowCount: reporting.blitzpayFinancingSessionsCreatedWindowCount,
             estimateDepositBeforeWorkQuoteCount: reporting.estimateDepositBeforeWorkQuoteCount,
             estimateOpenQuotesWithTotalCount: reporting.estimateOpenQuotesWithTotalCount,
+            blitzpayWorkOrderCollectPaymentLinksWindowCount: reporting.blitzpayWorkOrderCollectPaymentLinksWindowCount,
+            workOrdersFieldInvoiceLaterWindowCount: reporting.workOrdersFieldInvoiceLaterWindowCount,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

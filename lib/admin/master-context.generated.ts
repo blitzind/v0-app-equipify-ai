@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 265,
-  sqlMigrations: 162,
+  apiRouteHandlers: 270,
+  sqlMigrations: 163,
   dashboardPages: 60,
-  componentsTsx: 256,
-  libTsFiles: 554,
+  componentsTsx: 257,
+  libTsFiles: 557,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **265** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **162** |
+| API route handlers (\`app/api/**/route.ts\`) | **270** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **163** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
-| \`components/**/*.tsx\` | **256** |
-| \`lib/**/*.ts\` | **554** |
+| \`components/**/*.tsx\` | **257** |
+| \`lib/**/*.ts\` | **557** |
 
 ### Vercel crons
 
@@ -99,6 +99,7 @@ organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
 organizations/[organizationId]/blitzpay/financing/summary/route.ts
 organizations/[organizationId]/blitzpay/launch-readiness/route.ts
+organizations/[organizationId]/blitzpay/payment-plans/[planId]/link-work-order/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
@@ -232,6 +233,10 @@ organizations/[organizationId]/technician-skill-tags/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-parts-suggestions/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-service-summary/route.ts
 organizations/[organizationId]/work-orders/[workOrderId]/ai-technician-assist/route.ts
+organizations/[organizationId]/work-orders/[workOrderId]/blitzpay/field-invoice-later/route.ts
+organizations/[organizationId]/work-orders/[workOrderId]/blitzpay/invoices/[invoiceId]/collect/open-checkout/route.ts
+organizations/[organizationId]/work-orders/[workOrderId]/blitzpay/invoices/[invoiceId]/collect/payment-link/route.ts
+organizations/[organizationId]/work-orders/[workOrderId]/blitzpay/summary/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/duplicate/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/route.ts
 organizations/[organizationId]/workflow-automations/[automationId]/runs/route.ts

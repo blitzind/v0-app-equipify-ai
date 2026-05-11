@@ -29,7 +29,8 @@
     "test:blitzpay-phase-2l": "tsx scripts/test-blitzpay-phase-2l.ts",
     "test:blitzpay-phase-2m": "tsx scripts/test-blitzpay-phase-2m.ts",
     "test:blitzpay-phase-2n": "tsx scripts/test-blitzpay-phase-2n.ts",
-    "test:blitzpay-phase-2o": "tsx scripts/test-blitzpay-phase-2o.ts"
+    "test:blitzpay-phase-2o": "tsx scripts/test-blitzpay-phase-2o.ts",
+    "test:blitzpay-phase-2p": "tsx scripts/test-blitzpay-phase-2p.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

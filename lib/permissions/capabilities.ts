@@ -228,6 +228,12 @@ export const CAPABILITY_METADATA: Partial<Record<OrgPermissionKey, CapabilityMet
       "Resend, retry, or compose customer communications (Phase 2 mutations land here).",
     surface: "communications",
   },
+  canAssistBlitzpayCollection: {
+    label: "Assist BlitzPay collection from jobs",
+    description:
+      "From work orders: copy hosted payment links, open checkout, and mark invoice-email preferences — without refunds, disputes, or org fee settings.",
+    surface: "work-orders",
+  },
 }
 
 export function getCapabilityMetadata(key: OrgPermissionKey): CapabilityMetadata {

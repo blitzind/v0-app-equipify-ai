@@ -102,6 +102,12 @@ export type OrgPermissions = {
    * passthrough for the Phase 2 "Resend / retry" controls.
    */
   canManageCommunications: boolean
+  /**
+   * BlitzPay Phase 2P: field/work-order payment collection (copy pay link,
+   * open hosted checkout from job context). Does not grant refunds, fee
+   * edits, or org financial settings.
+   */
+  canAssistBlitzpayCollection: boolean
 }
 
 export type OrgPermissionKey = keyof OrgPermissions
@@ -143,6 +149,7 @@ const NONE: OrgPermissions = {
   canManageProspects: false,
   canViewCommunications: false,
   canManageCommunications: false,
+  canAssistBlitzpayCollection: false,
 }
 
 export function normalizeOrgMemberRole(raw: string | null | undefined): OrgMemberRole | null {
@@ -226,6 +233,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageProspects: true,
         canViewCommunications: true,
         canManageCommunications: true,
+        canAssistBlitzpayCollection: true,
       }
     case "manager":
       return {
@@ -266,6 +274,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageProspects: true,
         canViewCommunications: true,
         canManageCommunications: true,
+        canAssistBlitzpayCollection: true,
       }
     case "tech":
       return {
@@ -305,6 +314,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageProspects: false,
         canViewCommunications: true,
         canManageCommunications: false,
+        canAssistBlitzpayCollection: true,
       }
     case "viewer":
       return {
@@ -344,6 +354,7 @@ export function getOrgPermissionsForRole(role: OrgMemberRole | null): OrgPermiss
         canManageProspects: false,
         canViewCommunications: true,
         canManageCommunications: false,
+        canAssistBlitzpayCollection: true,
       }
     default:
       return NONE
@@ -376,6 +387,7 @@ export function getOrgPermissionsForProfile(profile: CommercialPermissionProfile
       canManageSettings: false,
       canManageWorkspaceSettings: false,
       canViewInsights: false,
+      canAssistBlitzpayCollection: true,
     }
   }
   if (profile === "sales") {
@@ -396,6 +408,7 @@ export function getOrgPermissionsForProfile(profile: CommercialPermissionProfile
       canViewInsights: false,
       canManageSettings: false,
       canManageWorkspaceSettings: false,
+      canAssistBlitzpayCollection: true,
     }
   }
   if (profile === "operations_manager") return getOrgPermissionsForRole("manager")

@@ -8,6 +8,7 @@ import {
   installmentTargetsMatchTotal,
   type PlanInstallmentDraft,
 } from "@/lib/blitzpay/blitzpay-payment-plan-math"
+import { assertInvoiceLinkedToWorkOrder } from "@/lib/blitzpay/work-order-invoice-link"
 
 function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
   if (!err) return false
@@ -108,6 +109,8 @@ export async function createPaymentPlanForInvoiceFromTemplate(
     invoiceId: string
     template: BlitzpayPaymentPlanTemplate
     idempotencyKey: string
+    /** When set, plan row is anchored to this WO (must be linked to the invoice). */
+    workOrderId?: string | null
   },
 ): Promise<{ planId: string; duplicate: boolean }> {
   assertUuid(input.organizationId, "organizationId")
@@ -130,6 +133,14 @@ export async function createPaymentPlanForInvoiceFromTemplate(
   const amt = Math.round(Number((inv as { amount_cents: number }).amount_cents ?? 0))
   const tax = Math.round(Number((inv as { tax_amount_cents?: number | null }).tax_amount_cents ?? 0))
   const totalTargetCents = Math.max(0, amt + tax)
+
+  let workOrderId: string | null = null
+  if (input.workOrderId && String(input.workOrderId).trim()) {
+    const wo = String(input.workOrderId).trim()
+    const ok = await assertInvoiceLinkedToWorkOrder(admin, input.organizationId, input.invoiceId, wo)
+    if (!ok) throw new Error("work_order_not_linked_to_invoice")
+    workOrderId = wo
+  }
 
   const drafts = installmentsForTemplate(totalTargetCents, input.template)
   if (drafts.length === 0 || !installmentTargetsMatchTotal(drafts, totalTargetCents)) {
@@ -161,7 +172,7 @@ export async function createPaymentPlanForInvoiceFromTemplate(
       organization_id: input.organizationId,
       org_invoice_id: input.invoiceId,
       org_quote_id: null,
-      work_order_id: null,
+      work_order_id: workOrderId,
       plan_kind: planKindForTemplate(input.template),
       status: "active",
       currency: "usd",

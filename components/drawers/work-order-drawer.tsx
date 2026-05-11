@@ -30,6 +30,7 @@ import {
   type CompletionCertificateSlot,
 } from "@/lib/work-orders/work-order-completion"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
+import { WorkOrderBlitzpayPanel } from "@/components/work-orders/work-order-blitzpay-panel"
 import { WorkOrderInventoryUsageCard } from "@/components/inventory/work-order-inventory-usage-card"
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { WorkOrderAiPartsSuggestionsPanel } from "@/components/work-orders/work-order-ai-parts-suggestions-panel"
@@ -2434,6 +2435,10 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           billingProfile={billingProfile}
           readyToInvoice={readyToInvoice}
         />
+      </DrawerCompactSection>
+
+      <DrawerCompactSection title="BlitzPay" subtitle="Pay links, wallet, installments, field collection" defaultOpen={false}>
+        <WorkOrderBlitzpayPanel organizationId={orgStatus === "ready" ? activeOrgId : null} workOrderId={wo.id} />
       </DrawerCompactSection>
 
       <DrawerCompactSection

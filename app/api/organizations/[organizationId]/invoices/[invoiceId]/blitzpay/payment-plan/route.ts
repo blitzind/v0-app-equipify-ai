@@ -59,7 +59,7 @@ export async function POST(
   const gate = await requireOrgPermission(organizationId, ["canEditInvoices", "canViewFinancials"])
   if ("error" in gate) return gate.error
 
-  let body: { template?: string; idempotencyKey?: string }
+  let body: { template?: string; idempotencyKey?: string; workOrderId?: string | null }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -92,11 +92,13 @@ export async function POST(
   }
 
   try {
+    const wo = body.workOrderId != null && String(body.workOrderId).trim() ? String(body.workOrderId).trim() : null
     const res = await createPaymentPlanForInvoiceFromTemplate(admin, {
       organizationId,
       invoiceId,
       template: template as BlitzpayPaymentPlanTemplate,
       idempotencyKey: idem,
+      workOrderId: wo,
     })
     const plan = await fetchActivePaymentPlanForInvoice(admin, organizationId, invoiceId)
     return NextResponse.json({ ok: true, duplicate: res.duplicate, planId: res.planId, plan })
@@ -110,6 +112,12 @@ export async function POST(
     }
     if (msg === "invalid_installment_schedule") {
       return NextResponse.json({ error: "invalid_schedule", message: "Could not build installment schedule." }, { status: 400 })
+    }
+    if (msg === "work_order_not_linked_to_invoice") {
+      return NextResponse.json(
+        { error: "work_order_mismatch", message: "Work order is not linked to this invoice." },
+        { status: 409 },
+      )
     }
     return NextResponse.json({ error: "plan_create_failed", message: msg }, { status: 500 })
   }

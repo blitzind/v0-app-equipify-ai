@@ -55,6 +55,10 @@ export type BlitzpayOrgReportingSnapshot = {
   estimateDepositBeforeWorkQuoteCount: number
   /** Open quotes (not archived, not converted) with positive total. */
   estimateOpenQuotesWithTotalCount: number
+  /** Payment links created from work-order collect flow in the reporting window. */
+  blitzpayWorkOrderCollectPaymentLinksWindowCount: number
+  /** Work orders where field staff marked “invoice email later” in the window. */
+  workOrdersFieldInvoiceLaterWindowCount: number
 }
 
 /**
@@ -212,6 +216,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let customerUnappliedEstimateDepositTotalCents = 0
   let estimateDepositBeforeWorkQuoteCount = 0
   let estimateOpenQuotesWithTotalCount = 0
+  let blitzpayWorkOrderCollectPaymentLinksWindowCount = 0
+  let workOrdersFieldInvoiceLaterWindowCount = 0
   {
     const { data: qRows, error: qErr } = await admin
       .from("org_quotes")
@@ -341,6 +347,24 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  if (sinceIso) {
+    const { count: wpl, error: wplErr } = await admin
+      .from("blitzpay_payment_links")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .contains("metadata", { source: "work_order_collect" })
+      .gte("created_at", sinceIso)
+    if (!wplErr && wpl != null) blitzpayWorkOrderCollectPaymentLinksWindowCount = wpl
+
+    const { count: wil, error: wilErr } = await admin
+      .from("work_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .not("blitzpay_field_invoice_later_at", "is", null)
+      .gte("blitzpay_field_invoice_later_at", sinceIso)
+    if (!wilErr && wil != null) workOrdersFieldInvoiceLaterWindowCount = wil
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -376,5 +400,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     blitzpayFinancingSessionsCreatedWindowCount,
     estimateDepositBeforeWorkQuoteCount,
     estimateOpenQuotesWithTotalCount,
+    blitzpayWorkOrderCollectPaymentLinksWindowCount,
+    workOrdersFieldInvoiceLaterWindowCount,
   }
 }
