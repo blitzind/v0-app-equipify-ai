@@ -72,7 +72,7 @@ No schema migration was required for 61.1.
 
 - **Partial sync**: multi-phase export can end `partial`; integration `sync_health` becomes `degraded`.
 - **No automatic retry queue** beyond API 429 single retry and 401 refresh path.
-- **Marketing** `/integrations` catalog may still label some partners “Coming soon” — workspace truth is **`/settings/integrations`**.
+- **Marketing** `/integrations` catalog: QuickBooks is **Live** (Phase 61.3); workspace truth remains **`/settings/integrations`** + `docs/INTEGRATION_CATALOG_INVENTORY.md`.
 
 ## Manual test checklist
 

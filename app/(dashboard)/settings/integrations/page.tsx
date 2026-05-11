@@ -2,13 +2,18 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { ExternalLink, Plug, Settings2 } from "lucide-react"
+import { Plug, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { cn } from "@/lib/utils"
+import {
+  INTEGRATION_READINESS_BADGE,
+  SETTINGS_HUB_INTEGRATION_READINESS,
+  type SettingsHubIntegrationId,
+} from "@/lib/integrations/catalog-metadata"
 
 interface Integration {
-  id: string
+  id: SettingsHubIntegrationId
   name: string
   description: string
   category: string
@@ -116,8 +121,15 @@ function IntegrationCard({
   const color = LOGO_COLORS[integration.logo] ?? "#6b7280"
   const isLive = Boolean(integration.detailHref)
 
+  const catalogReadiness = SETTINGS_HUB_INTEGRATION_READINESS[integration.id]
+  const readinessBadge = INTEGRATION_READINESS_BADGE[catalogReadiness]
+
   const statusPill =
-    integration.id === "quickbooks" && quickBooksLive && quickBooksLive !== "idle" ?
+    integration.id === "quickbooks" && quickBooksLive === "idle" ?
+      <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", readinessBadge.className)}>
+        {readinessBadge.label}
+      </span>
+    : integration.id === "quickbooks" && quickBooksLive && quickBooksLive !== "idle" ?
       quickBooksLive === "loading" ?
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
           Checking…
@@ -139,12 +151,19 @@ function IntegrationCard({
         </span>
     : isLive ?
       integration.id === "stripe" ?
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
-          Billing
+        <span
+          className={cn(
+            "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+            readinessBadge.className,
+          )}
+        >
+          {readinessBadge.label}
         </span>
       : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-info border">Setup</span>
-    : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-badge-warning border">
-        Coming soon
+    : <span
+        className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", readinessBadge.className)}
+      >
+        {readinessBadge.label}
       </span>
 
   return (
@@ -181,13 +200,10 @@ function IntegrationCard({
             </Link>
           </Button>
         ) : (
-          <Button size="sm" variant="outline" className="text-xs h-7" disabled title="Not implemented yet">
-            Connect (coming soon)
+          <Button size="sm" variant="outline" className="text-xs h-7" disabled title="No OAuth or setup flow in Equipify for this connector yet">
+            No in-app setup yet
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="text-xs h-7 gap-1.5 text-muted-foreground ml-auto" disabled>
-          Docs <ExternalLink size={10} />
-        </Button>
       </div>
     </div>
   )
@@ -299,7 +315,8 @@ export default function IntegrationsPage() {
           <Link href="/settings/api" className="text-primary hover:underline font-medium">
             Equipify API
           </Link>
-          . The public <Link href="/integrations">Integrations</Link> page lists the full roadmap including Gmail.
+          . The product <Link href="/integrations">Integrations</Link> catalog lists roadmap items with the same readiness labels as{" "}
+          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">docs/INTEGRATION_CATALOG_INVENTORY.md</code>.
         </p>
       </div>
     </div>

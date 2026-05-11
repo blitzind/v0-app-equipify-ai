@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T00:43:20.511Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T00:52:00.898Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -37,7 +37,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Auth:** Supabase Auth sessions; middleware refreshes session; dashboard routes protected; portal uses signed cookie session (\`/portal/*\`).
 - **Billing:** Stripe (checkout + webhooks), plan entitlements and usage limits in app logic.
 - **Deploy:** Vercel (\`vercel.json\` cron schedules). Analytics: Vercel Analytics package present.
-- **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; marketing **Integrations** catalog entries (Gmail, Calendar, etc.) are mostly **coming soon** — see \`docs/GMAIL_INTEGRATION.md\` for Gmail vs Resend boundaries; **no Gmail OAuth** in app code today.
+- **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; Stripe **billing** lives under Settings → Billing (not a generic tenant “Stripe Connect”); marketing **Integrations** catalog uses **Live / Limited / Beta / Planned** labels from \`lib/integrations/catalog-metadata.ts\` — see \`docs/INTEGRATION_CATALOG_INVENTORY.md\`; **no Gmail OAuth** in app code today (\`docs/GMAIL_INTEGRATION.md\`).
 
 ## App Architecture
 - **Route groups:** \`app/(dashboard)\` staff UI; \`app/(portal)\` customer portal; \`app/(admin)\` platform admin (\`/admin/*\`), gated by platform-admin identity server-side.
@@ -62,6 +62,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 60.5 — AI & automation governance:** \`docs/AI_AUTOMATION_GOVERNANCE.md\` — route matrix (AI Ops, AIden, workflows, communications). **Cron** \`/api/cron/ai-ops-digest\`: per-org \`requireFeatureAccess(..., "ai")\` before send; \`skipped_no_ai_entitlement\` + \`logAiGovernanceSkip\` (\`lib/ai/governance-log.ts\`). **API:** narrate (pre-LLM), communications AI assist, prospect draft-followup, follow-up regenerate-draft, digest settings PATCH when enabling — \`ai\` gate for non–platform-admin; digest **send/preview/test-destination** add **PA bypass**. Entitlement audit doc updated.
 - **Phase 61.1 — QuickBooks production hardening:** \`docs/QUICKBOOKS_PRODUCTION_READINESS.md\` — env vars, redirect URI, scopes, manual QA. **Security:** integration GET strips \`realm_id\` from JSON (\`quickbooks_company_linked\` only). **Connection:** \`error\` status distinct from disconnected (\`getQuickBooksConnection\` \`connection_error\`). **Logging:** \`lib/integrations/quickbooks/safe-log.ts\` — \`sanitizeQuickBooksClientMessage\`, structured \`quickbooks_integration\` stdout; sync-runner sanitizes row errors. **UI:** Settings + hub show **Needs attention**; invoice drawer \`connectionNeedsAttention\`; API environment pill (\`getQuickBooksApiEnvironment\`). **.env.example** documents \`QUICKBOOKS_API_BASE_URL\` sandbox note.
 - **Phase 61.2 — Webhook & public API expansion (architecture):** \`docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md\` — recommended key model (hash-at-rest, org scope, RLS, rate limits, audit), outbound webhook shape (signing, retries, delivery log), plan \`api_access\` + \`canManageApiKeys\`, platform-admin behavior; **no** live keys, public REST router, or webhook worker. **UI:** \`/settings/api\` remains non-interactive with roadmap + links to architecture, metering, entitlement, settings-audit docs. **Scaffolding:** \`lib/api/future-webhook-event-types.ts\` (unused event constants). **Docs:** \`SETTINGS_WIRING_AUDIT.md\`, \`USAGE_METERING_ENFORCEMENT.md\`, \`PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md\` cross-links.
+- **Phase 61.3 — Integration catalog accuracy audit:** \`docs/INTEGRATION_CATALOG_INVENTORY.md\` + \`lib/integrations/catalog-metadata.ts\` — shared readiness badges (**Live, Beta, Limited, Planned, Coming Soon, Internal, Enterprise** types; UI uses existing \`ds-badge-*\`). **Product** \`/integrations\`: QuickBooks **Live** (link to Settings), Stripe billing **Limited**, Fuzor **Beta** external link (**Visit Fuzor**, not “Connect”), roadmap **Planned** + **Register interest**; removed fake KPI “Automation Ready: 12”; interest/request modals disclose **no server submit**. **Settings** hub: readiness pills from catalog map; **No in-app setup yet** replaces fake Connect/Docs stubs; QuickBooks live \`connection_status\` pill unchanged. **Entitlements:** marketing banner distinguishes future **API keys** (Scale) from connectors. No DB migrations.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
@@ -192,9 +193,9 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 
 ### Integrations (in-app)
 - **Routes:** \`/integrations\`, \`/settings/integrations\`, \`/settings/integrations/quickbooks\`
-- **Purpose:** Integration catalog + real QuickBooks admin surface.
-- **Status:** QuickBooks connection + sync implemented; catalog page may still list some vendors as “coming soon”.
-- **Gaps:** Align marketing copy with actual connectors.
+- **Purpose:** Honest integration catalog + real QuickBooks admin surface.
+- **Status:** QuickBooks connection + sync implemented; marketing catalog aligned with inventory (Phase 61.3).
+- **Gaps:** Build additional OAuth connectors (Gmail, Calendar, etc.) per roadmap; public API keys when architecture ships.
 
 ### Customer portal
 - **Routes:** \`/portal/*\` (login, dashboard, equipment, work orders, invoices, quotes, certificates, maintenance, etc.)

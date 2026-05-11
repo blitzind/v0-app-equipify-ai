@@ -31,7 +31,7 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 | `/settings/portal` | Portal toggles & copy | Portal / org settings | Portal settings APIs | `canManagePortalSettings` | **Wired** (prior portal phases); review copy for “coming soon” islands |
 | `/settings/integrations` | QuickBooks & connectors | Integration tables + OAuth | Connector routes | `canManageIntegrations` | **Wired** where implemented |
 | `/settings/integrations` | QuickBooks connection pill | `organization_integrations` | **Phase 57.4:** Hub page `GET …/integrations/quickbooks` for live `connection_status` (Connected / Not connected / error); Stripe card shows **Billing** (not “connected”) | Same | **Wired** (status read-only) |
-| `/settings/integrations` | Gmail / other catalog entries | — | — | Same | **Planned** — disabled / “coming soon” |
+| `/settings/integrations` | Gmail / other catalog entries | — | — | Same | **Planned** — disabled **No in-app setup yet** (Phase 61.3); readiness badges from `lib/integrations/catalog-metadata.ts` |
 | `/settings/integrations/quickbooks` | Connection, sync, auto-sync | QBO integration state | QuickBooks settings APIs | Same | **Wired** (labels reflect server state) |
 | `/settings/security` | MFA, sessions, timeout, events | — | — | `canManageSecuritySettings` | **Planned** — non-interactive honesty page (Phase 57.2) |
 | `/settings/api` | API keys / outbound webhooks | — | — | `canManageApiKeys` | **Planned** — honesty shell (Phase 61.2); roadmap + link to `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`; no keys / no registrations |
@@ -57,3 +57,4 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 - **Phase 57.2:** Removed misleading password form, demo Security page, demo API keys, fake notification/automation saves; added this document.
 - **Phase 57.4:** Follow-up automation API/UI aligned on `canManageAutomations | canManageWorkspaceSettings`; AI Ops digest APIs aligned on `requireOrgPermission` (effective caps) + digest save toast; Integrations hub shows real QuickBooks connection status and honest Stripe label.
 - **Phase 61.2:** Added `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md` (future public API + outbound webhooks); `/settings/api` expanded copy + doc links; scaffolding `lib/api/future-webhook-event-types.ts` (unused event name constants).
+- **Phase 61.3:** Integration catalog accuracy — `docs/INTEGRATION_CATALOG_INVENTORY.md`, shared `lib/integrations/catalog-metadata.ts`; product `/integrations` aligns QuickBooks (live), Stripe billing (limited), Fuzor (beta external); roadmap **Planned** + honest interest/request modals; settings hub removes fake Docs / “Connect (coming soon)” stubs.
