@@ -25,6 +25,7 @@ type IntelligencePayload = {
     paymentLinksCreatedWindowCount: number
     workOrderCollectPaymentLinksWindowCount: number
     openRecoveryCasesCount: number
+    treasuryEstimateUpcomingTransferCents?: number
   }
   forecasts: {
     next7DaysExpectedCents: number
@@ -121,6 +122,10 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
             <Metric label="Net collected (window)" value={fmtMoney(data.dashboard.netCollectedWindowCents)} />
             <Metric label="Refunds (window)" value={fmtMoney(data.dashboard.refundedVolumeWindowCents)} />
             <Metric label="Pending payouts" value={fmtMoney(data.dashboard.pendingPayoutsCents)} />
+            <Metric
+              label="Upcoming transfer (est.)"
+              value={fmtMoney(data.dashboard.treasuryEstimateUpcomingTransferCents ?? 0)}
+            />
             <Metric
               label="Open disputes"
               value={`${data.dashboard.openDisputesCount} · ${fmtMoney(data.dashboard.openDisputesAmountCents)}`}

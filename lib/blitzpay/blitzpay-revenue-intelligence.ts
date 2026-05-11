@@ -37,6 +37,8 @@ export type BlitzpayOrgRevenueIntelligence = {
     paymentLinksCreatedWindowCount: number
     workOrderCollectPaymentLinksWindowCount: number
     openRecoveryCasesCount: number
+    /** Same source as treasury aggregate (`pending` + `in_transit` payout amounts). */
+    treasuryEstimateUpcomingTransferCents: number
   }
   forecasts: ReturnType<typeof buildBlitzpayForecastHorizonsCents> & {
     achPendingSettlementCents: number
@@ -208,7 +210,6 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
     collections,
     overdue,
     disputes,
-    pendingPayouts,
     paymentLinksWindow,
     recoveryOpen,
     sched7,
@@ -226,11 +227,6 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
       .from("blitzpay_invoice_disputes")
       .select("amount_cents, status")
       .eq("organization_id", organizationId),
-    admin
-      .from("blitzpay_payouts")
-      .select("amount_cents, status")
-      .eq("organization_id", organizationId)
-      .in("status", ["pending", "in_transit"]),
     admin
       .from("blitzpay_payment_links")
       .select("id", { count: "exact", head: true })
@@ -261,10 +257,7 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
     }
   }
 
-  const pendingPayoutsCents = (pendingPayouts.data ?? []).reduce(
-    (s, r) => s + Math.max(0, Math.round(Number((r as { amount_cents: number }).amount_cents))),
-    0,
-  )
+  const pendingPayoutsCents = reporting.treasuryPendingPayoutTotalsCents
 
   const scheduledFuturePaymentsCents = await sumPendingScheduledInRange(
     admin,
@@ -335,6 +328,7 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
       paymentLinksCreatedWindowCount: paymentLinksWindow.count ?? 0,
       workOrderCollectPaymentLinksWindowCount: reporting.blitzpayWorkOrderCollectPaymentLinksWindowCount,
       openRecoveryCasesCount: recoveryOpen.count ?? 0,
+      treasuryEstimateUpcomingTransferCents: reporting.treasuryEstimateUpcomingTransferCents,
     },
     forecasts: {
       ...horizons,
@@ -359,6 +353,10 @@ export type BlitzpayPlatformRevenueRollup = {
   succeededPaymentIntentsCountWindow: number
   openDisputesPlatformCount: number
   walletLiabilityTotalCentsApprox: number
+  /** Sum of in-flight payout amounts (bounded read; Stripe mirror). */
+  treasuryPendingInFlightPayoutCentsApprox: number
+  treasuryFailedPayouts30dCount: number
+  treasuryInstantPayoutInterestOrgsCount: number
 }
 
 /**
@@ -371,7 +369,17 @@ export async function fetchBlitzpayPlatformRevenueRollup(
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
 
-  const [{ data: led }, { count: piCount }, disputesRes, { data: wallets }] = await Promise.all([
+  const since30d = new Date(Date.now() - 30 * 86400_000).toISOString()
+
+  const [
+    { data: led },
+    { count: piCount },
+    disputesRes,
+    { data: wallets },
+    { data: inflightRows },
+    { count: failedPayout30 },
+    { count: instantInterestOrgs },
+  ] = await Promise.all([
     admin
       .from("blitzpay_ledger_entries")
       .select("amount_cents")
@@ -385,6 +393,20 @@ export async function fetchBlitzpayPlatformRevenueRollup(
       .gte("created_at", sinceIso),
     admin.from("blitzpay_invoice_disputes").select("status").limit(3000),
     admin.from("blitzpay_customer_wallets").select("available_credit_cents, refundable_credit_cents").limit(5000),
+    admin
+      .from("blitzpay_payouts")
+      .select("amount_cents")
+      .in("status", ["pending", "in_transit"])
+      .limit(4000),
+    admin
+      .from("blitzpay_payouts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "failed")
+      .gte("stripe_created_at", since30d),
+    admin
+      .from("blitzpay_org_settings")
+      .select("organization_id", { count: "exact", head: true })
+      .eq("blitzpay_instant_payout_interest", true),
   ])
 
   let ledgerPaymentCapturedCentsWindow = 0
@@ -396,6 +418,14 @@ export async function fetchBlitzpayPlatformRevenueRollup(
   for (const d of disputesRes.data ?? []) {
     const st = String((d as { status?: string }).status ?? "").toLowerCase()
     if (!DISPUTE_TERMINAL.has(st)) openDisputesPlatformCount += 1
+  }
+
+  let treasuryPendingInFlightPayoutCentsApprox = 0
+  for (const r of inflightRows ?? []) {
+    treasuryPendingInFlightPayoutCentsApprox += Math.max(
+      0,
+      Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    )
   }
 
   let walletLiabilityTotalCentsApprox = 0
@@ -413,5 +443,8 @@ export async function fetchBlitzpayPlatformRevenueRollup(
     succeededPaymentIntentsCountWindow: piCount ?? 0,
     openDisputesPlatformCount,
     walletLiabilityTotalCentsApprox,
+    treasuryPendingInFlightPayoutCentsApprox,
+    treasuryFailedPayouts30dCount: failedPayout30.count ?? 0,
+    treasuryInstantPayoutInterestOrgsCount: instantInterestOrgs.count ?? 0,
   }
 }

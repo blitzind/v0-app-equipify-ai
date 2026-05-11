@@ -52,7 +52,7 @@ Removed inert notification and fake profile affordances from **`PortalShell`** a
 - **Shared chrome:** `StaffPreviewFrame` — banner, customer picker, nav links with `organizationId` + `customerId` query params, exit to staff app.
 - **Supported read-only sections:** overview (`/portal/preview`), invoices, work orders, equipment, quotes (actions **forced off**), documents (list only), certificates (list only), maintenance, plus informational pages for service requests, reports, and account.
 - **Blocked / informational:** quote approve/decline; `/api/portal/*` downloads without session; service-request **rows** (API filters by `portal_user_id`); reports (still mock in live app — preview explains); account edits.
-- **Popup fallback:** Settings → Customer Portal shows the full **`/api/portal/preview/start?...`** URL in the toast when the browser blocks `window.open`.
+- **Popup fallback:** Preview is launched from a direct button click (`StaffPortalPreviewLaunchButton` → `tryOpenStaffPortalPreviewInNewTab`). If a new tab cannot be opened, an Equipify dialog offers **Open customer portal preview** (same-tab navigation to the bridge; server then redirects to `/portal/preview`). Internal API URLs are **not** shown in toasts or dialog copy.
 
 ## Follow-ups (non-goals for 56.1)
 

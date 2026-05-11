@@ -42,6 +42,8 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_org_financing_providers", select: "organization_id, provider_code" },
   { name: "blitzpay_financing_sessions", select: "id, status" },
   { name: "blitzpay_financing_offers", select: "id, session_id" },
+  { name: "blitzpay_org_balances", select: "organization_id" },
+  { name: "blitzpay_balance_snapshots", select: "id" },
   { name: "blitzpay_payment_plans", select: "id, organization_id" },
   { name: "blitzpay_payment_plan_installments", select: "id, payment_plan_id" },
 ]

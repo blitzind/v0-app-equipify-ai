@@ -785,6 +785,28 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **Admin → BlitzPay Ops** shows rollup card from `/api/platform/blitzpay/revenue-rollup`.  
 4. Customer portal: confirm no new BlitzPay executive surfaces.
 
+### 12.19 Phase 2R (contractor treasury, instant payout foundations, payout intelligence)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260924120000_blitzpay_phase_2r_treasury_balances.sql` — `blitzpay_org_settings.blitzpay_reserve_target_cents`, `blitzpay_instant_payout_interest`; `blitzpay_org_balances` (derived available / pending / held reserve / operating / payout-in-transit / velocities / instant heuristic / speed lane); `blitzpay_balance_snapshots` (append-only, app-throttled ~1/day/org). RLS: authenticated **select**; writes via **service role** only. |
+| **Pure libs** | `blitzpay-treasury-math.ts` — partition activity BTs by `available_on`, reserve + operating balance, payout delay average, upcoming-transfer estimate, speed lane classification, instant eligibility helper. `blitzpay-treasury-insights.ts` — deterministic read-only recommendations. |
+| **Server** | `blitzpay-contractor-treasury.ts` — `aggregateBlitzpayTreasuryMetrics`, `persistBlitzpayOrgTreasury`, `refreshBlitzpayOrgTreasuryState`, `fetchBlitzpayTreasuryDashboard` (sanitized payout tails + truncated failure copy only). Payout webhook + manual payout sync refresh treasury **best-effort** (non-fatal on drift). |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds treasury fields (`treasuryAveragePayoutDelayDays`, pending payout totals, failed 30d count, instant flag, reserve exposure, velocity 7d/30d, estimate upcoming transfer, speed lane). `GET …/blitzpay/status` exposes them under `payoutVisibility`. |
+| **Revenue intelligence** | `pendingPayoutsCents` is sourced from the same treasury aggregate as reporting for consistency; dashboard includes `treasuryEstimateUpcomingTransferCents`. |
+| **Platform** | `fetchBlitzpayPlatformRevenueRollup` adds in-flight payout cents (bounded), failed payouts (30d), and org count with instant-payout interest flag. Admin **BlitzPay Ops** strip shows the new cards. |
+| **APIs** | `GET …/blitzpay/treasury` — `canEditInvoices` **or** `canViewFinancials`; schema guard. `PATCH …/blitzpay/settings` accepts optional `blitzpay_reserve_target_cents` / `blitzpay_instant_payout_interest` (owner/admin BlitzPay gate). |
+| **UX** | Settings → **Payments** — `BlitzpayTreasuryPanel` (balances, reserve vs target, payouts in transit, recent payouts, insights). No instant payout execution in-app. |
+| **Portal** | No portal routes reference `/blitzpay/treasury`. |
+| **Tests** | `pnpm test:blitzpay-phase-2r` — pure math, insights smoke, API gate strings, migration + schema markers, reporting/revenue wiring, portal scan. |
+
+#### Manual test checklist (Phase 2R)
+
+1. With Connect payouts mirrored, open **Settings → Payments** — treasury panel shows available vs pending and recent payouts without full Stripe payout ids.  
+2. Run **Sync from Stripe** on payout ledger; treasury row updates (or refresh panel).  
+3. Platform admin: **Admin → BlitzPay Ops** revenue rollup includes payout health tiles.  
+4. Customer portal: confirm treasury API is not referenced.
+
 ---
 
-*Phase 2A–2Q vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2R vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

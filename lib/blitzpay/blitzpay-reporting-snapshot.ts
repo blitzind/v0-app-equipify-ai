@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { aggregateBlitzpayTreasuryMetrics } from "@/lib/blitzpay/blitzpay-contractor-treasury"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
@@ -59,6 +60,16 @@ export type BlitzpayOrgReportingSnapshot = {
   blitzpayWorkOrderCollectPaymentLinksWindowCount: number
   /** Work orders where field staff marked “invoice email later” in the window. */
   workOrdersFieldInvoiceLaterWindowCount: number
+  /** Phase 2R — derived contractor treasury (Stripe ledger mirror; no custody). */
+  treasuryAveragePayoutDelayDays: number | null
+  treasuryPendingPayoutTotalsCents: number
+  treasuryFailedPayoutCount30d: number
+  treasuryInstantTransferEligible: boolean
+  treasuryReserveExposureCents: number
+  treasuryPayoutVelocityPaidCents7d: number
+  treasuryPayoutVelocityPaidCents30d: number
+  treasuryEstimateUpcomingTransferCents: number
+  treasuryPayoutSpeedLane: "standard" | "accelerated" | "unknown"
 }
 
 /**
@@ -365,6 +376,30 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     if (!wilErr && wil != null) workOrdersFieldInvoiceLaterWindowCount = wil
   }
 
+  let treasuryAveragePayoutDelayDays: number | null = null
+  let treasuryPendingPayoutTotalsCents = 0
+  let treasuryFailedPayoutCount30d = 0
+  let treasuryInstantTransferEligible = false
+  let treasuryReserveExposureCents = 0
+  let treasuryPayoutVelocityPaidCents7d = 0
+  let treasuryPayoutVelocityPaidCents30d = 0
+  let treasuryEstimateUpcomingTransferCents = 0
+  let treasuryPayoutSpeedLane: "standard" | "accelerated" | "unknown" = "unknown"
+  try {
+    const tm = await aggregateBlitzpayTreasuryMetrics(admin, organizationId)
+    treasuryAveragePayoutDelayDays = tm.avgPayoutDelayDays
+    treasuryPendingPayoutTotalsCents = tm.pendingPayoutTotalCents
+    treasuryFailedPayoutCount30d = tm.failedPayoutCount30d
+    treasuryInstantTransferEligible = tm.instantTransferEligible
+    treasuryReserveExposureCents = tm.heldReserveCents
+    treasuryPayoutVelocityPaidCents7d = tm.payoutVelocityPaidCents7d
+    treasuryPayoutVelocityPaidCents30d = tm.payoutVelocityPaidCents30d
+    treasuryEstimateUpcomingTransferCents = tm.estimateUpcomingTransferCents
+    treasuryPayoutSpeedLane = tm.payoutSpeedLane
+  } catch {
+    /* migrations may lag in some sandboxes */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -402,5 +437,14 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     estimateOpenQuotesWithTotalCount,
     blitzpayWorkOrderCollectPaymentLinksWindowCount,
     workOrdersFieldInvoiceLaterWindowCount,
+    treasuryAveragePayoutDelayDays,
+    treasuryPendingPayoutTotalsCents,
+    treasuryFailedPayoutCount30d,
+    treasuryInstantTransferEligible,
+    treasuryReserveExposureCents,
+    treasuryPayoutVelocityPaidCents7d,
+    treasuryPayoutVelocityPaidCents30d,
+    treasuryEstimateUpcomingTransferCents,
+    treasuryPayoutSpeedLane,
   }
 }

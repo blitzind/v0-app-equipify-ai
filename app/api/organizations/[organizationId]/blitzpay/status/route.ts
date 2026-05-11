@@ -79,6 +79,8 @@ export async function GET(
         "blitzpay_financing_enabled",
         "blitzpay_installment_plans_enabled",
         "blitzpay_financing_monthly_estimate_disclosure",
+        "blitzpay_reserve_target_cents",
+        "blitzpay_instant_payout_interest",
       ].join(", "),
     )
     .eq("organization_id", organizationId)
@@ -175,6 +177,15 @@ export async function GET(
             estimateOpenQuotesWithTotalCount: reporting.estimateOpenQuotesWithTotalCount,
             blitzpayWorkOrderCollectPaymentLinksWindowCount: reporting.blitzpayWorkOrderCollectPaymentLinksWindowCount,
             workOrdersFieldInvoiceLaterWindowCount: reporting.workOrdersFieldInvoiceLaterWindowCount,
+            treasuryAveragePayoutDelayDays: reporting.treasuryAveragePayoutDelayDays,
+            treasuryPendingPayoutTotalsCents: reporting.treasuryPendingPayoutTotalsCents,
+            treasuryFailedPayoutCount30d: reporting.treasuryFailedPayoutCount30d,
+            treasuryInstantTransferEligible: reporting.treasuryInstantTransferEligible,
+            treasuryReserveExposureCents: reporting.treasuryReserveExposureCents,
+            treasuryPayoutVelocityPaidCents7d: reporting.treasuryPayoutVelocityPaidCents7d,
+            treasuryPayoutVelocityPaidCents30d: reporting.treasuryPayoutVelocityPaidCents30d,
+            treasuryEstimateUpcomingTransferCents: reporting.treasuryEstimateUpcomingTransferCents,
+            treasuryPayoutSpeedLane: reporting.treasuryPayoutSpeedLane,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

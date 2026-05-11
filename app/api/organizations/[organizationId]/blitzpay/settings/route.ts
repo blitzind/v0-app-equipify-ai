@@ -54,6 +54,8 @@ export async function GET(
         "blitzpay_financing_enabled",
         "blitzpay_installment_plans_enabled",
         "blitzpay_financing_monthly_estimate_disclosure",
+        "blitzpay_reserve_target_cents",
+        "blitzpay_instant_payout_interest",
       ].join(", "),
     )
     .eq("organization_id", gate.organizationId)
@@ -98,6 +100,8 @@ export async function PATCH(
     blitzpay_financing_enabled?: boolean
     blitzpay_installment_plans_enabled?: boolean
     blitzpay_financing_monthly_estimate_disclosure?: string | null
+    blitzpay_reserve_target_cents?: number
+    blitzpay_instant_payout_interest?: boolean
   }
   try {
     body = (await request.json()) as typeof body
@@ -182,6 +186,12 @@ export async function PATCH(
         body.blitzpay_financing_monthly_estimate_disclosure.trim().slice(0, 2000) || null
       : null
   }
+  if (Object.prototype.hasOwnProperty.call(body, "blitzpay_reserve_target_cents")) {
+    patchBase.blitzpay_reserve_target_cents = Math.max(0, Math.round(Number(body.blitzpay_reserve_target_cents)))
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "blitzpay_instant_payout_interest")) {
+    patchBase.blitzpay_instant_payout_interest = Boolean(body.blitzpay_instant_payout_interest)
+  }
   const patch = gate.platformAdmin
     ? {
         ...patchBase,
@@ -223,6 +233,8 @@ export async function PATCH(
         "blitzpay_financing_enabled",
         "blitzpay_installment_plans_enabled",
         "blitzpay_financing_monthly_estimate_disclosure",
+        "blitzpay_reserve_target_cents",
+        "blitzpay_instant_payout_interest",
       ].join(", "),
     )
     .maybeSingle()

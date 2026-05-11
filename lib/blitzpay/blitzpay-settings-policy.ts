@@ -24,7 +24,9 @@ export type BlitzpaySettingsPatchBody = Partial<
     | "blitzpay_allow_save_payment_methods"
     | "blitzpay_financing_enabled"
     | "blitzpay_installment_plans_enabled"
-    | "blitzpay_financing_monthly_estimate_disclosure",
+    | "blitzpay_financing_monthly_estimate_disclosure"
+    | "blitzpay_reserve_target_cents"
+    | "blitzpay_instant_payout_interest",
     unknown
   >
 >

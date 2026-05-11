@@ -1,13 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   Paintbrush,
   Save,
-  Eye,
   Check,
   Shield,
   Layers,
@@ -20,6 +19,7 @@ import {
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { CERTIFICATE_RELEASE_OPTIONS } from "@/lib/portal/certificate-release-staff"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { StaffPortalPreviewLaunchButton } from "@/components/portal/staff-portal-preview-launch-button"
 import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
@@ -230,27 +230,6 @@ export default function PortalSettingsPage() {
     }
   }, [orgStatus, organizationId, permStatus, canViewDocActivity])
 
-  const handlePreviewPortal = useCallback(() => {
-    if (orgStatus !== "ready" || !organizationId?.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Organization not ready",
-        description: "Select a workspace and wait for it to finish loading before previewing the portal.",
-      })
-      return
-    }
-    const oid = organizationId.trim()
-    const bridgeUrl = `${window.location.origin}/api/portal/preview/start?organizationId=${encodeURIComponent(oid)}`
-    const win = window.open(bridgeUrl, "_blank", "noopener,noreferrer")
-    if (!win) {
-      toast({
-        variant: "destructive",
-        title: "Popup blocked",
-        description: `Allow popups for this site, or open this URL manually (same-tab is fine): ${bridgeUrl}`,
-      })
-    }
-  }, [orgStatus, organizationId, toast])
-
   async function handleSave() {
     if (orgStatus !== "ready" || !organizationId?.trim()) {
       toast({
@@ -333,15 +312,12 @@ export default function PortalSettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={handlePreviewPortal}
+          <StaffPortalPreviewLaunchButton
+            organizationId={organizationId?.trim() ?? ""}
+            disabled={orgStatus !== "ready" || !organizationId?.trim()}
           >
-            <Eye size={13} /> Preview Portal
-          </Button>
+            Preview portal
+          </StaffPortalPreviewLaunchButton>
           <Button
             size="sm"
             className="gap-1.5 text-xs"

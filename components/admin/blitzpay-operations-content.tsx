@@ -11,6 +11,9 @@ type RevenueRollup = {
   succeededPaymentIntentsCountWindow: number
   openDisputesPlatformCount: number
   walletLiabilityTotalCentsApprox: number
+  treasuryPendingInFlightPayoutCentsApprox: number
+  treasuryFailedPayouts30dCount: number
+  treasuryInstantPayoutInterestOrgsCount: number
 }
 
 type OpsSummary = {
@@ -241,6 +244,18 @@ export function BlitzpayOperationsContent() {
             <div className="rounded-lg border border-border p-3">
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Wallet liability (approx)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.walletLiabilityTotalCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">In-flight payouts (approx)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.treasuryPendingInFlightPayoutCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed payouts (30d)</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.treasuryFailedPayouts30dCount}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Instant payout interest orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.treasuryInstantPayoutInterestOrgsCount}</p>
             </div>
           </div>
         </div>

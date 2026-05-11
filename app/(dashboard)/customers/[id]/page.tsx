@@ -88,6 +88,7 @@ import { ChildAccountsCard } from "@/components/customers/child-accounts-card"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
 import { CustomerPortalConsolidatedDocsCard } from "@/components/customers/customer-portal-consolidated-docs-card"
+import { StaffPortalPreviewLaunchButton } from "@/components/portal/staff-portal-preview-launch-button"
 import { CustomerBillingTermsCard } from "@/components/customers/customer-billing-terms-card"
 import { CustomerBlitzpayWalletCard } from "@/components/customers/customer-blitzpay-wallet-card"
 import { CustomerInvoiceAgingCard } from "@/components/customers/customer-invoice-aging-card"
@@ -522,13 +523,15 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
-  const { permissions } = useOrgPermissions()
+  const { permissions, status: permStatus } = useOrgPermissions()
   const { canArchiveRestore } = useOrgArchivePermissions()
   const assignedOnlyView = isAssignedWorkOnly(permissions)
   const canManageCustomerRecords = !assignedOnlyView
   const canViewCustomerFinancials = permissions.canViewFinancials || permissions.canViewBilling
   const canViewQuotes = permissions.canViewQuotes
   const canManageServiceContracts = permissions.canManageDispatch
+  const canOpenPortalPreview =
+    permStatus === "ready" && permissions.canManagePortalSettings && orgStatus === "ready"
   const { toast } = useToast()
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -2610,6 +2613,24 @@ export default function CustomerDetailPage() {
               organizationId={activeOrgId}
               customerOverride={customer.portalConsolidatedDocumentsEnabled}
             />
+          ) : null}
+
+          {canOpenPortalPreview && activeOrgId ? (
+            <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">Customer portal preview</h3>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  Open a read-only preview of the portal as this account. No invite is sent; this uses your staff sign-in.
+                </p>
+              </div>
+              <StaffPortalPreviewLaunchButton
+                organizationId={activeOrgId}
+                customerId={customer.id}
+                className="shrink-0 self-start sm:self-center"
+              >
+                Open portal preview
+              </StaffPortalPreviewLaunchButton>
+            </div>
           ) : null}
 
           {/* Invoicing Phase 2: Customer billing terms clarity */}

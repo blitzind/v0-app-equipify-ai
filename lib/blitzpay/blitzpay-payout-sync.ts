@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getStripe } from "@/lib/stripe"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
+import { refreshBlitzpayOrgTreasuryState } from "@/lib/blitzpay/blitzpay-contractor-treasury"
 
 export type ResolveConnectAccountOrgResult =
   | { ok: true; organizationId: string }
@@ -262,6 +263,20 @@ export async function dispatchBlitzpayPayoutWebhook(
     )
   }
 
+  try {
+    await refreshBlitzpayOrgTreasuryState(admin, resolved.organizationId)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn(
+      JSON.stringify({
+        source: "blitzpay-webhook",
+        message: "treasury refresh after payout failed (non-fatal)",
+        eventId: event.id,
+        detail: msg.slice(0, 400),
+      }),
+    )
+  }
+
   if (event.type === "payout.paid") {
     const { error: runErr } = await admin.from("blitzpay_reconciliation_runs").insert({
       organization_id: resolved.organizationId,
@@ -374,6 +389,12 @@ export async function runManualBlitzpayPayoutLedgerSync(
       })
       .eq("id", reconciliationRunId)
     throw e
+  }
+
+  try {
+    await refreshBlitzpayOrgTreasuryState(admin, organizationId)
+  } catch {
+    /* non-fatal — treasury tables may lag migrations */
   }
 
   return { payoutsSynced, balanceTransactionsUpserted, reconciliationRunId }
