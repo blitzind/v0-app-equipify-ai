@@ -20,7 +20,7 @@ Legacy demo `useTenant().can()` now bridges from real permissions when the provi
 
 ## Server helpers
 
-- [`requireOrgMemberPermission`](../lib/permissions/require-org-permission.ts) — use on sensitive `POST`/`PATCH` routes for early 403s (RLS remains authoritative).
+- [`requireOrgPermission`](../lib/api/require-org-permission.ts), [`requireAnyOrgPermission`](../lib/api/require-org-permission.ts), [`requireOrgMemberSession`](../lib/api/require-org-permission.ts) — use on organization-scoped Route Handlers for session + capability gates (RLS remains authoritative). The older `lib/permissions/require-org-permission.ts` stub was removed in Phase 62.1 (unused).
 
 ## Migration notes
 

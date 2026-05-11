@@ -33,6 +33,7 @@ import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { paymentAllocationUiLabel } from "@/lib/billing/invoice-payment-allocation"
 import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
+import { INVOICE_STATUS_BADGE_CLASSNAME } from "@/lib/invoices/invoice-status-badge-classes"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -54,12 +55,36 @@ function invoiceDisplayId(inv: AdminInvoice) {
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<InvoiceStatus, { label: string; className: string; icon: React.ElementType }> = {
-  "Draft":   { label: "Draft",   className: "bg-muted text-muted-foreground border-border",                                               icon: FilePen },
-  "Sent":    { label: "Sent",    className: "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30",         icon: Send },
-  "Unpaid":  { label: "Unpaid",  className: "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30", icon: Clock },
-  "Paid":    { label: "Paid",    className: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30", icon: CheckCircle2 },
-  "Overdue": { label: "Overdue", className: "bg-destructive/10 text-destructive border-destructive/30",                                  icon: AlertTriangle },
-  "Void":    { label: "Void",    className: "bg-muted text-muted-foreground/60 border-border line-through",                             icon: Ban },
+  Draft: {
+    label: "Draft",
+    className: INVOICE_STATUS_BADGE_CLASSNAME.Draft,
+    icon: FilePen,
+  },
+  Sent: {
+    label: "Sent",
+    className: INVOICE_STATUS_BADGE_CLASSNAME.Sent,
+    icon: Send,
+  },
+  Unpaid: {
+    label: "Unpaid",
+    className: INVOICE_STATUS_BADGE_CLASSNAME.Unpaid,
+    icon: Clock,
+  },
+  Paid: {
+    label: "Paid",
+    className: INVOICE_STATUS_BADGE_CLASSNAME.Paid,
+    icon: CheckCircle2,
+  },
+  Overdue: {
+    label: "Overdue",
+    className: INVOICE_STATUS_BADGE_CLASSNAME.Overdue,
+    icon: AlertTriangle,
+  },
+  Void: {
+    label: "Void",
+    className: cn(INVOICE_STATUS_BADGE_CLASSNAME.Void, "line-through"),
+    icon: Ban,
+  },
 }
 
 const ALL_STATUSES: InvoiceStatus[] = ["Draft", "Sent", "Unpaid", "Paid", "Overdue", "Void"]

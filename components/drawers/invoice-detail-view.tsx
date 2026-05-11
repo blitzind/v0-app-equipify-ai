@@ -5,6 +5,7 @@ import Link from "next/link"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
+import { INVOICE_STATUS_BADGE_CLASSNAME } from "@/lib/invoices/invoice-status-badge-classes"
 import { useInvoices } from "@/lib/quote-invoice-store"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useTenant } from "@/lib/tenant-store"
@@ -122,17 +123,6 @@ function invoiceBillingAddressLine(invoice: AdminInvoice): string {
   ]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(", ")
-}
-
-// ─── Status config ────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<InvoiceStatus, { className: string }> = {
-  Draft:   { className: "bg-muted text-muted-foreground border-border" },
-  Sent:    { className: "bg-[color:var(--status-info)]/10 text-[color:var(--status-info)] border-[color:var(--status-info)]/30" },
-  Unpaid:  { className: "bg-[color:var(--status-warning)]/10 text-[color:var(--status-warning)] border-[color:var(--status-warning)]/30" },
-  Paid:    { className: "bg-[color:var(--status-success)]/10 text-[color:var(--status-success)] border-[color:var(--status-success)]/30" },
-  Overdue: { className: "bg-destructive/10 text-destructive border-destructive/30" },
-  Void:    { className: "bg-muted text-muted-foreground/60 border-border" },
 }
 
 const ALL_STATUSES: InvoiceStatus[] = ["Draft", "Sent", "Unpaid", "Paid", "Overdue", "Void"]
@@ -1296,7 +1286,7 @@ function InfoTab({
           </EditRow>
         ) : (
           <Row label="Status" value={
-            <Badge variant="outline" className={cn("text-[10px] font-semibold", STATUS_CONFIG[invoice.status].className)}>{invoice.status}</Badge>
+            <Badge variant="outline" className={cn("text-[10px] font-semibold", INVOICE_STATUS_BADGE_CLASSNAME[invoice.status])}>{invoice.status}</Badge>
           } />
         )}
         {!editing && showFinancials && invoice.paymentAllocationState ? (

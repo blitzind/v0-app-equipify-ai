@@ -218,6 +218,7 @@ export const MARKETING_INTEGRATION_CATEGORIES = [
   "Maps & Routing",
 ] as const
 
+/** Count marketing catalog rows by readiness (KPIs + analytics-style summaries). */
 export function countMarketingCatalogByReadiness(
   readiness: IntegrationCatalogReadiness,
 ): number {

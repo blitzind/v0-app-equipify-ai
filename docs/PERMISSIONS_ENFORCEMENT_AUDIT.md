@@ -65,7 +65,7 @@ Statuses: **aligned** | **UI-only** (client hides only) | **server-only** (API o
 | Portal invites → `canManagePortalSettings` | `app/api/organizations/[organizationId]/portal-invites/route.ts` |
 | Workspace PATCH → `canManageWorkspaceSettings` | `app/api/organizations/[organizationId]/workspace/route.ts` |
 | Default invoice terms GET/PATCH → capability gates | `app/api/organizations/[organizationId]/billing/default-invoice-terms/route.ts` |
-| Legacy `requireOrgMemberPermission` uses effective perms | `lib/permissions/require-org-permission.ts` |
+| ~~Legacy `requireOrgMemberPermission`~~ **removed** (Phase 62.1 — had no live imports); use `requireOrgPermission` / `requireAnyOrgPermission` from `lib/api/require-org-permission.ts` | canonical Route Handler gates |
 
 ## Remaining gaps (deferred)
 

@@ -32,3 +32,8 @@ Single source for **what is real vs roadmap** in the Equipify product. UI copy s
 - Catalog metadata: `lib/integrations/catalog-metadata.ts`
 - Marketing page: `app/(dashboard)/integrations/page.tsx`
 - Settings hub: `app/(dashboard)/settings/integrations/page.tsx`
+
+## Maintenance (Phase 62.1)
+
+- Integration catalog remains **single-sourced** in `catalog-metadata.ts` — do not reintroduce parallel marketing arrays or duplicate readiness badge maps.
+- Roadmap KPI on `/integrations` counts catalog rows with readiness **`planned`** only; reserved readiness values (`coming_soon`, `internal`, `enterprise`) stay in the type union for future rows without affecting KPIs until entries exist.

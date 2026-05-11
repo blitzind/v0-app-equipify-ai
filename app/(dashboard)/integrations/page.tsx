@@ -28,9 +28,8 @@ import {
 const liveCount = countMarketingCatalogByReadiness("live")
 const limitedCount = countMarketingCatalogByReadiness("limited")
 const betaCount = countMarketingCatalogByReadiness("beta")
-const roadmapCount =
-  countMarketingCatalogByReadiness("planned") +
-  countMarketingCatalogByReadiness("coming_soon")
+/** Planned roadmap rows only; `coming_soon` is reserved for future catalog entries (see `IntegrationCatalogReadiness`). */
+const roadmapCount = countMarketingCatalogByReadiness("planned")
 
 const KPIS = [
   {
