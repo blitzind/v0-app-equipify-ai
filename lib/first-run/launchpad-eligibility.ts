@@ -14,6 +14,8 @@ export function isLaunchpadStepApplicable(id: FirstRunStepId, p: OrgPermissions)
       return p.canEditQuotes
     case "invoice_sent":
       return p.canEditInvoices
+    case "blitzpay":
+      return p.canViewBilling || p.canManageWorkspaceSettings
     case "team_invite":
       return p.canManageWorkspaceSettings
     case "quickbooks":

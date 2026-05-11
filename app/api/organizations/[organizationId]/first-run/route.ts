@@ -44,6 +44,7 @@ export async function GET(
 
   const [
     orgRes,
+    blitzpaySettingsRes,
     custReal,
     custSample,
     eqReal,
@@ -56,8 +57,15 @@ export async function GET(
   ] = await Promise.all([
     supabase
       .from("organizations")
-      .select("industry, demo_seed_status")
+      .select(
+        "industry, demo_seed_status, stripe_connect_account_id, stripe_connect_onboarding_complete, stripe_connect_status",
+      )
       .eq("id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("blitzpay_org_settings")
+      .select("blitzpay_invoice_pay_enabled")
+      .eq("organization_id", organizationId)
       .maybeSingle(),
     supabase
       .from("customers")
@@ -113,8 +121,24 @@ export async function GET(
     return NextResponse.json({ error: "query_failed", message: orgRes.error.message }, { status: 500 })
   }
 
-  const org = orgRes.data as { industry?: string | null; demo_seed_status?: string | null } | null
+  const org = orgRes.data as {
+    industry?: string | null
+    demo_seed_status?: string | null
+    stripe_connect_account_id?: string | null
+    stripe_connect_onboarding_complete?: boolean | null
+    stripe_connect_status?: string | null
+  } | null
   const demoSeedSucceeded = org?.demo_seed_status === "succeeded"
+
+  const blitzpayPayEnabled = Boolean(
+    !blitzpaySettingsRes.error &&
+      (blitzpaySettingsRes.data as { blitzpay_invoice_pay_enabled?: boolean } | null)?.blitzpay_invoice_pay_enabled,
+  )
+  const connectAcct = String(org?.stripe_connect_account_id ?? "").trim()
+  const connectOnboardingDone =
+    Boolean(org?.stripe_connect_onboarding_complete) ||
+    String(org?.stripe_connect_status ?? "").toLowerCase() === "ready"
+  const blitzpaySetupDone = blitzpayPayEnabled || (connectAcct.length > 0 && connectOnboardingDone)
   const sampleCustomers = custSample.count ?? 0
   const hasSampleWorkspace = demoSeedSucceeded || sampleCustomers > 0
 
@@ -171,6 +195,13 @@ export async function GET(
       description: "Move an invoice beyond draft when you are ready to bill.",
       done: nInvSent >= 1,
       href: "/invoices",
+    },
+    {
+      id: "blitzpay",
+      label: "Set up BlitzPay",
+      description: "Accept online invoice payments and optionally pass processing fees to customers.",
+      done: blitzpaySetupDone,
+      href: "/settings/payments",
     },
     {
       id: "team_invite",
