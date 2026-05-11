@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { reconcileOrgInvoiceFromPayments } from "@/lib/org-quotes-invoices/repository"
 import { appendBlitzpayLedgerEntry, fetchBlitzpayPaymentIntentByStripeId } from "@/lib/blitzpay/payment-repository"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
+import { clawbackBlitzpayWalletOverpaymentForStripeRefund } from "@/lib/blitzpay/blitzpay-customer-wallet"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -163,6 +164,7 @@ export async function applyBlitzpayStripeRefundToInvoiceIfEligible(
     org_invoice_id: string | null
     org_quote_id?: string | null
     currency: string
+    customer_id?: string | null
   }
   if (piRow.org_quote_id && !piRow.org_invoice_id) {
     return applyBlitzpayStripeRefundToQuoteDeposit(admin, stripeRefund, piRow)
@@ -194,7 +196,7 @@ export async function applyBlitzpayStripeRefundToInvoiceIfEligible(
   const appliedOn = new Date(createdSec * 1000).toISOString().slice(0, 10)
   const chargeId = typeof charge.id === "string" ? charge.id : String(charge.id)
 
-  return applyBlitzpaySucceededRefund(admin, {
+  const out = await applyBlitzpaySucceededRefund(admin, {
     organizationId: piRow.organization_id,
     orgInvoiceId: piRow.org_invoice_id,
     orgInvoicePaymentId: pay.id,
@@ -207,6 +209,19 @@ export async function applyBlitzpayStripeRefundToInvoiceIfEligible(
     staffUserId: null,
     idempotencyKey: null,
   })
+  const cust = String(piRow.customer_id ?? "").trim()
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  if (out.applied && UUID_RE.test(cust)) {
+    await clawbackBlitzpayWalletOverpaymentForStripeRefund(admin, {
+      organizationId: piRow.organization_id,
+      customerId: cust,
+      stripePaymentIntentId: piId,
+      stripeRefundId: stripeRefund.id,
+      refundAmountCents: stripeAmount,
+    })
+  }
+  return out
 }
 
 /**

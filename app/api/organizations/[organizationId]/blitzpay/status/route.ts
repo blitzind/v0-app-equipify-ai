@@ -158,6 +158,11 @@ export async function GET(
             connectedAccountNetActivityCents: reporting.connectedAccountNetActivityCents,
             paymentMethodMix: reporting.paymentMethodMix,
             achSettlement: reporting.achSettlement,
+            customerWalletSpendableCreditTotalCents: reporting.customerWalletSpendableCreditTotalCents,
+            customerWalletRefundableCreditTotalCents: reporting.customerWalletRefundableCreditTotalCents,
+            customerUnappliedEstimateDepositTotalCents: reporting.customerUnappliedEstimateDepositTotalCents,
+            customerWalletAppliedToInvoicesWindowCents: reporting.customerWalletAppliedToInvoicesWindowCents,
+            customerWalletCreditInflowWindowCents: reporting.customerWalletCreditInflowWindowCents,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

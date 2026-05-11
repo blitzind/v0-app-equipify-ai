@@ -1609,6 +1609,15 @@ function PaymentsTab({
   const [diagOpen, setDiagOpen] = useState(false)
   const [diagBody, setDiagBody] = useState("")
   const [diagLoading, setDiagLoading] = useState(false)
+  const [customerWalletSummary, setCustomerWalletSummary] = useState<{
+    availableCreditCents: number
+    appliedToInvoicesCents: number
+    unappliedEstimateDepositCents: number
+  } | null>(null)
+  const [customerWalletLoading, setCustomerWalletLoading] = useState(false)
+  const [customerWalletRefresh, setCustomerWalletRefresh] = useState(0)
+  const [walletApplyDollars, setWalletApplyDollars] = useState("")
+  const [walletApplyBusy, setWalletApplyBusy] = useState(false)
   const canViewBlitzpayActivity = permissions.canEditInvoices || permissions.canViewFinancials
 
   const staffPreparePortionQuery = useMemo(() => {
@@ -1636,6 +1645,15 @@ function PaymentsTab({
       : invoice.status === "Paid"
         ? 0
         : grandTotal
+
+  const balanceDueCents =
+    invoice.balanceDueCents != null
+      ? Math.max(0, invoice.balanceDueCents)
+      : invoice.status === "Paid"
+        ? 0
+        : Math.round(Math.max(0, balance) * 100)
+
+  const canApplyWalletCredit = permissions.canEditInvoices && permissions.canViewFinancials
 
   const canStartBlitzpayPay =
     (permissions.canEditInvoices || permissions.canViewFinancials) &&
@@ -1823,6 +1841,51 @@ function PaymentsTab({
   }, [orgId, invoice.id, canViewBlitzpayActivity, invoice.totalPaidCents, blitzpayActivityRefresh])
 
   useEffect(() => {
+    if (!orgId || !invoice.customerId || !canViewBlitzpayPayCard) {
+      setCustomerWalletSummary(null)
+      setCustomerWalletLoading(false)
+      return
+    }
+    if (!BLITZPAY_PI_UUID_RE.test(invoice.customerId)) {
+      setCustomerWalletSummary(null)
+      return
+    }
+    let cancelled = false
+    setCustomerWalletLoading(true)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(orgId)}/customers/${encodeURIComponent(invoice.customerId)}/blitzpay/wallet`,
+          { credentials: "include", cache: "no-store" },
+        )
+        const body = (await res.json()) as {
+          availableCreditCents?: number
+          appliedToInvoicesCents?: number
+          unappliedEstimateDepositCents?: number
+          error?: string
+        }
+        if (cancelled) return
+        if (!res.ok) {
+          setCustomerWalletSummary(null)
+          return
+        }
+        setCustomerWalletSummary({
+          availableCreditCents: Math.max(0, Math.round(Number(body.availableCreditCents ?? 0))),
+          appliedToInvoicesCents: Math.max(0, Math.round(Number(body.appliedToInvoicesCents ?? 0))),
+          unappliedEstimateDepositCents: Math.max(0, Math.round(Number(body.unappliedEstimateDepositCents ?? 0))),
+        })
+      } catch {
+        if (!cancelled) setCustomerWalletSummary(null)
+      } finally {
+        if (!cancelled) setCustomerWalletLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, invoice.customerId, canViewBlitzpayPayCard, customerWalletRefresh])
+
+  useEffect(() => {
     if (!diagOpen || !orgId) return
     let cancelled = false
     setDiagLoading(true)
@@ -1876,6 +1939,46 @@ function PaymentsTab({
       cancelled = true
     }
   }, [orgId, creatorIds])
+
+  const applyWalletToInvoice = async () => {
+    const cents = parseUsdToCents(walletApplyDollars)
+    if (cents == null || cents < 1 || !orgId || !invoice.customerId) {
+      pushToast("Enter a valid dollar amount.", "error")
+      return
+    }
+    setWalletApplyBusy(true)
+    try {
+      const idem =
+        typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto ?
+          globalThis.crypto.randomUUID()
+        : `wallet_apply_${Date.now()}`
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/customers/${encodeURIComponent(invoice.customerId)}/blitzpay/wallet/apply-invoice`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoiceId: invoice.id, amountCents: cents, idempotencyKey: idem }),
+          credentials: "include",
+        },
+      )
+      const body = (await res.json()) as { ok?: boolean; appliedCents?: number; error?: string; message?: string }
+      if (!res.ok) {
+        pushToast(body.message ?? body.error ?? "Could not apply account credit.", "error")
+        return
+      }
+      const applied = Math.max(0, Math.round(Number(body.appliedCents ?? 0)))
+      if (applied < 1) {
+        pushToast("Nothing new to apply.", "success")
+      } else {
+        pushToast(`Applied ${fmtCurrency(applied / 100)} from customer account credit.`, "success")
+      }
+      setWalletApplyDollars("")
+      setCustomerWalletRefresh((n) => n + 1)
+      await refreshInvoices()
+    } finally {
+      setWalletApplyBusy(false)
+    }
+  }
 
   const summaryTone =
     invoice.paymentAllocationState === "paid" || invoice.paymentAllocationState === "overpaid"
@@ -2037,6 +2140,76 @@ function PaymentsTab({
           </p>
         </div>
       </div>
+
+      {canViewBlitzpayPayCard && orgId && invoice.customerId && BLITZPAY_PI_UUID_RE.test(invoice.customerId) ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">Customer account credit</p>
+          <p className="text-[10px] text-muted-foreground">
+            Spendable wallet balance and estimate deposits (deposits apply when an estimate becomes an invoice).
+          </p>
+          {customerWalletLoading ? (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              Loading wallet…
+            </p>
+          ) : customerWalletSummary ? (
+            <div className="space-y-2">
+              <div className="grid gap-1.5 text-[10px] text-muted-foreground sm:grid-cols-2">
+                <p>
+                  Available credit:{" "}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {fmtCurrency(customerWalletSummary.availableCreditCents / 100)}
+                  </span>
+                </p>
+                <p>
+                  Remaining collectible:{" "}
+                  <span className="font-semibold text-foreground tabular-nums">{fmtCurrency(balanceDueCents / 100)}</span>
+                </p>
+                <p className="sm:col-span-2">
+                  Deposits on open estimates:{" "}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {fmtCurrency(customerWalletSummary.unappliedEstimateDepositCents / 100)}
+                  </span>
+                </p>
+                <p className="sm:col-span-2">
+                  Applied from wallet (lifetime):{" "}
+                  <span className="font-semibold text-foreground tabular-nums">
+                    {fmtCurrency(customerWalletSummary.appliedToInvoicesCents / 100)}
+                  </span>
+                </p>
+              </div>
+              {canApplyWalletCredit && balanceDueCents > 0 && customerWalletSummary.availableCreditCents > 0 ? (
+                <div className="flex flex-wrap items-end gap-2 pt-1 border-t border-border/60">
+                  <label className="text-[10px] space-y-0.5">
+                    <span className="text-muted-foreground">Apply from credit (USD)</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={walletApplyDollars}
+                      onChange={(e) => setWalletApplyDollars(e.target.value)}
+                      className="block w-full max-w-[160px] rounded border border-border bg-background px-2 py-1 text-[11px]"
+                      placeholder={`Up to ${fmtCurrency(
+                        Math.min(customerWalletSummary.availableCreditCents, balanceDueCents) / 100,
+                      )}`}
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 text-[11px]"
+                    disabled={walletApplyBusy}
+                    onClick={() => void applyWalletToInvoice()}
+                  >
+                    {walletApplyBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : "Apply credit"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">Wallet data unavailable.</p>
+          )}
+        </div>
+      ) : null}
 
       {canViewBlitzpayPayCard && orgId ? (
         <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>

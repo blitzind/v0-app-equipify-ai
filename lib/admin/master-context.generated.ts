@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 259,
-  sqlMigrations: 160,
+  apiRouteHandlers: 263,
+  sqlMigrations: 161,
   dashboardPages: 60,
-  componentsTsx: 255,
-  libTsFiles: 547,
+  componentsTsx: 256,
+  libTsFiles: 548,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **259** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **160** |
+| API route handlers (\`app/api/**/route.ts\`) | **263** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **161** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
-| \`components/**/*.tsx\` | **255** |
-| \`lib/**/*.ts\` | **547** |
+| \`components/**/*.tsx\` | **256** |
+| \`lib/**/*.ts\` | **548** |
 
 ### Vercel crons
 
@@ -124,6 +124,9 @@ organizations/[organizationId]/communications/templates/[templateId]/route.ts
 organizations/[organizationId]/communications/templates/preview/route.ts
 organizations/[organizationId]/communications/templates/route.ts
 organizations/[organizationId]/customers/[customerId]/blitzpay/revoke-autopay/route.ts
+organizations/[organizationId]/customers/[customerId]/blitzpay/wallet/apply-invoice/route.ts
+organizations/[organizationId]/customers/[customerId]/blitzpay/wallet/manual-credit/route.ts
+organizations/[organizationId]/customers/[customerId]/blitzpay/wallet/route.ts
 organizations/[organizationId]/customers/[customerId]/contact-email/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/[locationId]/route.ts
 organizations/[organizationId]/customers/[customerId]/locations/route.ts
@@ -283,6 +286,7 @@ portal/quotes/route.ts
 portal/service-contracts/route.ts
 portal/service-requests/route.ts
 portal/session/logout/route.ts
+portal/wallet/route.ts
 portal/work-orders/route.ts
 session/account-summary/route.ts
 session/archive-access/route.ts

@@ -36,6 +36,8 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_collections_timeline", select: "id" },
   { name: "blitzpay_scheduled_invoice_payments", select: "id" },
   { name: "blitzpay_autopay_consent_events", select: "id" },
+  { name: "blitzpay_customer_wallets", select: "id, organization_id, customer_id" },
+  { name: "blitzpay_customer_wallet_ledger", select: "id, entry_kind, idempotency_key" },
 ]
 
 export type BlitzpaySchemaHealthResult =

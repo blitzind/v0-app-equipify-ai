@@ -14,6 +14,7 @@ import {
   Clock,
   ArrowRight,
   ChevronRight,
+  Wallet,
 } from "lucide-react"
 import { usePortalSession } from "@/components/portal/portal-session-context"
 
@@ -96,6 +97,14 @@ type RecentDocument = {
   statusLabel: string
   downloadPath: string | null
   viewPath: string | null
+}
+
+type PortalWalletPayload = {
+  accountCreditCents: number
+  refundableCreditCents: number
+  estimateDepositsOnOpenQuotesCents: number
+  appliedCreditsCents: number
+  recentActivity: Array<{ label: string; amountCents: number; createdAt: string }>
 }
 
 function fmtDate(d: string | null | undefined) {
@@ -225,6 +234,7 @@ function QuickAction({
 export default function PortalDashboardPage() {
   const { bootstrap } = usePortalSession()
   const [data, setData] = useState<DashboardPayload | null>(null)
+  const [wallet, setWallet] = useState<PortalWalletPayload | null | undefined>(undefined)
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -250,6 +260,19 @@ export default function PortalDashboardPage() {
         )
       })
       .catch(() => setRecentDocuments([]))
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/portal/wallet")
+      .then(async (r) => {
+        if (!r.ok) {
+          setWallet(null)
+          return
+        }
+        const j = (await r.json()) as PortalWalletPayload
+        setWallet(j)
+      })
+      .catch(() => setWallet(null))
   }, [])
 
   const greetingName = bootstrap?.displayName?.split(/\s+/)[0] ?? "there"
@@ -297,6 +320,66 @@ export default function PortalDashboardPage() {
             View Visits
           </Link>
         </div>
+      </div>
+
+      <div className="portal-card p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Wallet size={16} style={{ color: "var(--portal-accent)" }} aria-hidden />
+          <h3 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            Account balance
+          </h3>
+        </div>
+        {wallet === undefined ? (
+          <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+            Loading account balance…
+          </p>
+        ) : wallet ? (
+            <div className="space-y-3 text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-80">Credit on account</p>
+                  <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+                    {fmtCurrency(wallet.accountCreditCents)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-80">Applied to recent invoices</p>
+                  <p className="text-lg font-semibold tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+                    {fmtCurrency(wallet.appliedCreditsCents)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-80">Deposits on open estimates</p>
+                  <p className="font-medium tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+                    {fmtCurrency(wallet.estimateDepositsOnOpenQuotesCents)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-80">Outstanding on invoices</p>
+                  <p className="font-medium tabular-nums mt-0.5" style={{ color: "var(--portal-foreground)" }}>
+                    {fmtCurrency(data.stats.outstandingCents)}
+                  </p>
+                </div>
+              </div>
+              {wallet.recentActivity.length > 0 ? (
+                <div>
+                  <p className="text-[11px] font-medium mb-1.5 opacity-90">Recent activity</p>
+                  <ul className="space-y-1.5 text-[11px] max-h-36 overflow-y-auto pr-1">
+                    {wallet.recentActivity.slice(0, 8).map((a, idx) => (
+                      <li key={`${a.createdAt}-${idx}`} className="flex justify-between gap-2 border-b border-black/5 pb-1">
+                        <span className="truncate opacity-90">{a.label}</span>
+                        <span className="tabular-nums shrink-0">{fmtCurrency(a.amountCents)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+            Account balance details are temporarily unavailable.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -89,6 +89,7 @@ import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment
 import { CustomerPortalCertificateRuleCard } from "@/components/customers/customer-portal-certificate-rule-card"
 import { CustomerPortalConsolidatedDocsCard } from "@/components/customers/customer-portal-consolidated-docs-card"
 import { CustomerBillingTermsCard } from "@/components/customers/customer-billing-terms-card"
+import { CustomerBlitzpayWalletCard } from "@/components/customers/customer-blitzpay-wallet-card"
 import { CustomerInvoiceAgingCard } from "@/components/customers/customer-invoice-aging-card"
 import {
   combineInvoiceAgingSummaries,
@@ -2616,6 +2617,14 @@ export default function CustomerDetailPage() {
             <CustomerBillingTermsCard
               organizationId={activeOrgId}
               customerTermsCode={customer.defaultInvoiceTermsCode}
+            />
+          ) : null}
+
+          {canViewCustomerFinancials && activeOrgId ? (
+            <CustomerBlitzpayWalletCard
+              organizationId={activeOrgId}
+              customerId={customer.id}
+              allowManualCredit={permissions.canViewFinancials}
             />
           ) : null}
 

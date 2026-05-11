@@ -14,6 +14,12 @@ import {
 } from "@/lib/blitzpay/payment-repository"
 import { dispatchBlitzpayPaymentReceiptEmails } from "@/lib/blitzpay/blitzpay-receipt-email-dispatch"
 import { syncBlitzpayCustomerPaymentProfileFromPaymentIntent } from "@/lib/blitzpay/blitzpay-payment-profiles"
+import { creditBlitzpayWalletOverpaymentFromInvoicePayment } from "@/lib/blitzpay/blitzpay-customer-wallet"
+import {
+  balanceDueCentsForBlitzpay,
+  loadInvoiceForBlitzpayPay,
+  sumNetRecordedPaymentsCentsForBlitzpay,
+} from "@/lib/blitzpay/invoice-pay-eligibility"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -33,6 +39,9 @@ type BlitzpayPiRow = {
   save_payment_method_requested: boolean
   payment_method_type: string | null
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export async function completeBlitzpayPaymentIntentSucceeded(
   admin: SupabaseClient,
@@ -85,14 +94,40 @@ export async function completeBlitzpayPaymentIntentSucceeded(
 
   if (cErr) throw new Error(cErr.message)
 
-  const invoicePortionCents = Math.round(
-    Math.min(
-      Number(row.invoice_amount_cents ?? row.amount_cents),
-      Number(pi.amount_received ?? pi.amount ?? 0),
-    ),
+  const received = Math.round(Number(pi.amount_received ?? pi.amount ?? 0))
+  const portionCap = Math.round(
+    Math.min(Number(row.invoice_amount_cents ?? row.amount_cents), received),
   )
 
-  if (invoicePortionCents <= 0) {
+  const inv = await loadInvoiceForBlitzpayPay(admin, row.organization_id, row.org_invoice_id)
+  if (!inv) {
+    await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
+      status: "completed",
+      failureCode: null,
+    })
+    return
+  }
+  const netPaidBefore = await sumNetRecordedPaymentsCentsForBlitzpay(admin, row.organization_id, row.org_invoice_id)
+  const balanceDue = balanceDueCentsForBlitzpay(inv, netPaidBefore)
+  const applyAmount = Math.max(0, Math.min(balanceDue, portionCap))
+  const overpayCents = Math.max(0, received - applyAmount)
+
+  if (applyAmount <= 0 && received <= 0) {
+    await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
+      status: "completed",
+      failureCode: null,
+    })
+    return
+  }
+
+  if (applyAmount <= 0 && received > 0 && row.customer_id && UUID_RE.test(row.customer_id)) {
+    await creditBlitzpayWalletOverpaymentFromInvoicePayment(admin, {
+      organizationId: row.organization_id,
+      customerId: row.customer_id,
+      stripePaymentIntentId: pi.id,
+      amountCents: received,
+      orgInvoiceId: row.org_invoice_id,
+    })
     await updateBlitzpayInvoicePaymentAttemptsForInternalIntent(admin, row.id, {
       status: "completed",
       failureCode: null,
@@ -105,7 +140,7 @@ export async function completeBlitzpayPaymentIntentSucceeded(
     const ins = await insertOrgInvoicePaymentWithActor(admin, {
       organizationId: row.organization_id,
       invoiceId: row.org_invoice_id,
-      amountCents: invoicePortionCents,
+      amountCents: applyAmount,
       paidOn,
       paymentMethod: "card",
       reference: ref,
@@ -126,7 +161,7 @@ export async function completeBlitzpayPaymentIntentSucceeded(
     await appendBlitzpayLedgerEntry(admin, {
       organizationId: row.organization_id,
       entryType: "payment_captured",
-      amountCents: BigInt(invoicePortionCents),
+      amountCents: BigInt(applyAmount),
       currency: row.currency || "usd",
       stripeObjectId: chargeId,
       blitzpayPaymentIntentId: row.id,
@@ -134,12 +169,22 @@ export async function completeBlitzpayPaymentIntentSucceeded(
       metadata: { stripe_payment_intent_id: pi.id },
     })
 
+    if (overpayCents > 0 && row.customer_id && UUID_RE.test(row.customer_id)) {
+      await creditBlitzpayWalletOverpaymentFromInvoicePayment(admin, {
+        organizationId: row.organization_id,
+        customerId: row.customer_id,
+        stripePaymentIntentId: pi.id,
+        amountCents: overpayCents,
+        orgInvoiceId: row.org_invoice_id,
+      })
+    }
+
     void dispatchBlitzpayPaymentReceiptEmails(admin, {
       organizationId: row.organization_id,
       orgInvoiceId: row.org_invoice_id,
       internalBlitzpayPaymentIntentId: row.id,
       stripePaymentIntentId: pi.id,
-      invoicePortionCents,
+      invoicePortionCents: applyAmount,
       paidOnYyyyMmDd: paidOn,
       currency: row.currency || "usd",
       sourceKind: "webhook_auto",

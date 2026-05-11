@@ -31,6 +31,16 @@ export type BlitzpayOrgReportingSnapshot = {
   quotesWithBlitzpayDepositCollected: number
   /** Quotes flagged financing-ready (current rows; not window-scoped). */
   financingReadyQuotesCount: number
+  /** Sum of `available_credit_cents` across org wallets (customer credit liability). */
+  customerWalletSpendableCreditTotalCents: number
+  /** Sum of `refundable_credit_cents` across org wallets (hosted-pay overpayment bucket). */
+  customerWalletRefundableCreditTotalCents: number
+  /** Deposits held on quotes not yet converted to invoices (current; not window-scoped). */
+  customerUnappliedEstimateDepositTotalCents: number
+  /** Sum of wallet debits applied to invoices in the reporting window (requires `sinceIso`). */
+  customerWalletAppliedToInvoicesWindowCents: number
+  /** Credits posted to wallets in the window (overpayment + manual; requires `sinceIso`). */
+  customerWalletCreditInflowWindowCents: number
 }
 
 /**
@@ -185,17 +195,67 @@ export async function fetchBlitzpayOrgReportingSnapshot(
 
   let quotesWithBlitzpayDepositCollected = 0
   let financingReadyQuotesCount = 0
+  let customerUnappliedEstimateDepositTotalCents = 0
   {
     const { data: qRows, error: qErr } = await admin
       .from("org_quotes")
-      .select("blitzpay_deposit_collected_cents, blitzpay_financing_ready")
+      .select("blitzpay_deposit_collected_cents, blitzpay_financing_ready, blitzpay_converted_invoice_id")
       .eq("organization_id", organizationId)
       .is("archived_at", null)
     if (!qErr && qRows) {
-      for (const r of qRows as Array<{ blitzpay_deposit_collected_cents?: number | string; blitzpay_financing_ready?: boolean | null }>) {
+      for (const r of qRows as Array<{
+        blitzpay_deposit_collected_cents?: number | string
+        blitzpay_financing_ready?: boolean | null
+        blitzpay_converted_invoice_id?: string | null
+      }>) {
         const c = Math.max(0, Math.round(Number(r.blitzpay_deposit_collected_cents ?? 0)))
         if (c > 0) quotesWithBlitzpayDepositCollected += 1
         if (Boolean(r.blitzpay_financing_ready)) financingReadyQuotesCount += 1
+        if (!r.blitzpay_converted_invoice_id) {
+          customerUnappliedEstimateDepositTotalCents += c
+        }
+      }
+    }
+  }
+
+  let customerWalletSpendableCreditTotalCents = 0
+  let customerWalletRefundableCreditTotalCents = 0
+  {
+    const { data: wRows, error: wErr } = await admin
+      .from("blitzpay_customer_wallets")
+      .select("available_credit_cents, refundable_credit_cents")
+      .eq("organization_id", organizationId)
+    if (!wErr && wRows) {
+      for (const r of wRows as Array<{
+        available_credit_cents?: number | string
+        refundable_credit_cents?: number | string
+      }>) {
+        customerWalletSpendableCreditTotalCents += Math.max(0, Math.round(Number(r.available_credit_cents ?? 0)))
+        customerWalletRefundableCreditTotalCents += Math.max(0, Math.round(Number(r.refundable_credit_cents ?? 0)))
+      }
+    }
+  }
+
+  let customerWalletAppliedToInvoicesWindowCents = 0
+  let customerWalletCreditInflowWindowCents = 0
+  if (sinceIso) {
+    const { data: lRows, error: lErr } = await admin
+      .from("blitzpay_customer_wallet_ledger")
+      .select("entry_kind, amount_cents")
+      .eq("organization_id", organizationId)
+      .gte("created_at", sinceIso)
+    if (!lErr && lRows) {
+      for (const r of lRows as Array<{ entry_kind: string; amount_cents: number | string }>) {
+        const amt = Math.round(Number(r.amount_cents))
+        if (r.entry_kind === "debit_apply_invoice" && amt < 0) {
+          customerWalletAppliedToInvoicesWindowCents += -amt
+        }
+        if (
+          (r.entry_kind === "credit_overpayment_invoice" || r.entry_kind === "credit_manual") &&
+          amt > 0
+        ) {
+          customerWalletCreditInflowWindowCents += amt
+        }
       }
     }
   }
@@ -223,5 +283,10 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     achSettlement,
     quotesWithBlitzpayDepositCollected,
     financingReadyQuotesCount,
+    customerWalletSpendableCreditTotalCents,
+    customerWalletRefundableCreditTotalCents,
+    customerUnappliedEstimateDepositTotalCents,
+    customerWalletAppliedToInvoicesWindowCents,
+    customerWalletCreditInflowWindowCents,
   }
 }

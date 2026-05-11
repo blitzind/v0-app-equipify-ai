@@ -707,6 +707,28 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Refund on a quote-only PI reduces collected deposit when ledger rules allow.  
 6. Reporting snapshot shows estimate deposit volume separately from invoice-style captures.
 
+### 12.15 Phase 2N (native customer wallet, credits, unified balance)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260921120000_blitzpay_phase_2n_customer_wallet.sql` — `blitzpay_customer_wallets` (org + customer unique; `available_credit_cents`, `refundable_credit_cents`); `blitzpay_customer_wallet_ledger` (`entry_kind`, signed `amount_cents`, `idempotency_key` partial unique per org, optional `org_invoice_id` / `org_quote_id` / `work_order_id`). RLS: authenticated **select**; writes via service role in APIs. |
+| **Core** | `lib/blitzpay/blitzpay-customer-wallet.ts` — `getOrCreateBlitzpayCustomerWallet`, replay-safe `appendBlitzpayCustomerWalletLedger`, `creditBlitzpayWalletOverpaymentFromInvoicePayment` (Stripe PI–keyed), `appendBlitzpayManualWalletCredit`, `sumUnappliedEstimateDepositCentsForCustomer`, `fetchBlitzpayCustomerWalletSummary`, `applyBlitzpayWalletCreditToInvoice` (ledger debit then `org_invoice_payments` with rollback credit on insert failure), `clawbackBlitzpayWalletOverpaymentForStripeRefund`. |
+| **Webhooks / refunds** | Invoice pay completion posts overpayment to wallet when `customer_id` is known; refund apply triggers wallet clawback for credited overpayments. |
+| **APIs** | `GET …/customers/[customerId]/blitzpay/wallet` (`canViewFinancials` **or** `canViewBilling`); `POST …/wallet/manual-credit` (`canViewFinancials`); `POST …/wallet/apply-invoice` (**both** `canEditInvoices` and `canViewFinancials`); `GET /api/portal/wallet` — customer-safe JSON (no raw Stripe objects). |
+| **Staff UX** | Customer profile: `CustomerBlitzpayWalletCard`. Invoice **Payments** tab: wallet summary + apply-credit form when permitted. |
+| **Portal UX** | Dashboard “Account balance” — credit on account, applied credits, deposits on open estimates, outstanding invoices (plain language). |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds wallet totals (`customerWalletSpendableCreditTotalCents`, `customerWalletRefundableCreditTotalCents`, `customerUnappliedEstimateDepositTotalCents`, windowed `customerWalletAppliedToInvoicesWindowCents`, `customerWalletCreditInflowWindowCents`); exposed on `GET …/blitzpay/status` under `payoutVisibility`. |
+| **Tests** | `pnpm test:blitzpay-phase-2n` — static/idempotency/refund/ledger integrity checks. |
+
+#### Manual test checklist (Phase 2N)
+
+1. Overpayment on hosted invoice pay increases **spendable** wallet credit once (replay webhook → no double credit).  
+2. **Apply credit** to an invoice debits wallet and creates a single `org_invoice_payments` reference; repeat with same idempotency → no duplicate payment.  
+3. **Manual credit** (financials role) increases balance; billing-only can view wallet but not post manual credit.  
+4. **Refund** of an overpayment-backed PI runs wallet clawback up to credited amount.  
+5. Portal wallet response contains **no** Stripe payment intent or PM identifiers.  
+6. Reporting snapshot / status includes org-wide wallet and unapplied estimate deposit totals.
+
 ---
 
-*Phase 2A–2M vertical slice for hosted invoice pay + estimate deposits + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2N vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
