@@ -38,6 +38,12 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_autopay_consent_events", select: "id" },
   { name: "blitzpay_customer_wallets", select: "id, organization_id, customer_id" },
   { name: "blitzpay_customer_wallet_ledger", select: "id, entry_kind, idempotency_key" },
+  { name: "blitzpay_financing_providers", select: "code, display_name" },
+  { name: "blitzpay_org_financing_providers", select: "organization_id, provider_code" },
+  { name: "blitzpay_financing_sessions", select: "id, status" },
+  { name: "blitzpay_financing_offers", select: "id, session_id" },
+  { name: "blitzpay_payment_plans", select: "id, organization_id" },
+  { name: "blitzpay_payment_plan_installments", select: "id, payment_plan_id" },
 ]
 
 export type BlitzpaySchemaHealthResult =

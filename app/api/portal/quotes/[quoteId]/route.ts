@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { mapQuoteStatus } from "@/lib/portal/display-mappers"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 import { isPortalQuoteCustomerActionableDb, quotePastExpirationYmd } from "@/lib/org-quotes-invoices/quote-approval"
+import { buildPortalQuoteFinancingPayload } from "@/lib/blitzpay/blitzpay-portal-financing-copy"
 
 export const runtime = "nodejs"
 
@@ -65,6 +66,29 @@ export async function GET(
   const collected = Math.max(0, Math.round(Number(r.blitzpay_deposit_collected_cents ?? 0)))
   const remainingAfterDeposit = Math.max(0, amountCents - collected)
 
+  const { data: bpSettings } = await svc
+    .from("blitzpay_org_settings")
+    .select(
+      "blitzpay_financing_enabled, blitzpay_installment_plans_enabled, blitzpay_financing_monthly_estimate_disclosure",
+    )
+    .eq("organization_id", portalUser.organization_id)
+    .maybeSingle()
+  const bs = bpSettings as Record<string, unknown> | null
+  const depositTargetStored =
+    r.blitzpay_deposit_target_cents == null ? null : Math.round(Number(r.blitzpay_deposit_target_cents))
+  const portalFinancing = buildPortalQuoteFinancingPayload({
+    orgFinancingEnabled: Boolean(bs?.blitzpay_financing_enabled),
+    orgInstallmentPlansEnabled: Boolean(bs?.blitzpay_installment_plans_enabled),
+    monthlyEstimateDisclosure:
+      typeof bs?.blitzpay_financing_monthly_estimate_disclosure === "string" ?
+        bs.blitzpay_financing_monthly_estimate_disclosure
+      : null,
+    quoteAmountCents: amountCents,
+    depositCollectedCents: collected,
+    depositTargetCents: depositTargetStored,
+    financingReady: Boolean(r.blitzpay_financing_ready),
+  })
+
   return NextResponse.json({
     id: r.id as string,
     quoteNumber: String(r.quote_number ?? ""),
@@ -89,5 +113,6 @@ export async function GET(
     blitzpayRemainingQuoteCents: remainingAfterDeposit,
     blitzpayFinancingReady: Boolean(r.blitzpay_financing_ready),
     blitzpayConvertedInvoiceId: (r.blitzpay_converted_invoice_id as string | null) ?? null,
+    portalFinancing,
   })
 }

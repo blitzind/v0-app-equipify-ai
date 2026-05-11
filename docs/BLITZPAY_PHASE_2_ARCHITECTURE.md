@@ -729,6 +729,24 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Portal wallet response contains **no** Stripe payment intent or PM identifiers.  
 6. Reporting snapshot / status includes org-wide wallet and unapplied estimate deposit totals.
 
+### 12.16 Phase 2O (financing integrations, installment plans, revenue acceleration)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260922120000_blitzpay_phase_2o_financing_installments.sql` — `blitzpay_org_settings` flags (`blitzpay_financing_enabled`, `blitzpay_installment_plans_enabled`, `blitzpay_financing_monthly_estimate_disclosure`); catalog `blitzpay_financing_providers`; org toggles `blitzpay_org_financing_providers`; `blitzpay_financing_sessions` / `blitzpay_financing_offers` (opaque `external_*_ref` only, no underwriting payloads); `blitzpay_payment_plans` + `blitzpay_payment_plan_installments` (anchor invoice or quote; payments still via `org_invoice_payments`). |
+| **Pure libs** | `blitzpay-financing-status.ts`, `blitzpay-payment-plan-math.ts`, `blitzpay-financing-eligibility.ts`, `blitzpay-revenue-acceleration-insights.ts`, `blitzpay-portal-financing-copy.ts`, `blitzpay-payment-plan-service.ts` (idempotent plan create; cancels prior active/draft plans on same invoice). |
+| **APIs** | `GET …/blitzpay/financing/summary` (staff); `GET/POST …/invoices/[invoiceId]/blitzpay/payment-plan` (POST requires `canEditInvoices` + `canViewFinancials`, installments org-flag). |
+| **UX** | Settings → Payments: revenue acceleration toggles + optional monthly estimate copy. Quote drawer: read-only insights. Invoice Payments: installment schedule + templates. Portal quote: customer-safe “Payment options” card from `portalFinancing`. |
+| **Reporting** | Snapshot adds active plan count, installment paid cents total, financing session counts, deposit-before-work quote counts; surfaced on `GET …/blitzpay/status` `payoutVisibility`. |
+| **Tests** | `pnpm test:blitzpay-phase-2o` — math, eligibility, migration markers, API wiring static checks. |
+
+#### Manual test checklist (Phase 2O)
+
+1. Enable **installment plans** in Payments settings; create a **25/50/25** plan on an open invoice; reload — same idempotency key does not duplicate rows.  
+2. **Financing summary** lists provider catalog + org toggles (no secrets).  
+3. Portal quote shows **Payment options** when org financing is on; copy stays non-committal (not a credit offer).  
+4. Reporting / status includes new **payoutVisibility** fields when migrations are applied.
+
 ---
 
-*Phase 2A–2N vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2O vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

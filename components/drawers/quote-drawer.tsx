@@ -58,6 +58,8 @@ import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
+import { computeBlitzpayQuoteDepositTargetCents } from "@/lib/blitzpay/blitzpay-estimate-deposit-math"
+import { buildQuoteRevenueAccelerationInsights } from "@/lib/blitzpay/blitzpay-revenue-acceleration-insights"
 
 let toastCounter = 0
 
@@ -582,8 +584,32 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
   const [blitzpayQuoteLinks, setBlitzpayQuoteLinks] = useState<Array<{ id: string; status: string }>>([])
   const [blitzpayQuoteBusy, setBlitzpayQuoteBusy] = useState(false)
   const [blitzpayPctDraft, setBlitzpayPctDraft] = useState("")
+  const [financingOrgSnapshot, setFinancingOrgSnapshot] = useState<{
+    financingEnabled: boolean
+    installmentPlansEnabled: boolean
+  } | null>(null)
 
   const quote = quoteId ? quotes.find((q) => q.id === quoteId) ?? null : null
+
+  const quoteRevenueInsights = useMemo(() => {
+    if (!quote || !financingOrgSnapshot) return []
+    const quoteAmountCents = Math.round(quote.amount * 100)
+    const mode = quote.blitzpayDepositMode ?? "none"
+    const targetRes = computeBlitzpayQuoteDepositTargetCents({
+      quoteAmountCents,
+      mode,
+      fixedCents: quote.blitzpayDepositFixedCents,
+      percentageBps: quote.blitzpayDepositPercentageBps,
+    })
+    return buildQuoteRevenueAccelerationInsights({
+      orgFinancingEnabled: financingOrgSnapshot.financingEnabled,
+      orgInstallmentPlansEnabled: financingOrgSnapshot.installmentPlansEnabled,
+      quoteAmountCents,
+      depositCollectedCents: quote.blitzpayDepositCollectedCents ?? 0,
+      depositTargetCents: targetRes.ok ? targetRes.targetPayCents : null,
+      financingReady: Boolean(quote.blitzpayFinancingReady),
+    })
+  }, [quote, financingOrgSnapshot])
 
   const { emails: quoteCustomerEmails } = useCustomerOutboundEmails(
     orgStatus === "ready" ? activeOrgId : null,
@@ -664,6 +690,35 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
       cancelled = true
     }
   }, [quote, activeOrgId, orgStatus, canStaffBlitzpayQuote])
+
+  useEffect(() => {
+    if (!activeOrgId || orgStatus !== "ready" || !canStaffBlitzpayQuote) {
+      setFinancingOrgSnapshot(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(activeOrgId)}/blitzpay/financing/summary`,
+        { credentials: "include", cache: "no-store" },
+      )
+      const j = (await res.json().catch(() => ({}))) as {
+        org?: { financingEnabled?: boolean; installmentPlansEnabled?: boolean }
+      }
+      if (cancelled) return
+      if (!res.ok || !j.org) {
+        setFinancingOrgSnapshot(null)
+        return
+      }
+      setFinancingOrgSnapshot({
+        financingEnabled: Boolean(j.org.financingEnabled),
+        installmentPlansEnabled: Boolean(j.org.installmentPlansEnabled),
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeOrgId, orgStatus, canStaffBlitzpayQuote])
 
   function toast(message: string, tone: "success" | "info" = "success") {
     const id = ++toastCounter
@@ -1506,6 +1561,19 @@ export function QuoteDrawer({ quoteId, onClose }: QuoteDrawerProps) {
                         <li key={l.id} className="flex justify-between gap-2">
                           <span className="truncate">{l.id.slice(0, 8)}…</span>
                           <span className="shrink-0 text-muted-foreground">{l.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {quoteRevenueInsights.length > 0 ? (
+                  <div className="pt-2 border-t border-border/60 space-y-1.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground">Revenue acceleration (read-only)</p>
+                    <ul className="space-y-1.5">
+                      {quoteRevenueInsights.map((i) => (
+                        <li key={i.code} className="rounded border border-border/60 p-2 text-[10px]">
+                          <p className="font-medium text-foreground">{i.title}</p>
+                          <p className="text-muted-foreground mt-0.5 leading-relaxed">{i.detail}</p>
                         </li>
                       ))}
                     </ul>

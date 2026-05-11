@@ -76,6 +76,9 @@ export async function GET(
         "blitzpay_allow_save_payment_methods",
         "blitzpay_reminders_enabled",
         "blitzpay_receipt_emails_enabled",
+        "blitzpay_financing_enabled",
+        "blitzpay_installment_plans_enabled",
+        "blitzpay_financing_monthly_estimate_disclosure",
       ].join(", "),
     )
     .eq("organization_id", organizationId)
@@ -163,6 +166,13 @@ export async function GET(
             customerUnappliedEstimateDepositTotalCents: reporting.customerUnappliedEstimateDepositTotalCents,
             customerWalletAppliedToInvoicesWindowCents: reporting.customerWalletAppliedToInvoicesWindowCents,
             customerWalletCreditInflowWindowCents: reporting.customerWalletCreditInflowWindowCents,
+            blitzpayActivePaymentPlansCount: reporting.blitzpayActivePaymentPlansCount,
+            blitzpayPaymentPlanInstallmentsPaidCentsTotal: reporting.blitzpayPaymentPlanInstallmentsPaidCentsTotal,
+            blitzpayFinancingSessionsTotal: reporting.blitzpayFinancingSessionsTotal,
+            blitzpayFinancingSessionsFundedOrReleasedCount: reporting.blitzpayFinancingSessionsFundedOrReleasedCount,
+            blitzpayFinancingSessionsCreatedWindowCount: reporting.blitzpayFinancingSessionsCreatedWindowCount,
+            estimateDepositBeforeWorkQuoteCount: reporting.estimateDepositBeforeWorkQuoteCount,
+            estimateOpenQuotesWithTotalCount: reporting.estimateOpenQuotesWithTotalCount,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

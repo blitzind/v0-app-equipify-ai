@@ -1791,6 +1791,8 @@ export interface AdminInvoice {
   amount: number
   status: InvoiceStatus
   createdBy: string
+  /** org_invoices.title — invoice subject / summary (separate from line-item descriptions). */
+  title?: string
   lineItems: {
     description: string
     qty: number

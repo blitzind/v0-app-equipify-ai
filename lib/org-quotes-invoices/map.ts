@@ -116,18 +116,136 @@ export type LineItemJson = {
 
 export type QuoteInvoiceLineItem = LineItemJson
 
+/** Notes / instructions when structured `line_items` JSON is empty or legacy. */
+export function buildInvoiceTextualDetailFallback(inv: {
+  notes?: string | null
+  internalNotes?: string | null
+  invoiceInstructions?: string | null
+}): string | null {
+  const parts: string[] = []
+  const n = inv.notes?.trim()
+  if (n) parts.push(n)
+  const ins = inv.invoiceInstructions?.trim()
+  if (ins) parts.push(`Customer instructions:\n${ins}`)
+  const intn = inv.internalNotes?.trim()
+  if (intn) parts.push(`Internal notes:\n${intn}`)
+  if (parts.length === 0) return null
+  return parts.join("\n\n")
+}
+
+function coerceLineItemsArray(raw: unknown): unknown[] | null {
+  if (raw == null) return null
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === "string") {
+    const t = raw.trim()
+    if (!t) return null
+    try {
+      const parsed = JSON.parse(t) as unknown
+      if (Array.isArray(parsed)) return parsed
+      if (parsed && typeof parsed === "object") {
+        const o = parsed as Record<string, unknown>
+        if (Array.isArray(o.lines)) return o.lines
+        if (Array.isArray(o.items)) return o.items
+        if (Array.isArray(o.line_items)) return o.line_items
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>
+    if (Array.isArray(o.lines)) return o.lines
+    if (Array.isArray(o.items)) return o.items
+    if (Array.isArray(o.line_items)) return o.line_items
+  }
+  return null
+}
+
+function pickTrimmedString(...vals: unknown[]): string {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v.trim()
+  }
+  return ""
+}
+
+function pickLineItemDescription(o: Record<string, unknown>): string {
+  const itemRef = o.ItemRef
+  let refName = ""
+  if (itemRef && typeof itemRef === "object") {
+    const nm = (itemRef as Record<string, unknown>).name
+    if (typeof nm === "string" && nm.trim()) refName = nm.trim()
+  }
+  return pickTrimmedString(
+    o.description,
+    o.name,
+    o.memo,
+    o.line_description,
+    o.title,
+    o.service_description,
+    refName,
+  )
+}
+
+function pickNumeric(...vals: unknown[]): number | null {
+  for (const c of vals) {
+    if (typeof c === "number" && Number.isFinite(c)) return c
+    if (typeof c === "string" && c.trim()) {
+      const n = Number(c)
+      if (Number.isFinite(n)) return n
+    }
+  }
+  return null
+}
+
+function pickLineItemQty(o: Record<string, unknown>): number {
+  const q = pickNumeric(o.qty, o.quantity, o.Qty, o.count, o.quantity_ordered)
+  if (q == null || q <= 0) return 1
+  return q
+}
+
+function pickLineItemUnitDollars(o: Record<string, unknown>, qty: number): number {
+  const direct = pickNumeric(o.unit, o.unit_price, o.unitPrice, o.rate, o.UnitPrice, o.price, o.unit_amount)
+  if (direct != null && direct !== 0) return direct
+
+  const totalD = pickNumeric(o.amount, o.line_total, o.total, o.lineTotal, o.Amount, o.subtotal, o.line_amount)
+  if (totalD != null && qty > 0) return totalD / qty
+
+  const cents = pickNumeric(
+    o.line_total_cents,
+    o.amount_cents,
+    o.total_cents,
+    o.line_amount_cents,
+    o.extended_price_cents,
+  )
+  if (cents != null && qty > 0) return cents / 100 / qty
+
+  return 0
+}
+
 export function parseLineItems(raw: unknown): LineItemJson[] {
-  if (!Array.isArray(raw)) return []
+  const arr = coerceLineItemsArray(raw)
+  if (!arr) return []
   const out: LineItemJson[] = []
-  for (const item of raw) {
+  for (const item of arr) {
     if (!item || typeof item !== "object") continue
     const o = item as Record<string, unknown>
     const cid = o.catalog_item_id
-    const row: LineItemJson = {
-      description: String(o.description ?? ""),
-      qty: typeof o.qty === "number" ? o.qty : Number(o.qty) || 0,
-      unit: typeof o.unit === "number" ? o.unit : Number(o.unit) || 0,
+    const qty = pickLineItemQty(o)
+    let unit = pickLineItemUnitDollars(o, qty)
+    let description = pickLineItemDescription(o)
+
+    const lineTotal = qty * unit
+    if (!description && lineTotal !== 0) {
+      description = "Line item"
     }
+
+    const row: LineItemJson = {
+      description,
+      qty,
+      unit,
+    }
+
     const sourceRef = o.source_ref
     if (typeof sourceRef === "string" && sourceRef.trim()) row.source_ref = sourceRef.trim()
     if (typeof o.taxable === "boolean") row.taxable = o.taxable
@@ -142,6 +260,12 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
     if (typeof sku === "string" && sku.trim()) row.sku = sku.trim()
     if (typeof itemType === "string" && itemType.trim()) row.item_type = itemType.trim()
     if (typeof unitLabel === "string" && unitLabel.trim()) row.unit_label = unitLabel.trim()
+
+    const hasMoney = Math.abs(row.qty * row.unit) > 1e-9
+    const hasMeta = Boolean(row.catalog_item_id) || Boolean(row.sku?.trim())
+    const hasType = Boolean(row.item_type?.trim())
+    if (!row.description.trim() && !hasMoney && !hasMeta && !hasType) continue
+
     out.push(row)
   }
   return out
@@ -311,6 +435,7 @@ export function mapOrgInvoiceToAdmin(
     amount: Math.round(row.amount_cents) / 100,
     status: invoiceStatusDbToUi(row.status),
     createdBy: names.createdByLabel,
+    title: row.title?.trim() ? row.title.trim() : undefined,
     lineItems,
     notes: row.notes ?? "",
     quoteId: row.quote_id ?? undefined,

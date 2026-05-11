@@ -41,6 +41,20 @@ export type BlitzpayOrgReportingSnapshot = {
   customerWalletAppliedToInvoicesWindowCents: number
   /** Credits posted to wallets in the window (overpayment + manual; requires `sinceIso`). */
   customerWalletCreditInflowWindowCents: number
+  /** Active installment / staged plans for the org (current). */
+  blitzpayActivePaymentPlansCount: number
+  /** Lifetime sum of `paid_cents` on installments for org plans. */
+  blitzpayPaymentPlanInstallmentsPaidCentsTotal: number
+  /** Financing sessions recorded for the org (all time). */
+  blitzpayFinancingSessionsTotal: number
+  /** Sessions in funded or payout_released state. */
+  blitzpayFinancingSessionsFundedOrReleasedCount: number
+  /** Sessions created in the reporting window (requires `sinceIso`). */
+  blitzpayFinancingSessionsCreatedWindowCount: number
+  /** Open quotes (not archived, not converted) with deposit collected > 0. */
+  estimateDepositBeforeWorkQuoteCount: number
+  /** Open quotes (not archived, not converted) with positive total. */
+  estimateOpenQuotesWithTotalCount: number
 }
 
 /**
@@ -196,10 +210,14 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let quotesWithBlitzpayDepositCollected = 0
   let financingReadyQuotesCount = 0
   let customerUnappliedEstimateDepositTotalCents = 0
+  let estimateDepositBeforeWorkQuoteCount = 0
+  let estimateOpenQuotesWithTotalCount = 0
   {
     const { data: qRows, error: qErr } = await admin
       .from("org_quotes")
-      .select("blitzpay_deposit_collected_cents, blitzpay_financing_ready, blitzpay_converted_invoice_id")
+      .select(
+        "blitzpay_deposit_collected_cents, blitzpay_financing_ready, blitzpay_converted_invoice_id, amount_cents",
+      )
       .eq("organization_id", organizationId)
       .is("archived_at", null)
     if (!qErr && qRows) {
@@ -207,12 +225,16 @@ export async function fetchBlitzpayOrgReportingSnapshot(
         blitzpay_deposit_collected_cents?: number | string
         blitzpay_financing_ready?: boolean | null
         blitzpay_converted_invoice_id?: string | null
+        amount_cents?: number | string
       }>) {
         const c = Math.max(0, Math.round(Number(r.blitzpay_deposit_collected_cents ?? 0)))
+        const amt = Math.max(0, Math.round(Number(r.amount_cents ?? 0)))
         if (c > 0) quotesWithBlitzpayDepositCollected += 1
         if (Boolean(r.blitzpay_financing_ready)) financingReadyQuotesCount += 1
         if (!r.blitzpay_converted_invoice_id) {
           customerUnappliedEstimateDepositTotalCents += c
+          if (amt > 0) estimateOpenQuotesWithTotalCount += 1
+          if (c > 0 && amt > 0) estimateDepositBeforeWorkQuoteCount += 1
         }
       }
     }
@@ -260,6 +282,65 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  let blitzpayActivePaymentPlansCount = 0
+  let blitzpayPaymentPlanInstallmentsPaidCentsTotal = 0
+  let blitzpayFinancingSessionsTotal = 0
+  let blitzpayFinancingSessionsFundedOrReleasedCount = 0
+  let blitzpayFinancingSessionsCreatedWindowCount = 0
+  {
+    const { count, error: pcErr } = await admin
+      .from("blitzpay_payment_plans")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+    if (!pcErr && count != null) blitzpayActivePaymentPlansCount = count
+  }
+  {
+    const { data: planRows, error: prErr } = await admin
+      .from("blitzpay_payment_plans")
+      .select("id")
+      .eq("organization_id", organizationId)
+    if (!prErr && planRows && planRows.length > 0) {
+      const ids = (planRows as Array<{ id: string }>).map((p) => p.id)
+      const chunk = 200
+      for (let i = 0; i < ids.length; i += chunk) {
+        const slice = ids.slice(i, i + chunk)
+        const { data: instRows, error: irErr } = await admin
+          .from("blitzpay_payment_plan_installments")
+          .select("paid_cents")
+          .in("payment_plan_id", slice)
+        if (irErr) break
+        for (const r of instRows ?? []) {
+          blitzpayPaymentPlanInstallmentsPaidCentsTotal += Math.max(
+            0,
+            Math.round(Number((r as { paid_cents: number }).paid_cents ?? 0)),
+          )
+        }
+      }
+    }
+  }
+  {
+    const { count, error: fsErr } = await admin
+      .from("blitzpay_financing_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+    if (!fsErr && count != null) blitzpayFinancingSessionsTotal = count
+    const { count: fr, error: frErr } = await admin
+      .from("blitzpay_financing_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("status", ["funded", "payout_released"])
+    if (!frErr && fr != null) blitzpayFinancingSessionsFundedOrReleasedCount = fr
+    if (sinceIso) {
+      const { count: fw, error: fwErr } = await admin
+        .from("blitzpay_financing_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .gte("created_at", sinceIso)
+      if (!fwErr && fw != null) blitzpayFinancingSessionsCreatedWindowCount = fw
+    }
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -288,5 +369,12 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     customerUnappliedEstimateDepositTotalCents,
     customerWalletAppliedToInvoicesWindowCents,
     customerWalletCreditInflowWindowCents,
+    blitzpayActivePaymentPlansCount,
+    blitzpayPaymentPlanInstallmentsPaidCentsTotal,
+    blitzpayFinancingSessionsTotal,
+    blitzpayFinancingSessionsFundedOrReleasedCount,
+    blitzpayFinancingSessionsCreatedWindowCount,
+    estimateDepositBeforeWorkQuoteCount,
+    estimateOpenQuotesWithTotalCount,
   }
 }

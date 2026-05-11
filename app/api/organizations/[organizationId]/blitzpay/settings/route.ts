@@ -51,6 +51,9 @@ export async function GET(
         "blitzpay_scheduled_payments_enabled",
         "blitzpay_reminders_enabled",
         "blitzpay_receipt_emails_enabled",
+        "blitzpay_financing_enabled",
+        "blitzpay_installment_plans_enabled",
+        "blitzpay_financing_monthly_estimate_disclosure",
       ].join(", "),
     )
     .eq("organization_id", gate.organizationId)
@@ -92,6 +95,9 @@ export async function PATCH(
     blitzpay_scheduled_payments_enabled?: boolean
     blitzpay_reminders_enabled?: boolean
     blitzpay_receipt_emails_enabled?: boolean
+    blitzpay_financing_enabled?: boolean
+    blitzpay_installment_plans_enabled?: boolean
+    blitzpay_financing_monthly_estimate_disclosure?: string | null
   }
   try {
     body = (await request.json()) as typeof body
@@ -147,7 +153,7 @@ export async function PATCH(
       Math.max(50, Math.round(Number(body.blitzpay_partial_payment_min_cents)))
     : 50
 
-  const patchBase = {
+  const patchBase: Record<string, unknown> = {
     blitzpay_invoice_pay_enabled: Boolean(body.blitzpay_invoice_pay_enabled),
     blitzpay_payment_method_card_enabled: cardEnabled,
     blitzpay_payment_method_ach_enabled: achEnabled,
@@ -162,6 +168,19 @@ export async function PATCH(
     blitzpay_reminders_enabled: body.blitzpay_reminders_enabled !== false,
     blitzpay_receipt_emails_enabled: body.blitzpay_receipt_emails_enabled !== false,
     updated_at: new Date().toISOString(),
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "blitzpay_financing_enabled")) {
+    patchBase.blitzpay_financing_enabled = Boolean(body.blitzpay_financing_enabled)
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "blitzpay_installment_plans_enabled")) {
+    patchBase.blitzpay_installment_plans_enabled = Boolean(body.blitzpay_installment_plans_enabled)
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "blitzpay_financing_monthly_estimate_disclosure")) {
+    patchBase.blitzpay_financing_monthly_estimate_disclosure =
+      body.blitzpay_financing_monthly_estimate_disclosure === null ? null
+      : typeof body.blitzpay_financing_monthly_estimate_disclosure === "string" ?
+        body.blitzpay_financing_monthly_estimate_disclosure.trim().slice(0, 2000) || null
+      : null
   }
   const patch = gate.platformAdmin
     ? {
@@ -201,6 +220,9 @@ export async function PATCH(
         "blitzpay_scheduled_payments_enabled",
         "blitzpay_reminders_enabled",
         "blitzpay_receipt_emails_enabled",
+        "blitzpay_financing_enabled",
+        "blitzpay_installment_plans_enabled",
+        "blitzpay_financing_monthly_estimate_disclosure",
       ].join(", "),
     )
     .maybeSingle()

@@ -41,6 +41,9 @@ type BlitzPayStatusPayload = {
     blitzpay_allow_save_payment_methods?: boolean
     blitzpay_reminders_enabled?: boolean
     blitzpay_receipt_emails_enabled?: boolean
+    blitzpay_financing_enabled?: boolean
+    blitzpay_installment_plans_enabled?: boolean
+    blitzpay_financing_monthly_estimate_disclosure?: string | null
   } | null
   payoutVisibility?: {
     estimatedNetPayoutCents: number
@@ -53,6 +56,8 @@ type BlitzPayStatusPayload = {
     paymentMethodMix?: { card: number; us_bank_account: number; unknown: number }
     achSettlement?: { pending: number; settled: number; failed: number }
     payoutStatus: string
+    blitzpayActivePaymentPlansCount?: number
+    blitzpayFinancingSessionsTotal?: number
   } | null
   operationalAlerts?: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }>
   storedPaymentProfiles?: {
@@ -164,6 +169,9 @@ function BlitzPaySettingsPageInner() {
   const [saveMethodsEnabled, setSaveMethodsEnabled] = useState(true)
   const [remindersEnabled, setRemindersEnabled] = useState(true)
   const [receiptEmailsEnabled, setReceiptEmailsEnabled] = useState(true)
+  const [financingEnabled, setFinancingEnabled] = useState(false)
+  const [installmentPlansEnabled, setInstallmentPlansEnabled] = useState(false)
+  const [financingMonthlyCopy, setFinancingMonthlyCopy] = useState("")
   const [launchLoading, setLaunchLoading] = useState(false)
   const [launchItems, setLaunchItems] = useState<BlitzpayLaunchChecklistItem[] | null>(null)
   const [launchScore, setLaunchScore] = useState<{ passed: number; total: number } | null>(null)
@@ -201,6 +209,13 @@ function BlitzPaySettingsPageInner() {
         setSaveMethodsEnabled(s.blitzpay_allow_save_payment_methods !== false)
         setRemindersEnabled(s.blitzpay_reminders_enabled !== false)
         setReceiptEmailsEnabled(s.blitzpay_receipt_emails_enabled !== false)
+        setFinancingEnabled(Boolean(s.blitzpay_financing_enabled))
+        setInstallmentPlansEnabled(Boolean(s.blitzpay_installment_plans_enabled))
+        setFinancingMonthlyCopy(
+          typeof s.blitzpay_financing_monthly_estimate_disclosure === "string" ?
+            s.blitzpay_financing_monthly_estimate_disclosure
+          : "",
+        )
       }
     } finally {
       setLoading(false)
@@ -404,6 +419,9 @@ function BlitzPaySettingsPageInner() {
           blitzpay_allow_save_payment_methods: saveMethodsEnabled,
           blitzpay_reminders_enabled: remindersEnabled,
           blitzpay_receipt_emails_enabled: receiptEmailsEnabled,
+          blitzpay_financing_enabled: financingEnabled,
+          blitzpay_installment_plans_enabled: installmentPlansEnabled,
+          blitzpay_financing_monthly_estimate_disclosure: financingMonthlyCopy.trim() || null,
         }),
       })
       const j = (await res.json()) as { error?: string; message?: string }
@@ -674,6 +692,48 @@ function BlitzPaySettingsPageInner() {
                 />
                 Send automatic payment receipt emails after successful checkout
               </label>
+              <p className="text-xs font-semibold pt-2 border-t border-border mt-2">Revenue acceleration (Phase 2O)</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Financing workflows are provider-agnostic placeholders — Equipify does not make lending decisions.
+                Installment plans schedule expectations; payments still post through BlitzPay and standard invoice
+                payments.
+              </p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={financingEnabled}
+                  onChange={(e) => setFinancingEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Enable financing-ready messaging on quotes and portal
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={installmentPlansEnabled}
+                  onChange={(e) => setInstallmentPlansEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Allow staged / installment payment plans on invoices
+              </label>
+              <label className="text-xs text-muted-foreground block">
+                Optional monthly estimate copy (include the literal token {"{{amount}}"} for the estimate total)
+                <textarea
+                  className="mt-1 w-full min-h-[72px] rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={financingMonthlyCopy}
+                  onChange={(e) => setFinancingMonthlyCopy(e.target.value)}
+                  disabled={!canConfigure || !financingEnabled}
+                  placeholder="Example: illustrative payment plans may be available for projects around {{amount}}."
+                />
+              </label>
+              {bp?.payoutVisibility?.blitzpayActivePaymentPlansCount != null ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Active installment plans (org): {bp.payoutVisibility.blitzpayActivePaymentPlansCount} · Financing
+                  sessions: {bp.payoutVisibility.blitzpayFinancingSessionsTotal ?? 0}
+                </p>
+              ) : null}
               <label className="text-xs text-muted-foreground block">
                 ACH timing guidance
                 <input

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 263,
-  sqlMigrations: 161,
+  apiRouteHandlers: 265,
+  sqlMigrations: 162,
   dashboardPages: 60,
   componentsTsx: 256,
-  libTsFiles: 548,
+  libTsFiles: 554,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **263** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **161** |
+| API route handlers (\`app/api/**/route.ts\`) | **265** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **162** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **256** |
-| \`lib/**/*.ts\` | **548** |
+| \`lib/**/*.ts\` | **554** |
 
 ### Vercel crons
 
@@ -97,6 +97,7 @@ organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
+organizations/[organizationId]/blitzpay/financing/summary/route.ts
 organizations/[organizationId]/blitzpay/launch-readiness/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
@@ -176,6 +177,7 @@ organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/diagnostics/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-link/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-links/[linkId]/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-plan/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/resend-receipt/route.ts

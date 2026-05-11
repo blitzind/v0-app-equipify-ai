@@ -18,7 +18,10 @@ import { useOrgArchivePermissions } from "@/lib/use-org-archive-permissions"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
-import type { QuoteInvoiceLineItem } from "@/lib/org-quotes-invoices/map"
+import {
+  buildInvoiceTextualDetailFallback,
+  type QuoteInvoiceLineItem,
+} from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
 import { buildQuoteInvoiceLineSnapshot } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
@@ -62,6 +65,7 @@ import {
   mapUiPaymentMethodToDb,
   paymentAllocationUiLabel,
 } from "@/lib/billing/invoice-payment-allocation"
+import { buildInvoiceRevenueAccelerationInsights } from "@/lib/blitzpay/blitzpay-revenue-acceleration-insights"
 import {
   invoiceGrandTotalDollarsDisplay,
   invoiceStoredSubtotalDollars,
@@ -389,6 +393,27 @@ function InvoicePreview({
   device: PreviewDevice
   documentBranding: OrganizationDocumentBranding
 }) {
+  const previewLines = useMemo(
+    () =>
+      invoice.lineItems.filter((item) => {
+        const desc = (item.description ?? "").trim()
+        const hasMoney = Math.abs(item.qty * item.unit) > 1e-9
+        return (
+          desc.length > 0 ||
+          hasMoney ||
+          Boolean(item.sku?.trim()) ||
+          Boolean(item.catalog_item_id) ||
+          Boolean(item.item_type?.trim())
+        )
+      }),
+    [invoice.lineItems],
+  )
+  const titleText = (invoice.title ?? "").trim()
+  const textualFallback = useMemo(
+    () => buildInvoiceTextualDetailFallback(invoice),
+    [invoice.notes, invoice.internalNotes, invoice.invoiceInstructions],
+  )
+
   const invoiceLabel = invoice.invoiceNumber?.trim() || "Invoice"
   const storedSubtotal = invoiceStoredSubtotalDollars(invoice)
   const taxAmt = settings.showTax ? invoiceTaxDollars(invoice) : 0
@@ -527,6 +552,13 @@ function InvoicePreview({
           </div>
         )}
 
+        {titleText ? (
+          <div className="px-8 py-3 border-b border-gray-100 bg-gray-50/40 dark:bg-[#111827]/40">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">Invoice subject</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-foreground leading-snug">{titleText}</p>
+          </div>
+        ) : null}
+
         {/* Line items */}
         {settings.showLineItems && (
           <div className="px-8 py-5">
@@ -541,28 +573,12 @@ function InvoicePreview({
                 </tr>
               </thead>
               <tbody>
-                {invoice.lineItems.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={Math.max(
-                        1,
-                        (settings.showLineItemNames ? 1 : 0) +
-                          (settings.showSku ? 1 : 0) +
-                          (settings.showQty ? 1 : 0) +
-                          (settings.showUnitPrice ? 1 : 0) +
-                          (settings.showTotalPrice ? 1 : 0),
-                      )}
-                      className="py-4 text-[10px] text-gray-500 italic"
-                    >
-                      No line items on this invoice — totals reflect the stored invoice amounts.
-                    </td>
-                  </tr>
-                ) : (
-                  invoice.lineItems.map((item, i) => (
+                {previewLines.length > 0 ? (
+                  previewLines.map((item, i) => (
                     <tr key={i} className="border-b border-gray-100">
                       {settings.showLineItemNames && (
                         <td className="py-2.5 pr-4">
-                          <p className="text-xs text-gray-800 font-medium">{item.description || "—"}</p>
+                          <p className="text-xs text-gray-800 font-medium">{item.description?.trim() ? item.description : "—"}</p>
                           {settings.showLineItemDescriptions && item.item_type?.trim() ? (
                             <p className="text-[10px] text-gray-400 mt-0.5">{item.item_type.trim()}</p>
                           ) : null}
@@ -584,6 +600,54 @@ function InvoicePreview({
                       )}
                     </tr>
                   ))
+                ) : textualFallback ? (
+                  <tr>
+                    <td
+                      colSpan={Math.max(
+                        1,
+                        (settings.showLineItemNames ? 1 : 0) +
+                          (settings.showSku ? 1 : 0) +
+                          (settings.showQty ? 1 : 0) +
+                          (settings.showUnitPrice ? 1 : 0) +
+                          (settings.showTotalPrice ? 1 : 0),
+                      )}
+                      className="py-4 text-[10px] text-gray-700 dark:text-foreground/90 leading-relaxed whitespace-pre-wrap"
+                    >
+                      {textualFallback}
+                    </td>
+                  </tr>
+                ) : titleText ? (
+                  <tr>
+                    <td
+                      colSpan={Math.max(
+                        1,
+                        (settings.showLineItemNames ? 1 : 0) +
+                          (settings.showSku ? 1 : 0) +
+                          (settings.showQty ? 1 : 0) +
+                          (settings.showUnitPrice ? 1 : 0) +
+                          (settings.showTotalPrice ? 1 : 0),
+                      )}
+                      className="py-3 text-[10px] text-gray-500 italic"
+                    >
+                      No structured line items — totals below use the stored invoice amounts. See invoice subject above.
+                    </td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={Math.max(
+                        1,
+                        (settings.showLineItemNames ? 1 : 0) +
+                          (settings.showSku ? 1 : 0) +
+                          (settings.showQty ? 1 : 0) +
+                          (settings.showUnitPrice ? 1 : 0) +
+                          (settings.showTotalPrice ? 1 : 0),
+                      )}
+                      className="py-4 text-[10px] text-gray-500 italic"
+                    >
+                      No line items or invoice description on file — totals reflect the stored invoice amounts.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -1403,6 +1467,14 @@ function InfoTab({
         </div>
       )}
 
+      {!editing && invoice.title?.trim() ? (
+        <Section title="Invoice subject">
+          <p className={cn(DRAWER_NESTED_CARD, "text-xs font-medium text-foreground leading-relaxed p-3")}>
+            {invoice.title.trim()}
+          </p>
+        </Section>
+      ) : null}
+
       {/* Line items */}
       <Section title="Line Items">
         {editing ? (
@@ -1412,7 +1484,12 @@ function InfoTab({
             extraActions={catalogLineActions}
           />
         ) : (
-          <ReadOnlyLineItems items={invoice.lineItems} total={invoice.amount} maskMoney={!showFinancials} />
+          <ReadOnlyLineItems
+            items={invoice.lineItems}
+            total={invoice.amount}
+            maskMoney={!showFinancials}
+            detailFallback={buildInvoiceTextualDetailFallback(invoice)}
+          />
         )}
       </Section>
 
@@ -1618,6 +1695,25 @@ function PaymentsTab({
   const [customerWalletRefresh, setCustomerWalletRefresh] = useState(0)
   const [walletApplyDollars, setWalletApplyDollars] = useState("")
   const [walletApplyBusy, setWalletApplyBusy] = useState(false)
+  const [orgFinancingFlags, setOrgFinancingFlags] = useState<{
+    financingEnabled: boolean
+    installmentPlansEnabled: boolean
+  } | null>(null)
+  const [paymentPlanInfo, setPaymentPlanInfo] = useState<{
+    plan: { id: string; status: string; planKind: string; totalTargetCents: number } | null
+    installments: Array<{
+      id: string
+      sequence: number
+      title: string
+      dueOn: string | null
+      targetCents: number
+      paidCents: number
+      status: string
+    }>
+  } | null>(null)
+  const [paymentPlanLoading, setPaymentPlanLoading] = useState(false)
+  const [installmentTemplate, setInstallmentTemplate] = useState("stages_25_50_25")
+  const [installmentCreateBusy, setInstallmentCreateBusy] = useState(false)
   const canViewBlitzpayActivity = permissions.canEditInvoices || permissions.canViewFinancials
 
   const staffPreparePortionQuery = useMemo(() => {
@@ -1886,6 +1982,64 @@ function PaymentsTab({
   }, [orgId, invoice.customerId, canViewBlitzpayPayCard, customerWalletRefresh])
 
   useEffect(() => {
+    if (!orgId || !canViewBlitzpayPayCard) {
+      setOrgFinancingFlags(null)
+      setPaymentPlanInfo(null)
+      setPaymentPlanLoading(false)
+      return
+    }
+    let cancelled = false
+    setPaymentPlanLoading(true)
+    void (async () => {
+      try {
+        const [fsRes, ppRes] = await Promise.all([
+          fetch(`/api/organizations/${encodeURIComponent(orgId)}/blitzpay/financing/summary`, {
+            credentials: "include",
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-plan`,
+            { credentials: "include", cache: "no-store" },
+          ),
+        ])
+        const fsJson = (await fsRes.json().catch(() => ({}))) as {
+          org?: { financingEnabled?: boolean; installmentPlansEnabled?: boolean }
+        }
+        const ppJson = (await ppRes.json().catch(() => ({}))) as {
+          plan?: {
+            plan: { id: string; status: string; planKind: string; totalTargetCents: number } | null
+            installments: Array<{
+              id: string
+              sequence: number
+              title: string
+              dueOn: string | null
+              targetCents: number
+              paidCents: number
+              status: string
+            }>
+          } | null
+        }
+        if (cancelled) return
+        if (fsRes.ok && fsJson.org) {
+          setOrgFinancingFlags({
+            financingEnabled: Boolean(fsJson.org.financingEnabled),
+            installmentPlansEnabled: Boolean(fsJson.org.installmentPlansEnabled),
+          })
+        } else {
+          setOrgFinancingFlags(null)
+        }
+        if (ppRes.ok) setPaymentPlanInfo(ppJson.plan ?? null)
+        else setPaymentPlanInfo(null)
+      } finally {
+        if (!cancelled) setPaymentPlanLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, invoice.id, canViewBlitzpayPayCard, blitzpayActivityRefresh])
+
+  useEffect(() => {
     if (!diagOpen || !orgId) return
     let cancelled = false
     setDiagLoading(true)
@@ -1979,6 +2133,53 @@ function PaymentsTab({
       setWalletApplyBusy(false)
     }
   }
+
+  const createInstallmentPlan = async () => {
+    if (!orgId) return
+    setInstallmentCreateBusy(true)
+    try {
+      const idem =
+        typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto ?
+          globalThis.crypto.randomUUID()
+        : `plan_${Date.now()}`
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-plan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template: installmentTemplate, idempotencyKey: idem }),
+          credentials: "include",
+        },
+      )
+      const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!res.ok) {
+        pushToast(body.message ?? body.error ?? "Could not create installment plan.", "error")
+        return
+      }
+      pushToast("Installment plan saved.", "success")
+      setBlitzpayActivityRefresh((n) => n + 1)
+      await refreshInvoices()
+    } finally {
+      setInstallmentCreateBusy(false)
+    }
+  }
+
+  const invoiceRevenueInsights = useMemo(() => {
+    if (!orgFinancingFlags) return []
+    const paidCents =
+      invoice.totalPaidCents != null ?
+        invoice.totalPaidCents
+      : invoice.status === "Paid" ?
+        Math.round(grandTotal * 100)
+      : 0
+    return buildInvoiceRevenueAccelerationInsights({
+      balanceDueCents,
+      totalPaidCents: paidCents,
+      orgFinancingEnabled: orgFinancingFlags.financingEnabled,
+      orgInstallmentPlansEnabled: orgFinancingFlags.installmentPlansEnabled,
+      hasActivePaymentPlan: Boolean(paymentPlanInfo?.plan),
+    })
+  }, [orgFinancingFlags, invoice.totalPaidCents, invoice.status, grandTotal, balanceDueCents, paymentPlanInfo])
 
   const summaryTone =
     invoice.paymentAllocationState === "paid" || invoice.paymentAllocationState === "overpaid"
@@ -2207,6 +2408,86 @@ function PaymentsTab({
             </div>
           ) : (
             <p className="text-[10px] text-muted-foreground">Wallet data unavailable.</p>
+          )}
+        </div>
+      ) : null}
+
+      {canViewBlitzpayPayCard && orgId ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">Installment plan (BlitzPay)</p>
+          <p className="text-[10px] text-muted-foreground">
+            Staged schedules reference standard invoice payments; enable under Settings → Payments → Revenue
+            acceleration.
+          </p>
+          {paymentPlanLoading ? (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              Loading plan…
+            </p>
+          ) : orgFinancingFlags?.installmentPlansEnabled ? (
+            <div className="space-y-2">
+              {paymentPlanInfo?.plan ? (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground">
+                    Plan {paymentPlanInfo.plan.planKind.replace(/_/g, " ")} · target{" "}
+                    {fmtCurrency(paymentPlanInfo.plan.totalTargetCents / 100)}
+                  </p>
+                  <ul className="space-y-1 text-[10px]">
+                    {paymentPlanInfo.installments.map((row) => (
+                      <li key={row.id} className="flex justify-between gap-2 border-b border-border/40 pb-0.5">
+                        <span>
+                          #{row.sequence} {row.title}
+                        </span>
+                        <span className="tabular-nums shrink-0">
+                          {fmtCurrency(row.targetCents / 100)} · paid {fmtCurrency(row.paidCents / 100)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground">No active installment plan on this invoice.</p>
+              )}
+              {canApplyWalletCredit && balanceDueCents > 0 ? (
+                <div className="flex flex-wrap items-end gap-2 pt-1 border-t border-border/60">
+                  <label className="text-[10px] space-y-0.5">
+                    <span className="text-muted-foreground">Template</span>
+                    <select
+                      className="block rounded border border-border bg-background px-2 py-1 text-[11px]"
+                      value={installmentTemplate}
+                      onChange={(e) => setInstallmentTemplate(e.target.value)}
+                    >
+                      <option value="stages_25_50_25">25% / 50% / 25%</option>
+                      <option value="equal_3">Three equal parts</option>
+                      <option value="equal_6">Six equal parts</option>
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 text-[11px]"
+                    disabled={installmentCreateBusy}
+                    onClick={() => void createInstallmentPlan()}
+                  >
+                    {installmentCreateBusy ?
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    : "Apply / replace plan"}
+                  </Button>
+                </div>
+              ) : null}
+              {invoiceRevenueInsights.length > 0 ? (
+                <ul className="space-y-1 pt-1 border-t border-border/60 text-[10px] text-muted-foreground">
+                  {invoiceRevenueInsights.map((i) => (
+                    <li key={i.code}>
+                      <span className="font-medium text-foreground">{i.title}: </span>
+                      {i.detail}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">Installment plans are disabled for this workspace.</p>
           )}
         </div>
       ) : null}
@@ -3822,11 +4103,30 @@ function ReadOnlyLineItems({
   items,
   total,
   maskMoney,
+  detailFallback,
 }: {
   items: LineItem[]
   total: number
   maskMoney?: boolean
+  /** When there are no displayable line items, show notes / instructions / internal notes instead. */
+  detailFallback?: string | null
 }) {
+  const displayItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const desc = (item.description ?? "").trim()
+        const hasMoney = Math.abs(item.qty * item.unit) > 1e-9
+        return (
+          desc.length > 0 ||
+          hasMoney ||
+          Boolean(item.sku?.trim()) ||
+          Boolean(item.catalog_item_id) ||
+          Boolean(item.item_type?.trim())
+        )
+      }),
+    [items],
+  )
+
   return (
     <table className="w-full text-xs">
       <thead className="ds-thead-bg">
@@ -3839,21 +4139,40 @@ function ReadOnlyLineItems({
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {items.map((item, i) => (
-          <tr key={i}>
-            <td className="px-3 py-2 text-foreground">{item.description}</td>
-            <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
-            <td className="px-3 py-2 text-right text-muted-foreground">
-              {maskMoney ? "—" : fmtCurrency(item.unit)}
-            </td>
-            <td className="px-3 py-2 text-center text-muted-foreground">
-              {item.taxable === false ? "No" : "Yes"}
-            </td>
-            <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
-              {maskMoney ? "—" : fmtCurrency(item.qty * item.unit)}
+        {displayItems.length > 0 ? (
+          displayItems.map((item, i) => (
+            <tr key={i}>
+              <td className="px-3 py-2 text-foreground">
+                <span className="block">{item.description?.trim() ? item.description : "—"}</span>
+                {item.item_type?.trim() ? (
+                  <span className="block text-[10px] text-muted-foreground mt-0.5">{item.item_type.trim()}</span>
+                ) : null}
+              </td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{item.qty}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">
+                {maskMoney ? "—" : fmtCurrency(item.unit)}
+              </td>
+              <td className="px-3 py-2 text-center text-muted-foreground">
+                {item.taxable === false ? "No" : "Yes"}
+              </td>
+              <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
+                {maskMoney ? "—" : fmtCurrency(item.qty * item.unit)}
+              </td>
+            </tr>
+          ))
+        ) : detailFallback?.trim() ? (
+          <tr>
+            <td colSpan={5} className="px-3 py-3 text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {detailFallback.trim()}
             </td>
           </tr>
-        ))}
+        ) : (
+          <tr>
+            <td colSpan={5} className="px-3 py-3 text-muted-foreground italic text-center">
+              No structured line items on file — stored invoice total is shown below.
+            </td>
+          </tr>
+        )}
       </tbody>
       <tfoot className="ds-tfoot-bg border-t border-border">
         <tr>

@@ -48,6 +48,10 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 | `SUPABASE_SERVICE_ROLE_KEY` | Required for webhook handler (writes `organization_subscriptions`, idempotency) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | App auth / RLS |
 
+## BlitzPay (Connect) vs SaaS subscription webhooks
+
+**BlitzPay** end-customer invoice payments use **`POST /api/blitzpay/webhook`** and the **Connect** webhook secret (`STRIPE_BLITZPAY_WEBHOOK_SECRET` / env naming per deploy). That path is **separate** from **`POST /api/stripe/webhook`** (SaaS subscriptions). Phase **2O** financing/installment features **do not** add new Stripe event types to the SaaS webhook; future third-party financing integrations must keep **PII and application payloads out of Equipify** and use **opaque provider references** only.
+
 ## Stripe Dashboard setup
 
 1. **API keys:** Use **live** keys on Production; **test** keys on local/preview.

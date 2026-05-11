@@ -21,7 +21,10 @@ export type BlitzpaySettingsPatchBody = Partial<
     | "blitzpay_payment_method_ach_enabled"
     | "blitzpay_ach_convenience_fee_enabled"
     | "blitzpay_ach_processing_timeline_copy"
-    | "blitzpay_allow_save_payment_methods",
+    | "blitzpay_allow_save_payment_methods"
+    | "blitzpay_financing_enabled"
+    | "blitzpay_installment_plans_enabled"
+    | "blitzpay_financing_monthly_estimate_disclosure",
     unknown
   >
 >

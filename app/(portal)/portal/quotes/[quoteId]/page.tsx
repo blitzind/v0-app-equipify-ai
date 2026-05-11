@@ -29,6 +29,12 @@ type QuoteDetail = {
   blitzpayRemainingQuoteCents: number
   blitzpayFinancingReady: boolean
   blitzpayConvertedInvoiceId: string | null
+  portalFinancing?: {
+    orgFinancingEnabled: boolean
+    orgInstallmentPlansEnabled: boolean
+    monthlyEstimateCopy: string | null
+    tips: string[]
+  }
 }
 
 type QuotePricing = {
@@ -277,6 +283,34 @@ export default function PortalQuoteDetailPage({ params }: { params: Promise<{ qu
             {pricing?.financingMessage ??
               "Your provider may offer financing in a future release. This page only supports standard card or bank payments today."}
           </span>
+        </div>
+      ) : null}
+
+      {detail.portalFinancing?.orgFinancingEnabled ? (
+        <div className="portal-card space-y-2 p-4 text-xs" style={{ color: "var(--portal-nav-text)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            Payment options
+          </p>
+          {detail.portalFinancing.monthlyEstimateCopy ? (
+            <p className="leading-relaxed">{detail.portalFinancing.monthlyEstimateCopy}</p>
+          ) : (
+            <p className="leading-relaxed">
+              Monthly financing may be available for larger projects. Your service provider will share next steps when
+              ready — this is not a credit application.
+            </p>
+          )}
+          {detail.portalFinancing.orgInstallmentPlansEnabled ? (
+            <p className="text-[11px] leading-relaxed opacity-90">
+              Staged billing (multiple payments tied to milestones) may be offered on invoices after you approve work.
+            </p>
+          ) : null}
+          {detail.portalFinancing.tips.length > 0 ? (
+            <ul className="list-disc pl-4 space-y-1 text-[11px] leading-relaxed">
+              {detail.portalFinancing.tips.map((t, idx) => (
+                <li key={idx}>{t}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
