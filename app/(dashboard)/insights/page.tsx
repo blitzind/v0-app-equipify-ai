@@ -340,7 +340,7 @@ function SummaryReportModal({ onClose, report }: { onClose: () => void; report: 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const dash = useSupabaseDashboard()
+  const dash = useSupabaseDashboard({ variant: "insights" })
   const { insightsAllowed } = useBillingAccess()
   const liveInsights = dash.operationalInsights
 

@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:07:49.423Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:13:18.663Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -64,6 +64,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 61.2 — Webhook & public API expansion (architecture):** \`docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md\` — recommended key model (hash-at-rest, org scope, RLS, rate limits, audit), outbound webhook shape (signing, retries, delivery log), plan \`api_access\` + \`canManageApiKeys\`, platform-admin behavior; **no** live keys, public REST router, or webhook worker. **UI:** \`/settings/api\` remains non-interactive with roadmap + links to architecture, metering, entitlement, settings-audit docs. **Scaffolding:** \`lib/api/future-webhook-event-types.ts\` (unused event constants). **Docs:** \`SETTINGS_WIRING_AUDIT.md\`, \`USAGE_METERING_ENFORCEMENT.md\`, \`PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md\` cross-links.
 - **Phase 61.3 — Integration catalog accuracy audit:** \`docs/INTEGRATION_CATALOG_INVENTORY.md\` + \`lib/integrations/catalog-metadata.ts\` — shared readiness badges (**Live, Beta, Limited, Planned, Coming Soon, Internal, Enterprise** types; UI uses existing \`ds-badge-*\`). **Product** \`/integrations\`: QuickBooks **Live** (link to Settings), Stripe billing **Limited**, Fuzor **Beta** external link (**Visit Fuzor**, not “Connect”), roadmap **Planned** + **Register interest**; removed fake KPI “Automation Ready: 12”; interest/request modals disclose **no server submit**. **Settings** hub: readiness pills from catalog map; **No in-app setup yet** replaces fake Connect/Docs stubs; QuickBooks live \`connection_status\` pill unchanged. **Entitlements:** marketing banner distinguishes future **API keys** (Scale) from connectors. No DB migrations.
 - **Phase 62.1 — Dead code & duplicate pattern cleanup:** Removed unused \`lib/permissions/require-org-permission.ts\` (\`requireOrgMemberPermission\` had zero imports). Centralized invoice status badge Tailwind strings in \`lib/invoices/invoice-status-badge-classes.ts\` for drawer header, invoice detail badge, and invoices list (Void row still adds \`line-through\` locally). Product \`/integrations\` roadmap KPI counts **planned** rows only (removed redundant always-zero \`coming_soon\` sum). No permission/entitlement/offline/sync logic changes; \`lib/integrations/catalog-metadata.ts\` remains the integration catalog source.
+- **Phase 62.2 — Performance & query optimization:** See \`docs/PERFORMANCE_AND_QUERY_OPTIMIZATION_AUDIT.md\`. **Dashboard hook** (\`lib/dashboard/use-supabase-dashboard.ts\`): head-only counts use minimal \`select('id', …)\`; overdue invoice rows filtered server-side with the same rule set as before (past due date **or** overdue with null due date); **Insights** uses \`variant: 'insights'\` to skip recent-work-order + preview-list queries not shown on that page. No RLS bypass; QuickBooks/offline/sync paths untouched.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
@@ -79,7 +80,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Purpose:** Operational overview (KPIs, shortcuts).
 - **Status:** Implemented (tenant-aware).
 - **Key UI:** Dashboard tiles, mobile technician snapshot where applicable.
-- **Data/API:** Reads via Supabase client + org scope.
+- **Data/API:** Reads via Supabase client + org scope (\`useSupabaseDashboard\`; Insights shares hook with a lighter **insights** variant — see Phase 62.2 doc).
 - **Gaps:** KPI definitions evolve; ensure parity with billing/analytics APIs.
 
 ### Customers

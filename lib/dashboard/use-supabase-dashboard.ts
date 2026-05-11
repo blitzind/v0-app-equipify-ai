@@ -279,7 +279,11 @@ export function buildOperationalInsights(input: {
   return insights
 }
 
-export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
+/** `insights` skips list/detail queries only needed on the home dashboard (recent WOs, equipment/warranty preview lists). */
+export function useSupabaseDashboard(
+  options: { disabled?: boolean; variant?: "full" | "insights" } = {},
+) {
+  const lightweight = options.variant === "insights"
   const activeOrg = useActiveOrganization()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -387,6 +391,12 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
       "id, work_order_number, title, status, priority, scheduled_on, created_at, customer_id, equipment_id, assigned_user_id"
     const recentWoSelect = recentWoSelectWithNum.replace("work_order_number, ", "")
 
+    const emptyTable = Promise.resolve({
+      data: [] as unknown[],
+      error: null as null,
+    })
+    const head = { count: "exact", head: true } as const
+
     try {
       let [
         dueMonthCountRes,
@@ -410,27 +420,29 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
       ] = await Promise.all([
         supabase
           .from("equipment")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "active")
           .not("next_due_at", "is", null)
           .gte("next_due_at", monthStart)
           .lte("next_due_at", monthEnd),
+        lightweight
+          ? emptyTable
+          : supabase
+              .from("equipment")
+              .select("id, name, category, next_due_at, customer_id")
+              .eq("organization_id", orgId)
+              .is("archived_at", null)
+              .eq("status", "active")
+              .not("next_due_at", "is", null)
+              .gte("next_due_at", monthStart)
+              .lte("next_due_at", monthEnd)
+              .order("next_due_at", { ascending: true })
+              .limit(12),
         supabase
           .from("equipment")
-          .select("id, name, category, next_due_at, customer_id")
-          .eq("organization_id", orgId)
-          .is("archived_at", null)
-          .eq("status", "active")
-          .not("next_due_at", "is", null)
-          .gte("next_due_at", monthStart)
-          .lte("next_due_at", monthEnd)
-          .order("next_due_at", { ascending: true })
-          .limit(12),
-        supabase
-          .from("equipment")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "active")
@@ -438,43 +450,43 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
           .lt("next_due_at", today),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .in("status", ["open", "scheduled", "in_progress"]),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "open"),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "scheduled"),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "in_progress"),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "completed"),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "completed_pending_signature"),
         supabase
           .from("work_orders")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "invoiced"),
@@ -487,29 +499,33 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
           .gte("updated_at", `${monthStart}T00:00:00.000Z`),
         supabase
           .from("equipment")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .not("warranty_expires_at", "is", null)
           .gte("warranty_expires_at", today)
           .lte("warranty_expires_at", warrantyBefore),
-        supabase
-          .from("equipment")
-          .select("id, name, warranty_expires_at, customer_id")
-          .eq("organization_id", orgId)
-          .is("archived_at", null)
-          .not("warranty_expires_at", "is", null)
-          .gte("warranty_expires_at", today)
-          .lte("warranty_expires_at", warrantyBefore)
-          .order("warranty_expires_at", { ascending: true })
-          .limit(12),
-        supabase
-          .from("work_orders")
-          .select(recentWoSelectWithNum)
-          .eq("organization_id", orgId)
-          .is("archived_at", null)
-          .order("created_at", { ascending: false })
-          .limit(10),
+        lightweight
+          ? emptyTable
+          : supabase
+              .from("equipment")
+              .select("id, name, warranty_expires_at, customer_id")
+              .eq("organization_id", orgId)
+              .is("archived_at", null)
+              .not("warranty_expires_at", "is", null)
+              .gte("warranty_expires_at", today)
+              .lte("warranty_expires_at", warrantyBefore)
+              .order("warranty_expires_at", { ascending: true })
+              .limit(12),
+        lightweight
+          ? emptyTable
+          : supabase
+              .from("work_orders")
+              .select(recentWoSelectWithNum)
+              .eq("organization_id", orgId)
+              .is("archived_at", null)
+              .order("created_at", { ascending: false })
+              .limit(10),
         supabase
           .from("work_orders")
           .select("equipment_id, created_at, title")
@@ -529,10 +545,10 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
           .select("amount_cents, due_date, status")
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["sent", "unpaid", "overdue"]),
+          .or(`and(status.eq.overdue,due_date.is.null),due_date.lt.${today}`),
         supabase
           .from("maintenance_plans")
-          .select("*", { count: "exact", head: true })
+          .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
           .eq("status", "active")
@@ -540,7 +556,7 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
           .lt("next_due_date", today),
       ])
 
-      if (recentWoRes.error && missingWorkOrderNumberColumn(recentWoRes.error)) {
+      if (!lightweight && recentWoRes.error && missingWorkOrderNumberColumn(recentWoRes.error)) {
         recentWoRes = await supabase
           .from("work_orders")
           .select(recentWoSelect)
@@ -555,20 +571,14 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
       const openWorkOrders = openWoCountRes.count ?? 0
       const expiringWarrantiesCount = warrantyCountRes.count ?? 0
 
+      /** Server filter matches prior client logic: past due date OR overdue status with no due date. */
       const invRows = (overdueInvoicesRes.data ?? []) as Array<{
         amount_cents: number
         due_date: string | null
         status: string
       }>
-      const overdueInvoicesFiltered = invRows.filter((r) => {
-        if (!r.due_date) return r.status === "overdue"
-        return r.due_date < today
-      })
-      const overdueInvoicesCount = overdueInvoicesFiltered.length
-      const overdueInvoicesAmountCents = overdueInvoicesFiltered.reduce(
-        (sum, r) => sum + (r.amount_cents ?? 0),
-        0,
-      )
+      const overdueInvoicesCount = invRows.length
+      const overdueInvoicesAmountCents = invRows.reduce((sum, r) => sum + (r.amount_cents ?? 0), 0)
       const maintenancePlansOverdueCount = plansOverdueRes.count ?? 0
 
       const woStatusCounts = [
@@ -839,7 +849,7 @@ export function useSupabaseDashboard(options: { disabled?: boolean } = {}) {
     } finally {
       setLoading(false)
     }
-  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, options.disabled])
+  }, [activeOrg.status, activeOrg.organizationId, activeOrg.organizations.length, options.disabled, lightweight])
 
   useEffect(() => {
     void load()
