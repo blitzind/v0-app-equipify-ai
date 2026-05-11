@@ -9,6 +9,7 @@ import { isBlitzPayPhase2WebhookEventType } from "../lib/blitzpay/webhook-phase2
 function testDisputeEventTypesRouted() {
   assert.equal(isBlitzPayPhase2WebhookEventType("charge.dispute.updated"), true)
   assert.equal(isBlitzPayPhase2WebhookEventType("charge.dispute.closed"), true)
+  assert.equal(isBlitzPayPhase2WebhookEventType("payout.failed"), true)
 }
 
 function testPortalRefundLineHasNoStripeIds() {

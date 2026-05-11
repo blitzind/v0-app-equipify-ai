@@ -13,6 +13,11 @@ export const BLITZPAY_PHASE2_WEBHOOK_EVENT_TYPES = new Set([
   "charge.dispute.created",
   "charge.dispute.updated",
   "charge.dispute.closed",
+  "payout.created",
+  "payout.paid",
+  "payout.updated",
+  "payout.failed",
+  "payout.canceled",
 ])
 
 export function isBlitzPayPhase2WebhookEventType(eventType: string): boolean {

@@ -1,6 +1,6 @@
 # BlitzPay / Equipify Payments — architecture (Phase 54.3)
 
-Design document for BlitzPay / Connect. **Phase 1** (`docs/BLITZPAY_PHASE_1.md`) implements **Stripe Connect Express onboarding**. **Phases 2A–2G** (`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12) add hosted **Stripe Checkout** for **org invoices** on the **connected account** (staff dashboard + **customer portal**), `application_fee_amount`, webhook-driven `org_invoice_payments`, fee snapshots, ledger rows, **staff refunds**, **dispute visibility**, diagnostics APIs, and merchant controls for convenience-fee disclosure/payout visibility.  
+Design document for BlitzPay / Connect. **Phase 1** (`docs/BLITZPAY_PHASE_1.md`) implements **Stripe Connect Express onboarding**. **Phases 2A–2H** (`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12) add hosted **Stripe Checkout** for **org invoices** on the **connected account** (staff dashboard + **customer portal**), `application_fee_amount`, webhook-driven `org_invoice_payments`, fee snapshots, ledger rows, **staff refunds**, **dispute visibility**, diagnostics APIs, merchant controls for convenience-fee disclosure, and **Phase 2H** payout/balance-transaction ledger + reconciliation (staff only).  
 SaaS subscription billing stays on the existing platform Stripe account and `/api/stripe/webhook` flow (Phases 54.1–54.2) — **unchanged**.
 
 ---

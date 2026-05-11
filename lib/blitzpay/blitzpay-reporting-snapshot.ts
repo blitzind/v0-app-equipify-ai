@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
+import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -12,6 +13,12 @@ export type BlitzpayOrgReportingSnapshot = {
   estimatedStripeFeesCents: number
   refundedFeesCents: number
   estimatedNetMerchantPayoutCents: number
+  /** When balance transactions were synced for this window, fees/net prefer Stripe ledger sums. */
+  reportingSource: "balance_transactions" | "estimate"
+  /** Sum of paid payout amounts (po_) with `stripe_created_at` in window — cash to bank. */
+  paidOutToBankCents: number
+  /** Net of connected-account balance activity (excludes payout rows) from synced `blitzpay_balance_transactions`. */
+  connectedAccountNetActivityCents: number | null
   onlinePaymentCount: number
   paymentSourceSplit: { customer_portal: number; staff_dashboard: number }
 }
@@ -89,6 +96,37 @@ export async function fetchBlitzpayOrgReportingSnapshot(
 
   refundedFeesCents = Math.min(estimatedStripeFeesCents, Math.round(refunded * 0.029))
 
+  let paidOutToBankCents = 0
+  let balanceTxTotals = null as ReturnType<typeof summarizeBlitzpayBalanceTransactions> | null
+  {
+    let qBt = admin
+      .from("blitzpay_balance_transactions")
+      .select("balance_type, gross_cents, fee_cents, net_cents")
+      .eq("organization_id", organizationId)
+    if (sinceIso) qBt = qBt.gte("stripe_created_at", sinceIso)
+    const { data: btRows, error: btErr } = await qBt
+    if (btErr) throw new Error(btErr.message)
+    if (btRows && btRows.length > 0) {
+      balanceTxTotals = summarizeBlitzpayBalanceTransactions(
+        btRows as Array<{ balance_type: string; gross_cents: number; fee_cents: number; net_cents: number }>,
+      )
+    }
+  }
+  {
+    let q = admin
+      .from("blitzpay_payouts")
+      .select("amount_cents")
+      .eq("organization_id", organizationId)
+      .eq("status", "paid")
+    if (sinceIso) q = q.gte("stripe_created_at", sinceIso)
+    const { data: paidRows, error: poErr } = await q
+    if (poErr) throw new Error(poErr.message)
+    paidOutToBankCents = (paidRows ?? []).reduce(
+      (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+      0,
+    )
+  }
+
   let portalCompleted = 0
   let staffCompleted = 0
   {
@@ -107,15 +145,25 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  const ledgerBacked = balanceTxTotals != null && balanceTxTotals.activityRowCount > 0
+  const connectedAccountNetActivityCents = ledgerBacked ? balanceTxTotals.sumNetCents : null
+  const stripeFeesForDisplay = ledgerBacked ? balanceTxTotals.sumStripeFeesCents : estimatedStripeFeesCents
+  const netMerchant = ledgerBacked
+    ? Math.max(0, balanceTxTotals.sumNetCents)
+    : Math.max(0, gross - refunded - estimatedStripeFeesCents + refundedFeesCents)
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
     refundedVolumeCents: refunded,
     netCollectedCents: Math.max(0, gross - refunded),
     convenienceFeeCollectedCents,
-    estimatedStripeFeesCents,
-    refundedFeesCents,
-    estimatedNetMerchantPayoutCents: Math.max(0, gross - refunded - estimatedStripeFeesCents + refundedFeesCents),
+    estimatedStripeFeesCents: stripeFeesForDisplay,
+    refundedFeesCents: ledgerBacked ? Math.min(stripeFeesForDisplay, refundedFeesCents) : refundedFeesCents,
+    estimatedNetMerchantPayoutCents: netMerchant,
+    reportingSource: ledgerBacked ? "balance_transactions" : "estimate",
+    paidOutToBankCents,
+    connectedAccountNetActivityCents,
     onlinePaymentCount,
     paymentSourceSplit: {
       customer_portal: portalCompleted,

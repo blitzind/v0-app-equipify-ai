@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { fetchBlitzpayPaymentIntentsForInvoice } from "@/lib/blitzpay/payment-repository"
+import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
 export type StaffBlitzpayRefundRow = {
   id: string
@@ -108,6 +109,14 @@ export async function fetchStaffBlitzpayInvoiceDisputes(
 }
 
 export type StaffBlitzpayInvoiceDiagnostics = {
+  balanceTransactionReconciliation: {
+    syncedRowCount: number
+    sumStripeFeesCents: number
+    sumNetCents: number
+    paymentLikeNetCents: number
+    refundLikeNetCents: number
+    disputeLikeNetCents: number
+  } | null
   paymentIntents: Array<{
     id: string
     stripePaymentIntentIdTail: string | null
@@ -154,6 +163,29 @@ export async function fetchStaffBlitzpayInvoiceDiagnostics(
     }
   })
 
+  const internalPiIds = paymentIntents.map((p) => p.id).filter((id) => id.length > 0)
+  let balanceTransactionReconciliation: StaffBlitzpayInvoiceDiagnostics["balanceTransactionReconciliation"] = null
+  if (internalPiIds.length > 0) {
+    const { data: btRows, error: btErr } = await admin
+      .from("blitzpay_balance_transactions")
+      .select("balance_type, gross_cents, fee_cents, net_cents")
+      .eq("organization_id", organizationId)
+      .in("blitzpay_payment_intent_id", internalPiIds)
+    if (!btErr && btRows && btRows.length > 0) {
+      const t = summarizeBlitzpayBalanceTransactions(
+        btRows as Array<{ balance_type: string; gross_cents: number; fee_cents: number; net_cents: number }>,
+      )
+      balanceTransactionReconciliation = {
+        syncedRowCount: btRows.length,
+        sumStripeFeesCents: t.sumStripeFeesCents,
+        sumNetCents: t.sumNetCents,
+        paymentLikeNetCents: t.paymentLikeNetCents,
+        refundLikeNetCents: t.refundLikeNetCents,
+        disputeLikeNetCents: t.disputeLikeNetCents,
+      }
+    }
+  }
+
   const { data: orgRow } = await admin
     .from("organizations")
     .select("stripe_connect_account_id")
@@ -188,12 +220,14 @@ export async function fetchStaffBlitzpayInvoiceDiagnostics(
   }
 
   return {
+    balanceTransactionReconciliation,
     paymentIntents,
     webhookInboxTail,
     replaySafetyNotes: [
       "Stripe Connect events dedupe at ingress via blitzpay_stripe_webhook_events (evt_… id).",
       "Allocation uses org_invoice_payments.reference = blitzpay_pi:<id> uniqueness.",
       "Refunds use unique stripe_refund_id + ledger (organization_id, entry_type, stripe_object_id).",
+      "Payout rows upsert on stripe_payout_id; balance transactions upsert on (organization_id, stripe_balance_transaction_id).",
       "Webhook inbox rows mark done/dead for this Connect account — safe Stripe retries on 500 after delete.",
     ],
   }

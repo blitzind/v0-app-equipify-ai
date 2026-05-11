@@ -94,6 +94,9 @@ export async function GET(
             estimatedStripeFeesCents: reporting.estimatedStripeFeesCents,
             recentOnlinePaymentTotalCents: reporting.grossProcessedVolumeCents,
             recentRefundedTotalCents: reporting.refundedVolumeCents,
+            reportingSource: reporting.reportingSource,
+            paidOutToBankCents: reporting.paidOutToBankCents,
+            connectedAccountNetActivityCents: reporting.connectedAccountNetActivityCents,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

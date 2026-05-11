@@ -11,6 +11,7 @@ import {
 } from "@/lib/blitzpay/webhook-invoice-pay-completion"
 import { dispatchBlitzpayChargeRefunded } from "@/lib/blitzpay/webhook-charge-refunded"
 import { upsertBlitzpayInvoiceDisputeFromStripe } from "@/lib/blitzpay/webhook-charge-dispute"
+import { dispatchBlitzpayPayoutWebhook } from "@/lib/blitzpay/blitzpay-payout-sync"
 
 async function refreshBlitzpayPaymentIntentMirror(
   admin: SupabaseClient,
@@ -119,6 +120,14 @@ export async function dispatchBlitzPayPhase2Webhook(
       }
       const dispute = event.data.object as Stripe.Dispute
       await upsertBlitzpayInvoiceDisputeFromStripe(admin, dispute, acct)
+      return
+    }
+    case "payout.created":
+    case "payout.paid":
+    case "payout.updated":
+    case "payout.failed":
+    case "payout.canceled": {
+      await dispatchBlitzpayPayoutWebhook(admin, event)
       return
     }
     default:

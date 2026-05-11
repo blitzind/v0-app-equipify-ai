@@ -66,6 +66,7 @@ function testMetadata() {
 
 function testWebhookHelpers() {
   assert.equal(isBlitzPayPhase2WebhookEventType("payment_intent.succeeded"), true)
+  assert.equal(isBlitzPayPhase2WebhookEventType("payout.paid"), true)
   assert.equal(isBlitzPayPhase2WebhookEventType("account.updated"), false)
   const h = blitzpayWebhookPayloadSha256('{"x":1}')
   assert.equal(h.length, 64)

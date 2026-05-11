@@ -548,8 +548,8 @@ Use this as a **checklist** when coding — not exhaustive.
 
 | Area | Details |
 |------|---------|
-| **Helper** | `lib/blitzpay/blitzpay-schema-health.ts` — service-role probes for onboarding diagnostic columns on `organizations` and for core BlitzPay tables (`blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_invoice_refunds`, `blitzpay_invoice_disputes`, `blitzpay_webhook_inbox`). Results are cached ~60s. |
-| **Routes** | BlitzPay **status**, **enable**, **sync**, **account-link**, invoice **activity**, **diagnostics**, **prepare-pay** (staff + portal), **refund**, and **resend-receipt** call the guard first. On drift, APIs return **503** with `error: "blitzpay_schema_incomplete"` and a stable `message` for UI (not raw PostgREST text). |
+| **Helper** | `lib/blitzpay/blitzpay-schema-health.ts` — service-role probes for onboarding diagnostic columns on `organizations` and for core BlitzPay tables (`blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_invoice_refunds`, `blitzpay_invoice_disputes`, `blitzpay_webhook_inbox`, `blitzpay_payouts`, `blitzpay_balance_transactions`, `blitzpay_reconciliation_runs`). Results are cached ~60s. |
+| **Routes** | BlitzPay **status**, **enable**, **sync**, **account-link**, invoice **activity**, **diagnostics**, **prepare-pay** (staff + portal), **refund**, **resend-receipt**, and **payout-ledger** call the guard first. On drift, APIs return **503** with `error: "blitzpay_schema_incomplete"` and a stable `message` for UI (not raw PostgREST text). |
 | **Logs** | `source: "blitzpay-schema-health"` JSON logs include `missing` (e.g. `table:blitzpay_invoice_refunds` or `organizations.blitzpay_last_onboarding_attempt_at`) and a short `detail` from Postgres/PostgREST. |
 | **Fix** | Point the app at the correct Supabase project and **apply pending migrations** (`supabase db push` / CI migration pipeline). The guard only treats **known** missing-relation/column signals as drift; other failures still surface from the underlying handlers. |
 
@@ -572,6 +572,28 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Settings payout visibility loads without exposing Stripe object ids.  
 6. Enabling pass-through without disclosure copy returns validation error.
 
+### 12.9 Phase 2H (payout ledger, balance transactions, reconciliation)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260915130000_blitzpay_phase_2h_payout_ledger.sql` — `blitzpay_payouts` (Stripe `po_…`, org-scoped), `blitzpay_balance_transactions` (Stripe `txn_…`, unique per org), `blitzpay_reconciliation_runs` (manual + `payout.paid` audit). RLS: org members **select** only; writes are service-role/server. |
+| **Stripe sync** | `lib/blitzpay/blitzpay-payout-sync.ts` — resolves workspace from `organizations.stripe_connect_account_id`, **upserts** payouts on webhook, lists **balance transactions per payout** on the connected account (paginated), **upserts** rows and links `blitzpay_payment_intent_id` when the charge id matches a `payment_captured` ledger row. |
+| **Webhooks** | `payout.created` / `paid` / `updated` / `failed` / `canceled` are Phase-2 routed (`webhook-phase2-events.ts`); handler is idempotent via Stripe id + DB upsert keys. `payout.paid` appends a `blitzpay_reconciliation_runs` success row with counts. |
+| **Reconciliation math** | `lib/blitzpay/blitzpay-reconciliation-math.ts` — pure sums by balance `type` (excludes `payout*` rows from “activity” totals). Used in reporting, invoice diagnostics, and tests. |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` prefers synced balance transactions in the window (`reportingSource: balance_transactions`) for fees + net; adds `paidOutToBankCents` from paid payouts. Falls back to Phase 2G estimates when no rows exist. |
+| **APIs** | `GET/POST /api/organizations/[organizationId]/blitzpay/payout-ledger` — GET: `canEditInvoices` **or** `canViewFinancials`; POST: owner/admin BlitzPay gate (`gateBlitzPayManagement`), pulls recent payouts from Stripe. |
+| **UI** | Settings → **Payments**: “Payout ledger (staff)” for financial viewers; **not** exposed on portal. Invoice **BlitzPay diagnostics** JSON adds `balanceTransactionReconciliation` when synced lines exist for the invoice’s payment intents. |
+| **Tests** | `pnpm test:blitzpay-phase-2h` |
+
+#### Manual test checklist (Phase 2H)
+
+1. After a successful BlitzPay payment and Stripe payout, **webhook** or **POST payout-ledger** creates/updates `blitzpay_payouts` and non-duplicate `blitzpay_balance_transactions`.  
+2. **Refunds** reduce net via negative refund balance lines (and existing ledger refund entries unchanged).  
+3. **Disputes** appear as dispute-typed balance lines when Stripe includes them in the payout’s transaction set.  
+4. **Replay** the same payout webhook or sync: row counts stable (upsert keys).  
+5. Staff with financial permissions see payout ledger + diagnostics reconciliation; **portal** APIs unchanged (no payout payloads).  
+6. **prepare-pay** / invoice pay flow still succeeds (schema guard includes new tables).
+
 ---
 
-*Phase 2A–2G vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + merchant controls) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2H vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + merchant controls + payout ledger) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

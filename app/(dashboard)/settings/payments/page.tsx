@@ -40,9 +40,47 @@ type BlitzPayStatusPayload = {
     estimatedStripeFeesCents: number
     recentOnlinePaymentTotalCents: number
     recentRefundedTotalCents: number
+    reportingSource?: "balance_transactions" | "estimate"
+    paidOutToBankCents?: number
+    connectedAccountNetActivityCents?: number | null
     payoutStatus: string
   } | null
   stripeMode?: "test" | "live" | "unknown"
+}
+
+type PayoutLedgerPanelPayload = {
+  payouts: Array<{
+    id: string
+    stripePayoutIdTail: string
+    status: string
+    amountCents: number
+    currency: string
+    arrivalDate: string | null
+    stripeCreatedAt: string
+    balanceTransactionCount: number
+    balanceTransactionSyncedAt: string | null
+  }>
+  recentRuns: Array<{
+    id: string
+    trigger: string
+    status: string
+    payoutsTouched: number
+    balanceTransactionsUpserted: number
+    createdAt: string
+    finishedAt: string | null
+    error: string | null
+  }>
+  sinceIso: string
+  balanceTransactionTotals: {
+    activityRowCount: number
+    sumGrossCents: number
+    sumStripeFeesCents: number
+    sumNetCents: number
+    paymentLikeNetCents: number
+    refundLikeNetCents: number
+    disputeLikeNetCents: number
+  }
+  paidOutToBankCents: number
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -84,6 +122,8 @@ function BlitzPaySettingsPageInner() {
   const returnHandled = useRef(false)
 
   const canConfigure = isPlatformAdmin || rawRole === "owner" || rawRole === "admin"
+  const canViewPayoutLedger =
+    permStatus === "ready" && (orgPermissions.has("canViewFinancials") || orgPermissions.has("canEditInvoices"))
 
   const [loading, setLoading] = useState(true)
   const [bp, setBp] = useState<BlitzPayStatusPayload | null>(null)
@@ -91,6 +131,9 @@ function BlitzPaySettingsPageInner() {
   const [linkBusy, setLinkBusy] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
   const [saveFeesBusy, setSaveFeesBusy] = useState(false)
+  const [payoutLedgerLoading, setPayoutLedgerLoading] = useState(false)
+  const [payoutLedgerSyncBusy, setPayoutLedgerSyncBusy] = useState(false)
+  const [payoutLedgerPanel, setPayoutLedgerPanel] = useState<PayoutLedgerPanelPayload | null>(null)
   const [onlinePayEnabled, setOnlinePayEnabled] = useState(false)
   const [passFees, setPassFees] = useState(false)
   const [feePct, setFeePct] = useState("2.90")
@@ -134,9 +177,37 @@ function BlitzPaySettingsPageInner() {
     }
   }, [organizationId, orgStatus, toast])
 
+  const loadPayoutLedger = useCallback(async () => {
+    if (!organizationId || orgStatus !== "ready" || !canViewPayoutLedger) {
+      setPayoutLedgerPanel(null)
+      return
+    }
+    setPayoutLedgerLoading(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/payout-ledger?since=${encodeURIComponent(
+          new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
+        )}`,
+        { cache: "no-store" },
+      )
+      const json = (await res.json()) as { payoutLedger?: PayoutLedgerPanelPayload; message?: string }
+      if (!res.ok) {
+        setPayoutLedgerPanel(null)
+        return
+      }
+      setPayoutLedgerPanel(json.payoutLedger ?? null)
+    } finally {
+      setPayoutLedgerLoading(false)
+    }
+  }, [organizationId, orgStatus, canViewPayoutLedger])
+
   useEffect(() => {
     void loadStatus()
   }, [loadStatus])
+
+  useEffect(() => {
+    void loadPayoutLedger()
+  }, [loadPayoutLedger])
 
   const runSync = useCallback(async () => {
     if (!organizationId) return
@@ -160,6 +231,30 @@ function BlitzPaySettingsPageInner() {
       setSyncBusy(false)
     }
   }, [organizationId, loadStatus, toast])
+
+  const runPayoutLedgerSync = useCallback(async () => {
+    if (!organizationId || !canConfigure) return
+    setPayoutLedgerSyncBusy(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/payout-ledger`, {
+        method: "POST",
+      })
+      const json = (await res.json()) as { error?: string; message?: string; ok?: boolean }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Payout sync failed",
+          description: json.message ?? json.error ?? res.statusText,
+        })
+        return
+      }
+      toast({ title: "Payout ledger synced", description: "Latest payouts and balance lines were pulled from Stripe." })
+      await loadPayoutLedger()
+      await loadStatus()
+    } finally {
+      setPayoutLedgerSyncBusy(false)
+    }
+  }, [organizationId, canConfigure, loadPayoutLedger, loadStatus, toast])
 
   useEffect(() => {
     if (!organizationId || orgStatus !== "ready") return
@@ -460,11 +555,30 @@ function BlitzPaySettingsPageInner() {
                 <div className="text-xs text-muted-foreground">
                   Payout visibility (last 30 days)
                   <p className="mt-1 text-sm text-foreground">
-                    Est. net payout: {bp?.payoutVisibility ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bp.payoutVisibility.estimatedNetPayoutCents / 100) : "—"}
+                    {bp?.payoutVisibility?.reportingSource === "balance_transactions" ? "Net (Stripe ledger)" : "Est. net payout"}
+                    :{" "}
+                    {bp?.payoutVisibility
+                      ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                          bp.payoutVisibility.estimatedNetPayoutCents / 100,
+                        )
+                      : "—"}
                   </p>
                   <p className="text-[11px]">
-                    Online volume: {bp?.payoutVisibility ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bp.payoutVisibility.recentOnlinePaymentTotalCents / 100) : "—"}
+                    Online volume:{" "}
+                    {bp?.payoutVisibility
+                      ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                          bp.payoutVisibility.recentOnlinePaymentTotalCents / 100,
+                        )
+                      : "—"}
                   </p>
+                  {bp?.payoutVisibility?.paidOutToBankCents != null && bp.payoutVisibility.paidOutToBankCents > 0 ? (
+                    <p className="text-[11px] mt-0.5">
+                      Paid out to bank (synced):{" "}
+                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                        bp.payoutVisibility.paidOutToBankCents / 100,
+                      )}
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <label className="text-xs text-muted-foreground block">
@@ -484,6 +598,133 @@ function BlitzPaySettingsPageInner() {
                 Save fee settings
               </Button>
             </div>
+
+            {canViewPayoutLedger && hasAccount ? (
+              <div className="border-t border-border pt-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold">Payout ledger (staff)</p>
+                  {canConfigure ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={payoutLedgerSyncBusy}
+                      onClick={() => void runPayoutLedgerSync()}
+                    >
+                      {payoutLedgerSyncBusy ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Sync from Stripe
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Operational finance data from Stripe Connect payouts and balance transactions. Not shown to portal
+                  customers. Sync after payouts settle or when troubleshooting reconciliation.
+                </p>
+                {payoutLedgerLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Loading payout ledger…
+                  </div>
+                ) : payoutLedgerPanel ? (
+                  <div className="space-y-3 text-xs">
+                    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <p className="font-medium text-foreground">Last 30 days (synced activity)</p>
+                      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-[11px]">
+                        <div>
+                          <dt className="text-muted-foreground">Balance tx rows</dt>
+                          <dd className="font-medium">{payoutLedgerPanel.balanceTransactionTotals.activityRowCount}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Stripe fees (sum)</dt>
+                          <dd className="font-medium">
+                            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                              payoutLedgerPanel.balanceTransactionTotals.sumStripeFeesCents / 100,
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Net activity</dt>
+                          <dd className="font-medium">
+                            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                              payoutLedgerPanel.balanceTransactionTotals.sumNetCents / 100,
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Paid out (paid payouts)</dt>
+                          <dd className="font-medium">
+                            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                              payoutLedgerPanel.paidOutToBankCents / 100,
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Refund-like net:{" "}
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                          payoutLedgerPanel.balanceTransactionTotals.refundLikeNetCents / 100,
+                        )}
+                        {" · "}
+                        Dispute-like net:{" "}
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                          payoutLedgerPanel.balanceTransactionTotals.disputeLikeNetCents / 100,
+                        )}
+                      </p>
+                    </div>
+                    {payoutLedgerPanel.payouts.length > 0 ? (
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="bg-muted/40">
+                            <tr>
+                              <th className="p-2 font-medium">Arrival</th>
+                              <th className="p-2 font-medium">Status</th>
+                              <th className="p-2 font-medium text-right">Amount</th>
+                              <th className="p-2 font-medium text-right">BTs</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {payoutLedgerPanel.payouts.map((p) => (
+                              <tr key={p.id} className="border-t border-border">
+                                <td className="p-2">{p.arrivalDate ?? formatWhen(p.stripeCreatedAt)}</td>
+                                <td className="p-2">{p.status}</td>
+                                <td className="p-2 text-right font-medium">
+                                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                                    p.amountCents / 100,
+                                  )}
+                                </td>
+                                <td className="p-2 text-right text-muted-foreground">{p.balanceTransactionCount}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">No payouts stored yet — run sync or wait for payout webhooks.</p>
+                    )}
+                    {payoutLedgerPanel.recentRuns.length > 0 ? (
+                      <details className="text-[11px]">
+                        <summary className="cursor-pointer text-muted-foreground">Recent reconciliation runs</summary>
+                        <ul className="mt-2 space-y-1 list-disc pl-4">
+                          {payoutLedgerPanel.recentRuns.map((r) => (
+                            <li key={r.id}>
+                              {formatWhen(r.createdAt)} — {r.trigger} {r.status}{" "}
+                              {r.payoutsTouched > 0 ? `(${r.payoutsTouched} payouts)` : ""}
+                              {r.error ? ` — ${r.error}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Could not load payout ledger.</p>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
       </div>
