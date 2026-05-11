@@ -44,6 +44,7 @@ import {
 } from "@/lib/onboarding-intent"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { MISSING_SUBSCRIPTION_BILLING_NOTE } from "@/lib/billing/access"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
@@ -602,11 +603,23 @@ function BillingPageContent() {
           {billingLoading && orgStatus === "ready" && (
             <p className="text-xs text-muted-foreground mb-3">Loading subscription…</p>
           )}
+          {!billingLoading && orgStatus === "ready" && !subscription && (
+            <div className="rounded-lg border border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] px-4 py-3 mb-4 space-y-2">
+              <p className="text-sm font-semibold text-foreground">Billing setup</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{MISSING_SUBSCRIPTION_BILLING_NOTE}</p>
+              {orgPermissions.canEditOrgBilling && (
+                <Button type="button" variant="outline" size="sm" className="mt-1" onClick={jumpToPlanComparison}>
+                  Choose a plan
+                </Button>
+              )}
+            </div>
+          )}
           {showPaymentAttentionBanner && (
             <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 mb-4 space-y-2">
-              <p className="text-sm font-semibold text-foreground">Payment required</p>
+              <p className="text-sm font-semibold text-foreground">Payment needs attention</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Your subscription needs attention. Manage billing to restore access.
+                Update billing to reduce the chance of interruption. Creating new records may already be limited for your
+                workspace.
               </p>
               <Button
                 type="button"
@@ -670,9 +683,9 @@ function BillingPageContent() {
             {/* Stats — 1 col on mobile, 3 on sm+ */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 rounded-lg border border-border bg-secondary/40 p-4">
               <div className="min-h-[44px] flex flex-col justify-center">
-                <p className="text-xs text-muted-foreground">Seats used</p>
+                <p className="text-xs text-muted-foreground">Seats reserved</p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">
-                  {usedSeats} /{" "}
+                  {usedSeatsReservedForPlan} /{" "}
                   {currentPlanData.seats === -1 ? "\u221e" : currentPlanData.seats}
                 </p>
               </div>
@@ -823,7 +836,10 @@ function BillingPageContent() {
             (subscription?.status === "past_due" || workspace.subscriptionStatus === "past_due") && (
             <div className="mt-4 flex items-center gap-2 p-3 rounded-lg border ds-alert-danger text-sm">
               <AlertTriangle size={14} />
-              <span>Your subscription payment is past due. Please update your payment method to avoid service interruption.</span>
+              <span>
+                Your subscription payment is past due. Update your payment method to keep your subscription active and avoid
+                interruption.
+              </span>
               <Button type="button" variant="ghost" size="sm" className="ml-auto text-xs h-7" onClick={() => void openBillingPortal()}>
                 Update now
               </Button>

@@ -6,8 +6,10 @@ import { AlertTriangle, X } from "lucide-react"
 import { useState } from "react"
 import { useBillingAccessOptional } from "@/lib/billing-access-context"
 import {
+  getBillingAppBannerTone,
   getBillingWarningMessage,
   shouldShowBillingWarning,
+  TRIAL_ENDING_WARNING_DAYS,
 } from "@/lib/billing/access"
 import { getTrialDaysRemaining, isTrialActive } from "@/lib/billing/subscriptions"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
@@ -29,50 +31,47 @@ export function BillingWarningBanner() {
   if (!shouldShowBillingWarning(sub)) return null
   const trialLive = isTrialActive(sub)
   const trialDaysLeft = trialLive ? getTrialDaysRemaining(sub) : 0
-  if (trialLive && trialDaysLeft > 6) return null
+  if (trialLive && trialDaysLeft > TRIAL_ENDING_WARNING_DAYS) return null
 
-  const trialExpired = !!sub && sub.status === "trialing" && !trialLive
-  const message = trialExpired
-    ? "Your trial has ended. Choose a plan now to restore access and continue creating records."
-    : getBillingWarningMessage(sub)
+  const message = getBillingWarningMessage(sub)
   if (!message) return null
+
+  const bannerTone = getBillingAppBannerTone(sub)
   const trialTone =
-    trialLive && trialDaysLeft <= 2
+    bannerTone === "critical"
       ? "urgent"
-      : trialLive && trialDaysLeft <= 6
-      ? "warning"
-      : trialExpired
-      ? "urgent"
-      : "warning"
+      : bannerTone === "info"
+        ? "info"
+        : "warning"
   const showStickyTrialPrompt = trialLive && trialDaysLeft <= 6
 
   const toneClasses =
     trialTone === "urgent"
       ? "border-destructive/30 bg-destructive/10 text-destructive"
       : trialTone === "info"
-      ? "border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)]"
-      : "border-amber-500/25 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+        ? "border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)]"
+        : "border-amber-500/25 bg-amber-500/10 text-amber-950 dark:text-amber-100"
 
   const iconClasses =
     trialTone === "urgent"
       ? "text-destructive"
       : trialTone === "info"
-      ? "text-[color:var(--ds-info-text)]"
-      : "text-amber-600 dark:text-amber-400"
+        ? "text-[color:var(--ds-info-text)]"
+        : "text-amber-600 dark:text-amber-400"
 
   const linkClasses =
     trialTone === "urgent"
       ? "text-destructive underline-offset-2 hover:underline"
       : trialTone === "info"
-      ? "text-[color:var(--ds-info-text)] underline-offset-2 hover:underline"
-      : "text-amber-900 dark:text-amber-50 underline-offset-2 hover:underline"
+        ? "text-[color:var(--ds-info-text)] underline-offset-2 hover:underline"
+        : "text-amber-900 dark:text-amber-50 underline-offset-2 hover:underline"
 
   const closeClasses =
     trialTone === "urgent"
       ? "hover:bg-destructive/20 text-destructive"
       : trialTone === "info"
-      ? "hover:bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)]"
-      : "hover:bg-amber-500/20 text-amber-800 dark:text-amber-200"
+        ? "hover:bg-[color:var(--ds-info-bg)] text-[color:var(--ds-info-text)]"
+        : "hover:bg-amber-500/20 text-amber-800 dark:text-amber-200"
 
   return (
     <>
@@ -112,7 +111,7 @@ export function BillingWarningBanner() {
           )}
         >
           <p className="text-xs text-foreground leading-relaxed">
-            Your trial ends soon. Choose a plan to keep access.
+            Your trial ends soon. Choose a plan in billing to avoid interruption.
           </p>
           <Link
             href="/settings/billing#plan-comparison"

@@ -4,6 +4,8 @@ This document maps **how Equipify ties Stripe / `organization_subscriptions` to 
 
 **Usage counters & numeric limits** (what is metered vs display-only) are covered in **`docs/USAGE_METERING_ENFORCEMENT.md`** (Phase 60.2 metering + **60.3 seat policy / reserved seats**).
 
+**Billing UX & grace messaging** (trial, past_due, canceled, missing row — **no hard lockout** in 60.4): **`docs/BILLING_ACCESS_AND_GRACE_PERIODS.md`**.
+
 ## Architecture summary
 
 ### Where the current plan is resolved
