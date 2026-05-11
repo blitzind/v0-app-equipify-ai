@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-collections-copilot-panel"
 import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -44,9 +45,14 @@ export default function FinancialCommandCenterPage() {
         <Link href="/settings/payments#blitzpay-executive-dashboard-anchor" className="text-primary underline-offset-2 hover:underline">
           Settings → Payments → Executive business health
         </Link>
+        . Collections copilot:{" "}
+        <Link href="/settings/payments#blitzpay-collections-copilot-anchor" className="text-primary underline-offset-2 hover:underline">
+          Settings → Payments → Collections copilot
+        </Link>
         .
       </p>
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
     </div>
   )

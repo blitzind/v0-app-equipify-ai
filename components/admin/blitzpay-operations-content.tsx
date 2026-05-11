@@ -17,6 +17,18 @@ type CommandCenterPlatformRollup = {
   schemaHealthOk: boolean
 }
 
+type CollectionsPlatformRollup = {
+  reportingWindowDays: number
+  orgsSampled: number
+  overdueCollectibleCentsTotalApprox: number
+  estimatedRecoverableOverdueCentsApprox: number
+  fieldCollectibleCentsApprox: number
+  installmentPlansActiveApprox: number
+  achAdoptionOrgsApprox: number
+  averageReminderDispatchPct: number
+  topRiskThemes: string[]
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -89,6 +101,7 @@ export function BlitzpayOperationsContent() {
   const [revenueRollup, setRevenueRollup] = useState<RevenueRollup | null>(null)
   const [commandRollup, setCommandRollup] = useState<CommandCenterPlatformRollup | null>(null)
   const [healthRollup, setHealthRollup] = useState<BusinessHealthPlatformRollup | null>(null)
+  const [collectionsRollup, setCollectionsRollup] = useState<CollectionsPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -127,24 +140,29 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3] = await Promise.all([
+        const [r1, r2, r3, r4] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/collections-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
         const j3 = (await r3.json()) as { rollup?: BusinessHealthPlatformRollup }
+        const j4 = (await r4.json()) as { rollup?: CollectionsPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
         else setCommandRollup(null)
         if (r3.ok) setHealthRollup(j3.rollup ?? null)
         else setHealthRollup(null)
+        if (r4.ok) setCollectionsRollup(j4.rollup ?? null)
+        else setCollectionsRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
         setHealthRollup(null)
+        setCollectionsRollup(null)
       }
     })()
   }, [])
@@ -423,6 +441,56 @@ export function BlitzpayOperationsContent() {
               <ul className="list-disc pl-4 space-y-0.5">
                 {healthRollup.topGrowthOpportunityThemes.map((b) => (
                   <li key={b.slice(0, 120)}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {collectionsRollup && collectionsRollup.orgsSampled > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Collections acceleration (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled {collectionsRollup.orgsSampled} Connect workspaces ({collectionsRollup.reportingWindowDays}d). Totals
+            are directional, not audited cash forecasts.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Overdue AR (approx sum)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(collectionsRollup.overdueCollectibleCentsTotalApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Recoverable overdue (heuristic)</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {fmtMoney(collectionsRollup.estimatedRecoverableOverdueCentsApprox)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Field opportunity (approx)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(collectionsRollup.fieldCollectibleCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg active plans / org</p>
+              <p className="text-lg font-semibold tabular-nums">{collectionsRollup.installmentPlansActiveApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">ACH-heavy orgs (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{collectionsRollup.achAdoptionOrgsApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
+              <p className="text-lg font-semibold tabular-nums">{collectionsRollup.averageReminderDispatchPct}%</p>
+            </div>
+          </div>
+          {collectionsRollup.topRiskThemes.length > 0 ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-[11px] text-rose-950">
+              <p className="font-semibold mb-1">Operational risk themes</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {collectionsRollup.topRiskThemes.map((b) => (
+                  <li key={b}>{b}</li>
                 ))}
               </ul>
             </div>

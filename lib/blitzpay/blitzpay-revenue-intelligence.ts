@@ -39,6 +39,17 @@ export type BlitzpayOrgRevenueIntelligence = {
     openRecoveryCasesCount: number
     /** Same source as treasury aggregate (`pending` + `in_transit` payout amounts). */
     treasuryEstimateUpcomingTransferCents: number
+    /** Phase 2V — mirrored from reporting snapshot (bounded). */
+    estimatedRecoverableOverdueCents: number
+    likelyFieldCollectibleCents: number
+    achAccelerationOpportunityCents: number
+    installmentConversionOpportunityCents: number
+    technicianAssistedRecoveryRatePct: number
+    reminderConversionRatePct: number
+    fieldCollectionRecoveryRatePct: number
+    workOrdersWithCollectibleBalancesCount: number
+    paymentMethodMix: { card: number; us_bank_account: number; unknown: number }
+    customerWalletSpendableCreditTotalCents: number
   }
   forecasts: ReturnType<typeof buildBlitzpayForecastHorizonsCents> & {
     achPendingSettlementCents: number
@@ -205,9 +216,10 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
   const nowIso = new Date().toISOString()
 
+  const collections = await computeBlitzpayCollectionsReporting(admin, organizationId)
+
   const [
     reporting,
-    collections,
     overdue,
     disputes,
     paymentLinksWindow,
@@ -220,8 +232,10 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
     inst60,
     achPending,
   ] = await Promise.all([
-    fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
-    computeBlitzpayCollectionsReporting(admin, organizationId),
+    fetchBlitzpayOrgReportingSnapshot(admin, organizationId, {
+      sinceIso,
+      collectionsPulse: { reminderEffectivenessRatePct: collections.reminderEffectivenessRatePct },
+    }),
     computeOverdueCollectible(admin, organizationId),
     admin
       .from("blitzpay_invoice_disputes")
@@ -329,6 +343,16 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
       workOrderCollectPaymentLinksWindowCount: reporting.blitzpayWorkOrderCollectPaymentLinksWindowCount,
       openRecoveryCasesCount: recoveryOpen.count ?? 0,
       treasuryEstimateUpcomingTransferCents: reporting.treasuryEstimateUpcomingTransferCents,
+      estimatedRecoverableOverdueCents: reporting.estimatedRecoverableOverdueCents,
+      likelyFieldCollectibleCents: reporting.likelyFieldCollectibleCents,
+      achAccelerationOpportunityCents: reporting.achAccelerationOpportunityCents,
+      installmentConversionOpportunityCents: reporting.installmentConversionOpportunityCents,
+      technicianAssistedRecoveryRatePct: reporting.technicianAssistedRecoveryRatePct,
+      reminderConversionRatePct: reporting.reminderConversionRatePct,
+      fieldCollectionRecoveryRatePct: reporting.fieldCollectionRecoveryRatePct,
+      workOrdersWithCollectibleBalancesCount: reporting.workOrdersWithCollectibleBalancesCount,
+      paymentMethodMix: reporting.paymentMethodMix,
+      customerWalletSpendableCreditTotalCents: reporting.customerWalletSpendableCreditTotalCents,
     },
     forecasts: {
       ...horizons,

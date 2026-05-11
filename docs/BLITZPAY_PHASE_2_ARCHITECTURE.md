@@ -866,6 +866,25 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **BlitzPay Ops** — business health rollup card renders when at least one sampled org returns health (empty sample hides card).  
 4. Customer portal: confirm no business-health API paths.
 
+### 12.23 Phase 2V (collections copilot + cash acceleration — deterministic, staff-only)
+
+| Area | Details |
+|------|---------|
+| **Pure libs** | `blitzpay-collections-playbooks.ts` — rule-based recommended actions/channels/recovery windows. `blitzpay-collections-priority.ts` — `buildCollectionsPriorityQueue` urgency ordering. `blitzpay-collections-automation-insights.ts` — automation strings + `buildCustomerPaymentBehaviorProfile` from bounded aggregates. `blitzpay-collections-copilot-types.ts` — client-safe payload types. |
+| **Server** | `blitzpay-collections-acceleration-metrics.ts` — bounded overdue + WO scheduled-window heuristics, technician leaderboard (paid-invoice sample), recovery multipliers. `blitzpay-collections-copilot.ts` — `fetchBlitzpayCollectionsCopilot` composes revenue intelligence, customer payment summary, acceleration metrics, bounded reminder/PI/plan enrichment for priority rows. `blitzpay-platform-collections-rollup.ts` — ≤10 Connect org sample for platform ops. |
+| **Reporting / intelligence** | `fetchBlitzpayOrgReportingSnapshot` adds Phase 2V cents/rate fields (recoverable overdue, field-collectible, ACH/installment opportunity heuristics, technician-assisted recovery sample rate, reminder conversion %, field recovery %, WO collectible count). `fetchBlitzpayOrgRevenueIntelligence` exposes `paymentMethodMix` + wallet spendable + those fields on `dashboard`. `fetchBlitzpayBusinessHealth` surfaces the same facts on `BlitzpayBusinessHealthPayload.facts`. |
+| **APIs** | `GET …/blitzpay/collections-copilot?windowDays=` — `canViewFinancialReports` **or** `canViewFinancials` + schema guard. `GET /api/platform/blitzpay/collections-rollup` — platform admins only. |
+| **UX** | `BlitzpayCollectionsCopilotPanel` — **Settings → Payments** and **Insights → Financial command center** (`#blitzpay-collections-copilot-anchor`). **Admin → BlitzPay Ops** adds collections rollup strip. Executive dashboard lists acceleration lines under collections. |
+| **Portal** | No customer portal routes or bootstrap references `collections-copilot` / `collections-rollup`. |
+| **Tests** | `pnpm test:blitzpay-phase-2v` — deterministic priority/playbook, recovery multiplier bounds, API gate strings, bounded scan markers, portal isolation string check, no `pi_`/`po_` tails in Phase 2V libs. |
+
+#### Manual test checklist (Phase 2V)
+
+1. Financial role: **Settings → Payments** — collections copilot card loads; refresh works; drilldowns stay in-app.  
+2. **Insights → Financial command center** — copilot appears between executive health and command center.  
+3. Platform admin: **BlitzPay Ops** — collections rollup renders when sampled orgs exist.  
+4. Customer portal: confirm no collections-copilot API paths.
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

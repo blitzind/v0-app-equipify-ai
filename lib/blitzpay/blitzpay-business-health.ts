@@ -307,6 +307,14 @@ export async function fetchBlitzpayBusinessHealth(
       completedWoWithoutInvoiceSampleCount: pipelineResolved.completedWorkOrdersWithoutInvoiceSampleCount,
       completedWoScanned: pipelineResolved.completedWoScanned,
       fieldInvoiceLaterWindowCount: pipelineResolved.workOrdersFieldInvoiceLaterWindowCount,
+      estimatedRecoverableOverdueCents: d.estimatedRecoverableOverdueCents,
+      likelyFieldCollectibleCents: d.likelyFieldCollectibleCents,
+      achAccelerationOpportunityCents: d.achAccelerationOpportunityCents,
+      installmentConversionOpportunityCents: d.installmentConversionOpportunityCents,
+      technicianAssistedRecoveryRatePct: d.technicianAssistedRecoveryRatePct,
+      reminderConversionRatePct: d.reminderConversionRatePct,
+      fieldCollectionRecoveryRatePct: d.fieldCollectionRecoveryRatePct,
+      workOrdersWithCollectibleBalancesCount: d.workOrdersWithCollectibleBalancesCount,
     },
   }
 }

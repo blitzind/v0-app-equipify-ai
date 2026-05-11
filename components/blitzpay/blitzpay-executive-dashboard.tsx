@@ -135,6 +135,14 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
                 <li>Open disputes: {data.facts.openDisputesCount} ({fmtMoney(data.facts.openDisputesAmountCents)})</li>
                 <li>Refunds (window): {fmtMoney(data.facts.refundedVolumeWindowCents)}</li>
                 <li>Recovery volume tagged late-paid: {fmtMoney(data.facts.recoveredRevenueCents)}</li>
+                <li>Estimated recoverable overdue (heuristic): {fmtMoney(data.facts.estimatedRecoverableOverdueCents)}</li>
+                <li>Field visit collection opportunity (14d): {fmtMoney(data.facts.likelyFieldCollectibleCents)}</li>
+                <li>ACH acceleration opportunity (heuristic): {fmtMoney(data.facts.achAccelerationOpportunityCents)}</li>
+                <li>Installment conversion opportunity (heuristic): {fmtMoney(data.facts.installmentConversionOpportunityCents)}</li>
+                <li>Technician-assisted recovery rate (sample): {data.facts.technicianAssistedRecoveryRatePct}%</li>
+                <li>Reminder conversion (dispatch success): {data.facts.reminderConversionRatePct}%</li>
+                <li>Field recovery share of overdue: {data.facts.fieldCollectionRecoveryRatePct}%</li>
+                <li>Work orders with collectible balance (upcoming visits): {data.facts.workOrdersWithCollectibleBalancesCount}</li>
               </ul>
             </div>
           </div>

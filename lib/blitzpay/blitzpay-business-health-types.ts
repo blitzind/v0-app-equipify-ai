@@ -56,5 +56,14 @@ export type BlitzpayBusinessHealthPayload = {
     completedWoWithoutInvoiceSampleCount: number
     completedWoScanned: number
     fieldInvoiceLaterWindowCount: number
+    /** Phase 2V — collections acceleration (from revenue intelligence / reporting). */
+    estimatedRecoverableOverdueCents: number
+    likelyFieldCollectibleCents: number
+    achAccelerationOpportunityCents: number
+    installmentConversionOpportunityCents: number
+    technicianAssistedRecoveryRatePct: number
+    reminderConversionRatePct: number
+    fieldCollectionRecoveryRatePct: number
+    workOrdersWithCollectibleBalancesCount: number
   }
 }

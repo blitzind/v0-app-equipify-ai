@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { aggregateBlitzpayTreasuryMetrics } from "@/lib/blitzpay/blitzpay-contractor-treasury"
 import { fetchApReportingExtras } from "@/lib/blitzpay/blitzpay-vendor-payables"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
+import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
+import { fetchBlitzpayCollectionsAccelerationMetrics } from "@/lib/blitzpay/blitzpay-collections-acceleration-metrics"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
 export type BlitzpayOrgReportingSnapshot = {
@@ -78,6 +80,15 @@ export type BlitzpayOrgReportingSnapshot = {
   apDue60OpenCents: number
   apVendorInternalVelocity7dCents: number
   apProjectedOutgoingCents7d: number
+  /** Phase 2V — deterministic collections acceleration (bounded reads). */
+  estimatedRecoverableOverdueCents: number
+  likelyFieldCollectibleCents: number
+  achAccelerationOpportunityCents: number
+  installmentConversionOpportunityCents: number
+  technicianAssistedRecoveryRatePct: number
+  reminderConversionRatePct: number
+  fieldCollectionRecoveryRatePct: number
+  workOrdersWithCollectibleBalancesCount: number
 }
 
 /**
@@ -86,7 +97,7 @@ export type BlitzpayOrgReportingSnapshot = {
 export async function fetchBlitzpayOrgReportingSnapshot(
   admin: SupabaseClient,
   organizationId: string,
-  options?: { sinceIso?: string | null },
+  options?: { sinceIso?: string | null; collectionsPulse?: { reminderEffectivenessRatePct: number } },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
   const sinceIso = options?.sinceIso?.trim() ? options.sinceIso.trim() : null
@@ -426,6 +437,37 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* vendor payables migration may lag */
   }
 
+  const pulse = options?.collectionsPulse
+    ? options.collectionsPulse
+    : { reminderEffectivenessRatePct: (await computeBlitzpayCollectionsReporting(admin, organizationId)).reminderEffectivenessRatePct }
+
+  let estimatedRecoverableOverdueCents = 0
+  let likelyFieldCollectibleCents = 0
+  let achAccelerationOpportunityCents = 0
+  let installmentConversionOpportunityCents = 0
+  let technicianAssistedRecoveryRatePct = 0
+  let reminderConversionRatePct = 0
+  let fieldCollectionRecoveryRatePct = 0
+  let workOrdersWithCollectibleBalancesCount = 0
+  try {
+    const accel = await fetchBlitzpayCollectionsAccelerationMetrics(admin, organizationId, {
+      sinceIso,
+      paymentMethodMix,
+      activeInstallmentPlansCount: blitzpayActivePaymentPlansCount,
+      collectionsPulse: pulse,
+    })
+    estimatedRecoverableOverdueCents = accel.estimatedRecoverableOverdueCents
+    likelyFieldCollectibleCents = accel.likelyFieldCollectibleCents
+    achAccelerationOpportunityCents = accel.achAccelerationOpportunityCents
+    installmentConversionOpportunityCents = accel.installmentConversionOpportunityCents
+    technicianAssistedRecoveryRatePct = accel.technicianAssistedRecoveryRatePct
+    reminderConversionRatePct = accel.reminderConversionRatePct
+    fieldCollectionRecoveryRatePct = accel.fieldCollectionRecoveryRatePct
+    workOrdersWithCollectibleBalancesCount = accel.workOrdersWithCollectibleBalancesCount
+  } catch {
+    /* sandboxes without full BlitzPay schema */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -478,5 +520,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     apDue60OpenCents,
     apVendorInternalVelocity7dCents,
     apProjectedOutgoingCents7d,
+    estimatedRecoverableOverdueCents,
+    likelyFieldCollectibleCents,
+    achAccelerationOpportunityCents,
+    installmentConversionOpportunityCents,
+    technicianAssistedRecoveryRatePct,
+    reminderConversionRatePct,
+    fieldCollectionRecoveryRatePct,
+    workOrdersWithCollectibleBalancesCount,
   }
 }
