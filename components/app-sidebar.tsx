@@ -815,7 +815,7 @@ export function AppSidebar() {
 
       {/* ── Mobile overlay drawer ──────────────────────────────── */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 md:hidden" role="presentation">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -823,11 +823,17 @@ export function AppSidebar() {
             aria-hidden="true"
           />
           {/* Drawer panel */}
-          <aside className="absolute inset-y-0 left-0 flex flex-col w-64 bg-[#0F172A] border-r border-sidebar-border shadow-2xl">
+          <aside
+            id="mobile-sidebar-nav"
+            role="navigation"
+            aria-label="Primary navigation"
+            className="absolute inset-y-0 left-0 flex flex-col w-64 max-w-[85vw] bg-[#0F172A] border-r border-sidebar-border shadow-2xl outline-none"
+          >
             {/* Close button */}
             <button
+              type="button"
               onClick={() => setMobileOpen(false)}
-              className="absolute top-3 right-3 z-10 flex items-center justify-center w-7 h-7 rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+              className="absolute top-3 right-3 z-10 flex items-center justify-center min-h-11 min-w-11 rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors touch-manipulation"
               aria-label="Close menu"
             >
               <X className="w-4 h-4" />

@@ -283,6 +283,12 @@ export function PageShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:left-3 focus:top-3 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+      >
+        Skip to main content
+      </a>
       <AppTopbar />
       {meta && (
         <PageHero
@@ -293,7 +299,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
           pathname={pathname}
         />
       )}
-      <main className="flex-1 overflow-y-auto">
+      <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16">
         {/* pb-24 on mobile gives clearance above the fixed bottom nav (≈80px bar + safe area) */}
         <div className="max-w-[1440px] mx-auto p-3 sm:p-6 pb-24 lg:pb-6">
           {children}

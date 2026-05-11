@@ -116,7 +116,7 @@ export function AppTopbar() {
   const [hubOpen, setHubOpen]       = useState(false)
   const hubRef     = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const { setMobileOpen } = useContext(SidebarContext)
+  const { mobileOpen, setMobileOpen } = useContext(SidebarContext)
 
   const hubRoleLabel =
     orgRoleLabel ??
@@ -267,9 +267,12 @@ export function AppTopbar() {
     <header className="flex items-center h-14 md:h-16 px-3 md:px-6 bg-sidebar md:bg-card border-b border-sidebar-border md:border-border gap-3 shrink-0 relative z-30 sticky top-0">
       {/* Hamburger — mobile only */}
       <button
+        type="button"
         onClick={() => setMobileOpen(true)}
-        className="md:hidden flex items-center justify-center w-10 h-10 rounded-md hover:bg-sidebar-accent/60 transition-colors shrink-0"
+        className="md:hidden flex items-center justify-center min-h-11 min-w-11 rounded-md hover:bg-sidebar-accent/60 transition-colors shrink-0 touch-manipulation"
         aria-label="Open menu"
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-sidebar-nav"
       >
         <Menu className="w-5 h-5 text-sidebar-foreground" />
       </button>

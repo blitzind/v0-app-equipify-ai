@@ -203,6 +203,8 @@ export function WorkOrderOfflineSyncBar({
   return (
     <div
       role="status"
+      aria-live="polite"
+      aria-relevant="additions text"
       className={cn(
         "flex flex-col gap-1.5 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:py-2",
         className,

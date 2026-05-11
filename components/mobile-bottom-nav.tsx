@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -59,7 +59,30 @@ function resolveMobileNavPermissions(args: {
 
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
 
-function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+function BottomSheet({
+  open,
+  onClose,
+  titleId,
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Element id of the visible sheet title (`aria-labelledby`). */
+  titleId: string
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [open, onClose])
+
   return (
     <>
       <div
@@ -71,15 +94,19 @@ function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () =
         aria-hidden="true"
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-hidden={!open}
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-[91] lg:hidden",
+          "fixed bottom-0 left-0 right-0 z-[91] lg:hidden flex flex-col max-h-[85dvh] outline-none",
           "bg-background rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.15)]",
           "transition-transform duration-300 ease-out",
-          open ? "translate-y-0" : "translate-y-full",
+          open ? "translate-y-0" : "translate-y-full pointer-events-none",
         )}
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
       >
-        {children}
+        <div className="min-h-0 overflow-y-auto overscroll-contain">{children}</div>
       </div>
     </>
   )
@@ -134,14 +161,17 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
   const items = filteredItems.filter((item) => allowed(navPermissions, item.anyOf))
 
   return (
-    <BottomSheet open={open} onClose={onClose}>
+    <BottomSheet open={open} onClose={onClose} titleId="quick-add-sheet-title">
       <div className="px-5 pt-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-semibold text-foreground">Quick Add</p>
+          <h2 id="quick-add-sheet-title" className="text-sm font-semibold text-foreground">
+            Quick Add
+          </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close"
+            className="min-h-10 min-w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+            aria-label="Close quick add"
           >
             <X className="w-4 h-4" />
           </button>
@@ -150,8 +180,9 @@ function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }
           {items.map(({ icon: Icon, label, action }) => (
             <button
               key={label}
+              type="button"
               onClick={() => fire(action)}
-              className="flex flex-col items-center gap-2 p-3.5 rounded-xl border border-border bg-muted/30 active:scale-95 transition-transform"
+              className="flex flex-col items-center gap-2 p-3.5 rounded-xl border border-border bg-muted/30 active:scale-95 transition-transform touch-manipulation min-h-[72px]"
             >
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
@@ -200,14 +231,17 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
       ]
 
   return (
-    <BottomSheet open={open} onClose={onClose}>
-      <div className="px-5 pt-5">
+    <BottomSheet open={open} onClose={onClose} titleId="more-sheet-title">
+      <div className="px-5 pt-5 pb-2">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-foreground">More</p>
+          <h2 id="more-sheet-title" className="text-sm font-semibold text-foreground">
+            More
+          </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close"
+            className="min-h-10 min-w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+            aria-label="Close more menu"
           >
             <X className="w-4 h-4" />
           </button>

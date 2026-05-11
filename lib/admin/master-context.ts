@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:17:20.631Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:21:32.526Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -65,6 +65,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 61.3 — Integration catalog accuracy audit:** \`docs/INTEGRATION_CATALOG_INVENTORY.md\` + \`lib/integrations/catalog-metadata.ts\` — shared readiness badges (**Live, Beta, Limited, Planned, Coming Soon, Internal, Enterprise** types; UI uses existing \`ds-badge-*\`). **Product** \`/integrations\`: QuickBooks **Live** (link to Settings), Stripe billing **Limited**, Fuzor **Beta** external link (**Visit Fuzor**, not “Connect”), roadmap **Planned** + **Register interest**; removed fake KPI “Automation Ready: 12”; interest/request modals disclose **no server submit**. **Settings** hub: readiness pills from catalog map; **No in-app setup yet** replaces fake Connect/Docs stubs; QuickBooks live \`connection_status\` pill unchanged. **Entitlements:** marketing banner distinguishes future **API keys** (Scale) from connectors. No DB migrations.
 - **Phase 62.1 — Dead code & duplicate pattern cleanup:** Removed unused \`lib/permissions/require-org-permission.ts\` (\`requireOrgMemberPermission\` had zero imports). Centralized invoice status badge Tailwind strings in \`lib/invoices/invoice-status-badge-classes.ts\` for drawer header, invoice detail badge, and invoices list (Void row still adds \`line-through\` locally). Product \`/integrations\` roadmap KPI counts **planned** rows only (removed redundant always-zero \`coming_soon\` sum). No permission/entitlement/offline/sync logic changes; \`lib/integrations/catalog-metadata.ts\` remains the integration catalog source.
 - **Phase 62.2 — Performance & query optimization:** See \`docs/PERFORMANCE_AND_QUERY_OPTIMIZATION_AUDIT.md\`. **Dashboard hook** (\`lib/dashboard/use-supabase-dashboard.ts\`): head-only counts use minimal \`select('id', …)\`; overdue invoice rows filtered server-side with the same rule set as before (past due date **or** overdue with null due date); **Insights** uses \`variant: 'insights'\` to skip recent-work-order + preview-list queries not shown on that page. No RLS bypass; QuickBooks/offline/sync paths untouched.
+- **Phase 62.3 — Accessibility & responsive validation:** See \`docs/ACCESSIBILITY_AND_RESPONSIVE_VALIDATION.md\`. **Page shell:** skip link + \`main\` landmark \`id="main-content"\`; **mobile:** hamburger ↔ \`mobile-sidebar-nav\` wiring (\`aria-expanded\`, \`aria-controls\`), navigation landmark on drawer, wider close target; **Quick Add / More** sheets: dialog semantics, \`h2\` titles, Escape to close, \`max-h-[85dvh]\` scroll; **toasts:** provider region label; **offline WO sync bar:** \`aria-live="polite"\`. No permission/entitlement/offline logic changes.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
