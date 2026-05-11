@@ -84,7 +84,7 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 | **Reports / advanced** | Growth `reports_advanced` | `canUseFeature` (where used) | Some report surfaces | Spot-check per route | N/A | **Partial** | Not all report endpoints audited in 60.1. |
 | **Imports / migration** | None standard | N/A | Settings | Service role / admin | N/A | **Mixed** | High-trust operations; often capability-gated. |
 | **Certificates** | No dedicated feature key | N/A | UI | RLS + permissions | N/A | **Permission / RLS** | |
-| **API keys / developer** | Scale `api_access` | `canUseFeature` (where wired) | Settings API page | Some routes | **API calls monthly** in `PLAN_LIMITS` | **Partial** | **Counters displayed**; **hard API throttling not fully enforced** app-wide — see gaps. |
+| **API keys / developer** | Scale `api_access` | `canUseFeature` (where wired) | Settings API page (honest placeholder) | Some routes | **API calls monthly** in `PLAN_LIMITS` | **Partial** | **Counters displayed**; **hard API throttling not fully enforced** app-wide — see gaps. Future public API/webhooks: **`docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`**. |
 | **Offline technician** | N/A (device) | N/A | Work order UX | N/A | N/A | **N/A** | Not subscription-gated. |
 | **Storage / documents** | No unified entitlement | N/A | N/A | N/A | N/A | **Planned / ad hoc** | |
 
@@ -159,3 +159,4 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 - `lib/ai/execution-mode.ts` — live vs mock AI.
 - `app/(dashboard)/settings/billing/page.tsx` — usage display.
 - `docs/AI_AUTOMATION_GOVERNANCE.md` — AI/automation route matrix & cron behavior (60.5).
+- `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md` — future public API & outbound webhooks (61.2 design only).

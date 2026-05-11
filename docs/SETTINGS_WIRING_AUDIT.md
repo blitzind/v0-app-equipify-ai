@@ -34,7 +34,7 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 | `/settings/integrations` | Gmail / other catalog entries | — | — | Same | **Planned** — disabled / “coming soon” |
 | `/settings/integrations/quickbooks` | Connection, sync, auto-sync | QBO integration state | QuickBooks settings APIs | Same | **Wired** (labels reflect server state) |
 | `/settings/security` | MFA, sessions, timeout, events | — | — | `canManageSecuritySettings` | **Planned** — non-interactive honesty page (Phase 57.2) |
-| `/settings/api` | API keys / webhooks | — | — | `canManageApiKeys` | **Planned** — honesty shell; no fake keys |
+| `/settings/api` | API keys / outbound webhooks | — | — | `canManageApiKeys` | **Planned** — honesty shell (Phase 61.2); roadmap + link to `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`; no keys / no registrations |
 | `/settings/audit-log` | Audit entries | Audit log tables | Read APIs | `canViewOperationalReports` or `canManageSecuritySettings` | **Wired** (read) |
 | `/settings/archived` | Archived records restore | Archive tables | Restore actions on page | `canArchiveRecords` | **Wired** |
 | `/settings/equipment-types` | Equipment types CRUD | Org equipment types | CRUD APIs on page | `canManageWorkspaceSettings` | **Wired** |
@@ -50,9 +50,10 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 - Persist personal notification channel preferences behind a dedicated API.
 - Replace reminder cadence preview with a stored model or remove until product definition is fixed.
 - Implement Supabase-backed MFA / session management when ready, then re-enable interactive Security settings.
-- Implement real API keys + webhooks with audit trail and rotation.
+- Implement real API keys + outbound webhooks with audit trail and rotation (see `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`).
 
 ## Changelog
 
 - **Phase 57.2:** Removed misleading password form, demo Security page, demo API keys, fake notification/automation saves; added this document.
 - **Phase 57.4:** Follow-up automation API/UI aligned on `canManageAutomations | canManageWorkspaceSettings`; AI Ops digest APIs aligned on `requireOrgPermission` (effective caps) + digest save toast; Integrations hub shows real QuickBooks connection status and honest Stripe label.
+- **Phase 61.2:** Added `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md` (future public API + outbound webhooks); `/settings/api` expanded copy + doc links; scaffolding `lib/api/future-webhook-event-types.ts` (unused event name constants).

@@ -45,6 +45,7 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 | **AI requests** | Per-task caps in `AiTaskDefinition` + plan tier | `ai_usage_logs` | AI usage settings / ops | `evaluateAiPlanGate` + budget precheck | Calendar month (UTC) for MTD task aggregation | **enforced** where tasks use plan gate; not every AI touchpoint may use the same task id |
 | **AI spend** | Org budget (not plan tier table) | `ai_usage_logs` + org settings | Settings → AI usage | `precheckOrganizationAiBudget` (warn/block) | Calendar month | **enforced** when configured |
 | **API calls (plan allowance)** | `apiCallsMonthly` Growth/Scale | `organization_api_usage_monthly.api_calls` | Billing Usage bar | **None** — no app increment | UTC calendar month row | **display-only** — counter not incremented by app code yet |
+| **Public developer API** (future) | Scale `api_access` (expected) | TBD key + request logs | Settings → API (planned) | **Planned** — must tie to reliable counters | UTC month | **planned** — see **`docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`**; distinct from dashboard Route Handlers |
 | **Automations / workflow runs** | Indirect (automation feature Growth+) | Run history tables | — | Feature + billing on create + `dispatchWorkflowTriggers` skip; no per-run numeric cap | — | **partial** — see **`docs/AI_AUTOMATION_GOVERNANCE.md`** |
 | **Storage / documents** | Not in `PLAN_LIMITS` | Supabase storage | — | RLS / permissions | — | **needs follow-up** / product |
 | **Imports / migration** | Platform-admin gated | Platform routes | — | `isPlatformAdminEmail` + org migration helpers | — | **n/a** for tenant plan caps |
@@ -61,6 +62,10 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 2. **`isMonthlyApiCallPlanCapExceeded`** in `lib/billing/usage.ts` — helper for a future guard once `api_calls` is incremented reliably.
 
 3. **Billing copy** — clarifies API bar is not fed by live increments yet.
+
+## Phase 61.2 — Public API (planned only)
+
+A future **third-party HTTP API** (Bearer keys, optional webhooks) would need **dedicated** metering and enforcement; it must **not** be confused with existing **internal** `app/api/organizations/...` usage. Until keys and a public router exist, **`organization_api_usage_monthly` remains display-only / partial** for that story. Design notes: `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`.
 
 ## Phase 60.3 code changes
 
