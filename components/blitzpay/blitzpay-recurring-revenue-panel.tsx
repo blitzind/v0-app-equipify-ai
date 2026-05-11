@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { CalendarClock, Loader2, RefreshCw, Repeat } from "lucide-react"
 import type { BlitzpayRecurringRevenuePulsePayload } from "@/lib/blitzpay/blitzpay-recurring-revenue-types"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -33,13 +34,23 @@ export function BlitzpayRecurringRevenuePanel({ organizationId, orgReady }: Prop
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/recurring-revenue?windowDays=30`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { recurringRevenue?: BlitzpayRecurringRevenuePulsePayload; message?: string }
+      let j: { recurringRevenue?: BlitzpayRecurringRevenuePulsePayload }
+      try {
+        j = (await res.json()) as { recurringRevenue?: BlitzpayRecurringRevenuePulsePayload }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.recurringRevenue)
+        return
+      }
       if (!res.ok) {
         setData(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load recurring revenue signals.")
+        setError(blitzpayStaffWidgetLoadCopy.recurringRevenue)
         return
       }
       setData(j.recurringRevenue ?? null)
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.recurringRevenue)
     } finally {
       setLoading(false)
     }
@@ -75,7 +86,7 @@ export function BlitzpayRecurringRevenuePanel({ organizationId, orgReady }: Prop
         </Button>
       </div>
 
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…

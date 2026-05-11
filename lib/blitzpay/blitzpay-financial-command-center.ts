@@ -62,6 +62,17 @@ export type BlitzpayFinancialCommandCenterPayload = {
     recurringRevenueSharePendingCents: number
     commissionVelocity7dCents: number
     draftPayrollRuns: number
+    /** Phase 2Z — internal cash planning (not custodial). */
+    estimatedOperatingCashCents: number
+    cashReserveTargetCents: number
+    cashReserveGapCents: number
+    cashRunwayStatus: "healthy" | "watch" | "risk"
+    expectedInflows7dCents: number
+    expectedInflows30dCents: number
+    expectedOutflows7dCents: number
+    expectedOutflows30dCents: number
+    payrollReserveCoverageBasisPoints: number
+    apReserveCoverageBasisPoints: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -86,6 +97,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     reports: { href: "/reports", label: "Operations reports" },
     memberships: { href: "/memberships", label: "Memberships & agreements" },
     payroll: { href: "/settings/payments#blitzpay-payroll-anchor", label: "Payroll & commissions (Settings → Payments)" },
+    cashPlanning: { href: "/settings/payments#blitzpay-cash-accounts-anchor", label: "Operating cash & runway (Settings → Payments)" },
   }
 }
 
@@ -177,6 +189,13 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     estimateOpenQuotesWithTotalCount: reporting.estimateOpenQuotesWithTotalCount,
     workOrderCollectPaymentLinksWindowCount: d.workOrderCollectPaymentLinksWindowCount,
     pendingApprovalPayableCount,
+    cashRunwayStatus: reporting.cashRunwayStatus,
+    cashReserveGapCents: reporting.cashReserveGapCents,
+    estimatedOperatingCashCents: reporting.estimatedOperatingCashCents,
+    payrollLiabilityCents: reporting.payrollLiabilityCents,
+    expectedInflows30Cents: reporting.expectedInflows30dCents,
+    expectedOutflows30Cents: reporting.expectedOutflows30dCents,
+    recurringPlannedInflow30dCents: reporting.blitzpayRecurringPlannedInflow30dCents,
   })
 
   return {
@@ -221,6 +240,16 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       recurringRevenueSharePendingCents: payrollHealth?.revenueSharePendingCents ?? 0,
       commissionVelocity7dCents: payrollHealth?.commissionVelocity7dCents ?? 0,
       draftPayrollRuns: payrollHealth?.draftPayrollRuns ?? 0,
+      estimatedOperatingCashCents: reporting.estimatedOperatingCashCents,
+      cashReserveTargetCents: reporting.cashReserveTargetCents,
+      cashReserveGapCents: reporting.cashReserveGapCents,
+      cashRunwayStatus: reporting.cashRunwayStatus,
+      expectedInflows7dCents: reporting.expectedInflows7dCents,
+      expectedInflows30dCents: reporting.expectedInflows30dCents,
+      expectedOutflows7dCents: reporting.expectedOutflows7dCents,
+      expectedOutflows30dCents: reporting.expectedOutflows30dCents,
+      payrollReserveCoverageBasisPoints: reporting.payrollReserveCoverageBasisPoints,
+      apReserveCoverageBasisPoints: reporting.apReserveCoverageBasisPoints,
     },
     combinedForecast,
     scorecards,

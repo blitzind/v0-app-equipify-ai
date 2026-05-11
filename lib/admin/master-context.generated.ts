@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 303,
-  sqlMigrations: 167,
+  apiRouteHandlers: 308,
+  sqlMigrations: 168,
   dashboardPages: 62,
-  componentsTsx: 272,
-  libTsFiles: 602,
+  componentsTsx: 273,
+  libTsFiles: 608,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **303** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **167** |
+| API route handlers (\`app/api/**/route.ts\`) | **308** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **168** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **272** |
-| \`lib/**/*.ts\` | **602** |
+| \`components/**/*.tsx\` | **273** |
+| \`lib/**/*.ts\` | **608** |
 
 ### Vercel crons
 
@@ -99,6 +99,10 @@ organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
 organizations/[organizationId]/blitzpay/business-health/route.ts
+organizations/[organizationId]/blitzpay/cash-accounts/route.ts
+organizations/[organizationId]/blitzpay/cash-reserve-rules/[ruleId]/route.ts
+organizations/[organizationId]/blitzpay/cash-reserve-rules/route.ts
+organizations/[organizationId]/blitzpay/cash-runway/route.ts
 organizations/[organizationId]/blitzpay/collections-copilot/route.ts
 organizations/[organizationId]/blitzpay/commissions/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
@@ -284,6 +288,7 @@ platform/ai-profitability/route.ts
 platform/analytics/route.ts
 platform/analytics/snapshot/route.ts
 platform/blitzpay/business-health-rollup/route.ts
+platform/blitzpay/cash-accounts-rollup/route.ts
 platform/blitzpay/collections-rollup/route.ts
 platform/blitzpay/command-center-rollup/route.ts
 platform/blitzpay/membership-rollup/route.ts

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { blitzpayStaffOperationFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { approvePayrollRun } from "@/lib/blitzpay/blitzpay-payroll-runs"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
@@ -37,7 +38,6 @@ export async function POST(
     const run = await approvePayrollRun(admin, { organizationId, runId })
     return NextResponse.json({ run })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "approve_failed", message: msg }, { status: 400 })
+    return blitzpayStaffOperationFailedResponse("POST payroll-runs approve", e, "approve_failed", 400)
   }
 }

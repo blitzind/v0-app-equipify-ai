@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { cn } from "@/lib/utils"
 
 type SettlementRow = {
@@ -43,13 +44,23 @@ export function BlitzpayVendorPayoutsPanel({ organizationId, orgReady }: Props) 
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/vendor-payouts?limit=60`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { vendorSettlements?: SettlementRow[]; message?: string }
+      let j: { vendorSettlements?: SettlementRow[] }
+      try {
+        j = (await res.json()) as { vendorSettlements?: SettlementRow[] }
+      } catch {
+        setRows([])
+        setError(blitzpayStaffWidgetLoadCopy.contractorSettlements)
+        return
+      }
       if (!res.ok) {
         setRows([])
-        setError(typeof j.message === "string" ? j.message : "Could not load contractor settlements.")
+        setError(blitzpayStaffWidgetLoadCopy.contractorSettlements)
         return
       }
       setRows(j.vendorSettlements ?? [])
+    } catch {
+      setRows([])
+      setError(blitzpayStaffWidgetLoadCopy.contractorSettlements)
     } finally {
       setLoading(false)
     }
@@ -83,7 +94,7 @@ export function BlitzpayVendorPayoutsPanel({ organizationId, orgReady }: Props) 
           Refresh
         </Button>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {rows.length === 0 && !loading ? (
         <p className="text-[11px] text-muted-foreground">No settlement rows yet.</p>
       ) : (

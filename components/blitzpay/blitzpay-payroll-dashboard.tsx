@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Briefcase, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { cn } from "@/lib/utils"
 
 type PayrollHealth = {
@@ -78,11 +79,19 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
           credentials: "include",
         }),
       ])
-      const pj = (await pRes.json()) as { payroll?: PayrollPayload; message?: string }
-      const rj = (await rRes.json()) as { runs?: PayrollRun[]; message?: string }
+      let pj: { payroll?: PayrollPayload }
+      let rj: { runs?: PayrollRun[] }
+      try {
+        pj = (await pRes.json()) as { payroll?: PayrollPayload }
+        rj = (await rRes.json()) as { runs?: PayrollRun[] }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.payroll)
+        return
+      }
       if (!pRes.ok) {
         setData(null)
-        setError(typeof pj.message === "string" ? pj.message : "Could not load payroll dashboard.")
+        setError(blitzpayStaffWidgetLoadCopy.payroll)
         return
       }
       const runs = rRes.ok ? (rj.runs ?? []) : []
@@ -93,6 +102,9 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
       }
       setData(merged)
       setSelectedRunId((prev) => prev || (merged.recentRuns[0]?.id ?? ""))
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.payroll)
     } finally {
       setLoading(false)
     }
@@ -113,13 +125,21 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ periodStart, periodEnd }),
       })
-      const j = (await res.json()) as { run?: { id: string }; message?: string }
+      let j: { run?: { id: string } }
+      try {
+        j = (await res.json()) as { run?: { id: string } }
+      } catch {
+        setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
+        return
+      }
       if (!res.ok) {
-        setError(typeof j.message === "string" ? j.message : "Could not create draft run.")
+        setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
         return
       }
       if (j.run?.id) setSelectedRunId(j.run.id)
       await load()
+    } catch {
+      setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
     } finally {
       setBusy(null)
     }
@@ -134,9 +154,11 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/payroll-runs/${encodeURIComponent(selectedRunId)}/approve`,
         { method: "POST", credentials: "include" },
       )
-      const j = (await res.json()) as { message?: string }
-      if (!res.ok) setError(typeof j.message === "string" ? j.message : "Approve failed.")
+      await res.json().catch(() => null)
+      if (!res.ok) setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
       await load()
+    } catch {
+      setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
     } finally {
       setBusy(null)
     }
@@ -151,9 +173,11 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/payroll-runs/${encodeURIComponent(selectedRunId)}/finalize`,
         { method: "POST", credentials: "include" },
       )
-      const j = (await res.json()) as { message?: string }
-      if (!res.ok) setError(typeof j.message === "string" ? j.message : "Finalize failed.")
+      await res.json().catch(() => null)
+      if (!res.ok) setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
       await load()
+    } catch {
+      setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
     } finally {
       setBusy(null)
     }
@@ -183,7 +207,7 @@ export function BlitzpayPayrollDashboard({ organizationId, orgReady }: Props) {
           Refresh
         </Button>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { fetchBlitzpayTreasuryDashboard } from "@/lib/blitzpay/blitzpay-contractor-treasury"
+import { fetchBlitzpayOrgCashPlanningPayload } from "@/lib/blitzpay/blitzpay-cash-accounts-service"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
@@ -54,9 +56,14 @@ export async function GET(
     const treasury = await fetchBlitzpayTreasuryDashboard(admin, organizationId, {
       achPendingCount: achPending,
     })
-    return NextResponse.json({ treasury })
+    let cashPlanning: Awaited<ReturnType<typeof fetchBlitzpayOrgCashPlanningPayload>> | null = null
+    try {
+      cashPlanning = await fetchBlitzpayOrgCashPlanningPayload(admin, organizationId)
+    } catch {
+      cashPlanning = null
+    }
+    return NextResponse.json({ treasury, cashPlanning })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    return blitzpayStaffLoadFailedResponse("GET treasury", e)
   }
 }

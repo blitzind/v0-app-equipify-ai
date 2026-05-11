@@ -80,5 +80,16 @@ export type BlitzpayBusinessHealthPayload = {
     contractorSettlementExposureCents: number
     recurringRevenueSharePendingCents: number
     commissionVelocity7dCents: number
+    /** Phase 2Z */
+    estimatedOperatingCashCents: number
+    cashReserveTargetCents: number
+    cashReserveGapCents: number
+    cashRunwayStatus: "healthy" | "watch" | "risk"
+    expectedInflows7dCents: number
+    expectedInflows30dCents: number
+    expectedOutflows7dCents: number
+    expectedOutflows30dCents: number
+    payrollReserveCoverageBasisPoints: number
+    apReserveCoverageBasisPoints: number
   }
 }

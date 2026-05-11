@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Landmark, Loader2, RefreshCw, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 
 type TreasuryPayload = {
   availableBalanceCents: number
@@ -44,6 +45,16 @@ type TreasuryPayload = {
   }
 }
 
+type CashPlanningPayload = {
+  summary: {
+    estimatedOperatingCashCents: number
+    cashReserveTargetCents: number
+    cashReserveGapCents: number
+  }
+  runway: { status: string; expectedInflows30dCents: number; expectedOutflows30dCents: number }
+  health: { payrollReserveCoverageBasisPoints: number; apReserveCoverageBasisPoints: number }
+}
+
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
 }
@@ -65,6 +76,7 @@ type Props = {
 export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
   const [loading, setLoading] = useState(false)
   const [treasury, setTreasury] = useState<TreasuryPayload | null>(null)
+  const [cashPlanning, setCashPlanning] = useState<CashPlanningPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -79,13 +91,27 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/treasury`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { treasury?: TreasuryPayload; message?: string }
+      let j: { treasury?: TreasuryPayload; cashPlanning?: CashPlanningPayload | null }
+      try {
+        j = (await res.json()) as { treasury?: TreasuryPayload; cashPlanning?: CashPlanningPayload | null }
+      } catch {
+        setTreasury(null)
+        setCashPlanning(null)
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
+        return
+      }
       if (!res.ok) {
         setTreasury(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load treasury snapshot.")
+        setCashPlanning(null)
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
         return
       }
       setTreasury(j.treasury ?? null)
+      setCashPlanning(j.cashPlanning ?? null)
+    } catch {
+      setTreasury(null)
+      setCashPlanning(null)
+      setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
     } finally {
       setLoading(false)
     }
@@ -114,7 +140,7 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
         Derived from Stripe Connect payout and balance-transaction mirrors. No bank account numbers are stored or shown.
         Reserve targets are configuration-only; funds remain at Stripe.
       </p>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !treasury ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
@@ -130,6 +156,25 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
                 {fmtMoney(treasury.recurringCashSignals.plannedRecurringInflow30dCents)}
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">{treasury.recurringCashSignals.summaryNote}</p>
+            </div>
+          ) : null}
+          {cashPlanning ? (
+            <div className="rounded-lg border border-border/70 bg-background/60 px-4 py-3 text-sm space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operating cash &amp; runway (Phase 2Z)</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Internal planning only — compares wallet/quote holds to treasury operating signals. Cash runway:{" "}
+                <span className="font-medium text-foreground capitalize">{cashPlanning.runway.status}</span>.
+              </p>
+              <p className="text-xs tabular-nums leading-relaxed">
+                Available operating cash (estimate) {fmtMoney(cashPlanning.summary.estimatedOperatingCashCents)} · Reserve
+                target {fmtMoney(cashPlanning.summary.cashReserveTargetCents)} · Gap{" "}
+                {fmtMoney(cashPlanning.summary.cashReserveGapCents)}
+              </p>
+              <p className="text-xs tabular-nums text-muted-foreground">
+                Expected incoming (30d) {fmtMoney(cashPlanning.runway.expectedInflows30dCents)} · Upcoming obligations (30d
+                est.) {fmtMoney(cashPlanning.runway.expectedOutflows30dCents)} · Payroll/AP coverage (bps){" "}
+                {cashPlanning.health.payrollReserveCoverageBasisPoints} / {cashPlanning.health.apReserveCoverageBasisPoints}
+              </p>
             </div>
           ) : null}
           {treasury.payrollTreasurySignals ? (

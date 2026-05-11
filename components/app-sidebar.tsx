@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check, Bot,
-  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, CreditCard, Repeat,
+  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark, Repeat,
   Bell,
   Warehouse,
   UserPlus,
@@ -114,7 +114,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "BlitzPay",
         href: "/insights/financial-command-center",
-        icon: CreditCard,
+        icon: Landmark,
         anyOf: ["canViewFinancialReports", "canViewFinancials"],
       },
       {

@@ -939,6 +939,19 @@ Use this as a **checklist** when coding — not exhaustive.
 | **UX** | Settings → Payments + Insights → Financial command center — payroll dashboard, commission queue, vendor settlements panel; work-order BlitzPay strip; technician drawer performance tab (financial roles). **Portal:** no payroll internals. |
 | **Tests** | `pnpm test:blitzpay-phase-2y` — migration + table split note, engine math, idempotency keys, bounded caps, no Stripe substrings in new client components, permission gates, platform rollup auth, `server-only` isolation for accrual vs pure engine. |
 
+### 12.27 Phase 2Z (internal cash buckets, reserve rules, runway snapshots — planning only)
+
+| Area | Details |
+|------|---------|
+| **Schema** | `blitzpay_cash_accounts`, `blitzpay_cash_account_allocations`, `blitzpay_cash_reserve_rules`, `blitzpay_cash_runway_snapshots` — org-scoped `SELECT` for authenticated members; **writes via service-role org APIs** only. **No stored-money custody**; rows are internal planning mirrors layered on Connect treasury + AP + payroll signals. |
+| **Pure + server libs** | `blitzpay-cash-accounts.ts` — `estimateOperatingBalance`, `calculateReserveTargets`, `allocateCollectionsToCashAccounts`, `releaseCashAccountAllocation`, `buildCashAccountSummary`, `buildCashAccountHealth`, `buildCashRunwaySnapshot`, `deriveBlitzpayCashPlanningMetrics` (no I/O). `blitzpay-cash-accounts-service.ts` — bounded loads + `fetchBlitzpayOrgCashPlanningPayload`, reserve rule CRUD helpers, runway snapshot upsert. `blitzpay-platform-cash-accounts-rollup.ts` — capped org sample for Admin ops. |
+| **Org APIs** | `GET …/blitzpay/cash-accounts` (includes recent allocation sample), `GET …/blitzpay/cash-runway` (best-effort daily snapshot upsert), `GET/POST …/blitzpay/cash-reserve-rules`, `PATCH …/blitzpay/cash-reserve-rules/[ruleId]`. Reads: `canViewFinancialReports` **or** `canViewFinancials`. Mutations: `canManageSettings` **and** `canViewFinancials`. |
+| **Treasury API** | `GET …/blitzpay/treasury` returns `{ treasury, cashPlanning? }` — `cashPlanning` is optional when schema lags. |
+| **Platform** | `GET /api/platform/blitzpay/cash-accounts-rollup` — platform admin email gate; bounded org sample (`PLATFORM_CASH_ORG_SAMPLE_CAP`). |
+| **Reporting / dashboards** | `fetchBlitzpayOrgReportingSnapshot` adds `openDisputesAmountCents` (bounded) + Phase 2Z runway/reserve/inflow/outflow/bps fields. Financial command center, executive dashboard, revenue intelligence, business health, treasury panel, BlitzPay Ops strip consume the same signals. |
+| **UX** | Contractor-friendly copy (“Available operating cash”, “Money to reserve”, “Upcoming obligations”) — **no** “bank account” / “insured balance” claims. **Portal:** no cash-planning APIs. |
+| **Tests** | `pnpm test:blitzpay-phase-2z` — migration tables, pure math, double-count guard, runway status, route permission strings, portal exclusion grep, no Stripe id patterns in new panel, schema-health table names, bounded caps. |
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

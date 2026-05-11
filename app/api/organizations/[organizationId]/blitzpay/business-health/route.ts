@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { fetchBlitzpayBusinessHealth } from "@/lib/blitzpay/blitzpay-business-health"
+import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
@@ -48,7 +49,6 @@ export async function GET(
     })
     return NextResponse.json({ businessHealth })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    return blitzpayStaffLoadFailedResponse("GET business-health", e)
   }
 }

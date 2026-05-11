@@ -10,6 +10,7 @@ import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-re
 import { fetchBlitzpayMembershipReportingSlice } from "@/lib/blitzpay/blitzpay-memberships"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
+import { deriveBlitzpayCashPlanningMetrics, type BlitzpayCashReserveRuleInput } from "@/lib/blitzpay/blitzpay-cash-accounts"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -120,6 +121,19 @@ export type BlitzpayOrgReportingSnapshot = {
   estimatedPayrollBurdenCents: number
   commissionVelocity7dCents: number
   recurringMemberPayoutStability0to100: number
+  /** Non-terminal disputes (bounded scan). */
+  openDisputesAmountCents: number
+  /** Phase 2Z — internal cash planning (not custodial balances). */
+  estimatedOperatingCashCents: number
+  cashReserveTargetCents: number
+  cashReserveGapCents: number
+  expectedInflows7dCents: number
+  expectedInflows30dCents: number
+  expectedOutflows7dCents: number
+  expectedOutflows30dCents: number
+  cashRunwayStatus: "healthy" | "watch" | "risk"
+  payrollReserveCoverageBasisPoints: number
+  apReserveCoverageBasisPoints: number
 }
 
 /**
@@ -435,17 +449,18 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let treasuryPayoutVelocityPaidCents30d = 0
   let treasuryEstimateUpcomingTransferCents = 0
   let treasuryPayoutSpeedLane: "standard" | "accelerated" | "unknown" = "unknown"
+  let tmSnapshot: Awaited<ReturnType<typeof aggregateBlitzpayTreasuryMetrics>> | null = null
   try {
-    const tm = await aggregateBlitzpayTreasuryMetrics(admin, organizationId)
-    treasuryAveragePayoutDelayDays = tm.avgPayoutDelayDays
-    treasuryPendingPayoutTotalsCents = tm.pendingPayoutTotalCents
-    treasuryFailedPayoutCount30d = tm.failedPayoutCount30d
-    treasuryInstantTransferEligible = tm.instantTransferEligible
-    treasuryReserveExposureCents = tm.heldReserveCents
-    treasuryPayoutVelocityPaidCents7d = tm.payoutVelocityPaidCents7d
-    treasuryPayoutVelocityPaidCents30d = tm.payoutVelocityPaidCents30d
-    treasuryEstimateUpcomingTransferCents = tm.estimateUpcomingTransferCents
-    treasuryPayoutSpeedLane = tm.payoutSpeedLane
+    tmSnapshot = await aggregateBlitzpayTreasuryMetrics(admin, organizationId)
+    treasuryAveragePayoutDelayDays = tmSnapshot.avgPayoutDelayDays
+    treasuryPendingPayoutTotalsCents = tmSnapshot.pendingPayoutTotalCents
+    treasuryFailedPayoutCount30d = tmSnapshot.failedPayoutCount30d
+    treasuryInstantTransferEligible = tmSnapshot.instantTransferEligible
+    treasuryReserveExposureCents = tmSnapshot.heldReserveCents
+    treasuryPayoutVelocityPaidCents7d = tmSnapshot.payoutVelocityPaidCents7d
+    treasuryPayoutVelocityPaidCents30d = tmSnapshot.payoutVelocityPaidCents30d
+    treasuryEstimateUpcomingTransferCents = tmSnapshot.estimateUpcomingTransferCents
+    treasuryPayoutSpeedLane = tmSnapshot.payoutSpeedLane
   } catch {
     /* migrations may lag in some sandboxes */
   }
@@ -595,6 +610,69 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* payroll tables optional until migration applied */
   }
 
+  const DISPUTE_TERMINAL = new Set(["won", "lost", "charge_refunded", "closed"])
+  let openDisputesAmountCents = 0
+  try {
+    const { data: drows, error: dErr } = await admin
+      .from("blitzpay_invoice_disputes")
+      .select("amount_cents, status")
+      .eq("organization_id", organizationId)
+      .limit(80)
+    if (!dErr && drows) {
+      for (const d of drows as Array<{ amount_cents: number; status: string }>) {
+        if (DISPUTE_TERMINAL.has(String(d.status))) continue
+        openDisputesAmountCents += Math.max(0, Math.round(Number(d.amount_cents)))
+      }
+    }
+  } catch {
+    openDisputesAmountCents = 0
+  }
+
+  let cashReserveRulesForMetrics: BlitzpayCashReserveRuleInput[] = []
+  try {
+    const { data: crRows, error: crErr } = await admin
+      .from("blitzpay_cash_reserve_rules")
+      .select("rule_type, basis_points, fixed_amount_cents, active")
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .limit(48)
+    if (!crErr && crRows) {
+      cashReserveRulesForMetrics = (crRows as Array<{ rule_type: string; basis_points: number | null; fixed_amount_cents: number | null; active: boolean }>).map(
+        (r) => ({
+          ruleType: r.rule_type as BlitzpayCashReserveRuleInput["ruleType"],
+          basisPoints: r.basis_points != null ? Math.round(Number(r.basis_points)) : null,
+          fixedAmountCents: r.fixed_amount_cents != null ? Math.round(Number(r.fixed_amount_cents)) : null,
+          active: Boolean(r.active),
+        }),
+      )
+    }
+  } catch {
+    cashReserveRulesForMetrics = []
+  }
+
+  const walletL = customerWalletSpendableCreditTotalCents
+  const depL = customerUnappliedEstimateDepositTotalCents
+  const overlapWd = Math.min(walletL, depL)
+  const cash2z = deriveBlitzpayCashPlanningMetrics({
+    treasuryOperatingCents: tmSnapshot?.operatingBalanceCents ?? 0,
+    heldReserveCents: tmSnapshot?.heldReserveCents ?? 0,
+    reserveTargetFromSettingsCents: tmSnapshot?.reserveTargetCents ?? 0,
+    pendingPayoutTotalCents: tmSnapshot?.pendingPayoutTotalCents ?? 0,
+    walletSpendableLiabilityCents: walletL,
+    unappliedEstimateDepositCents: depL,
+    walletDepositOverlapCents: overlapWd,
+    netCollectedWindowCents: Math.max(0, gross - refunded),
+    payrollLiabilityCents,
+    apOpenOutstandingCents,
+    disputeExposureCents: openDisputesAmountCents,
+    reserveRules: cashReserveRulesForMetrics,
+    apDue7OpenCents,
+    apDue30OpenCents,
+    treasuryPendingPayoutTotalsCents,
+    treasuryEstimateUpcomingTransferCents,
+    recurringPlannedInflow30dCents: blitzpayRecurringPlannedInflow30dCents,
+  })
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -680,5 +758,16 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     estimatedPayrollBurdenCents,
     commissionVelocity7dCents,
     recurringMemberPayoutStability0to100,
+    openDisputesAmountCents,
+    estimatedOperatingCashCents: cash2z.estimatedOperatingCashCents,
+    cashReserveTargetCents: cash2z.cashReserveTargetCents,
+    cashReserveGapCents: cash2z.cashReserveGapCents,
+    expectedInflows7dCents: cash2z.expectedInflows7dCents,
+    expectedInflows30dCents: cash2z.expectedInflows30dCents,
+    expectedOutflows7dCents: cash2z.expectedOutflows7dCents,
+    expectedOutflows30dCents: cash2z.expectedOutflows30dCents,
+    cashRunwayStatus: cash2z.cashRunwayStatus,
+    payrollReserveCoverageBasisPoints: cash2z.payrollReserveCoverageBasisPoints,
+    apReserveCoverageBasisPoints: cash2z.apReserveCoverageBasisPoints,
   }
 }

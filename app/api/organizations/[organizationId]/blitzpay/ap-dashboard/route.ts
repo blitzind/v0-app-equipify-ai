@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { fetchBlitzpayApDashboard } from "@/lib/blitzpay/blitzpay-vendor-payables"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
@@ -56,7 +57,6 @@ export async function GET(
     const dashboard = await fetchBlitzpayApDashboard(admin, organizationId, { achPendingCount: achPending })
     return NextResponse.json({ dashboard })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    return blitzpayStaffLoadFailedResponse("GET ap-dashboard", e)
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Activity, AlertTriangle, Gauge, Loader2, RefreshCw, Sparkles, TrendingUp } from "lucide-react"
 import type { BlitzpayBusinessHealthPayload } from "@/lib/blitzpay/blitzpay-business-health-types"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -49,13 +50,23 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/business-health?windowDays=30`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { businessHealth?: BlitzpayBusinessHealthPayload; message?: string }
+      let j: { businessHealth?: BlitzpayBusinessHealthPayload }
+      try {
+        j = (await res.json()) as { businessHealth?: BlitzpayBusinessHealthPayload }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
+        return
+      }
       if (!res.ok) {
         setData(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load business health.")
+        setError(blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
         return
       }
       setData(j.businessHealth ?? null)
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.executiveBusinessHealth)
     } finally {
       setLoading(false)
     }
@@ -90,7 +101,7 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
@@ -129,6 +140,15 @@ export function BlitzpayExecutiveDashboard({ organizationId, orgReady }: Props) 
                 <li>
                   Payout timing (avg delay):{" "}
                   {data.facts.treasuryAveragePayoutDelayDays == null ? "—" : `${data.facts.treasuryAveragePayoutDelayDays}d`}
+                </li>
+                <li>Available operating cash (estimate): {fmtMoney(data.facts.estimatedOperatingCashCents)}</li>
+                <li>Reserve target / gap: {fmtMoney(data.facts.cashReserveTargetCents)} / {fmtMoney(data.facts.cashReserveGapCents)}</li>
+                <li>Cash runway status: {data.facts.cashRunwayStatus}</li>
+                <li>Expected incoming payments (30d): {fmtMoney(data.facts.expectedInflows30dCents)}</li>
+                <li>Upcoming obligations (30d est.): {fmtMoney(data.facts.expectedOutflows30dCents)}</li>
+                <li>
+                  Payroll / AP reserve coverage (bps): {data.facts.payrollReserveCoverageBasisPoints} /{" "}
+                  {data.facts.apReserveCoverageBasisPoints}
                 </li>
               </ul>
             </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Briefcase, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 
 type ApDashboard = {
   todayYmd: string
@@ -75,13 +76,23 @@ export function BlitzpayApPanel({ organizationId, orgReady }: Props) {
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/ap-dashboard`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { dashboard?: ApDashboard; message?: string }
+      let j: { dashboard?: ApDashboard }
+      try {
+        j = (await res.json()) as { dashboard?: ApDashboard }
+      } catch {
+        setDashboard(null)
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
+        return
+      }
       if (!res.ok) {
         setDashboard(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load AP dashboard.")
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
         return
       }
       setDashboard(j.dashboard ?? null)
+    } catch {
+      setDashboard(null)
+      setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
     } finally {
       setLoading(false)
     }
@@ -117,13 +128,15 @@ export function BlitzpayApPanel({ organizationId, orgReady }: Props) {
           }),
         },
       )
-      const j = (await res.json()) as { message?: string }
+      await res.json().catch(() => null)
       if (!res.ok) {
-        setError(typeof j.message === "string" ? j.message : "Could not create payable.")
+        setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
         return
       }
       setForm((f) => ({ ...f, counterpartyLabel: "", amount: "", dueDate: "" }))
       await load()
+    } catch {
+      setError(blitzpayStaffWidgetLoadCopy.actionUnavailable)
     } finally {
       setCreating(false)
     }
@@ -147,7 +160,17 @@ export function BlitzpayApPanel({ organizationId, orgReady }: Props) {
         Scheduling and approvals only — no outbound ACH from Equipify. Combined with Stripe treasury signals for cash
         planning. Customer portal never calls these APIs.
       </p>
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? (
+        <p
+          className={
+            error === "Enter counterparty, positive amount, and due date."
+              ? "text-[11px] text-destructive"
+              : "text-xs text-muted-foreground leading-relaxed"
+          }
+        >
+          {error}
+        </p>
+      ) : null}
       {loading && !dashboard ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…

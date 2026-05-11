@@ -241,6 +241,9 @@ export async function fetchBlitzpayBusinessHealth(
   const recommendations = buildExecutiveRecommendations(execFacts)
 
   const warnings: string[] = []
+  if (reportingResolved.cashRunwayStatus === "risk") {
+    warnings.push("Cash runway signal is elevated — review operating cash estimates against upcoming obligations.")
+  }
   if (scores.financial < 55) warnings.push("Financial pressure score is below the comfort band — prioritize cash-in and payout timing.")
   if (scores.collections < 55) warnings.push("Collections health is soft — tighten follow-up on overdue balances and hosted pay links.")
   if (scores.customerConcentrationRisk >= 65) warnings.push("Customer concentration risk is elevated — diversify pipeline and payment terms.")
@@ -328,6 +331,16 @@ export async function fetchBlitzpayBusinessHealth(
       contractorSettlementExposureCents: reportingResolved.contractorSettlementExposureCents,
       recurringRevenueSharePendingCents: reportingResolved.recurringRevenueSharePendingCents,
       commissionVelocity7dCents: reportingResolved.commissionVelocity7dCents,
+      estimatedOperatingCashCents: reportingResolved.estimatedOperatingCashCents,
+      cashReserveTargetCents: reportingResolved.cashReserveTargetCents,
+      cashReserveGapCents: reportingResolved.cashReserveGapCents,
+      cashRunwayStatus: reportingResolved.cashRunwayStatus,
+      expectedInflows7dCents: reportingResolved.expectedInflows7dCents,
+      expectedInflows30dCents: reportingResolved.expectedInflows30dCents,
+      expectedOutflows7dCents: reportingResolved.expectedOutflows7dCents,
+      expectedOutflows30dCents: reportingResolved.expectedOutflows30dCents,
+      payrollReserveCoverageBasisPoints: reportingResolved.payrollReserveCoverageBasisPoints,
+      apReserveCoverageBasisPoints: reportingResolved.apReserveCoverageBasisPoints,
     },
   }
 }

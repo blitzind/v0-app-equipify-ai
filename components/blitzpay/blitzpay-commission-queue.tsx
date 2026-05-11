@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ClipboardList, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { cn } from "@/lib/utils"
 
 type CommissionRow = {
@@ -42,13 +43,23 @@ export function BlitzpayCommissionQueue({ organizationId, orgReady }: Props) {
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/commissions?limit=60&status=pending`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { commissions?: CommissionRow[]; message?: string }
+      let j: { commissions?: CommissionRow[] }
+      try {
+        j = (await res.json()) as { commissions?: CommissionRow[] }
+      } catch {
+        setRows([])
+        setError(blitzpayStaffWidgetLoadCopy.commissions)
+        return
+      }
       if (!res.ok) {
         setRows([])
-        setError(typeof j.message === "string" ? j.message : "Could not load commissions.")
+        setError(blitzpayStaffWidgetLoadCopy.commissions)
         return
       }
       setRows(j.commissions ?? [])
+    } catch {
+      setRows([])
+      setError(blitzpayStaffWidgetLoadCopy.commissions)
     } finally {
       setLoading(false)
     }
@@ -77,7 +88,7 @@ export function BlitzpayCommissionQueue({ organizationId, orgReady }: Props) {
           Refresh
         </Button>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && rows.length === 0 ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
       {rows.length === 0 && !loading ? (
         <p className="text-[11px] text-muted-foreground">No pending commission rows in the bounded window.</p>

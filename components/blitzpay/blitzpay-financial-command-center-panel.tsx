@@ -6,6 +6,7 @@ import { Landmark, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { scorecardStatusLabel, type OwnerScorecardStatus } from "@/lib/blitzpay/blitzpay-owner-scorecards"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 
 type CommandCenterPayload = {
   reportingWindowDays: number
@@ -46,6 +47,16 @@ type CommandCenterPayload = {
     recurringRevenueSharePendingCents?: number
     commissionVelocity7dCents?: number
     draftPayrollRuns?: number
+    estimatedOperatingCashCents?: number
+    cashReserveTargetCents?: number
+    cashReserveGapCents?: number
+    cashRunwayStatus?: "healthy" | "watch" | "risk"
+    expectedInflows7dCents?: number
+    expectedInflows30dCents?: number
+    expectedOutflows7dCents?: number
+    expectedOutflows30dCents?: number
+    payrollReserveCoverageBasisPoints?: number
+    apReserveCoverageBasisPoints?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -91,13 +102,23 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/financial-command-center?windowDays=30`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { commandCenter?: CommandCenterPayload; message?: string }
+      let j: { commandCenter?: CommandCenterPayload }
+      try {
+        j = (await res.json()) as { commandCenter?: CommandCenterPayload }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.financialCommandCenter)
+        return
+      }
       if (!res.ok) {
         setData(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load financial command center.")
+        setError(blitzpayStaffWidgetLoadCopy.financialCommandCenter)
         return
       }
       setData(j.commandCenter ?? null)
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.financialCommandCenter)
     } finally {
       setLoading(false)
     }
@@ -132,7 +153,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-sm text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
@@ -178,6 +199,16 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Revenue-share pending (internal)", v: fmtMoney(data.tiles.recurringRevenueSharePendingCents ?? 0) },
               { k: "Commission velocity (7d accruals)", v: fmtMoney(data.tiles.commissionVelocity7dCents ?? 0) },
               { k: "Draft payroll runs", v: String(data.tiles.draftPayrollRuns ?? 0) },
+              { k: "Available operating cash (estimate)", v: fmtMoney(data.tiles.estimatedOperatingCashCents ?? 0) },
+              { k: "Money to reserve (target)", v: fmtMoney(data.tiles.cashReserveTargetCents ?? 0) },
+              { k: "Reserve gap / shortfall", v: fmtMoney(data.tiles.cashReserveGapCents ?? 0) },
+              { k: "Cash runway", v: data.tiles.cashRunwayStatus ?? "—" },
+              { k: "Expected incoming payments (7d)", v: fmtMoney(data.tiles.expectedInflows7dCents ?? 0) },
+              { k: "Expected incoming payments (30d)", v: fmtMoney(data.tiles.expectedInflows30dCents ?? 0) },
+              { k: "Upcoming obligations (7d est.)", v: fmtMoney(data.tiles.expectedOutflows7dCents ?? 0) },
+              { k: "Upcoming obligations (30d est.)", v: fmtMoney(data.tiles.expectedOutflows30dCents ?? 0) },
+              { k: "Payroll reserve coverage (bps)", v: String(data.tiles.payrollReserveCoverageBasisPoints ?? 0) },
+              { k: "AP reserve coverage (bps)", v: String(data.tiles.apReserveCoverageBasisPoints ?? 0) },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

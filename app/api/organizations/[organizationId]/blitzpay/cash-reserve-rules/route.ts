@@ -5,13 +5,22 @@ import {
   blitzpayStaffOperationFailedResponse,
 } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
-import { PAYROLL_RUN_LIST_CAP, runDraftPayrollGeneration } from "@/lib/blitzpay/blitzpay-payroll-runs"
+import { CASH_RESERVE_RULES_CAP, insertBlitzpayCashReserveRule } from "@/lib/blitzpay/blitzpay-cash-accounts-service"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const RULE_TYPES = new Set([
+  "percent_of_collections",
+  "fixed_monthly_reserve",
+  "payroll_liability",
+  "vendor_ap_pressure",
+  "dispute_risk",
+  "tax_estimate",
+])
 
 export async function GET(_request: Request, context: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await context.params
@@ -23,7 +32,7 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
   if ("error" in gate) return gate.error
 
   const schemaResp = await blitzpaySchemaGuardNextResponse(
-    "GET /api/organizations/[organizationId]/blitzpay/payroll-runs",
+    "GET /api/organizations/[organizationId]/blitzpay/cash-reserve-rules",
   )
   if (schemaResp) return schemaResp
 
@@ -36,17 +45,15 @@ export async function GET(_request: Request, context: { params: Promise<{ organi
 
   try {
     const { data, error } = await admin
-      .from("blitzpay_payroll_runs")
-      .select(
-        "id, organization_id, period_start, period_end, payroll_status, total_payout_cents, total_commission_cents, technician_count, processed_at",
-      )
+      .from("blitzpay_cash_reserve_rules")
+      .select("id, organization_id, rule_name, rule_type, basis_points, fixed_amount_cents, active, metadata, created_at, updated_at")
       .eq("organization_id", organizationId)
-      .order("period_end", { ascending: false })
-      .limit(PAYROLL_RUN_LIST_CAP)
+      .order("created_at", { ascending: true })
+      .limit(CASH_RESERVE_RULES_CAP)
     if (error) throw new Error(error.message)
-    return NextResponse.json({ runs: data ?? [] })
+    return NextResponse.json({ rules: data ?? [] })
   } catch (e) {
-    return blitzpayStaffLoadFailedResponse("GET payroll-runs", e)
+    return blitzpayStaffLoadFailedResponse("GET cash-reserve-rules", e)
   }
 }
 
@@ -60,20 +67,27 @@ export async function POST(request: Request, context: { params: Promise<{ organi
   if ("error" in gate) return gate.error
 
   const schemaResp = await blitzpaySchemaGuardNextResponse(
-    "POST /api/organizations/[organizationId]/blitzpay/payroll-runs",
+    "POST /api/organizations/[organizationId]/blitzpay/cash-reserve-rules",
   )
   if (schemaResp) return schemaResp
 
-  let body: { periodStart?: string; periodEnd?: string }
+  let body: {
+    ruleName?: string
+    ruleType?: string
+    basisPoints?: number | null
+    fixedAmountCents?: number | null
+    active?: boolean
+    metadata?: Record<string, unknown>
+  }
   try {
-    body = (await request.json()) as { periodStart?: string; periodEnd?: string }
+    body = (await request.json()) as typeof body
   } catch {
     return NextResponse.json({ error: "bad_request", message: "JSON body required." }, { status: 400 })
   }
-  const periodStart = String(body.periodStart || "").slice(0, 10)
-  const periodEnd = String(body.periodEnd || "").slice(0, 10)
-  if (!periodStart || !periodEnd) {
-    return NextResponse.json({ error: "bad_request", message: "periodStart and periodEnd (YYYY-MM-DD) required." }, { status: 400 })
+  const ruleName = String(body.ruleName || "").trim()
+  const ruleType = String(body.ruleType || "").trim()
+  if (!ruleName || !ruleType || !RULE_TYPES.has(ruleType)) {
+    return NextResponse.json({ error: "bad_request", message: "ruleName and valid ruleType required." }, { status: 400 })
   }
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
@@ -84,9 +98,16 @@ export async function POST(request: Request, context: { params: Promise<{ organi
   }
 
   try {
-    const run = await runDraftPayrollGeneration(admin, { organizationId, periodStart, periodEnd })
-    return NextResponse.json({ run })
+    const rule = await insertBlitzpayCashReserveRule(admin, organizationId, {
+      ruleName,
+      ruleType,
+      basisPoints: body.basisPoints,
+      fixedAmountCents: body.fixedAmountCents,
+      active: body.active,
+      metadata: body.metadata,
+    })
+    return NextResponse.json({ rule })
   } catch (e) {
-    return blitzpayStaffOperationFailedResponse("POST payroll-runs", e, "draft_failed", 500)
+    return blitzpayStaffOperationFailedResponse("POST cash-reserve-rules", e, "insert_failed", 500)
   }
 }

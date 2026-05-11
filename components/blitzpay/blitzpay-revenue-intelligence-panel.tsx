@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { AlertTriangle, BarChart3, Info, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { cn } from "@/lib/utils"
 
 type IntelligencePayload = {
@@ -31,6 +32,12 @@ type IntelligencePayload = {
     autopayAdoptionPct: number
     churnRiskScore0to100: number
     projectedRenewalRevenue90dCents: number
+    estimatedOperatingCashCents?: number
+    cashReserveGapCents?: number
+    cashRunwayStatus?: "healthy" | "watch" | "risk"
+    expectedOutflows30dCents?: number
+    payrollReserveCoverageBasisPoints?: number
+    apReserveCoverageBasisPoints?: number
   }
   forecasts: {
     next7DaysExpectedCents: number
@@ -79,13 +86,23 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/revenue-intelligence?windowDays=30`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { intelligence?: IntelligencePayload; message?: string }
+      let j: { intelligence?: IntelligencePayload }
+      try {
+        j = (await res.json()) as { intelligence?: IntelligencePayload }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
+        return
+      }
       if (!res.ok) {
         setData(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load revenue intelligence.")
+        setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
         return
       }
       setData(j.intelligence ?? null)
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.dataUnavailable)
     } finally {
       setLoading(false)
     }
@@ -114,7 +131,7 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
         <span className="font-medium text-foreground">{data?.reportingSource === "balance_transactions" ? "Stripe ledger" : "Estimated"}</span>
         .
       </p>
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
@@ -152,6 +169,14 @@ export function BlitzpayRevenueIntelligencePanel({ organizationId, orgReady }: P
             <Metric label="Autopay adoption" value={`${data.dashboard.autopayAdoptionPct}%`} />
             <Metric label="Churn-risk (renewal hygiene)" value={`${data.dashboard.churnRiskScore0to100}/100`} />
             <Metric label="Projected renewals (90d)" value={fmtMoney(data.dashboard.projectedRenewalRevenue90dCents)} />
+            <Metric label="Available operating cash (est.)" value={fmtMoney(data.dashboard.estimatedOperatingCashCents ?? 0)} />
+            <Metric label="Reserve gap" value={fmtMoney(data.dashboard.cashReserveGapCents ?? 0)} />
+            <Metric label="Cash runway" value={data.dashboard.cashRunwayStatus ?? "—"} />
+            <Metric label="Upcoming obligations (30d est.)" value={fmtMoney(data.dashboard.expectedOutflows30dCents ?? 0)} />
+            <Metric
+              label="Payroll / AP reserve coverage (bps)"
+              value={`${data.dashboard.payrollReserveCoverageBasisPoints ?? 0} / ${data.dashboard.apReserveCoverageBasisPoints ?? 0}`}
+            />
           </div>
 
           <div className="rounded-md border border-border/70 bg-background/60 px-2 py-2 space-y-1">

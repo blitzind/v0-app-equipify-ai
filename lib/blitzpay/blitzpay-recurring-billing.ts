@@ -129,9 +129,9 @@ export async function fetchBlitzpayRecurringRevenueMetrics(
     sumInstallmentRemainingDueInRange(admin, organizationId, todayYmd, end90.slice(0, 10)),
     admin
       .from("maintenance_plans")
-      .select("id, customer_id, status, interval_unit, interval_value, next_due_date, is_archived")
+      .select("id, customer_id, status, interval_unit, interval_value, next_due_date, archived_at")
       .eq("organization_id", organizationId)
-      .eq("is_archived", false)
+      .is("archived_at", null)
       .limit(RECURRING_MAINTENANCE_SCAN_CAP),
     admin
       .from("org_service_contracts")
@@ -179,7 +179,7 @@ export async function fetchBlitzpayRecurringRevenueMetrics(
     interval_unit: string
     interval_value: number
     next_due_date: string | null
-    is_archived: boolean
+    archived_at: string | null
   }>
 
   let maintenanceActiveCount = 0
@@ -226,7 +226,7 @@ export async function fetchBlitzpayRecurringRevenueMetrics(
     maintenanceRows.map((m) => ({
       status: m.status,
       nextDueYmd: m.next_due_date,
-      isArchived: Boolean(m.is_archived),
+      isArchived: m.archived_at != null,
     })),
     todayYmd,
     30,
@@ -379,7 +379,7 @@ export async function fetchBlitzpayRecurringRevenuePulse(
         .from("maintenance_plans")
         .select("id, customer_id, next_due_date, status, interval_unit, interval_value")
         .eq("organization_id", organizationId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .eq("status", "active")
         .not("next_due_date", "is", null)
         .gte("next_due_date", todayYmd)
@@ -407,7 +407,7 @@ export async function fetchBlitzpayRecurringRevenuePulse(
         .from("maintenance_plans")
         .select("customer_id")
         .eq("organization_id", organizationId)
-        .eq("is_archived", false)
+        .is("archived_at", null)
         .eq("status", "active")
         .limit(120),
       admin

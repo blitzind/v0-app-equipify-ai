@@ -59,6 +59,10 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_contractor_settlements", select: "id, organization_id, settlement_status" },
   { name: "blitzpay_revenue_share_rules", select: "id, organization_id, rule_type" },
   { name: "blitzpay_revenue_share_ledger", select: "id, organization_id, idempotency_key" },
+  { name: "blitzpay_cash_accounts", select: "id, organization_id, account_type" },
+  { name: "blitzpay_cash_account_allocations", select: "id, organization_id, cash_account_id" },
+  { name: "blitzpay_cash_reserve_rules", select: "id, organization_id, rule_type" },
+  { name: "blitzpay_cash_runway_snapshots", select: "id, organization_id, snapshot_date" },
 ]
 
 export type BlitzpaySchemaHealthResult =

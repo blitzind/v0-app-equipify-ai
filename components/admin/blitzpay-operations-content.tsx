@@ -64,6 +64,19 @@ type PayrollPlatformRollup = {
   highCommissionExposureOrgsApprox: number
 }
 
+type CashAccountsPlatformRollup = {
+  reportingWindowDays: number
+  generatedAt: string
+  orgsSampled: number
+  orgsWithReserveGapApprox: number
+  orgsRunwayRiskApprox: number
+  orgsRunwayWatchApprox: number
+  sampleEstimatedOperatingCashTotalApprox: number
+  payrollReserveLowCoverageOrgsApprox: number
+  apReserveLowCoverageOrgsApprox: number
+  outflowStressOrgsApprox: number
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -140,6 +153,7 @@ export function BlitzpayOperationsContent() {
   const [recurringRollup, setRecurringRollup] = useState<RecurringRevenuePlatformRollup | null>(null)
   const [membershipRollup, setMembershipRollup] = useState<MembershipPlatformRollup | null>(null)
   const [payrollRollup, setPayrollRollup] = useState<PayrollPlatformRollup | null>(null)
+  const [cashRollup, setCashRollup] = useState<CashAccountsPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -178,7 +192,7 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
@@ -186,6 +200,7 @@ export function BlitzpayOperationsContent() {
           fetch("/api/platform/blitzpay/recurring-revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/membership-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/payroll-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/cash-accounts-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
@@ -194,6 +209,7 @@ export function BlitzpayOperationsContent() {
         const j5 = (await r5.json()) as { rollup?: RecurringRevenuePlatformRollup }
         const j6 = (await r6.json()) as { rollup?: MembershipPlatformRollup }
         const j7 = (await r7.json()) as { rollup?: PayrollPlatformRollup }
+        const j8 = (await r8.json()) as { rollup?: CashAccountsPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
@@ -208,6 +224,8 @@ export function BlitzpayOperationsContent() {
         else setMembershipRollup(null)
         if (r7.ok) setPayrollRollup(j7.rollup ?? null)
         else setPayrollRollup(null)
+        if (r8.ok) setCashRollup(j8.rollup ?? null)
+        else setCashRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
@@ -216,6 +234,7 @@ export function BlitzpayOperationsContent() {
         setRecurringRollup(null)
         setMembershipRollup(null)
         setPayrollRollup(null)
+        setCashRollup(null)
       }
     })()
   }, [])
@@ -592,6 +611,46 @@ export function BlitzpayOperationsContent() {
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {cashRollup && cashRollup.orgsSampled > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Operating cash &amp; runway (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled {cashRollup.orgsSampled} recent orgs ({cashRollup.reportingWindowDays}d). Estimates are internal planning
+            only; not custodial balances.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Reserve gap orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{cashRollup.orgsWithReserveGapApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Runway risk / watch</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {cashRollup.orgsRunwayRiskApprox} / {cashRollup.orgsRunwayWatchApprox}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Sample operating cash sum</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(cashRollup.sampleEstimatedOperatingCashTotalApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Low payroll coverage orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{cashRollup.payrollReserveLowCoverageOrgsApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Low AP coverage orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{cashRollup.apReserveLowCoverageOrgsApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Outflow stress orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{cashRollup.outflowStressOrgsApprox}</p>
+            </div>
+          </div>
         </div>
       ) : null}
 

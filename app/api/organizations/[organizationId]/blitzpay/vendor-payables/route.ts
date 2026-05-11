@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/api/require-org-permission"
+import {
+  blitzpayStaffLoadFailedResponse,
+  blitzpayStaffOperationFailedResponse,
+} from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import {
   fetchOrgVendorPayablesForDashboard,
@@ -48,8 +52,7 @@ export async function GET(
     const payables = await fetchOrgVendorPayablesForDashboard(admin, organizationId)
     return NextResponse.json({ payables })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "load_failed", message: msg }, { status: 500 })
+    return blitzpayStaffLoadFailedResponse("GET vendor-payables", e)
   }
 }
 
@@ -117,7 +120,6 @@ export async function POST(
     })
     return NextResponse.json({ id })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "insert_failed", message: msg }, { status: 400 })
+    return blitzpayStaffOperationFailedResponse("POST vendor-payables", e, "insert_failed", 400)
   }
 }

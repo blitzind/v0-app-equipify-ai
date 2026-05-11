@@ -1,4 +1,5 @@
 import type { CombinedArApCashForecast } from "@/lib/blitzpay/blitzpay-command-center-math"
+import type { BlitzpayCashRunwayStatus } from "@/lib/blitzpay/blitzpay-cash-accounts"
 
 export type FinancialCommandCenterRecommendation = {
   id: string
@@ -21,6 +22,14 @@ export type FinancialCommandCenterRecommendationInput = {
   estimateOpenQuotesWithTotalCount: number
   workOrderCollectPaymentLinksWindowCount: number
   pendingApprovalPayableCount: number
+  /** Phase 2Z — optional internal cash planning (deterministic copy). */
+  cashRunwayStatus?: BlitzpayCashRunwayStatus
+  cashReserveGapCents?: number
+  estimatedOperatingCashCents?: number
+  payrollLiabilityCents?: number
+  expectedInflows30Cents?: number
+  expectedOutflows30Cents?: number
+  recurringPlannedInflow30dCents?: number
 }
 
 export function buildFinancialCommandCenterRecommendations(
@@ -82,6 +91,55 @@ export function buildFinancialCommandCenterRecommendations(
       id: "tight_runway_7d",
       severity: "warning",
       message: "Seven-day net cash forecast is negative after payables and payout pressure — triage AR and AP timing.",
+    })
+  }
+
+  const runway = input.cashRunwayStatus
+  const gap = input.cashReserveGapCents ?? 0
+  const op = input.estimatedOperatingCashCents ?? 0
+  const payrollLiab = input.payrollLiabilityCents ?? 0
+  if (runway === "risk" && gap > 0) {
+    out.push({
+      id: "cash_runway_risk",
+      severity: "warning",
+      message: "Cash runway looks stressed — review reserve target and upcoming obligations before large payouts.",
+    })
+  }
+  if (runway === "watch") {
+    out.push({
+      id: "cash_runway_watch",
+      severity: "info",
+      message: "Cash runway is in a watch band — confirm expected incoming payments against vendor and payroll timing.",
+    })
+  }
+  if (payrollLiab > 0 && op > 0 && payrollLiab > op * 0.4) {
+    out.push({
+      id: "payroll_reserve_low",
+      severity: "info",
+      message: "Payroll reserve is below recommended target relative to available operating cash.",
+    })
+  }
+  const inf30 = input.expectedInflows30Cents ?? input.recurringPlannedInflow30dCents ?? 0
+  const out30 = input.expectedOutflows30Cents ?? 0
+  if (inf30 > 0 && out30 > 0 && inf30 >= out30) {
+    out.push({
+      id: "collections_cover_ap",
+      severity: "info",
+      message: "Expected collections cover upcoming AP obligations in the next 30 days.",
+    })
+  }
+  if (input.pendingApprovalPayableCount > 0 && gap > 50_000) {
+    out.push({
+      id: "hold_before_vendor_payouts",
+      severity: "warning",
+      message: "Hold additional cash before approving vendor payouts — reserve gap is elevated.",
+    })
+  }
+  if ((input.recurringPlannedInflow30dCents ?? 0) > payrollLiab && (input.recurringPlannedInflow30dCents ?? 0) > 0) {
+    out.push({
+      id: "membership_renewal_confidence",
+      severity: "info",
+      message: "Upcoming membership renewals improve cash-flow confidence.",
     })
   }
 

@@ -138,6 +138,8 @@ Evidence from migrations under `supabase/migrations/`:
 
 **Phase 2Y (payroll accruals):** org APIs and `syncBlitzpayPayrollAccrualForOrgInvoice` use **capped selects** (`PAYROLL_COMMISSION_SCAN_CAP`, `PAYROLL_SETTLEMENT_SCAN_CAP`, membership/rule caps). Platform payroll rollup samples at most **`PLATFORM_PAYROLL_ORG_SAMPLE_CAP`** organizations per request — webhook accrual sync remains best-effort and must stay non-blocking.
 
+**Phase 2Z (cash planning):** `blitzpay-cash-accounts-service.ts` caps cash account rows (**`CASH_ACCOUNTS_ROW_CAP`**), reserve rules (**`CASH_RESERVE_RULES_CAP`**), allocation history (**`CASH_ALLOCATIONS_SCAN_CAP`**), and open-dispute scan (80 rows) inside reporting snapshot. Platform cash rollup samples at most **`PLATFORM_CASH_ORG_SAMPLE_CAP`** orgs per request — planning payloads must stay read-only for members except explicit reserve-rule mutations.
+
 ### 8.1 SaaS Stripe (`/api/stripe/webhook`)
 
 - **Idempotency:** insert into `stripe_webhook_events` by `event.id`; duplicate → `200` + `duplicate: true`.

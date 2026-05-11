@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { ClipboardList, Loader2, RefreshCw, Target } from "lucide-react"
 import type { BlitzpayCollectionsCopilotPayload } from "@/lib/blitzpay/blitzpay-collections-copilot-types"
+import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -33,13 +34,23 @@ export function BlitzpayCollectionsCopilotPanel({ organizationId, orgReady }: Pr
         `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/collections-copilot?windowDays=30`,
         { cache: "no-store", credentials: "include" },
       )
-      const j = (await res.json()) as { collectionsCopilot?: BlitzpayCollectionsCopilotPayload; message?: string }
+      let j: { collectionsCopilot?: BlitzpayCollectionsCopilotPayload }
+      try {
+        j = (await res.json()) as { collectionsCopilot?: BlitzpayCollectionsCopilotPayload }
+      } catch {
+        setData(null)
+        setError(blitzpayStaffWidgetLoadCopy.collectionsCopilot)
+        return
+      }
       if (!res.ok) {
         setData(null)
-        setError(typeof j.message === "string" ? j.message : "Could not load collections copilot.")
+        setError(blitzpayStaffWidgetLoadCopy.collectionsCopilot)
         return
       }
       setData(j.collectionsCopilot ?? null)
+    } catch {
+      setData(null)
+      setError(blitzpayStaffWidgetLoadCopy.collectionsCopilot)
     } finally {
       setLoading(false)
     }
@@ -77,7 +88,7 @@ export function BlitzpayCollectionsCopilotPanel({ organizationId, orgReady }: Pr
         </Button>
       </div>
 
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-muted-foreground leading-relaxed">{error}</p> : null}
       {loading && !data ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…

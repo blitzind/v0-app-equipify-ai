@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
-import { listBlitzpayPayrollCommissions } from "@/lib/blitzpay/blitzpay-payroll-runs"
+import { fetchBlitzpayOrgCashPlanningPayload, fetchRecentCashAllocations } from "@/lib/blitzpay/blitzpay-cash-accounts-service"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 
 export const runtime = "nodejs"
@@ -10,7 +10,7 @@ export const runtime = "nodejs"
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-export async function GET(request: Request, context: { params: Promise<{ organizationId: string }> }) {
+export async function GET(_request: Request, context: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await context.params
   if (!UUID_RE.test(organizationId)) {
     return NextResponse.json({ error: "bad_request", message: "Invalid organization." }, { status: 400 })
@@ -20,24 +20,9 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
   if ("error" in gate) return gate.error
 
   const schemaResp = await blitzpaySchemaGuardNextResponse(
-    "GET /api/organizations/[organizationId]/blitzpay/commissions",
+    "GET /api/organizations/[organizationId]/blitzpay/cash-accounts",
   )
   if (schemaResp) return schemaResp
-
-  let technicianUserId: string | null = null
-  let workOrderId: string | null = null
-  let status: string | null = null
-  let limit = 80
-  try {
-    const u = new URL(request.url)
-    technicianUserId = u.searchParams.get("technicianUserId")
-    workOrderId = u.searchParams.get("workOrderId")
-    status = u.searchParams.get("status")
-    const rawL = u.searchParams.get("limit")
-    if (rawL != null) limit = Number(rawL)
-  } catch {
-    /* ignore */
-  }
 
   let admin: ReturnType<typeof createServiceRoleSupabaseClient>
   try {
@@ -47,14 +32,12 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
   }
 
   try {
-    const commissions = await listBlitzpayPayrollCommissions(admin, organizationId, {
-      technicianUserId,
-      workOrderId,
-      status,
-      limit,
-    })
-    return NextResponse.json({ commissions })
+    const [cash, allocations] = await Promise.all([
+      fetchBlitzpayOrgCashPlanningPayload(admin, organizationId),
+      fetchRecentCashAllocations(admin, organizationId).catch(() => []),
+    ])
+    return NextResponse.json({ cash, allocations })
   } catch (e) {
-    return blitzpayStaffLoadFailedResponse("GET commissions", e)
+    return blitzpayStaffLoadFailedResponse("GET cash-accounts", e)
   }
 }

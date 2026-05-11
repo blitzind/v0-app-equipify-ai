@@ -14,7 +14,7 @@ import {
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
   CalendarRange, Store, Package, Upload, Bell,
   Warehouse,
-  CreditCard,
+  Landmark,
   Repeat,
 } from "lucide-react"
 import Image from "next/image"
@@ -157,7 +157,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "BlitzPay Financial Command Center",
     subtitle:
       "Monitor receivables, cash flow, treasury activity, collections, forecasts, and financial operations health across your business.",
-    icon: CreditCard,
+    icon: Landmark,
     heroAccessory: "blitzpay-wordmark",
     heroSubtitleMultiline: true,
   },
@@ -249,6 +249,10 @@ function PageHero({
   const blitzPayFinancialHero = pathname === "/insights/financial-command-center"
   const isSettingsArea = pathname.startsWith("/settings/")
   const multilineSubtitle = Boolean(isSettingsArea || heroSubtitleMultiline)
+  const heroIconFrameClass = blitzPayFinancialHero
+    ? "w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center shrink-0"
+    : "w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
+  const heroIconGlyphClass = blitzPayFinancialHero ? "shrink-0 w-6 h-6 sm:w-7 sm:h-7" : "w-4 h-4 sm:w-5 sm:h-5 shrink-0"
   return (
     <div
       className={cn(
@@ -265,19 +269,15 @@ function PageHero({
         <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
           {maintenancePlansHero ? (
             <MaintenancePlansBrandTile size="md" />
-          ) : blitzPayFinancialHero ? (
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-green-200 bg-green-500/10 flex items-center justify-center shrink-0">
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-green-600" aria-hidden />
-            </div>
           ) : (
             <div
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
+              className={heroIconFrameClass}
               style={{
                 backgroundColor: `color-mix(in srgb, ${featureColor} 14%, var(--card))`,
                 borderColor: `color-mix(in srgb, ${featureColor} 24%, var(--border))`,
               }}
             >
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: featureColor }} />
+              <Icon className={heroIconGlyphClass} style={{ color: featureColor }} aria-hidden />
             </div>
           )}
           <div className="min-w-0 flex-1">

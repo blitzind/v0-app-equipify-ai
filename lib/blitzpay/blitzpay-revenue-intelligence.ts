@@ -70,6 +70,13 @@ export type BlitzpayOrgRevenueIntelligence = {
     estimatedPayrollBurdenCents: number
     commissionVelocity7dCents: number
     recurringMemberPayoutStability0to100: number
+    /** Phase 2Z */
+    estimatedOperatingCashCents: number
+    cashReserveGapCents: number
+    cashRunwayStatus: "healthy" | "watch" | "risk"
+    expectedOutflows30dCents: number
+    payrollReserveCoverageBasisPoints: number
+    apReserveCoverageBasisPoints: number
   }
   forecasts: ReturnType<typeof buildBlitzpayForecastHorizonsCents> & {
     achPendingSettlementCents: number
@@ -400,6 +407,12 @@ export async function fetchBlitzpayOrgRevenueIntelligence(
       estimatedPayrollBurdenCents: reporting.estimatedPayrollBurdenCents,
       commissionVelocity7dCents: reporting.commissionVelocity7dCents,
       recurringMemberPayoutStability0to100: reporting.recurringMemberPayoutStability0to100,
+      estimatedOperatingCashCents: reporting.estimatedOperatingCashCents,
+      cashReserveGapCents: reporting.cashReserveGapCents,
+      cashRunwayStatus: reporting.cashRunwayStatus,
+      expectedOutflows30dCents: reporting.expectedOutflows30dCents,
+      payrollReserveCoverageBasisPoints: reporting.payrollReserveCoverageBasisPoints,
+      apReserveCoverageBasisPoints: reporting.apReserveCoverageBasisPoints,
     },
     forecasts: {
       ...horizonsChurnAdjusted,
