@@ -14,7 +14,15 @@ import {
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import { AidenFeatureRequestFlow, type AidenFrFormValues } from "@/components/aiden/aiden-feature-request-flow"
-import { moduleFromPath } from "@/lib/aiden/module-context"
+import {
+  aidenCapabilityBadgeLabel,
+  buildAidenIdlePanelHint,
+  buildAidenWelcomeContent,
+  PREPARED_WORKSPACE_ACTION_INTRO,
+  resolveAidenCapabilityBadge,
+  type AidenEligibilityForMessaging,
+} from "@/lib/aiden/aiden-capability-messaging"
+import { moduleFromPath, type AidenModuleId } from "@/lib/aiden/module-context"
 import {
   clearAidenChatSession,
   loadAidenChatSession,
@@ -37,14 +45,11 @@ type ChatMessage = {
   createdAt: Date
 }
 
-const WELCOME_CONTENT =
-  "Hi — I'm AIden, here to help you use Equipify. Ask how to create work orders, manage certificates, billing, the portal, equipment, or anything in the app. I explain steps — I can't perform actions for you. If something isn't built yet, you can submit a feature request from here."
-
-function createWelcomeMessage(): ChatMessage {
+function createWelcomeMessage(moduleId: AidenModuleId, eligibility: AidenEligibilityForMessaging | null): ChatMessage {
   return {
     id: "welcome",
     role: "assistant",
-    content: WELCOME_CONTENT,
+    content: buildAidenWelcomeContent({ moduleId, eligibility }),
     createdAt: new Date(),
   }
 }
@@ -180,10 +185,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const [frNonce, setFrNonce] = useState(0)
   const [frInitial, setFrInitial] = useState<AidenFrFormValues>(() => defaultFrValues(""))
 
-  const [aidenEligibility, setAidenEligibility] = useState<{
-    safeActionsEnabled: boolean
-    safeActionsGrowthHint: boolean
-  } | null>(null)
+  const [aidenEligibility, setAidenEligibility] = useState<AidenEligibilityForMessaging | null>(null)
   const [actionIntent, setActionIntent] = useState("")
   const [actionBusy, setActionBusy] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingSafeActionPreview | null>(null)
@@ -212,7 +214,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       if (!organizationId || orgStatus !== "ready") {
         if (!cancelled) {
           sessionStartedAtRef.current = new Date()
-          setMessages([createWelcomeMessage()])
+          setMessages([createWelcomeMessage(currentModule.id, null)])
           setSessionReady(true)
         }
         return
@@ -226,7 +228,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
         setMessages(messagesFromPayload(stored.messages))
       } else {
         sessionStartedAtRef.current = new Date()
-        setMessages([createWelcomeMessage()])
+        setMessages([createWelcomeMessage(currentModule.id, null)])
       }
       setSessionReady(true)
     })()
@@ -251,12 +253,16 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
           ok?: boolean
           safeActionsEnabled?: boolean
           safeActionsGrowthHint?: boolean
+          productivityEnabled?: boolean
+          operationalCopilotEnabled?: boolean
         }
         if (cancelled) return
         if (res.ok && data.ok) {
           setAidenEligibility({
             safeActionsEnabled: Boolean(data.safeActionsEnabled),
             safeActionsGrowthHint: Boolean(data.safeActionsGrowthHint),
+            productivityEnabled: Boolean(data.productivityEnabled),
+            operationalCopilotEnabled: Boolean(data.operationalCopilotEnabled),
           })
         } else {
           setAidenEligibility(null)
@@ -269,6 +275,28 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       cancelled = true
     }
   }, [open, organizationId, orgStatus])
+
+  /** Keep the welcome bubble aligned with path + plan when the user has not started a conversation yet. */
+  useEffect(() => {
+    if (!open || !sessionReady) return
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0]?.id !== "welcome") return prev
+      const nextContent = buildAidenWelcomeContent({
+        moduleId: currentModule.id,
+        eligibility: aidenEligibility,
+      })
+      if (prev[0].content === nextContent) return prev
+      return [{ ...prev[0], content: nextContent }]
+    })
+  }, [
+    open,
+    sessionReady,
+    currentModule.id,
+    aidenEligibility?.safeActionsEnabled,
+    aidenEligibility?.safeActionsGrowthHint,
+    aidenEligibility?.productivityEnabled,
+    aidenEligibility?.operationalCopilotEnabled,
+  ])
 
   /** Persist session (best-effort). */
   useEffect(() => {
@@ -321,7 +349,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
       clearAidenChatSession(organizationId, userId)
     }
     sessionStartedAtRef.current = new Date()
-    setMessages([createWelcomeMessage()])
+    setMessages([createWelcomeMessage(currentModule.id, aidenEligibility)])
     setError(null)
     setFrOpen(false)
     setPendingAction(null)
@@ -540,6 +568,8 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     void sendMessage(input)
   }
 
+  const capabilityBadgeId = resolveAidenCapabilityBadge(aidenEligibility)
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-[30rem]">
@@ -556,6 +586,13 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                 <SheetDescription className="text-xs text-muted-foreground text-left">
                   Help for <strong>{currentModule.label}</strong> — you&apos;re on{" "}
                   <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{pathname || "/"}</code>
+                  {orgStatus === "ready" && organizationId ? (
+                    <span className="mt-1.5 block">
+                      <span className="inline-flex max-w-full items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {aidenCapabilityBadgeLabel(capabilityBadgeId)}
+                      </span>
+                    </span>
+                  ) : null}
                 </SheetDescription>
               </div>
             </div>
@@ -592,8 +629,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                 Context: <span className="text-muted-foreground">{currentModule.label}</span>
               </p>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                I only answer how to use Equipify — not general chat. Try a suggested prompt below or ask your own
-                question.
+                {buildAidenIdlePanelHint({ moduleId: currentModule.id, eligibility: aidenEligibility })}
               </p>
             </div>
           ) : null}
@@ -762,10 +798,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                 <ClipboardList size={14} className="shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
                 Prepared workspace action
               </div>
-              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-                Describe what you want to capture (task, note, reminder, or unsent draft). Nothing is saved until you
-                confirm below.
-              </p>
+              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">{PREPARED_WORKSPACE_ACTION_INTRO}</p>
               {!pendingAction ? (
                 <div className="space-y-2">
                   <Textarea

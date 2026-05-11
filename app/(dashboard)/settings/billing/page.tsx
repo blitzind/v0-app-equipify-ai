@@ -131,10 +131,10 @@ function planTierIndex(planId: PlanId): number {
 
 function PlanBadge({ planId, label }: { planId: PlanId; label?: string }) {
   const map: Record<PlanId, { color: string; bg: string }> = {
-    solo:   { color: "#78350f", bg: "#fffbeb" },
+    solo:   { color: "#6b21a8", bg: "#f3e8ff" },
     core:   { color: "#b45309", bg: "#fffbeb" },
     growth: { color: "#1d4ed8", bg: "#eff6ff" },
-    scale:  { color: "#6d28d9", bg: "#f5f3ff" },
+    scale:  { color: "#9a3412", bg: "#fff7ed" },
   }
   const key = normalizePlanIdForRead(planId) as PlanId
   const { color, bg } = map[key] ?? map.solo

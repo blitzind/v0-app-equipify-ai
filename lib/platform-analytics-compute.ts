@@ -52,10 +52,10 @@ export type PlatformPlanDistribution = {
 }
 
 const PLAN_DIST_META: { id: "solo" | "core" | "growth" | "scale"; plan: string; color: string }[] = [
-  { id: "solo", plan: "Solo", color: "#f59e0b" },
+  { id: "solo", plan: "Solo", color: "#a855f7" },
   { id: "core", plan: "Core", color: "#0ea5e9" },
   { id: "growth", plan: "Growth", color: "#3b82f6" },
-  { id: "scale", plan: "Enterprise", color: "#8b5cf6" },
+  { id: "scale", plan: "Enterprise", color: "#f59f1c" },
 ]
 
 export type PlatformMetricsComputed = {

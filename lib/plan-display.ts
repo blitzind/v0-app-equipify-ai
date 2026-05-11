@@ -1,14 +1,17 @@
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import type { TenantWorkspace } from "@/lib/tenant-data"
 
-/** Sidebar / chrome tier labels — aligned with `organization_subscriptions.plan_id`. Legacy `starter` → Solo. */
+/**
+ * Sidebar / chrome tier labels — aligned with `organization_subscriptions.plan_id`.
+ * Legacy `starter` → Solo. Colors use `globals.css` tokens for Solo (purple) and Scale (brand gold / `--cta`).
+ */
 export const PLAN_BADGE_META: Record<string, { label: string; color: string }> = {
-  solo: { label: "Solo", color: "#f59e0b" },
-  starter: { label: "Solo", color: "#f59e0b" },
+  solo: { label: "Solo", color: "var(--plan-solo-accent)" },
+  starter: { label: "Solo", color: "var(--plan-solo-accent)" },
   core: { label: "Core", color: "#6366f1" },
   growth: { label: "Growth", color: "#3b82f6" },
-  scale: { label: "Scale", color: "#8b5cf6" },
-  enterprise: { label: "Enterprise", color: "#8b5cf6" },
+  scale: { label: "Scale", color: "var(--plan-scale-accent)" },
+  enterprise: { label: "Enterprise", color: "var(--plan-scale-accent)" },
 }
 
 /**

@@ -10,6 +10,7 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
 import { BlitzpayRevenueIntelligencePanel } from "@/components/blitzpay/blitzpay-revenue-intelligence-panel"
 import { BlitzpayApPanel } from "@/components/blitzpay/blitzpay-ap-panel"
+import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -156,6 +157,12 @@ function BlitzPaySettingsPageInner() {
   const canViewPayoutLedger =
     permStatus === "ready" && (orgPermissions.has("canViewFinancials") || orgPermissions.has("canEditInvoices"))
   const canViewBlitzpayRevenue =
+    permStatus === "ready" &&
+    (isPlatformAdmin ||
+      orgPermissions.has("canViewFinancialReports") ||
+      orgPermissions.has("canViewFinancials"))
+
+  const canViewFinancialCommandCenter =
     permStatus === "ready" &&
     (isPlatformAdmin ||
       orgPermissions.has("canViewFinancialReports") ||
@@ -914,13 +921,19 @@ function BlitzPaySettingsPageInner() {
                   <BlitzpayRevenueIntelligencePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
+
+              {canViewFinancialCommandCenter && organizationId ? (
+                <div id="blitzpay-financial-command-center-anchor" className="border-t border-border pt-4">
+                  <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                </div>
+              ) : null}
             </div>
 
             {canViewPayoutLedger && hasAccount ? (
               <div className="border-t border-border pt-4 space-y-4">
                 <BlitzpayTreasuryPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 <BlitzpayApPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
-                <div className="space-y-3">
+                <div id="blitzpay-payout-ledger-anchor" className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold">Payout ledger (staff)</p>
                   {canConfigure ? (

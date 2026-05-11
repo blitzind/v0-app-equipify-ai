@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T21:10:13.819Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T21:23:54.364Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -88,6 +88,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 64.9 — BlitzPay Phase 2I (multi-method + stored profiles):** Migration \`20260916110000_blitzpay_phase_2i_multi_method_profiles.sql\` adds card/ACH method toggles, ACH timeline + ACH fee toggle, save-payment-method flag, PaymentIntent method metadata columns, and \`blitzpay_customer_payment_profiles\` (org+customer unique, Stripe reference-only). Preview + prepare-pay support method selection and ACH timeline disclosure. Payment success syncs stored profile references and autopay-eligibility foundation flags (no auto-charging yet). Status/reporting expose method mix, ACH settlement counters, and stored profile summary. Doc §12.10; test \`pnpm test:blitzpay-phase-2i\`.
 - **Phase 64.10 — BlitzPay Phase 2R (contractor treasury):** Migration \`20260924120000_blitzpay_phase_2r_treasury_balances.sql\` — \`blitzpay_org_balances\`, \`blitzpay_balance_snapshots\`, org settings \`blitzpay_reserve_target_cents\` / \`blitzpay_instant_payout_interest\`. \`lib/blitzpay/blitzpay-contractor-treasury.ts\` derives balances from synced balance transactions + payouts; \`GET /api/organizations/{id}/blitzpay/treasury\` (financials); reporting/status \`payoutVisibility\` treasury fields; platform revenue rollup adds payout health tiles; payout webhook + manual payout sync refresh treasury best-effort. Doc §12.19; test \`pnpm test:blitzpay-phase-2r\`.
 - **Phase 64.11 — BlitzPay Phase 2S (vendor AP):** Migration \`20260925120000_blitzpay_phase_2s_vendor_payables.sql\` — \`blitzpay_vendor_payables\`, \`blitzpay_vendor_payouts\` (internal paid marker). Libs: \`blitzpay-ap-math.ts\`, \`blitzpay-payable-lifecycle.ts\`, \`blitzpay-ap-insights.ts\`, \`blitzpay-vendor-payables.ts\`. APIs: \`GET/POST …/blitzpay/vendor-payables\`, \`PATCH …/vendor-payables/{id}\`, \`GET …/blitzpay/ap-dashboard\`. Reporting snapshot + status \`payoutVisibility\` add AP fields; platform rollup adds AP health; work-order BlitzPay summary links payables (field-safe). Settings **Payments** \`BlitzpayApPanel\`. Doc §12.20; test \`pnpm test:blitzpay-phase-2s\`.
+- **Phase 64.12 — BlitzPay Phase 2T (financial command center):** Libs \`blitzpay-command-center-math.ts\`, \`blitzpay-owner-scorecards.ts\`, \`blitzpay-command-center-recommendations.ts\`, server \`blitzpay-financial-command-center.ts\`, \`blitzpay-platform-command-center.ts\`. APIs: \`GET …/blitzpay/financial-command-center\`, \`GET /api/platform/blitzpay/command-center-rollup\`. UI: \`BlitzpayFinancialCommandCenterPanel\`, route \`/insights/financial-command-center\`, Settings anchor, sidebar link, BlitzPay Ops platform strip. Doc §12.21; test \`pnpm test:blitzpay-phase-2t\`.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

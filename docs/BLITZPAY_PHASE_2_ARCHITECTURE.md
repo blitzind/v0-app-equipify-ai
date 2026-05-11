@@ -829,6 +829,25 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **BlitzPay Ops** rollup shows AP health tiles.  
 4. Customer portal: confirm no AP API paths.
 
+### 12.21 Phase 2T (financial command center, owner scorecards, platform rollup)
+
+| Area | Details |
+|------|---------|
+| **Pure libs** | `blitzpay-command-center-math.ts` — AR/AP combined net cash positions (7/30/60) vs payout pressure + risk notes. `blitzpay-owner-scorecards.ts` — Healthy / Watch / Needs attention scorecards. `blitzpay-command-center-recommendations.ts` — deterministic automation strings layered on revenue context. |
+| **Server** | `blitzpay-financial-command-center.ts` — `fetchBlitzpayOrgFinancialCommandCenter` composes revenue intelligence, reporting snapshot, treasury metrics, pending-approval AP counts, drilldown hrefs (no Stripe ids). `blitzpay-platform-command-center.ts` — bounded platform rollup (vendor AP org coverage, overdue AP orgs, Connect launch gaps, stale sync, disputes/refunds sample, schema health). |
+| **APIs** | `GET …/blitzpay/financial-command-center?windowDays=` — `canViewFinancialReports` **or** `canViewFinancials`. `GET /api/platform/blitzpay/command-center-rollup` — platform admins only. |
+| **UX** | `BlitzpayFinancialCommandCenterPanel` — **Settings → Payments** (`#blitzpay-financial-command-center-anchor`) and **Insights → BlitzPay command center** (`/insights/financial-command-center`). Sidebar **Financial** adds entry. **Admin → BlitzPay Ops** adds platform command-center strip. |
+| **Portal** | No customer portal routes reference financial-command-center or command-center-rollup. |
+| **Tests** | `pnpm test:blitzpay-phase-2t` — forecast + scorecards + recommendations + API wiring + portal scan + drilldown safety. |
+
+#### Manual test checklist (Phase 2T)
+
+1. As owner/financial role, open **Insights → BlitzPay command center** (or Settings → Payments anchor) — panel loads without 403.  
+2. Scorecards show Healthy / Watch / Needs attention; combined AR/AP net row updates on refresh.  
+3. Drilldown links navigate to in-app routes only (no `pi_` / `po_` tails in the panel).  
+4. Platform admin: **BlitzPay Ops** shows the second rollup card for cross-org signals.  
+5. Customer portal: confirm no command-center API paths.
+
 ---
 
-*Phase 2A–2S vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

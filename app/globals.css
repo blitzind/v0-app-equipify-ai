@@ -52,6 +52,10 @@
   --status-warning: oklch(0.72 0.17 70);    /* #f59e0b */
   --status-danger:  oklch(0.577 0.245 27.33); /* #ef4444 */
   --status-info:    oklch(0.56 0.21 231);   /* #0f7ae5 */
+  /* Billing / sidebar plan tier accents (see `lib/plan-display.ts`) */
+  /* Readable on dark sidebar (`#0F172A`) in light or dark app theme */
+  --plan-solo-accent: oklch(0.78 0.14 290);
+  --plan-scale-accent: var(--cta);
   /* AI accent: aliases to brand blue */
   --ai-purple: oklch(0.56 0.21 231);
   --ai-purple-fg: oklch(0.99 0 0);
@@ -88,6 +92,8 @@
   --cta-hover: color-mix(in srgb, var(--cta) 88%, #000000);
   --cta-active: color-mix(in srgb, var(--cta) 72%, #000000);
   --cta-foreground: oklch(0.16 0.04 65);
+  --plan-solo-accent: oklch(0.78 0.14 290);
+  --plan-scale-accent: var(--cta);
   --secondary: oklch(0.24 0.018 252);
   --secondary-foreground: oklch(0.90 0.008 240);
   --muted: oklch(0.24 0.018 252);

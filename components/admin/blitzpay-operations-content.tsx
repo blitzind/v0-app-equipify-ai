@@ -5,6 +5,18 @@ import { CreditCard, Loader2, Play, FlaskConical, AlertTriangle, Info, ShieldAle
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+type CommandCenterPlatformRollup = {
+  reportingWindowDays: number
+  orgsWithOpenVendorPayablesApprox: number
+  orgsVendorPayablesOverdueApprox: number
+  orgsLaunchReadinessConnectGapApprox: number
+  orgsStaleConnectSync7d: number
+  openDisputesPlatformSample: number
+  pendingRefundsPlatform: number
+  failedPaymentAttempts7d: number
+  schemaHealthOk: boolean
+}
+
 type RevenueRollup = {
   reportingWindowDays: number
   ledgerPaymentCapturedCentsWindow: number
@@ -58,6 +70,7 @@ function alertIcon(sev: OpsSummary["alerts"][0]["severity"]) {
 export function BlitzpayOperationsContent() {
   const [summary, setSummary] = useState<OpsSummary | null>(null)
   const [revenueRollup, setRevenueRollup] = useState<RevenueRollup | null>(null)
+  const [commandRollup, setCommandRollup] = useState<CommandCenterPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -96,11 +109,19 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const r = await fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" })
-        const j = (await r.json()) as { rollup?: RevenueRollup }
-        if (r.ok) setRevenueRollup(j.rollup ?? null)
+        const [r1, r2] = await Promise.all([
+          fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
+        ])
+        const j1 = (await r1.json()) as { rollup?: RevenueRollup }
+        const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
+        if (r1.ok) setRevenueRollup(j1.rollup ?? null)
+        else setRevenueRollup(null)
+        if (r2.ok) setCommandRollup(j2.rollup ?? null)
+        else setCommandRollup(null)
       } catch {
         setRevenueRollup(null)
+        setCommandRollup(null)
       }
     })()
   }, [])
@@ -271,6 +292,48 @@ export function BlitzpayOperationsContent() {
             <div className="rounded-lg border border-border p-3">
               <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — overdue open lines</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.apOverdueOpenLinesApprox}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {commandRollup ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Financial command center (platform)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Bounded scans across workspaces — use with BlitzPay Ops playbooks. Schema:{" "}
+            {commandRollup.schemaHealthOk ? "OK" : "check failures"}.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — orgs (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsWithOpenVendorPayablesApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — overdue orgs (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsVendorPayablesOverdueApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Connect launch gaps</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsLaunchReadinessConnectGapApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Stale Connect sync (7d)</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsStaleConnectSync7d}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed pay attempts (7d)</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.failedPaymentAttempts7d}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.openDisputesPlatformSample}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending refunds</p>
+              <p className="text-lg font-semibold tabular-nums">{commandRollup.pendingRefundsPlatform}</p>
             </div>
           </div>
         </div>

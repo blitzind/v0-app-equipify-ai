@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check, Bot,
-  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package,
+  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark,
   Bell,
   Warehouse,
   UserPlus,
@@ -106,6 +106,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Quotes", href: "/quotes", icon: FileText, anyOf: ["canViewQuotes", "canEditQuotes"] },
       { label: "Invoices", href: "/invoices", icon: Receipt, anyOf: ["canViewBilling", "canEditInvoices"] },
+      {
+        label: "BlitzPay command center",
+        href: "/insights/financial-command-center",
+        icon: Landmark,
+        anyOf: ["canViewFinancialReports", "canViewFinancials"],
+      },
       { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, anyOf: ["canViewBilling"] },
       { label: "Vendors", href: "/vendors", icon: Store, anyOf: ["canViewBilling"] },
     ],
@@ -429,8 +435,8 @@ function SidebarBody({
       {/* ── Logo hero (full wordmark expanded · square mark collapsed) ─ */}
       <div
         className={cn(
-          "relative grid min-h-[52px] w-full shrink-0 place-items-center border-b border-sidebar-border [grid-template-areas:'stack'] px-3",
-          isCollapsed ? "py-2" : "py-3.5"
+          "relative grid min-h-[52px] w-full shrink-0 place-items-center border-b border-sidebar-border [grid-template-areas:'stack']",
+          isCollapsed ? "px-0 py-2" : "px-3 py-3.5",
         )}
       >
         <Link
@@ -479,7 +485,7 @@ function SidebarBody({
       <div
         className={cn(
           "relative border-b border-sidebar-border shrink-0",
-          isCollapsed ? "px-2 py-2" : "px-3 py-3",
+          isCollapsed ? "px-0 py-2" : "px-3 py-3",
         )}
       >
         <button
@@ -591,7 +597,12 @@ function SidebarBody({
       </div>
 
       {/* ── Navigation ────────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto py-2 px-3">
+      <nav
+        className={cn(
+          "flex-1 overflow-y-auto py-2",
+          isCollapsed ? "flex flex-col items-stretch px-0" : "px-3",
+        )}
+      >
         {shouldRenderNavDebugPanel() && navDebug ? (
           <div className="mb-3 rounded-md border border-amber-400/40 bg-amber-400/10 p-2 text-[10px] leading-relaxed text-amber-50">
             <p className="font-semibold">Nav Debug</p>
@@ -619,7 +630,7 @@ function SidebarBody({
           const groupCollapsed = collapsedGroups.has(group.id)
           const groupHasActive = group.items.some((item) => isItemActive(pathname, item.href))
           return (
-            <div key={group.id} className={cn(gi > 0 && (isCollapsed ? "mt-3" : "mt-3"))}>
+            <div key={group.id} className={cn("w-full", gi > 0 && (isCollapsed ? "mt-3" : "mt-3"))}>
               {/* Collapsible category header — desktop only when sidebar is open */}
               {!isCollapsed && (
                 <button
@@ -659,7 +670,7 @@ function SidebarBody({
               <div
                 id={`nav-group-${group.id}`}
                 hidden={!isCollapsed && groupCollapsed}
-                className="space-y-0.5"
+                className={cn("space-y-0.5", isCollapsed && "flex flex-col items-stretch")}
               >
                 {group.items.map(({ label, href, icon: Icon, highlight, comingSoon }) => {
                   const active = isItemActive(pathname, href)
@@ -671,7 +682,7 @@ function SidebarBody({
                         aria-disabled
                         className={cn(
                           "flex items-center gap-3 group relative cursor-not-allowed select-none",
-                          isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
+                          isCollapsed ? "h-10 w-full min-w-0 justify-center px-0" : "h-10 px-3",
                           NAV_ROW_INACTIVE_HOVER_SIDEBAR,
                           "opacity-55 hover:opacity-65",
                         )}
@@ -696,7 +707,7 @@ function SidebarBody({
                       className={cn(
                         "flex items-center gap-3 group relative",
                         NAV_PRIMARY_ROW_MOTION,
-                        isCollapsed ? "justify-center h-10 w-10 mx-auto" : "h-10 px-3",
+                        isCollapsed ? "h-10 w-full min-w-0 justify-center px-0" : "h-10 px-3",
                         active ? NAV_ROW_ACTIVE_SIDEBAR : NAV_ROW_INACTIVE_HOVER_SIDEBAR,
                       )}
                     >
@@ -757,9 +768,9 @@ function SidebarBody({
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
-              "w-full flex items-center gap-2 px-4 py-3 text-xs text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors",
+              "w-full flex items-center gap-2 py-3 text-xs text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/30 transition-colors",
+              isCollapsed ? "justify-center px-0" : "px-4",
               !isCollapsed && "border-t border-sidebar-border",
-              isCollapsed && "justify-center"
             )}
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >

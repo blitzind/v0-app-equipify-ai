@@ -25,6 +25,7 @@ import type { AiGeneratedInsightItem } from "@/lib/insights/openai-generate-insi
 import { AiInsightActions } from "@/components/insights/ai-insight-actions"
 import { Toaster } from "@/components/ui/toaster"
 import { useBillingAccess } from "@/lib/billing-access-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { aiFeatureUpgradeMessage } from "@/lib/billing/feature-access"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -342,6 +343,9 @@ function SummaryReportModal({ onClose, report }: { onClose: () => void; report: 
 export default function InsightsPage() {
   const dash = useSupabaseDashboard({ variant: "insights" })
   const { insightsAllowed } = useBillingAccess()
+  const { permissions, status: orgPermStatus } = useOrgPermissions()
+  const canBlitzpayFinancialCommandCenter =
+    orgPermStatus === "ready" && (permissions.canViewFinancialReports || permissions.canViewFinancials)
   const liveInsights = dash.operationalInsights
 
   const [aiLoading, setAiLoading] = useState(false)
@@ -559,6 +563,19 @@ export default function InsightsPage() {
               Settings → Payments → Revenue intelligence
             </Link>
             .
+            {canBlitzpayFinancialCommandCenter ?
+              <>
+                {" "}
+                Owner financial command center (AR, AP, treasury, forecasts):{" "}
+                <Link
+                  href="/insights/financial-command-center"
+                  className="font-semibold text-white/90 underline-offset-2 hover:underline"
+                >
+                  Open BlitzPay command center
+                </Link>
+                .
+              </>
+            : null}
           </p>
 
           {/* Category nav tabs */}

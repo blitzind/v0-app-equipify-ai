@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logAidenHelpEvent } from "@/lib/aiden/analytics"
 import { buildAidenSupportPhase2Prompt } from "@/lib/aiden/aiden-support-phase2-prompt"
-import { getAidenPageGuidanceLevel } from "@/lib/aiden/tier-capabilities"
+import { canUseAidenCapability, getAidenPageGuidanceLevel } from "@/lib/aiden/tier-capabilities"
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { canAccessApp } from "@/lib/billing/access"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
@@ -93,6 +93,9 @@ export async function POST(
 
   const planId = getEffectivePlanId(subscription?.plan_id ?? "solo", subscription)
   const pageGuidanceLevel = getAidenPageGuidanceLevel(planId)
+  const productivityEnabled = canUseAidenCapability(planId, "productivity_ai")
+  const operationalCopilotEnabled = canUseAidenCapability(planId, "operational_copilot")
+  const safeActionsEnabled = canUseAidenCapability(planId, "safe_aiden_actions")
 
   const { data: organization } = await supabase
     .from("organizations")
@@ -113,6 +116,11 @@ export async function POST(
     currentModule: moduleLabel,
     planTier: planId,
     pageGuidanceLevel,
+    workspaceMessaging: {
+      productivityEnabled,
+      operationalCopilotEnabled,
+      safeActionsEnabled,
+    },
   })
 
   const result = await runAiTask<AidenSupportPhase2Answer>({

@@ -132,7 +132,7 @@ export function BlitzpayApPanel({ organizationId, orgReady }: Props) {
   if (!organizationId || !orgReady) return null
 
   return (
-    <div className="rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-3">
+    <div id="blitzpay-ap-anchor" className="rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Briefcase className="h-4 w-4 text-[color:var(--primary)] shrink-0" aria-hidden />
