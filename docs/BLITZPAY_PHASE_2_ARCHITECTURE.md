@@ -544,6 +544,15 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Staff digest email arrives for owner/admin when configured; contains no Stripe object ids.  
 6. **Resend** from Payments tab succeeds and appends a `staff_resend` dispatch row (multiple resends allowed).
 
+### 12.7 Schema health (deployments)
+
+| Area | Details |
+|------|---------|
+| **Helper** | `lib/blitzpay/blitzpay-schema-health.ts` — service-role probes for onboarding diagnostic columns on `organizations` and for core BlitzPay tables (`blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_invoice_refunds`, `blitzpay_invoice_disputes`, `blitzpay_webhook_inbox`). Results are cached ~60s. |
+| **Routes** | BlitzPay **status**, **enable**, **sync**, **account-link**, invoice **activity**, **diagnostics**, **prepare-pay** (staff + portal), **refund**, and **resend-receipt** call the guard first. On drift, APIs return **503** with `error: "blitzpay_schema_incomplete"` and a stable `message` for UI (not raw PostgREST text). |
+| **Logs** | `source: "blitzpay-schema-health"` JSON logs include `missing` (e.g. `table:blitzpay_invoice_refunds` or `organizations.blitzpay_last_onboarding_attempt_at`) and a short `detail` from Postgres/PostgREST. |
+| **Fix** | Point the app at the correct Supabase project and **apply pending migrations** (`supabase db push` / CI migration pipeline). The guard only treats **known** missing-relation/column signals as drift; other failures still surface from the underlying handlers. |
+
 ---
 
 *Phase 2A–2F vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

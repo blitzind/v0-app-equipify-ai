@@ -11,6 +11,7 @@ import {
   createUsExpressConnectedAccount,
 } from "@/lib/blitzpay/connect-stripe"
 import { supabaseForBlitzPayOrgWrite } from "@/lib/blitzpay/org-write-client"
+import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -45,6 +46,11 @@ export async function POST(
     if (!gate.ok) {
       return jsonError(gate.status, "forbidden", gate.message)
     }
+
+    const schemaResp = await blitzpaySchemaGuardNextResponse(
+      "POST /api/organizations/[organizationId]/blitzpay/account-link",
+    )
+    if (schemaResp) return schemaResp
 
     const db = await supabaseForBlitzPayOrgWrite(gate)
     const origin = getPublicAppOrigin().replace(/\/+$/, "")

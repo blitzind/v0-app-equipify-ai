@@ -7,6 +7,7 @@ import {
   fetchStaffBlitzpayInvoiceRefunds,
 } from "@/lib/blitzpay/staff-blitzpay-invoice-support"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
+import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -33,6 +34,12 @@ export async function GET(
   } catch {
     return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
   }
+
+  const drift = await blitzpaySchemaDriftIfUnhealthy(
+    admin,
+    "GET /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/diagnostics",
+  )
+  if (drift) return drift
 
   const since = new URL(request.url).searchParams.get("since")?.trim() || null
 

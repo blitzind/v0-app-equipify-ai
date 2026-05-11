@@ -11,6 +11,7 @@ import {
   retrieveConnectAccount,
 } from "@/lib/blitzpay/connect-stripe"
 import { supabaseForBlitzPayOrgWrite } from "@/lib/blitzpay/org-write-client"
+import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -53,6 +54,8 @@ export async function POST(
       blitzpayEnableDebug("enable.gate_denied", { orgTail, status: gate.status })
       return jsonError(gate.status, "forbidden", gate.message)
     }
+    const schemaResp = await blitzpaySchemaGuardNextResponse("POST /api/organizations/[organizationId]/blitzpay/enable")
+    if (schemaResp) return schemaResp
     blitzpayEnableDebug("enable.gate_ok", { orgTail, platformAdmin: gate.platformAdmin })
 
     const db = await supabaseForBlitzPayOrgWrite(gate)

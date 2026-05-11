@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { getPublicAppOrigin } from "@/lib/email/config"
 import { prepareBlitzpayInvoiceHostedCheckout } from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
+import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 
 export const runtime = "nodejs"
@@ -31,6 +32,12 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
   }
+
+  const drift = await blitzpaySchemaDriftIfUnhealthy(
+    admin,
+    "POST /api/portal/invoices/[invoiceId]/blitzpay/prepare-pay",
+  )
+  if (drift) return drift
 
   const origin = getPublicAppOrigin().replace(/\/+$/, "")
   const successUrl = `${origin}/portal/invoices/${encodeURIComponent(invoiceId)}?blitzpay=1&status=success`

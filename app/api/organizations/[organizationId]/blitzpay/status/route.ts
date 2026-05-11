@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOrgMemberSession } from "@/lib/api/require-org-permission"
+import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -20,6 +21,9 @@ export async function GET(
 
   const gate = await requireOrgMemberSession(organizationId)
   if ("error" in gate) return gate.error
+
+  const schemaResp = await blitzpaySchemaGuardNextResponse("GET /api/organizations/[organizationId]/blitzpay/status")
+  if (schemaResp) return schemaResp
 
   const { supabase } = gate
 

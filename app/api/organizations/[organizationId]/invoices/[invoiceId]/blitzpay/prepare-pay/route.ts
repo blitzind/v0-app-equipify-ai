@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { prepareBlitzpayInvoiceHostedCheckout } from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
+import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -22,6 +23,12 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
   }
+
+  const drift = await blitzpaySchemaDriftIfUnhealthy(
+    admin,
+    "POST /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay",
+  )
+  if (drift) return drift
 
   const result = await prepareBlitzpayInvoiceHostedCheckout({
     admin,

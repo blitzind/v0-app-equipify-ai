@@ -5,6 +5,7 @@ import { nextResponseBlitzPayConnectOnboardingFailure } from "@/lib/blitzpay/con
 import { blitzpayOnboardingSuccessDiagnosticsPatch } from "@/lib/blitzpay/onboarding-diagnostics"
 import { buildBlitzPayOrgUpdateFromStripeAccount, retrieveConnectAccount } from "@/lib/blitzpay/connect-stripe"
 import { supabaseForBlitzPayOrgWrite } from "@/lib/blitzpay/org-write-client"
+import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -34,6 +35,9 @@ export async function POST(
   if (!gate.ok) {
     return jsonError(gate.status, "forbidden", gate.message)
   }
+
+  const schemaResp = await blitzpaySchemaGuardNextResponse("POST /api/organizations/[organizationId]/blitzpay/sync")
+  if (schemaResp) return schemaResp
 
   const db = await supabaseForBlitzPayOrgWrite(gate)
 

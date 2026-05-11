@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T18:18:46.056Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T18:23:37.447Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -83,6 +83,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 64.4 — BlitzPay Phase 2D (payment UX):** Portal **Payment update** + poll after Checkout success; **Payment history** on \`GET /api/portal/invoices/{id}\` (customer-safe rows via \`lib/portal/portal-invoice-payment-history.ts\`). Staff \`GET .../blitzpay/activity\` + Payments tab **BlitzPay online attempts** (\`lib/blitzpay/staff-blitzpay-invoice-activity.ts\`). Receipt-shaped helper \`lib/blitzpay/invoice-payment-receipt.ts\` (email in §64.6). Doc §12.4; test \`pnpm test:blitzpay-phase-2d\`.
 - **Phase 64.5 — BlitzPay Phase 2E (refunds, disputes, diagnostics):** Migration \`20260913120000_blitzpay_phase_2e_refunds_disputes.sql\` (\`blitzpay_invoice_refunds\`, \`blitzpay_invoice_disputes\`). Staff \`POST /api/organizations/{org}/invoices/{id}/blitzpay/refund\` + \`GET .../blitzpay/diagnostics\`; \`GET .../blitzpay/activity\` now includes refunds + disputes. Webhook: \`charge.refunded\`, \`charge.dispute.created\` / \`updated\` / \`closed\`. Net balances: \`reconcileOrgInvoiceFromPayments\` + invoice hydration subtract succeeded BlitzPay refunds; portal \`GET .../invoices/{id}\` adds customer-safe refund lines (no dispute payloads). Helpers: \`lib/blitzpay/blitzpay-refund-apply.ts\`, \`staff-blitzpay-invoice-support.ts\`, \`blitzpay-reporting-snapshot.ts\`. Doc §12.5; test \`pnpm test:blitzpay-phase-2e\`.
 - **Phase 64.6 — BlitzPay Phase 2F (receipt email + staff alerts):** Migrations \`20260913150000_blitzpay_phase_2f_receipt_dispatches.sql\` + \`20260913151000_blitzpay_receipt_dispatch_skipped_preference.sql\` — \`blitzpay_payment_receipt_dispatches\` idempotency for webhook auto customer + staff sends. \`completeBlitzpayPaymentIntentSucceeded\` triggers \`dispatchBlitzpayPaymentReceiptEmails\` (non-blocking). Customer-safe view model + templates; \`invoice_delivery_preference\` can skip automatic customer mail; staff \`POST .../blitzpay/resend-receipt\` + Payments tab **Resend** when outbound mail is configured. Doc §12.6; test \`pnpm test:blitzpay-phase-2f\`.
+- **Phase 64.7 — BlitzPay schema health guard:** \`lib/blitzpay/blitzpay-schema-health.ts\` probes critical BlitzPay tables + org onboarding diagnostic columns (service role, ~60s cache). BlitzPay status / enable / sync / account-link / activity / diagnostics / prepare-pay / refund / resend-receipt return **503** \`blitzpay_schema_incomplete\` with stable copy when migrations are missing instead of raw PostgREST errors. Doc §12.7; test \`pnpm test:blitzpay-schema-health\`.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.
