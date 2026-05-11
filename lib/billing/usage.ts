@@ -4,6 +4,7 @@ import { getPlanLimits } from "@/lib/billing/entitlements"
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 
 export type OrganizationUsage = {
+  /** Active `organization_members` only (not invited / not pending token invites). Billing UI should use `/seat-metrics` for enforcement alignment. */
   seatsUsed: number
   equipmentUsed: number
   apiCallsUsedThisMonth: number
@@ -84,6 +85,7 @@ export async function getUsageWithLimits(
   const userCap = limits.users === "unlimited" ? Number.POSITIVE_INFINITY : limits.users
   const equipCap = limits.equipment === "unlimited" ? Number.POSITIVE_INFINITY : limits.equipment
 
+  /** Uses `seatsUsed` (active members only). For plan-cap alignment use `/seat-metrics` + `seatsReservedForPlan`. */
   const percentSeats =
     userCap === Number.POSITIVE_INFINITY ? null : pct(usage.seatsUsed, userCap)
 

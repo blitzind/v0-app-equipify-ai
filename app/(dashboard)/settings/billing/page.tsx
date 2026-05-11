@@ -153,9 +153,11 @@ interface UsageBarProps {
   used: number
   limit: number
   unit?: string
+  /** Optional helper under the bar (honesty / enforcement notes). */
+  detail?: string
 }
 
-function UsageBar({ label, icon: Icon, used, limit, unit = "" }: UsageBarProps) {
+function UsageBar({ label, icon: Icon, used, limit, unit = "", detail }: UsageBarProps) {
   const isUnlimited = limit === -1
   const pct = isUnlimited ? 0 : Math.min((used / limit) * 100, 100)
   const isWarning = !isUnlimited && pct >= 80
@@ -194,6 +196,7 @@ function UsageBar({ label, icon: Icon, used, limit, unit = "" }: UsageBarProps) 
       {isCritical && (
         <p className="text-[10px] text-destructive">At limit — upgrade to add more.</p>
       )}
+      {detail ? <p className="text-[10px] text-muted-foreground leading-snug">{detail}</p> : null}
     </div>
   )
 }
@@ -261,6 +264,14 @@ function BillingPageContent() {
 
   const [subscription, setSubscription] = useState<OrganizationSubscription | null>(null)
   const [usagePack, setUsagePack] = useState<UsageWithLimits | null>(null)
+  type SeatMetricsApi = {
+    activeBillable: number
+    invitedMemberRowsBillable: number
+    pendingTokenInvites: number
+    seatsReservedForPlan: number
+    activeTotalIncludingAdmins: number
+  }
+  const [seatMetrics, setSeatMetrics] = useState<SeatMetricsApi | null>(null)
   const [billingLoadError, setBillingLoadError] = useState<string | null>(null)
   const [billingLoading, setBillingLoading] = useState(true)
   const [portalBusy, setPortalBusy] = useState(false)
@@ -333,11 +344,28 @@ function BillingPageContent() {
         } catch {
           if (!cancelled) setUsagePack(null)
         }
+
+        try {
+          const sm = await fetch(
+            `/api/organizations/${encodeURIComponent(organizationId)}/seat-metrics`,
+            { cache: "no-store" },
+          )
+          if (!cancelled) {
+            if (sm.ok) {
+              setSeatMetrics((await sm.json()) as SeatMetricsApi)
+            } else {
+              setSeatMetrics(null)
+            }
+          }
+        } catch {
+          if (!cancelled) setSeatMetrics(null)
+        }
       } catch (e) {
         if (!cancelled) {
           setBillingLoadError(e instanceof Error ? e.message : "Failed to load billing data.")
           setSubscription(null)
           setUsagePack(null)
+          setSeatMetrics(null)
         }
       } finally {
         if (!cancelled) setBillingLoading(false)
@@ -423,11 +451,20 @@ function BillingPageContent() {
       ? "info"
       : null
 
-  const usedSeats = usagePack?.usage.seatsUsed ?? workspaceUsers.filter((u) => u.status === "Active").length
+  const usedSeatsActiveApprox =
+    usagePack?.usage.seatsUsed ?? workspaceUsers.filter((u) => u.status === "Active").length
+  const usedSeatsReservedForPlan =
+    seatMetrics?.seatsReservedForPlan ?? usedSeatsActiveApprox
   const usedEquipment = usagePack?.usage.equipmentUsed ?? 0
   const usedApiCalls = usagePack?.usage.apiCallsUsedThisMonth ?? 0
 
   const seatBarLimit = usagePack ? barLimit(usagePack.limits.users) : currentPlanData.seats === -1 ? -1 : currentPlanData.seats
+  const seatUsageDetail =
+    seatMetrics != null
+      ? `${seatMetrics.activeBillable.toLocaleString()} active (billable) · ${(
+          seatMetrics.invitedMemberRowsBillable + seatMetrics.pendingTokenInvites
+        ).toLocaleString()} pending invitation(s) · bar compares reserved total to plan`
+      : undefined
   const equipBarLimit = usagePack ? barLimit(usagePack.limits.equipment) : currentPlanData.equipmentLimit
   const apiBarLimit =
     usagePack?.limits.apiCallsMonthly != null ? usagePack.limits.apiCallsMonthly : -1
@@ -832,10 +869,11 @@ function BillingPageContent() {
         <div className="px-4 md:px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-0 sm:divide-x divide-border">
           <div className="sm:pr-6">
             <UsageBar
-              label="Team seats"
+              label="Team seats (reserved)"
               icon={Users}
-              used={usedSeats}
+              used={usedSeatsReservedForPlan}
               limit={seatBarLimit}
+              detail={seatUsageDetail}
             />
           </div>
           <div className="sm:px-6">
@@ -858,10 +896,12 @@ function BillingPageContent() {
         </div>
         <p className="px-4 md:px-6 pb-4 pt-1 text-[11px] text-muted-foreground leading-snug border-t border-border/70">
           <strong className="font-medium text-foreground/90">Enforced:</strong> team seats and equipment on supported server
-          actions (create / invite). If live counts cannot be loaded for a subscribed workspace, those actions return a retry
-          message instead of skipping the check. <strong className="font-medium text-foreground/90">Tracked, not enforced
-          yet:</strong> the API calls bar — there is no app code incrementing monthly API totals today, so it stays at zero
-          until metering is wired; see <span className="whitespace-nowrap">docs/USAGE_METERING_ENFORCEMENT.md</span>.
+          actions (create / invite). Seats compare <strong className="font-medium text-foreground/90">reserved</strong>{" "}
+          totals (active billable members + invited roster + pending email invites, excluding platform-admin allowlist) to
+          your plan. If live counts cannot be loaded for a subscribed workspace, those actions return a retry message instead
+          of skipping the check. <strong className="font-medium text-foreground/90">Tracked, not enforced yet:</strong> the
+          API calls bar — there is no app code incrementing monthly API totals today, so it stays at zero until metering is
+          wired; see <span className="whitespace-nowrap">docs/USAGE_METERING_ENFORCEMENT.md</span>.
         </p>
       </div>
 

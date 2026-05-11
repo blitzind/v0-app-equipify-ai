@@ -30,6 +30,8 @@ export type QuotaEvaluationOptions = {
    * Service/cron paths should pass false so transient read errors do not block automation.
    */
   strictUsageCounts?: boolean
+  /** Platform support: skip numeric seat cap (billing state still applies). */
+  skipSeatCap?: boolean
 }
 
 export type RecordEligibility =
@@ -86,8 +88,8 @@ export function evaluateEquipmentCreate(
 }
 
 /**
- * Inviting a member: billing + seat slots (active + invited roster).
- * Pass total seat slots already used (active + invited).
+ * Inviting a member: billing + reserved seats vs plan cap.
+ * `seatSlotsUsed` must be **seats reserved for the plan** (active billable + invited member rows + pending token invites) — see `fetchOrganizationSeatMetrics`.
  */
 export function evaluateSeatInvite(
   subscription: OrganizationSubscription | null,
@@ -100,6 +102,10 @@ export function evaluateSeatInvite(
 
   const b = billingEligibility(subscription)
   if (!b.ok) return b
+
+  if (opts?.skipSeatCap) {
+    return { ok: true }
+  }
 
   if (strict && loadFailed && subscription != null) {
     const planId = planIdFromSubscriptionRow(subscription.plan_id)

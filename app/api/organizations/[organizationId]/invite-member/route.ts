@@ -183,6 +183,11 @@ export async function POST(
     })
   }
 
+  const billingRecheck = await checkOrgInviteEligibility(organizationId)
+  if (!billingRecheck.ok) {
+    return NextResponse.json({ error: "billing_gate", message: billingRecheck.message }, { status: 403 })
+  }
+
   const { error: omErr } = await admin.from("organization_members").insert({
     organization_id: organizationId,
     user_id: targetUserId,

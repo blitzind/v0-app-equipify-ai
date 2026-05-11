@@ -14,6 +14,7 @@ import {
   isTrialActive,
   type OrganizationSubscription,
 } from "@/lib/billing/subscriptions"
+import { fetchOrganizationSeatMetrics } from "@/lib/billing/seat-counts"
 import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } from "@/lib/billing/usage"
 
 /** CRM / operational inserts */
@@ -63,14 +64,9 @@ function fromEligibility(el: RecordEligibility, httpStatus = 403): GuardResult {
 }
 
 async function fetchSeatSlots(supabase: SupabaseClient, organizationId: string): Promise<number | null> {
-  const { count, error } = await supabase
-    .from("organization_members")
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .in("status", ["active", "invited"])
-
-  if (error) return null
-  return count ?? 0
+  const metrics = await fetchOrganizationSeatMetrics(supabase, organizationId)
+  if (!metrics) return null
+  return metrics.seatsReservedForPlan
 }
 
 export async function loadOrgBillingContext(supabase: SupabaseClient, organizationId: string): Promise<{
@@ -143,24 +139,25 @@ export async function requireCanCreateRecord(
   if (denied) return denied
 
   const ctx = await loadOrgBillingContext(supabase, organizationId)
+  const { data: actorProf } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle()
+  const actorEmail = (actorProf as { email?: string | null } | null)?.email
+  const actorIsPlatformAdmin = isPlatformAdminEmail(actorEmail)
+
   let usageLoadFailed = ctx.usageLoadFailed
-  if (
-    usageLoadFailed &&
-    (recordType === "equipment" || recordType === "team_invite")
-  ) {
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", userId)
-      .maybeSingle()
-    if (isPlatformAdminEmail((prof as { email?: string | null } | null)?.email)) {
-      usageLoadFailed = false
-    }
+  if (usageLoadFailed && (recordType === "equipment" || recordType === "team_invite")) {
+    if (actorIsPlatformAdmin) usageLoadFailed = false
   }
+
+  const skipSeatCap = recordType === "team_invite" && actorIsPlatformAdmin
 
   return applyCreateRules(ctx.subscription, ctx.usagePack, ctx.seatSlotsUsed, recordType, {
     usageLoadFailed,
     strictUsageCounts: true,
+    skipSeatCap,
   })
 }
 
@@ -238,19 +235,23 @@ export async function requireWithinPlanLimit(
 ): Promise<GuardResult> {
   const ctx = await loadOrgBillingContext(supabase, organizationId)
   let usageLoadFailed = ctx.usageLoadFailed
-  if (usageLoadFailed && actingUserId) {
+  let skipSeatCap = false
+  if (actingUserId) {
     const { data: prof } = await supabase
       .from("profiles")
       .select("email")
       .eq("id", actingUserId)
       .maybeSingle()
-    if (isPlatformAdminEmail((prof as { email?: string | null } | null)?.email)) {
+    const em = (prof as { email?: string | null } | null)?.email
+    if (isPlatformAdminEmail(em)) {
       usageLoadFailed = false
+      skipSeatCap = limitType === "seats"
     }
   }
   const quotaOpts: QuotaEvaluationOptions = {
     usageLoadFailed,
     strictUsageCounts: true,
+    skipSeatCap,
   }
   if (limitType === "equipment") {
     return fromEligibility(evaluateEquipmentCreate(ctx.subscription, ctx.usagePack, quotaOpts))

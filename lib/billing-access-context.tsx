@@ -33,7 +33,7 @@ type BillingAccessContextValue = {
   status: "loading" | "ready"
   subscription: OrganizationSubscription | null
   usagePack: UsageWithLimits | null
-  /** Active + invited members (for seat limit when inviting). */
+  /** Reserved seats vs plan (server metrics: active billable + invited members + pending token invites). */
   seatSlotsUsed: number | null
   refresh: () => Promise<void>
   standardCreateEligibility: RecordEligibility
@@ -70,16 +70,20 @@ export function BillingAccessProvider({ children }: { children: ReactNode }) {
       const pack = await getUsageWithLimits(supabase, organizationId, planId, trialOn)
       setUsagePack(pack)
 
-      const { count, error: seatErr } = await supabase
-        .from("organization_members")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .in("status", ["active", "invited"])
-
-      if (seatErr) {
+      try {
+        const sm = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/seat-metrics`, {
+          cache: "no-store",
+        })
+        if (sm.ok) {
+          const j = (await sm.json()) as { seatsReservedForPlan?: number }
+          setSeatSlotsUsed(
+            typeof j.seatsReservedForPlan === "number" ? j.seatsReservedForPlan : null,
+          )
+        } else {
+          setSeatSlotsUsed(null)
+        }
+      } catch {
         setSeatSlotsUsed(null)
-      } else {
-        setSeatSlotsUsed(count ?? 0)
       }
     } catch {
       setSubscription(null)

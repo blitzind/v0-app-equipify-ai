@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
+import { checkOrgInviteEligibility } from "@/app/actions/org-billing-guard"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { getPublicAppOrigin } from "@/lib/email/config"
@@ -54,6 +55,11 @@ export async function POST(request: Request) {
     .maybeSingle()
   if (!member || (member.role !== "owner" && member.role !== "admin")) {
     return NextResponse.json({ error: "forbidden", message: "Only owners and admins can invite users." }, { status: 403 })
+  }
+
+  const billingGate = await checkOrgInviteEligibility(organizationId)
+  if (!billingGate.ok) {
+    return NextResponse.json({ error: "billing_gate", message: billingGate.message }, { status: 403 })
   }
 
   const admin = createServiceRoleClient()
@@ -121,6 +127,7 @@ export async function POST(request: Request) {
     text: `You've been invited to join ${organizationName} on Equipify.\n\nAccept invite: ${inviteLink}\n\nThis link expires in 48 hours.`,
   })
   if (!emailSend.ok) {
+    await admin.from("organization_invites").delete().eq("id", insertedInvite.id as string)
     return NextResponse.json(
       {
         error: "email_failed",

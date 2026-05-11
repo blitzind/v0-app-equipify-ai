@@ -101,6 +101,14 @@ type PendingInviteRow = {
   createdAt: string
 }
 
+type SeatMetricsApi = {
+  activeBillable: number
+  invitedMemberRowsBillable: number
+  pendingTokenInvites: number
+  seatsReservedForPlan: number
+  activeTotalIncludingAdmins: number
+}
+
 function isMembershipRoleString(r: string): r is MembershipRole {
   return (MEMBERSHIP_ROLES as readonly string[]).includes(r)
 }
@@ -196,6 +204,7 @@ export default function TeamPage() {
   const [inviteSent, setInviteSent] = useState(false)
   const [inviteSending, setInviteSending] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [seatMetrics, setSeatMetrics] = useState<SeatMetricsApi | null>(null)
 
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
 
@@ -222,6 +231,7 @@ export default function TeamPage() {
     if (!organizationId) {
       setMembers([])
       setPendingInvites([])
+      setSeatMetrics(null)
       setLoading(false)
       return
     }
@@ -246,9 +256,23 @@ export default function TeamPage() {
       setCurrentUserId(data.currentUserId ?? null)
       setCurrentUserRole(data.currentUserRole ?? null)
       setCanManageTeam(Boolean(data.canManageTeam))
+
+      try {
+        const sm = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/seat-metrics`, {
+          cache: "no-store",
+        })
+        if (sm.ok) {
+          setSeatMetrics((await sm.json()) as SeatMetricsApi)
+        } else {
+          setSeatMetrics(null)
+        }
+      } catch {
+        setSeatMetrics(null)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not load team."
       setLoadError(msg)
+      setSeatMetrics(null)
       pushToast({ title: "Error", description: msg, variant: "destructive" })
     } finally {
       setLoading(false)
@@ -291,8 +315,18 @@ export default function TeamPage() {
   }, [loadSkillTags])
 
   const seatLimit = plan.seats
-  const usedSeats = useMemo(() => members.filter((m) => m.status === "active").length, [members])
-  const atLimit = seatLimit !== -1 && usedSeats >= seatLimit
+  const reservedSeatsFallback = useMemo(() => {
+    const memberSlots = members.filter((m) => m.status === "active" || m.status === "invited").length
+    return memberSlots + pendingInvites.length
+  }, [members, pendingInvites])
+  const reservedSeatsForPlan = seatMetrics?.seatsReservedForPlan ?? reservedSeatsFallback
+  const activeBillableDisplay =
+    seatMetrics?.activeBillable ?? members.filter((m) => m.status === "active").length
+  const pendingSeatDisplay =
+    seatMetrics != null
+      ? seatMetrics.invitedMemberRowsBillable + seatMetrics.pendingTokenInvites
+      : members.filter((m) => m.status === "invited").length + pendingInvites.length
+  const atLimit = seatLimit !== -1 && reservedSeatsForPlan >= seatLimit
 
   const assignableRoles: MembershipRole[] = useMemo(() => {
     if (currentUserRole === "owner") return [...MEMBERSHIP_ROLES]
@@ -600,7 +634,9 @@ export default function TeamPage() {
           <div>
             <h3 className="text-sm font-semibold text-foreground">Team members</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {usedSeats} of {seatLimit === -1 ? "unlimited" : seatLimit} seats used
+              {activeBillableDisplay.toLocaleString()} active · {pendingSeatDisplay.toLocaleString()} pending invite
+              {pendingSeatDisplay === 1 ? "" : "s"} · {reservedSeatsForPlan.toLocaleString()} reserved
+              {seatLimit === -1 ? "" : ` / ${seatLimit} plan seats`}
             </p>
           </div>
           <Button onClick={() => setInviteOpen((v) => !v)} disabled={atLimit || !canManageTeam} size="sm">
@@ -613,16 +649,17 @@ export default function TeamPage() {
           <div className="px-6 py-3 bg-secondary/50 border-b border-border">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
               <span>Seat usage</span>
-              <span className={usedSeats >= seatLimit ? "ds-text-danger font-medium" : ""}>
-                {usedSeats}/{seatLimit}
+              <span className={reservedSeatsForPlan >= seatLimit ? "ds-text-danger font-medium" : ""}>
+                {reservedSeatsForPlan}/{seatLimit}
               </span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
                 style={{
-                  width: `${Math.min(100, (usedSeats / seatLimit) * 100)}%`,
-                  background: usedSeats >= seatLimit ? "var(--ds-danger-subtle)" : "var(--primary)",
+                  width: `${Math.min(100, (reservedSeatsForPlan / seatLimit) * 100)}%`,
+                  background:
+                    reservedSeatsForPlan >= seatLimit ? "var(--ds-danger-subtle)" : "var(--primary)",
                 }}
               />
             </div>

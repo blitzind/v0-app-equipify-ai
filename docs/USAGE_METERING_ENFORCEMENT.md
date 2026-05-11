@@ -1,13 +1,29 @@
-# Usage metering & enforcement (Phase 60.2)
+# Usage metering & enforcement (Phase 60.2 / 60.3)
 
 Companion to `docs/PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md` (entitlements & feature gates). This document covers **numeric usage**, **counters**, and **where limits are enforced vs displayed**.
+
+## Seat counting policy (Phase 60.3)
+
+| Category | Counts toward plan “reserved” seats? |
+|----------|--------------------------------------|
+| **`organization_members.status = 'active'`** | Yes, unless the member’s profile email is on the **platform-admin allowlist** (`EQUIPIFY_PLATFORM_ADMIN_EMAILS`). |
+| **`organization_members.status = 'invited'`** (Supabase-auth / roster invite) | Yes (same billable-email rule). |
+| **`organization_invites` with `status = 'pending'` and `expires_at` in the future** | Yes (token onboarding invites). |
+| **`accepted` / `expired` / `revoked` invites** | No. |
+| **`suspended` members** | No (not active or invited). |
+| **Accepting a token invite** | Does not increase reserved total *if* the invite was already counted as pending (swap pending → active). |
+
+**Enforcement surfaces:** `fetchOrganizationSeatMetrics` (`lib/billing/seat-counts.ts`) → `loadOrgBillingContext` / `evaluateSeatInvite`; `GET /api/organizations/[organizationId]/seat-metrics` for **billing** + **team** UI; `checkOrgInviteEligibility` on **`/api/invites/create`** and **`/api/organizations/.../invite-member`** (recheck before insert). **Platform admins** skip the numeric seat cap when inviting (`skipSeatCap` in `QuotaEvaluationOptions`) but still respect billing state.
+
+**Invite acceptance (`/api/invites/accept`):** No extra seat check (reserved total unchanged when pending token becomes active). Documented defense-in-depth deferred if product wants DB constraints.
 
 ## Architecture summary
 
 | Piece | Role |
 |-------|------|
 | `organization_subscriptions` | Plan id, trial, billing status — drives limits via `getPlanLimits` / `getEffectivePlanId`. |
-| `lib/billing/usage.ts` | Live **seats** (active members) and **equipment** (non-archived) counts; reads **API** rollup row. |
+| `lib/billing/usage.ts` | **Equipment** + **API** rollup; `seatsUsed` = **active members only** (legacy KPI — not the enforcement total). |
+| `lib/billing/seat-counts.ts` | **Authoritative reserved seat math** for enforcement + honest UI (60.3). |
 | `organization_api_usage_monthly` | DB table for monthly `api_calls` per org (`month_start` = UTC month). **Select** via RLS for members; **writes** intended for service role only. |
 | `lib/billing/record-eligibility.ts` | Pure evaluation: billing state, equipment cap, seat cap, **usage count verify** (60.2). |
 | `lib/billing/server-guard.ts` | `requireCanCreateRecord`, `requireWithinPlanLimit`, `loadOrgBillingContext` — wires eligibility to HTTP-oriented guards. |
@@ -21,7 +37,7 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 
 | Category | Plan limit source | Storage / helper | UI display | Server enforcement | Reset window | Status |
 |----------|-------------------|------------------|------------|--------------------|--------------|--------|
-| **Team seats** | `PLAN_LIMITS.users` | Count: `organization_members` active + invited for invites (`server-guard.fetchSeatSlots`); billing UI uses active-only in `getOrganizationUsage` | Billing Usage bar | `requireCanCreateRecord` / `checkOrgInviteEligibility` / `requireWithinPlanLimit` / invite routes | N/A (live count) | **partial** — invite path uses active+invited; billing bar can differ from invite rule (see 60.3 note) |
+| **Team seats** | `PLAN_LIMITS.users` | `fetchOrganizationSeatMetrics` + `GET .../seat-metrics` | Billing + Team UI (reserved bar + breakdown) | `requireCanCreateRecord` (`team_invite`), `checkOrgInviteEligibility`, `requireWithinPlanLimit`, `/api/invites/create`, `/api/organizations/.../invite-member` | N/A (live count) | **enforced** (server); `getOrganizationUsage.seatsUsed` remains active-only for legacy/aux |
 | **Equipment / assets** | `PLAN_LIMITS.equipment` | Count: `equipment` non-archived (`getOrganizationUsage`) | Billing Usage bar | `enforceCanCreateRecord` (equipment), `requireCanCreateRecord` in conversion flows | N/A | **enforced** on guarded server paths; direct Supabase inserts may bypass (RLS) |
 | **Customers** | No numeric cap in `PLAN_LIMITS` | — | — | Billing state only (`evaluateStandardCreate`) | — | **n/a** |
 | **Work orders / quotes / invoices / etc.** | No per-type numeric cap | — | — | Billing state only | — | **n/a** (beyond billing) |
@@ -46,17 +62,27 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 
 3. **Billing copy** — clarifies API bar is not fed by live increments yet.
 
+## Phase 60.3 code changes
+
+1. **`lib/billing/seat-counts.ts`** — `fetchOrganizationSeatMetrics` (billable active + invited members + valid pending token invites; excludes platform-admin allowlist).  
+2. **`GET /api/organizations/[organizationId]/seat-metrics`** — member-authenticated read for billing + team + `BillingAccessProvider`.  
+3. **`server-guard`** — `fetchSeatSlots` uses reserved total from seat metrics.  
+4. **`/api/invites/create`** — `checkOrgInviteEligibility` before insert; **rollback** (delete row) if outbound email fails after insert.  
+5. **`invite-member`** — billing **recheck** immediately before `organization_members` insert (race reduction).  
+6. **`evaluateSeatInvite`** — `skipSeatCap` for platform-admin inviter.  
+7. **Billing / Team UI** — show **reserved** vs plan + active/pending breakdown; footnotes updated.
+
 ## Platform admin & demo
 
 | Actor | Behavior |
 |-------|----------|
-| **Platform admin** (email policy) | When usage counts fail to load, equipment/invite **strict** verify is **skipped** for that user (profile lookup). `requireWithinPlanLimit` from `enforcePlanLimit` uses the same bypass. |
+| **Platform admin** (email policy) | When usage counts fail to load, equipment/invite **strict** verify is **skipped** for that user (profile lookup). `requireWithinPlanLimit` from `enforcePlanLimit` uses the same bypass. **Seat cap:** inviter with allowlist email **skips numeric seat limit** (`skipSeatCap`); platform-admin **members** still do not consume a billable seat. |
 | **Demo / sample orgs** | No special casing in quota math; demo gates live in `lib/demo-data/access.ts` for sample tools only. Orgs **without** a subscription row still use **fail-open** for usage-load failures (strict branch requires `subscription != null`). |
 
 ## Deferred / risks
 
 - **API monthly cap:** Needs **increment** points (service-role upsert on agreed “billable API” surface) before enforcement is honest.  
-- **Seat count mismatch:** Billing bar uses **active** seats; invites use **active + invited** — document under **60.3 Seat limit enforcement**.  
+- **Token + roster duplicate:** Same email could theoretically appear in `organization_invites` and `organization_members` — reserved count may **double-count** that edge case until deduped.  
 - **No subscription row:** Still allows record creation per `getBillingAccessState`; usage-load strict branch does not apply.  
 - **503 on usage verify:** Clients should show a retry toast; not a “upgrade plan” message.
 
@@ -67,9 +93,10 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 - [ ] Simulate usage load failure (optional, dev): member equipment add → 503 retry copy; same user as platform admin → succeeds or follows admin rules.  
 - [ ] Cron or workflow path using `requireCanCreateRecordForOrganization` still creates WOs when usage read fails (fail-open).  
 - [ ] Billing Usage: API calls bar shows **0** until increments ship; copy matches.  
+- [ ] **60.3:** Reserved seats on billing and team match; token invite blocked at cap; email failure does not leave orphan `organization_invites` row; platform-admin inviter bypasses cap.  
 
 ## References
 
-- `lib/billing/usage.ts`, `lib/billing/record-eligibility.ts`, `lib/billing/server-guard.ts`, `lib/billing/entitlements.ts`  
+- `lib/billing/seat-counts.ts`, `lib/billing/usage.ts`, `lib/billing/record-eligibility.ts`, `lib/billing/server-guard.ts`, `lib/billing/entitlements.ts`  
 - `lib/ai/plan-gate.ts`, `lib/ai/budget.ts`  
 - `supabase/migrations/20260518280000_billing_plans_and_api_usage.sql`  
