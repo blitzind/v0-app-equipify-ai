@@ -848,6 +848,24 @@ Use this as a **checklist** when coding — not exhaustive.
 4. Platform admin: **BlitzPay Ops** shows the second rollup card for cross-org signals.  
 5. Customer portal: confirm no command-center API paths.
 
+### 12.22 Phase 2U (executive business health engine — deterministic, staff-only)
+
+| Area | Details |
+|------|---------|
+| **Pure libs** | `blitzpay-executive-recommendations.ts` — threshold-based insight strings from numeric facts only. `blitzpay-business-health-types.ts` — shared payload types for server + client (no `server-only`). |
+| **Server** | `blitzpay-customer-payment-behavior.ts` — bounded invoice scan + wallet/financing counts; aggregates only (no customer names in concentration strings). `blitzpay-workflow-cash-pipeline.ts` — bounded WO/quote samples for service-to-cash leakage notes. `blitzpay-business-health.ts` — `fetchBlitzpayBusinessHealth` composes revenue intelligence, reporting snapshot, pipeline + customer summaries, technician concentration helpers (capped). `blitzpay-platform-business-health.ts` — samples ≤10 Connect orgs for admin rollup averages. |
+| **APIs** | `GET …/blitzpay/business-health?windowDays=` — same financial gate as command center + schema guard. `GET /api/platform/blitzpay/business-health-rollup` — platform admins only. |
+| **UX** | `BlitzpayExecutiveDashboard` — **Settings → Payments** (`#blitzpay-executive-dashboard-anchor`) and **Insights → Financial command center**. **Admin → BlitzPay Ops** adds sampled health rollup card. |
+| **Portal** | No portal routes reference `business-health` or `business-health-rollup`. |
+| **Tests** | `pnpm test:blitzpay-phase-2u` — deterministic recommendations, API gate strings, bounded-limit markers, portal isolation, no `pi_`/`po_` in executive libs. |
+
+#### Manual test checklist (Phase 2U)
+
+1. Financial role: **Settings → Payments** — executive dashboard loads; scores stay within 0–100; refresh works.  
+2. **Insights → Financial command center** — executive strip appears above the command center panel.  
+3. Platform admin: **BlitzPay Ops** — business health rollup card renders when at least one sampled org returns health (empty sample hides card).  
+4. Customer portal: confirm no business-health API paths.
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

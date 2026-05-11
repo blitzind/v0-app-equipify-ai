@@ -17,6 +17,23 @@ type CommandCenterPlatformRollup = {
   schemaHealthOk: boolean
 }
 
+type BusinessHealthPlatformRollup = {
+  reportingWindowDays: number
+  generatedAt: string
+  orgsSampled: number
+  averageOverallHealth: number
+  averageFinancialHealth: number
+  averageCollectionsHealth: number
+  orgsUnderStressApprox: number
+  commonBottlenecks: string[]
+  averageArPressureRatio: number
+  financingAdoptionRatePct: number
+  averageReminderDispatchPct: number
+  averagePayoutDelayDays: number | null
+  recurringRevenueSignalAvg: number
+  topGrowthOpportunityThemes: string[]
+}
+
 type RevenueRollup = {
   reportingWindowDays: number
   ledgerPaymentCapturedCentsWindow: number
@@ -71,6 +88,7 @@ export function BlitzpayOperationsContent() {
   const [summary, setSummary] = useState<OpsSummary | null>(null)
   const [revenueRollup, setRevenueRollup] = useState<RevenueRollup | null>(null)
   const [commandRollup, setCommandRollup] = useState<CommandCenterPlatformRollup | null>(null)
+  const [healthRollup, setHealthRollup] = useState<BusinessHealthPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -109,19 +127,24 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2] = await Promise.all([
+        const [r1, r2, r3] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
+        const j3 = (await r3.json()) as { rollup?: BusinessHealthPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
         else setCommandRollup(null)
+        if (r3.ok) setHealthRollup(j3.rollup ?? null)
+        else setHealthRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
+        setHealthRollup(null)
       }
     })()
   }, [])
@@ -336,6 +359,74 @@ export function BlitzpayOperationsContent() {
               <p className="text-lg font-semibold tabular-nums">{commandRollup.pendingRefundsPlatform}</p>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {healthRollup && healthRollup.orgsSampled > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Executive business health (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled up to {healthRollup.orgsSampled} active Connect workspaces ({healthRollup.reportingWindowDays}d window).
+            Deterministic scores — not a credit score; use for internal monitoring only.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg overall health</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.averageOverallHealth}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg financial</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.averageFinancialHealth}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg collections</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.averageCollectionsHealth}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Orgs under stress</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.orgsUnderStressApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg AR pressure ratio</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.averageArPressureRatio}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Financing adoption %</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.financingAdoptionRatePct}%</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
+              <p className="text-lg font-semibold tabular-nums">{healthRollup.averageReminderDispatchPct}%</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg payout delay (d)</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {healthRollup.averagePayoutDelayDays == null ? "—" : healthRollup.averagePayoutDelayDays}
+              </p>
+            </div>
+          </div>
+          {healthRollup.commonBottlenecks.length > 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-950">
+              <p className="font-semibold mb-1">Common bottlenecks (themes)</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {healthRollup.commonBottlenecks.map((b) => (
+                  <li key={b.slice(0, 120)}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {healthRollup.topGrowthOpportunityThemes.length > 0 ? (
+            <div className="rounded-lg border border-sky-200 bg-sky-50/80 p-3 text-[11px] text-sky-950">
+              <p className="font-semibold mb-1">Growth opportunity themes</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {healthRollup.topGrowthOpportunityThemes.map((b) => (
+                  <li key={b.slice(0, 120)}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

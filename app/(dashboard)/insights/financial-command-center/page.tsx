@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -41,9 +42,14 @@ export default function FinancialCommandCenterPage() {
           <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline">
             Settings → Payments
           </Link>
+          . Executive health (deterministic, no AI) is anchored at{" "}
+          <Link href="/settings/payments#blitzpay-executive-dashboard-anchor" className="text-primary underline-offset-2 hover:underline">
+            Settings → Payments → Executive business health
+          </Link>
           .
         </p>
       </div>
+      <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
     </div>
   )
