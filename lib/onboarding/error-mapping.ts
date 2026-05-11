@@ -64,6 +64,6 @@ export function describeProvisioningPhaseFailure(code: ProvisioningErrorCode): s
       return "Workspace setup is temporarily unavailable. Please try again shortly."
     case "internal_error":
     default:
-      return "Something went wrong while setting up your workspace. Please try again."
+      return "We couldn't finish setting up your workspace. Please try again."
   }
 }

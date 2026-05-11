@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:21:32.526Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T01:27:54.699Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -66,6 +66,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 62.1 — Dead code & duplicate pattern cleanup:** Removed unused \`lib/permissions/require-org-permission.ts\` (\`requireOrgMemberPermission\` had zero imports). Centralized invoice status badge Tailwind strings in \`lib/invoices/invoice-status-badge-classes.ts\` for drawer header, invoice detail badge, and invoices list (Void row still adds \`line-through\` locally). Product \`/integrations\` roadmap KPI counts **planned** rows only (removed redundant always-zero \`coming_soon\` sum). No permission/entitlement/offline/sync logic changes; \`lib/integrations/catalog-metadata.ts\` remains the integration catalog source.
 - **Phase 62.2 — Performance & query optimization:** See \`docs/PERFORMANCE_AND_QUERY_OPTIMIZATION_AUDIT.md\`. **Dashboard hook** (\`lib/dashboard/use-supabase-dashboard.ts\`): head-only counts use minimal \`select('id', …)\`; overdue invoice rows filtered server-side with the same rule set as before (past due date **or** overdue with null due date); **Insights** uses \`variant: 'insights'\` to skip recent-work-order + preview-list queries not shown on that page. No RLS bypass; QuickBooks/offline/sync paths untouched.
 - **Phase 62.3 — Accessibility & responsive validation:** See \`docs/ACCESSIBILITY_AND_RESPONSIVE_VALIDATION.md\`. **Page shell:** skip link + \`main\` landmark \`id="main-content"\`; **mobile:** hamburger ↔ \`mobile-sidebar-nav\` wiring (\`aria-expanded\`, \`aria-controls\`), navigation landmark on drawer, wider close target; **Quick Add / More** sheets: dialog semantics, \`h2\` titles, Escape to close, \`max-h-[85dvh]\` scroll; **toasts:** provider region label; **offline WO sync bar:** \`aria-live="polite"\`. No permission/entitlement/offline logic changes.
+- **Phase 62.4 — Error boundary & failure-state standardization:** See \`docs/ERROR_BOUNDARY_AND_FAILURE_STATE_STANDARDS.md\`. **Canonical copy:** \`lib/failure-states/copy.ts\` (\`FAILURE_COPY\`). **Shared UI:** \`RouteErrorFallback\` (\`components/failure-states/route-error-fallback.tsx\`) for Next.js \`error.tsx\` / \`global-error.tsx\`; \`SectionFailureState\` for inline drawer/section failures with optional real retry. **Routes:** \`app/error.tsx\`, \`app/global-error.tsx\`, \`app/not-found.tsx\`, plus segment \`error.tsx\` for \`(dashboard)\`, \`(portal)\`, \`(admin)\`. **Hardening example:** \`FeedDetailDrawer\` detail fetch uses standardized copy + retry nonce (no raw API message). **Small copy drift:** provisioning default message (\`lib/onboarding/error-mapping.ts\`), AI job unknown-error fallback (\`sanitizeAiJobError\`). No API contract changes; permission/entitlement/RLS/offline/QB behavior unchanged.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

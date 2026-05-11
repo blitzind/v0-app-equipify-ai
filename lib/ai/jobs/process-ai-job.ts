@@ -16,6 +16,7 @@ import type { PriceListImportJobInput, PriceListImportJobResult } from "@/lib/ai
 import { getPromptForTask, promptMetadataForLog } from "@/lib/ai/prompts"
 import { parseStoredPriceListPayload } from "@/lib/catalog/parse-stored-payload"
 import { toSafeAiJobPayload } from "@/lib/ai/redaction"
+import { FAILURE_COPY } from "@/lib/failure-states/copy"
 
 const JOB_PROCESSING_TIMEOUT_MS = 280_000
 
@@ -25,7 +26,7 @@ export function sanitizeAiJobError(err: unknown): string {
       ? err.message
       : typeof err === "string"
         ? err
-        : "Something went wrong."
+        : FAILURE_COPY.processingStepFailed
   const safe = raw.replace(/\s+/g, " ").trim()
   if (safe.length <= 500) return safe
   return `${safe.slice(0, 497)}…`

@@ -57,6 +57,8 @@ import { buildLifecycle, explainFailure } from "@/lib/communications/lifecycle"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
 import { COMMUNICATION_KIND_LABEL } from "@/lib/communications/communication-kind"
+import { SectionFailureState } from "@/components/failure-states/section-failure-state"
+import { FAILURE_COPY } from "@/lib/failure-states/copy"
 import { FeedStatusPill } from "./feed-status-pill"
 import { LifecycleTimeline } from "./lifecycle-timeline"
 import type { FeedDetailClient, FeedItemClient } from "./types-client"
@@ -92,6 +94,7 @@ export function FeedDetailDrawer({
   const [aiAssistTone, setAiAssistTone] = useState<"professional" | "friendly" | "concise">(
     "professional",
   )
+  const [detailFetchNonce, setDetailFetchNonce] = useState(0)
 
   const activeCommunicationId = detail?.id ?? initial?.id ?? null
 
@@ -169,7 +172,12 @@ export function FeedDetailDrawer({
           setShowRawMetadata(Boolean(body.showRawMetadata))
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load.")
+        if (!cancelled) {
+          setError(FAILURE_COPY.loadData)
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[feed-detail-drawer] detail fetch failed", e)
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -177,7 +185,7 @@ export function FeedDetailDrawer({
     return () => {
       cancelled = true
     }
-  }, [open, initial, organizationId])
+  }, [open, initial, organizationId, detailFetchNonce])
 
   async function requeueFailedDelivery() {
     if (!detail || !canManageCommunications) return
@@ -350,7 +358,13 @@ export function FeedDetailDrawer({
             </div>
           ) : null}
           {error ? (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <SectionFailureState
+              title={error}
+              onRetry={() => {
+                setError(null)
+                setDetailFetchNonce((n) => n + 1)
+              }}
+            />
           ) : null}
 
           {item ? (
