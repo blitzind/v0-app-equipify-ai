@@ -22,6 +22,7 @@ type SendStatus =
   | "skipped_no_email"
   | "skipped_unconfigured"
   | "skipped_preference"
+  | "skipped_org_disabled"
   | "failed"
 
 function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
@@ -274,6 +275,13 @@ async function dispatchBlitzpayPaymentReceiptEmailsInner(
   const { viewModel, customerTo, customerId, invoiceDeliveryPreference } = ctx
   const emailConfigured = isOutboundEmailConfigured()
   const blockAutoByPreference = blitzpayAutomaticCustomerReceiptBlockedByInvoicePreference(invoiceDeliveryPreference)
+  const { data: orgReceiptRow } = await admin
+    .from("blitzpay_org_settings")
+    .select("blitzpay_receipt_emails_enabled")
+    .eq("organization_id", args.organizationId)
+    .maybeSingle()
+  const orgReceiptEmailsEnabled =
+    (orgReceiptRow as { blitzpay_receipt_emails_enabled?: boolean } | null)?.blitzpay_receipt_emails_enabled !== false
 
   // --- Customer receipt ---
   if (args.sourceKind === "webhook_auto") {
@@ -288,7 +296,12 @@ async function dispatchBlitzpayPaymentReceiptEmailsInner(
     if (!claim.duplicate && claim.id) {
       const dispatchId = claim.id
       try {
-        if (!emailConfigured) {
+        if (!orgReceiptEmailsEnabled) {
+          await updateDispatchRow(admin, dispatchId, {
+            send_status: "skipped_org_disabled",
+            error_detail: "blitzpay_receipt_emails_enabled_false",
+          })
+        } else if (!emailConfigured) {
           await updateDispatchRow(admin, dispatchId, { send_status: "skipped_unconfigured" })
         } else if (blockAutoByPreference) {
           await updateDispatchRow(admin, dispatchId, {

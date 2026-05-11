@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandLogo } from "@/components/brand-logo"
 import { AiOperationsContent } from "@/components/admin/ai-operations-content"
+import { BlitzpayOperationsContent } from "@/components/admin/blitzpay-operations-content"
 import { ImportOperationsContent } from "@/components/admin/import-operations-content"
 import { MasterContextTabContent } from "@/components/admin/master-context-tab-content"
 import {
@@ -251,7 +252,15 @@ function severityIcon(sev: string) {
   return <Info size={13} className="ds-icon-info shrink-0" />
 }
 
-type Tab = "accounts" | "analytics" | "flags" | "audit" | "ai_operations" | "import_operations" | "master_context"
+type Tab =
+  | "accounts"
+  | "analytics"
+  | "flags"
+  | "audit"
+  | "ai_operations"
+  | "import_operations"
+  | "master_context"
+  | "blitzpay_operations"
 
 // ─── Sub-sections ─────────────────────────────────────────────────────────────
 
@@ -1983,6 +1992,7 @@ export default function PlatformAdminPage() {
     { key: "ai_operations", label: "AI Operations", icon: Brain },
     { key: "import_operations", label: "Import Ops", icon: Database },
     { key: "master_context", label: "Master Context", icon: ScrollText },
+    { key: "blitzpay_operations", label: "BlitzPay Ops", icon: CreditCard },
   ]
 
   return (
@@ -2130,6 +2140,7 @@ export default function PlatformAdminPage() {
           {activeTab === "ai_operations" && <AiOperationsContent />}
           {activeTab === "import_operations" && <ImportOperationsContent />}
           {activeTab === "master_context" && <MasterContextTabContent />}
+          {activeTab === "blitzpay_operations" && <BlitzpayOperationsContent />}
         </div>
       </div>
     </div>

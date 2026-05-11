@@ -1582,6 +1582,7 @@ function PaymentsTab({
   const [staffSchedConsent, setStaffSchedConsent] = useState(false)
   const [staffSchedBusy, setStaffSchedBusy] = useState(false)
   const [blitzpayPaymentLinkBusy, setBlitzpayPaymentLinkBusy] = useState(false)
+  const [blitzpayLinkCtlBusy, setBlitzpayLinkCtlBusy] = useState<string | null>(null)
   type BlitzpayRefundActivityRow = {
     orgInvoicePaymentId: string
     amountCents: number
@@ -2610,6 +2611,159 @@ function PaymentsTab({
                 Copy payment link
               </Button>
             </div>
+            {blitzpayCollections?.paymentLinks && blitzpayCollections.paymentLinks.length > 0 ? (
+              <div className="space-y-1 pt-1 border-t border-border">
+                <p className="text-[10px] font-medium text-muted-foreground">Payment links (staff)</p>
+                <ul className="space-y-1.5">
+                  {blitzpayCollections.paymentLinks.map((pl) => {
+                    const busyKey = (a: string) => blitzpayLinkCtlBusy === `${pl.id}:${a}`
+                    const canCtl = permissions.canEditInvoices && pl.status === "active"
+                    return (
+                      <li
+                        key={pl.id}
+                        className="flex flex-col gap-1 rounded border border-border/80 bg-muted/20 px-2 py-1.5 text-[10px]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <span className="text-muted-foreground">
+                            {new Date(pl.createdAt).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}{" "}
+                            · <span className="font-medium text-foreground">{pl.status}</span>
+                            {pl.useCount > 0 ? ` · opened ${pl.useCount}×` : ""}
+                          </span>
+                        </div>
+                        {canCtl ? (
+                          <div className="flex flex-wrap gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-[9px]"
+                              disabled={busyKey("revoke")}
+                              onClick={() => {
+                                void (async () => {
+                                  if (!orgId) return
+                                  setBlitzpayLinkCtlBusy(`${pl.id}:revoke`)
+                                  try {
+                                    const res = await fetch(
+                                      `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-links/${encodeURIComponent(pl.id)}`,
+                                      {
+                                        method: "POST",
+                                        credentials: "include",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "revoke" }),
+                                      },
+                                    )
+                                    const j = (await res.json()) as { error?: string; message?: string }
+                                    if (!res.ok) {
+                                      pushToast(j.message ?? j.error ?? "Could not revoke link.", "error")
+                                      return
+                                    }
+                                    pushToast("Payment link revoked.", "success")
+                                    setBlitzpayActivityRefresh((n) => n + 1)
+                                  } catch (e) {
+                                    pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                                  } finally {
+                                    setBlitzpayLinkCtlBusy(null)
+                                  }
+                                })()
+                              }}
+                            >
+                              {busyKey("revoke") ? <Loader2 className="w-3 h-3 animate-spin" /> : "Revoke"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-[9px]"
+                              disabled={busyKey("expire")}
+                              onClick={() => {
+                                void (async () => {
+                                  if (!orgId) return
+                                  setBlitzpayLinkCtlBusy(`${pl.id}:expire`)
+                                  try {
+                                    const res = await fetch(
+                                      `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-links/${encodeURIComponent(pl.id)}`,
+                                      {
+                                        method: "POST",
+                                        credentials: "include",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "expire" }),
+                                      },
+                                    )
+                                    const j = (await res.json()) as { error?: string; message?: string }
+                                    if (!res.ok) {
+                                      pushToast(j.message ?? j.error ?? "Could not expire link.", "error")
+                                      return
+                                    }
+                                    pushToast("Payment link expired.", "success")
+                                    setBlitzpayActivityRefresh((n) => n + 1)
+                                  } catch (e) {
+                                    pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                                  } finally {
+                                    setBlitzpayLinkCtlBusy(null)
+                                  }
+                                })()
+                              }}
+                            >
+                              {busyKey("expire") ? <Loader2 className="w-3 h-3 animate-spin" /> : "Expire"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-6 px-2 text-[9px]"
+                              disabled={busyKey("regenerate")}
+                              onClick={() => {
+                                void (async () => {
+                                  if (!orgId) return
+                                  setBlitzpayLinkCtlBusy(`${pl.id}:regenerate`)
+                                  try {
+                                    const res = await fetch(
+                                      `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-links/${encodeURIComponent(pl.id)}`,
+                                      {
+                                        method: "POST",
+                                        credentials: "include",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ action: "regenerate" }),
+                                      },
+                                    )
+                                    const body = (await res.json()) as {
+                                      link?: { url?: string }
+                                      error?: string
+                                      message?: string
+                                    }
+                                    if (!res.ok || !body.link?.url) {
+                                      pushToast(body.message ?? body.error ?? "Could not regenerate link.", "error")
+                                      return
+                                    }
+                                    await navigator.clipboard.writeText(body.link.url)
+                                    pushToast("New payment link copied (previous link expired).", "success")
+                                    setBlitzpayActivityRefresh((n) => n + 1)
+                                  } catch (e) {
+                                    pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                                  } finally {
+                                    setBlitzpayLinkCtlBusy(null)
+                                  }
+                                })()
+                              }}
+                            >
+                              {busyKey("regenerate") ? <Loader2 className="w-3 h-3 animate-spin" /> : "Regenerate"}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+                <p className="text-[9px] text-muted-foreground leading-snug">
+                  Raw link tokens are never shown after creation; regenerate returns a one-time URL to your clipboard.
+                </p>
+              </div>
+            ) : null}
             {blitzpayCollections?.recoveryCase ? (
               <p className="text-[10px] text-muted-foreground">
                 Recovery stage: <span className="text-foreground">{blitzpayCollections.recoveryCase.stage}</span> · status{" "}

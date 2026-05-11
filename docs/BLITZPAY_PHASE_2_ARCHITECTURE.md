@@ -662,6 +662,27 @@ Use this as a **checklist** when coding — not exhaustive.
 6. Successful scheduled payment still triggers receipt path like other succeeded intents; failure surfaces recovery/notification (not silent).  
 7. Staff can **cancel** a pending schedule and **revoke** autopay; raw Stripe PM ids never appear in API/UI payloads tested here.
 
+### 12.13 Phase 2L (admin operations, rollout controls, launch readiness)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260919120000_blitzpay_phase_2l_operations_rollout.sql` — org toggles `blitzpay_reminders_enabled`, `blitzpay_receipt_emails_enabled`; reminder run `trigger` accepts `dry_run`; receipt dispatch status `skipped_org_disabled`. |
+| **Platform admin** | `GET /api/platform/blitzpay/operations` aggregates enabled orgs, volume, failed attempts, disputes/refunds, webhook dead rows (24h), reminder health, stale Connect sync, schema health, and computed **alerts**. Platform Admin UI tab **BlitzPay Ops** (`components/admin/blitzpay-operations-content.tsx`) surfaces the summary, alert strip, dry-run / manual reminder dispatch (`POST /api/platform/blitzpay/reminder-dispatch`), and run history (`GET /api/platform/blitzpay/reminder-runs`). |
+| **Reminder controls** | `runBlitzpayReminderDispatch(admin, { dryRun, manual })` — dry run records a `dry_run` trigger row and skips writes/sends; manual platform POST always passes `manual: true`. Cron `POST /api/cron/blitzpay-reminders` keeps default cron trigger. |
+| **Payment links** | `POST .../blitzpay/payment-links/[linkId]` with `action: revoke \| expire \| regenerate` — staff (`canEditInvoices`); regenerate expires the prior link then mints a new hashed token; response returns `{ url }` once for clipboard copy only. |
+| **Org rollout & staff UX** | `PATCH .../blitzpay/settings` includes reminder + receipt email toggles (not fee policy). `GET .../blitzpay/status` adds `operationalAlerts` (schema, platform-wide dead webhooks count, Connect charges readiness). Settings → Payments shows alerts, toggles, and **launch readiness** from `GET .../blitzpay/launch-readiness` (org vs platform audience via `gateBlitzPayManagement`). |
+| **Launch checklist** | Pure builder `lib/blitzpay/blitzpay-launch-readiness.ts` — env, schema, webhook secret, cron secret, Connect, hosted pay, methods, receipts, reminders, test capture. |
+| **Tests** | `pnpm test:blitzpay-phase-2l` — launch checklist / rollout expectations, reminder trigger selection, static checks that platform routes enforce `isPlatformAdminEmail`, payment-link route gates `canEditInvoices`. |
+
+#### Manual test checklist (Phase 2L)
+
+1. Non–platform-admin receives **403** on `/api/platform/blitzpay/operations`, `reminder-dispatch`, and `reminder-runs`.  
+2. Platform admin **dry run** increments `blitzpay_reminder_runs` with `trigger=dry_run` and does not send mail.  
+3. **Revoke / expire** updates link status; **regenerate** leaves only one active link and copies the new URL once.  
+4. Org owners toggle **reminders** and **receipt emails**; reminder dispatch skips disabled orgs; receipt dispatch can mark `skipped_org_disabled`.  
+5. **Launch readiness** differs for workspace admin vs platform admin (extra env rows).  
+6. Settings **operational alerts** surface schema and webhook signals without exposing fee policy internals.
+
 ---
 
-*Phase 2A–2K vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2L vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

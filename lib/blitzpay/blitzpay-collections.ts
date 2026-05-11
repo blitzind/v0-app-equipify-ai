@@ -9,6 +9,7 @@ import { buildInvoiceCustomerEmailContent } from "@/lib/email/templates"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
 import { sha256Hex } from "@/lib/portal/token-hash"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
+import { blitzpayReminderDispatchTrigger } from "@/lib/blitzpay/blitzpay-reminder-dispatch-trigger"
 import { fetchBlitzpayPaymentIntentsForInvoice } from "@/lib/blitzpay/payment-repository"
 
 export type BlitzpayReminderKind =
@@ -302,16 +303,30 @@ async function sendReminderEmail(
   return { ok: true, providerMessageId: send.id ?? null }
 }
 
-export async function runBlitzpayReminderDispatch(admin: SupabaseClient): Promise<{
+export type RunBlitzpayReminderDispatchOptions = {
+  /** Count-only path: no reminder rows, no email, no recovery updates. */
+  dryRun?: boolean
+  /** Platform manual invocation (vs cron). */
+  manual?: boolean
+}
+
+export async function runBlitzpayReminderDispatch(
+  admin: SupabaseClient,
+  opts?: RunBlitzpayReminderDispatchOptions,
+): Promise<{
   evaluated: number
   sent: number
   skipped: number
   runId: string
+  dryRun?: boolean
+  simulatedSent?: number
 }> {
+  const dryRun = Boolean(opts?.dryRun)
+  const trigger = blitzpayReminderDispatchTrigger(opts)
   const now = new Date().toISOString()
   const { data: runRow, error: runErr } = await admin
     .from("blitzpay_reminder_runs")
-    .insert({ trigger: "cron", status: "started", created_at: now })
+    .insert({ trigger, status: "started", created_at: now })
     .select("id")
     .single()
   if (runErr) throw new Error(runErr.message)
@@ -320,14 +335,47 @@ export async function runBlitzpayReminderDispatch(admin: SupabaseClient): Promis
   let evaluated = 0
   let sent = 0
   let skipped = 0
+  let simulatedSent = 0
   try {
     const candidates = await collectReminderCandidates(admin)
+    const orgIds = [...new Set(candidates.map((c) => c.organization_id))]
+    let remindersOnByOrg = new Map<string, boolean>()
+    if (orgIds.length > 0) {
+      const { data: settingsRows, error: setErr } = await admin
+        .from("blitzpay_org_settings")
+        .select("organization_id, blitzpay_reminders_enabled")
+        .in("organization_id", orgIds)
+      if (setErr) throw new Error(setErr.message)
+      for (const row of settingsRows ?? []) {
+        const r = row as { organization_id: string; blitzpay_reminders_enabled?: boolean }
+        remindersOnByOrg.set(r.organization_id, r.blitzpay_reminders_enabled !== false)
+      }
+    }
+
     for (const inv of candidates) {
       const kind = reminderKindForInvoice({ due_date: inv.due_date, status: inv.status })
       if (!kind) continue
+      if (remindersOnByOrg.get(inv.organization_id) === false) {
+        skipped += 1
+        continue
+      }
       evaluated += 1
       const idempotencyKey = idempotencyKeyForReminder(inv.organization_id, inv.id, kind)
       const suppress = await reminderSuppressed(admin, inv.organization_id, inv.id, inv.customer_id)
+
+      if (dryRun) {
+        if (suppress.suppressed) {
+          skipped += 1
+          continue
+        }
+        if (!isOutboundEmailConfigured()) {
+          skipped += 1
+          continue
+        }
+        simulatedSent += 1
+        continue
+      }
+
       const reminderRow = {
         organization_id: inv.organization_id,
         org_invoice_id: inv.id,
@@ -415,14 +463,16 @@ export async function runBlitzpayReminderDispatch(admin: SupabaseClient): Promis
       })
     }
 
+    const summary = dryRun ? { dry_run: true, simulated_sent: simulatedSent } : {}
     const { error: finErr } = await admin
       .from("blitzpay_reminder_runs")
       .update({
         status: "success",
         reminders_evaluated: evaluated,
-        reminders_sent: sent,
+        reminders_sent: dryRun ? 0 : sent,
         reminders_skipped: skipped,
         finished_at: new Date().toISOString(),
+        summary,
       })
       .eq("id", runId)
     if (finErr) throw new Error(finErr.message)
@@ -433,7 +483,7 @@ export async function runBlitzpayReminderDispatch(admin: SupabaseClient): Promis
       .update({
         status: "failed",
         reminders_evaluated: evaluated,
-        reminders_sent: sent,
+        reminders_sent: dryRun ? 0 : sent,
         reminders_skipped: skipped,
         error: msg.slice(0, 2000),
         finished_at: new Date().toISOString(),
@@ -441,7 +491,9 @@ export async function runBlitzpayReminderDispatch(admin: SupabaseClient): Promis
       .eq("id", runId)
     throw e
   }
-  return { evaluated, sent, skipped, runId }
+  return dryRun ?
+      { evaluated, sent: 0, skipped, runId, dryRun: true, simulatedSent }
+    : { evaluated, sent, skipped, runId }
 }
 
 export async function fetchBlitzpayInvoiceCollectionsView(

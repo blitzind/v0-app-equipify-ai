@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 248,
-  sqlMigrations: 158,
+  apiRouteHandlers: 253,
+  sqlMigrations: 159,
   dashboardPages: 60,
-  componentsTsx: 254,
-  libTsFiles: 538,
+  componentsTsx: 255,
+  libTsFiles: 542,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **248** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **158** |
+| API route handlers (\`app/api/**/route.ts\`) | **253** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **159** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
-| \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **538** |
+| \`components/**/*.tsx\` | **255** |
+| \`lib/**/*.ts\` | **542** |
 
 ### Vercel crons
 
@@ -97,6 +97,7 @@ organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
+organizations/[organizationId]/blitzpay/launch-readiness/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
@@ -171,6 +172,7 @@ organizations/[organizationId]/invite-member/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/diagnostics/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-link/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-links/[linkId]/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/resend-receipt/route.ts
@@ -243,6 +245,9 @@ platform/ai-operations/route.ts
 platform/ai-profitability/route.ts
 platform/analytics/route.ts
 platform/analytics/snapshot/route.ts
+platform/blitzpay/operations/route.ts
+platform/blitzpay/reminder-dispatch/route.ts
+platform/blitzpay/reminder-runs/route.ts
 platform/feature-requests/route.ts
 platform/import-operations/bulk-recover/route.ts
 platform/import-operations/bulk-retry/route.ts

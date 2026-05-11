@@ -5,6 +5,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import { fetchBlitzpayStoredPaymentProfilesSummary } from "@/lib/blitzpay/blitzpay-payment-profiles"
 import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
+import { runBlitzpaySchemaHealthCheckCached } from "@/lib/blitzpay/blitzpay-schema-health"
 
 export const runtime = "nodejs"
 
@@ -73,6 +74,8 @@ export async function GET(
         "blitzpay_ach_convenience_fee_enabled",
         "blitzpay_ach_processing_timeline_copy",
         "blitzpay_allow_save_payment_methods",
+        "blitzpay_reminders_enabled",
+        "blitzpay_receipt_emails_enabled",
       ].join(", "),
     )
     .eq("organization_id", organizationId)
@@ -81,17 +84,51 @@ export async function GET(
   let reporting: Awaited<ReturnType<typeof fetchBlitzpayOrgReportingSnapshot>> | null = null
   let profileSummary: Awaited<ReturnType<typeof fetchBlitzpayStoredPaymentProfilesSummary>> | null = null
   let collectionsReporting: Awaited<ReturnType<typeof computeBlitzpayCollectionsReporting>> | null = null
+  let operationalAlerts: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }> = []
   try {
     const admin = createServiceRoleSupabaseClient()
     const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
-    const [reportingRes, profileRes, collectionsRes] = await Promise.all([
+    const since24h = new Date(Date.now() - 86400_000).toISOString()
+    const [reportingRes, profileRes, collectionsRes, schemaHealth, { count: webhookDead24h }] = await Promise.all([
       fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
       fetchBlitzpayStoredPaymentProfilesSummary(admin, organizationId),
       computeBlitzpayCollectionsReporting(admin, organizationId),
+      runBlitzpaySchemaHealthCheckCached(admin),
+      admin
+        .from("blitzpay_webhook_inbox")
+        .select("stripe_event_id", { count: "exact", head: true })
+        .eq("processing_status", "dead")
+        .gte("created_at", since24h),
     ])
     reporting = reportingRes
     profileSummary = profileRes
     collectionsReporting = collectionsRes
+    if (!schemaHealth.ok) {
+      operationalAlerts.push({
+        severity: "critical",
+        code: "schema_incomplete",
+        message:
+          schemaHealth.kind === "schema_incomplete" ?
+            `BlitzPay schema incomplete (${schemaHealth.missing}). Apply migrations.`
+          : "BlitzPay schema health check failed.",
+      })
+    }
+    if ((webhookDead24h ?? 0) > 0) {
+      operationalAlerts.push({
+        severity: "warning",
+        code: "webhook_dead_recent",
+        message: `${webhookDead24h ?? 0} dead webhook inbox event(s) in the last 24h (platform-wide signal).`,
+      })
+    }
+    const chargesOk = Boolean((org as { stripe_charges_enabled?: boolean | null } | null)?.stripe_charges_enabled)
+    const acct = String((org as { stripe_connect_account_id?: string | null } | null)?.stripe_connect_account_id ?? "").trim()
+    if (acct && !chargesOk) {
+      operationalAlerts.push({
+        severity: "warning",
+        code: "connect_charges_not_ready",
+        message: "Stripe Connect account exists but charges are not enabled yet.",
+      })
+    }
   } catch {
     reporting = null
     profileSummary = null
@@ -125,6 +162,7 @@ export async function GET(
       storedPaymentProfiles: profileSummary,
       collectionsReporting,
       stripeMode,
+      operationalAlerts,
     },
   })
 }

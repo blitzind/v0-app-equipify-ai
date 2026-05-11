@@ -49,6 +49,8 @@ export async function GET(
         "blitzpay_partial_payment_min_cents",
         "blitzpay_platform_partial_payments_allowed",
         "blitzpay_scheduled_payments_enabled",
+        "blitzpay_reminders_enabled",
+        "blitzpay_receipt_emails_enabled",
       ].join(", "),
     )
     .eq("organization_id", gate.organizationId)
@@ -88,6 +90,8 @@ export async function PATCH(
     blitzpay_partial_payment_min_cents?: number
     blitzpay_platform_partial_payments_allowed?: boolean
     blitzpay_scheduled_payments_enabled?: boolean
+    blitzpay_reminders_enabled?: boolean
+    blitzpay_receipt_emails_enabled?: boolean
   }
   try {
     body = (await request.json()) as typeof body
@@ -155,6 +159,8 @@ export async function PATCH(
     blitzpay_partial_payments_enabled: Boolean(body.blitzpay_partial_payments_enabled),
     blitzpay_partial_payment_min_cents: partialMin,
     blitzpay_scheduled_payments_enabled: body.blitzpay_scheduled_payments_enabled !== false,
+    blitzpay_reminders_enabled: body.blitzpay_reminders_enabled !== false,
+    blitzpay_receipt_emails_enabled: body.blitzpay_receipt_emails_enabled !== false,
     updated_at: new Date().toISOString(),
   }
   const patch = gate.platformAdmin
@@ -193,6 +199,8 @@ export async function PATCH(
         "blitzpay_partial_payment_min_cents",
         "blitzpay_platform_partial_payments_allowed",
         "blitzpay_scheduled_payments_enabled",
+        "blitzpay_reminders_enabled",
+        "blitzpay_receipt_emails_enabled",
       ].join(", "),
     )
     .maybeSingle()

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, RefreshCw, Wallet } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Circle, Info, Loader2, RefreshCw, ShieldAlert, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -39,6 +39,8 @@ type BlitzPayStatusPayload = {
     blitzpay_ach_convenience_fee_enabled?: boolean
     blitzpay_ach_processing_timeline_copy?: string
     blitzpay_allow_save_payment_methods?: boolean
+    blitzpay_reminders_enabled?: boolean
+    blitzpay_receipt_emails_enabled?: boolean
   } | null
   payoutVisibility?: {
     estimatedNetPayoutCents: number
@@ -52,12 +54,21 @@ type BlitzPayStatusPayload = {
     achSettlement?: { pending: number; settled: number; failed: number }
     payoutStatus: string
   } | null
+  operationalAlerts?: Array<{ severity: "critical" | "warning" | "info"; code: string; message: string }>
   storedPaymentProfiles?: {
     totalProfiles: number
     withDefaultMethod: number
     lastUsedMethodMix: { card: number; us_bank_account: number; unknown: number }
   } | null
   stripeMode?: "test" | "live" | "unknown"
+}
+
+type BlitzpayLaunchChecklistItem = {
+  id: string
+  label: string
+  ok: boolean
+  detail: string
+  platformOnly?: boolean
 }
 
 type PayoutLedgerPanelPayload = {
@@ -151,6 +162,11 @@ function BlitzPaySettingsPageInner() {
   const [achEnabled, setAchEnabled] = useState(false)
   const [achTimelineCopy, setAchTimelineCopy] = useState("Bank (ACH) payments can take 3-5 business days to settle.")
   const [saveMethodsEnabled, setSaveMethodsEnabled] = useState(true)
+  const [remindersEnabled, setRemindersEnabled] = useState(true)
+  const [receiptEmailsEnabled, setReceiptEmailsEnabled] = useState(true)
+  const [launchLoading, setLaunchLoading] = useState(false)
+  const [launchItems, setLaunchItems] = useState<BlitzpayLaunchChecklistItem[] | null>(null)
+  const [launchScore, setLaunchScore] = useState<{ passed: number; total: number } | null>(null)
 
   const loadStatus = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") {
@@ -183,11 +199,46 @@ function BlitzPaySettingsPageInner() {
           (s.blitzpay_ach_processing_timeline_copy ?? "Bank (ACH) payments can take 3-5 business days to settle.").trim(),
         )
         setSaveMethodsEnabled(s.blitzpay_allow_save_payment_methods !== false)
+        setRemindersEnabled(s.blitzpay_reminders_enabled !== false)
+        setReceiptEmailsEnabled(s.blitzpay_receipt_emails_enabled !== false)
       }
     } finally {
       setLoading(false)
     }
   }, [organizationId, orgStatus, toast])
+
+  const loadLaunchReadiness = useCallback(async () => {
+    if (!organizationId || orgStatus !== "ready" || !canConfigure) {
+      setLaunchItems(null)
+      setLaunchScore(null)
+      return
+    }
+    setLaunchLoading(true)
+    try {
+      const res = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/launch-readiness`,
+        { cache: "no-store" },
+      )
+      const j = (await res.json()) as {
+        checklist?: BlitzpayLaunchChecklistItem[]
+        score?: { passed: number; total: number }
+        message?: string
+      }
+      if (!res.ok) {
+        setLaunchItems(null)
+        setLaunchScore(null)
+        return
+      }
+      setLaunchItems(j.checklist ?? null)
+      setLaunchScore(j.score ?? null)
+    } finally {
+      setLaunchLoading(false)
+    }
+  }, [organizationId, orgStatus, canConfigure])
+
+  useEffect(() => {
+    void loadLaunchReadiness()
+  }, [loadLaunchReadiness])
 
   const loadPayoutLedger = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready" || !canViewPayoutLedger) {
@@ -351,6 +402,8 @@ function BlitzPaySettingsPageInner() {
           blitzpay_payment_method_ach_enabled: achEnabled,
           blitzpay_ach_processing_timeline_copy: achTimelineCopy,
           blitzpay_allow_save_payment_methods: saveMethodsEnabled,
+          blitzpay_reminders_enabled: remindersEnabled,
+          blitzpay_receipt_emails_enabled: receiptEmailsEnabled,
         }),
       })
       const j = (await res.json()) as { error?: string; message?: string }
@@ -364,6 +417,7 @@ function BlitzPaySettingsPageInner() {
       }
       toast({ title: "Payment settings saved" })
       await loadStatus()
+      await loadLaunchReadiness()
     } finally {
       setSaveFeesBusy(false)
     }
@@ -431,6 +485,26 @@ function BlitzPaySettingsPageInner() {
           </div>
         ) : (
           <div className="space-y-5">
+            {bp?.operationalAlerts && bp.operationalAlerts.length > 0 ? (
+              <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+                <p className="text-xs font-semibold text-foreground">Operational signals</p>
+                <ul className="space-y-1.5">
+                  {bp.operationalAlerts.map((a) => (
+                    <li key={a.code} className="flex items-start gap-2 text-[11px] leading-snug">
+                      {a.severity === "critical" ? (
+                        <ShieldAlert className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" aria-hidden />
+                      ) : a.severity === "warning" ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+                      ) : (
+                        <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+                      )}
+                      <span className="text-muted-foreground">{a.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
@@ -579,6 +653,27 @@ function BlitzPaySettingsPageInner() {
                 />
                 Allow Checkout to save payment methods for future invoices
               </label>
+              <p className="text-xs font-semibold pt-2 border-t border-border mt-2">Communications & collections</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={remindersEnabled}
+                  onChange={(e) => setRemindersEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Send automated payment reminder emails (BlitzPay collections)
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={receiptEmailsEnabled}
+                  onChange={(e) => setReceiptEmailsEnabled(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Send automatic payment receipt emails after successful checkout
+              </label>
               <label className="text-xs text-muted-foreground block">
                 ACH timing guidance
                 <input
@@ -647,6 +742,57 @@ function BlitzPaySettingsPageInner() {
                     Last used mix — card: {bp.storedPaymentProfiles.lastUsedMethodMix.card}, ACH:{" "}
                     {bp.storedPaymentProfiles.lastUsedMethodMix.us_bank_account}
                   </p>
+                </div>
+              ) : null}
+
+              {canConfigure ? (
+                <div className="border-t border-border pt-4 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold">Launch readiness</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      disabled={launchLoading}
+                      onClick={() => void loadLaunchReadiness()}
+                    >
+                      {launchLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                      Refresh checklist
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Workspace-level checks for hosted pay, Connect, outbound mail, reminders, and a recorded successful
+                    capture. Platform-only items appear when a platform admin opens this page for the workspace.
+                  </p>
+                  {launchLoading && !launchItems ? (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Loading checklist…
+                    </p>
+                  ) : launchScore && launchItems && launchItems.length > 0 ? (
+                    <>
+                      <p className="text-[11px] font-medium text-foreground">
+                        Score: {launchScore.passed}/{launchScore.total} passed
+                      </p>
+                      <ul className="space-y-1.5">
+                        {launchItems.map((item) => (
+                          <li key={item.id} className="flex items-start gap-2 text-[11px]">
+                            {item.ok ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                            ) : (
+                              <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+                            )}
+                            <span>
+                              <span className="font-medium text-foreground">{item.label}</span>
+                              <span className="text-muted-foreground"> — {item.detail}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">Checklist unavailable.</p>
+                  )}
                 </div>
               ) : null}
             </div>
