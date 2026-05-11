@@ -285,6 +285,14 @@ function BlitzPaySettingsPageInner() {
   const hasAccount = Boolean(bp?.stripe_connect_account_id && String(bp.stripe_connect_account_id).trim())
   const dueNow = asStringList(bp?.stripe_requirements_currently_due)
   const duePast = asStringList(bp?.stripe_requirements_past_due)
+  const hasRequirementsDue = dueNow.length > 0 || duePast.length > 0
+  const onboardingComplete = Boolean(bp?.stripe_connect_onboarding_complete)
+  const chargesEnabled = Boolean(bp?.stripe_charges_enabled)
+  const canContinueOnboarding = hasAccount && (!onboardingComplete || hasRequirementsDue)
+  const canEnableBlitzpay =
+    !enableBusy &&
+    canConfigure &&
+    (!hasAccount || (onboardingComplete && chargesEnabled && !hasRequirementsDue))
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -362,21 +370,24 @@ function BlitzPaySettingsPageInner() {
               </div>
             </dl>
 
-            {(dueNow.length > 0 || duePast.length > 0) && (
+            {hasRequirementsDue && (
               <div
                 className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm"
                 role="status"
               >
-                <p className="font-medium text-foreground">Stripe needs more information</p>
+                <p className="font-medium text-foreground">Stripe needs more information before BlitzPay can accept payments.</p>
                 <p className="text-muted-foreground text-xs mt-1 leading-relaxed">
                   Your connected account has outstanding requirements. Continue onboarding in Stripe to finish setup.
                 </p>
-                {duePast.length > 0 ?
-                  <p className="text-xs text-destructive mt-2">Past due: {duePast.join(", ")}</p>
-                : null}
-                {dueNow.length > 0 ?
-                  <p className="text-xs text-muted-foreground mt-1">Currently due: {dueNow.join(", ")}</p>
-                : null}
+                <details className="mt-2">
+                  <summary className="text-[11px] text-muted-foreground cursor-pointer">Developer details</summary>
+                  {duePast.length > 0 ? (
+                    <p className="text-[11px] text-destructive mt-1">Past due keys: {duePast.join(", ")}</p>
+                  ) : null}
+                  {dueNow.length > 0 ? (
+                    <p className="text-[11px] text-muted-foreground mt-1">Currently due keys: {dueNow.join(", ")}</p>
+                  ) : null}
+                </details>
               </div>
             )}
 
@@ -390,7 +401,7 @@ function BlitzPaySettingsPageInner() {
             <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
               <Button
                 type="button"
-                disabled={!canConfigure || enableBusy || hasAccount}
+                disabled={!canEnableBlitzpay}
                 onClick={() => void handleEnable()}
               >
                 {enableBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -399,9 +410,7 @@ function BlitzPaySettingsPageInner() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={
-                  !canConfigure || linkBusy || statusKey === "ready" || statusKey === "disabled"
-                }
+                disabled={!canConfigure || linkBusy || !canContinueOnboarding}
                 onClick={() => void handleContinueOnboarding()}
               >
                 {linkBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
