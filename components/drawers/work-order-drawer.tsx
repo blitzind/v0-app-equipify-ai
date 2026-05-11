@@ -31,6 +31,7 @@ import {
 } from "@/lib/work-orders/work-order-completion"
 import { CertificateMultiTabContent } from "@/components/work-orders/certificate-multi-tab-content"
 import { WorkOrderBlitzpayPanel } from "@/components/work-orders/work-order-blitzpay-panel"
+import { BlitzpayCustomerMembershipHint } from "@/components/blitzpay/blitzpay-customer-membership-hint"
 import { WorkOrderInventoryUsageCard } from "@/components/inventory/work-order-inventory-usage-card"
 import { WorkOrderTruckConsumeCard } from "@/components/inventory/work-order-truck-consume-card"
 import { WorkOrderAiPartsSuggestionsPanel } from "@/components/work-orders/work-order-ai-parts-suggestions-panel"
@@ -2422,6 +2423,13 @@ export function WorkOrderDrawer({ workOrderId, onClose, onUpdated, initialTab }:
           </div>
         </div>
       ) : null}
+
+      <BlitzpayCustomerMembershipHint
+        organizationId={orgStatus === "ready" ? activeOrgId : null}
+        orgReady={orgStatus === "ready"}
+        customerId={wo.customerId}
+        canViewFinancial={woOrgPermissions.canViewFinancialReports || woOrgPermissions.canViewFinancials}
+      />
 
       <DrawerCompactSection
         title="Invoicing"

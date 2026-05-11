@@ -41,6 +41,17 @@ type RecurringRevenuePlatformRollup = {
   topOperationalThemes: string[]
 }
 
+type MembershipPlatformRollup = {
+  sampledOrganizations: number
+  organizationsWithMemberships: number
+  totalActiveMembershipsSample: number
+  totalMrrCentsSample: number
+  delinquentMembershipsSample: number
+  openFailuresSample: number
+  avgAutopayAdoptionPctSample: number
+  delinquencyPressurePct: number
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -115,6 +126,7 @@ export function BlitzpayOperationsContent() {
   const [healthRollup, setHealthRollup] = useState<BusinessHealthPlatformRollup | null>(null)
   const [collectionsRollup, setCollectionsRollup] = useState<CollectionsPlatformRollup | null>(null)
   const [recurringRollup, setRecurringRollup] = useState<RecurringRevenuePlatformRollup | null>(null)
+  const [membershipRollup, setMembershipRollup] = useState<MembershipPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -153,18 +165,20 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3, r4, r5] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/collections-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/recurring-revenue-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/membership-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
         const j3 = (await r3.json()) as { rollup?: BusinessHealthPlatformRollup }
         const j4 = (await r4.json()) as { rollup?: CollectionsPlatformRollup }
         const j5 = (await r5.json()) as { rollup?: RecurringRevenuePlatformRollup }
+        const j6 = (await r6.json()) as { rollup?: MembershipPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
@@ -175,12 +189,15 @@ export function BlitzpayOperationsContent() {
         else setCollectionsRollup(null)
         if (r5.ok) setRecurringRollup(j5.rollup ?? null)
         else setRecurringRollup(null)
+        if (r6.ok) setMembershipRollup(j6.rollup ?? null)
+        else setMembershipRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
         setHealthRollup(null)
         setCollectionsRollup(null)
         setRecurringRollup(null)
+        setMembershipRollup(null)
       }
     })()
   }, [])
@@ -557,6 +574,44 @@ export function BlitzpayOperationsContent() {
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {membershipRollup && membershipRollup.sampledOrganizations > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Native memberships (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled {membershipRollup.sampledOrganizations} recent orgs; {membershipRollup.organizationsWithMemberships} show
+            membership rows. Bounded reads only.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Active memberships</p>
+              <p className="text-lg font-semibold tabular-nums">{membershipRollup.totalActiveMembershipsSample}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">MRR sample total</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(membershipRollup.totalMrrCentsSample)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Delinquents</p>
+              <p className="text-lg font-semibold tabular-nums">{membershipRollup.delinquentMembershipsSample}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open failures</p>
+              <p className="text-lg font-semibold tabular-nums">{membershipRollup.openFailuresSample}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg autopay %</p>
+              <p className="text-lg font-semibold tabular-nums">{membershipRollup.avgAutopayAdoptionPctSample}%</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Delinquency pressure %</p>
+              <p className="text-lg font-semibold tabular-nums">{membershipRollup.delinquencyPressurePct}%</p>
+            </div>
+          </div>
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
 import { fetchBlitzpayCollectionsAccelerationMetrics } from "@/lib/blitzpay/blitzpay-collections-acceleration-metrics"
 import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
+import { fetchBlitzpayMembershipReportingSlice } from "@/lib/blitzpay/blitzpay-memberships"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
 export type BlitzpayOrgReportingSnapshot = {
@@ -102,6 +103,14 @@ export type BlitzpayOrgReportingSnapshot = {
   blitzpayProjectedRenewalRevenue90dCents: number
   blitzpayRenewalRecoveryOpportunityCents: number
   blitzpayAutopayRiskExposureCents: number
+  /** Phase 2X — native membership recurring metrics (bounded). */
+  recurringRevenueCents: number
+  annualRecurringRevenueCents: number
+  delinquentMembershipRevenueCents: number
+  renewalPipelineCents: number
+  recoveredMembershipRevenueCents: number
+  membershipAutoPayAdoptionBasisPoints: number
+  churnRiskRevenueCents: number
 }
 
 /**
@@ -536,6 +545,26 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* recurring reads optional in partial sandboxes */
   }
 
+  let recurringRevenueCents = 0
+  let annualRecurringRevenueCents = 0
+  let delinquentMembershipRevenueCents = 0
+  let renewalPipelineCents = 0
+  let recoveredMembershipRevenueCents = 0
+  let membershipAutoPayAdoptionBasisPoints = 0
+  let churnRiskRevenueCents = 0
+  try {
+    const mx = await fetchBlitzpayMembershipReportingSlice(admin, organizationId)
+    recurringRevenueCents = mx.recurringRevenueCents
+    annualRecurringRevenueCents = mx.annualRecurringRevenueCents
+    delinquentMembershipRevenueCents = mx.delinquentMembershipRevenueCents
+    renewalPipelineCents = mx.renewalPipelineCents
+    recoveredMembershipRevenueCents = mx.recoveredMembershipRevenueCents
+    membershipAutoPayAdoptionBasisPoints = mx.membershipAutoPayAdoptionBasisPoints
+    churnRiskRevenueCents = mx.churnRiskRevenueCents
+  } catch {
+    /* membership tables optional until migration applied */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -607,5 +636,12 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     blitzpayProjectedRenewalRevenue90dCents,
     blitzpayRenewalRecoveryOpportunityCents,
     blitzpayAutopayRiskExposureCents,
+    recurringRevenueCents,
+    annualRecurringRevenueCents,
+    delinquentMembershipRevenueCents,
+    renewalPipelineCents,
+    recoveredMembershipRevenueCents,
+    membershipAutoPayAdoptionBasisPoints,
+    churnRiskRevenueCents,
   }
 }

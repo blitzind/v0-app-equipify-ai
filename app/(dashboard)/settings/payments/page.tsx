@@ -502,7 +502,7 @@ function BlitzPaySettingsPageInner() {
     (!hasAccount || (onboardingComplete && chargesEnabled && !hasRequirementsDue))
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex w-full min-w-0 flex-col gap-6">
       <div>
         <h1 className="text-lg font-semibold text-foreground">Payments</h1>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
@@ -523,7 +523,7 @@ function BlitzPaySettingsPageInner() {
         </p>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <div className="w-full min-w-0 rounded-xl border border-border bg-card p-5 shadow-sm">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
             <Loader2 className="w-4 h-4 animate-spin" />

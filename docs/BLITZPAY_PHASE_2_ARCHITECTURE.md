@@ -904,6 +904,28 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **BlitzPay Ops** — recurring rollup renders when sampled orgs exist.  
 4. Customer portal: confirm no recurring-revenue API paths.
 
+### 12.25 Phase 2X (native memberships, service agreements ops, recurring invoice engine — deterministic)
+
+| Area | Details |
+|------|---------|
+| **Schema** | `blitzpay_memberships`, `blitzpay_membership_invoices` (link to `org_invoices`), `blitzpay_membership_payment_failures`, `blitzpay_membership_events`, `blitzpay_membership_retention_snapshots` — RLS aligned with other BlitzPay tables (`is_org_member` + authenticated read). `work_order_template_id` is optional UUID without FK until a canonical templates table exists. |
+| **Pure / server libs** | `blitzpay-memberships.ts` — bounded list/retention reads, billing period math, dashboard + reporting slice, event logging, health/churn wiring to `blitzpay-membership-health.ts`. `blitzpay-recurring-billing-engine.ts` — due-invoice generation with **idempotency** (`blitzpayMembershipInvoiceGenerationKeyV1`), duplicate prevention via membership-invoice link + key, capped due scans, failure retry + delinquency transitions, retention snapshot upsert. `blitzpay-platform-membership-rollup.ts` — capped org sample for ops. |
+| **Cron** | `POST /api/cron/blitzpay-memberships` — Bearer `CRON_SECRET`; runs engine tick (invoices, retries, delinquency, snapshots); schema drift guard. |
+| **Org APIs** | `GET/POST …/blitzpay/memberships`, `GET/PATCH …/memberships/[id]`, pause/resume/cancel/retry-payment, `GET …/membership-insights`, `GET …/retention-report`. Reads: financial reports **or** financials. Mutations: **invoice edit + financials** + schema guard. |
+| **Portal** | `GET /api/portal/memberships` + `GET …/[membershipId]` — renewal dates, included services summary from plan linkage when present, payment history via org invoices only; **no** internal analytics, **no** raw Stripe identifiers. |
+| **Reporting / command center** | Snapshot adds Phase 2X cents/bps (MRR, ARR, delinquent membership revenue, renewal pipeline, recovered membership revenue, autopay adoption bps, churn-risk revenue proxy). Financial command center tiles + drilldown to `/memberships`. |
+| **Platform** | `GET /api/platform/blitzpay/membership-rollup` — bounded org sample; BlitzPay Ops card. |
+| **UX** | Financial nav **Memberships** → dashboard; customer profile + work order + invoice drawers show membership context; invoice drawer calls `membership-insights?orgInvoiceId=` for “generated from membership” banner. |
+| **Tests** | `pnpm test:blitzpay-phase-2x` — migration presence, idempotency key, caps, billing math, route guards, portal isolation, schema-health table names. |
+
+#### Manual test checklist (Phase 2X)
+
+1. Financial role: **Financial → Memberships** — dashboard loads; metrics bounded.  
+2. Create/patch membership via org API or future form — next invoice scheduling advances after cron (staging).  
+3. Invoice linked to membership shows banner in invoice drawer.  
+4. Portal session: **memberships** list/detail — no Stripe IDs, no staff-only insight fields.  
+5. Cron: invoke with valid secret — no duplicate invoices for same period (idempotency).
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

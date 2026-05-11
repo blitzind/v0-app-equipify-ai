@@ -27,6 +27,20 @@ export function buildBlitzPayPaymentIntentIdempotencyKey(input: {
   return `blitzpay:pi:v1:${input.organizationId}:${input.orgInvoiceId}:${token}`
 }
 
+/** Deterministic membership-cycle invoice generation key (v1). */
+export function blitzpayMembershipInvoiceGenerationKeyV1(input: {
+  membershipId: string
+  billingPeriodStart: string
+  billingPeriodEnd: string
+  generatedBy: "scheduler" | "manual" | "renewal"
+}): string {
+  assertUuid(input.membershipId, "membershipId")
+  const a = String(input.billingPeriodStart).slice(0, 10)
+  const b = String(input.billingPeriodEnd).slice(0, 10)
+  const g = input.generatedBy
+  return `blitzpay:membership_inv:v1:${input.membershipId}:${a}:${b}:${g}`
+}
+
 export function buildBlitzPayQuotePaymentIntentIdempotencyKey(input: {
   organizationId: string
   orgQuoteId: string

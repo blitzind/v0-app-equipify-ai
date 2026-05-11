@@ -15,6 +15,7 @@ import {
   CalendarRange, Store, Package, Upload, Bell,
   Warehouse,
   CreditCard,
+  Repeat,
 } from "lucide-react"
 import Image from "next/image"
 import type { LucideIcon } from "lucide-react"
@@ -146,6 +147,12 @@ const ROUTE_META: Record<string, RouteMeta> = {
       "Track customer emails, reminders, delivery status, quote follow-ups, invoice notifications, and automated outreach activity.",
     icon: Bell,
   },
+  "/memberships": {
+    title: "Memberships & recurring agreements",
+    subtitle:
+      "Track service memberships, preventive agreements, renewal pipeline, autopilot coverage, and native recurring billing health.",
+    icon: Repeat,
+  },
   "/insights/financial-command-center": {
     title: "BlitzPay Financial Command Center",
     subtitle:
@@ -182,11 +189,13 @@ const FEATURE_ICON_HEX: Record<string, string> = {
   "/integrations": "#2563EB",
   "/communications": "#6366F1",
   "/insights/financial-command-center": "#16a34a",
+  "/memberships": "#059669",
 }
 
 function getFeatureIconColor(pathname: string): string {
   if (FEATURE_ICON_HEX[pathname]) return FEATURE_ICON_HEX[pathname]!
   if (pathname.startsWith("/insights/financial-command-center")) return "#16a34a"
+  if (pathname.startsWith("/memberships")) return "#059669"
   if (pathname.startsWith("/customers/")) return "#2563EB"
   if (pathname.startsWith("/technicians/today")) return "#4F46E5"
   if (pathname.startsWith("/work-orders/")) return "#22C55E"

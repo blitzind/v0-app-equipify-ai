@@ -12,6 +12,7 @@ import { buildOwnerScorecards, type OwnerScorecard } from "@/lib/blitzpay/blitzp
 import { fetchBlitzpayOrgRevenueIntelligence } from "@/lib/blitzpay/blitzpay-revenue-intelligence"
 import type { BlitzpayRevenueRecommendation } from "@/lib/blitzpay/blitzpay-revenue-recommendations"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
+import { fetchBlitzpayMembershipDashboard } from "@/lib/blitzpay/blitzpay-memberships"
 
 export type BlitzpayFinancialCommandCenterDrilldown = {
   href: string
@@ -48,6 +49,11 @@ export type BlitzpayFinancialCommandCenterPayload = {
     recurringStabilityScore0to100: number
     plannedRecurringInflow30dCents: number
     autopayAdoptionPct: number
+    membershipMrrCents: number
+    membershipDelinquentCount: number
+    membershipChurnRisk0to100: number
+    membershipOpenFailures: number
+    membershipRenewalPipelineCents: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -70,6 +76,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     payouts: { href: "/settings/payments#blitzpay-payout-ledger-anchor", label: "Payout ledger (Settings → Payments)" },
     disputes: { href: "/settings/payments", label: "Disputes & refunds (review in Payments / invoices)" },
     reports: { href: "/reports", label: "Operations reports" },
+    memberships: { href: "/memberships", label: "Memberships & agreements" },
   }
 }
 
@@ -82,9 +89,10 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
 
-  const [intelligence, reporting] = await Promise.all([
+  const [intelligence, reporting, membershipDash] = await Promise.all([
     fetchBlitzpayOrgRevenueIntelligence(admin, organizationId, { reportingWindowDays }),
     fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
+    fetchBlitzpayMembershipDashboard(admin, organizationId).catch(() => null),
   ])
 
   let stripePayoutsEnabled = false
@@ -189,6 +197,11 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       recurringStabilityScore0to100: d.recurringStabilityScore0to100,
       plannedRecurringInflow30dCents: d.recurringPlannedInflow30dCents,
       autopayAdoptionPct: d.autopayAdoptionPct,
+      membershipMrrCents: membershipDash?.mrrCents ?? 0,
+      membershipDelinquentCount: membershipDash?.delinquentCount ?? 0,
+      membershipChurnRisk0to100: membershipDash?.churnRiskScore0to100 ?? 0,
+      membershipOpenFailures: membershipDash?.openFailureCount ?? 0,
+      membershipRenewalPipelineCents: membershipDash?.renewalPipelineCents ?? 0,
     },
     combinedForecast,
     scorecards,

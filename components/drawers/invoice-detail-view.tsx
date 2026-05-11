@@ -4375,6 +4375,33 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
     if (!showFinancials && activeTab === "payments") setActiveTab("info")
   }, [showFinancials, activeTab])
 
+  const [membershipInvoiceLabel, setMembershipInvoiceLabel] = useState<string | null>(null)
+  useEffect(() => {
+    if (!organizationId || orgStatus !== "ready" || !(permissions.canViewFinancialReports || permissions.canViewFinancials)) {
+      setMembershipInvoiceLabel(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/membership-insights?orgInvoiceId=${encodeURIComponent(invoice.id)}`,
+          { credentials: "include", cache: "no-store" },
+        )
+        const j = (await res.json()) as { invoiceMembershipTag?: { membershipNumber: string } | null }
+        if (!res.ok || cancelled) return
+        const tag = j.invoiceMembershipTag
+        if (tag?.membershipNumber) setMembershipInvoiceLabel(tag.membershipNumber)
+        else setMembershipInvoiceLabel(null)
+      } catch {
+        if (!cancelled) setMembershipInvoiceLabel(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [organizationId, orgStatus, invoice.id, permissions.canViewFinancialReports, permissions.canViewFinancials])
+
   const DEVICES: { id: PreviewDevice; icon: React.ReactNode; label: string }[] = [
     { id: "mobile",  icon: <Smartphone className="w-3.5 h-3.5" />,  label: "Mobile" },
     { id: "tablet",  icon: <Tablet className="w-3.5 h-3.5" />,      label: "Tablet" },
@@ -4384,6 +4411,16 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
 
   return (
     <>
+      {membershipInvoiceLabel ? (
+        <div className="mx-5 mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-foreground">
+          <Badge variant="outline" className="text-[10px] font-semibold border-emerald-500/40 text-emerald-900 dark:text-emerald-100">
+            Membership billing
+          </Badge>
+          <span className="text-muted-foreground">
+            Generated from recurring membership <span className="font-medium text-foreground">{membershipInvoiceLabel}</span>
+          </span>
+        </div>
+      ) : null}
       {/* ── Top action bar ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] flex-wrap shrink-0">
         {editing ? (

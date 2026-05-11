@@ -48,6 +48,11 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_payment_plan_installments", select: "id, payment_plan_id" },
   { name: "blitzpay_vendor_payables", select: "id, organization_id, status" },
   { name: "blitzpay_vendor_payouts", select: "id, organization_id, vendor_payable_id" },
+  { name: "blitzpay_memberships", select: "id, organization_id, status" },
+  { name: "blitzpay_membership_invoices", select: "id, membership_id, org_invoice_id" },
+  { name: "blitzpay_membership_payment_failures", select: "id, membership_id, recovery_status" },
+  { name: "blitzpay_membership_events", select: "id, membership_id, event_type" },
+  { name: "blitzpay_membership_retention_snapshots", select: "id, organization_id, snapshot_date" },
 ]
 
 export type BlitzpaySchemaHealthResult =
