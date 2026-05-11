@@ -45,6 +45,15 @@ function testMetadata() {
   const parsed = parseBlitzpayInvoiceMetadata(m)
   assert.equal(parsed?.organizationId, org)
   assert.equal(parsed?.orgInvoiceId, inv)
+  assert.equal(parsed?.paymentSource, null)
+
+  const mPortal = blitzpayInvoicePaymentMetadata({
+    organizationId: org,
+    orgInvoiceId: inv,
+    feePolicyVersion: "blitzpay_fees_v1",
+    paymentSource: "customer_portal",
+  })
+  assert.equal(parseBlitzpayInvoiceMetadata(mPortal)?.paymentSource, "customer_portal")
 }
 
 function testIdempotency() {

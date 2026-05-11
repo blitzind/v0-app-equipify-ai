@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getPortalBlitzpayHostedCheckoutEligibility } from "@/lib/blitzpay/portal-blitzpay-checkout-eligibility"
 import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { buildPortalInvoicePaymentSummary } from "@/lib/portal/invoice-payment-summary"
@@ -288,6 +289,8 @@ export async function GET(
     billing_country: inv.billing_country as string | null | undefined,
   })
 
+  const blitzpayHostedCheckout = await getPortalBlitzpayHostedCheckoutEligibility(svc, orgId)
+
   return NextResponse.json({
     invoice: {
       id: inv.id as string,
@@ -324,5 +327,6 @@ export async function GET(
     workOrders: workOrdersOut,
     certificates,
     timeline,
+    blitzpayHostedCheckout,
   })
 }

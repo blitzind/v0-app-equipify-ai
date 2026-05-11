@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getPortalBlitzpayHostedCheckoutEligibility } from "@/lib/blitzpay/portal-blitzpay-checkout-eligibility"
 import { pickPreferredDocumentLogoUrl } from "@/lib/organization/document-branding"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 
@@ -52,6 +53,8 @@ export async function GET() {
   const portalPrimaryColorRaw = orgRow?.primary_color != null ? String(orgRow.primary_color).trim() : ""
   const portalPrimaryColor = portalPrimaryColorRaw.length > 0 ? portalPrimaryColorRaw : null
 
+  const blitzpayHostedCheckout = await getPortalBlitzpayHostedCheckoutEligibility(svc, portalUser.organization_id)
+
   return NextResponse.json({
     portalUserId: portalUser.id,
     organizationId: portalUser.organization_id,
@@ -65,7 +68,7 @@ export async function GET() {
     portalPrimaryColor,
     customerCompanyName: (customer as { company_name?: string } | null)?.company_name ?? "Customer",
     features: {
-      onlinePayments: false,
+      onlinePayments: blitzpayHostedCheckout.hostedCheckoutAvailable,
     },
   })
 }

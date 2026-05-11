@@ -1,6 +1,6 @@
 import "server-only"
 
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getPublicAppOrigin } from "@/lib/email/config"
 import { createBlitzpayInvoiceCheckoutSession } from "@/lib/blitzpay/connect-stripe"
@@ -23,6 +23,7 @@ import {
 import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
 import { DEFAULT_BLITZPAY_FEE_POLICY_VERSION } from "@/lib/blitzpay/payment-domain"
+import type { BlitzpayInvoicePayChannel } from "@/lib/blitzpay/payment-domain"
 
 export type PrepareBlitzpayInvoicePayResult = {
   url: string
@@ -31,24 +32,88 @@ export type PrepareBlitzpayInvoicePayResult = {
   blitzpayPaymentIntentRowId: string
 }
 
+type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
+  admin: SupabaseClient
+  organizationId: string
+  invoiceId: string
+  initiatedBy: "staff_dashboard"
+  userId: string
+}
+
+type PrepareBlitzpayInvoiceHostedCheckoutPortalInput = {
+  admin: SupabaseClient
+  organizationId: string
+  invoiceId: string
+  initiatedBy: "customer_portal"
+  portalUserId: string
+  portalCustomerId: string
+  returnUrls: { successUrl: string; cancelUrl: string }
+}
+
+export type PrepareBlitzpayInvoiceHostedCheckoutInput =
+  | PrepareBlitzpayInvoiceHostedCheckoutStaffInput
+  | PrepareBlitzpayInvoiceHostedCheckoutPortalInput
+
 function errCode(e: unknown): string {
   return e instanceof Error ? e.message : "prepare_failed"
 }
 
-export async function prepareBlitzpayInvoiceHostedCheckout(params: {
-  admin: SupabaseClient
-  organizationId: string
-  invoiceId: string
-  userId: string
-}): Promise<{ ok: true; data: PrepareBlitzpayInvoicePayResult } | { ok: false; status: number; code: string; message: string }> {
+function buildPreparePayAttemptToken(input: PrepareBlitzpayInvoiceHostedCheckoutInput): string {
+  const nonce = randomUUID().replace(/-/g, "")
+  if (input.initiatedBy === "staff_dashboard") {
+    return randomUUID()
+  }
+  const h = createHash("sha256")
+    .update(`blitzpay_portal_prepare:${input.portalUserId}:${nonce}`)
+    .digest("hex")
+    .slice(0, 24)
+  return `pt_${h}_${nonce}`
+}
+
+function rateLimitPrincipalId(input: PrepareBlitzpayInvoiceHostedCheckoutInput): string {
+  if (input.initiatedBy === "staff_dashboard") {
+    return input.userId
+  }
+  return `portal:${input.portalUserId}`
+}
+
+function paymentSourceForMetadata(
+  input: PrepareBlitzpayInvoiceHostedCheckoutInput,
+): "staff_dashboard" | "customer_portal" {
+  return input.initiatedBy === "staff_dashboard" ? "staff_dashboard" : "customer_portal"
+}
+
+function attemptChannel(input: PrepareBlitzpayInvoiceHostedCheckoutInput): BlitzpayInvoicePayChannel {
+  return input.initiatedBy === "staff_dashboard" ? "checkout" : "portal_link"
+}
+
+function createdByUserId(input: PrepareBlitzpayInvoiceHostedCheckoutInput): string | null {
+  return input.initiatedBy === "staff_dashboard" ? input.userId : null
+}
+
+function portalAccessContext(
+  input: PrepareBlitzpayInvoiceHostedCheckoutInput,
+): Record<string, unknown> | null {
+  if (input.initiatedBy !== "customer_portal") return null
+  return {
+    payment_channel: "customer_portal",
+    portal_user_id: input.portalUserId,
+  }
+}
+
+export async function prepareBlitzpayInvoiceHostedCheckout(
+  input: PrepareBlitzpayInvoiceHostedCheckoutInput,
+): Promise<{ ok: true; data: PrepareBlitzpayInvoicePayResult } | { ok: false; status: number; code: string; message: string }> {
+  const { admin, organizationId, invoiceId } = input
+
   if (!isBlitzPayInvoicePayEnabledEnv()) {
     return { ok: false, status: 403, code: "feature_disabled", message: "BlitzPay invoice pay is not enabled for this deployment." }
   }
 
-  const rate = await tryConsumeBlitzpayPreparePaySlots(params.admin, {
-    organizationId: params.organizationId,
-    invoiceId: params.invoiceId,
-    userId: params.userId,
+  const rate = await tryConsumeBlitzpayPreparePaySlots(admin, {
+    organizationId,
+    invoiceId,
+    userId: rateLimitPrincipalId(input),
   })
   if (!rate.ok) {
     return {
@@ -59,7 +124,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
     }
   }
 
-  const settings = await fetchBlitzpayOrgSettingsRow(params.admin, params.organizationId)
+  const settings = await fetchBlitzpayOrgSettingsRow(admin, organizationId)
   if (!settings || !(settings as { blitzpay_invoice_pay_enabled?: boolean }).blitzpay_invoice_pay_enabled) {
     return {
       ok: false,
@@ -69,10 +134,10 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
     }
   }
 
-  const { data: orgRow, error: orgErr } = await params.admin
+  const { data: orgRow, error: orgErr } = await admin
     .from("organizations")
     .select("stripe_connect_account_id, stripe_charges_enabled, stripe_connect_status")
-    .eq("id", params.organizationId)
+    .eq("id", organizationId)
     .maybeSingle()
 
   if (orgErr || !orgRow) {
@@ -90,12 +155,16 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
     }
   }
 
-  const inv = await loadInvoiceForBlitzpayPay(params.admin, params.organizationId, params.invoiceId)
+  const inv = await loadInvoiceForBlitzpayPay(admin, organizationId, invoiceId)
   if (!inv) {
     return { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." }
   }
 
-  const paidSum = await sumRecordedPaymentsCents(params.admin, params.organizationId, params.invoiceId)
+  if (input.initiatedBy === "customer_portal" && inv.customer_id !== input.portalCustomerId) {
+    return { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." }
+  }
+
+  const paidSum = await sumRecordedPaymentsCents(admin, organizationId, invoiceId)
   try {
     assertInvoicePayableForBlitzpay(inv, paidSum)
   } catch (e) {
@@ -151,23 +220,31 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
   }
 
   const applicationFeeCents = Number(breakdown.computedTotalApplicationFeeCents)
-  const attemptToken = randomUUID()
+  const attemptToken = buildPreparePayAttemptToken(input)
   const idempotencyKey = buildBlitzPayPaymentIntentIdempotencyKey({
-    organizationId: params.organizationId,
-    orgInvoiceId: params.invoiceId,
+    organizationId,
+    orgInvoiceId: invoiceId,
     attemptToken,
   })
 
   const feeVersion = DEFAULT_BLITZPAY_FEE_POLICY_VERSION
+  const paySrc = paymentSourceForMetadata(input)
   const meta = blitzpayInvoicePaymentMetadata({
-    organizationId: params.organizationId,
-    orgInvoiceId: params.invoiceId,
+    organizationId,
+    orgInvoiceId: invoiceId,
     feePolicyVersion: feeVersion,
+    paymentSource: paySrc,
   })
 
   const origin = getPublicAppOrigin().replace(/\/+$/, "")
-  const successUrl = `${origin}/invoices?blitzpay=1&status=success&invoiceId=${encodeURIComponent(params.invoiceId)}`
-  const cancelUrl = `${origin}/invoices?blitzpay=1&status=cancel&invoiceId=${encodeURIComponent(params.invoiceId)}`
+  const successUrl =
+    input.initiatedBy === "customer_portal" ?
+      input.returnUrls.successUrl
+    : `${origin}/invoices?blitzpay=1&status=success&invoiceId=${encodeURIComponent(invoiceId)}`
+  const cancelUrl =
+    input.initiatedBy === "customer_portal" ?
+      input.returnUrls.cancelUrl
+    : `${origin}/invoices?blitzpay=1&status=cancel&invoiceId=${encodeURIComponent(invoiceId)}`
 
   const productName = `Invoice ${inv.invoice_number} — ${inv.title}`.slice(0, 120)
 
@@ -187,7 +264,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    console.error(JSON.stringify({ source: "blitzpay-prepare-pay", message: msg, organizationId: params.organizationId }))
+    console.error(JSON.stringify({ source: "blitzpay-prepare-pay", message: msg, organizationId }))
     return {
       ok: false,
       status: 502,
@@ -203,12 +280,12 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
   }
 
   const internalPiId = randomUUID()
-  const attemptNo = await nextBlitzpayInvoicePaymentAttemptNo(params.admin, params.organizationId, params.invoiceId)
+  const attemptNo = await nextBlitzpayInvoicePaymentAttemptNo(admin, organizationId, invoiceId)
 
   try {
-    await createBlitzpayPaymentIntentRecord(params.admin, {
+    await createBlitzpayPaymentIntentRecord(admin, {
       id: internalPiId,
-      organizationId: params.organizationId,
+      organizationId,
       stripeConnectAccountId: acct,
       stripePaymentIntentId: stripePiId,
       stripeCheckoutSessionId: session.id,
@@ -218,25 +295,26 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
       applicationFeeCents: breakdown.computedTotalApplicationFeeCents,
       convenienceFeeCents: 0n,
       invoiceAmountCents: BigInt(balanceDue),
-      orgInvoiceId: params.invoiceId,
+      orgInvoiceId: invoiceId,
       customerId: inv.customer_id,
       idempotencyKey,
       metadata: { ...meta, stripe_checkout_session_id: session.id },
     })
 
-    await createBlitzpayFeeSnapshot(params.admin, {
-      organizationId: params.organizationId,
+    await createBlitzpayFeeSnapshot(admin, {
+      organizationId,
       blitzpayPaymentIntentId: internalPiId,
       feeInputs,
     })
 
-    await createBlitzpayInvoicePaymentAttempt(params.admin, {
-      organizationId: params.organizationId,
-      orgInvoiceId: params.invoiceId,
+    await createBlitzpayInvoicePaymentAttempt(admin, {
+      organizationId,
+      orgInvoiceId: invoiceId,
       blitzpayPaymentIntentId: internalPiId,
       attemptNo,
-      channel: "checkout",
-      createdByUserId: params.userId,
+      channel: attemptChannel(input),
+      createdByUserId: createdByUserId(input),
+      portalAccessContext: portalAccessContext(input),
       status: "initiated",
     })
   } catch (e) {
@@ -246,7 +324,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(params: {
         source: "blitzpay-prepare-pay",
         phase: "db_after_stripe",
         message: msg,
-        organizationId: params.organizationId,
+        organizationId,
         stripeCheckoutSessionId: session.id,
       }),
     )

@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { use, useEffect, useState } from "react"
-import { ChevronLeft, Clock, Download, Lock, Receipt, ShieldCheck } from "lucide-react"
+import { Suspense, use, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ChevronLeft, Clock, Download, ExternalLink, Loader2, Lock, Receipt, ShieldCheck } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { ServiceLifecycleTimeline } from "@/components/lifecycle/service-lifecycle-timeline"
 import type { ServiceTimelineEvent } from "@/lib/lifecycle/service-timeline"
 import { invoiceTermsCodeLabel } from "@/lib/billing/invoice-terms"
@@ -46,7 +48,13 @@ type PortalInvoiceLine = {
   itemType: string | null
 }
 
+type PortalBlitzpayHostedCheckoutPayload = {
+  hostedCheckoutAvailable: boolean
+  unavailableReason: "feature_disabled" | "org_disabled" | "connect_not_ready" | null
+}
+
 type DetailPayload = {
+  blitzpayHostedCheckout?: PortalBlitzpayHostedCheckoutPayload
   invoice: {
     id: string
     invoiceNumber: string
@@ -81,10 +89,42 @@ type DetailPayload = {
   timeline: ServiceTimelineEvent[]
 }
 
-export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ invoiceId: string }> }) {
+function blitzpayUnavailableCopy(reason: PortalBlitzpayHostedCheckoutPayload["unavailableReason"]): string {
+  if (reason === "feature_disabled") {
+    return "Online card payment is not enabled for this deployment."
+  }
+  if (reason === "org_disabled") {
+    return "Your service provider has not turned on BlitzPay online payments for invoices."
+  }
+  if (reason === "connect_not_ready") {
+    return "Your service provider’s BlitzPay account is not ready to accept charges yet. Try again later or use another payment method."
+  }
+  return "Online payment is not available right now."
+}
+
+function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = use(params)
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [data, setData] = useState<DetailPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [blitzpayReturnMessage, setBlitzpayReturnMessage] = useState<string | null>(null)
+  const [prepareError, setPrepareError] = useState<string | null>(null)
+  const [blitzpayBusy, setBlitzpayBusy] = useState(false)
+
+  useEffect(() => {
+    const b = searchParams.get("blitzpay")
+    const st = searchParams.get("status")
+    if (b !== "1" || (st !== "success" && st !== "cancel")) return
+    if (st === "success") {
+      setBlitzpayReturnMessage(
+        "Payment submitted. This page will refresh when your provider’s records update — usually within a minute after Stripe confirms.",
+      )
+    } else {
+      setBlitzpayReturnMessage("Checkout was canceled. You can try again when you are ready.")
+    }
+    router.replace(`/portal/invoices/${invoiceId}`, { scroll: false })
+  }, [searchParams, router, invoiceId])
 
   useEffect(() => {
     fetch(`/api/portal/invoices/${invoiceId}`)
@@ -130,6 +170,13 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
   const subtotalCents = inv.subtotalCents ?? inv.amountCents
   const taxCents = inv.taxCents
   const showTax = taxCents != null && taxCents > 0
+
+  const blitzpay = data.blitzpayHostedCheckout
+  const stRaw = String(inv.status || "").toLowerCase()
+  const fullyPaid = balanceDue <= 0 || stRaw === "paid"
+  const blockedStatus = stRaw === "draft" || stRaw === "void"
+  const meetsCardMinimum = balanceDue >= 50
+  const workspaceReady = blitzpay?.hostedCheckoutAvailable === true
 
   return (
     <div className="space-y-6">
@@ -331,6 +378,87 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
         ) : null}
       </div>
 
+      {blitzpay ? (
+        <div className="portal-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            Pay online (BlitzPay)
+          </h2>
+          {blitzpayReturnMessage ? (
+            <p
+              className="text-sm rounded-md border px-3 py-2 leading-relaxed"
+              style={{
+                borderColor: "var(--portal-accent)",
+                background: "var(--portal-accent-muted)",
+                color: "var(--portal-foreground)",
+              }}
+            >
+              {blitzpayReturnMessage}
+            </p>
+          ) : null}
+          {prepareError ? <p className="text-sm text-destructive">{prepareError}</p> : null}
+          <p className="text-xs leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
+            Secure card payment through Stripe Checkout on your service provider&apos;s connected account. Final
+            confirmation may take a moment after you return from Stripe.
+          </p>
+          {fullyPaid ? (
+            <p className="text-sm font-medium" style={{ color: "var(--portal-success)" }}>
+              This invoice is already paid — no balance is due.
+            </p>
+          ) : blockedStatus ? (
+            <p className="text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              This invoice cannot be paid online in its current status.
+            </p>
+          ) : !workspaceReady ? (
+            <p className="text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              {blitzpayUnavailableCopy(blitzpay.unavailableReason)}
+            </p>
+          ) : !meetsCardMinimum ? (
+            <p className="text-sm" style={{ color: "var(--portal-nav-text)" }}>
+              The balance due is below the online card minimum (USD 0.50). Contact your service provider for other
+              payment options.
+            </p>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                className="w-fit gap-1.5"
+                disabled={blitzpayBusy}
+                onClick={() => {
+                  setPrepareError(null)
+                  void (async () => {
+                    setBlitzpayBusy(true)
+                    try {
+                      const res = await fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay`, {
+                        method: "POST",
+                        credentials: "include",
+                      })
+                      const body = (await res.json()) as { error?: string; message?: string; url?: string }
+                      if (!res.ok) {
+                        setPrepareError(body.message ?? body.error ?? "Could not start BlitzPay checkout.")
+                        return
+                      }
+                      if (body.url) {
+                        window.location.assign(body.url)
+                      } else {
+                        setPrepareError("Checkout URL missing. Please try again.")
+                      }
+                    } catch (e) {
+                      setPrepareError(e instanceof Error ? e.message : "Network error.")
+                    } finally {
+                      setBlitzpayBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {blitzpayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                Pay with BlitzPay
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {data.timeline.length > 0 ? (
         <div>
           <h2 className="text-sm font-semibold mb-2" style={{ color: "var(--portal-foreground)" }}>
@@ -469,5 +597,19 @@ export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ 
         ) : null}
       </p>
     </div>
+  )
+}
+
+export default function PortalInvoiceDetailPage({ params }: { params: Promise<{ invoiceId: string }> }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="portal-card py-20 text-center text-sm" style={{ color: "var(--portal-nav-text)" }}>
+          Loading invoice…
+        </div>
+      }
+    >
+      <PortalInvoiceDetailPageInner params={params} />
+    </Suspense>
   )
 }

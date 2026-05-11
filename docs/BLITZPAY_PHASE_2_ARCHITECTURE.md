@@ -452,12 +452,34 @@ Use this as a **checklist** when coding — not exhaustive.
 | **UI** | Minimal: invoice Payments tab — “Pay with BlitzPay (hosted)” when permitted (`components/drawers/invoice-detail-view.tsx`). |
 | **Tests** | `pnpm test:blitzpay-phase-2b` (`scripts/test-blitzpay-phase-2b.ts`) — eligibility, metadata, idempotency key shape, fee math. |
 
-### 12.3 Phase 2C (next)
+### 12.3 Phase 2C (shipped in repo) — customer portal hosted Checkout
 
-- Customer **portal** token-gated pay session; payment history list.  
-- Refund/dispute handling beyond stubs; admin diagnostics if needed.  
-- Payout visibility, richer failed-payment UX, async inbox worker hardening per `docs/SCALE_READINESS_AUDIT.md` where BlitzPay-specific.
+| Area | Details |
+|------|---------|
+| **API** | `POST /api/portal/invoices/[invoiceId]/blitzpay/prepare-pay` — **no staff session**; `requirePortalSession()` + org/customer from `portal_users`; invoice must match portal `customer_id` (wrong id → **404** “Invoice not found.” to avoid enumeration). Same Stripe Checkout + DB persistence path as 2B via `prepareBlitzpayInvoiceHostedCheckout` (`lib/blitzpay/blitzpay-prepare-invoice-pay.ts`). |
+| **Return URLs** | Success: `/portal/invoices/{id}?blitzpay=1&status=success`. Cancel: same with `status=cancel`. Built with `getPublicAppOrigin()`. |
+| **Metadata / attempts** | Stripe metadata includes `payment_source` = `customer_portal` (staff flow uses `staff_dashboard`). `blitzpay_invoice_payment_attempts.channel` = `portal_link`; `created_by_user_id` null; `portal_access_context` json `{ payment_channel, portal_user_id }`. |
+| **Idempotency** | Same `blitzpay:pi:v1:{org}:{invoice}:{attemptToken}` format; portal uses `attemptToken` = `pt_{sha256…24}{nonce}` derived from `blitzpay_portal_prepare:{portalUserId}:{nonce}` so keys are unique per attempt without embedding the portal session cookie. |
+| **Rate limits** | Reuses `tryConsumeBlitzpayPreparePaySlots` with principal `portal:{portalUserId}` for the per-principal bucket (distinct from staff auth user ids). |
+| **UI** | `app/(portal)/portal/invoices/[invoiceId]/page.tsx` — “Pay online (BlitzPay)” card: pay when eligible, disabled copy when org/env/Connect gates fail, already-paid / draft+void / sub-minimum states, inline error when prepare fails, return banners after Stripe redirect. |
+| **Bootstrap** | `GET /api/portal/bootstrap` sets `features.onlinePayments` when hosted Checkout is available for the workspace (same eligibility helper as invoice detail). |
+| **Invoice JSON** | `GET /api/portal/invoices/[invoiceId]` includes `blitzpayHostedCheckout` from `getPortalBlitzpayHostedCheckoutEligibility`. |
+| **Tests** | `pnpm test:blitzpay-phase-2c-portal` — portal idempotency token shape + `customer_portal` metadata round-trip. |
+
+#### Manual test checklist (Phase 2C)
+
+1. Enable `BLITZPAY_INVOICE_PAY_ENABLED=true`, org `blitzpay_invoice_pay_enabled`, and a Connect account with `stripe_charges_enabled` (test mode).  
+2. Sign in to the **customer portal** as a contact with access to a customer that has a **sent** (or similar payable) invoice with balance due **≥ $0.50**.  
+3. Open **Invoices → invoice detail**; confirm “Pay online (BlitzPay)” shows **Pay with BlitzPay**.  
+4. Click pay → redirect to Stripe Checkout (connected account); complete or cancel.  
+5. **Success:** land on portal invoice without query string noise; banner explains confirmation delay; after webhook, balance / payment status update (same as staff-paid flow).  
+6. **Cancel:** return to same invoice; banner indicates cancel.  
+7. With BlitzPay org pay **disabled** or Connect **not ready**, confirm explanatory disabled copy (no pay button).  
+8. Open an invoice id that belongs to **another** customer (same org): expect **404** on GET and prepare-pay.  
+9. Staff invoice Payments tab **Pay with BlitzPay (hosted)** still works unchanged.
+
+**Deferred (not Phase 2C):** portal payment history list, refunds/disputes beyond webhook stubs, payout UI.
 
 ---
 
-*Phase 2A–2B vertical slice for hosted invoice pay is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2C vertical slice for hosted invoice pay (staff + portal) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

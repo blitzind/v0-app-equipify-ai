@@ -60,6 +60,7 @@ function testMetadata() {
   })
   assert.equal(m.purpose, BLITZPAY_METADATA_PURPOSE_INVOICE)
   assert.equal(parseBlitzpayInvoiceMetadata(m)?.organizationId, org)
+  assert.equal(parseBlitzpayInvoiceMetadata(m)?.paymentSource, null)
   assert.equal(parseBlitzpayInvoiceMetadata({ purpose: "other" }), null)
 }
 

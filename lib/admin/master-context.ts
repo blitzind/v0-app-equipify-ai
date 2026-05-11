@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T17:22:47.542Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T17:28:48.177Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -79,6 +79,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Phase 63.9 — Sample data removal UX:** **Settings → Sample data** destructive flow uses the confirmation phrase **REMOVE SAMPLE DATA** (\`lib/demo-data/remove-sample-confirmation.ts\`, shared with \`POST /api/demo-data/reset\`), **Remove sample data** button labeling, controlled \`AlertDialog\` close (block cancel/escape while the POST runs), and a success toast fed by \`resetSampleDataForOrganization\` summary counts.
 - **Phase 64.1 — BlitzPay Connect onboarding (Phase 1):** **Stripe Connect Express** (US, \`card_payments\` + \`transfers\` requested) stored on \`organizations\` (\`stripe_connect_account_id\`, status + requirements jsonb, \`last_stripe_connect_sync_at\`). APIs: \`GET/POST /api/organizations/{id}/blitzpay/{status,enable,sync,account-link}\` (owner/admin + platform admin for writes). **Webhook:** \`POST /api/blitzpay/webhook\` + \`blitzpay_stripe_webhook_events\` + \`STRIPE_BLITZPAY_WEBHOOK_SECRET\`; handles \`account.updated\` only. **UI:** Settings → **Payments** (\`/settings/payments\`). SaaS \`/api/stripe/webhook\` unchanged. Doc: \`docs/BLITZPAY_PHASE_1.md\`.
 - **Phase 64.2 — BlitzPay Phase 2A (payment foundation):** Migrations add \`blitzpay_org_settings\`, \`blitzpay_payment_intents\`, \`blitzpay_invoice_payment_attempts\`, \`blitzpay_fee_snapshots\`, \`blitzpay_ledger_entries\`, \`blitzpay_webhook_inbox\` (RLS: org members **read** payment tables; inbox service-role only). **Webhook** same endpoint now routes \`payment_intent.*\`, \`checkout.session.completed\`, \`charge.refunded\`, \`charge.dispute.created\` — inbox + mirror PI status updates; **no** \`org_invoice_payments\` allocation yet. **Libs:** \`lib/blitzpay/payment-repository.ts\`, \`fees.ts\`, \`stripe-metadata.ts\`, \`idempotency-keys.ts\`, etc. **Env:** \`BLITZPAY_INVOICE_PAY_ENABLED\` (global gate, default off). Doc: \`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md\` §12.
+- **Phase 64.3 — BlitzPay Phase 2B–2C hosted invoice pay:** Shared \`prepareBlitzpayInvoiceHostedCheckout\` (\`lib/blitzpay/blitzpay-prepare-invoice-pay.ts\`) powers **staff** \`POST /api/organizations/{org}/invoices/{id}/blitzpay/prepare-pay\` (metadata \`payment_source=staff_dashboard\`, attempt channel \`checkout\`) and **customer portal** \`POST /api/portal/invoices/{id}/blitzpay/prepare-pay\` (\`requirePortalSession\`, invoice must match portal customer; \`payment_source=customer_portal\`, channel \`portal_link\`, return URLs under \`/portal/invoices/...\`). Stripe Checkout on the **connected account** with \`application_fee_amount\`; webhook completion idempotently writes \`org_invoice_payments\` + ledger (Phase 2B). Portal invoice UI + bootstrap \`features.onlinePayments\`. Doc: \`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md\` §12.2–12.3.
 
 ## Multi-Tenant Data Model
 - **Organizations:** \`organizations\` — tenant root; branding/workspace settings on org rows and related tables.

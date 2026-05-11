@@ -13,6 +13,7 @@
     "test:blitzpay-onboarding-errors": "tsx scripts/test-blitzpay-onboarding-errors.ts",
     "test:blitzpay-phase-2a": "tsx scripts/test-blitzpay-phase-2a-foundation.ts",
     "test:blitzpay-phase-2b": "tsx scripts/test-blitzpay-phase-2b.ts",
+    "test:blitzpay-phase-2c-portal": "tsx scripts/test-blitzpay-phase-2c-portal.ts",
     "ai:evals": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ai-evals.ts",
     "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs",
     "update:master-context": "tsx scripts/update-master-context.ts"

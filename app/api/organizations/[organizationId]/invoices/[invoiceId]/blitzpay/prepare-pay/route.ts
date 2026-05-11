@@ -27,6 +27,7 @@ export async function POST(
     admin,
     organizationId,
     invoiceId,
+    initiatedBy: "staff_dashboard",
     userId: gate.userId,
   })
 

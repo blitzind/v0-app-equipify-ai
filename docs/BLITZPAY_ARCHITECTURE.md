@@ -1,6 +1,6 @@
 # BlitzPay / Equipify Payments — architecture (Phase 54.3)
 
-Design document for BlitzPay / Connect. **Phase 1 (see `docs/BLITZPAY_PHASE_1.md`)** implements **Stripe Connect Express onboarding only** (org columns, Account Links, `/api/blitzpay/webhook` for `account.updated`). **No** customer invoice checkout, **no** application fees, **no** card/ACH collection in product flows yet.  
+Design document for BlitzPay / Connect. **Phase 1** (`docs/BLITZPAY_PHASE_1.md`) implements **Stripe Connect Express onboarding**. **Phases 2A–2C** (`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12) add hosted **Stripe Checkout** for **org invoices** on the **connected account** (staff dashboard + **customer portal**), `application_fee_amount`, webhook-driven `org_invoice_payments`, fee snapshots, and ledger rows.  
 SaaS subscription billing stays on the existing platform Stripe account and `/api/stripe/webhook` flow (Phases 54.1–54.2) — **unchanged**.
 
 ---
@@ -37,10 +37,11 @@ SaaS subscription billing stays on the existing platform Stripe account and `/ap
 |--------|------|
 | `org_invoices` | Invoice totals, `status`, `paid_at`, portal exposure |
 | `org_invoice_payments` (Phase 38 migration) | **Staff-recorded** payments: cash, check, ACH, wire, card (label only), etc. — **no processor** |
-| `components/drawers/invoice-detail-view.tsx` → `PaymentModal` | “Record payment” writes to `org_invoice_payments`; **no Stripe charge** |
+| `components/drawers/invoice-detail-view.tsx` | “Record payment” (`PaymentModal`) writes to `org_invoice_payments`; **BlitzPay (hosted)** starts Checkout on the connected account (staff). |
+| `app/(portal)/portal/invoices/[invoiceId]/page.tsx` + `POST /api/portal/invoices/[invoiceId]/blitzpay/prepare-pay` | Portal cookie session; same prepare pipeline as staff; return URLs under `/portal/invoices/...`. |
 | `lib/billing/invoice-payment-allocation.ts` + repository | Balance / paid / partial pay logic |
-| `app/api/invoices/send-email/route.ts`, `app/api/email/invoice/route.ts` | Email invoice to customer; copy may mention “pay via link” as **product language only** — **no payment link is created in code today** |
-| Portal `app/api/portal/invoices/*` | Read-only invoice list/detail including `paid_at` |
+| `app/api/invoices/send-email/route.ts`, `app/api/email/invoice/route.ts` | Email invoice to customer |
+| Portal `app/api/portal/invoices/*` | Invoice list/detail including balances; **prepare-pay** when BlitzPay is enabled |
 
 ### QuickBooks
 
@@ -49,7 +50,7 @@ SaaS subscription billing stays on the existing platform Stripe account and `/ap
 | OAuth + sync | `organization_integration_oauth_tokens`, QuickBooks invoice sync |
 | `lib/integrations/quickbooks/invoice-inbound-reconcile.ts`, `apply-inbound-paid` | When QB shows paid, can **mark Equipify invoice paid**; reconciles with recorded payments |
 
-**Gap:** There is **no** PaymentIntent, **no** Connect account id on organizations, **no** hosted pay link for `org_invoices`, and **no** application fee pipeline for end-customer payments.
+**Remaining gaps:** Refunds/disputes beyond webhook stubs, richer pay failure UX, portal payment history — see `docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` and `docs/BLITZPAY_REMAINING_PHASES_ROADMAP.md`.
 
 ---
 
