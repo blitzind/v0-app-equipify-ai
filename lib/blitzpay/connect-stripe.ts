@@ -107,3 +107,29 @@ export async function createBlitzpayInvoiceCheckoutSession(params: {
     },
   )
 }
+
+/** Refund a charge on the connected account; set `refundApplicationFee` so platform fee reverses with Stripe rules. */
+export async function createBlitzpayConnectRefund(params: {
+  stripeConnectAccountId: string
+  chargeId: string
+  /** Omit for full remaining charge refund (Stripe default). */
+  amountCents?: number
+  idempotencyKey: string
+  refundApplicationFee: boolean
+}): Promise<Stripe.Refund> {
+  const stripe = getStripe()
+  const body: Stripe.RefundCreateParams = {
+    charge: params.chargeId,
+    refund_application_fee: params.refundApplicationFee,
+  }
+  if (params.amountCents != null) {
+    if (!Number.isInteger(params.amountCents) || params.amountCents < 1) {
+      throw new Error("amountCents must be a positive integer when provided.")
+    }
+    body.amount = params.amountCents
+  }
+  return stripe.refunds.create(body, {
+    stripeAccount: params.stripeConnectAccountId,
+    idempotencyKey: params.idempotencyKey,
+  })
+}

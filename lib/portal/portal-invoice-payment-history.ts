@@ -49,6 +49,23 @@ function referenceDisplayForPortal(reference: string | null | undefined): string
   return r.length > 120 ? `${r.slice(0, 117)}…` : r
 }
 
+/** Customer-safe refund line (no Stripe refund or dispute ids). */
+export function mapBlitzpayRefundToPortalHistory(row: {
+  amount_cents: number | string
+  applied_on: string | null
+}): PortalInvoicePaymentHistoryItem {
+  const cents = Math.round(Number(row.amount_cents))
+  const rawDate = (row.applied_on ?? "").trim().slice(0, 10)
+  const paidOn = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : new Date().toISOString().slice(0, 10)
+  return {
+    paidOn,
+    amountCents: -Math.abs(Number.isFinite(cents) ? cents : 0),
+    methodLabel: "Card refund (BlitzPay)",
+    referenceDisplay: null,
+    statusLabel: "Refunded",
+  }
+}
+
 export function mapOrgInvoicePaymentRowToPortalHistory(row: {
   paid_on: string
   amount_cents: number | string

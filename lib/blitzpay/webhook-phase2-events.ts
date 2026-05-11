@@ -11,6 +11,8 @@ export const BLITZPAY_PHASE2_WEBHOOK_EVENT_TYPES = new Set([
   "checkout.session.completed",
   "charge.refunded",
   "charge.dispute.created",
+  "charge.dispute.updated",
+  "charge.dispute.closed",
 ])
 
 export function isBlitzPayPhase2WebhookEventType(eventType: string): boolean {

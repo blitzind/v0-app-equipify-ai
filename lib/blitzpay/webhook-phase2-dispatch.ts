@@ -9,6 +9,8 @@ import {
   completeBlitzpayPaymentIntentFailed,
   completeBlitzpayPaymentIntentSucceeded,
 } from "@/lib/blitzpay/webhook-invoice-pay-completion"
+import { dispatchBlitzpayChargeRefunded } from "@/lib/blitzpay/webhook-charge-refunded"
+import { upsertBlitzpayInvoiceDisputeFromStripe } from "@/lib/blitzpay/webhook-charge-dispute"
 
 async function refreshBlitzpayPaymentIntentMirror(
   admin: SupabaseClient,
@@ -97,18 +99,26 @@ export async function dispatchBlitzPayPhase2Webhook(
       }
       return
     }
-    case "charge.refunded":
-    case "charge.dispute.created": {
-      const obj = event.data.object as { id?: string }
-      console.info(
-        JSON.stringify({
-          source: "blitzpay-webhook",
-          phase: "2b_stub",
-          message: `${event.type} (refund/dispute handling deferred)`,
-          eventId: event.id,
-          stripeObjectId: obj.id ?? null,
-        }),
-      )
+    case "charge.refunded": {
+      await dispatchBlitzpayChargeRefunded(admin, event)
+      return
+    }
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed": {
+      const acct = typeof event.account === "string" && event.account.length > 0 ? event.account : null
+      if (!acct) {
+        console.info(
+          JSON.stringify({
+            source: "blitzpay-webhook",
+            message: `${event.type} missing connected account — skipping dispute upsert`,
+            eventId: event.id,
+          }),
+        )
+        return
+      }
+      const dispute = event.data.object as Stripe.Dispute
+      await upsertBlitzpayInvoiceDisputeFromStripe(admin, dispute, acct)
       return
     }
     default:

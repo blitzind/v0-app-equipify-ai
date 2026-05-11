@@ -149,7 +149,7 @@ async function hydrateAdminInvoicesFromRows(
   const creatorIds = [...new Set(list.map((r) => r.created_by).filter((id): id is string => Boolean(id)))]
   const invoiceIds = list.map((r) => r.id)
 
-  const [custRes, eqRes, profMap, linkRes, payRes] = await Promise.all([
+  const [custRes, eqRes, profMap, linkRes, payRes, refundRes] = await Promise.all([
     supabase.from("customers").select("id, company_name").eq("organization_id", organizationId).in("id", customerIds),
     equipIds.length
       ? supabase
@@ -172,6 +172,14 @@ async function hydrateAdminInvoicesFromRows(
           .select("invoice_id, amount_cents")
           .eq("organization_id", organizationId)
           .in("invoice_id", invoiceIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    invoiceIds.length
+      ? supabase
+          .from("blitzpay_invoice_refunds")
+          .select("org_invoice_id, amount_cents")
+          .eq("organization_id", organizationId)
+          .in("org_invoice_id", invoiceIds)
+          .eq("status", "succeeded")
       : Promise.resolve({ data: [] as unknown[] }),
   ])
 
@@ -210,11 +218,23 @@ async function hydrateAdminInvoicesFromRows(
     }
   }
 
+  const refundTotals = new Map<string, number>()
+  if (!refundRes.error) {
+    for (const p of (refundRes.data ?? []) as Array<{ org_invoice_id: string; amount_cents: number }>) {
+      refundTotals.set(
+        p.org_invoice_id,
+        (refundTotals.get(p.org_invoice_id) ?? 0) + Math.round(Number(p.amount_cents)),
+      )
+    }
+  }
+
   return list.map((row) => {
     const fromLinks = linkMap.get(row.id) ?? []
     const merged = [...new Set([...fromLinks, ...(row.work_order_id ? [row.work_order_id] : [])])]
     const totalDue = invoiceGrandTotalCents(row)
-    const sumPaid = payTotals.get(row.id) ?? 0
+    const grossPaid = payTotals.get(row.id) ?? 0
+    const refunded = refundTotals.get(row.id) ?? 0
+    const sumPaid = Math.max(0, grossPaid - refunded)
     const alloc = computeInvoicePaymentAllocation({
       invoiceTotalCents: totalDue,
       paymentsTotalCents: sumPaid,
@@ -271,7 +291,7 @@ async function syncLinkedWorkOrdersBillingState(
     .in("id", [...ids])
 }
 
-async function reconcileOrgInvoiceFromPayments(
+export async function reconcileOrgInvoiceFromPayments(
   supabase: SupabaseClient,
   organizationId: string,
   invoiceId: string,
@@ -303,11 +323,26 @@ async function reconcileOrgInvoiceFromPayments(
 
   if (payErr) return
 
-  const sumPay = (payments ?? []).reduce(
+  const grossPay = (payments ?? []).reduce(
     (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
     0,
   )
-  if (sumPay === 0) return
+
+  const { data: refundRows, error: refErr } = await supabase
+    .from("blitzpay_invoice_refunds")
+    .select("amount_cents")
+    .eq("organization_id", organizationId)
+    .eq("org_invoice_id", invoiceId)
+    .eq("status", "succeeded")
+
+  if (refErr) return
+
+  const refundSum = (refundRows ?? []).reduce(
+    (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    0,
+  )
+  const sumPay = Math.max(0, grossPay - refundSum)
+  if (sumPay === 0 && grossPay === 0) return
 
   const totalDue = invoiceGrandTotalCents(row)
 

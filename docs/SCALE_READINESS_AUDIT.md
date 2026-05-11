@@ -68,7 +68,7 @@ Evidence from migrations under `supabase/migrations/`:
 | **communications / notifications** | `idx_communication_events_org_*`, internal notification log (`20260910121500`) |
 | **audit** | `idx_organization_audit_events_org_created` (`20260607110000`) |
 | **AI usage** | `idx_ai_usage_logs_org_created`, `idx_ai_usage_logs_task` (`20260617100000`), `idx_aiden_usage_events_org_created` / feature-month (`20260812291000`) |
-| **Stripe** | `stripe_webhook_events` table (`20260518270000`); BlitzPay `blitzpay_stripe_webhook_events` + partial unique on `organizations.stripe_connect_account_id` (`20260813100000`) |
+| **Stripe** | `stripe_webhook_events` table (`20260518270000`); BlitzPay `blitzpay_stripe_webhook_events` + partial unique on `organizations.stripe_connect_account_id` (`20260813100000`); **Phase 2E** adds `blitzpay_invoice_refunds` + `blitzpay_invoice_disputes` (`20260913120000`) for idempotent refund/dispute bookkeeping |
 
 ### 4.3 Missing or weak index risks (analytical, not applied in this audit)
 
@@ -155,6 +155,11 @@ Evidence from migrations under `supabase/migrations/`:
 | **Application fees / transfers** | Ledger tables + unique constraints on “applied fee for invoice X” |
 | **Payouts / disputes** | New tables indexed by `stripe_connect_account_id` + `event_id` |
 | **Invoice sync** | Outbox pattern: write local state then enqueue Stripe action; reconcile cron |
+
+### 8.4 BlitzPay Phase 2E (operational refunds / disputes)
+
+- **Refund idempotency:** unique `stripe_refund_id` on `blitzpay_invoice_refunds` plus ledger `(organization_id, entry_type, stripe_object_id)` dedupe replays; ingress still dedupes by `blitzpay_stripe_webhook_events.id`.
+- **Volume:** refund/dispute rows are **low cardinality** per invoice; `blitzpay_webhook_inbox` remains the first place to watch if Stripe retry storms grow — same async-worker note as §8.3.
 
 ---
 

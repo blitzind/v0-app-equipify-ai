@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { getPortalBlitzpayHostedCheckoutEligibility } from "@/lib/blitzpay/portal-blitzpay-checkout-eligibility"
-import { mapOrgInvoicePaymentRowToPortalHistory } from "@/lib/portal/portal-invoice-payment-history"
+import {
+  mapBlitzpayRefundToPortalHistory,
+  mapOrgInvoicePaymentRowToPortalHistory,
+} from "@/lib/portal/portal-invoice-payment-history"
 import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { buildPortalInvoicePaymentSummary } from "@/lib/portal/invoice-payment-summary"
@@ -72,7 +75,7 @@ export async function GET(
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 })
   }
 
-  const [payRes, orgMetaRes, custMetaRes] = await Promise.all([
+  const [payRes, refundRes, orgMetaRes, custMetaRes] = await Promise.all([
     svc
       .from("org_invoice_payments")
       .select("id, amount_cents, paid_on, payment_method, reference")
@@ -80,16 +83,36 @@ export async function GET(
       .eq("invoice_id", invoiceId)
       .order("paid_on", { ascending: false })
       .order("created_at", { ascending: false }),
+    svc
+      .from("blitzpay_invoice_refunds")
+      .select("amount_cents, applied_on")
+      .eq("organization_id", orgId)
+      .eq("org_invoice_id", invoiceId)
+      .eq("status", "succeeded")
+      .order("created_at", { ascending: false }),
     svc.from("organizations").select("name").eq("id", orgId).maybeSingle(),
     svc.from("customers").select("company_name").eq("organization_id", orgId).eq("id", custId).maybeSingle(),
   ])
 
   let paySum = 0
   const paymentRows = !payRes.error ? (payRes.data ?? []) : []
-  paySum = paymentRows.reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
-  const paymentHistory = paymentRows.map((r) =>
+  const grossPay = paymentRows.reduce(
+    (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    0,
+  )
+  const refundRows = !refundRes.error ? (refundRes.data ?? []) : []
+  const refundSum = refundRows.reduce(
+    (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    0,
+  )
+  paySum = Math.max(0, grossPay - refundSum)
+  const paymentParts = paymentRows.map((r) =>
     mapOrgInvoicePaymentRowToPortalHistory(r as { paid_on: string; amount_cents: number; payment_method: string; reference?: string | null }),
   )
+  const refundParts = refundRows.map((r) =>
+    mapBlitzpayRefundToPortalHistory(r as { amount_cents: number; applied_on: string | null }),
+  )
+  const paymentHistory = [...paymentParts, ...refundParts].sort((a, b) => (a.paidOn < b.paidOn ? 1 : a.paidOn > b.paidOn ? -1 : 0))
 
   const workspaceDisplayName =
     ((orgMetaRes.data as { name?: string } | null)?.name ?? "").trim() || "Organization"

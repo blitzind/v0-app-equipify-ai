@@ -11,7 +11,7 @@ import {
   assertInvoicePayableForBlitzpay,
   balanceDueCentsForBlitzpay,
   loadInvoiceForBlitzpayPay,
-  sumRecordedPaymentsCents,
+  sumNetRecordedPaymentsCentsForBlitzpay,
 } from "@/lib/blitzpay/invoice-pay-eligibility"
 import {
   createBlitzpayFeeSnapshot,
@@ -164,7 +164,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
     return { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." }
   }
 
-  const paidSum = await sumRecordedPaymentsCents(admin, organizationId, invoiceId)
+  const paidSum = await sumNetRecordedPaymentsCentsForBlitzpay(admin, organizationId, invoiceId)
   try {
     assertInvoicePayableForBlitzpay(inv, paidSum)
   } catch (e) {

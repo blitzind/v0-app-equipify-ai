@@ -438,7 +438,7 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Migration** | `20260911120000_blitzpay_phase_2a_foundation.sql` — tables `blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_ledger_entries`, `blitzpay_webhook_inbox`; indexes and uniqueness per §2. |
 | **RLS** | Org-scoped tables: `authenticated` **SELECT** only with `is_org_member(organization_id)`; **no** authenticated writes. `blitzpay_webhook_inbox`: no grants to `authenticated` (service role only). |
 | **Server libs** | `lib/blitzpay/payment-domain.ts`, `money.ts`, `fees.ts`, `idempotency-keys.ts`, `stripe-metadata.ts`, `phase2-feature-flag.ts`, `payment-repository.ts`, `webhook-inbox.ts`, `webhook-phase2-events.ts`, `webhook-phase2-dispatch.ts`. |
-| **Webhook (2A baseline)** | `POST /api/blitzpay/webhook` — Phase 1 `account.updated` unchanged. Phase 2 inbox + **mirror** `blitzpay_payment_intents` for `payment_intent.*`; stubs for charge refund/dispute. **Phase 2B** extends dispatch for succeeded/failed/canceled PI and Checkout completion (see §12.2). |
+| **Webhook (2A baseline)** | `POST /api/blitzpay/webhook` — Phase 1 `account.updated` unchanged. Phase 2 inbox + **mirror** `blitzpay_payment_intents` for `payment_intent.*`. **Phase 2B+** extends dispatch for PI/Checkout completion; **Phase 2E** adds `charge.refunded` + dispute events (see §12.5). |
 | **Env** | `BLITZPAY_INVOICE_PAY_ENABLED` — global gate (default off); see `.env.local.example`. Per-org `blitzpay_org_settings.blitzpay_invoice_pay_enabled` for rollout. |
 
 ### 12.2 Phase 2B (shipped in repo)
@@ -478,7 +478,7 @@ Use this as a **checklist** when coding — not exhaustive.
 8. Open an invoice id that belongs to **another** customer (same org): expect **404** on GET and prepare-pay.  
 9. Staff invoice Payments tab **Pay with BlitzPay (hosted)** still works unchanged.
 
-**Deferred (not Phase 2C):** refunds/disputes beyond webhook stubs, payout UI.
+**Deferred (not Phase 2C):** payout UI; refunds/disputes ship in **Phase 2E** (§12.5).
 
 ### 12.4 Phase 2D (shipped in repo) — receipts foundation, payment history, confirmation UX
 
@@ -486,7 +486,7 @@ Use this as a **checklist** when coding — not exhaustive.
 |------|---------|
 | **Portal confirmation** | After Stripe success (`?blitzpay=1&status=success`), **Payment update** explains webhook delay; if invoice is already paid / zero balance → **Payment received**; otherwise **confirming** copy + short poll of `GET /api/portal/invoices/[id]` until paid or timeout. Does **not** assert funds captured until allocation shows on the invoice. |
 | **Portal payment history** | `GET /api/portal/invoices/[invoiceId]` returns `paymentHistory` (from `org_invoice_payments`) via `mapOrgInvoicePaymentRowToPortalHistory` — masks `blitzpay_pi:*` references as **Electronic confirmation on file**; no Stripe ids, fees, or internal UUIDs in payloads. |
-| **Staff visibility** | `GET /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity` — `canEditInvoices` **or** `canViewFinancials`; returns recent `blitzpay_invoice_payment_attempts` joined to `blitzpay_payment_intents` with **tails only** (`pi…{6}`, `cs…{8}`) for support correlation. **Payments tab** lists attempts with source (staff vs customer portal) and status (pending / succeeded / failed / canceled / expired). Recorded payments table shows **BlitzPay (online)** instead of raw `blitzpay_pi:` reference. |
+| **Staff visibility** | `GET …/blitzpay/activity` — same permissions; returns **attempts** (as above) plus **refunds** and **disputes** summary rows (tails only where applicable). **Payments tab** lists attempts with source (staff vs customer portal) and status (pending / succeeded / failed / canceled / expired). Recorded payments table shows **BlitzPay (online)** instead of raw `blitzpay_pi:` reference. **Phase 2E** adds per-payment refund sub-rows, disputes card, and **BlitzPay diagnostics** (`GET …/blitzpay/diagnostics`). |
 | **Receipt foundation** | `lib/blitzpay/invoice-payment-receipt.ts` — `InvoicePaymentReceiptShape` + `buildInvoicePaymentReceiptShape` for future email/PDF; **no outbound email in Phase 2D** (email receipts = next). |
 | **Tests** | `pnpm test:blitzpay-phase-2d` — portal history masking + receipt builder. |
 
@@ -500,8 +500,30 @@ Use this as a **checklist** when coding — not exhaustive.
 6. Failed or canceled Checkout: attempt row shows **Failed** / **Canceled** (or **Expired**) without marking the invoice paid unless a separate successful webhook posted.  
 7. Portal JSON and UI never expose full Stripe ids, platform/application fees, or `blitzpay_payment_intents` internal UUIDs to customers.
 
-**Next (not Phase 2D):** email/PDF receipts using `buildInvoicePaymentReceiptShape`, richer staff tooling, refunds/disputes.
+**Next (not Phase 2D):** email/PDF receipts using `buildInvoicePaymentReceiptShape`; dispute evidence workflow.
+
+### 12.5 Phase 2E (shipped in repo) — refunds, disputes, diagnostics, reporting helpers
+
+| Area | Details |
+|------|---------|
+| **Migration** | `20260913120000_blitzpay_phase_2e_refunds_disputes.sql` — `blitzpay_invoice_refunds` (unique `stripe_refund_id`, optional staff `idempotency_key`), `blitzpay_invoice_disputes` (unique `stripe_dispute_id`); RLS **SELECT** for org members; writes service-role / server only. |
+| **Staff refund API** | `POST /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund` — body `{ orgInvoicePaymentId, amountCents? }`; `canEditInvoices` **or** `canViewFinancials`; Stripe `refunds.create` on connected account via `createBlitzpayConnectRefund` with `refund_application_fee: true`; books via `applyBlitzpaySucceededRefund` (`lib/blitzpay/blitzpay-refund-apply.ts`). |
+| **Net balance** | `reconcileOrgInvoiceFromPayments` and admin invoice hydration subtract **succeeded** rows in `blitzpay_invoice_refunds` from gross `org_invoice_payments` sums. `sumNetRecordedPaymentsCentsForBlitzpay` gates hosted prepare-pay. |
+| **Webhooks** | `charge.refunded` → `dispatchBlitzpayChargeRefunded` (expand refunds, idempotent per `stripe_refund_id`). `charge.dispute.created` / `updated` / `closed` → `upsertBlitzpayInvoiceDisputeFromStripe`. |
+| **Portal** | `GET /api/portal/invoices/[id]` — **no** dispute payloads; payment summary uses **net** paid; `paymentHistory` appends customer-safe **Card refund (BlitzPay)** lines via `mapBlitzpayRefundToPortalHistory` (negative `amountCents`, no Stripe ids). |
+| **Diagnostics** | `GET …/blitzpay/diagnostics` — PI mirror tails, recent `blitzpay_webhook_inbox` for the org Connect account, refunds/disputes for the invoice, and `fetchBlitzpayOrgReportingSnapshot` (optional `?since=` ISO). |
+| **Reporting helper** | `lib/blitzpay/blitzpay-reporting-snapshot.ts` — gross ledger `payment_captured`, refunded ledger `refund`, net, online BlitzPay payment row count, completed attempt source split (`portal_link` vs staff channels). |
+| **Tests** | `pnpm test:blitzpay-phase-2e` — webhook type coverage + portal refund line shape. |
+
+#### Manual test checklist (Phase 2E)
+
+1. **Full refund** on a BlitzPay card payment succeeds; invoice balance returns toward due; `blitzpay_invoice_refunds` row `succeeded`.  
+2. **Partial refund** then second partial until fully refunded — each step respects remaining refundable.  
+3. **Duplicate** `charge.refunded` webhook delivery does **not** double-book (unique `stripe_refund_id`).  
+4. **Dispute** webhook creates/updates a staff-visible dispute row; **portal** JSON has **no** dispute fields.  
+5. **Diagnostics** JSON shows PI rows + inbox tail + replay-safety notes.  
+6. **Idempotency-Key** / server idempotency: repeat staff refund POST with same key returns the same outcome without double Stripe calls (Stripe idempotency window).
 
 ---
 
-*Phase 2A–2D vertical slice for hosted invoice pay (staff + portal + confirmation/history) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2E vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

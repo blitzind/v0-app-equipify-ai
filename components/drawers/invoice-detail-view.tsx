@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useMemo, useCallback, useEffect, type ReactNode } from "react"
+import { Fragment, useState, useRef, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
 import { cn } from "@/lib/utils"
@@ -1479,13 +1479,6 @@ function PaymentsTab({
   const activeOrg = useActiveOrganization()
   const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
   const canEditPayments = permissions.canViewBilling && permissions.canEditInvoices
-  const canStartBlitzpayPay =
-    (permissions.canEditInvoices || permissions.canViewFinancials) &&
-    balance > 0 &&
-    !invoice.isArchived &&
-    invoice.status !== "Void" &&
-    invoice.status !== "Draft" &&
-    invoice.status !== "Paid"
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
   type BlitzpayActivityRow = {
     attemptNo: number
@@ -1502,7 +1495,41 @@ function PaymentsTab({
   const [blitzpayActivity, setBlitzpayActivity] = useState<BlitzpayActivityRow[]>([])
   const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
   const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
+  type BlitzpayRefundActivityRow = {
+    orgInvoicePaymentId: string
+    amountCents: number
+    currency: string
+    status: string
+    appliedOn: string | null
+    createdAt: string
+  }
+  type BlitzpayDisputeActivityRow = {
+    id: string
+    stripeDisputeIdTail: string
+    amountCents: number
+    currency: string
+    status: string
+    openedAt: string | null
+    updatedAt: string
+  }
+  const [blitzpayRefunds, setBlitzpayRefunds] = useState<BlitzpayRefundActivityRow[]>([])
+  const [blitzpayDisputes, setBlitzpayDisputes] = useState<BlitzpayDisputeActivityRow[]>([])
+  const [refundTarget, setRefundTarget] = useState<{ paymentId: string; maxCents: number } | null>(null)
+  const [refundDollarsInput, setRefundDollarsInput] = useState("")
+  const [refundBusy, setRefundBusy] = useState(false)
+  const [diagOpen, setDiagOpen] = useState(false)
+  const [diagBody, setDiagBody] = useState("")
+  const [diagLoading, setDiagLoading] = useState(false)
   const canViewBlitzpayActivity = permissions.canEditInvoices || permissions.canViewFinancials
+
+  const succeededRefundCentsByPayment = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const r of blitzpayRefunds) {
+      if (r.status !== "succeeded") continue
+      m.set(r.orgInvoicePaymentId, (m.get(r.orgInvoicePaymentId) ?? 0) + r.amountCents)
+    }
+    return m
+  }, [blitzpayRefunds])
 
   const grandTotal = invoiceGrandTotalDollars(invoice)
   const totalPaid =
@@ -1513,6 +1540,15 @@ function PaymentsTab({
       : invoice.status === "Paid"
         ? 0
         : grandTotal
+
+  const canStartBlitzpayPay =
+    (permissions.canEditInvoices || permissions.canViewFinancials) &&
+    balance > 0 &&
+    !invoice.isArchived &&
+    invoice.status !== "Void" &&
+    invoice.status !== "Draft" &&
+    invoice.status !== "Paid"
+
   const allocLabel =
     invoice.paymentAllocationState != null
       ? paymentAllocationUiLabel(invoice.paymentAllocationState)
@@ -1576,18 +1612,30 @@ function PaymentsTab({
           `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/activity`,
           { credentials: "include", cache: "no-store" },
         )
-        const body = (await res.json()) as { attempts?: BlitzpayActivityRow[]; error?: string; message?: string }
+        const body = (await res.json()) as {
+          attempts?: BlitzpayActivityRow[]
+          refunds?: BlitzpayRefundActivityRow[]
+          disputes?: BlitzpayDisputeActivityRow[]
+          error?: string
+          message?: string
+        }
         if (cancelled) return
         if (!res.ok) {
           setBlitzpayActivityErr(body.message ?? body.error ?? "Could not load BlitzPay activity.")
           setBlitzpayActivity([])
+          setBlitzpayRefunds([])
+          setBlitzpayDisputes([])
         } else {
           setBlitzpayActivity(body.attempts ?? [])
+          setBlitzpayRefunds(body.refunds ?? [])
+          setBlitzpayDisputes(body.disputes ?? [])
         }
       } catch (e) {
         if (!cancelled) {
           setBlitzpayActivityErr(e instanceof Error ? e.message : "Could not load BlitzPay activity.")
           setBlitzpayActivity([])
+          setBlitzpayRefunds([])
+          setBlitzpayDisputes([])
         }
       } finally {
         if (!cancelled) setBlitzpayActivityLoading(false)
@@ -1597,6 +1645,35 @@ function PaymentsTab({
       cancelled = true
     }
   }, [orgId, invoice.id, canViewBlitzpayActivity, invoice.totalPaidCents])
+
+  useEffect(() => {
+    if (!diagOpen || !orgId) return
+    let cancelled = false
+    setDiagLoading(true)
+    setDiagBody("")
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/diagnostics`,
+          { credentials: "include", cache: "no-store" },
+        )
+        const j = (await res.json()) as unknown
+        if (cancelled) return
+        if (!res.ok) {
+          setDiagBody(JSON.stringify(j, null, 2))
+        } else {
+          setDiagBody(JSON.stringify(j, null, 2))
+        }
+      } catch (e) {
+        if (!cancelled) setDiagBody(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setDiagLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [diagOpen, orgId, invoice.id])
 
   const creatorIds = useMemo(
     () => [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[],
@@ -1924,6 +2001,63 @@ function PaymentsTab({
         </div>
       ) : null}
 
+      {canViewBlitzpayActivity && orgId && blitzpayDisputes.length > 0 ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">Card disputes (BlitzPay)</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Internal visibility only — no evidence submission workflow yet.
+          </p>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border bg-muted/30 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-2 py-1.5 font-semibold">Opened</th>
+                  <th className="px-2 py-1.5 font-semibold">Status</th>
+                  <th className="px-2 py-1.5 font-semibold text-right">Amount</th>
+                  <th className="px-2 py-1.5 font-semibold hidden sm:table-cell">Correlation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blitzpayDisputes.map((d) => (
+                  <tr key={d.id} className="border-b border-border last:border-0">
+                    <td className="px-2 py-1.5 whitespace-nowrap text-foreground">
+                      {d.openedAt ?
+                        new Date(d.openedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-muted-foreground">{d.status}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-medium text-foreground">
+                      {fmtCurrency(d.amountCents / 100)}
+                    </td>
+                    <td className="px-2 py-1.5 text-muted-foreground hidden sm:table-cell font-mono text-[10px]">
+                      dp…{d.stripeDisputeIdTail}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {canViewBlitzpayActivity && orgId ? (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-[11px]"
+            onClick={() => setDiagOpen(true)}
+          >
+            BlitzPay diagnostics
+          </Button>
+        </div>
+      ) : null}
+
       {canViewQbFinancialSync ? (
         <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-[color:var(--ds-info-border)]/40")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2090,23 +2224,64 @@ function PaymentsTab({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 text-foreground whitespace-nowrap">{fmtDate(String(r.paid_on).slice(0, 10))}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{formatPaymentMethodDb(r.payment_method)}</td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                      {fmtCurrency(r.amount_cents / 100)}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
-                      {(r.reference ?? "").trim().startsWith("blitzpay_pi:") ?
-                        "BlitzPay (online)"
-                      : (r.reference ?? "").trim() || "—"}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
-                      {r.created_by ? creatorMap.get(r.created_by) ?? "—" : "—"}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((r) => {
+                  const refRaw = (r.reference ?? "").trim()
+                  const isBlitz = refRaw.startsWith("blitzpay_pi:")
+                  const refundedCents = succeededRefundCentsByPayment.get(r.id) ?? 0
+                  const remainingCents = Math.max(0, Math.round(Number(r.amount_cents)) - refundedCents)
+                  return (
+                    <Fragment key={r.id}>
+                      <tr className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                          {fmtDate(String(r.paid_on).slice(0, 10))}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatPaymentMethodDb(r.payment_method)}</td>
+                        <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                          {fmtCurrency(r.amount_cents / 100)}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
+                          {isBlitz ? "BlitzPay (online)" : refRaw || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
+                          {r.created_by ? creatorMap.get(r.created_by) ?? "—" : "—"}
+                        </td>
+                      </tr>
+                      {isBlitz && canViewBlitzpayActivity ? (
+                        <tr className="border-b border-border bg-muted/15 last:border-0">
+                          <td colSpan={5} className="px-3 py-2 text-[10px] text-muted-foreground">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span>
+                                Refunded (BlitzPay):{" "}
+                                <strong className="text-foreground tabular-nums">
+                                  {fmtCurrency(refundedCents / 100)}
+                                </strong>
+                                {" · "}
+                                Remaining refundable:{" "}
+                                <strong className="text-foreground tabular-nums">
+                                  {fmtCurrency(remainingCents / 100)}
+                                </strong>
+                              </span>
+                              {remainingCents > 0 ? (
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-7 text-[11px]"
+                                  onClick={() => {
+                                    setRefundDollarsInput((remainingCents / 100).toFixed(2))
+                                    setRefundTarget({ paymentId: r.id, maxCents: remainingCents })
+                                  }}
+                                >
+                                  Refund…
+                                </Button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
             {rows.some((r) => r.note?.trim()) ? (
@@ -2124,6 +2299,133 @@ function PaymentsTab({
           </div>
         )}
       </Section>
+
+      <AlertDialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>BlitzPay diagnostics</AlertDialogTitle>
+            <AlertDialogDescription>
+              PaymentIntent mirror, recent webhook inbox rows for this Connect account, refunds, disputes, and
+              lightweight org reporting totals (optionally scoped with <span className="font-mono">?since=</span> ISO
+              time).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 pb-2">
+            {diagLoading ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+              </p>
+            ) : (
+              <pre className="max-h-[min(420px,55vh)] overflow-auto rounded-md border border-border bg-muted/30 p-2 text-[10px] leading-relaxed whitespace-pre-wrap break-all">
+                {diagBody || "—"}
+              </pre>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={refundTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setRefundTarget(null)
+            setRefundDollarsInput("")
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Issue BlitzPay refund</AlertDialogTitle>
+            <AlertDialogDescription>
+              Refunds run on your Stripe Connect account. Application fees follow Stripe&apos;s refund rules. This action
+              is staff-only and is idempotent per Stripe refund id.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-6 space-y-3 pb-2">
+            <p className="text-xs text-muted-foreground">
+              Maximum refundable now:{" "}
+              <strong className="text-foreground tabular-nums">
+                {refundTarget ? fmtCurrency(refundTarget.maxCents / 100) : "—"}
+              </strong>
+            </p>
+            <label className="block space-y-1 text-xs">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Amount (USD)</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+                value={refundDollarsInput}
+                onChange={(e) => setRefundDollarsInput(e.target.value)}
+              />
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" disabled={refundBusy}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={refundBusy || !refundTarget || !orgId}
+              onClick={() => {
+                void (async () => {
+                  if (!refundTarget || !orgId) return
+                  const raw = refundDollarsInput.trim().replace(/[$,]/g, "")
+                  const dollars = Number.parseFloat(raw)
+                  if (!Number.isFinite(dollars) || dollars <= 0) {
+                    pushToast("Enter a valid refund amount.", "error")
+                    return
+                  }
+                  const cents = Math.round(dollars * 100)
+                  if (cents < 1 || cents > refundTarget.maxCents) {
+                    pushToast(`Amount must be between $0.01 and ${(refundTarget.maxCents / 100).toFixed(2)}.`, "error")
+                    return
+                  }
+                  setRefundBusy(true)
+                  try {
+                    const body: { orgInvoicePaymentId: string; amountCents?: number } = {
+                      orgInvoicePaymentId: refundTarget.paymentId,
+                    }
+                    if (cents < refundTarget.maxCents) body.amountCents = cents
+                    const res = await fetch(
+                      `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/refund`,
+                      {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                      },
+                    )
+                    const j = (await res.json()) as { error?: string; message?: string; pending?: boolean }
+                    if (!res.ok) {
+                      pushToast(j.message ?? j.error ?? "Refund failed.", "error")
+                      return
+                    }
+                    pushToast(
+                      j.pending
+                        ? "Refund submitted — balance updates when Stripe finishes processing."
+                        : "Refund completed.",
+                      "success",
+                    )
+                    setRefundTarget(null)
+                    setRefundDollarsInput("")
+                    void refreshInvoices()
+                  } catch (e) {
+                    pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                  } finally {
+                    setRefundBusy(false)
+                  }
+                })()
+              }}
+            >
+              {refundBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Confirm refund
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Section title="Milestones">
         <div className="space-y-2">

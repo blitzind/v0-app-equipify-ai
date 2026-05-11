@@ -50,6 +50,28 @@ export async function sumRecordedPaymentsCents(
   )
 }
 
+/** Gross recorded payments minus succeeded BlitzPay refunds (invoice balance / hosted pay eligibility). */
+export async function sumNetRecordedPaymentsCentsForBlitzpay(
+  admin: SupabaseClient,
+  organizationId: string,
+  invoiceId: string,
+): Promise<number> {
+  const gross = await sumRecordedPaymentsCents(admin, organizationId, invoiceId)
+  const { data, error } = await admin
+    .from("blitzpay_invoice_refunds")
+    .select("amount_cents")
+    .eq("organization_id", organizationId)
+    .eq("org_invoice_id", invoiceId)
+    .eq("status", "succeeded")
+
+  if (error) throw new Error(error.message)
+  const refunded = (data ?? []).reduce(
+    (s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)),
+    0,
+  )
+  return Math.max(0, gross - refunded)
+}
+
 export function assertInvoicePayableForBlitzpay(inv: InvoicePayEligibilityRow, paymentsTotalCents: number): void {
   if (inv.archived_at) {
     throw new Error("invoice_archived")
