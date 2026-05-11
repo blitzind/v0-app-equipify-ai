@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:blitzpay-onboarding-errors": "tsx scripts/test-blitzpay-onboarding-errors.ts",
     "ai:evals": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ai-evals.ts",
     "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs",
     "update:master-context": "tsx scripts/update-master-context.ts"

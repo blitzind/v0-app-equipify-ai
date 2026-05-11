@@ -52,6 +52,10 @@ Phase 1 adds **organization-level Stripe Connect Express** account creation, **A
 
 ---
 
+## Onboarding errors (user-safe)
+
+APIs return `{ error, message }` where `error` is a **normalized code** (for example `connect_temporarily_restricted`, `connect_rate_limited`) and `message` is **safe copy** — not raw Stripe text. Server logs include Stripe `requestId`, `code`, `type`, and raw message for support. Persisted columns on `organizations` (see migration `20260910160000_blitzpay_onboarding_diagnostics.sql`) store the last failure **category** and Stripe **request id** for future admin tools.
+
 ## Environment variables
 
 | Variable | Required | Purpose |

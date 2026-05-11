@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
 import { cn } from "@/lib/utils"
 
 type BlitzPayStatusPayload = {
@@ -21,6 +22,10 @@ type BlitzPayStatusPayload = {
   stripe_requirements_eventually_due: unknown
   stripe_requirements_past_due: unknown
   last_stripe_connect_sync_at: string | null
+  blitzpay_last_onboarding_attempt_at?: string | null
+  blitzpay_last_onboarding_failure_at?: string | null
+  blitzpay_last_onboarding_error_category?: string | null
+  blitzpay_last_stripe_request_id?: string | null
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -104,12 +109,12 @@ function BlitzPaySettingsPageInner() {
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/sync`, {
         method: "POST",
       })
-      const json = (await res.json()) as { message?: string }
+      const json = (await res.json()) as { error?: string; message?: string }
       if (!res.ok) {
         toast({
           variant: "destructive",
           title: "Sync failed",
-          description: json.message ?? res.statusText,
+          description: blitzpayConnectOnboardingToastDescription(json.error, json.message ?? res.statusText),
         })
         return
       }
@@ -147,12 +152,12 @@ function BlitzPaySettingsPageInner() {
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/enable`, {
         method: "POST",
       })
-      const json = (await res.json()) as { message?: string; alreadyHadAccount?: boolean }
+      const json = (await res.json()) as { error?: string; message?: string; alreadyHadAccount?: boolean }
       if (!res.ok) {
         toast({
           variant: "destructive",
           title: "Could not enable BlitzPay",
-          description: json.message ?? res.statusText,
+          description: blitzpayConnectOnboardingToastDescription(json.error, json.message ?? res.statusText),
         })
         return
       }
@@ -175,12 +180,12 @@ function BlitzPaySettingsPageInner() {
       const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/account-link`, {
         method: "POST",
       })
-      const json = (await res.json()) as { url?: string; message?: string }
+      const json = (await res.json()) as { url?: string; error?: string; message?: string }
       if (!res.ok || !json.url) {
         toast({
           variant: "destructive",
           title: "Could not start onboarding",
-          description: json.message ?? res.statusText,
+          description: blitzpayConnectOnboardingToastDescription(json.error, json.message ?? res.statusText),
         })
         return
       }

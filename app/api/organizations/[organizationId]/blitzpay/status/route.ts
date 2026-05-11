@@ -37,6 +37,10 @@ export async function GET(
         "stripe_requirements_eventually_due",
         "stripe_requirements_past_due",
         "last_stripe_connect_sync_at",
+        "blitzpay_last_onboarding_attempt_at",
+        "blitzpay_last_onboarding_failure_at",
+        "blitzpay_last_onboarding_error_category",
+        "blitzpay_last_stripe_request_id",
       ].join(", "),
     )
     .eq("id", organizationId)
