@@ -13,6 +13,14 @@ export type DashboardStats = {
   equipmentDueThisMonth: number
   overdueService: number
   openWorkOrders: number
+  /** Completed / pending signature / invoiced with `completed_at` in the current calendar month. */
+  workOrdersCompletedThisMonth: number
+  /** Open pipeline: draft, sent, pending_approval (see `OPEN_QUOTE_PIPELINE_STATUSES`). */
+  openQuotesPipelineCount: number
+  /** Open / scheduled / in progress with no primary assignee. */
+  unassignedOpenWorkOrders: number
+  /** Active maintenance plans (not archived). */
+  activeMaintenancePlansCount: number
   monthlyRevenueCents: number
   expiringWarrantiesCount: number
   repeatRepairAlertsCount: number
@@ -20,6 +28,9 @@ export type DashboardStats = {
   overdueInvoicesAmountCents: number
   maintenancePlansOverdueCount: number
 }
+
+/** Matches customer rollup “open quote” semantics (`lib/customers/rollup-metrics.ts`). */
+const OPEN_QUOTE_PIPELINE_STATUSES = ["draft", "sent", "pending_approval"] as const
 
 export type RecentWorkOrderRow = {
   id: string
@@ -135,6 +146,8 @@ export function buildOperationalInsights(input: {
   overdueInvoicesCount?: number
   overdueInvoicesAmountCents?: number
   maintenancePlansOverdueCount?: number
+  unassignedOpenWorkOrders?: number
+  openQuotesPipelineCount?: number
 }): AiInsight[] {
   const insights: AiInsight[] = []
   let n = 0
@@ -182,6 +195,38 @@ export function buildOperationalInsights(input: {
       value: String(input.openWorkOrders),
       actionLabel: "Open queue",
       actionHref: "/work-orders",
+    })
+  }
+
+  const unassigned = input.unassignedOpenWorkOrders ?? 0
+  if (unassigned > 0) {
+    insights.push({
+      id: id("unassigned"),
+      category: "upsell",
+      severity: unassigned >= 5 ? "high" : "medium",
+      title: `${unassigned} unassigned open work order${unassigned === 1 ? "" : "s"}`,
+      description:
+        "Jobs still in Open, Scheduled, or In Progress without a primary technician. Assign owners to improve accountability and ETAs.",
+      meta: "Primary assignee empty",
+      value: String(unassigned),
+      actionLabel: "Assign from dispatch",
+      actionHref: "/dispatch",
+    })
+  }
+
+  const quotesOpen = input.openQuotesPipelineCount ?? 0
+  if (quotesOpen > 0) {
+    insights.push({
+      id: id("quotes"),
+      category: "revenue_opportunity",
+      severity: "medium",
+      title: `${quotesOpen} quote${quotesOpen === 1 ? "" : "s"} in draft, sent, or pending approval`,
+      description:
+        "Quotes still moving through the pipeline. Follow up on sent items and convert approved quotes to work orders.",
+      meta: "Draft / sent / pending approval",
+      value: String(quotesOpen),
+      actionLabel: "View quotes",
+      actionHref: "/quotes",
     })
   }
 
@@ -291,6 +336,10 @@ export function useSupabaseDashboard(
     equipmentDueThisMonth: 0,
     overdueService: 0,
     openWorkOrders: 0,
+    workOrdersCompletedThisMonth: 0,
+    openQuotesPipelineCount: 0,
+    unassignedOpenWorkOrders: 0,
+    activeMaintenancePlansCount: 0,
     monthlyRevenueCents: 0,
     expiringWarrantiesCount: 0,
     repeatRepairAlertsCount: 0,
@@ -324,6 +373,10 @@ export function useSupabaseDashboard(
         equipmentDueThisMonth: 0,
         overdueService: 0,
         openWorkOrders: 0,
+        workOrdersCompletedThisMonth: 0,
+        openQuotesPipelineCount: 0,
+        unassignedOpenWorkOrders: 0,
+        activeMaintenancePlansCount: 0,
         monthlyRevenueCents: 0,
         expiringWarrantiesCount: 0,
         repeatRepairAlertsCount: 0,
@@ -359,6 +412,10 @@ export function useSupabaseDashboard(
         equipmentDueThisMonth: 0,
         overdueService: 0,
         openWorkOrders: 0,
+        workOrdersCompletedThisMonth: 0,
+        openQuotesPipelineCount: 0,
+        unassignedOpenWorkOrders: 0,
+        activeMaintenancePlansCount: 0,
         monthlyRevenueCents: 0,
         expiringWarrantiesCount: 0,
         repeatRepairAlertsCount: 0,
@@ -417,6 +474,10 @@ export function useSupabaseDashboard(
         woForChartRes,
         overdueInvoicesRes,
         plansOverdueRes,
+        woCompletedMonthRes,
+        quotesPipelineRes,
+        unassignedOpenRes,
+        activeMaintPlansRes,
       ] = await Promise.all([
         supabase
           .from("equipment")
@@ -554,6 +615,34 @@ export function useSupabaseDashboard(
           .eq("status", "active")
           .not("next_due_date", "is", null)
           .lt("next_due_date", today),
+        supabase
+          .from("work_orders")
+          .select("id", head)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", ["completed", "completed_pending_signature", "invoiced"])
+          .not("completed_at", "is", null)
+          .gte("completed_at", `${monthStart}T00:00:00.000Z`)
+          .lte("completed_at", `${monthEnd}T23:59:59.999Z`),
+        supabase
+          .from("org_quotes")
+          .select("id", head)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", OPEN_QUOTE_PIPELINE_STATUSES as unknown as string[]),
+        supabase
+          .from("work_orders")
+          .select("id", head)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .in("status", ["open", "scheduled", "in_progress"])
+          .is("assigned_user_id", null),
+        supabase
+          .from("maintenance_plans")
+          .select("id", head)
+          .eq("organization_id", orgId)
+          .is("archived_at", null)
+          .eq("status", "active"),
       ])
 
       if (!lightweight && recentWoRes.error && missingWorkOrderNumberColumn(recentWoRes.error)) {
@@ -580,6 +669,11 @@ export function useSupabaseDashboard(
       const overdueInvoicesCount = invRows.length
       const overdueInvoicesAmountCents = invRows.reduce((sum, r) => sum + (r.amount_cents ?? 0), 0)
       const maintenancePlansOverdueCount = plansOverdueRes.count ?? 0
+
+      const workOrdersCompletedThisMonth = woCompletedMonthRes.count ?? 0
+      const openQuotesPipelineCount = quotesPipelineRes.count ?? 0
+      const unassignedOpenWorkOrders = unassignedOpenRes.count ?? 0
+      const activeMaintenancePlansCount = activeMaintPlansRes.count ?? 0
 
       const woStatusCounts = [
         woCountOpenRes.count ?? 0,
@@ -819,6 +913,10 @@ export function useSupabaseDashboard(
         equipmentDueThisMonth,
         overdueService,
         openWorkOrders,
+        workOrdersCompletedThisMonth,
+        openQuotesPipelineCount,
+        unassignedOpenWorkOrders,
+        activeMaintenancePlansCount,
         monthlyRevenueCents,
         expiringWarrantiesCount,
         repeatRepairAlertsCount,
@@ -842,6 +940,8 @@ export function useSupabaseDashboard(
           overdueInvoicesCount,
           overdueInvoicesAmountCents,
           maintenancePlansOverdueCount,
+          unassignedOpenWorkOrders,
+          openQuotesPipelineCount,
         }),
       )
     } catch (e) {

@@ -50,6 +50,8 @@ Focused **export infrastructure** pass: shared CSV helpers, consistent filenames
 
 ## Related docs
 
+- `docs/EXECUTIVE_DASHBOARD_EXPANSION.md` — home dashboard metrics vs. export/report definitions.
+- `docs/PERFORMANCE_AND_QUERY_OPTIMIZATION_AUDIT.md`
 - `docs/PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md`
 - `docs/ERROR_BOUNDARY_AND_FAILURE_STATE_STANDARDS.md`
 - `docs/SETTINGS_WIRING_AUDIT.md` (audit preview honesty)

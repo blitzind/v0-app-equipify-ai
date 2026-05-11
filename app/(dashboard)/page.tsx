@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   FileWarning,
   ListTodo,
+  CheckCircle2,
+  ScrollText,
+  UserRoundX,
+  ListChecks,
 } from "lucide-react"
 import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 import { StatCard } from "@/components/dashboard/stat-card"
@@ -41,6 +45,7 @@ function formatUsdFromCents(cents: number): string {
 export default function DashboardPage() {
   const { organizationId: dashboardOrgId, status: dashboardOrgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const showQuotesExecutive = Boolean(permissions.canViewQuotes)
   const showServiceRequestSignals = canReadServiceRequestQueue(permissions)
   const technicianFocused =
     permissions.canUseTechnicianWorkspace &&
@@ -90,7 +95,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Stat cards row */}
+      {/* Stat cards — Phase 63.2 executive snapshot (bounded head counts + existing hooks). */}
+      <div className="print:hidden">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          Executive snapshot
+        </h2>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
         <StatCard
           title="Equipment Due This Month"
@@ -177,6 +187,49 @@ export default function DashboardPage() {
           iconColor="text-primary"
           iconBg="bg-primary/10"
           urgent={stats.maintenancePlansOverdueCount > 0}
+          href="/maintenance-plans"
+          loading={loading}
+        />
+        <StatCard
+          title="Completed This Month"
+          value={stats.workOrdersCompletedThisMonth}
+          subtitle="Completed / pending signature / invoiced (completion date in range)"
+          icon={CheckCircle2}
+          iconColor="text-[oklch(0.42_0.17_145)]"
+          iconBg="bg-[oklch(0.62_0.17_145)]/10"
+          href="/work-orders"
+          loading={loading}
+        />
+        {showQuotesExecutive ? (
+          <StatCard
+            title="Quote Pipeline"
+            value={stats.openQuotesPipelineCount}
+            subtitle="Draft, sent, or pending approval"
+            icon={ScrollText}
+            iconColor="text-sky-700"
+            iconBg="bg-sky-500/10"
+            href="/quotes"
+            loading={loading}
+          />
+        ) : null}
+        <StatCard
+          title="Unassigned Open Work"
+          value={stats.unassignedOpenWorkOrders}
+          subtitle="Open, scheduled, or in progress — no primary technician"
+          icon={UserRoundX}
+          iconColor="text-amber-800"
+          iconBg="bg-amber-500/15"
+          urgent={stats.unassignedOpenWorkOrders > 0}
+          href="/dispatch"
+          loading={loading}
+        />
+        <StatCard
+          title="Active PM Plans"
+          value={stats.activeMaintenancePlansCount}
+          subtitle="Contracts on file (active status)"
+          icon={ListChecks}
+          iconColor="text-primary"
+          iconBg="bg-primary/10"
           href="/maintenance-plans"
           loading={loading}
         />
