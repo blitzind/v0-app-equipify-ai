@@ -19,13 +19,16 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { reportRangeFromPreset } from "@/lib/reporting/date-range"
 import type { ReportAnalyticsResponse } from "@/lib/reporting/types"
 import { downloadCsv, rowsToCsv } from "@/lib/reporting/export-csv"
+import { equipifyExportFilename } from "@/lib/reporting/export-filename"
 import {
   loadEquipmentCategoryBreakdown,
   type EquipmentCategoryBreakdownRow,
 } from "@/lib/equipment/intelligence-rollup"
 import { EquipmentCategoryBreakdownCard } from "@/components/equipment/equipment-category-breakdown-card"
 import { FinancialInvoiceReportSection } from "@/components/reporting/financial-invoice-report-section"
+import { ReportExportCenter } from "@/components/reporting/report-export-center"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
 const woByTypeFallback = [
@@ -239,6 +242,8 @@ export default function ReportsPage() {
 
   const [presets, setPresets] = useState<SavedPreset[]>([])
   const [presetName, setPresetName] = useState("")
+  const [exportBusy, setExportBusy] = useState(false)
+  const { toast } = useToast()
 
   const { from, to } = useMemo(
     () => reportRangeFromPreset(dateRange, customFrom || null, customTo || null),
@@ -436,9 +441,27 @@ export default function ReportsPage() {
   }
 
   const exportCsv = () => {
-    if (!analytics) return
-    const csv = rowsToCsv(reportToCsvRows(analytics))
-    downloadCsv(`equipify-report-${analytics.from}_${analytics.to}.csv`, csv)
+    if (!analytics || exportBusy) return
+    setExportBusy(true)
+    queueMicrotask(() => {
+      try {
+        const csv = rowsToCsv(reportToCsvRows(analytics))
+        const name = equipifyExportFilename({
+          slug: "operational-report",
+          range: { from: analytics.from, to: analytics.to },
+        })
+        downloadCsv(name, csv, { utf8Bom: true })
+        toast({ title: "CSV ready", description: "Your download should start shortly." })
+      } catch (e) {
+        toast({
+          title: "Could not build CSV",
+          description: e instanceof Error ? e.message : "Try again with a narrower date range.",
+          variant: "destructive",
+        })
+      } finally {
+        setExportBusy(false)
+      }
+    })
   }
 
   const printPdf = () => {
@@ -818,11 +841,16 @@ export default function ReportsPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!analytics}
+              disabled={!analytics || exportBusy}
               onClick={exportCsv}
-              title={analytics ? "Download CSV" : "Load data first"}
+              title={analytics ? "Download CSV (UTF-8, Excel-friendly)" : "Load data first"}
             >
-              <Download className="w-3.5 h-3.5" /> CSV
+              {exportBusy ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Download className="w-3.5 h-3.5" aria-hidden />
+              )}{" "}
+              CSV
             </Button>
             <Button variant="outline" size="sm" onClick={printPdf} title="Print or save as PDF">
               <Printer className="w-3.5 h-3.5" /> PDF
@@ -857,6 +885,15 @@ export default function ReportsPage() {
             )}
           </div>
         )}
+
+        <ReportExportCenter
+          canAccessOperationalAnalytics={
+            permissions.canViewOperationalReports || permissions.canViewFinancialReports
+          }
+          showFinancialExportSection={Boolean(
+            permissions.canViewBilling || permissions.canViewFinancials,
+          )}
+        />
 
         {(permissions.canViewBilling || permissions.canViewFinancials) && (
           <FinancialInvoiceReportSection

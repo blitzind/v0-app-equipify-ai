@@ -11,8 +11,20 @@ export function rowsToCsv(rows: string[][]): string {
   return rows.map((r) => r.map(escapeCsvCell).join(",")).join("\r\n")
 }
 
-export function downloadCsv(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8" })
+/** Excel on Windows often expects a UTF-8 BOM to infer encoding for plain CSV. */
+export function withUtf8Bom(content: string): string {
+  return `\uFEFF${content}`
+}
+
+export type DownloadCsvOptions = {
+  /** Prepend UTF-8 BOM (recommended for Excel). Default true. */
+  utf8Bom?: boolean
+}
+
+export function downloadCsv(filename: string, content: string, options?: DownloadCsvOptions) {
+  const useBom = options?.utf8Bom !== false
+  const body = useBom ? withUtf8Bom(content) : content
+  const blob = new Blob([body], { type: "text/csv;charset=utf-8" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url

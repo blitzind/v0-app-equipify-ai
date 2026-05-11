@@ -9,6 +9,8 @@ import {
   type FinancialInvoicesReportPayload,
 } from "@/lib/reporting/financial-invoices-report"
 import { downloadCsv, rowsToCsv } from "@/lib/reporting/export-csv"
+import { equipifyExportFilename } from "@/lib/reporting/export-filename"
+import { useToast } from "@/hooks/use-toast"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 const DATE_RANGES = ["Last 30 days", "Last 60 days", "Last 90 days", "Last 6 months", "Last 12 months", "Custom"] as const
@@ -90,6 +92,8 @@ export function FinancialInvoiceReportSection({
   const [data, setData] = useState<FinancialInvoicesReportPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exportBusy, setExportBusy] = useState(false)
+  const { toast } = useToast()
 
   const standaloneRange = useMemo(
     () => reportRangeFromPreset(dateRange, customFrom || null, customTo || null),
@@ -171,9 +175,27 @@ export function FinancialInvoiceReportSection({
   }, [load])
 
   const exportCsv = () => {
-    if (!data) return
-    const csv = rowsToCsv(financialInvoicesReportToCsv(data))
-    downloadCsv(`equipify-financial-invoices-${data.from}_${data.to}.csv`, csv)
+    if (!data || exportBusy) return
+    setExportBusy(true)
+    queueMicrotask(() => {
+      try {
+        const csv = rowsToCsv(financialInvoicesReportToCsv(data))
+        downloadCsv(
+          equipifyExportFilename({ slug: "financial-invoices", range: { from: data.from, to: data.to } }),
+          csv,
+          { utf8Bom: true },
+        )
+        toast({ title: "CSV ready", description: "Download uses the same rows as the table (subject to the report cap)." })
+      } catch (e) {
+        toast({
+          title: "Could not build CSV",
+          description: e instanceof Error ? e.message : "Try again after refresh.",
+          variant: "destructive",
+        })
+      } finally {
+        setExportBusy(false)
+      }
+    })
   }
 
   if (!organizationId) {
@@ -195,8 +217,16 @@ export function FinancialInvoiceReportSection({
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               Refresh
             </Button>
-            <Button type="button" variant="outline" size="sm" disabled={!data} onClick={exportCsv}>
-              <Download className="w-3.5 h-3.5" /> CSV
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!data || exportBusy}
+              onClick={exportCsv}
+              title="UTF-8 CSV with BOM (Excel-friendly)"
+            >
+              {exportBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Download className="w-3.5 h-3.5" aria-hidden />}{" "}
+              CSV
             </Button>
           </div>
         }

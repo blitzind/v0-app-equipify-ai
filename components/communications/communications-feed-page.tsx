@@ -44,6 +44,10 @@ import {
   type CommunicationCenterKind,
 } from "@/lib/communications/communication-kind"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
+import { downloadCsv, rowsToCsv } from "@/lib/reporting/export-csv"
+import { equipifyExportFilename } from "@/lib/reporting/export-filename"
+import { CLIENT_CSV_EXPORT_ROW_WARN_THRESHOLD } from "@/lib/reporting/export-constants"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -102,6 +106,7 @@ const EMPTY_STATS: FeedStatsClient = {
 export function CommunicationsFeedPage() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { permissions } = useOrgPermissions()
+  const { toast } = useToast()
 
   const canView = Boolean(permissions.canViewCommunications)
   const canManage = Boolean(permissions.canManageCommunications)
@@ -211,6 +216,10 @@ export function CommunicationsFeedPage() {
   }, [])
 
   function exportCsv() {
+    if (items.length === 0) {
+      toast({ title: "Nothing to export", description: "Adjust filters or wait for the feed to load." })
+      return
+    }
     const header = [
       "created_at",
       "channel",
@@ -222,27 +231,30 @@ export function CommunicationsFeedPage() {
       "entity",
       "summary",
     ]
-    const rows = items.map((it) => [
+    const dataRows: string[][] = items.map((it) => [
       it.created_at,
       it.channel,
       it.event_type,
-      csvEscape(it.title),
+      it.title,
       it.delivery_status,
       String(it.automated),
-      csvEscape(it.customer_label ?? ""),
-      csvEscape(it.entity_label ?? ""),
-      csvEscape(it.summary ?? ""),
+      it.customer_label ?? "",
+      it.entity_label ?? "",
+      it.summary ?? "",
     ])
-    const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `communications-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const csv = rowsToCsv([header, ...dataRows])
+    const name = equipifyExportFilename({
+      slug: "communications-feed",
+      dateStamp: new Date().toISOString().slice(0, 10),
+    })
+    downloadCsv(name, csv, { utf8Bom: true })
+    toast({
+      title: "CSV ready",
+      description:
+        items.length > CLIENT_CSV_EXPORT_ROW_WARN_THRESHOLD
+          ? `${items.length.toLocaleString()} rows — large export; the browser may pause briefly. Current feed and filters only.`
+          : `${items.length} row(s) — current feed and filters only.`,
+    })
   }
 
   if (orgStatus !== "ready" || !organizationId) {
@@ -584,12 +596,6 @@ export function CommunicationsFeedPage() {
       />
     </div>
   )
-}
-
-function csvEscape(s: string): string {
-  if (s == null) return ""
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
-  return s
 }
 
 /** YYYY-MM-DD in the viewer's local calendar for grouping. */

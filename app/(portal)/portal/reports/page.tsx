@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { FileText, FileDown, BarChart3, Activity, CheckSquare, DollarSign, ChevronRight } from "lucide-react"
+import { toast } from "sonner"
 import { portalReports } from "@/lib/mock-data"
 
 const CUSTOMER_ID = "CUS-001"
@@ -21,7 +22,7 @@ const TYPE_META: Record<string, { icon: React.ElementType; bg: string; text: str
 
 function ReportCard({ report, onDownload }: {
   report: typeof allReports[number]
-  onDownload: (id: string) => void
+  onDownload: () => void
 }) {
   const meta = TYPE_META[report.type] ?? TYPE_META["Service Summary"]
   const Icon = meta.icon
@@ -50,7 +51,8 @@ function ReportCard({ report, onDownload }: {
             <span className="font-medium">{(report.sizeKb / 1024).toFixed(2)} MB</span>
           </div>
           <button
-            onClick={() => onDownload(report.id)}
+            type="button"
+            onClick={onDownload}
             className="flex items-center gap-1.5 text-xs font-medium px-3 h-8 rounded-md border transition-all"
             style={{
               borderColor: "var(--portal-border)",
@@ -79,7 +81,6 @@ function ReportCard({ report, onDownload }: {
 
 export default function PortalReportsPage() {
   const [filter, setFilter] = useState("All")
-  const [downloaded, setDownloaded] = useState<Set<string>>(new Set())
 
   const types = ["All", ...Object.keys(TYPE_META)]
   const filtered = allReports.filter((r) => filter === "All" || r.type === filter)
@@ -145,8 +146,16 @@ export default function PortalReportsPage() {
           </div>
         ) : (
           filtered.map((r) => (
-            <ReportCard key={r.id} report={r}
-              onDownload={(id) => setDownloaded((prev) => new Set([...prev, id]))} />
+            <ReportCard
+              key={r.id}
+              report={r}
+              onDownload={() =>
+                toast.message("Report download unavailable", {
+                  description:
+                    "These entries are preview/sample content. Your service provider can supply real PDFs or exports when connected.",
+                })
+              }
+            />
           ))
         )}
       </div>

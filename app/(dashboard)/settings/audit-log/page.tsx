@@ -1,9 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Download, Filter, User, Settings, CreditCard, Shield, Wrench, Key } from "lucide-react"
+import { Search, Download, Filter, User, Settings, CreditCard, Shield, Wrench, Key, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { downloadCsv, rowsToCsv } from "@/lib/reporting/export-csv"
+import { equipifyExportFilename } from "@/lib/reporting/export-filename"
+import { useToast } from "@/hooks/use-toast"
 
 interface AuditEvent {
   id: string
@@ -130,6 +133,8 @@ export default function AuditLogPage() {
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("All")
   const [severityFilter, setSeverityFilter] = useState<AuditEvent["severity"] | "All">("All")
+  const [exportBusy, setExportBusy] = useState(false)
+  const { toast } = useToast()
 
   const filtered = AUDIT_EVENTS.filter((ev) => {
     const matchCat = categoryFilter === "All" || ev.category === categoryFilter
@@ -138,6 +143,46 @@ export default function AuditLogPage() {
     const matchSearch = !q || ev.actor.toLowerCase().includes(q) || ev.action.toLowerCase().includes(q) || ev.target.toLowerCase().includes(q)
     return matchCat && matchSev && matchSearch
   })
+
+  function exportAuditPreviewCsv() {
+    if (filtered.length === 0) {
+      toast({ title: "Nothing to export", description: "Adjust filters to include at least one row." })
+      return
+    }
+    setExportBusy(true)
+    queueMicrotask(() => {
+      try {
+        const header = ["timestamp", "actor", "actor_role", "action", "target", "category", "severity", "ip"]
+        const rows: string[][] = filtered.map((ev) => [
+          ev.timestamp,
+          ev.actor,
+          ev.actorRole,
+          ev.action,
+          ev.target,
+          ev.category,
+          ev.severity,
+          ev.ip,
+        ])
+        const csv = rowsToCsv([header, ...rows])
+        downloadCsv(equipifyExportFilename({ slug: "audit-preview", dateStamp: new Date().toISOString().slice(0, 10) }), csv, {
+          utf8Bom: true,
+        })
+        toast({
+          title: "Preview CSV downloaded",
+          description:
+            "This export reflects the sample audit stream shown on this page — not a live enterprise audit trail.",
+        })
+      } catch (e) {
+        toast({
+          title: "Could not export",
+          description: e instanceof Error ? e.message : "Try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setExportBusy(false)
+      }
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -159,8 +204,17 @@ export default function AuditLogPage() {
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9">
             <Filter size={12} /> Filters
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 ml-auto">
-            <Download size={12} /> Export CSV
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs h-9 ml-auto"
+            type="button"
+            disabled={exportBusy}
+            onClick={exportAuditPreviewCsv}
+            title="Exports the filtered preview rows shown below (sample data)."
+          >
+            {exportBusy ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Download size={12} aria-hidden />}{" "}
+            Export preview CSV
           </Button>
         </div>
 
