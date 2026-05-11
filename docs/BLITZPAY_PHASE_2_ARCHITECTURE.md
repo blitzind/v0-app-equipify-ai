@@ -616,6 +616,29 @@ Use this as a **checklist** when coding — not exhaustive.
 5. Webhook replay keeps profile rows stable (upsert on org+customer).  
 6. Refund/dispute/payout reconciliation paths still operate and existing tests stay green.
 
+### 12.11 Phase 2J (automated collections, recovery, hosted payment links)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260917120000_blitzpay_phase_2j_collections_automation.sql` adds `blitzpay_payment_links`, `blitzpay_payment_reminders`, `blitzpay_reminder_runs`, `blitzpay_recovery_cases`, and `blitzpay_collections_timeline` with org-scoped RLS select policies for staff visibility. |
+| **Reminder orchestration** | `lib/blitzpay/blitzpay-collections.ts` introduces run-safe reminder scheduling (`before_due`, `due_date`, overdue windows), suppression rules (paid/void/archived/preference/email guardrails), and idempotent keys per invoice+reminder window. |
+| **Payment links** | Hosted invoice links are minted as opaque tokens (`bpl_…`), stored hashed (`sha256`) and resolved through `GET /portal/pay/[token]` to keep customer routing in portal-safe flow. Staff generate/copy links via `POST /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-link`. |
+| **Recovery foundations** | Recovery case rows track stage/status/reason/recommendations and last reminder/attempt metadata (no auto-charge/autopay execution). Activity API now returns collections + recovery payload for invoice-level support operations. |
+| **AI-assisted insights** | Read-only recommendations are derived from invoice attempts/history (abandonment trend, ACH candidate, overdue collectible signal) and surfaced to staff in invoice Payments activity. |
+| **Revenue reporting** | Status API now includes `collectionsReporting` snapshot: reminder effectiveness rate, average payment delay days, recovered revenue estimate, and abandoned checkout invoice count. |
+| **Operational APIs** | `POST /api/cron/blitzpay-reminders` runs reminder dispatch behind `CRON_SECRET`; retries are replay-safe via DB idempotency keys and status updates. |
+| **Tests** | `pnpm test:blitzpay-phase-2j` covers reminder eligibility/suppression, idempotency key stability, payment-link token shape, and recovery recommendation baseline logic. |
+
+#### Manual test checklist (Phase 2J)
+
+1. Reminder sends include valid `/portal/pay/{token}` links and can be opened safely.  
+2. Paid/void invoices and archived customers are suppressed from reminder dispatch.  
+3. Overdue invoices appear with recovery stage/status in staff activity panel.  
+4. Repeated unsuccessful attempts surface abandonment insight text in staff UI.  
+5. Card/ACH flows from hosted payment remain unchanged after payment-link entry.  
+6. Replaying reminder runs does not duplicate the same reminder kind for the same invoice window.  
+7. Portal entry from payment-link keeps customer experience limited to safe hosted invoice pay flow.
+
 ---
 
-*Phase 2A–2I vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2J vertical slice for hosted invoice pay + collections automation (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

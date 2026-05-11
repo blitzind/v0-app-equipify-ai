@@ -4,6 +4,7 @@ import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import { fetchBlitzpayStoredPaymentProfilesSummary } from "@/lib/blitzpay/blitzpay-payment-profiles"
+import { computeBlitzpayCollectionsReporting } from "@/lib/blitzpay/blitzpay-collections"
 
 export const runtime = "nodejs"
 
@@ -79,18 +80,22 @@ export async function GET(
 
   let reporting: Awaited<ReturnType<typeof fetchBlitzpayOrgReportingSnapshot>> | null = null
   let profileSummary: Awaited<ReturnType<typeof fetchBlitzpayStoredPaymentProfilesSummary>> | null = null
+  let collectionsReporting: Awaited<ReturnType<typeof computeBlitzpayCollectionsReporting>> | null = null
   try {
     const admin = createServiceRoleSupabaseClient()
     const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
-    const [reportingRes, profileRes] = await Promise.all([
+    const [reportingRes, profileRes, collectionsRes] = await Promise.all([
       fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
       fetchBlitzpayStoredPaymentProfilesSummary(admin, organizationId),
+      computeBlitzpayCollectionsReporting(admin, organizationId),
     ])
     reporting = reportingRes
     profileSummary = profileRes
+    collectionsReporting = collectionsRes
   } catch {
     reporting = null
     profileSummary = null
+    collectionsReporting = null
   }
 
   const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim() ?? ""
@@ -118,6 +123,7 @@ export async function GET(
           }
         : null,
       storedPaymentProfiles: profileSummary,
+      collectionsReporting,
       stripeMode,
     },
   })

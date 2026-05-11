@@ -29,6 +29,11 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_balance_transactions", select: "id" },
   { name: "blitzpay_reconciliation_runs", select: "id" },
   { name: "blitzpay_customer_payment_profiles", select: "id" },
+  { name: "blitzpay_payment_links", select: "id" },
+  { name: "blitzpay_payment_reminders", select: "id" },
+  { name: "blitzpay_reminder_runs", select: "id" },
+  { name: "blitzpay_recovery_cases", select: "id" },
+  { name: "blitzpay_collections_timeline", select: "id" },
 ]
 
 export type BlitzpaySchemaHealthResult =

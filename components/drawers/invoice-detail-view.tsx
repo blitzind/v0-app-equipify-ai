@@ -1516,6 +1516,35 @@ function PaymentsTab({
   const [blitzpayOutboundEmailConfigured, setBlitzpayOutboundEmailConfigured] = useState(false)
   const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
   const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
+  const [blitzpayCollections, setBlitzpayCollections] = useState<{
+    reminders: Array<{
+      id: string
+      kind: string
+      status: string
+      channel: string
+      scheduledFor: string
+      sentAt: string | null
+      skipReason: string | null
+    }>
+    paymentLinks: Array<{
+      id: string
+      status: string
+      createdAt: string
+      lastUsedAt: string | null
+      useCount: number
+    }>
+    recoveryCase: {
+      stage: string
+      status: string
+      reason: string
+      recommendation: string | null
+      lastReminderAt: string | null
+      lastAttemptAt: string | null
+      lastAttemptStatus: string | null
+    } | null
+    insights: Array<{ key: string; title: string; detail: string }>
+  } | null>(null)
+  const [blitzpayPaymentLinkBusy, setBlitzpayPaymentLinkBusy] = useState(false)
   type BlitzpayRefundActivityRow = {
     orgInvoicePaymentId: string
     amountCents: number
@@ -1697,6 +1726,7 @@ function PaymentsTab({
           attempts?: BlitzpayActivityRow[]
           refunds?: BlitzpayRefundActivityRow[]
           disputes?: BlitzpayDisputeActivityRow[]
+          collections?: typeof blitzpayCollections
           outboundEmail?: { configured?: boolean }
           error?: string
           message?: string
@@ -1707,11 +1737,13 @@ function PaymentsTab({
           setBlitzpayActivity([])
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
+          setBlitzpayCollections(null)
           setBlitzpayOutboundEmailConfigured(false)
         } else {
           setBlitzpayActivity(body.attempts ?? [])
           setBlitzpayRefunds(body.refunds ?? [])
           setBlitzpayDisputes(body.disputes ?? [])
+          setBlitzpayCollections((body.collections ?? null) as typeof blitzpayCollections)
           setBlitzpayOutboundEmailConfigured(Boolean(body.outboundEmail?.configured))
         }
       } catch (e) {
@@ -1720,6 +1752,7 @@ function PaymentsTab({
           setBlitzpayActivity([])
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
+          setBlitzpayCollections(null)
           setBlitzpayOutboundEmailConfigured(false)
         }
       } finally {
@@ -2213,6 +2246,73 @@ function PaymentsTab({
               </table>
             </div>
           )}
+          <div className="rounded-md border border-border p-2 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold">Collections automation</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-[10px]"
+                disabled={blitzpayPaymentLinkBusy}
+                onClick={() => {
+                  void (async () => {
+                    if (!orgId) return
+                    setBlitzpayPaymentLinkBusy(true)
+                    try {
+                      const res = await fetch(
+                        `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/payment-link`,
+                        { method: "POST", credentials: "include" },
+                      )
+                      const body = (await res.json()) as { link?: { url?: string }; message?: string; error?: string }
+                      if (!res.ok || !body.link?.url) {
+                        pushToast(body.message ?? body.error ?? "Could not create payment link.", "error")
+                        return
+                      }
+                      await navigator.clipboard.writeText(body.link.url)
+                      pushToast("Payment link copied.")
+                    } catch (e) {
+                      pushToast(e instanceof Error ? e.message : "Could not copy payment link.", "error")
+                    } finally {
+                      setBlitzpayPaymentLinkBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {blitzpayPaymentLinkBusy ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                Copy payment link
+              </Button>
+            </div>
+            {blitzpayCollections?.recoveryCase ? (
+              <p className="text-[10px] text-muted-foreground">
+                Recovery stage: <span className="text-foreground">{blitzpayCollections.recoveryCase.stage}</span> · status{" "}
+                <span className="text-foreground">{blitzpayCollections.recoveryCase.status}</span>
+                {blitzpayCollections.recoveryCase.lastAttemptStatus ?
+                  ` · last attempt ${blitzpayCollections.recoveryCase.lastAttemptStatus}`
+                : ""}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">No recovery case yet.</p>
+            )}
+            {blitzpayCollections?.reminders && blitzpayCollections.reminders.length > 0 ? (
+              <p className="text-[10px] text-muted-foreground">
+                Last reminder: {blitzpayCollections.reminders[0].kind} ({blitzpayCollections.reminders[0].status}) at{" "}
+                {fmtDateTime(blitzpayCollections.reminders[0].scheduledFor)}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">No reminder history yet.</p>
+            )}
+            {blitzpayCollections?.insights && blitzpayCollections.insights.length > 0 ? (
+              <div className="space-y-1 pt-1">
+                <p className="text-[10px] font-medium text-muted-foreground">Collections insights</p>
+                {blitzpayCollections.insights.slice(0, 3).map((i) => (
+                  <p key={i.key} className="text-[10px] text-muted-foreground">
+                    <span className="text-foreground">{i.title}:</span> {i.detail}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

@@ -173,6 +173,14 @@ Evidence from migrations under `supabase/migrations/`:
 - ACH timeline and convenience-fee behavior are configurable at org level; fee math must remain method-aware to avoid customer-facing mismatches.
 - Stored payment profile records should remain reference-only (`stripe_customer_id`, method type flags) with no local PAN/bank account details.
 
+### 8.7 BlitzPay Phase 2J (collections automation + recovery visibility)
+
+- Collections automation tables (`blitzpay_payment_reminders`, `blitzpay_reminder_runs`, `blitzpay_recovery_cases`, `blitzpay_payment_links`, `blitzpay_collections_timeline`) add operational history for reminders and recovery decisions.
+- Reminder dispatch uses deterministic idempotency keys (`organization_id + idempotency_key`) to remain replay-safe during cron retries and deploy restarts.
+- Reminder suppression should remain strict for paid/void invoices, archived customers, and non-email preferences to avoid noisy/unsafe outreach.
+- Hosted payment links use hashed opaque tokens and route into portal-safe pay pages; no raw banking or Stripe method secrets are exposed.
+- New scaling watchpoint: reminder cron fan-out across large org counts. Add per-org batching/leases when volume grows.
+
 ---
 
 ## 9. AI / Usage Scale Risks

@@ -8,6 +8,7 @@ import {
 } from "@/lib/blitzpay/staff-blitzpay-invoice-support"
 import { isOutboundEmailConfigured } from "@/lib/email/config"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
+import { fetchBlitzpayInvoiceCollectionsView } from "@/lib/blitzpay/blitzpay-collections"
 
 export const runtime = "nodejs"
 
@@ -42,15 +43,17 @@ export async function GET(
   if (drift) return drift
 
   try {
-    const [attempts, refunds, disputes] = await Promise.all([
+    const [attempts, refunds, disputes, collections] = await Promise.all([
       fetchStaffBlitzpayInvoiceAttemptActivity(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceRefunds(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceDisputes(admin, organizationId, invoiceId),
+      fetchBlitzpayInvoiceCollectionsView(admin, organizationId, invoiceId),
     ])
     return NextResponse.json({
       attempts,
       refunds,
       disputes,
+      collections,
       outboundEmail: { configured: isOutboundEmailConfigured() },
     })
   } catch (e) {

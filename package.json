@@ -23,7 +23,8 @@
     "update:master-context": "tsx scripts/update-master-context.ts",
     "test:blitzpay-phase-2g": "tsx scripts/test-blitzpay-phase-2g.ts",
     "test:blitzpay-phase-2h": "tsx scripts/test-blitzpay-phase-2h.ts",
-    "test:blitzpay-phase-2i": "tsx scripts/test-blitzpay-phase-2i.ts"
+    "test:blitzpay-phase-2i": "tsx scripts/test-blitzpay-phase-2i.ts",
+    "test:blitzpay-phase-2j": "tsx scripts/test-blitzpay-phase-2j.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

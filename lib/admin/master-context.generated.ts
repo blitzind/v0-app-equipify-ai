@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 241,
-  sqlMigrations: 156,
+  apiRouteHandlers: 243,
+  sqlMigrations: 157,
   dashboardPages: 60,
   componentsTsx: 254,
-  libTsFiles: 533,
+  libTsFiles: 534,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **241** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **156** |
+| API route handlers (\`app/api/**/route.ts\`) | **243** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **157** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **533** |
+| \`lib/**/*.ts\` | **534** |
 
 ### Vercel crons
 
@@ -39,6 +39,7 @@ billing/checkout/route.ts
 blitzpay/webhook/route.ts
 certificates/import-template/route.ts
 cron/ai-ops-digest/route.ts
+cron/blitzpay-reminders/route.ts
 cron/maintenance-due/route.ts
 cron/process-ai-jobs/route.ts
 cron/process-import-runs/route.ts
@@ -167,6 +168,7 @@ organizations/[organizationId]/inventory/vehicle-stock/route.ts
 organizations/[organizationId]/invite-member/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/diagnostics/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/payment-link/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/resend-receipt/route.ts
