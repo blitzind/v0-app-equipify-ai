@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 227,
+  apiRouteHandlers: 228,
   sqlMigrations: 147,
   dashboardPages: 59,
-  componentsTsx: 252,
-  libTsFiles: 482,
+  componentsTsx: 254,
+  libTsFiles: 487,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **227** |
+| API route handlers (\`app/api/**/route.ts\`) | **228** |
 | SQL migrations (\`supabase/migrations/*.sql\`) | **147** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
-| \`components/**/*.tsx\` | **252** |
-| \`lib/**/*.ts\` | **482** |
+| \`components/**/*.tsx\` | **254** |
+| \`lib/**/*.ts\` | **487** |
 
 ### Vercel crons
 
@@ -120,6 +120,7 @@ organizations/[organizationId]/customers/[customerId]/portal-certificate-release
 organizations/[organizationId]/customers/[customerId]/portal-consolidated-documents/route.ts
 organizations/[organizationId]/equipment-warranties/[warrantyId]/route.ts
 organizations/[organizationId]/equipment-warranties/route.ts
+organizations/[organizationId]/first-run/route.ts
 organizations/[organizationId]/follow-up-automation/settings/route.ts
 organizations/[organizationId]/follow-up-tasks/[taskId]/approve/route.ts
 organizations/[organizationId]/follow-up-tasks/[taskId]/dismiss/route.ts

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useAdmin } from "@/lib/admin-store"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { normalizeIndustryKey, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
 
 const RESET_CONFIRM = "RESET_SAMPLE_DATA"
@@ -55,6 +57,9 @@ type DemoStatusResponse = {
 export default function SampleDataSettingsPage() {
   const { toast } = useToast()
   const { organizationId, status: orgStatus } = useActiveOrganization()
+  const { rawRole } = useOrgPermissions()
+  const { isPlatformAdmin } = useAdmin()
+  const isSampleDataAdmin = isPlatformAdmin || rawRole === "owner" || rawRole === "admin"
 
   const [statusLoading, setStatusLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
@@ -66,6 +71,7 @@ export default function SampleDataSettingsPage() {
   const [resetOpen, setResetOpen] = useState(false)
   const [resetPhrase, setResetPhrase] = useState("")
   const [resetLoading, setResetLoading] = useState(false)
+  const [launchpadShowLoading, setLaunchpadShowLoading] = useState(false)
 
   const loadStatus = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") return
@@ -145,6 +151,33 @@ export default function SampleDataSettingsPage() {
     }
   }
 
+  async function handleShowLaunchpadAgain() {
+    if (!organizationId) return
+    setLaunchpadShowLoading(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/first-run`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "show_launchpad" }),
+      })
+      const json = (await res.json()) as { message?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not update preference",
+          description: json.message ?? res.statusText,
+        })
+        return
+      }
+      toast({
+        title: "Checklist visible again",
+        description: "Open the main dashboard to see Getting started.",
+      })
+    } finally {
+      setLaunchpadShowLoading(false)
+    }
+  }
+
   async function handleReset() {
     if (!organizationId) return
     setResetLoading(true)
@@ -203,9 +236,32 @@ export default function SampleDataSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {isSampleDataAdmin ?
+        <SettingCard
+          title="Dashboard getting started"
+          description="If you hid the checklist on the home dashboard, bring it back here. This only changes your personal view — not your team."
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground max-w-xl">
+              The checklist tracks real actions (new customers you add, invoices you move past draft, and so on). It
+              never marks items complete unless the underlying work exists in your workspace.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={launchpadShowLoading}
+              onClick={() => void handleShowLaunchpadAgain()}
+            >
+              {launchpadShowLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Show checklist on dashboard
+            </Button>
+          </div>
+        </SettingCard>
+      : null}
+
       <SettingCard
         title="Sample & demo data"
-        description="Loads or clears demo-only rows for this workspace. Real customer records you create are never deleted unless they are explicitly marked as sample."
+        description="Loads or clears demo-only rows for this workspace. Records you create yourself stay in place — only rows created as examples are removed on reset."
       >
         {statusLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -214,16 +270,42 @@ export default function SampleDataSettingsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            <div className="rounded-md border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">What gets seeded</p>
-              <ul className="mt-2 list-disc pl-5 space-y-1">
-                <li>Customers, contacts, sites, equipment, work orders, and maintenance plans</li>
-                <li>Prospects, quotes, invoices, purchase orders, vendors, catalog lines, and inventory (demo locations + on-hand quantities)</li>
-                <li>Starter calibration templates (full calibration record payloads stay on the rich biomedical profile)</li>
-                <li>Demo technician roster, industry skill-tag options, sample communications, and sample AI Ops cards</li>
+            <div className="rounded-md border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground space-y-3">
+              <p className="font-medium text-foreground">What is sample data?</p>
+              <p>
+                Sample bundles mirror how teams use Equipify day to day: realistic customers, assets, jobs, quotes, and
+                invoices so you can click through workflows safely. Anything labeled as sample can be removed in one
+                step; your own customers, equipment, and billing stay untouched.
+              </p>
+              <p className="font-medium text-foreground pt-1">Modules included in a full import</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <span className="text-foreground font-medium">Field operations:</span> customers, contacts, sites,
+                  equipment, work orders, maintenance plans
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">Sales & billing:</span> prospects, quotes, invoices
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">Supply chain:</span> vendors, catalog lines, purchase
+                  orders, demo warehouse locations and on-hand stock
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">People & skills:</span> demo technician roster and
+                  industry skill-tag options marked as sample
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">Engagement & insights:</span> sample communications on
+                  timelines and sample AI Operations cards for training
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">Compliance (profile-dependent):</span> starter
+                  calibration templates; richer calibration payloads ship with the biomedical profile
+                </li>
               </ul>
-              <p className="mt-2 text-xs">
-                Equipment categories on seeded assets follow your industry. The separate Equipment types screen still uses lightweight in-app presets for UI demos.
+              <p className="text-xs">
+                Equipment categories on seeded assets follow the industry you pick at import. The separate Equipment
+                types screen still uses lightweight in-app presets for layout demos.
               </p>
             </div>
             <div className="flex items-start gap-3">
@@ -262,8 +344,8 @@ export default function SampleDataSettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Import uses the same generator as onboarding (`seedDemoForIndustry`). Your workspace must have no
-                customer rows except after a full sample reset.
+                Import uses the same industry bundles as first-time workspace setup. Your workspace must have no
+                customer rows except after a full sample reset (or a brand-new workspace).
               </p>
             </div>
 
@@ -298,9 +380,13 @@ export default function SampleDataSettingsPage() {
                   This permanently removes demo-only rows for this workspace: customers, equipment, work orders,
                   maintenance plans, prospects, catalog and inventory tied to demo location codes, sample vendors,
                   quotes and invoices marked sample, sample technician skill tags, demo communications on timelines,
-                  sample AI Ops recommendation rows, and demo technician memberships from the importer. Your
+                  sample AI Operations recommendation rows, and demo technician memberships from the importer. Your
                   organization profile, subscriptions, non-sample users, billing, and workspace settings stay in
                   place.
+                </p>
+                <p>
+                  Re-import after a reset is safe and repeatable: the importer clears prior sample markers first. You
+                  can run it again whenever you want a fresh practice dataset — it does not duplicate your real records.
                 </p>
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">Confirmation phrase</label>

@@ -36,6 +36,7 @@ import { FollowUpAutomationSignals } from "@/components/dashboard/follow-up-auto
 import { ServiceRequestSignals } from "@/components/dashboard/service-request-signals"
 import { cn } from "@/lib/utils"
 import { canReadServiceRequestQueue } from "@/lib/service-requests/list-filter"
+import { DashboardLaunchpad } from "@/components/first-run/dashboard-launchpad"
 
 function formatUsdFromCents(cents: number): string {
   const dollars = Math.round(cents / 100)
@@ -73,6 +74,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <TechnicianTodayMobileCard />
+      <DashboardLaunchpad />
       {dashboardOrgStatus === "ready" && dashboardOrgId ? (
         <>
           <FollowUpAutomationSignals organizationId={dashboardOrgId} />

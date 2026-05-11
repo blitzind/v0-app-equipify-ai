@@ -21,6 +21,7 @@ import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
+import { FirstRunWelcomeGate } from "@/components/first-run/first-run-welcome-gate"
 import { AdminProvider, useAdmin } from "@/lib/admin-store"
 import { ShieldAlert, X, ArrowRight } from "lucide-react"
 
@@ -93,6 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           </div>
                           {/* Fixed launcher lives outside workspace overflow stacks; still not part of sidebar/nav RBAC */}
                           <AidenChatLauncher />
+                          <FirstRunWelcomeGate />
                         </div>
                       </SidebarContext.Provider>
                     </EquipmentTypeProvider>
