@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAnyOrgPermission, requireOrgPermission } from "@/lib/api/require-org-permission"
 import { defaultDigestSettings, loadDigestSettings } from "@/lib/ai-ops/digest"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import type { RecommendationCategory, RecommendationPriority } from "@/lib/ai-ops/types"
 
 export const runtime = "nodejs"
@@ -77,6 +79,11 @@ export async function PATCH(
   if ("error" in gate) return gate.error
   const { supabase, userId } = gate
 
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+  const isPlatformAdmin = Boolean(authUser?.email && isPlatformAdminEmail(authUser.email))
+
   let body: unknown
   try {
     body = await request.json()
@@ -134,6 +141,16 @@ export async function PATCH(
   // Phase 4 safety: silently disable a destination if its webhook URL is cleared.
   if (data.slackWebhookUrl === null) upsert.slack_enabled = false
   if (data.teamsWebhookUrl === null) upsert.teams_enabled = false
+
+  const prior = await loadDigestSettings(supabase, organizationId)
+  const baseRow = prior.row ?? defaultDigestSettings(organizationId)
+  const nextEnabled = data.enabled !== undefined ? data.enabled : baseRow.enabled
+  if (nextEnabled && !isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) {
+      return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+    }
+  }
 
   const { error } = await supabase
     .from("ai_ops_digest_settings")

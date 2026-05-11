@@ -8,6 +8,7 @@ import { deriveCommunicationCenterKind } from "@/lib/communications/communicatio
 import { communicationEventInAssignedScope } from "@/lib/communications/feed-scope"
 import { isFinancialRow } from "@/lib/communications/feed"
 import { runAiTask } from "@/lib/ai/server"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
@@ -137,6 +138,13 @@ export async function POST(
     })
     if (!communicationEventInAssignedScope(row, scope)) {
       return jsonError("Forbidden.", 403)
+    }
+  }
+
+  if (!isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) {
+      return jsonError(planGate.message, planGate.httpStatus, planGate.code)
     }
   }
 

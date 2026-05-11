@@ -15,9 +15,12 @@
  *   - No customer-facing sends.
  *   - Authenticated by `CRON_SECRET` shared secret.
  *   - Skips orgs with no recipients configured.
+ *   - Phase 60.5: skips orgs without Growth+ `ai` plan entitlement (trial Scale counts).
  */
 
 import { NextResponse } from "next/server"
+import { logAiGovernanceSkip } from "@/lib/ai/governance-log"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { runDigestForOrganization } from "@/lib/ai-ops/digest-runner"
 import { normalizeSettingsRow } from "@/lib/ai-ops/digest"
@@ -86,7 +89,15 @@ async function runAiOpsDigestCron(request: Request) {
     orgById.set(o.id, o)
   }
 
-  const summary = { processed: 0, sent: 0, skipped: 0, failed: 0, no_items: 0, no_recipients: 0 }
+  const summary = {
+    processed: 0,
+    sent: 0,
+    skipped: 0,
+    skipped_no_ai_entitlement: 0,
+    failed: 0,
+    no_items: 0,
+    no_recipients: 0,
+  }
   const perOrg: Array<{
     organizationId: string
     status: string
@@ -125,6 +136,25 @@ async function runAiOpsDigestCron(request: Request) {
         perOrg.push({ organizationId: org.id, status: "skipped", runId: null, error: "cooldown" })
         continue
       }
+    }
+
+    const planGate = await requireFeatureAccess(admin, org.id, "ai")
+    if (!planGate.ok) {
+      summary.skipped += 1
+      summary.skipped_no_ai_entitlement += 1
+      logAiGovernanceSkip({
+        organizationId: org.id,
+        feature: "ai_ops_digest_cron",
+        reason: "missing_ai_plan_entitlement",
+        source: "cron/ai-ops-digest",
+      })
+      perOrg.push({
+        organizationId: org.id,
+        status: "skipped",
+        runId: null,
+        error: "no_ai_entitlement",
+      })
+      continue
     }
 
     try {

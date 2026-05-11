@@ -45,7 +45,7 @@ Statuses: **enforced** | **partial** | **display-only** | **planned** | **needs 
 | **AI requests** | Per-task caps in `AiTaskDefinition` + plan tier | `ai_usage_logs` | AI usage settings / ops | `evaluateAiPlanGate` + budget precheck | Calendar month (UTC) for MTD task aggregation | **enforced** where tasks use plan gate; not every AI touchpoint may use the same task id |
 | **AI spend** | Org budget (not plan tier table) | `ai_usage_logs` + org settings | Settings → AI usage | `precheckOrganizationAiBudget` (warn/block) | Calendar month | **enforced** when configured |
 | **API calls (plan allowance)** | `apiCallsMonthly` Growth/Scale | `organization_api_usage_monthly.api_calls` | Billing Usage bar | **None** — no app increment | UTC calendar month row | **display-only** — counter not incremented by app code yet |
-| **Automations / workflow runs** | Indirect (automation feature Growth+) | Run history tables | — | Feature + billing on create paths; no per-run numeric cap | — | **partial** — entitlement/billing, not run count |
+| **Automations / workflow runs** | Indirect (automation feature Growth+) | Run history tables | — | Feature + billing on create + `dispatchWorkflowTriggers` skip; no per-run numeric cap | — | **partial** — see **`docs/AI_AUTOMATION_GOVERNANCE.md`** |
 | **Storage / documents** | Not in `PLAN_LIMITS` | Supabase storage | — | RLS / permissions | — | **needs follow-up** / product |
 | **Imports / migration** | Platform-admin gated | Platform routes | — | `isPlatformAdminEmail` + org migration helpers | — | **n/a** for tenant plan caps |
 | **Portal users / links** | Not in `PLAN_LIMITS` | — | — | Permissions + RLS | — | **needs follow-up** if product adds caps |

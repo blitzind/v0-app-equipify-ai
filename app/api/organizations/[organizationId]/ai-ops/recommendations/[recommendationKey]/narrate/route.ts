@@ -5,6 +5,7 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { getOrganizationMemberRole } from "@/lib/api/org-role"
 import { getOrgPermissionsForRole, normalizeOrgMemberRole } from "@/lib/permissions/model"
 import { runAiTask } from "@/lib/ai/server"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
@@ -123,6 +124,22 @@ export async function POST(
       provider: cached.provider,
       model: cached.model,
     })
+  }
+
+  if (!isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) {
+      const fallback = buildFallbackNarration(target)
+      return NextResponse.json(
+        {
+          ok: false,
+          error: planGate.code,
+          message: planGate.message,
+          fallback,
+        },
+        { status: planGate.httpStatus },
+      )
+    }
   }
 
   // 2. Generate via existing AI infrastructure. We reuse the

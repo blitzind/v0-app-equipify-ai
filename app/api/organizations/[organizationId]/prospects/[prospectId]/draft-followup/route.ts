@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { recordAidenUsageEvent } from "@/lib/aiden/usage-events"
 import { requireOrgPermission } from "@/lib/api/require-org-permission"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
+import { requireFeatureAccess } from "@/lib/billing/server-guard"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
 import { runAiTask } from "@/lib/ai/server"
@@ -53,7 +55,7 @@ const TIMELINE_LIMIT = 5
  *
  * Permissions:
  *   - `requireOrgPermission("canManageProspects")` — staff-side only.
- *   - Plan/budget gating handled internally by `runAiTask`.
+ *   - Growth+ **`ai`** via `requireFeatureAccess` (non–platform-admin); budget/task gating inside `runAiTask`.
  */
 export async function POST(
   request: Request,
@@ -82,6 +84,15 @@ export async function POST(
   const gate = await requireOrgPermission(organizationId, "canManageProspects")
   if ("error" in gate) return gate.error
   const { supabase, userId } = gate
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+  const isPlatformAdmin = Boolean(authUser?.email && isPlatformAdminEmail(authUser.email))
+  if (!isPlatformAdmin) {
+    const planGate = await requireFeatureAccess(supabase, organizationId, "ai")
+    if (!planGate.ok) return jsonError(planGate.message, planGate.httpStatus, planGate.code)
+  }
 
   const { data: prospect, error: lookupError } = await supabase
     .from("prospects")

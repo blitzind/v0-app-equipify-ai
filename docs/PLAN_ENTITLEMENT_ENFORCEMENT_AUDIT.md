@@ -6,6 +6,8 @@ This document maps **how Equipify ties Stripe / `organization_subscriptions` to 
 
 **Billing UX & grace messaging** (trial, past_due, canceled, missing row — **no hard lockout** in 60.4): **`docs/BILLING_ACCESS_AND_GRACE_PERIODS.md`**.
 
+**AI & automation governance** (cron digest, route matrix, AIden vs `ai` entitlement): **`docs/AI_AUTOMATION_GOVERNANCE.md`** (Phase 60.5).
+
 ## Architecture summary
 
 ### Where the current plan is resolved
@@ -69,13 +71,13 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 | **Workflow automations** | Growth+ `automation` | `canUseFeature` in automations routes | Settings UI | POST/PATCH/duplicate | N/A | **Enforced** | |
 | **AI assistants (run/enqueue)** | Growth+ `ai` | `requireFeatureAccess(..., "ai")` | UI | Route handlers | Budget / task gate inside AI | **Enforced** | |
 | **Insights generate / org-tasks** | Growth+ `ai` + billing | `requireFeatureAccess` + `requireCanCreateRecord` | UI | Yes | N/A | **Enforced** | |
-| **AI Ops digest (send/preview/test)** | Growth+ `ai` | `requireFeatureAccess(..., "ai")` **Phase 60.1** | Settings | Digest routes | N/A | **Enforced** (60.1+) | Previously permission-only. |
+| **AI Ops digest (send/preview/test)** | Growth+ `ai` | `requireFeatureAccess(..., "ai")` **Phase 60.1** (+ **60.5** PA bypass) | Settings | Digest routes | N/A | **Enforced** (60.1+) | Previously permission-only. |
 | **AI Ops recommendations list** | Growth+ `ai` | `requireFeatureAccess` **60.1** (non–platform-admin) | AI Ops UI | GET | N/A | **Enforced** (60.1+) | Platform admin bypass preserved for support. |
 | **AI Ops execute action** | Growth+ `ai` | `requireFeatureAccess` **60.1** (non–platform-admin) | UI | POST | Uses `requireCanCreateRecord` inside executor | **Enforced** (60.1+) | |
-| **AI Ops narrate** | Plan via `runAiTask` / plan-gate | `getEffectivePlanId` + AI router | UI | POST | Token usage | **Enforced** | Inherited from AI pipeline. |
+| **AI Ops narrate** | Growth+ `ai` before LLM | `requireFeatureAccess` **60.5** (non-PA) + `runAiTask` | UI | POST | Token usage | **Enforced** | Cache hit skips LLM + plan gate for new generation only. |
 | **AIden chat / feature-requests** | Scale/Growth rules + billing | `canAccessApp`, `canUseAidenCapability`, `getEffectivePlanId` | UI | Dedicated route context | Usage events | **Enforced** | Productivity/safe-actions have separate context files. |
 | **Work order AI (parts/summary/tech assist)** | Plan + AI gate | Plan-gate + `resolveAiExecutionMode` | UI | Per-route | Usage | **Enforced** | |
-| **Communications AI assist** | Plan tier in route | `getEffectivePlanId` | UI | Route | | **Partial** | Verify parity with `canUseFeature("ai")` in future pass. |
+| **Communications AI assist** | Growth+ `ai` | `requireFeatureAccess` **60.5** (non-PA) | UI | Route | AIden usage event | **Enforced** | |
 | **QuickBooks integration** | None explicit in route sample | N/A | Integrations hub | `requireOrgIntegrationAdmin` + financial perms | N/A | **UI / permission only** | Not mapped to `canUseFeature`; product may intend Core+. |
 | **Customer portal** | Not centrally entitlement-gated | N/A | Portal routes | Session / org scoping | N/A | **Partial** | Marketing: Core+ “portal” — enforcement is org setup + auth, not plan id check in portal bootstrap. |
 | **Inventory APIs** | No `requireFeatureAccess` in inventory folder | Capabilities | Client + `requireOrgPermission` patterns | Various inventory routes | N/A | **Permission-first** | Plan does not gate inventory module in code audit. |
@@ -99,11 +101,10 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 3. **API monthly call limit**  
    `organization_api_usage_monthly` + UI bar; **not** a universal hard stop on all external API usage (documented as informational / planned metering).
 
-4. **AI Ops settings GET/PATCH without plan gate**  
-   60.1 gates **send / preview / test webhook** and **recommendations / execute** for non–platform-admin. Settings can still be saved on lower tiers — **low risk** (no AI spend until send/preview).
+4. **AI Ops digest settings PATCH**  
+   **60.5** blocks enabling the digest (`enabled: true`) without **`ai`** for non–platform-admin. GET remains permission-only.
 
-5. **Cron `ai-ops-digest` worker** (`/api/cron/ai-ops-digest`)  
-   Uses service role and does not re-check `canUseFeature("ai")` per org. A Solo org that enabled digest settings in the DB could still receive scheduled sends until settings are gated or cron checks plan — **deferred** to **60.5**.
+5. **Cron `ai-ops-digest` worker** — **closed in 60.5** (`requireFeatureAccess` per org + safe skip logs). See `docs/AI_AUTOMATION_GOVERNANCE.md`.
 
 6. **QuickBooks / portal / inventory**  
    Permission-rich; **plan alignment** is mostly marketing unless product mandates explicit `canUseFeature` — **deferred** to policy pass.
@@ -132,7 +133,7 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 | **60.2 Usage metering & enforcement** | Wire API call counters to consistent enforcement points; optional soft caps; align Growth/Scale limits with actual traffic. |
 | **60.3 Seat limit enforcement** | Align “seats used” display with invite rule; block member activation paths; handle edge fail-open. |
 | **60.4 Grace period / lockout UX** | Past-due read-only, messaging, **no** full hard lock in 60.x unless product approves. |
-| **60.5 AI & automation governance** | Unify `canUseFeature("ai"|"automation")` with AIden matrix; communications AI assist; cron digest scheduler plan check. |
+| **60.5 AI & automation governance** | **Shipped** — `docs/AI_AUTOMATION_GOVERNANCE.md` (cron digest plan check; narrate/communications/prospect/follow-up `ai` gates; digest settings enable gate; PA bypass on digest send/preview/test). |
 
 ---
 
@@ -143,7 +144,8 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 - [ ] **Trialing** org: Scale limits, AI features allowed per matrix; AI execution **mock** vs live per `resolveAiExecutionMode`.
 - [ ] **past_due**: record creation still allowed; AI disabled in execution mode.
 - [ ] **canceled/unpaid**: record creation blocked on guarded flows.
-- [ ] **Platform admin** email: can still hit AI Ops recommendations/execute for support (bypass plan gate).
+- [ ] **Platform admin** email: can still hit AI Ops recommendations/execute/digest send/preview/test for support (bypass plan gate).
+- [ ] **Cron digest**: ineligible org skipped with `no_ai_entitlement`; logs contain no prompts/secrets (`ai_governance_skip`).
 - [ ] **Permissions**: technician without insights permission still blocked regardless of plan.
 
 ---
@@ -156,3 +158,4 @@ Legend: **Enforced** = consistent UI + server (or server-only where UI N/A). **P
 - `lib/billing/subscriptions.ts` — row shape & trial helpers.
 - `lib/ai/execution-mode.ts` — live vs mock AI.
 - `app/(dashboard)/settings/billing/page.tsx` — usage display.
+- `docs/AI_AUTOMATION_GOVERNANCE.md` — AI/automation route matrix & cron behavior (60.5).
