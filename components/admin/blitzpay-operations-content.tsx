@@ -52,6 +52,18 @@ type MembershipPlatformRollup = {
   delinquencyPressurePct: number
 }
 
+type PayrollPlatformRollup = {
+  reportingWindowDays: number
+  generatedAt: string
+  orgsSampled: number
+  orgsWithDraftPayrollApprox: number
+  orgsWithFailedPayrollApprox: number
+  pendingCommissionExposureCentsApprox: number
+  contractorSettlementPendingCentsApprox: number
+  recurringSharePendingCentsApprox: number
+  highCommissionExposureOrgsApprox: number
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -127,6 +139,7 @@ export function BlitzpayOperationsContent() {
   const [collectionsRollup, setCollectionsRollup] = useState<CollectionsPlatformRollup | null>(null)
   const [recurringRollup, setRecurringRollup] = useState<RecurringRevenuePlatformRollup | null>(null)
   const [membershipRollup, setMembershipRollup] = useState<MembershipPlatformRollup | null>(null)
+  const [payrollRollup, setPayrollRollup] = useState<PayrollPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -165,13 +178,14 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/collections-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/recurring-revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/membership-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/payroll-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
@@ -179,6 +193,7 @@ export function BlitzpayOperationsContent() {
         const j4 = (await r4.json()) as { rollup?: CollectionsPlatformRollup }
         const j5 = (await r5.json()) as { rollup?: RecurringRevenuePlatformRollup }
         const j6 = (await r6.json()) as { rollup?: MembershipPlatformRollup }
+        const j7 = (await r7.json()) as { rollup?: PayrollPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
@@ -191,6 +206,8 @@ export function BlitzpayOperationsContent() {
         else setRecurringRollup(null)
         if (r6.ok) setMembershipRollup(j6.rollup ?? null)
         else setMembershipRollup(null)
+        if (r7.ok) setPayrollRollup(j7.rollup ?? null)
+        else setPayrollRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
@@ -198,6 +215,7 @@ export function BlitzpayOperationsContent() {
         setCollectionsRollup(null)
         setRecurringRollup(null)
         setMembershipRollup(null)
+        setPayrollRollup(null)
       }
     })()
   }, [])
@@ -574,6 +592,44 @@ export function BlitzpayOperationsContent() {
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {payrollRollup && payrollRollup.orgsSampled > 0 ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Payroll & commission exposure (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Sampled {payrollRollup.orgsSampled} recent orgs ({payrollRollup.reportingWindowDays}d window). Directional totals;
+            bounded reads only. Not ACH payroll processing.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Draft payroll runs (orgs)</p>
+              <p className="text-lg font-semibold tabular-nums">{payrollRollup.orgsWithDraftPayrollApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed payroll (orgs)</p>
+              <p className="text-lg font-semibold tabular-nums">{payrollRollup.orgsWithFailedPayrollApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending commissions (sample sum)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.pendingCommissionExposureCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Contractor settlements pending</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.contractorSettlementPendingCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Revenue-share pending</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.recurringSharePendingCentsApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">High commission exposure orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{payrollRollup.highCommissionExposureOrgsApprox}</p>
+            </div>
+          </div>
         </div>
       ) : null}
 

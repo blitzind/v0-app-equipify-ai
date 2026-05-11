@@ -13,6 +13,7 @@ import { fetchBlitzpayOrgRevenueIntelligence } from "@/lib/blitzpay/blitzpay-rev
 import type { BlitzpayRevenueRecommendation } from "@/lib/blitzpay/blitzpay-revenue-recommendations"
 import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 import { fetchBlitzpayMembershipDashboard } from "@/lib/blitzpay/blitzpay-memberships"
+import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 
 export type BlitzpayFinancialCommandCenterDrilldown = {
   href: string
@@ -54,6 +55,13 @@ export type BlitzpayFinancialCommandCenterPayload = {
     membershipChurnRisk0to100: number
     membershipOpenFailures: number
     membershipRenewalPipelineCents: number
+    /** Phase 2Y — payroll / commission exposure (bounded). */
+    payrollPendingCommissionCents: number
+    payrollLiabilityCents: number
+    contractorSettlementExposureCents: number
+    recurringRevenueSharePendingCents: number
+    commissionVelocity7dCents: number
+    draftPayrollRuns: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -77,6 +85,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     disputes: { href: "/settings/payments", label: "Disputes & refunds (review in Payments / invoices)" },
     reports: { href: "/reports", label: "Operations reports" },
     memberships: { href: "/memberships", label: "Memberships & agreements" },
+    payroll: { href: "/settings/payments#blitzpay-payroll-anchor", label: "Payroll & commissions (Settings → Payments)" },
   }
 }
 
@@ -89,10 +98,11 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
   const reportingWindowDays = Math.min(90, Math.max(7, Math.round(Number(options?.reportingWindowDays ?? 30))))
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
 
-  const [intelligence, reporting, membershipDash] = await Promise.all([
+  const [intelligence, reporting, membershipDash, payrollHealth] = await Promise.all([
     fetchBlitzpayOrgRevenueIntelligence(admin, organizationId, { reportingWindowDays }),
     fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso }),
     fetchBlitzpayMembershipDashboard(admin, organizationId).catch(() => null),
+    summarizePayrollHealth(admin, organizationId).catch(() => null),
   ])
 
   let stripePayoutsEnabled = false
@@ -202,6 +212,15 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       membershipChurnRisk0to100: membershipDash?.churnRiskScore0to100 ?? 0,
       membershipOpenFailures: membershipDash?.openFailureCount ?? 0,
       membershipRenewalPipelineCents: membershipDash?.renewalPipelineCents ?? 0,
+      payrollPendingCommissionCents: payrollHealth?.pendingCommissionCents ?? 0,
+      payrollLiabilityCents:
+        (payrollHealth?.pendingCommissionCents ?? 0) +
+        (payrollHealth?.contractorSettlementPendingCents ?? 0) +
+        (payrollHealth?.revenueSharePendingCents ?? 0),
+      contractorSettlementExposureCents: payrollHealth?.contractorSettlementPendingCents ?? 0,
+      recurringRevenueSharePendingCents: payrollHealth?.revenueSharePendingCents ?? 0,
+      commissionVelocity7dCents: payrollHealth?.commissionVelocity7dCents ?? 0,
+      draftPayrollRuns: payrollHealth?.draftPayrollRuns ?? 0,
     },
     combinedForecast,
     scorecards,

@@ -37,6 +37,11 @@ type TreasuryPayload = {
     plannedRecurringInflow30dCents: number
     summaryNote: string
   }
+  payrollTreasurySignals?: {
+    payrollLiabilityCents: number
+    pendingCommissionCents: number
+    contractorSettlementPendingCents: number
+  }
 }
 
 function fmtMoney(cents: number): string {
@@ -93,96 +98,110 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
   if (!organizationId || !orgReady) return null
 
   return (
-    <div className="rounded-lg border border-border bg-muted/10 px-3 py-3 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-[color:var(--primary)] shrink-0" aria-hidden />
-          <p className="text-xs font-semibold">BlitzPay contractor balance &amp; payouts</p>
+    <div className="rounded-xl border border-border bg-muted/10 px-4 py-4 sm:px-5 sm:py-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Landmark className="h-5 w-5 text-[color:var(--primary)] shrink-0" aria-hidden />
+          <p className="text-sm font-semibold text-foreground">BlitzPay contractor balance &amp; payouts</p>
         </div>
-        <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" disabled={loading} onClick={() => void load()}>
-          {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+        <Button type="button" variant="outline" size="sm" className="h-8 text-xs shrink-0" disabled={loading} onClick={() => void load()}>
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
           Refresh
         </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-1.5">
-        <Shield className="w-3.5 h-3.5 shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
+      <p className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2">
+        <Shield className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
         Derived from Stripe Connect payout and balance-transaction mirrors. No bank account numbers are stored or shown.
         Reserve targets are configuration-only; funds remain at Stripe.
       </p>
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {loading && !treasury ? (
-        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-          <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
         </p>
       ) : null}
       {treasury ? (
         <>
           {treasury.recurringCashSignals ? (
-            <div className="rounded-md border border-border/70 bg-background/60 px-2 py-2 text-[11px] space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Recurring cash confidence</p>
-              <p className="text-muted-foreground leading-snug">
+            <div className="rounded-lg border border-border/70 bg-background/60 px-4 py-3 text-sm space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recurring cash confidence</p>
+              <p className="text-muted-foreground leading-relaxed">
                 Stability {treasury.recurringCashSignals.stabilityScore0to100}/100 · Planned inbound (30d){" "}
                 {fmtMoney(treasury.recurringCashSignals.plannedRecurringInflow30dCents)}
               </p>
-              <p className="text-[10px] text-muted-foreground leading-snug">{treasury.recurringCashSignals.summaryNote}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{treasury.recurringCashSignals.summaryNote}</p>
             </div>
           ) : null}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Available (ledger)</p>
-              <p className="font-medium tabular-nums">{fmtMoney(treasury.availableBalanceCents)}</p>
+          {treasury.payrollTreasurySignals ? (
+            <div className="rounded-lg border border-border/70 bg-background/60 px-4 py-3 text-sm space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payroll liability vs cash (Phase 2Y)</p>
+              <p className="text-muted-foreground leading-relaxed text-xs">
+                Accrued commissions + contractor settlements (internal ledger). Not a bank balance; compare to operating
+                cash when planning distributions.
+              </p>
+              <p className="text-xs tabular-nums">
+                Liability {fmtMoney(treasury.payrollTreasurySignals.payrollLiabilityCents)} · Pending commissions{" "}
+                {fmtMoney(treasury.payrollTreasurySignals.pendingCommissionCents)} · Contractor settlements{" "}
+                {fmtMoney(treasury.payrollTreasurySignals.contractorSettlementPendingCents)}
+              </p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Pending settlement</p>
-              <p className="font-medium tabular-nums">{fmtMoney(treasury.pendingBalanceCents)}</p>
+          ) : null}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Available (ledger)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(treasury.availableBalanceCents)}</p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Held reserve (target)</p>
-              <p className="font-medium tabular-nums">
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Pending settlement</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(treasury.pendingBalanceCents)}</p>
+            </div>
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Held reserve (target)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">
                 {fmtMoney(treasury.heldReserveCents)}
                 <span className="text-muted-foreground font-normal"> / {fmtMoney(treasury.reserveTargetCents)}</span>
               </p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Operating (after reserve)</p>
-              <p className="font-medium tabular-nums">{fmtMoney(treasury.operatingBalanceCents)}</p>
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Operating (after reserve)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(treasury.operatingBalanceCents)}</p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Payout in transit</p>
-              <p className="font-medium tabular-nums">{fmtMoney(treasury.payoutInTransitCents)}</p>
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Payout in transit</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(treasury.payoutInTransitCents)}</p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Est. upcoming transfer</p>
-              <p className="font-medium tabular-nums">{fmtMoney(treasury.estimateUpcomingTransferCents)}</p>
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Est. upcoming transfer</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(treasury.estimateUpcomingTransferCents)}</p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Failed payouts (30d)</p>
-              <p className="font-medium tabular-nums">{treasury.failedPayoutCount30d}</p>
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Failed payouts (30d)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">{treasury.failedPayoutCount30d}</p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Avg paid delay (days)</p>
-              <p className="font-medium tabular-nums">
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Avg paid delay (days)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5">
                 {treasury.avgPayoutDelayDays != null ? treasury.avgPayoutDelayDays.toFixed(1) : "—"}
               </p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5">
-              <p className="text-muted-foreground">Payout velocity (7d / 30d)</p>
-              <p className="font-medium tabular-nums text-[10px] leading-snug">
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Payout velocity (7d / 30d)</p>
+              <p className="font-semibold tabular-nums text-foreground mt-0.5 text-xs leading-snug">
                 {fmtMoney(treasury.payoutVelocityPaidCents7d)} · {fmtMoney(treasury.payoutVelocityPaidCents30d)}
               </p>
             </div>
-            <div className="rounded-md border border-border/80 bg-background/60 px-2 py-1.5 sm:col-span-2">
-              <p className="text-muted-foreground">Instant / speed lane</p>
-              <p className="font-medium">
+            <div className="rounded-lg border border-border/80 bg-background/60 px-3 py-2 sm:col-span-2">
+              <p className="text-xs text-muted-foreground">Instant / speed lane</p>
+              <p className="font-semibold text-foreground mt-0.5">
                 {treasury.instantTransferEligible ? "Eligible (heuristic)" : "Not flagged"}{" "}
                 <span className="text-muted-foreground font-normal">· {treasury.payoutSpeedLane}</span>
               </p>
             </div>
           </div>
           {treasury.insights.length > 0 ? (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Insights</p>
-              <ul className="space-y-1 text-[11px]">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Insights</p>
+              <ul className="space-y-1.5 text-sm leading-relaxed">
                 {treasury.insights.map((i) => (
                   <li
                     key={i.id}
@@ -197,12 +216,12 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
             </div>
           ) : null}
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Recent payouts</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent payouts</p>
             {treasury.recentPayouts.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">No payout rows yet.</p>
+              <p className="text-sm text-muted-foreground">No payout rows yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-md border border-border">
-                <table className="w-full text-left text-[11px]">
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-left text-sm">
                   <thead className="bg-muted/40">
                     <tr>
                       <th className="p-2 font-medium">Arrival</th>
@@ -227,12 +246,12 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
               </div>
             )}
             {treasury.recentPayouts.some((p) => p.failureSummary) ? (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Failure summaries are truncated Stripe messages for staff triage only.
               </p>
             ) : null}
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Last computed {fmtWhen(treasury.orgBalanceRowComputedAt)} · Instant execution is not enabled in-app.
           </p>
         </>

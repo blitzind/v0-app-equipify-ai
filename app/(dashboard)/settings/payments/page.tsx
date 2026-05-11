@@ -14,6 +14,9 @@ import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpayRecurringRevenuePanel } from "@/components/blitzpay/blitzpay-recurring-revenue-panel"
 import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
+import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
+import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
+import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -928,6 +931,14 @@ function BlitzPaySettingsPageInner() {
               {canViewFinancialCommandCenter && organizationId ? (
                 <div id="blitzpay-executive-dashboard-anchor" className="border-t border-border pt-4">
                   <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                </div>
+              ) : null}
+
+              {canViewFinancialCommandCenter && organizationId ? (
+                <div id="blitzpay-payroll-anchor" className="border-t border-border pt-4 space-y-4">
+                  <BlitzpayPayrollDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                  <BlitzpayCommissionQueue organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                  <BlitzpayVendorPayoutsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
 

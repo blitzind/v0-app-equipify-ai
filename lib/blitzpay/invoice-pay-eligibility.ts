@@ -14,6 +14,7 @@ export type InvoicePayEligibilityRow = {
   invoice_number: string
   title: string
   archived_at: string | null
+  work_order_id?: string | null
 }
 
 export async function loadInvoiceForBlitzpayPay(
@@ -23,7 +24,9 @@ export async function loadInvoiceForBlitzpayPay(
 ): Promise<InvoicePayEligibilityRow | null> {
   const { data, error } = await admin
     .from("org_invoices")
-    .select("id, organization_id, customer_id, amount_cents, tax_amount_cents, status, invoice_number, title, archived_at")
+    .select(
+      "id, organization_id, customer_id, amount_cents, tax_amount_cents, status, invoice_number, title, archived_at, work_order_id",
+    )
     .eq("organization_id", organizationId)
     .eq("id", invoiceId)
     .maybeSingle()

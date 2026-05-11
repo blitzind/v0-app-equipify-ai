@@ -15,6 +15,7 @@ import {
 } from "@/lib/blitzpay/blitzpay-treasury-math"
 import { buildBlitzpayTreasuryInsights } from "@/lib/blitzpay/blitzpay-treasury-insights"
 import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
+import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 
 const BT_PAGE = 800
 
@@ -235,6 +236,12 @@ export type BlitzpayTreasuryDashboardPayload = BlitzpayTreasuryMetricsCore & {
     plannedRecurringInflow30dCents: number
     summaryNote: string
   }
+  /** Phase 2Y — payroll liability vs operating cash (no execution). */
+  payrollTreasurySignals?: {
+    payrollLiabilityCents: number
+    pendingCommissionCents: number
+    contractorSettlementPendingCents: number
+  }
 }
 
 export async function persistBlitzpayOrgTreasury(
@@ -406,6 +413,19 @@ export async function fetchBlitzpayTreasuryDashboard(
     recurringCashSignals = undefined
   }
 
+  let payrollTreasurySignals: BlitzpayTreasuryDashboardPayload["payrollTreasurySignals"]
+  try {
+    const ph = await summarizePayrollHealth(admin, organizationId)
+    payrollTreasurySignals = {
+      payrollLiabilityCents:
+        ph.pendingCommissionCents + ph.contractorSettlementPendingCents + ph.revenueSharePendingCents,
+      pendingCommissionCents: ph.pendingCommissionCents,
+      contractorSettlementPendingCents: ph.contractorSettlementPendingCents,
+    }
+  } catch {
+    payrollTreasurySignals = undefined
+  }
+
   const insights = buildBlitzpayTreasuryInsights({
     avgPayoutDelayDays: metrics.avgPayoutDelayDays,
     avgPayoutDelayBaselineDays: 3,
@@ -426,5 +446,6 @@ export async function fetchBlitzpayTreasuryDashboard(
     insights,
     orgBalanceRowComputedAt,
     recurringCashSignals,
+    payrollTreasurySignals,
   }
 }

@@ -9,6 +9,7 @@ import { fetchBlitzpayCollectionsAccelerationMetrics } from "@/lib/blitzpay/blit
 import { fetchBlitzpayRecurringRevenueMetrics } from "@/lib/blitzpay/blitzpay-recurring-billing"
 import { fetchBlitzpayMembershipReportingSlice } from "@/lib/blitzpay/blitzpay-memberships"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
+import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -111,6 +112,14 @@ export type BlitzpayOrgReportingSnapshot = {
   recoveredMembershipRevenueCents: number
   membershipAutoPayAdoptionBasisPoints: number
   churnRiskRevenueCents: number
+  /** Phase 2Y — payroll / commission / contractor settlement signals (bounded reads). */
+  payrollPendingCommissionCents: number
+  payrollLiabilityCents: number
+  contractorSettlementExposureCents: number
+  recurringRevenueSharePendingCents: number
+  estimatedPayrollBurdenCents: number
+  commissionVelocity7dCents: number
+  recurringMemberPayoutStability0to100: number
 }
 
 /**
@@ -565,6 +574,27 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* membership tables optional until migration applied */
   }
 
+  let payrollPendingCommissionCents = 0
+  let payrollLiabilityCents = 0
+  let contractorSettlementExposureCents = 0
+  let recurringRevenueSharePendingCents = 0
+  let estimatedPayrollBurdenCents = 0
+  let commissionVelocity7dCents = 0
+  let recurringMemberPayoutStability0to100 = 0
+  try {
+    const ph = await summarizePayrollHealth(admin, organizationId)
+    payrollPendingCommissionCents = ph.pendingCommissionCents
+    contractorSettlementExposureCents = ph.contractorSettlementPendingCents
+    recurringRevenueSharePendingCents = ph.revenueSharePendingCents
+    commissionVelocity7dCents = ph.commissionVelocity7dCents
+    payrollLiabilityCents =
+      ph.pendingCommissionCents + ph.contractorSettlementPendingCents + ph.revenueSharePendingCents
+    estimatedPayrollBurdenCents = payrollLiabilityCents
+    recurringMemberPayoutStability0to100 = blitzpayRecurringStabilityScore0to100
+  } catch {
+    /* payroll tables optional until migration applied */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -643,5 +673,12 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     recoveredMembershipRevenueCents,
     membershipAutoPayAdoptionBasisPoints,
     churnRiskRevenueCents,
+    payrollPendingCommissionCents,
+    payrollLiabilityCents,
+    contractorSettlementExposureCents,
+    recurringRevenueSharePendingCents,
+    estimatedPayrollBurdenCents,
+    commissionVelocity7dCents,
+    recurringMemberPayoutStability0to100,
   }
 }

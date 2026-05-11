@@ -53,6 +53,12 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_membership_payment_failures", select: "id, membership_id, recovery_status" },
   { name: "blitzpay_membership_events", select: "id, membership_id, event_type" },
   { name: "blitzpay_membership_retention_snapshots", select: "id, organization_id, snapshot_date" },
+  { name: "blitzpay_payroll_runs", select: "id, organization_id, payroll_status" },
+  { name: "blitzpay_technician_compensation_profiles", select: "id, organization_id, technician_user_id" },
+  { name: "blitzpay_work_order_commissions", select: "id, organization_id, commission_status" },
+  { name: "blitzpay_contractor_settlements", select: "id, organization_id, settlement_status" },
+  { name: "blitzpay_revenue_share_rules", select: "id, organization_id, rule_type" },
+  { name: "blitzpay_revenue_share_ledger", select: "id, organization_id, idempotency_key" },
 ]
 
 export type BlitzpaySchemaHealthResult =

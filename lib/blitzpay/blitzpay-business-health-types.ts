@@ -74,5 +74,11 @@ export type BlitzpayBusinessHealthPayload = {
     projectedRenewalRevenue90dCents: number
     renewalRecoveryOpportunityCents: number
     autopayRiskExposureCents: number
+    /** Phase 2Y */
+    payrollPendingCommissionCents: number
+    payrollLiabilityCents: number
+    contractorSettlementExposureCents: number
+    recurringRevenueSharePendingCents: number
+    commissionVelocity7dCents: number
   }
 }

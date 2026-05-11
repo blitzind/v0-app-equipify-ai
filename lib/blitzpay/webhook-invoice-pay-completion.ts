@@ -20,6 +20,7 @@ import {
   loadInvoiceForBlitzpayPay,
   sumNetRecordedPaymentsCentsForBlitzpay,
 } from "@/lib/blitzpay/invoice-pay-eligibility"
+import { syncBlitzpayPayrollAccrualForOrgInvoice } from "@/lib/blitzpay/blitzpay-payroll-accrual"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -222,6 +223,15 @@ export async function completeBlitzpayPaymentIntentSucceeded(
     status: "completed",
     failureCode: null,
   })
+
+  try {
+    await syncBlitzpayPayrollAccrualForOrgInvoice(admin, {
+      organizationId: row.organization_id,
+      orgInvoiceId: row.org_invoice_id,
+    })
+  } catch {
+    /* accrual is best-effort; never block webhook completion */
+  }
 }
 
 export async function completeBlitzpayPaymentIntentFailed(

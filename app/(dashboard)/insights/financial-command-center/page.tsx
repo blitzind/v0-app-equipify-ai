@@ -6,6 +6,9 @@ import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpayRecurringRevenuePanel } from "@/components/blitzpay/blitzpay-recurring-revenue-panel"
 import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
+import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
+import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
+import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 
@@ -37,7 +40,7 @@ export default function FinancialCommandCenterPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-xs text-muted-foreground leading-relaxed max-w-4xl">
+      <p className="text-sm text-muted-foreground leading-relaxed max-w-4xl">
         The same command center lives under{" "}
         <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline">
           Settings → Payments
@@ -54,12 +57,19 @@ export default function FinancialCommandCenterPage() {
         <Link href="/settings/payments#blitzpay-recurring-revenue-anchor" className="text-primary underline-offset-2 hover:underline">
           Settings → Payments → Recurring revenue
         </Link>
+        . Payroll accruals:{" "}
+        <Link href="/settings/payments#blitzpay-payroll-anchor" className="text-primary underline-offset-2 hover:underline">
+          Settings → Payments → Payroll
+        </Link>
         .
       </p>
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayRecurringRevenuePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayPayrollDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayCommissionQueue organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayVendorPayoutsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
     </div>
   )
 }

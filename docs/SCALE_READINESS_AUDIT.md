@@ -136,6 +136,8 @@ Evidence from migrations under `supabase/migrations/`:
 
 ## 8. Stripe / BlitzPay Scale Risks
 
+**Phase 2Y (payroll accruals):** org APIs and `syncBlitzpayPayrollAccrualForOrgInvoice` use **capped selects** (`PAYROLL_COMMISSION_SCAN_CAP`, `PAYROLL_SETTLEMENT_SCAN_CAP`, membership/rule caps). Platform payroll rollup samples at most **`PLATFORM_PAYROLL_ORG_SAMPLE_CAP`** organizations per request — webhook accrual sync remains best-effort and must stay non-blocking.
+
 ### 8.1 SaaS Stripe (`/api/stripe/webhook`)
 
 - **Idempotency:** insert into `stripe_webhook_events` by `event.id`; duplicate → `200` + `duplicate: true`.

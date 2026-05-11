@@ -8,6 +8,7 @@ import {
   loadInvoiceForBlitzpayPay,
   sumNetRecordedPaymentsCentsForBlitzpay,
 } from "@/lib/blitzpay/invoice-pay-eligibility"
+import { syncBlitzpayPayrollAccrualForOrgInvoice } from "@/lib/blitzpay/blitzpay-payroll-accrual"
 import { insertOrgInvoicePaymentWithActor } from "@/lib/org-quotes-invoices/repository"
 
 function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
@@ -406,6 +407,15 @@ export async function applyBlitzpayWalletCreditToInvoice(
       orgInvoiceId: input.invoiceId,
     }).catch(() => {})
     return { ok: false, code: "payment_insert_failed", message: ins.error }
+  }
+
+  try {
+    await syncBlitzpayPayrollAccrualForOrgInvoice(admin, {
+      organizationId: input.organizationId,
+      orgInvoiceId: input.invoiceId,
+    })
+  } catch {
+    /* best-effort accrual refresh */
   }
 
   return { ok: true, appliedCents: applyCents, paymentReference: payRef }

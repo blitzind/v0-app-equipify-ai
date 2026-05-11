@@ -19,6 +19,8 @@ import {
 } from "@/lib/technicians/skill-tags"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { BlitzpayTechnicianPayoutsPanel } from "@/components/blitzpay/blitzpay-technician-payouts-panel"
 import { formatWorkOrderDisplay } from "@/lib/work-orders/display"
 import { parseRepairLog } from "@/lib/work-orders/parse-repair-log"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
@@ -286,6 +288,7 @@ export function TechnicianDrawer({
   onUpdated,
 }: TechnicianDrawerProps) {
   const { organizationId: activeOrgId, status: orgStatus } = useActiveOrganization()
+  const { permissions } = useOrgPermissions()
   const [tab, setTab] = useState<DrawerTab>("overview")
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
@@ -1911,6 +1914,16 @@ export function TechnicianDrawer({
                     </p>
                   </div>
                 </div>
+              ) : null}
+              {(permissions.canViewFinancialReports || permissions.canViewFinancials) &&
+              activeOrgId &&
+              techId &&
+              orgStatus === "ready" ? (
+                <BlitzpayTechnicianPayoutsPanel
+                  organizationId={activeOrgId}
+                  technicianUserId={techId}
+                  orgReady={orgStatus === "ready"}
+                />
               ) : null}
             </div>
           )}

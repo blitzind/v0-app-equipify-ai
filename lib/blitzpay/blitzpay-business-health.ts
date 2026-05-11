@@ -323,6 +323,11 @@ export async function fetchBlitzpayBusinessHealth(
       projectedRenewalRevenue90dCents: d.projectedRenewalRevenue90dCents,
       renewalRecoveryOpportunityCents: d.renewalRecoveryOpportunityCents,
       autopayRiskExposureCents: d.autopayRiskExposureCents,
+      payrollPendingCommissionCents: reportingResolved.payrollPendingCommissionCents,
+      payrollLiabilityCents: reportingResolved.payrollLiabilityCents,
+      contractorSettlementExposureCents: reportingResolved.contractorSettlementExposureCents,
+      recurringRevenueSharePendingCents: reportingResolved.recurringRevenueSharePendingCents,
+      commissionVelocity7dCents: reportingResolved.commissionVelocity7dCents,
     },
   }
 }

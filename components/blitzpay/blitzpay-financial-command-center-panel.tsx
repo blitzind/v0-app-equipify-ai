@@ -40,6 +40,12 @@ type CommandCenterPayload = {
     membershipChurnRisk0to100?: number
     membershipOpenFailures?: number
     membershipRenewalPipelineCents?: number
+    payrollPendingCommissionCents?: number
+    payrollLiabilityCents?: number
+    contractorSettlementExposureCents?: number
+    recurringRevenueSharePendingCents?: number
+    commissionVelocity7dCents?: number
+    draftPayrollRuns?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -106,40 +112,40 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card px-3 py-4 sm:px-5 sm:py-5 space-y-4",
+        "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-[color:var(--primary)] shrink-0" aria-hidden />
-          <div>
-            <p className="text-xs font-semibold">Command center data</p>
-            <p className="text-[10px] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Landmark className="h-5 w-5 text-[color:var(--primary)] shrink-0" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Command center data</p>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-0.5">
               Unified receivables, payables, treasury, credits, and forecasts — no raw Stripe identifiers.
             </p>
           </div>
         </div>
-        <Button type="button" variant="outline" size="sm" className="h-7 text-[11px]" disabled={loading} onClick={() => void load()}>
-          {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+        <Button type="button" variant="outline" size="sm" className="h-8 text-xs shrink-0" disabled={loading} onClick={() => void load()}>
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
           Refresh
         </Button>
       </div>
 
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {loading && !data ? (
-        <p className="text-[11px] text-muted-foreground flex items-center gap-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
         </p>
       ) : null}
 
       {data ? (
         <>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground tabular-nums">
             Window {data.reportingWindowDays}d · Generated {new Date(data.generatedAt).toLocaleString()}
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {[
               { k: "Cash collected", v: fmtMoney(data.tiles.cashCollectedWindowCents) },
               { k: "Expected collections (7d)", v: fmtMoney(data.tiles.expectedCollections7Cents) },
@@ -166,67 +172,73 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Membership churn risk", v: `${data.tiles.membershipChurnRisk0to100 ?? 0}/100` },
               { k: "Membership open failures", v: String(data.tiles.membershipOpenFailures ?? 0) },
               { k: "Membership renewal pipeline (90d)", v: fmtMoney(data.tiles.membershipRenewalPipelineCents ?? 0) },
+              { k: "Pending technician commissions", v: fmtMoney(data.tiles.payrollPendingCommissionCents ?? 0) },
+              { k: "Payroll liability (comm + settlements + share)", v: fmtMoney(data.tiles.payrollLiabilityCents ?? 0) },
+              { k: "Contractor settlement exposure", v: fmtMoney(data.tiles.contractorSettlementExposureCents ?? 0) },
+              { k: "Revenue-share pending (internal)", v: fmtMoney(data.tiles.recurringRevenueSharePendingCents ?? 0) },
+              { k: "Commission velocity (7d accruals)", v: fmtMoney(data.tiles.commissionVelocity7dCents ?? 0) },
+              { k: "Draft payroll runs", v: String(data.tiles.draftPayrollRuns ?? 0) },
             ].map((x) => (
-              <div key={x.k} className="rounded border border-border/70 bg-background/40 px-2 py-1.5">
-                <p className="text-[9px] text-muted-foreground uppercase leading-tight">{x.k}</p>
-                <p className="text-xs font-semibold tabular-nums mt-0.5">{x.v}</p>
+              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
+                <p className="text-sm font-semibold tabular-nums mt-1 text-foreground">{x.v}</p>
               </div>
             ))}
           </div>
 
-          <div className="rounded-lg border border-border/80 px-3 py-2 space-y-2">
-            <p className="text-[10px] font-semibold uppercase text-muted-foreground">AR / AP combined cash outlook</p>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
+          <div className="rounded-lg border border-border/80 px-4 py-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AR / AP combined cash outlook</p>
+            <div className="grid grid-cols-3 gap-3 text-sm">
               <div>
-                <p className="text-muted-foreground">Net 7d</p>
-                <p className="font-semibold tabular-nums">{fmtMoney(data.combinedForecast.netCashPosition7Cents)}</p>
+                <p className="text-muted-foreground text-xs">Net 7d</p>
+                <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(data.combinedForecast.netCashPosition7Cents)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Net 30d</p>
-                <p className="font-semibold tabular-nums">{fmtMoney(data.combinedForecast.netCashPosition30Cents)}</p>
+                <p className="text-muted-foreground text-xs">Net 30d</p>
+                <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(data.combinedForecast.netCashPosition30Cents)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Net 60d</p>
-                <p className="font-semibold tabular-nums">{fmtMoney(data.combinedForecast.netCashPosition60Cents)}</p>
+                <p className="text-muted-foreground text-xs">Net 60d</p>
+                <p className="font-semibold tabular-nums text-foreground mt-0.5">{fmtMoney(data.combinedForecast.netCashPosition60Cents)}</p>
               </div>
             </div>
             {data.combinedForecast.riskNotes.length > 0 ? (
-              <ul className="text-[10px] text-[color:var(--status-warning)] space-y-0.5">
+              <ul className="text-xs text-[color:var(--status-warning)] space-y-1 leading-relaxed">
                 {data.combinedForecast.riskNotes.map((n) => (
                   <li key={n}>{n}</li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[10px] text-muted-foreground">No extra cash-timing flags in this snapshot.</p>
+              <p className="text-sm text-muted-foreground">No extra cash-timing flags in this snapshot.</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase text-muted-foreground">Owner scorecards</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Owner scorecards</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {data.scorecards.map((s) => (
-                <div key={s.id} className="rounded border border-border/70 bg-background/30 px-2 py-2 text-[11px]">
+                <div key={s.id} className="rounded-lg border border-border/70 bg-background/30 px-3 py-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{s.title}</p>
+                    <p className="font-semibold text-foreground">{s.title}</p>
                     <span
                       className={cn(
-                        "text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0",
+                        "text-xs font-semibold px-2 py-0.5 rounded-md border shrink-0",
                         statusChipClass(s.status),
                       )}
                     >
                       {scorecardStatusLabel(s.status)}
                     </span>
                   </div>
-                  <p className="text-muted-foreground mt-1 leading-snug">{s.detail}</p>
+                  <p className="text-muted-foreground mt-2 leading-relaxed">{s.detail}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded border border-border/70 px-2 py-2 space-y-1">
-              <p className="text-[10px] font-semibold uppercase text-muted-foreground">Automation (command center)</p>
-              <ul className="space-y-1 text-[11px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border/70 px-4 py-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Automation (command center)</p>
+              <ul className="space-y-2 text-sm leading-relaxed">
                 {data.commandCenterRecommendations.length === 0 ?
                   <li className="text-muted-foreground">No extra automation flags.</li>
                 : data.commandCenterRecommendations.map((r) => (
@@ -240,12 +252,12 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
                 }
               </ul>
             </div>
-            <div className="rounded border border-border/70 px-2 py-2 space-y-1">
-              <p className="text-[10px] font-semibold uppercase text-muted-foreground">Collections & revenue tips</p>
-              <ul className="space-y-1 text-[11px]">
+            <div className="rounded-lg border border-border/70 px-4 py-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Collections & revenue tips</p>
+              <ul className="space-y-2 text-sm leading-relaxed">
                 {data.revenueRecommendations.slice(0, 6).map((r) => (
                   <li key={r.id} className="text-muted-foreground">
-                    <span className="font-medium text-foreground">{r.title}</span> — {r.detail.slice(0, 140)}
+                    <span className="font-semibold text-foreground">{r.title}</span> — {r.detail.slice(0, 140)}
                     {r.detail.length > 140 ? "…" : ""}
                   </li>
                 ))}
@@ -254,13 +266,13 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
           </div>
 
           <div>
-            <p className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5">Drilldowns</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Drilldowns</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(data.drilldowns).map(([key, d]) => (
                 <Link
                   key={key}
                   href={d.href}
-                  className="text-[11px] rounded border border-border px-2 py-1 bg-background/60 hover:bg-muted/50 transition-colors"
+                  className="text-sm rounded-md border border-border px-3 py-1.5 bg-background/60 hover:bg-muted/50 transition-colors"
                 >
                   {d.label}
                   {typeof d.count === "number" ? ` (${d.count})` : ""}

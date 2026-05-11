@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { paymentAllocationUiLabel } from "@/lib/billing/invoice-payment-allocation"
 import type { WorkOrderBlitzpaySummary } from "@/lib/blitzpay/work-order-blitzpay-summary"
+import { BlitzpayWorkOrderPayrollStrip } from "@/components/blitzpay/blitzpay-work-order-payroll-strip"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -256,6 +257,8 @@ export function WorkOrderBlitzpayPanel({ organizationId, workOrderId }: Props) {
 
       {loading ? <p className="text-muted-foreground">Loading payment summary…</p> : null}
       {error ? <p className="text-destructive text-[11px]">{error}</p> : null}
+
+      <BlitzpayWorkOrderPayrollStrip organizationId={organizationId} workOrderId={workOrderId} />
 
       {summary?.fieldInvoiceLaterAt ? (
         <p className="rounded-md border border-border bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground">

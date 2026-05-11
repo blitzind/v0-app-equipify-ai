@@ -926,6 +926,19 @@ Use this as a **checklist** when coding — not exhaustive.
 4. Portal session: **memberships** list/detail — no Stripe IDs, no staff-only insight fields.  
 5. Cron: invoke with valid secret — no duplicate invoices for same period (idempotency).
 
+### 12.26 Phase 2Y (payroll-style accruals, technician commissions, contractor settlements, revenue share — deterministic)
+
+| Area | Details |
+|------|---------|
+| **Schema** | `blitzpay_payroll_runs`, `blitzpay_technician_compensation_profiles`, `blitzpay_work_order_commissions`, **`blitzpay_contractor_settlements`** (WO/invoice-linked subcontractor/partner settlements), `blitzpay_revenue_share_rules`, `blitzpay_revenue_share_ledger`. **Does not** recreate `blitzpay_vendor_payouts` (Phase 2S internal AP “paid” marker table). RLS: org-scoped `SELECT` for authenticated members; writes via service-role org APIs only. |
+| **Pure engine** | `blitzpay-payroll-engine.ts` — commission math, hybrid hourly+commission helper, revenue basis with optional overlap input, period summaries, technician payout breakdown, approval queue ordering (no DB). |
+| **Server libs** | `blitzpay-payroll-accrual.ts` — idempotent `syncBlitzpayPayrollAccrualForOrgInvoice` after collections change (bounded WO/invoice/membership link reads). `blitzpay-payroll-runs.ts` — draft/approve/finalize orchestration (**accounting only; no ACH payroll**). `blitzpay-platform-payroll-rollup.ts` — bounded org sample for Admin ops. |
+| **Org APIs** | `GET …/blitzpay/payroll`, `GET/POST …/blitzpay/payroll-runs`, `POST …/payroll-runs/[runId]/approve`, `POST …/payroll-runs/[runId]/finalize`, `GET …/blitzpay/commissions` (`technicianUserId`, `workOrderId`, `status`, `limit`), `GET …/blitzpay/vendor-payouts` (returns **contractor settlements** payload key `vendorSettlements` for route-name compatibility). Reads: `canViewFinancialReports` **or** `canViewFinancials` + schema guard. Mutations: `canManageSettings` **and** `canViewFinancials`. |
+| **Platform** | `GET /api/platform/blitzpay/payroll-rollup` — platform admin email gate; bounded org sample. |
+| **Reporting / CC / treasury / revenue** | `fetchBlitzpayOrgReportingSnapshot` adds Phase 2Y cents; financial command center tiles + drilldown anchor `#blitzpay-payroll-anchor`; revenue intelligence dashboard mirrors snapshot fields; treasury dashboard adds `payrollTreasurySignals`; business health facts include payroll KPIs. |
+| **UX** | Settings → Payments + Insights → Financial command center — payroll dashboard, commission queue, vendor settlements panel; work-order BlitzPay strip; technician drawer performance tab (financial roles). **Portal:** no payroll internals. |
+| **Tests** | `pnpm test:blitzpay-phase-2y` — migration + table split note, engine math, idempotency keys, bounded caps, no Stripe substrings in new client components, permission gates, platform rollup auth, `server-only` isolation for accrual vs pure engine. |
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

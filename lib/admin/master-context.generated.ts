@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 296,
-  sqlMigrations: 166,
+  apiRouteHandlers: 303,
+  sqlMigrations: 167,
   dashboardPages: 62,
-  componentsTsx: 267,
-  libTsFiles: 598,
+  componentsTsx: 272,
+  libTsFiles: 602,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **296** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **166** |
+| API route handlers (\`app/api/**/route.ts\`) | **303** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **167** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **267** |
-| \`lib/**/*.ts\` | **598** |
+| \`components/**/*.tsx\` | **272** |
+| \`lib/**/*.ts\` | **602** |
 
 ### Vercel crons
 
@@ -100,6 +100,7 @@ organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
 organizations/[organizationId]/blitzpay/business-health/route.ts
 organizations/[organizationId]/blitzpay/collections-copilot/route.ts
+organizations/[organizationId]/blitzpay/commissions/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
 organizations/[organizationId]/blitzpay/financial-command-center/route.ts
 organizations/[organizationId]/blitzpay/financing/summary/route.ts
@@ -113,6 +114,10 @@ organizations/[organizationId]/blitzpay/memberships/[membershipId]/route.ts
 organizations/[organizationId]/blitzpay/memberships/route.ts
 organizations/[organizationId]/blitzpay/payment-plans/[planId]/link-work-order/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
+organizations/[organizationId]/blitzpay/payroll-runs/[runId]/approve/route.ts
+organizations/[organizationId]/blitzpay/payroll-runs/[runId]/finalize/route.ts
+organizations/[organizationId]/blitzpay/payroll-runs/route.ts
+organizations/[organizationId]/blitzpay/payroll/route.ts
 organizations/[organizationId]/blitzpay/recurring-revenue/route.ts
 organizations/[organizationId]/blitzpay/retention-report/route.ts
 organizations/[organizationId]/blitzpay/revenue-intelligence/route.ts
@@ -122,6 +127,7 @@ organizations/[organizationId]/blitzpay/sync/route.ts
 organizations/[organizationId]/blitzpay/treasury/route.ts
 organizations/[organizationId]/blitzpay/vendor-payables/[payableId]/route.ts
 organizations/[organizationId]/blitzpay/vendor-payables/route.ts
+organizations/[organizationId]/blitzpay/vendor-payouts/route.ts
 organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
 organizations/[organizationId]/calibration-templates/import-commit/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/attachments/route.ts
@@ -282,6 +288,7 @@ platform/blitzpay/collections-rollup/route.ts
 platform/blitzpay/command-center-rollup/route.ts
 platform/blitzpay/membership-rollup/route.ts
 platform/blitzpay/operations/route.ts
+platform/blitzpay/payroll-rollup/route.ts
 platform/blitzpay/recurring-revenue-rollup/route.ts
 platform/blitzpay/reminder-dispatch/route.ts
 platform/blitzpay/reminder-runs/route.ts

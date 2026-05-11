@@ -54,3 +54,29 @@ export function buildBlitzPayQuotePaymentIntentIdempotencyKey(input: {
   }
   return `blitzpay:pi_quote:v1:${input.organizationId}:${input.orgQuoteId}:${token}`
 }
+
+/** Stable key for revenue-share ledger rows (v1). */
+export function blitzpayRevenueShareLedgerKeyV1(input: {
+  organizationId: string
+  ruleId: string
+  sourceType: string
+  sourceId: string
+}): string {
+  assertUuid(input.organizationId, "organizationId")
+  assertUuid(input.ruleId, "ruleId")
+  assertUuid(input.sourceId, "sourceId")
+  const st = String(input.sourceType || "unknown").replace(/:/g, "_")
+  return `blitzpay:revshare:v1:${input.organizationId}:${input.ruleId}:${st}:${input.sourceId}`
+}
+
+/** Stable key for work-order commission accrual rows (matches DB unique org+invoice+technician). */
+export function blitzpayWorkOrderCommissionAccrualKeyV1(input: {
+  organizationId: string
+  orgInvoiceId: string
+  technicianUserId: string
+}): string {
+  assertUuid(input.organizationId, "organizationId")
+  assertUuid(input.orgInvoiceId, "orgInvoiceId")
+  assertUuid(input.technicianUserId, "technicianUserId")
+  return `blitzpay:wo_comm:v1:${input.organizationId}:${input.orgInvoiceId}:${input.technicianUserId}`
+}
