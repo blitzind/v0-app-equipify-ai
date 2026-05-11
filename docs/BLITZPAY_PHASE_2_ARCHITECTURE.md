@@ -767,6 +767,24 @@ Use this as a **checklist** when coding — not exhaustive.
 4. Attach an existing plan UUID whose invoice is linked to the WO — `work_order_id` updates on the plan row.  
 5. Reporting / status shows new **payoutVisibility** counters after activity in the window.
 
+### 12.18 Phase 2Q (revenue intelligence, forecasting, executive reporting)
+
+| Area | Details |
+|------|---------|
+| **Pure libs** | `blitzpay-revenue-forecast-math.ts` — wallet liability sum, overdue recovery multiplier, horizon forecast composition. `blitzpay-revenue-recommendations.ts` — read-only heuristic insights (no LLM). |
+| **Server** | `blitzpay-revenue-intelligence.ts` — `fetchBlitzpayOrgRevenueIntelligence` composes `fetchBlitzpayOrgReportingSnapshot`, `computeBlitzpayCollectionsReporting`, overdue AR (invoice allocation), scheduled payments, installment remainders, disputes, pending payouts, recovery cases, ACH pending settlement; returns `dashboard`, `forecasts`, extended `collections`, `recommendations`, and `reportingSource` for UI consistency. `fetchBlitzpayPlatformRevenueRollup` — bounded platform-wide ledger sum, PI count, open disputes sample, wallet liability sum (capped rows). |
+| **APIs** | `GET …/blitzpay/revenue-intelligence?windowDays=` — `canViewFinancialReports` **or** `canViewFinancials` (platform admins bypass via `requireAnyOrgPermission`). `GET /api/platform/blitzpay/revenue-rollup` — platform admin only. |
+| **UX** | Settings → **Payments** — **BlitzPay revenue intelligence** panel (`BlitzpayRevenueIntelligencePanel`). Insights hub links to Payments anchor `#blitzpay-revenue-intelligence`. Admin → **BlitzPay Ops** shows platform revenue rollup strip. |
+| **Portal** | No portal routes reference revenue intelligence APIs. |
+| **Tests** | `pnpm test:blitzpay-phase-2q` — forecast + wallet math, recommendations smoke, API gates, portal scan, reportingSource wiring. |
+
+#### Manual test checklist (Phase 2Q)
+
+1. As owner or financial role, open **Settings → Payments** — revenue panel loads without 403; numbers move when you refresh.  
+2. Forecast horizons increase 7 → 30 → 60 days; ACH pending line reflects unsettled bank transfers.  
+3. Platform admin: **Admin → BlitzPay Ops** shows rollup card from `/api/platform/blitzpay/revenue-rollup`.  
+4. Customer portal: confirm no new BlitzPay executive surfaces.
+
 ---
 
-*Phase 2A–2P vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + **work-order-native collection** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2Q vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

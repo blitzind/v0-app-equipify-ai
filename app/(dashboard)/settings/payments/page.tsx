@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
+import { BlitzpayRevenueIntelligencePanel } from "@/components/blitzpay/blitzpay-revenue-intelligence-panel"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
@@ -152,6 +153,11 @@ function BlitzPaySettingsPageInner() {
   const canConfigure = isPlatformAdmin || rawRole === "owner" || rawRole === "admin"
   const canViewPayoutLedger =
     permStatus === "ready" && (orgPermissions.has("canViewFinancials") || orgPermissions.has("canEditInvoices"))
+  const canViewBlitzpayRevenue =
+    permStatus === "ready" &&
+    (isPlatformAdmin ||
+      orgPermissions.has("canViewFinancialReports") ||
+      orgPermissions.has("canViewFinancials"))
 
   const [loading, setLoading] = useState(true)
   const [bp, setBp] = useState<BlitzPayStatusPayload | null>(null)
@@ -898,6 +904,12 @@ function BlitzPaySettingsPageInner() {
                   ) : (
                     <p className="text-[11px] text-muted-foreground">Checklist unavailable.</p>
                   )}
+                </div>
+              ) : null}
+
+              {canViewBlitzpayRevenue && organizationId ? (
+                <div className="border-t border-border pt-4">
+                  <BlitzpayRevenueIntelligencePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
             </div>

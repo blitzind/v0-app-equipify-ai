@@ -5,6 +5,14 @@ import { CreditCard, Loader2, Play, FlaskConical, AlertTriangle, Info, ShieldAle
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+type RevenueRollup = {
+  reportingWindowDays: number
+  ledgerPaymentCapturedCentsWindow: number
+  succeededPaymentIntentsCountWindow: number
+  openDisputesPlatformCount: number
+  walletLiabilityTotalCentsApprox: number
+}
+
 type OpsSummary = {
   orgsBlitzpayEnabled: number
   orgsConnectChargesReady: number
@@ -43,6 +51,7 @@ function alertIcon(sev: OpsSummary["alerts"][0]["severity"]) {
 
 export function BlitzpayOperationsContent() {
   const [summary, setSummary] = useState<OpsSummary | null>(null)
+  const [revenueRollup, setRevenueRollup] = useState<RevenueRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -77,6 +86,18 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" })
+        const j = (await r.json()) as { rollup?: RevenueRollup }
+        if (r.ok) setRevenueRollup(j.rollup ?? null)
+      } catch {
+        setRevenueRollup(null)
+      }
+    })()
+  }, [])
 
   async function runDispatch(dryRun: boolean) {
     setDispatchBusy(dryRun ? "dry" : "live")
@@ -196,6 +217,34 @@ export function BlitzpayOperationsContent() {
           <p className="text-lg font-semibold">{summary?.schemaHealth?.ok ? "OK" : "Issue"}</p>
         </div>
       </div>
+
+      {revenueRollup ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revenue rollup (platform)</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Bounded aggregates across workspaces ({revenueRollup.reportingWindowDays}d window). Ledger sum uses capped
+            reads; wallet liability sums up to 5k wallet rows.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Ledger captured</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.ledgerPaymentCapturedCentsWindow)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Succeeded PIs</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.succeededPaymentIntentsCountWindow}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.openDisputesPlatformCount}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Wallet liability (approx)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.walletLiabilityTotalCentsApprox)}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-border p-4 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reminder orchestration</p>

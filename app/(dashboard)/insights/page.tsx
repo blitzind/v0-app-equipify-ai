@@ -550,6 +550,17 @@ export default function InsightsPage() {
               icon={CheckCircle2} accent="#a78bfa" />
           </div>
 
+          <p className="text-[11px] pb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
+            BlitzPay revenue forecasts, collections metrics, and wallet liability:{" "}
+            <Link
+              href="/settings/payments#blitzpay-revenue-intelligence"
+              className="font-semibold text-white/90 underline-offset-2 hover:underline"
+            >
+              Settings → Payments → Revenue intelligence
+            </Link>
+            .
+          </p>
+
           {/* Category nav tabs */}
           <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: "none" }}>
             {(([["all", "All Insights", liveInsights.length - dismissed.size]] as [string, string, number][]).concat(
