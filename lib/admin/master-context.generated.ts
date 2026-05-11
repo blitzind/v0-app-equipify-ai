@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 228,
-  sqlMigrations: 147,
-  dashboardPages: 59,
+  apiRouteHandlers: 233,
+  sqlMigrations: 148,
+  dashboardPages: 60,
   componentsTsx: 254,
-  libTsFiles: 488,
+  libTsFiles: 492,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **228** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **147** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **59** |
+| API route handlers (\`app/api/**/route.ts\`) | **233** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **148** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **488** |
+| \`lib/**/*.ts\` | **492** |
 
 ### Vercel crons
 
@@ -36,6 +36,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 archived/restore/route.ts
 archived/route.ts
 billing/checkout/route.ts
+blitzpay/webhook/route.ts
 certificates/import-template/route.ts
 cron/ai-ops-digest/route.ts
 cron/maintenance-due/route.ts
@@ -92,6 +93,10 @@ organizations/[organizationId]/aiden/productivity/work-order-summary/route.ts
 organizations/[organizationId]/attachments/[attachmentId]/route.ts
 organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
+organizations/[organizationId]/blitzpay/account-link/route.ts
+organizations/[organizationId]/blitzpay/enable/route.ts
+organizations/[organizationId]/blitzpay/status/route.ts
+organizations/[organizationId]/blitzpay/sync/route.ts
 organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
 organizations/[organizationId]/calibration-templates/import-commit/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/attachments/route.ts

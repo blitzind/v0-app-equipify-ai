@@ -1,11 +1,21 @@
 # BlitzPay / Equipify Payments — architecture (Phase 54.3)
 
-Design-only document: **no live card collection, no Connect onboarding, and no application fees are enabled by this phase.**  
-SaaS subscription billing stays on the existing platform Stripe account and `/api/stripe/webhook` flow (Phases 54.1–54.2).
+Design document for BlitzPay / Connect. **Phase 1 (see `docs/BLITZPAY_PHASE_1.md`)** implements **Stripe Connect Express onboarding only** (org columns, Account Links, `/api/blitzpay/webhook` for `account.updated`). **No** customer invoice checkout, **no** application fees, **no** card/ACH collection in product flows yet.  
+SaaS subscription billing stays on the existing platform Stripe account and `/api/stripe/webhook` flow (Phases 54.1–54.2) — **unchanged**.
 
 ---
 
 ## 1. Current state audit (codebase)
+
+### BlitzPay Connect onboarding (Phase 1 — implemented)
+
+| Surface | Role |
+|--------|------|
+| `organizations` Connect columns | Persist `stripe_connect_account_id`, normalized status, requirements arrays, `last_stripe_connect_sync_at` |
+| `lib/blitzpay/*` | Express `accounts.create` (US), `accountLinks.create`, `accounts.retrieve`, map Account → org patch |
+| `GET/POST …/blitzpay/*` | Org-scoped status, enable, sync, account-link (owner/admin + platform admin for mutations) |
+| `POST /api/blitzpay/webhook` | `STRIPE_BLITZPAY_WEBHOOK_SECRET`, idempotency table `blitzpay_stripe_webhook_events`, `account.updated` only |
+| Settings → **Payments** | `/settings/payments` — Enable, Continue onboarding, Refresh status |
 
 ### SaaS subscription billing (unchanged scope)
 

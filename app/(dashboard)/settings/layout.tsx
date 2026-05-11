@@ -7,7 +7,7 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } from "@/lib/permissions/model"
 import {
   User, Building2, Users, CreditCard, Bell,
-  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload, Sparkles,
+  Zap, Plug, Shield, Code2, ScrollText, Wrench, Lock, Globe, Database, Archive, Upload, Sparkles, Wallet,
 } from "lucide-react"
 import {
   NAV_ICON_INACTIVE_CARD,
@@ -31,6 +31,12 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { label: "Team", href: "/settings/team", icon: Users, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Permissions", href: "/settings/permissions", icon: Lock, visible: (p) => p.canManageWorkspaceSettings },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, visible: (p) => p.canViewBilling },
+  {
+    label: "Payments",
+    href: "/settings/payments",
+    icon: Wallet,
+    visible: (p) => p.canViewBilling || p.canManageWorkspaceSettings,
+  },
   { label: "AI Usage", href: "/settings/ai-usage", icon: Sparkles, visible: (p) => p.canViewInsights },
   {
     label: "Notifications",
