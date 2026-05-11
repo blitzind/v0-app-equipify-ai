@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import { computeBlitzpayConvenienceFeePreview } from "../lib/blitzpay/convenience-fees"
 import { evaluateBlitzpayAutopayEligibility } from "../lib/blitzpay/blitzpay-autopay-foundation"
 import { isBlitzPayPhase2WebhookEventType } from "../lib/blitzpay/webhook-phase2-events"
+import { picksPlatformManagedFeeFields } from "../lib/blitzpay/blitzpay-settings-policy"
 
 function testAchCanApplyFeeWhenEnabled() {
   const p = computeBlitzpayConvenienceFeePreview({
@@ -51,7 +52,17 @@ function testWebhookRoutingStillIncludesPayoutAndRefundDispute() {
   assert.equal(isBlitzPayPhase2WebhookEventType("payment_intent.succeeded"), true)
 }
 
+function testPlatformManagedFeeFieldDetection() {
+  const fields = picksPlatformManagedFeeFields({
+    blitzpay_invoice_pay_enabled: true,
+    blitzpay_fee_percentage_snapshot: 2.9,
+    blitzpay_fee_disclosure_copy: "A processing fee is applied for online card payments.",
+  })
+  assert.deepEqual(fields.sort(), ["blitzpay_fee_disclosure_copy", "blitzpay_fee_percentage_snapshot"])
+}
+
 testAchCanApplyFeeWhenEnabled()
 testAutopayEligibilityFoundation()
 testWebhookRoutingStillIncludesPayoutAndRefundDispute()
+testPlatformManagedFeeFieldDetection()
 console.log("blitzpay phase 2i tests passed")

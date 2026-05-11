@@ -147,14 +147,8 @@ function BlitzPaySettingsPageInner() {
   const [payoutLedgerSyncBusy, setPayoutLedgerSyncBusy] = useState(false)
   const [payoutLedgerPanel, setPayoutLedgerPanel] = useState<PayoutLedgerPanelPayload | null>(null)
   const [onlinePayEnabled, setOnlinePayEnabled] = useState(false)
-  const [passFees, setPassFees] = useState(false)
-  const [feePct, setFeePct] = useState("2.90")
-  const [feeDisclosure, setFeeDisclosure] = useState(
-    "A processing fee is applied for online card payments.",
-  )
   const [cardEnabled, setCardEnabled] = useState(true)
   const [achEnabled, setAchEnabled] = useState(false)
-  const [achFeeEnabled, setAchFeeEnabled] = useState(false)
   const [achTimelineCopy, setAchTimelineCopy] = useState("Bank (ACH) payments can take 3-5 business days to settle.")
   const [saveMethodsEnabled, setSaveMethodsEnabled] = useState(true)
 
@@ -183,14 +177,8 @@ function BlitzPaySettingsPageInner() {
       const s = (json.blitzpay as BlitzPayStatusPayload | undefined)?.settings
       if (s) {
         setOnlinePayEnabled(Boolean(s.blitzpay_invoice_pay_enabled))
-        setPassFees(Boolean(s.blitzpay_pass_processing_fees_to_customer))
-        setFeePct(Number(s.blitzpay_fee_percentage_snapshot ?? 0).toFixed(2))
-        setFeeDisclosure(
-          (s.blitzpay_fee_disclosure_copy ?? "A processing fee is applied for online card payments.").trim(),
-        )
         setCardEnabled(s.blitzpay_payment_method_card_enabled !== false)
         setAchEnabled(Boolean(s.blitzpay_payment_method_ach_enabled))
-        setAchFeeEnabled(Boolean(s.blitzpay_ach_convenience_fee_enabled))
         setAchTimelineCopy(
           (s.blitzpay_ach_processing_timeline_copy ?? "Bank (ACH) payments can take 3-5 business days to settle.").trim(),
         )
@@ -350,7 +338,7 @@ function BlitzPaySettingsPageInner() {
     }
   }
 
-  async function handleSaveFeeSettings() {
+  async function handleSavePaymentSettings() {
     if (!organizationId || !canConfigure) return
     setSaveFeesBusy(true)
     try {
@@ -359,13 +347,8 @@ function BlitzPaySettingsPageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           blitzpay_invoice_pay_enabled: onlinePayEnabled,
-          blitzpay_pass_processing_fees_to_customer: passFees,
-          blitzpay_fee_mode: passFees ? "customer_pass_through" : "merchant_absorbs",
-          blitzpay_fee_percentage_snapshot: Number(feePct),
-          blitzpay_fee_disclosure_copy: feeDisclosure,
           blitzpay_payment_method_card_enabled: cardEnabled,
           blitzpay_payment_method_ach_enabled: achEnabled,
-          blitzpay_ach_convenience_fee_enabled: achFeeEnabled,
           blitzpay_ach_processing_timeline_copy: achTimelineCopy,
           blitzpay_allow_save_payment_methods: saveMethodsEnabled,
         }),
@@ -374,12 +357,12 @@ function BlitzPaySettingsPageInner() {
       if (!res.ok) {
         toast({
           variant: "destructive",
-          title: "Could not save fee settings",
+          title: "Could not save payment settings",
           description: j.message ?? j.error ?? res.statusText,
         })
         return
       }
-      toast({ title: "Fee settings saved" })
+      toast({ title: "Payment settings saved" })
       await loadStatus()
     } finally {
       setSaveFeesBusy(false)
@@ -560,7 +543,11 @@ function BlitzPaySettingsPageInner() {
                 </p>
               ) : null}
 
-              <p className="text-xs font-semibold">Convenience fee settings</p>
+              <p className="text-xs font-semibold">BlitzPay fee policy</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                BlitzPay online payment fees are managed by Equipify. If enabled for your account, customers will see
+                the processing fee before paying online.
+              </p>
               <p className="text-xs font-semibold">Accepted payment methods</p>
               <label className="flex items-center gap-2 text-xs">
                 <input
@@ -592,16 +579,6 @@ function BlitzPaySettingsPageInner() {
                 />
                 Allow Checkout to save payment methods for future invoices
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  className="rounded border-border"
-                  checked={achFeeEnabled}
-                  onChange={(e) => setAchFeeEnabled(e.target.checked)}
-                  disabled={!canConfigure || !achEnabled}
-                />
-                Apply convenience fees to ACH
-              </label>
               <label className="text-xs text-muted-foreground block">
                 ACH timing guidance
                 <input
@@ -611,26 +588,7 @@ function BlitzPaySettingsPageInner() {
                   disabled={!canConfigure || !achEnabled}
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  className="rounded border-border"
-                  checked={passFees}
-                  onChange={(e) => setPassFees(e.target.checked)}
-                  disabled={!canConfigure}
-                />
-                Pass processing fee to customer
-              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-xs text-muted-foreground">
-                  Fee percent snapshot
-                  <input
-                    className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                    value={feePct}
-                    onChange={(e) => setFeePct(e.target.value)}
-                    disabled={!canConfigure || !passFees}
-                  />
-                </label>
                 <div className="text-xs text-muted-foreground">
                   Payout visibility (last 30 days)
                   <p className="mt-1 text-sm text-foreground">
@@ -672,21 +630,12 @@ function BlitzPaySettingsPageInner() {
                   ) : null}
                 </div>
               </div>
-              <label className="text-xs text-muted-foreground block">
-                Customer disclosure copy
-                <textarea
-                  className="mt-1 min-h-[68px] w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                  value={feeDisclosure}
-                  onChange={(e) => setFeeDisclosure(e.target.value)}
-                  disabled={!canConfigure}
-                />
-              </label>
               <p className="text-[11px] text-muted-foreground">
                 Deposits and payouts are handled by Stripe based on your connected account schedule. Refunds and disputes can affect net deposits.
               </p>
-              <Button type="button" size="sm" onClick={() => void handleSaveFeeSettings()} disabled={!canConfigure || saveFeesBusy}>
+              <Button type="button" size="sm" onClick={() => void handleSavePaymentSettings()} disabled={!canConfigure || saveFeesBusy}>
                 {saveFeesBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Save fee settings
+                Save payment settings
               </Button>
               {bp?.storedPaymentProfiles ? (
                 <div className="rounded-md border border-border/80 p-2 text-[11px] space-y-0.5">

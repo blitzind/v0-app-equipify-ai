@@ -163,7 +163,7 @@ Evidence from migrations under `supabase/migrations/`:
 
 ### 8.5 BlitzPay Phase 2G (merchant controls + fee disclosure + payout visibility)
 
-- Tenant-level fee policy now lives in `blitzpay_org_settings` (pass-through toggle, disclosure copy, percentage snapshot).
+- Fee policy fields live in `blitzpay_org_settings`, but tenant/workspace editing should remain disabled for convenience-fee values (platform-managed pass-through policy).
 - Staff/portal prepare-pay preview endpoints provide pricing disclosure before redirect, reducing charge-surprise support incidents.
 - Reporting adds estimated Stripe fee / net payout fields; still estimate-based and not a full payout-ledger sync.
 

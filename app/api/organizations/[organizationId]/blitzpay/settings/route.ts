@@ -5,6 +5,7 @@ import { supabaseForBlitzPayOrgWrite } from "@/lib/blitzpay/org-write-client"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
 import { ensureBlitzPayOrgSettings } from "@/lib/blitzpay/payment-repository"
 import { DEFAULT_BLITZPAY_DISCLOSURE_COPY } from "@/lib/blitzpay/convenience-fees"
+import { picksPlatformManagedFeeFields } from "@/lib/blitzpay/blitzpay-settings-policy"
 
 export const runtime = "nodejs"
 
@@ -86,6 +87,17 @@ export async function PATCH(
     return jsonError(400, "bad_request", "Invalid JSON body.")
   }
 
+  if (!gate.platformAdmin) {
+    const forbidden = picksPlatformManagedFeeFields(body as Record<string, unknown>)
+    if (forbidden.length > 0) {
+      return jsonError(
+        403,
+        "forbidden_fee_controls",
+        "BlitzPay convenience fee policy is managed by Equipify and cannot be edited at workspace level.",
+      )
+    }
+  }
+
   const pass = Boolean(body.blitzpay_pass_processing_fees_to_customer)
   const mode =
     body.blitzpay_fee_mode === "customer_partial_pass_through" || body.blitzpay_fee_mode === "customer_pass_through"
@@ -110,17 +122,10 @@ export async function PATCH(
     return jsonError(400, "invalid_payment_methods", "Enable at least one payment method (card or ACH).")
   }
 
-  const patch = {
+  const patchBase = {
     blitzpay_invoice_pay_enabled: Boolean(body.blitzpay_invoice_pay_enabled),
-    blitzpay_pass_processing_fees_to_customer: pass,
-    blitzpay_fee_mode: pass ? mode : "merchant_absorbs",
-    blitzpay_fee_percentage_snapshot: pass ? pct : 0,
-    blitzpay_fee_cap_cents:
-      body.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(body.blitzpay_fee_cap_cents))),
-    blitzpay_fee_disclosure_copy: disclosure,
     blitzpay_payment_method_card_enabled: cardEnabled,
     blitzpay_payment_method_ach_enabled: achEnabled,
-    blitzpay_ach_convenience_fee_enabled: Boolean(body.blitzpay_ach_convenience_fee_enabled),
     blitzpay_ach_processing_timeline_copy:
       typeof body.blitzpay_ach_processing_timeline_copy === "string" && body.blitzpay_ach_processing_timeline_copy.trim()
         ? body.blitzpay_ach_processing_timeline_copy.trim()
@@ -128,6 +133,18 @@ export async function PATCH(
     blitzpay_allow_save_payment_methods: body.blitzpay_allow_save_payment_methods !== false,
     updated_at: new Date().toISOString(),
   }
+  const patch = gate.platformAdmin
+    ? {
+        ...patchBase,
+        blitzpay_pass_processing_fees_to_customer: pass,
+        blitzpay_fee_mode: pass ? mode : "merchant_absorbs",
+        blitzpay_fee_percentage_snapshot: pass ? pct : 0,
+        blitzpay_fee_cap_cents:
+          body.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(body.blitzpay_fee_cap_cents))),
+        blitzpay_fee_disclosure_copy: disclosure,
+        blitzpay_ach_convenience_fee_enabled: Boolean(body.blitzpay_ach_convenience_fee_enabled),
+      }
+    : patchBase
 
   const { data, error } = await db
     .from("blitzpay_org_settings")

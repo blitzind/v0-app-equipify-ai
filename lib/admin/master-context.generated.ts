@@ -8,7 +8,7 @@ export const MCG_SCAN_COUNTS = {
   sqlMigrations: 156,
   dashboardPages: 60,
   componentsTsx: 254,
-  libTsFiles: 532,
+  libTsFiles: 533,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -21,7 +21,7 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 | SQL migrations (\`supabase/migrations/*.sql\`) | **156** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **532** |
+| \`lib/**/*.ts\` | **533** |
 
 ### Vercel crons
 

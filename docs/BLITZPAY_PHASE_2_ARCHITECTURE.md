@@ -553,24 +553,24 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Logs** | `source: "blitzpay-schema-health"` JSON logs include `missing` (e.g. `table:blitzpay_invoice_refunds` or `organizations.blitzpay_last_onboarding_attempt_at`) and a short `detail` from Postgres/PostgREST. |
 | **Fix** | Point the app at the correct Supabase project and **apply pending migrations** (`supabase db push` / CI migration pipeline). The guard only treats **known** missing-relation/column signals as drift; other failures still surface from the underlying handlers. |
 
-### 12.8 Phase 2G (merchant controls, fee disclosure, payout visibility)
+### 12.8 Phase 2G (platform-managed fee disclosure, payout visibility)
 
 | Area | Details |
 |------|---------|
-| **Merchant controls** | Migration `20260914120000_blitzpay_phase_2g_merchant_controls.sql` extends `blitzpay_org_settings` with pass-through toggle, fee mode, snapshot percentage, optional cap, and disclosure copy. New API: `GET/PATCH /api/organizations/[organizationId]/blitzpay/settings`. |
+| **Platform-managed fee policy** | Migration `20260914120000_blitzpay_phase_2g_merchant_controls.sql` extends `blitzpay_org_settings` with fee policy fields (`pass-through`, mode, percentage snapshot, cap, disclosure). Workspace Settings no longer exposes fee editing; platform/admin paths control fee policy server-side. |
 | **Fee disclosure** | `previewBlitzpayInvoiceHostedCheckout` in `lib/blitzpay/blitzpay-prepare-invoice-pay.ts` computes balance/processing-fee/total. Staff + portal prepare-pay routes expose `GET` preview and UI shows pricing disclosure before redirect to Stripe Checkout. |
 | **Charge math** | Hosted Checkout now charges `invoiceBalance + convenienceFee` when pass-through is enabled. `blitzpay_payment_intents.convenience_fee_cents` stores customer convenience fee separately while existing `application_fee_amount` behavior remains platform-fee controlled. |
 | **Payout visibility** | `fetchBlitzpayOrgReportingSnapshot` now includes convenience fees collected, estimated Stripe fees, refunded fee estimate, and estimated net merchant payout. |
-| **Safety controls** | Settings guard blocks pass-through enable without disclosure copy. Online payments toggle is disabled when Connect charges are not enabled. Status API returns test/live mode hint from Stripe secret key prefix. |
+| **Safety controls** | Normal workspace PATCH calls cannot update fee percentage/cap/disclosure/pass-through fields. Online payments toggle remains workspace-configurable; fee controls are platform-managed. Status API returns test/live mode hint from Stripe secret key prefix. |
 
 #### Manual test checklist (Phase 2G)
 
 1. Merchant absorbs fees: disclosure shows zero processing fee and Checkout total equals invoice balance.  
-2. Customer pass-through enabled: disclosure shows fee + total and Checkout total matches disclosure.  
+2. When platform pass-through is enabled, disclosure shows fee + total and Checkout total matches disclosure.  
 3. Portal and staff both show fee disclosure before Stripe redirect.  
 4. Refund flow still caps by remaining refundable amount and avoids replay double-booking.  
 5. Settings payout visibility loads without exposing Stripe object ids.  
-6. Enabling pass-through without disclosure copy returns validation error.
+6. Workspace owners/admins cannot modify convenience-fee fields via settings PATCH; platform admins can via internal/admin-level code paths.
 
 ### 12.9 Phase 2H (payout ledger, balance transactions, reconciliation)
 
@@ -618,4 +618,4 @@ Use this as a **checklist** when coding — not exhaustive.
 
 ---
 
-*Phase 2A–2I vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + merchant controls + payout ledger + multi-method foundations) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2I vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
