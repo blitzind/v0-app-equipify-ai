@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getPortalBlitzpayHostedCheckoutEligibility } from "@/lib/blitzpay/portal-blitzpay-checkout-eligibility"
+import { mapOrgInvoicePaymentRowToPortalHistory } from "@/lib/portal/portal-invoice-payment-history"
 import { mapCustomerWorkOrderStatus, mapInvoiceStatus, mapWorkOrderType } from "@/lib/portal/display-mappers"
 import { buildPortalCertificateItems } from "@/lib/portal/portal-certificate-items"
 import { buildPortalInvoicePaymentSummary } from "@/lib/portal/invoice-payment-summary"
@@ -71,15 +72,29 @@ export async function GET(
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 })
   }
 
+  const [payRes, orgMetaRes, custMetaRes] = await Promise.all([
+    svc
+      .from("org_invoice_payments")
+      .select("id, amount_cents, paid_on, payment_method, reference")
+      .eq("organization_id", orgId)
+      .eq("invoice_id", invoiceId)
+      .order("paid_on", { ascending: false })
+      .order("created_at", { ascending: false }),
+    svc.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+    svc.from("customers").select("company_name").eq("organization_id", orgId).eq("id", custId).maybeSingle(),
+  ])
+
   let paySum = 0
-  const payRes = await svc
-    .from("org_invoice_payments")
-    .select("amount_cents")
-    .eq("organization_id", orgId)
-    .eq("invoice_id", invoiceId)
-  if (!payRes.error) {
-    paySum = (payRes.data ?? []).reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
-  }
+  const paymentRows = !payRes.error ? (payRes.data ?? []) : []
+  paySum = paymentRows.reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
+  const paymentHistory = paymentRows.map((r) =>
+    mapOrgInvoicePaymentRowToPortalHistory(r as { paid_on: string; amount_cents: number; payment_method: string; reference?: string | null }),
+  )
+
+  const workspaceDisplayName =
+    ((orgMetaRes.data as { name?: string } | null)?.name ?? "").trim() || "Organization"
+  const customerDisplayName =
+    ((custMetaRes.data as { company_name?: string } | null)?.company_name ?? "").trim() || "Customer"
 
   const paymentSummary = buildPortalInvoicePaymentSummary(
     {
@@ -292,6 +307,9 @@ export async function GET(
   const blitzpayHostedCheckout = await getPortalBlitzpayHostedCheckoutEligibility(svc, orgId)
 
   return NextResponse.json({
+    workspaceDisplayName,
+    customerDisplayName,
+    paymentHistory,
     invoice: {
       id: inv.id as string,
       invoiceNumber: inv.invoice_number as string,

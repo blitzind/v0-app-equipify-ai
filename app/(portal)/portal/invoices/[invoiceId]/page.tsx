@@ -53,7 +53,18 @@ type PortalBlitzpayHostedCheckoutPayload = {
   unavailableReason: "feature_disabled" | "org_disabled" | "connect_not_ready" | null
 }
 
+type PortalPaymentHistoryItem = {
+  paidOn: string
+  amountCents: number
+  methodLabel: string
+  referenceDisplay: string | null
+  statusLabel: string
+}
+
 type DetailPayload = {
+  workspaceDisplayName?: string
+  customerDisplayName?: string
+  paymentHistory?: PortalPaymentHistoryItem[]
   blitzpayHostedCheckout?: PortalBlitzpayHostedCheckoutPayload
   invoice: {
     id: string
@@ -108,7 +119,8 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const searchParams = useSearchParams()
   const [data, setData] = useState<DetailPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [blitzpayReturnMessage, setBlitzpayReturnMessage] = useState<string | null>(null)
+  const [checkoutReturn, setCheckoutReturn] = useState<"success" | "cancel" | null>(null)
+  const [confirmPollExhausted, setConfirmPollExhausted] = useState(false)
   const [prepareError, setPrepareError] = useState<string | null>(null)
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
 
@@ -117,14 +129,48 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
     const st = searchParams.get("status")
     if (b !== "1" || (st !== "success" && st !== "cancel")) return
     if (st === "success") {
-      setBlitzpayReturnMessage(
-        "Payment submitted. This page will refresh when your provider’s records update — usually within a minute after Stripe confirms.",
-      )
+      setCheckoutReturn("success")
+      setConfirmPollExhausted(false)
     } else {
-      setBlitzpayReturnMessage("Checkout was canceled. You can try again when you are ready.")
+      setCheckoutReturn("cancel")
     }
     router.replace(`/portal/invoices/${invoiceId}`, { scroll: false })
   }, [searchParams, router, invoiceId])
+
+  useEffect(() => {
+    if (checkoutReturn !== "success" || !invoiceId) return
+    let cancelled = false
+    let ticks = 0
+    const id = window.setInterval(() => {
+      void (async () => {
+        if (cancelled) return
+        ticks += 1
+        try {
+          const r = await fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}`, { credentials: "include" })
+          if (!r.ok || cancelled) return
+          const j = (await r.json()) as DetailPayload
+          setData(j)
+          const bal = j.invoice.balanceDueCents ?? 0
+          const paidSt = String(j.invoice.status || "").toLowerCase() === "paid"
+          if (paidSt || bal <= 0) {
+            window.clearInterval(id)
+            setConfirmPollExhausted(false)
+            return
+          }
+          if (ticks >= 18) {
+            window.clearInterval(id)
+            if (!cancelled) setConfirmPollExhausted(true)
+          }
+        } catch {
+          /* ignore transient errors while polling */
+        }
+      })()
+    }, 2500)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [checkoutReturn, invoiceId])
 
   useEffect(() => {
     fetch(`/api/portal/invoices/${invoiceId}`)
@@ -378,23 +424,103 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
         ) : null}
       </div>
 
+      {checkoutReturn ? (
+        <div className="portal-card p-5 space-y-2">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            Payment update
+          </h2>
+          {checkoutReturn === "cancel" ? (
+            <p className="text-sm leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
+              Checkout was canceled before completing payment. You can use{" "}
+              <span className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                Pay with BlitzPay
+              </span>{" "}
+              below when you are ready to try again.
+            </p>
+          ) : fullyPaid || String(inv.status || "").toLowerCase() === "paid" ? (
+            <p className="text-sm font-medium leading-relaxed" style={{ color: "var(--portal-success)" }}>
+              Payment received — thank you. This invoice is paid in full on your account.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--portal-foreground)" }}>
+                Payment submitted. Your bank or card issuer may show a charge right away, but this page only reflects
+                payment after your service provider&apos;s system confirms it from Stripe — usually within about a minute.
+              </p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
+                Until your balance due shows{" "}
+                <span className="font-medium" style={{ color: "var(--portal-foreground)" }}>
+                  $0.00
+                </span>
+                , your payment
+                is still being confirmed — that does not mean your card was charged twice.
+              </p>
+              {confirmPollExhausted ? (
+                <p className="text-xs leading-relaxed mt-1" style={{ color: "var(--portal-nav-text)" }}>
+                  We&apos;re still waiting on the final confirmation. Refresh this page in a few minutes, or contact your
+                  service provider if the balance does not update.
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      <div className="portal-card p-5">
+        <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--portal-foreground)" }}>
+          Payment history
+        </h2>
+        {(data.paymentHistory ?? []).length === 0 ? (
+          <p className="text-sm leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
+            No payments are posted to this invoice yet. When you pay online or your provider records a payment, it will
+            appear here.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--portal-border-light)" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-left text-[11px] uppercase tracking-wide"
+                  style={{ color: "var(--portal-nav-text)", background: "var(--portal-accent-muted)" }}
+                >
+                  <th className="px-3 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Method</th>
+                  <th className="px-3 py-2 font-medium">Reference</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.paymentHistory ?? []).map((row, idx) => (
+                  <tr key={`${row.paidOn}-${idx}`} className="border-t" style={{ borderColor: "var(--portal-border-light)" }}>
+                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--portal-foreground)" }}>
+                      {fmtDate(row.paidOn)}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums font-medium" style={{ color: "var(--portal-foreground)" }}>
+                      {fmtCurrency(row.amountCents)}
+                    </td>
+                    <td className="px-3 py-2" style={{ color: "var(--portal-nav-text)" }}>
+                      {row.methodLabel}
+                    </td>
+                    <td className="px-3 py-2 max-w-[200px]" style={{ color: "var(--portal-nav-text)" }}>
+                      {row.referenceDisplay ?? "—"}
+                    </td>
+                    <td className="px-3 py-2" style={{ color: "var(--portal-success)" }}>
+                      {row.statusLabel}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {blitzpay ? (
         <div className="portal-card p-5 space-y-3">
           <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
             Pay online (BlitzPay)
           </h2>
-          {blitzpayReturnMessage ? (
-            <p
-              className="text-sm rounded-md border px-3 py-2 leading-relaxed"
-              style={{
-                borderColor: "var(--portal-accent)",
-                background: "var(--portal-accent-muted)",
-                color: "var(--portal-foreground)",
-              }}
-            >
-              {blitzpayReturnMessage}
-            </p>
-          ) : null}
           {prepareError ? <p className="text-sm text-destructive">{prepareError}</p> : null}
           <p className="text-xs leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
             Secure card payment through Stripe Checkout on your service provider&apos;s connected account. Final

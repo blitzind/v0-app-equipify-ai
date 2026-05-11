@@ -1487,6 +1487,22 @@ function PaymentsTab({
     invoice.status !== "Draft" &&
     invoice.status !== "Paid"
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
+  type BlitzpayActivityRow = {
+    attemptNo: number
+    paymentSource: "staff_dashboard" | "customer_portal"
+    displayStatus: "pending" | "succeeded" | "failed" | "canceled" | "expired"
+    attemptStatusRaw: string
+    failureCode: string | null
+    createdAt: string
+    amountCents: number | null
+    currency: string | null
+    stripePiTail: string | null
+    checkoutSessionTail: string | null
+  }
+  const [blitzpayActivity, setBlitzpayActivity] = useState<BlitzpayActivityRow[]>([])
+  const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
+  const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
+  const canViewBlitzpayActivity = permissions.canEditInvoices || permissions.canViewFinancials
 
   const grandTotal = invoiceGrandTotalDollars(invoice)
   const totalPaid =
@@ -1543,6 +1559,44 @@ function PaymentsTab({
       cancelled = true
     }
   }, [orgId, invoice.id, invoice.totalPaidCents])
+
+  useEffect(() => {
+    if (!orgId || !canViewBlitzpayActivity) {
+      setBlitzpayActivity([])
+      setBlitzpayActivityErr(null)
+      setBlitzpayActivityLoading(false)
+      return
+    }
+    let cancelled = false
+    setBlitzpayActivityLoading(true)
+    setBlitzpayActivityErr(null)
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/activity`,
+          { credentials: "include", cache: "no-store" },
+        )
+        const body = (await res.json()) as { attempts?: BlitzpayActivityRow[]; error?: string; message?: string }
+        if (cancelled) return
+        if (!res.ok) {
+          setBlitzpayActivityErr(body.message ?? body.error ?? "Could not load BlitzPay activity.")
+          setBlitzpayActivity([])
+        } else {
+          setBlitzpayActivity(body.attempts ?? [])
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setBlitzpayActivityErr(e instanceof Error ? e.message : "Could not load BlitzPay activity.")
+          setBlitzpayActivity([])
+        }
+      } finally {
+        if (!cancelled) setBlitzpayActivityLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, invoice.id, canViewBlitzpayActivity, invoice.totalPaidCents])
 
   const creatorIds = useMemo(
     () => [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[],
@@ -1777,6 +1831,99 @@ function PaymentsTab({
         </div>
       ) : null}
 
+      {canViewBlitzpayActivity && orgId ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">BlitzPay online attempts</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Hosted Checkout sessions for this invoice. Status comes from Stripe via webhooks — use this when helping a
+            customer who paid from the portal or from staff.
+          </p>
+          {blitzpayActivityLoading ? (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+            </p>
+          ) : blitzpayActivityErr ? (
+            <p className="text-[11px] text-destructive">{blitzpayActivityErr}</p>
+          ) : blitzpayActivity.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground">No BlitzPay Checkout attempts for this invoice yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-semibold">When</th>
+                    <th className="px-2 py-1.5 font-semibold">Source</th>
+                    <th className="px-2 py-1.5 font-semibold">Status</th>
+                    <th className="px-2 py-1.5 font-semibold text-right">Amount</th>
+                    <th className="px-2 py-1.5 font-semibold hidden sm:table-cell">Correlation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {blitzpayActivity.map((a) => {
+                    const src =
+                      a.paymentSource === "customer_portal" ? "Customer portal" : "Staff (dashboard)"
+                    const stLabel =
+                      a.displayStatus === "succeeded"
+                        ? "Succeeded"
+                        : a.displayStatus === "failed"
+                          ? "Failed"
+                          : a.displayStatus === "canceled"
+                            ? "Canceled"
+                            : a.displayStatus === "expired"
+                              ? "Expired"
+                              : "Pending"
+                    const corr =
+                      [a.checkoutSessionTail ? `cs…${a.checkoutSessionTail}` : null, a.stripePiTail ? `pi…${a.stripePiTail}` : null]
+                        .filter(Boolean)
+                        .join(" · ") || "—"
+                    return (
+                      <tr key={`${a.attemptNo}-${a.createdAt}`} className="border-b border-border last:border-0">
+                        <td className="px-2 py-1.5 whitespace-nowrap text-foreground">
+                          {new Date(a.createdAt).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">{src}</td>
+                        <td className="px-2 py-1.5">
+                          <span
+                            className={cn(
+                              "font-medium",
+                              a.displayStatus === "succeeded" && "text-[color:var(--status-success)]",
+                              a.displayStatus === "failed" && "text-destructive",
+                              (a.displayStatus === "pending" || a.displayStatus === "expired") &&
+                                "text-[color:var(--status-warning)]",
+                              a.displayStatus === "canceled" && "text-muted-foreground",
+                            )}
+                          >
+                            {stLabel}
+                          </span>
+                          {a.failureCode && a.displayStatus === "failed" ? (
+                            <span className="block text-[10px] text-muted-foreground truncate max-w-[140px]">
+                              {a.failureCode}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums font-medium text-foreground">
+                          {a.amountCents != null ?
+                            fmtCurrency(a.amountCents / 100)
+                          : "—"}
+                        </td>
+                        <td className="px-2 py-1.5 text-muted-foreground hidden sm:table-cell font-mono text-[10px]">
+                          {corr}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {canViewQbFinancialSync ? (
         <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-[color:var(--ds-info-border)]/40")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1951,7 +2098,9 @@ function PaymentsTab({
                       {fmtCurrency(r.amount_cents / 100)}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell max-w-[140px] truncate">
-                      {r.reference?.trim() || "—"}
+                      {(r.reference ?? "").trim().startsWith("blitzpay_pi:") ?
+                        "BlitzPay (online)"
+                      : (r.reference ?? "").trim() || "—"}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground hidden md:table-cell">
                       {r.created_by ? creatorMap.get(r.created_by) ?? "—" : "—"}

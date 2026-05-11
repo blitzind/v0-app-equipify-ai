@@ -449,7 +449,7 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Stripe** | **Checkout Session** `mode: payment` on **connected account** (`Stripe-Account`), `payment_intent_data.application_fee_amount`, metadata from `stripe-metadata.ts`, idempotency from `idempotency-keys.ts`, amounts/fees via `money.ts` / `fees.ts`. No client secret or card data in the app UI beyond redirect to Stripe-hosted Checkout. |
 | **Persistence** | Before/around Stripe: insert `blitzpay_payment_intents` (stable id), `blitzpay_fee_snapshots`, `blitzpay_invoice_payment_attempts` (`checkout` / `initiated`); retries use new `attemptToken` / idempotency key to avoid duplicate Checkout sessions for the same logical retry policy. |
 | **Webhook** | `payment_intent.succeeded` / `payment_intent.payment_failed` / `payment_intent.canceled` + `checkout.session.completed` (paid): mirror PI, then idempotent `org_invoice_payments` via `reference = blitzpay_pi:{payment_intent_id}` and `lib/billing/invoice-payment-allocation.ts` path; ledger `payment_captured` + optional `application_fee_received`; attempt row terminal status; inbox `done` / `dead` per existing inbox rules. |
-| **UI** | Minimal: invoice Payments tab — “Pay with BlitzPay (hosted)” when permitted (`components/drawers/invoice-detail-view.tsx`). |
+| **UI** | Invoice Payments tab — “Pay with BlitzPay (hosted)” when permitted; Phase **2D** adds attempt history + clearer BlitzPay references (`components/drawers/invoice-detail-view.tsx`). |
 | **Tests** | `pnpm test:blitzpay-phase-2b` (`scripts/test-blitzpay-phase-2b.ts`) — eligibility, metadata, idempotency key shape, fee math. |
 
 ### 12.3 Phase 2C (shipped in repo) — customer portal hosted Checkout
@@ -478,8 +478,30 @@ Use this as a **checklist** when coding — not exhaustive.
 8. Open an invoice id that belongs to **another** customer (same org): expect **404** on GET and prepare-pay.  
 9. Staff invoice Payments tab **Pay with BlitzPay (hosted)** still works unchanged.
 
-**Deferred (not Phase 2C):** portal payment history list, refunds/disputes beyond webhook stubs, payout UI.
+**Deferred (not Phase 2C):** refunds/disputes beyond webhook stubs, payout UI.
+
+### 12.4 Phase 2D (shipped in repo) — receipts foundation, payment history, confirmation UX
+
+| Area | Details |
+|------|---------|
+| **Portal confirmation** | After Stripe success (`?blitzpay=1&status=success`), **Payment update** explains webhook delay; if invoice is already paid / zero balance → **Payment received**; otherwise **confirming** copy + short poll of `GET /api/portal/invoices/[id]` until paid or timeout. Does **not** assert funds captured until allocation shows on the invoice. |
+| **Portal payment history** | `GET /api/portal/invoices/[invoiceId]` returns `paymentHistory` (from `org_invoice_payments`) via `mapOrgInvoicePaymentRowToPortalHistory` — masks `blitzpay_pi:*` references as **Electronic confirmation on file**; no Stripe ids, fees, or internal UUIDs in payloads. |
+| **Staff visibility** | `GET /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity` — `canEditInvoices` **or** `canViewFinancials`; returns recent `blitzpay_invoice_payment_attempts` joined to `blitzpay_payment_intents` with **tails only** (`pi…{6}`, `cs…{8}`) for support correlation. **Payments tab** lists attempts with source (staff vs customer portal) and status (pending / succeeded / failed / canceled / expired). Recorded payments table shows **BlitzPay (online)** instead of raw `blitzpay_pi:` reference. |
+| **Receipt foundation** | `lib/blitzpay/invoice-payment-receipt.ts` — `InvoicePaymentReceiptShape` + `buildInvoicePaymentReceiptShape` for future email/PDF; **no outbound email in Phase 2D** (email receipts = next). |
+| **Tests** | `pnpm test:blitzpay-phase-2d` — portal history masking + receipt builder. |
+
+#### Manual test checklist (Phase 2D)
+
+1. Portal invoice with balance due shows **Pay online (BlitzPay)**.  
+2. Complete Stripe Checkout (test).  
+3. Return URL: **Payment update** shows confirming copy until webhook posts; then **Payment received** when balance is zero / status paid.  
+4. **Payment history** lists the posted row with customer-safe reference (no `pi_` / `cs_` strings).  
+5. Staff **Payments** tab: recorded payment shows **BlitzPay (online)**; **BlitzPay online attempts** shows the attempt with correct **Source** and **Status**.  
+6. Failed or canceled Checkout: attempt row shows **Failed** / **Canceled** (or **Expired**) without marking the invoice paid unless a separate successful webhook posted.  
+7. Portal JSON and UI never expose full Stripe ids, platform/application fees, or `blitzpay_payment_intents` internal UUIDs to customers.
+
+**Next (not Phase 2D):** email/PDF receipts using `buildInvoicePaymentReceiptShape`, richer staff tooling, refunds/disputes.
 
 ---
 
-*Phase 2A–2C vertical slice for hosted invoice pay (staff + portal) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2D vertical slice for hosted invoice pay (staff + portal + confirmation/history) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
