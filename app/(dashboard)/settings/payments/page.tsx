@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useAdmin } from "@/lib/admin-store"
 import { BlitzpayRevenueIntelligencePanel } from "@/components/blitzpay/blitzpay-revenue-intelligence-panel"
+import { BlitzpayApPanel } from "@/components/blitzpay/blitzpay-ap-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -918,6 +919,7 @@ function BlitzPaySettingsPageInner() {
             {canViewPayoutLedger && hasAccount ? (
               <div className="border-t border-border pt-4 space-y-4">
                 <BlitzpayTreasuryPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                <BlitzpayApPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold">Payout ledger (staff)</p>

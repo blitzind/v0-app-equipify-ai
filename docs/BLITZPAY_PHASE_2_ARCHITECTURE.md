@@ -807,6 +807,28 @@ Use this as a **checklist** when coding — not exhaustive.
 3. Platform admin: **Admin → BlitzPay Ops** revenue rollup includes payout health tiles.  
 4. Customer portal: confirm treasury API is not referenced.
 
+### 12.20 Phase 2S (vendor payables, AP scheduling, treasury/AP intelligence)
+
+| Area | Details |
+|------|---------|
+| **Migrations** | `20260925120000_blitzpay_phase_2s_vendor_payables.sql` — `blitzpay_vendor_payables` (vendor_kind, counterparty_label, due_date, scheduled_payout_date, paid_at, status lifecycle, approval fields, WO/invoice/PO links, reimbursement/material flags); `blitzpay_vendor_payouts` (internal row when payable marked **paid** — not Stripe `po_`). RLS: authenticated **select** via `is_org_member`; writes via **service role** APIs only. |
+| **Pure libs** | `blitzpay-payable-lifecycle.ts` — status graph + `isOpenVendorPayableStatus`. `blitzpay-ap-math.ts` — obligation buckets (7/30/60, overdue, WO-linked), internal vendor payout velocity, projected outgoing (AP 7d + Stripe upcoming-transfer estimate), reserve stress ratio. `blitzpay-ap-insights.ts` — read-only operational strings. |
+| **Server** | `blitzpay-vendor-payables.ts` — list/dashboard, `insertBlitzpayVendorPayable`, `patchBlitzpayVendorPayable` (valid transitions, approval stamp, insert internal payout on paid), `fetchWorkOrderVendorPayablesSlice`, `fetchApReportingExtras` for reporting. |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `apOpenOutstandingCents`, `apDue7/30/60OpenCents`, `apVendorInternalVelocity7dCents`, `apProjectedOutgoingCents7d`. `GET …/blitzpay/status` `payoutVisibility` mirrors those fields. |
+| **Platform** | `fetchBlitzpayPlatformRevenueRollup` adds bounded scan: orgs with open payables, total open cents, overdue open line count. Admin **BlitzPay Ops** strip shows AP tiles. |
+| **APIs** | `GET/POST …/blitzpay/vendor-payables`; `PATCH …/blitzpay/vendor-payables/{id}` — `canViewFinancials` **and** `canEditInvoices` for writes; `canViewFinancials` **or** `canEditInvoices` for reads. `GET …/blitzpay/ap-dashboard` — composite treasury + AP + insights. |
+| **Work orders** | `fetchWorkOrderBlitzpaySummary` adds `vendorPayablesField` (aggregates) + `vendorPayablesStaff` (detail). WO BlitzPay API strips staff rows when `fieldView` (technician-safe). |
+| **UX** | Settings → **Payments** — `BlitzpayApPanel` under treasury. Work order **BlitzPay** panel shows vendor obligations. |
+| **Portal** | No customer portal routes reference vendor-payables or ap-dashboard. |
+| **Tests** | `pnpm test:blitzpay-phase-2s` — aggregation + lifecycle + insights + API path strings + portal scan + migration marker. |
+
+#### Manual test checklist (Phase 2S)
+
+1. Financial user: **Settings → Payments** — AP panel loads; create a draft payable; advance status via API or future tooling.  
+2. Link a payable to a work order; confirm WO BlitzPay panel shows totals; field-only role sees aggregates without vendor list.  
+3. Platform admin: **BlitzPay Ops** rollup shows AP health tiles.  
+4. Customer portal: confirm no AP API paths.
+
 ---
 
-*Phase 2A–2R vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2S vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

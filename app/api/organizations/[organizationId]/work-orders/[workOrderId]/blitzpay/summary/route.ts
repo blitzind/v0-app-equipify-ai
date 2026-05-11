@@ -32,13 +32,16 @@ export async function GET(
   )
   if (drift) return drift
 
-  const summary = await fetchWorkOrderBlitzpaySummary(admin, organizationId, workOrderId)
+  const fieldView = !gate.permissions.canViewFinancials
+  const summary = await fetchWorkOrderBlitzpaySummary(admin, organizationId, workOrderId, {
+    staffVendorPayableDetail: !fieldView,
+  })
   if (!summary) {
     return NextResponse.json({ error: "not_found", message: "Work order not found." }, { status: 404 })
   }
-  const fieldView = !gate.permissions.canViewFinancials
+  const safeSummary = fieldView ? { ...summary, vendorPayablesStaff: null } : summary
   return NextResponse.json({
-    summary,
+    summary: safeSummary,
     fieldView,
   })
 }

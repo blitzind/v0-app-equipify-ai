@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 273,
-  sqlMigrations: 164,
+  apiRouteHandlers: 276,
+  sqlMigrations: 165,
   dashboardPages: 60,
-  componentsTsx: 260,
-  libTsFiles: 564,
+  componentsTsx: 261,
+  libTsFiles: 568,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **273** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **164** |
+| API route handlers (\`app/api/**/route.ts\`) | **276** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **165** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
-| \`components/**/*.tsx\` | **260** |
-| \`lib/**/*.ts\` | **564** |
+| \`components/**/*.tsx\` | **261** |
+| \`lib/**/*.ts\` | **568** |
 
 ### Vercel crons
 
@@ -96,6 +96,7 @@ organizations/[organizationId]/attachments/[attachmentId]/route.ts
 organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
+organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
 organizations/[organizationId]/blitzpay/financing/summary/route.ts
 organizations/[organizationId]/blitzpay/launch-readiness/route.ts
@@ -106,6 +107,8 @@ organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
 organizations/[organizationId]/blitzpay/sync/route.ts
 organizations/[organizationId]/blitzpay/treasury/route.ts
+organizations/[organizationId]/blitzpay/vendor-payables/[payableId]/route.ts
+organizations/[organizationId]/blitzpay/vendor-payables/route.ts
 organizations/[organizationId]/calibration-records/[recordId]/portal-release/route.ts
 organizations/[organizationId]/calibration-templates/import-commit/route.ts
 organizations/[organizationId]/catalog-items/[itemId]/attachments/route.ts

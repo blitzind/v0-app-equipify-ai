@@ -186,6 +186,12 @@ export async function GET(
             treasuryPayoutVelocityPaidCents30d: reporting.treasuryPayoutVelocityPaidCents30d,
             treasuryEstimateUpcomingTransferCents: reporting.treasuryEstimateUpcomingTransferCents,
             treasuryPayoutSpeedLane: reporting.treasuryPayoutSpeedLane,
+            apOpenOutstandingCents: reporting.apOpenOutstandingCents,
+            apDue7OpenCents: reporting.apDue7OpenCents,
+            apDue30OpenCents: reporting.apDue30OpenCents,
+            apDue60OpenCents: reporting.apDue60OpenCents,
+            apVendorInternalVelocity7dCents: reporting.apVendorInternalVelocity7dCents,
+            apProjectedOutgoingCents7d: reporting.apProjectedOutgoingCents7d,
             payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
               ? "payouts_enabled"
               : "payouts_not_ready",

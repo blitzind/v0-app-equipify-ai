@@ -357,6 +357,10 @@ export type BlitzpayPlatformRevenueRollup = {
   treasuryPendingInFlightPayoutCentsApprox: number
   treasuryFailedPayouts30dCount: number
   treasuryInstantPayoutInterestOrgsCount: number
+  /** Phase 2S — bounded scan of open vendor payables (internal AP, not customer portal). */
+  apOpenPayablesOrgsApprox: number
+  apOpenOutstandingCentsTotalApprox: number
+  apOverdueOpenLinesApprox: number
 }
 
 /**
@@ -370,6 +374,8 @@ export async function fetchBlitzpayPlatformRevenueRollup(
   const sinceIso = new Date(Date.now() - reportingWindowDays * 86400_000).toISOString()
 
   const since30d = new Date(Date.now() - 30 * 86400_000).toISOString()
+
+  const todayYmd = new Date().toISOString().slice(0, 10)
 
   const [
     { data: led },
@@ -409,6 +415,18 @@ export async function fetchBlitzpayPlatformRevenueRollup(
       .eq("blitzpay_instant_payout_interest", true),
   ])
 
+  let apRows: Array<{ organization_id?: string; amount_cents?: number; due_date?: string; status?: string }> = []
+  try {
+    const { data, error } = await admin
+      .from("blitzpay_vendor_payables")
+      .select("organization_id, amount_cents, due_date, status")
+      .in("status", ["draft", "pending_approval", "approved", "scheduled"])
+      .limit(8000)
+    if (!error && data) apRows = data as typeof apRows
+  } catch {
+    /* table may not exist before migration */
+  }
+
   let ledgerPaymentCapturedCentsWindow = 0
   for (const r of led ?? []) {
     ledgerPaymentCapturedCentsWindow += Math.max(0, Math.round(Number((r as { amount_cents: number }).amount_cents)))
@@ -437,6 +455,21 @@ export async function fetchBlitzpayPlatformRevenueRollup(
     )
   }
 
+  const orgsWithAp = new Set<string>()
+  let apOpenOutstandingCentsTotalApprox = 0
+  let apOverdueOpenLinesApprox = 0
+  const todayMs = Date.parse(`${todayYmd}T00:00:00.000Z`)
+  for (const r of apRows) {
+    const row = r
+    const oid = String(row.organization_id ?? "")
+    if (!oid) continue
+    orgsWithAp.add(oid)
+    apOpenOutstandingCentsTotalApprox += Math.max(0, Math.round(Number(row.amount_cents ?? 0)))
+    const due = String(row.due_date ?? "").slice(0, 10)
+    const dueMs = Date.parse(`${due}T00:00:00.000Z`)
+    if (Number.isFinite(dueMs) && dueMs < todayMs) apOverdueOpenLinesApprox += 1
+  }
+
   return {
     reportingWindowDays,
     ledgerPaymentCapturedCentsWindow,
@@ -446,5 +479,8 @@ export async function fetchBlitzpayPlatformRevenueRollup(
     treasuryPendingInFlightPayoutCentsApprox,
     treasuryFailedPayouts30dCount: failedPayout30.count ?? 0,
     treasuryInstantPayoutInterestOrgsCount: instantInterestOrgs.count ?? 0,
+    apOpenPayablesOrgsApprox: orgsWithAp.size,
+    apOpenOutstandingCentsTotalApprox,
+    apOverdueOpenLinesApprox,
   }
 }

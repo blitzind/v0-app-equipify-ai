@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { aggregateBlitzpayTreasuryMetrics } from "@/lib/blitzpay/blitzpay-contractor-treasury"
+import { fetchApReportingExtras } from "@/lib/blitzpay/blitzpay-vendor-payables"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 
@@ -70,6 +71,13 @@ export type BlitzpayOrgReportingSnapshot = {
   treasuryPayoutVelocityPaidCents30d: number
   treasuryEstimateUpcomingTransferCents: number
   treasuryPayoutSpeedLane: "standard" | "accelerated" | "unknown"
+  /** Phase 2S — internal vendor payables (not Stripe payouts). */
+  apOpenOutstandingCents: number
+  apDue7OpenCents: number
+  apDue30OpenCents: number
+  apDue60OpenCents: number
+  apVendorInternalVelocity7dCents: number
+  apProjectedOutgoingCents7d: number
 }
 
 /**
@@ -400,6 +408,24 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* migrations may lag in some sandboxes */
   }
 
+  let apOpenOutstandingCents = 0
+  let apDue7OpenCents = 0
+  let apDue30OpenCents = 0
+  let apDue60OpenCents = 0
+  let apVendorInternalVelocity7dCents = 0
+  let apProjectedOutgoingCents7d = 0
+  try {
+    const apx = await fetchApReportingExtras(admin, organizationId)
+    apOpenOutstandingCents = apx.apOpenOutstandingCents
+    apDue7OpenCents = apx.apDue7OpenCents
+    apDue30OpenCents = apx.apDue30OpenCents
+    apDue60OpenCents = apx.apDue60OpenCents
+    apVendorInternalVelocity7dCents = apx.apVendorInternalVelocity7dCents
+    apProjectedOutgoingCents7d = apx.apProjectedOutgoingCents7d
+  } catch {
+    /* vendor payables migration may lag */
+  }
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -446,5 +472,11 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     treasuryPayoutVelocityPaidCents30d,
     treasuryEstimateUpcomingTransferCents,
     treasuryPayoutSpeedLane,
+    apOpenOutstandingCents,
+    apDue7OpenCents,
+    apDue30OpenCents,
+    apDue60OpenCents,
+    apVendorInternalVelocity7dCents,
+    apProjectedOutgoingCents7d,
   }
 }

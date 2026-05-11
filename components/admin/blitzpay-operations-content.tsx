@@ -14,6 +14,9 @@ type RevenueRollup = {
   treasuryPendingInFlightPayoutCentsApprox: number
   treasuryFailedPayouts30dCount: number
   treasuryInstantPayoutInterestOrgsCount: number
+  apOpenPayablesOrgsApprox: number
+  apOpenOutstandingCentsTotalApprox: number
+  apOverdueOpenLinesApprox: number
 }
 
 type OpsSummary = {
@@ -256,6 +259,18 @@ export function BlitzpayOperationsContent() {
             <div className="rounded-lg border border-border p-3">
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Instant payout interest orgs</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.treasuryInstantPayoutInterestOrgsCount}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — orgs w/ open payables</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.apOpenPayablesOrgsApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — open outstanding (approx)</p>
+              <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.apOpenOutstandingCentsTotalApprox)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — overdue open lines</p>
+              <p className="text-lg font-semibold tabular-nums">{revenueRollup.apOverdueOpenLinesApprox}</p>
             </div>
           </div>
         </div>

@@ -46,6 +46,8 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_balance_snapshots", select: "id" },
   { name: "blitzpay_payment_plans", select: "id, organization_id" },
   { name: "blitzpay_payment_plan_installments", select: "id, payment_plan_id" },
+  { name: "blitzpay_vendor_payables", select: "id, organization_id, status" },
+  { name: "blitzpay_vendor_payouts", select: "id, organization_id, vendor_payable_id" },
 ]
 
 export type BlitzpaySchemaHealthResult =

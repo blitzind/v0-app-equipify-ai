@@ -308,6 +308,44 @@ export function WorkOrderBlitzpayPanel({ organizationId, workOrderId }: Props) {
         </div>
       ) : null}
 
+      {summary?.vendorPayablesField &&
+      (summary.vendorPayablesField.openCount > 0 ||
+        (!fieldView && (summary.vendorPayablesStaff?.length ?? 0) > 0)) ? (
+        <div className="rounded-lg border border-border px-3 py-2 space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Vendor payables</p>
+          <p className="text-[11px] text-muted-foreground">
+            Open obligations {fmtMoney(summary.vendorPayablesField.openObligationCents)} · {summary.vendorPayablesField.openCount}{" "}
+            line(s)
+            {summary.vendorPayablesField.overdueCount > 0 ?
+              ` · ${summary.vendorPayablesField.overdueCount} overdue`
+            : ""}
+            {summary.vendorPayablesField.hasReimbursementOpen ? " · includes reimbursement" : ""}
+            {summary.vendorPayablesField.hasMaterialOpen ? " · includes material" : ""}
+          </p>
+          {!fieldView && summary.vendorPayablesStaff && summary.vendorPayablesStaff.length > 0 ? (
+            <ul className="space-y-1 mt-1">
+              {summary.vendorPayablesStaff.map((v) => (
+                <li key={v.id} className="text-[11px] flex justify-between gap-2 border-t border-border/50 pt-1 first:border-0 first:pt-0">
+                  <span className="truncate">
+                    {v.counterpartyLabel}
+                    <span className="text-muted-foreground block text-[9px]">
+                      {v.vendorKind.replace(/_/g, " ")} · {v.status}
+                      {v.reimbursementFlag ? " · reimb" : ""}
+                      {v.materialCostFlag ? " · material" : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {fmtMoney(v.amountCents)} · due {v.dueDate}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : fieldView ? (
+            <p className="text-[10px] text-muted-foreground">Office view shows payable detail; field view shows totals only.</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {summary?.quotes && summary.quotes.length > 0 ? (
         <div className="rounded-lg border border-border px-3 py-2 space-y-1">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Linked estimates</p>

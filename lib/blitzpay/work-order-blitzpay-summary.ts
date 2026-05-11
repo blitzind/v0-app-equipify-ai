@@ -8,6 +8,11 @@ import {
   invoiceGrandTotalCents,
 } from "@/lib/billing/invoice-payment-allocation"
 import { invoiceStatusDbToUi } from "@/lib/org-quotes-invoices/map"
+import {
+  fetchWorkOrderVendorPayablesSlice,
+  type WorkOrderVendorPayablesFieldSlice,
+  type WorkOrderVendorPayablesStaffRow,
+} from "@/lib/blitzpay/blitzpay-vendor-payables"
 
 export function blitzpayDisplayPaymentReference(ref: string | null | undefined): string {
   if (ref == null) return ""
@@ -68,12 +73,15 @@ export type WorkOrderBlitzpaySummary = {
     useCount: number
   }>
   financingSessionCount: number
+  vendorPayablesField: WorkOrderVendorPayablesFieldSlice
+  vendorPayablesStaff: WorkOrderVendorPayablesStaffRow[] | null
 }
 
 export async function fetchWorkOrderBlitzpaySummary(
   admin: SupabaseClient,
   organizationId: string,
   workOrderId: string,
+  options?: { staffVendorPayableDetail?: boolean },
 ): Promise<WorkOrderBlitzpaySummary | null> {
   assertUuid(organizationId, "organizationId")
   assertUuid(workOrderId, "workOrderId")
@@ -357,6 +365,24 @@ export async function fetchWorkOrderBlitzpaySummary(
     if (!error && count != null) financingSessionCount += count
   }
 
+  let vendorPayablesField: WorkOrderVendorPayablesFieldSlice = {
+    openObligationCents: 0,
+    openCount: 0,
+    overdueCount: 0,
+    hasReimbursementOpen: false,
+    hasMaterialOpen: false,
+  }
+  let vendorPayablesStaff: WorkOrderVendorPayablesStaffRow[] | null = null
+  try {
+    const vp = await fetchWorkOrderVendorPayablesSlice(admin, organizationId, workOrderId, {
+      staffDetail: Boolean(options?.staffVendorPayableDetail),
+    })
+    vendorPayablesField = vp.field
+    vendorPayablesStaff = vp.staff
+  } catch {
+    /* migrations may lag */
+  }
+
   return {
     workOrderId,
     customerId,
@@ -368,5 +394,7 @@ export async function fetchWorkOrderBlitzpaySummary(
     recentPayments,
     paymentLinks,
     financingSessionCount,
+    vendorPayablesField,
+    vendorPayablesStaff,
   }
 }
