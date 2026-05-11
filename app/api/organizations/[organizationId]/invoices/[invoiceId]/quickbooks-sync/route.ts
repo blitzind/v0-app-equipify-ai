@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { readInvoiceInboundSnapshot } from "@/lib/integrations/quickbooks/invoice-inbound-reconcile"
+import { sanitizeQuickBooksClientMessage } from "@/lib/integrations/quickbooks/safe-log"
 
 export const runtime = "nodejs"
 
@@ -34,7 +35,9 @@ export async function GET(
     .eq("provider", "quickbooks_online")
     .maybeSingle()
 
-  const connected = (integ as { connection_status?: string } | null)?.connection_status === "connected"
+  const connSt = (integ as { connection_status?: string } | null)?.connection_status
+  const connected = connSt === "connected"
+  const connectionNeedsAttention = connSt === "error"
 
   const { data: inv } = await svc
     .from("org_invoices")
@@ -109,16 +112,23 @@ export async function GET(
     }
   })
 
+  const lastErrRaw = (integ as { last_sync_error?: string | null })?.last_sync_error ?? null
+  const lastSyncErrorSafe =
+    typeof lastErrRaw === "string" ? sanitizeQuickBooksClientMessage(lastErrRaw, 500) : null
+
   return NextResponse.json({
     connected,
-    integrationHealth: connected
-      ? {
-          lastSuccessfulSyncAt: (integ as { last_successful_sync_at?: string | null })?.last_successful_sync_at ?? null,
-          lastSyncAttemptAt: (integ as { last_sync_attempt_at?: string | null })?.last_sync_attempt_at ?? null,
-          syncHealth: (integ as { sync_health?: string })?.sync_health ?? "unknown",
-          lastSyncError: (integ as { last_sync_error?: string | null })?.last_sync_error ?? null,
-        }
-      : null,
+    connectionNeedsAttention,
+    integrationHealth:
+      connected || connectionNeedsAttention
+        ? {
+            lastSuccessfulSyncAt:
+              (integ as { last_successful_sync_at?: string | null })?.last_successful_sync_at ?? null,
+            lastSyncAttemptAt: (integ as { last_sync_attempt_at?: string | null })?.last_sync_attempt_at ?? null,
+            syncHealth: (integ as { sync_health?: string })?.sync_health ?? "unknown",
+            lastSyncError: lastSyncErrorSafe,
+          }
+        : null,
     invoice: invoiceMap
       ? {
           quickBooksInvoiceId: (invoiceMap as { external_id: string }).external_id,

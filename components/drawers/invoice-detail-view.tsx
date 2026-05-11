@@ -1450,6 +1450,7 @@ type OrgPaymentRow = {
 
 type QuickBooksInvoiceSyncResponse = {
   connected: boolean
+  connectionNeedsAttention?: boolean
   integrationHealth: {
     lastSuccessfulSyncAt: string | null
     lastSyncAttemptAt: string | null
@@ -1747,7 +1748,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
                 variant="secondary"
                 size="sm"
                 className="h-7 text-[11px] gap-1"
-                disabled={qbBusy !== null || !orgId || !qbPayload?.connected}
+                disabled={qbBusy !== null || !orgId || !qbPayload?.connected || qbPayload?.connectionNeedsAttention}
                 onClick={() => void pullQuickBooksPaymentStatus()}
               >
                 {qbBusy === "pull" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -1763,10 +1764,16 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
               <Loader2 className="w-3 h-3 animate-spin" /> Loading QuickBooks sync…
             </p>
           ) : null}
-          {qbPayload && !qbPayload.connected ? (
+          {qbPayload && !qbPayload.connected && !qbPayload.connectionNeedsAttention ? (
             <p className="text-[11px] text-muted-foreground">QuickBooks is not connected for this workspace.</p>
           ) : null}
-          {qbPayload?.connected && qbPayload.integrationHealth ? (
+          {qbPayload?.connectionNeedsAttention ? (
+            <p className="text-[11px] text-[color:var(--status-warning)] border border-[color:var(--status-warning)]/30 rounded-md px-2 py-1.5 bg-[color:var(--status-warning)]/5">
+              QuickBooks needs attention (authorization may have expired). Open Settings → Integrations → QuickBooks to
+              disconnect and connect again.
+            </p>
+          ) : null}
+          {qbPayload?.integrationHealth ? (
             <div className="text-[10px] text-muted-foreground space-y-0.5">
               <p>
                 Sync health:{" "}
@@ -1831,7 +1838,7 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
                 </Button>
               ) : null}
             </div>
-          ) : qbPayload?.connected ? (
+          ) : qbPayload?.connected && !qbPayload?.connectionNeedsAttention ? (
             <p className="text-[11px] text-muted-foreground">This invoice has not been exported to QuickBooks yet.</p>
           ) : null}
           {qbPayload?.payments?.length ? (

@@ -1,3 +1,12 @@
+export type QuickBooksApiEnvironment = "production" | "sandbox"
+
+/** Derive accounting API target for UI labels (never exposes secrets). */
+export function getQuickBooksApiEnvironment(): QuickBooksApiEnvironment {
+  const base = (process.env.QUICKBOOKS_API_BASE_URL ?? "").trim().toLowerCase()
+  if (base.includes("sandbox")) return "sandbox"
+  return "production"
+}
+
 export function quickBooksOAuthConfigured(): boolean {
   return Boolean(
     process.env.QUICKBOOKS_CLIENT_ID?.trim() &&

@@ -6,6 +6,10 @@ import { syncCustomersToQuickBooks } from "@/lib/integrations/quickbooks/custome
 import { syncCatalogItemsToQuickBooks } from "@/lib/integrations/quickbooks/catalog-sync"
 import { syncInvoicesToQuickBooks } from "@/lib/integrations/quickbooks/invoice-sync"
 import { reconcileQuickBooksInvoiceInboundStatuses } from "@/lib/integrations/quickbooks/invoice-inbound-reconcile"
+import {
+  logQuickBooksIntegrationEvent,
+  sanitizeQuickBooksClientMessage,
+} from "@/lib/integrations/quickbooks/safe-log"
 
 export type QuickBooksExportSyncKind = "customers" | "catalog_items" | "invoices" | "full_initial"
 
@@ -67,6 +71,13 @@ export async function runQuickBooksExportSync(params: {
 
   const logId = logRow.id as string
 
+  logQuickBooksIntegrationEvent({
+    kind: "sync_export_started",
+    organizationId: params.organizationId,
+    syncLogId: logId,
+    syncKind: syncKindDb,
+  })
+
   const baseArgs = {
     svc: params.svc,
     organizationId: params.organizationId,
@@ -113,12 +124,13 @@ export async function runQuickBooksExportSync(params: {
     const status: "success" | "partial" | "failed" =
       errors.length === 0 ? "success" : succeeded > 0 ? "partial" : "failed"
 
-    const errorMessage =
+    const errorMessageRaw =
       errors.length === 0
         ? null
         : succeeded > 0
           ? `${errors.length} record error(s) — see sync detail.`
           : errors[0]?.message.slice(0, 900) ?? "QuickBooks sync failed."
+    const errorMessage = errorMessageRaw ? sanitizeQuickBooksClientMessage(errorMessageRaw, 900) : null
 
     const completedAt = new Date().toISOString()
 
@@ -130,7 +142,10 @@ export async function runQuickBooksExportSync(params: {
         succeeded: p.result.succeeded,
         errorCount: p.result.errors.filter((x) => x.internalId !== "_").length,
       })),
-      errors: errors.slice(0, 80),
+      errors: errors.slice(0, 80).map((e) => ({
+        ...e,
+        message: sanitizeQuickBooksClientMessage(e.message, 500),
+      })),
     }
 
     await params.svc
@@ -160,6 +175,17 @@ export async function runQuickBooksExportSync(params: {
       .eq("organization_id", params.organizationId)
       .eq("provider", "quickbooks_online")
 
+    logQuickBooksIntegrationEvent({
+      kind: "sync_export_completed",
+      organizationId: params.organizationId,
+      syncLogId: logId,
+      syncKind: syncKindDb,
+      status,
+      recordsAttempted: attempted,
+      recordsSucceeded: succeeded,
+      message: errorMessage ?? undefined,
+    })
+
     return {
       ok: true,
       syncLogId: logId,
@@ -170,14 +196,22 @@ export async function runQuickBooksExportSync(params: {
       detail,
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
+    const msg = sanitizeQuickBooksClientMessage(e instanceof Error ? e.message : String(e), 900)
     const completedAt = new Date().toISOString()
+    logQuickBooksIntegrationEvent({
+      kind: "sync_export_failed",
+      organizationId: params.organizationId,
+      syncLogId: logId,
+      syncKind: syncKindDb,
+      code: "sync_exception",
+      message: msg,
+    })
     await params.svc
       .from("quickbooks_sync_logs")
       .update({
         status: "failed",
-        error_message: msg.slice(0, 900),
-        detail: { fatal: true, message: msg.slice(0, 900) },
+        error_message: msg,
+        detail: { fatal: true, message: msg },
         completed_at: completedAt,
       })
       .eq("id", logId)
@@ -187,7 +221,7 @@ export async function runQuickBooksExportSync(params: {
       .update({
         last_sync_attempt_at: completedAt,
         sync_health: "error",
-        last_sync_error: msg.slice(0, 500),
+        last_sync_error: sanitizeQuickBooksClientMessage(msg, 500),
         updated_at: completedAt,
       })
       .eq("organization_id", params.organizationId)
@@ -238,6 +272,13 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
 
   const logId = logRow.id as string
 
+  logQuickBooksIntegrationEvent({
+    kind: "sync_import_started",
+    organizationId: params.organizationId,
+    syncLogId: logId,
+    syncKind: "payments",
+  })
+
   try {
     const result = await reconcileQuickBooksInvoiceInboundStatuses({
       svc: params.svc,
@@ -252,12 +293,13 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
     const status: "success" | "partial" | "failed" =
       errors.length === 0 ? "success" : result.succeeded > 0 ? "partial" : "failed"
 
-    const errorMessage =
+    const errorMessageRaw =
       errors.length === 0
         ? null
         : result.succeeded > 0
           ? `${errors.length} invoice(s) need attention — see sync detail.`
           : errors[0]?.message.slice(0, 900) ?? "QuickBooks payment status import failed."
+    const errorMessage = errorMessageRaw ? sanitizeQuickBooksClientMessage(errorMessageRaw, 900) : null
 
     const completedAt = new Date().toISOString()
     const detail = {
@@ -270,7 +312,10 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
           errorCount: errors.length,
         },
       ],
-      errors: result.errors.slice(0, 80),
+      errors: result.errors.slice(0, 80).map((e) => ({
+        ...e,
+        message: sanitizeQuickBooksClientMessage(e.message, 500),
+      })),
     }
 
     await params.svc
@@ -300,6 +345,17 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
       .eq("organization_id", params.organizationId)
       .eq("provider", "quickbooks_online")
 
+    logQuickBooksIntegrationEvent({
+      kind: "sync_import_completed",
+      organizationId: params.organizationId,
+      syncLogId: logId,
+      syncKind: "payments",
+      status,
+      recordsAttempted: result.attempted,
+      recordsSucceeded: result.succeeded,
+      message: errorMessage ?? undefined,
+    })
+
     return {
       ok: true,
       syncLogId: logId,
@@ -310,14 +366,22 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
       detail,
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
+    const msg = sanitizeQuickBooksClientMessage(e instanceof Error ? e.message : String(e), 900)
     const completedAt = new Date().toISOString()
+    logQuickBooksIntegrationEvent({
+      kind: "sync_import_failed",
+      organizationId: params.organizationId,
+      syncLogId: logId,
+      syncKind: "payments",
+      code: "sync_exception",
+      message: msg,
+    })
     await params.svc
       .from("quickbooks_sync_logs")
       .update({
         status: "failed",
-        error_message: msg.slice(0, 900),
-        detail: { fatal: true, message: msg.slice(0, 900) },
+        error_message: msg,
+        detail: { fatal: true, message: msg },
         completed_at: completedAt,
       })
       .eq("id", logId)
@@ -327,7 +391,7 @@ export async function runQuickBooksPaymentStatusImportSync(params: {
       .update({
         last_sync_attempt_at: completedAt,
         sync_health: "error",
-        last_sync_error: msg.slice(0, 500),
+        last_sync_error: sanitizeQuickBooksClientMessage(msg, 500),
         updated_at: completedAt,
       })
       .eq("organization_id", params.organizationId)

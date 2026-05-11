@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { requireOrgIntegrationAdmin } from "@/lib/integrations/require-org-integration-admin"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
-import { quickBooksOAuthConfigured } from "@/lib/integrations/quickbooks-env"
+import { getQuickBooksApiEnvironment, quickBooksOAuthConfigured } from "@/lib/integrations/quickbooks-env"
+import { sanitizeQuickBooksClientMessage } from "@/lib/integrations/quickbooks/safe-log"
 import {
   runQuickBooksExportSync,
   runQuickBooksPaymentStatusImportSync,
@@ -74,10 +75,7 @@ export async function GET(
   }
 
   const integrationOut = integration
-    ? {
-        ...(integration as Record<string, unknown>),
-        ...(showFinancialSyncDetail ? {} : { last_sync_error: null }),
-      }
+    ? formatQuickBooksIntegrationForClient(integration as Record<string, unknown>, showFinancialSyncDetail)
     : null
 
   const logsOut = showFinancialSyncDetail
@@ -90,12 +88,29 @@ export async function GET(
 
   return NextResponse.json({
     oauthEnvironmentConfigured: quickBooksOAuthConfigured(),
+    quickBooksApiEnvironment: getQuickBooksApiEnvironment(),
+    quickBooksOAuthCallbackPath: "/api/integrations/quickbooks/callback",
     integration: integrationOut,
     recentSyncLogs: logsOut,
     mappingCounts,
     syncStatusByEntity: syncStatusCounts,
     financialSyncDetailVisible: showFinancialSyncDetail,
   })
+}
+
+/** Never expose realm_id or raw tokens to the browser. */
+function formatQuickBooksIntegrationForClient(
+  row: Record<string, unknown>,
+  showFinancialSyncDetail: boolean,
+): Record<string, unknown> {
+  const { realm_id: _realm, last_sync_error: lastErr, ...rest } = row
+  const safeLastError =
+    typeof lastErr === "string" ? sanitizeQuickBooksClientMessage(lastErr, 500) : null
+  return {
+    ...rest,
+    quickbooks_company_linked: Boolean(String(_realm ?? "").trim()),
+    last_sync_error: showFinancialSyncDetail ? safeLastError : null,
+  }
 }
 
 export async function PATCH(
@@ -240,7 +255,10 @@ export async function POST(
 
     if (!result.ok) {
       const status =
-        result.code === "not_connected" || result.code === "missing_realm" || result.code === "missing_tokens"
+        result.code === "not_connected" ||
+        result.code === "missing_realm" ||
+        result.code === "missing_tokens" ||
+        result.code === "connection_error"
           ? 409
           : 502
       return NextResponse.json(
@@ -277,7 +295,10 @@ export async function POST(
 
   if (!result.ok) {
     const status =
-      result.code === "not_connected" || result.code === "missing_realm" || result.code === "missing_tokens"
+      result.code === "not_connected" ||
+      result.code === "missing_realm" ||
+      result.code === "missing_tokens" ||
+      result.code === "connection_error"
         ? 409
         : 502
     return NextResponse.json(

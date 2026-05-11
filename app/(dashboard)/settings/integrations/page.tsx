@@ -130,6 +130,10 @@ function IntegrationCard({
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
           Not connected
         </span>
+      : quickBooksLive === "error" ?
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-destructive/35 text-destructive bg-destructive/10">
+          Needs attention
+        </span>
       : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">
           Status unavailable
         </span>
@@ -214,7 +218,9 @@ export default function IntegrationsPage() {
         }
         const j = (await res.json()) as { integration?: { connection_status?: string } | null }
         const st = j.integration?.connection_status
-        setQuickBooksLive(st === "connected" ? "connected" : "disconnected")
+        if (st === "connected") setQuickBooksLive("connected")
+        else if (st === "error") setQuickBooksLive("error")
+        else setQuickBooksLive("disconnected")
       } catch {
         if (!cancelled) setQuickBooksLive("error")
       }

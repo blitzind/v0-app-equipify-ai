@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { refreshQuickBooksAccessToken } from "@/lib/integrations/quickbooks-oauth"
+import {
+  logQuickBooksIntegrationEvent,
+  sanitizeQuickBooksClientMessage,
+} from "@/lib/integrations/quickbooks/safe-log"
 
 export type QuickBooksConnection = {
   integrationId: string
@@ -33,7 +37,21 @@ export async function getQuickBooksConnection(
   }
 
   const row = int as { id?: string; realm_id?: string | null; connection_status?: string } | null
-  if (!row?.id || row.connection_status !== "connected") {
+  if (!row?.id) {
+    return { error: "QuickBooks is not connected for this organization.", code: "not_connected" }
+  }
+  const st = row.connection_status
+  if (st === "disconnected" || st === "revoked") {
+    return { error: "QuickBooks is not connected for this organization.", code: "not_connected" }
+  }
+  if (st === "error") {
+    return {
+      error:
+        "QuickBooks authorization failed or expired. Open QuickBooks settings, disconnect if needed, then connect again.",
+      code: "connection_error",
+    }
+  }
+  if (st !== "connected") {
     return { error: "QuickBooks is not connected for this organization.", code: "not_connected" }
   }
   if (!row.realm_id?.trim()) {
@@ -83,17 +101,24 @@ export async function getQuickBooksConnection(
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
+      const safe = sanitizeQuickBooksClientMessage(msg, 500)
+      logQuickBooksIntegrationEvent({
+        kind: "token_refresh_failed",
+        organizationId,
+        code: "token_refresh_failed",
+        message: safe,
+      })
       await svc
         .from("organization_integrations")
         .update({
           connection_status: "error",
           sync_health: "error",
-          last_sync_error: msg.slice(0, 500),
+          last_sync_error: safe,
           updated_at: new Date().toISOString(),
         })
         .eq("id", row.id)
 
-      return { error: msg, code: "token_refresh_failed" }
+      return { error: safe, code: "token_refresh_failed" }
     }
   }
 

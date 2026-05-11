@@ -25,7 +25,8 @@ import { cn } from "@/lib/utils"
 type IntegrationRow = {
   id: string
   connection_status: string
-  realm_id: string | null
+  /** Server-only hint: QuickBooks company is linked (realm id never sent to the browser). */
+  quickbooks_company_linked?: boolean
   company_name: string | null
   last_successful_sync_at: string | null
   last_sync_attempt_at: string | null
@@ -85,6 +86,7 @@ function QuickBooksIntegrationPageInner() {
   const [actionBusy, setActionBusy] = useState<string | null>(null)
   const [autoSyncBusy, setAutoSyncBusy] = useState(false)
   const [financialSyncVisible, setFinancialSyncVisible] = useState(false)
+  const [quickBooksApiEnvironment, setQuickBooksApiEnvironment] = useState<"production" | "sandbox" | null>(null)
 
   const load = useCallback(async () => {
     if (orgStatus !== "ready" || !organizationId) {
@@ -101,6 +103,8 @@ function QuickBooksIntegrationPageInner() {
       )
       const body = (await res.json()) as {
         oauthEnvironmentConfigured?: boolean
+        quickBooksApiEnvironment?: "production" | "sandbox"
+        quickBooksOAuthCallbackPath?: string
         integration?: IntegrationRow | null
         recentSyncLogs?: SyncLogRow[]
         mappingCounts?: Record<string, number>
@@ -112,6 +116,7 @@ function QuickBooksIntegrationPageInner() {
         throw new Error(body.error ?? res.statusText)
       }
       setOauthEnv(Boolean(body.oauthEnvironmentConfigured))
+      setQuickBooksApiEnvironment(body.quickBooksApiEnvironment ?? null)
       setIntegration(body.integration ?? null)
       setLogs(body.recentSyncLogs ?? [])
       setMappingCounts(body.mappingCounts ?? {})
@@ -301,6 +306,7 @@ function QuickBooksIntegrationPageInner() {
   }
 
   const connected = integration?.connection_status === "connected"
+  const connectionError = integration?.connection_status === "error"
   const autoSyncOn = Boolean(integration?.sync_settings?.auto_sync_invoices)
 
   const entityLabels: Record<string, string> = {
@@ -386,14 +392,19 @@ function QuickBooksIntegrationPageInner() {
                     "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
                     connected
                       ? "ds-badge-success border-[color:var(--status-success)]/40"
-                      : "bg-muted text-muted-foreground border-border",
+                      : connectionError
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "bg-muted text-muted-foreground border-border",
                   )}
                 >
-                  {connected ? "Connected" : "Not connected"}
+                  {connected ? "Connected" : connectionError ? "Needs attention" : "Not connected"}
                 </span>
-                {integration?.realm_id ? (
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    Realm ID: {integration.realm_id}
+                {integration?.quickbooks_company_linked ? (
+                  <span className="text-[11px] text-muted-foreground">QuickBooks company linked</span>
+                ) : null}
+                {quickBooksApiEnvironment ? (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground uppercase tracking-wide">
+                    API: {quickBooksApiEnvironment}
                   </span>
                 ) : null}
                 {integration?.sync_health ? (
@@ -402,6 +413,14 @@ function QuickBooksIntegrationPageInner() {
                   </span>
                 ) : null}
               </div>
+
+              {connectionError ? (
+                <p className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-md px-3 py-2">
+                  Authorization failed or expired. Disconnect, then connect QuickBooks again. If this keeps happening,
+                  confirm production vs sandbox in your Intuit app matches this deployment (
+                  {quickBooksApiEnvironment ?? "see env"} API).
+                </p>
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 {!connected && oauthEnv ? (
@@ -414,10 +433,10 @@ function QuickBooksIntegrationPageInner() {
                     }}
                   >
                     <Plug className="w-3.5 h-3.5" />
-                    Connect QuickBooks
+                    {connectionError ? "Reconnect QuickBooks" : "Connect QuickBooks"}
                   </Button>
                 ) : null}
-                {connected ? (
+                {connected || connectionError ? (
                   <>
                     <Button
                       size="sm"
@@ -498,7 +517,7 @@ function QuickBooksIntegrationPageInner() {
         </CardContent>
       </Card>
 
-      {connected && !loading ? (
+      {connected && !connectionError && !loading ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Export to QuickBooks</CardTitle>
