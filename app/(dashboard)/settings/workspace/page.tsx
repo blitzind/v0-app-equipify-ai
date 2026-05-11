@@ -472,7 +472,7 @@ export default function WorkspacePage() {
           description:
             typeof data.message === "string" && data.message.trim()
               ? data.message
-              : "The server responded OK but did not return a saved logo URL. Check Supabase organizations.logo_url, Storage bucket, and SUPABASE_SERVICE_ROLE_KEY on the server.",
+              : "The server responded OK but did not return a saved logo URL. Try again in a moment; if it persists, contact support so we can verify file storage for your workspace.",
         })
         return
       }
@@ -726,7 +726,7 @@ export default function WorkspacePage() {
               onClick={() => void refetchWorkspace()}
               disabled={!organizationId}
             >
-              Re-fetch GET /workspace
+              Reload workspace data
             </Button>
           </div>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-mono text-muted-foreground">
@@ -735,28 +735,23 @@ export default function WorkspacePage() {
               <dd className="break-all text-foreground">{organizationId}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground/80">tenant workspace.logoUrl</dt>
+              <dt className="text-muted-foreground/80">workspace.logoUrl</dt>
               <dd className="break-all text-foreground">{workspace.logoUrl || "(empty)"}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-muted-foreground/80">tenant workspace.documentLogoUrl</dt>
+              <dt className="text-muted-foreground/80">workspace.documentLogoUrl</dt>
               <dd className="break-all text-foreground">{workspace.documentLogoUrl || "(empty)"}</dd>
             </div>
           </dl>
           <details className="text-[11px] font-mono">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Last GET /workspace payload</summary>
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Last workspace payload (debug)</summary>
             <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-border bg-background p-2 text-[10px]">
               {diagWorkspaceGetSnapshot || "(none yet — load or re-fetch)"}
             </pre>
           </details>
           <p className="text-[10px] text-muted-foreground">
-            Production env: set{" "}
-            <code className="rounded bg-secondary px-1">NEXT_PUBLIC_SUPABASE_URL</code>,{" "}
-            <code className="rounded bg-secondary px-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>,{" "}
-            <code className="rounded bg-secondary px-1">SUPABASE_SERVICE_ROLE_KEY</code> on the server. Optional bucket
-            override: <code className="rounded bg-secondary px-1">ORGANIZATION_LOGOS_BUCKET</code> (default{" "}
-            <code className="rounded bg-secondary px-1">organization-logos</code>). Enable this panel on a custom domain
-            with <code className="rounded bg-secondary px-1">NEXT_PUBLIC_WORKSPACE_LOGO_DEBUG=1</code>.
+            For operators: this panel is for diagnosing logo upload issues in non-production environments. Enable it only
+            when directed by Equipify support.
           </p>
         </div>
       )}

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     if (!userIsPlatformAdmin) {
       const { data: member } = await supabase
         .from("organization_members")
-        .select("id")
+        .select("organization_id")
         .eq("organization_id", organizationId)
         .eq("user_id", user.id)
         .eq("status", "active")

@@ -917,7 +917,7 @@ function BillingPageContent() {
           your plan. If live counts cannot be loaded for a subscribed workspace, those actions return a retry message instead
           of skipping the check. <strong className="font-medium text-foreground/90">Tracked, not enforced yet:</strong> the
           API calls bar — there is no app code incrementing monthly API totals today, so it stays at zero until metering is
-          wired; see <span className="whitespace-nowrap">docs/USAGE_METERING_ENFORCEMENT.md</span>.
+          wired; the billing team can share timing when that ships.
         </p>
       </div>
 

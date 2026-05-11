@@ -62,9 +62,8 @@ function resolveSettingsNavPermissions(args: {
   role: OrgMemberRole | null
   status: "loading" | "ready" | "no_org"
 }): OrgPermissions {
-  // Phase 20 retry: settings navigation stays on DB role defaults and fails
-  // open while membership loads. Profile overlays are intentionally not used
-  // here so owner/admin/manager settings nav cannot disappear on refresh.
+  // Settings navigation follows base role defaults until membership finishes loading.
+  // Optional commercial profiles are not used for nav in this pass — keeps owner/admin/manager settings visible on refresh.
   if (args.status !== "ready" || !args.role) return getOrgPermissionsForRole("owner")
   return getOrgPermissionsForRole(args.role)
 }

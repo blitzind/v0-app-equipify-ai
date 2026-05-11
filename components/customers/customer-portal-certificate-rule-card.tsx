@@ -75,7 +75,7 @@ export function CustomerPortalCertificateRuleCard({
   const orgDefaultLabel = modeLabel(orgMode as CertificateReleaseMode | null)
 
   const helper =
-    CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === effectiveMode)?.helper ?? ""
+    CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === effectiveMode)?.detail ?? ""
 
   const Icon =
     effectiveMode === "immediate_release"

@@ -286,8 +286,8 @@ async function enrichRows(
   const labels = new Map<string, string>() // `${type}:${id}` → label
   await Promise.all([
     resolveType(supabase, organizationId, idsByType.get("work_order"), "work_orders", labels, "work_order", workOrderRowToLabel),
-    resolveType(supabase, organizationId, idsByType.get("invoice"), "invoices", labels, "invoice", invoiceRowToLabel),
-    resolveType(supabase, organizationId, idsByType.get("quote"), "quotes", labels, "quote", quoteRowToLabel),
+    resolveType(supabase, organizationId, idsByType.get("invoice"), "org_invoices", labels, "invoice", invoiceRowToLabel),
+    resolveType(supabase, organizationId, idsByType.get("quote"), "org_quotes", labels, "quote", quoteRowToLabel),
     resolveType(supabase, organizationId, idsByType.get("customer"), "customers", labels, "customer", customerRowToLabel),
     resolveType(supabase, organizationId, idsByType.get("prospect"), "prospects", labels, "prospect", prospectRowToLabel),
     resolveType(supabase, organizationId, idsByType.get("equipment"), "equipment", labels, "equipment", equipmentRowToLabel),
@@ -351,11 +351,12 @@ async function resolveCustomers(
   if (ids.size === 0) return
   const { data } = await supabase
     .from("customers")
-    .select("id, company")
+    .select("id, company_name")
     .eq("organization_id", organizationId)
     .in("id", Array.from(ids))
-  for (const row of (data ?? []) as Array<{ id: string; company?: string | null }>) {
-    if (row.company) labels.set(`customer:${row.id}`, row.company)
+  for (const row of (data ?? []) as Array<{ id: string; company_name?: string | null }>) {
+    const name = row.company_name?.trim()
+    if (name) labels.set(`customer:${row.id}`, name)
   }
 }
 
@@ -363,12 +364,12 @@ function labelColumnsByTable(table: string): string {
   switch (table) {
     case "work_orders":
       return "id, work_order_number, title"
-    case "invoices":
+    case "org_invoices":
       return "id, invoice_number, customer_id"
-    case "quotes":
+    case "org_quotes":
       return "id, quote_number, customer_id"
     case "customers":
-      return "id, company"
+      return "id, company_name"
     case "prospects":
       return "id, company_name"
     case "equipment":
@@ -396,7 +397,7 @@ function quoteRowToLabel(r: Record<string, unknown>): string | null {
   return num ?? null
 }
 function customerRowToLabel(r: Record<string, unknown>): string | null {
-  return (r.company as string | null) ?? null
+  return (r.company_name as string | null) ?? null
 }
 function prospectRowToLabel(r: Record<string, unknown>): string | null {
   return (r.company_name as string | null) ?? null

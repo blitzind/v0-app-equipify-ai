@@ -327,10 +327,10 @@ export default function GeneralPage() {
         </div>
       </SettingCard>
 
-      {/* Password — auth is Supabase; in-app change is not implemented */}
+      {/* Password — in-app change not implemented; recovery via sign-in / support */}
       <SettingCard
         title="Password"
-        description="Your password is managed by Supabase Auth. Changing it from Settings is not available yet."
+        description="Password changes are not available inside Settings yet. Use the sign-in flow or your workspace admin for access issues."
       >
         <p className="text-sm text-muted-foreground max-w-md">
           Use the sign-in page to authenticate. If you need to recover access, work with your workspace administrator or Equipify support — self-serve password reset from the app is planned.

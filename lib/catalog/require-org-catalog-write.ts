@@ -10,7 +10,7 @@ import {
 } from "@/lib/permissions/model"
 
 /**
- * Phase 2 (Permissions): capability checks use **effective** permissions (DB role +
+ * Phase 2 (Permissions): capability checks use **effective** permissions (base role +
  * optional `permission_profile` / `permissions_json`), matching `requireOrgPermission`.
  * Default capability is `canManageInventory`; callers may pass another key (e.g.
  * `canConsumePartsOnWorkOrders` for consume/restock flows).
@@ -120,7 +120,7 @@ export async function requireOrgMemberRead(organizationId: string): Promise<
   if (!platformAdmin) {
     const { data: mem, error: memErr } = await supabase
       .from("organization_members")
-      .select("id")
+      .select("organization_id")
       .eq("organization_id", organizationId)
       .eq("user_id", user.id)
       .eq("status", "active")

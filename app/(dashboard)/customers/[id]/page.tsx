@@ -181,23 +181,23 @@ type CustomerPortalConsolidatedMode = "" | "true" | "false"
 const CUSTOMER_CONSOLIDATED_DOCS_OPTIONS: Array<{
   value: CustomerPortalConsolidatedMode
   label: string
-  helper: string
+  detail: string
 }> = [
   {
     value: "",
     label: "Use workspace default",
-    helper: "Inherits the consolidated documents toggle under Settings → Customer portal.",
+    detail: "Inherits the consolidated documents toggle under Settings → Customer portal.",
   },
   {
     value: "true",
     label: "Force consolidated view on",
-    helper:
+    detail:
       "Eligible parent portal users can include child-account documents in the library when hierarchy allows.",
   },
   {
     value: "false",
     label: "Force consolidated view off",
-    helper: "Portal users for this account only see documents for this account.",
+    detail: "Portal users for this account only see documents for this account.",
   },
 ]
 
@@ -3620,7 +3620,7 @@ export default function CustomerDetailPage() {
                 <p id="cust-portal-cert-help" className="text-[11px] text-muted-foreground mt-1">
                   {
                     CUSTOMER_CERT_RELEASE_OPTIONS.find((o) => o.value === editForm.portalCertificateRelease)
-                      ?.helper
+                      ?.detail
                   }
                 </p>
               </div>
@@ -3674,7 +3674,7 @@ export default function CustomerDetailPage() {
                 <p id="cust-portal-consolidated-help" className="text-[11px] text-muted-foreground mt-1">
                   {
                     CUSTOMER_CONSOLIDATED_DOCS_OPTIONS.find((o) => o.value === editForm.portalConsolidatedDocuments)
-                      ?.helper
+                      ?.detail
                   }
                 </p>
               </div>
@@ -3703,7 +3703,7 @@ export default function CustomerDetailPage() {
                 <p id="cust-invoice-terms-help" className="text-[11px] text-muted-foreground mt-1">
                   {
                     CUSTOMER_TERMS_OPTIONS.find((o) => o.code === editForm.defaultInvoiceTermsCode)
-                      ?.helper
+                      ?.detail
                   }
                 </p>
               </div>

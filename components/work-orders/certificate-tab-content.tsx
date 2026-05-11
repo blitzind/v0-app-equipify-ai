@@ -416,7 +416,7 @@ export function CertificateTabContent({
               Source: {technicianSignatureSourceLabel(technicianSignatureStatus.source)}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">{technicianSignatureStatus.helper}</p>
+          <p className="text-xs text-muted-foreground">{technicianSignatureStatus.caption}</p>
         </div>
       ) : null}
 

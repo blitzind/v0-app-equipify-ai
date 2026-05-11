@@ -5,10 +5,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 /**
  * Phase 57.2 — Replaced demo API keys / webhooks with an honest placeholder.
- * Phase 61.2 — Roadmap + architecture doc reference; still non-interactive (no key issuance).
+ * Phase 61.2 — Roadmap messaging; still non-interactive (no key issuance).
  *
- * Dashboard routes use cookie sessions; integration OAuth (e.g. QuickBooks) is on Integrations.
- * Stripe’s **platform** webhook is separate from tenant outbound webhooks (see architecture doc).
+ * Dashboard actions use your signed-in session. Integration OAuth (e.g. QuickBooks)
+ * is configured under Integrations. Stripe billing uses Checkout from the Billing page.
  */
 export default function ApiPage() {
   return (
@@ -23,8 +23,7 @@ export default function ApiPage() {
             don&apos;t imply security we don&apos;t enforce.
           </p>
           <p>
-            Today, automation happens inside the product:{" "}
-            <span className="font-medium text-foreground">dashboard Route Handlers</span> (session + org membership),{" "}
+            Today, automation happens inside the product: signed-in staff workflows,{" "}
             <span className="font-medium text-foreground">QuickBooks</span> under Integrations, and the{" "}
             <span className="font-medium text-foreground">customer portal</span>. Those are{" "}
             <span className="font-medium text-foreground">not</span> a third-party HTTP API with developer keys.
@@ -36,42 +35,28 @@ export default function ApiPage() {
         <div className="px-6 py-4 border-b border-border flex items-start gap-3">
           <BookOpen className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Architecture (repository doc)</h3>
+            <h3 className="text-sm font-semibold text-foreground">What we are building</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              A <span className="font-medium text-foreground">future</span> public API and outbound webhooks are
-              specified in{" "}
-              <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">
-                docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md
-              </code>
-              — key hashing, org scoping, signing, retries, plan gates, and platform-admin behavior. That document is
-              for engineers and operators; it does <span className="font-medium text-foreground">not</span> mean those
-              features are live.
+              A future <span className="font-medium text-foreground">public HTTP API</span> and{" "}
+              <span className="font-medium text-foreground">outbound webhooks</span> are on the roadmap: org-scoped
+              keys, signed deliveries, retries, and plan-based access. Those capabilities are{" "}
+              <span className="font-medium text-foreground">not live</span> in the product today; this screen exists so
+              expectations stay clear.
             </p>
           </div>
         </div>
         <div className="px-6 py-5 text-sm text-muted-foreground space-y-3">
           <p>
-            <span className="font-medium text-foreground">Planned gates:</span> issuing keys will likely require the{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">canManageApiKeys</code> capability (this nav
-            item) plus a <span className="font-medium text-foreground">Scale-level</span>{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">api_access</code> entitlement — see{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">docs/PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md</code>
-            .
+            <span className="font-medium text-foreground">Planned access:</span> issuing keys will likely require an
+            explicit “manage API keys” permission plus a Scale-level plan add-on for HTTP access.
           </p>
           <p>
             <span className="font-medium text-foreground">Usage &amp; limits:</span> billing may show an API monthly
-            allowance; counters are <span className="font-medium text-foreground">not</span> fully driven by a public
-            API yet — see{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">docs/USAGE_METERING_ENFORCEMENT.md</code>.
+            allowance; live counters will appear once usage is recorded end-to-end.
           </p>
           <p>
-            <span className="font-medium text-foreground">Settings matrix:</span>{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">docs/SETTINGS_WIRING_AUDIT.md</code> lists this
-            route as <span className="font-medium text-foreground">planned / honesty shell</span>.
-          </p>
-          <p className="text-xs border-t border-border pt-3">
-            Event name scaffolding for future webhooks (unused at runtime):{" "}
-            <code className="text-[11px] bg-secondary px-1 py-0.5 rounded">lib/api/future-webhook-event-types.ts</code>
+            <span className="font-medium text-foreground">Settings coverage:</span> other Settings pages describe what
+            is wired today versus preview-only.
           </p>
         </div>
       </div>

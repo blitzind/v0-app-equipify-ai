@@ -150,17 +150,14 @@ export default function PermissionsPage() {
         <div className="space-y-1">
           <p className="text-sm font-medium">Live capability map</p>
           <p className="text-xs leading-relaxed">
-            This matrix is generated from the staged role-based permission model.
-            It is available for previews and targeted guards, but main and
-            settings navigation intentionally still use DB role defaults in this retry. Showing
-            {" "}
-            <span className="font-medium">{totalCapabilities}</span> capabilities
-            across <span className="font-medium">{ROLES.length}</span> built-in
-            roles.
+            This matrix reflects the role-based permission model used for previews and targeted checks. Primary navigation
+            still follows each member&apos;s assigned role while optional profiles roll out. Showing{" "}
+            <span className="font-medium">{totalCapabilities}</span> capabilities across{" "}
+            <span className="font-medium">{ROLES.length}</span> built-in roles.
           </p>
           <p className="text-[11px] text-muted-foreground/80">
-            Commercial profiles such as Billing and Sales are stored as optional overlays over existing DB roles.
-            Supabase RLS and navigation still use the broad DB role as the stable tenant boundary.
+            Optional profiles such as Billing or Sales adjust defaults on top of a member&apos;s base role. Workspace
+            access and data visibility remain tied to membership and role in the product.
           </p>
           {viewerStatus === "ready" && viewerRole ? (
             <p className="text-[11px] text-muted-foreground/80">
@@ -208,7 +205,8 @@ export default function PermissionsPage() {
             Commercial permission profiles
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Profiles are optional overlays stored on team members. They do not replace the DB role enum.
+            Profiles are optional presets stored on team members. They refine capabilities; they do not replace the
+            underlying role assignment.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
@@ -221,7 +219,7 @@ export default function PermissionsPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-foreground">{meta.label}</p>
                   <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
-                    DB role: {ROLE_META[meta.mappedRole].label}
+                    Base role: {ROLE_META[meta.mappedRole].label}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{meta.description}</p>
@@ -238,8 +236,8 @@ export default function PermissionsPage() {
             Role permissions matrix
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            A read-only overview of every capability the system enforces. Custom
-            profile overlays are applied from Team settings and checked by API guards.
+            A read-only overview of every capability the product checks. Custom profiles are assigned in Team settings and
+            respected by in-app actions and server checks.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -284,7 +282,7 @@ export default function PermissionsPage() {
                           <span className="text-xs text-foreground">{row.label}</span>
                           <span
                             className="text-[10px] text-muted-foreground/80 leading-relaxed"
-                            title={row.key}
+                            title={row.label}
                           >
                             {row.description}
                           </span>
@@ -313,7 +311,7 @@ export default function PermissionsPage() {
             <a href="/settings/team" className="underline font-medium">
               Team settings
             </a>
-            ) feed the shared permission helper used by UI gates and API guards. RLS still enforces tenant membership and DB-role boundaries.
+            ) drive what each person can see and do. Changes there apply across the dashboard and supported workflows.
           </p>
         </div>
       </div>

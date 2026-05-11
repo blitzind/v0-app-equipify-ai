@@ -127,12 +127,12 @@ export function normalizeImportedInvoiceTerms(
 }
 
 /** UI options for editing org/customer defaults (allows "use default" inheritance). */
-export const CUSTOMER_TERMS_OPTIONS: { code: InvoiceTermsCode | ""; label: string; helper: string }[] = [
-  { code: "", label: "Use organization default", helper: "Inherit the workspace default for new invoices." },
+export const CUSTOMER_TERMS_OPTIONS: { code: InvoiceTermsCode | ""; label: string; detail: string }[] = [
+  { code: "", label: "Use organization default", detail: "Inherit the workspace default for new invoices." },
   ...PAYMENT_TERMS_OPTIONS.map((o) => ({
     code: o.code,
     label: o.label,
-    helper:
+    detail:
       o.code === "due_on_receipt"
         ? "Due immediately on the issue date."
         : o.code === "custom"

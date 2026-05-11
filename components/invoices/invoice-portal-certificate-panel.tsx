@@ -202,7 +202,7 @@ export function InvoicePortalCertificatePanel({ invoice }: { invoice: AdminInvoi
           ))}
         </select>
         <p className="text-[10px] text-muted-foreground">
-          {INVOICE_CERT_RELEASE_OPTIONS.find((o) => o.value === (overrideLocal || ""))?.helper}
+          {INVOICE_CERT_RELEASE_OPTIONS.find((o) => o.value === (overrideLocal || ""))?.detail}
         </p>
         <Button
           type="button"

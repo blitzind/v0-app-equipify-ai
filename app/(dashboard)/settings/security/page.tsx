@@ -5,8 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 /**
  * Phase 57.2 — Security settings previously showed local-only MFA, sessions,
- * and event lists that did not reflect Supabase or server state. Until real
- * wiring exists, this page is intentionally honest and non-interactive.
+ * and event lists that did not reflect live server state. Until real wiring
+ * exists, this page is intentionally honest and non-interactive.
  */
 export default function SecurityPage() {
   return (
@@ -27,7 +27,7 @@ export default function SecurityPage() {
           <div>
             <h3 className="text-sm font-semibold text-foreground">What to expect next</h3>
             <ul className="text-xs text-muted-foreground mt-2 space-y-1.5 list-disc pl-4">
-              <li>TOTP-based 2FA backed by Supabase (or equivalent) with real enrollment and recovery.</li>
+              <li>TOTP-based two-factor authentication with real enrollment and recovery.</li>
               <li>Session listing and revoke, when the product exposes device/session metadata safely.</li>
               <li>Optional inactivity timeout aligned with your org policy.</li>
             </ul>

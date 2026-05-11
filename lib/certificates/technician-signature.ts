@@ -7,7 +7,7 @@ export type TechnicianSignatureSource =
 export type TechnicianSignatureState = {
   source: TechnicianSignatureSource
   label: string
-  helper: string
+  caption: string
   imageUrl: string | null
   hasImage: boolean
   fallbackUsed: boolean
@@ -34,7 +34,7 @@ export function resolveTechnicianSignatureState(args: {
     return {
       source: "fresh_capture",
       label: "Fresh signature captured",
-      helper: "This visit signature will be used on generated certificates.",
+      caption: "This visit signature will be used on generated certificates.",
       imageUrl: fresh,
       hasImage: true,
       fallbackUsed: false,
@@ -47,7 +47,7 @@ export function resolveTechnicianSignatureState(args: {
     return {
       source: "stored_profile",
       label: "Stored signature available",
-      helper: args.storedSignatureUpdatedAt
+      caption: args.storedSignatureUpdatedAt
         ? "Using the technician signature saved on their profile."
         : "Using the technician signature saved on their profile.",
       imageUrl: stored,
@@ -62,7 +62,7 @@ export function resolveTechnicianSignatureState(args: {
     return {
       source: "generated_label",
       label: "Fallback signature label",
-      helper: "No signature image is available; the certificate will show a signature-on-file label.",
+      caption: "No signature image is available; the certificate will show a signature-on-file label.",
       imageUrl: null,
       hasImage: false,
       fallbackUsed: true,
@@ -73,7 +73,7 @@ export function resolveTechnicianSignatureState(args: {
   return {
     source: "unsigned",
     label: "No signature available",
-    helper: "Assign a technician or add a stored signature before generating signed certificates.",
+    caption: "Assign a technician or add a stored signature before generating signed certificates.",
     imageUrl: null,
     hasImage: false,
     fallbackUsed: true,

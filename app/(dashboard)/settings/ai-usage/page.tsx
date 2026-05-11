@@ -505,18 +505,19 @@ export default function AiUsageSettingsPage() {
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Response cache</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Repeated identical AI inputs can be served from cache (no provider tokens). Hit counts update when a cached row is reused.
+            When the same AI request runs again with identical inputs, Equipify can reuse a stored response so you are not
+            charged another provider run for that repeat.
           </p>
         </div>
         <div className="p-4 space-y-3 text-sm">
           <p className="text-muted-foreground">
-            <span className="font-medium text-foreground">{cacheTotalHits.toLocaleString()}</span> total recorded cache hits
-            (sum of per-entry counters).
+            <span className="font-medium text-foreground">{cacheTotalHits.toLocaleString()}</span> recorded reuse events
+            across saved cache entries.
             {isAdmin ? <> Dollar savings are not estimated automatically.</> : null}
           </p>
           <p className="text-xs text-muted-foreground">
-            Cache-hit visibility in <code className="text-[11px]">ai_usage_logs</code>:{" "}
-            {cacheLogHitsToUsage ? "enabled (zero-cost rows when AI_LOG_CACHE_HITS_TO_USAGE is on)" : "disabled"}
+            Recording reuse into your billing usage view:{" "}
+            {cacheLogHitsToUsage ? "on (reuses may appear as zero-token usage rows)" : "off"}
           </p>
           {cacheNote && <p className="text-xs text-muted-foreground">{cacheNote}</p>}
           <div className="overflow-x-auto">

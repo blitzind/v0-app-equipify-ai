@@ -45,7 +45,7 @@ import {
   type OrgPermissions,
 } from "@/lib/permissions/model"
 
-// ─── Role definitions (DB roles) ──────────────────────────────────────────────
+// ─── Built-in team roles ─────────────────────────────────────────────────────
 
 const ROLE_LABEL: Record<MembershipRole, string> = {
   owner: "Owner",
@@ -1208,8 +1208,8 @@ export default function TeamPage() {
                   <p className="text-[11px] text-muted-foreground">
                     {editPermissionProfile
                       ? COMMERCIAL_PERMISSION_PROFILES[editPermissionProfile].description
-                      : "Uses the default permissions for the selected DB role."}
-                    {" "}Navigation currently remains based on the DB role while this RBAC foundation is staged.
+                      : "Uses the default permissions for the selected base role."}
+                    {" "}Primary navigation still follows the base role while optional profiles continue to roll out.
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -1250,7 +1250,8 @@ export default function TeamPage() {
                 </div>
                 {(editRole !== editMember.role || (editPermissionProfile || null) !== (normalizePermissionProfile(editMember.permissionProfile) ?? null)) ? (
                   <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
-                    Changing the DB role may immediately change navigation. Profile overlays are staged for capability checks and do not drive navigation in this pass.
+                    Changing the base role may immediately change which areas of the app appear. Optional profiles adjust
+                    capabilities but may not yet change every menu the way the base role does.
                   </p>
                 ) : null}
               </div>

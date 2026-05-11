@@ -47,7 +47,7 @@ const INTEGRATIONS: Integration[] = [
     id: "gmail",
     name: "Gmail (mailbox)",
     description:
-      "Coming soon. Will connect a Google mailbox for optional staff workflows only. Invoices, quotes, invites, and system mail use Resend — Gmail does not replace transactional email unless product scopes that later (see docs/GMAIL_INTEGRATION.md).",
+      "Coming soon. Will connect a Google mailbox for optional staff workflows only. Invoices, quotes, invites, and system email today use Equipify’s transactional mail provider — Gmail would be additive, not a replacement, when it ships.",
     category: "Communication",
     logo: "GM",
   },
@@ -262,9 +262,7 @@ export default function IntegrationsPage() {
             Billing
           </Link>
           . <strong className="text-foreground">Gmail</strong> is not connected anywhere in the app yet — customer-facing
-          and system email uses <strong className="text-foreground">Resend</strong> (see product Integrations catalog and{" "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">docs/GMAIL_INTEGRATION.md</code>
-          ).
+          and system email uses <strong className="text-foreground">Resend</strong> today.
         </p>
       </div>
 
@@ -315,8 +313,7 @@ export default function IntegrationsPage() {
           <Link href="/settings/api" className="text-primary hover:underline font-medium">
             Equipify API
           </Link>
-          . The product <Link href="/integrations">Integrations</Link> catalog lists roadmap items with the same readiness labels as{" "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">docs/INTEGRATION_CATALOG_INVENTORY.md</code>.
+          . The public <Link href="/integrations">Integrations</Link> catalog lists the same roadmap items and readiness labels.
         </p>
       </div>
     </div>

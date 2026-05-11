@@ -3,24 +3,24 @@ import { normalizeReleaseMode, resolveEffectiveCertificateReleaseMode } from "@/
 
 /** Human-readable labels for settings dropdowns (staff UI). */
 export const CERTIFICATE_RELEASE_OPTIONS = [
-  { value: "immediate_release" as const, label: "Release immediately", helper: "Customers can download portal-visible certificates as soon as they exist." },
-  { value: "release_on_payment" as const, label: "Release after invoice is paid", helper: "Certificate stays locked until linked invoices are paid." },
-  { value: "manual_release" as const, label: "Manual release only", helper: "Staff must explicitly release each certificate to the portal." },
-  { value: "internal_only" as const, label: "Internal only", helper: "Certificates are withheld from the portal unless the customer rule is changed." },
+  { value: "immediate_release" as const, label: "Release immediately", detail: "Customers can download portal-visible certificates as soon as they exist." },
+  { value: "release_on_payment" as const, label: "Release after invoice is paid", detail: "Certificate stays locked until linked invoices are paid." },
+  { value: "manual_release" as const, label: "Manual release only", detail: "Staff must explicitly release each certificate to the portal." },
+  { value: "internal_only" as const, label: "Internal only", detail: "Certificates are withheld from the portal unless the customer rule is changed." },
 ] as const
 
 export const CUSTOMER_CERT_RELEASE_OPTIONS = [
-  { value: "" as const, label: "Use organization default", helper: "Follow the workspace setting below." },
-  ...CERTIFICATE_RELEASE_OPTIONS.map((o) => ({ value: o.value, label: o.label, helper: o.helper })),
+  { value: "" as const, label: "Use organization default", detail: "Follow the workspace setting below." },
+  ...CERTIFICATE_RELEASE_OPTIONS.map((o) => ({ value: o.value, label: o.label, detail: o.detail })),
 ]
 
 export const INVOICE_CERT_RELEASE_OPTIONS = [
   {
     value: "" as const,
     label: "No invoice override",
-    helper: "Customer settings control certificate release by default. Use this only when this invoice needs a different rule.",
+    detail: "Customer settings control certificate release by default. Use this only when this invoice needs a different rule.",
   },
-  ...CERTIFICATE_RELEASE_OPTIONS.map((o) => ({ value: o.value, label: o.label, helper: o.helper })),
+  ...CERTIFICATE_RELEASE_OPTIONS.map((o) => ({ value: o.value, label: o.label, detail: o.detail })),
 ]
 
 export function modeLabel(mode: CertificateReleaseMode | null | undefined): string {

@@ -418,7 +418,7 @@ export default function PortalSettingsPage() {
             </select>
             <p className="text-[10px] text-muted-foreground leading-snug">
               {
-                CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === certificateReleaseMode)?.helper
+                CERTIFICATE_RELEASE_OPTIONS.find((o) => o.value === certificateReleaseMode)?.detail
               }
             </p>
           </div>
@@ -433,7 +433,7 @@ export default function PortalSettingsPage() {
       >
         {consolidatedSchemaPending ? (
           <p className="text-xs text-muted-foreground">
-            Consolidated document settings are not available until the latest database migration is applied.
+            Consolidated document settings are not available on this workspace until your environment is updated to the latest Equipify release.
           </p>
         ) : (
           <>
@@ -493,7 +493,7 @@ export default function PortalSettingsPage() {
                   Opens and downloads from the customer portal document library (no file URLs stored here).
                 </p>
                 {activitySchemaPending ? (
-                  <p className="text-xs text-muted-foreground">Activity history is not available on this database yet.</p>
+                  <p className="text-xs text-muted-foreground">Activity history is not available for this workspace yet.</p>
                 ) : activityLoading ? (
                   <p className="text-xs text-muted-foreground">Loading…</p>
                 ) : activityRows.length === 0 ? (
@@ -583,9 +583,8 @@ export default function PortalSettingsPage() {
               <strong className="text-foreground">data access and release rules</strong>, not module switches on this page.
             </p>
             <p>
-              When per-customer or workspace module defaults ship, they will persist here. The propagation matrix lives in{" "}
-              <code className="text-[11px] bg-muted px-1 py-0.5 rounded">docs/PORTAL_SETTINGS_PROPAGATION.md</code> in the
-              repository.
+              When per-customer or workspace module defaults ship, they will persist here. Until then, visibility follows
+              your data-access and release rules in the live portal.
             </p>
           </div>
         </div>
@@ -603,9 +602,8 @@ export default function PortalSettingsPage() {
             from this screen.
           </p>
           <p>
-            Optional <code className="text-[11px] bg-muted px-1 py-0.5 rounded">?organizationId=</code> on the login URL
-            loads public branding accent only (no secrets). See{" "}
-            <code className="text-[11px]">/api/portal/public-branding</code>.
+            Including your workspace id on the sign-in link only preloads your workspace name and accent color for a
+            consistent experience. It does not sign anyone in or grant access by itself.
           </p>
         </div>
       </SectionCard>
