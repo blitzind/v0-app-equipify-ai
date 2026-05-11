@@ -6,6 +6,15 @@ import { useActiveOrganization } from "@/lib/active-organization-context"
 import type { AiInsight } from "@/lib/mock-data"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { getEquipmentDisplayPrimary } from "@/lib/equipment/display"
+import {
+  QUOTE_PIPELINE_DB_STATUSES,
+  REPEAT_REPAIR_LOOKBACK_DAYS,
+  WARRANTY_EXPIRY_LOOKAHEAD_DAYS,
+  WORK_ORDER_COMPLETED_AT_MONTH_DB,
+  WORK_ORDER_OPEN_PIPELINE_DB,
+  WORK_ORDER_PIPELINE_CHART_ORDER_DB,
+  WORK_ORDER_REVENUE_MONTH_ROLLUP_DB,
+} from "@/lib/kpi/definitions"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -15,7 +24,7 @@ export type DashboardStats = {
   openWorkOrders: number
   /** Completed / pending signature / invoiced with `completed_at` in the current calendar month. */
   workOrdersCompletedThisMonth: number
-  /** Open pipeline: draft, sent, pending_approval (see `OPEN_QUOTE_PIPELINE_STATUSES`). */
+  /** Open pipeline: draft, sent, pending_approval (`QUOTE_PIPELINE_DB_STATUSES`). */
   openQuotesPipelineCount: number
   /** Open / scheduled / in progress with no primary assignee. */
   unassignedOpenWorkOrders: number
@@ -28,9 +37,6 @@ export type DashboardStats = {
   overdueInvoicesAmountCents: number
   maintenancePlansOverdueCount: number
 }
-
-/** Matches customer rollup “open quote” semantics (`lib/customers/rollup-metrics.ts`). */
-const OPEN_QUOTE_PIPELINE_STATUSES = ["draft", "sent", "pending_approval"] as const
 
 export type RecentWorkOrderRow = {
   id: string
@@ -104,16 +110,6 @@ function woDbStatusToUi(s: string): string {
   }
   return m[s] ?? s
 }
-
-/** DB column values in pipeline order (matches Work Orders page `ALL_STATUSES`). */
-const WO_PIPELINE_DB_KEYS = [
-  "open",
-  "scheduled",
-  "in_progress",
-  "completed",
-  "completed_pending_signature",
-  "invoiced",
-] as const
 
 function woDbPriorityToUi(p: string): string {
   const m: Record<string, string> = {
@@ -435,8 +431,8 @@ export function useSupabaseDashboard(
     const orgId = activeOrg.organizationId
 
     const { monthStart, monthEnd, today } = boundsThisMonth()
-    const warrantyBefore = addDays(today, 30)
-    const ninetyDaysAgo = addDays(today, -90)
+    const warrantyBefore = addDays(today, WARRANTY_EXPIRY_LOOKAHEAD_DAYS)
+    const ninetyDaysAgo = addDays(today, -REPEAT_REPAIR_LOOKBACK_DAYS)
 
     const chartWindowStart = new Date()
     chartWindowStart.setMonth(chartWindowStart.getMonth() - 11)
@@ -514,7 +510,7 @@ export function useSupabaseDashboard(
           .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["open", "scheduled", "in_progress"]),
+          .in("status", [...WORK_ORDER_OPEN_PIPELINE_DB]),
         supabase
           .from("work_orders")
           .select("id", head)
@@ -556,7 +552,7 @@ export function useSupabaseDashboard(
           .select("total_labor_cents, total_parts_cents, completed_at, updated_at, status")
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["completed", "invoiced"])
+          .in("status", [...WORK_ORDER_REVENUE_MONTH_ROLLUP_DB])
           .gte("updated_at", `${monthStart}T00:00:00.000Z`),
         supabase
           .from("equipment")
@@ -599,7 +595,7 @@ export function useSupabaseDashboard(
           .select("total_labor_cents, total_parts_cents, updated_at, status")
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["completed", "invoiced"])
+          .in("status", [...WORK_ORDER_REVENUE_MONTH_ROLLUP_DB])
           .gte("updated_at", chartWindowStartIso),
         supabase
           .from("org_invoices")
@@ -620,7 +616,7 @@ export function useSupabaseDashboard(
           .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["completed", "completed_pending_signature", "invoiced"])
+          .in("status", [...WORK_ORDER_COMPLETED_AT_MONTH_DB])
           .not("completed_at", "is", null)
           .gte("completed_at", `${monthStart}T00:00:00.000Z`)
           .lte("completed_at", `${monthEnd}T23:59:59.999Z`),
@@ -629,13 +625,13 @@ export function useSupabaseDashboard(
           .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", OPEN_QUOTE_PIPELINE_STATUSES as unknown as string[]),
+          .in("status", [...QUOTE_PIPELINE_DB_STATUSES]),
         supabase
           .from("work_orders")
           .select("id", head)
           .eq("organization_id", orgId)
           .is("archived_at", null)
-          .in("status", ["open", "scheduled", "in_progress"])
+          .in("status", [...WORK_ORDER_OPEN_PIPELINE_DB])
           .is("assigned_user_id", null),
         supabase
           .from("maintenance_plans")
@@ -683,7 +679,7 @@ export function useSupabaseDashboard(
         woCountPendingSigRes.count ?? 0,
         woCountInvoicedRes.count ?? 0,
       ]
-      const pie: WorkOrderStatusSlice[] = WO_PIPELINE_DB_KEYS.map((db, i) => ({
+      const pie: WorkOrderStatusSlice[] = WORK_ORDER_PIPELINE_CHART_ORDER_DB.map((db, i) => ({
         status: woDbStatusToUi(db),
         count: woStatusCounts[i] ?? 0,
       }))

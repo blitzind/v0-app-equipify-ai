@@ -5,9 +5,10 @@ import type {
   InternalNotificationEventType,
 } from "@/lib/internal-notifications/types"
 import { dateDaysFromNowYmd, dateTodayYmd, diffDaysUtc, numConfig } from "@/lib/internal-notifications/utils"
+import { WORK_ORDER_OPEN_PIPELINE_DB } from "@/lib/kpi/definitions"
 
 const RULE_LIMIT = 40
-const OPEN_WO_DB = ["open", "scheduled", "in_progress"] as const
+const OPEN_WO_DB = WORK_ORDER_OPEN_PIPELINE_DB
 const SR_OPEN_DB = ["new", "reviewing", "needs_info", "approved"] as const
 const DAY_MS = 24 * 60 * 60 * 1000
 const MIN_MS = 60 * 1000

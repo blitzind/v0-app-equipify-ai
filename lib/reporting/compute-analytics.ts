@@ -17,6 +17,14 @@ import type {
   WarrantyExpiryRow,
   WorkOrderTypeSlice,
 } from "./types"
+import {
+  INVOICE_AGING_QUERY_DB,
+  REPEAT_REPAIR_LOOKBACK_DAYS,
+  WORK_ORDER_ANALYTICS_EXTENDED_COMPLETION_DB,
+  WORK_ORDER_ANALYTICS_PM_LINKED_DB,
+  WORK_ORDER_ANALYTICS_REVENUE_PERIOD_DB,
+  WORK_ORDER_OPEN_PIPELINE_DB,
+} from "@/lib/kpi/definitions"
 
 function fmtShortDate(iso: string | null): string {
   if (!iso) return "—"
@@ -153,7 +161,7 @@ export async function computeReportAnalytics(
   }
   const statusFilter = params.workOrderStatus && params.workOrderStatus !== "all" ? params.workOrderStatus : null
 
-  const ninetyLookbackFrom = addDays(to, -90)
+  const ninetyLookbackFrom = addDays(to, -REPEAT_REPAIR_LOOKBACK_DAYS)
 
   const [
     woCreatedRes,
@@ -179,17 +187,17 @@ export async function computeReportAnalytics(
       .select(
         "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
       )
-      .in("status", ["completed", "invoiced"])
+      .in("status", [...WORK_ORDER_ANALYTICS_REVENUE_PERIOD_DB])
       .gte("updated_at", fromStart)
       .lte("updated_at", toEnd),
     applyWorkOrderScope(supabase, organizationId, scope)
       .select("id, created_at, updated_at, completed_at, status")
-      .in("status", ["completed", "invoiced", "completed_pending_signature"])
+      .in("status", [...WORK_ORDER_ANALYTICS_EXTENDED_COMPLETION_DB])
       .gte("updated_at", fromStart)
       .lte("updated_at", toEnd),
     applyWorkOrderScope(supabase, organizationId, scope)
       .select("*", { count: "exact", head: true })
-      .in("status", ["open", "scheduled", "in_progress"]),
+      .in("status", [...WORK_ORDER_OPEN_PIPELINE_DB]),
     applyWorkOrderScope(supabase, organizationId, scope)
       .select("equipment_id, created_at, title")
       .gte("created_at", `${ninetyLookbackFrom}T00:00:00.000Z`)
@@ -228,7 +236,7 @@ export async function computeReportAnalytics(
         .select("id, invoice_number, title, amount_cents, status, due_date, customer_id")
         .eq("organization_id", organizationId)
         .is("archived_at", null)
-        .in("status", ["sent", "unpaid", "overdue"])
+        .in("status", [...INVOICE_AGING_QUERY_DB])
       if (params.customerId) q = q.eq("customer_id", params.customerId)
       const { data, error } = await q
       if (error) return { data: [], error }
@@ -255,7 +263,7 @@ export async function computeReportAnalytics(
     applyWorkOrderScope(supabase, organizationId, scope)
       .select("id")
       .not("maintenance_plan_id", "is", null)
-      .in("status", ["completed", "invoiced"])
+      .in("status", [...WORK_ORDER_ANALYTICS_PM_LINKED_DB])
       .gte("updated_at", fromStart)
       .lte("updated_at", toEnd),
     supabase.from("customers").select("id, company_name").eq("organization_id", organizationId),
@@ -481,8 +489,8 @@ export async function computeReportAnalytics(
     }
   }
 
-  const openStatuses = new Set(["open", "scheduled", "in_progress"])
-  const completedStatuses = new Set(["completed", "invoiced", "completed_pending_signature"])
+  const openStatuses = new Set(WORK_ORDER_OPEN_PIPELINE_DB)
+  const completedStatuses = new Set(WORK_ORDER_ANALYTICS_EXTENDED_COMPLETION_DB)
   for (const wo of woCreated) {
     const equipmentTypesForWo = new Set<string>()
     for (const equipmentId of assetsByWorkOrder.get(wo.id) ?? []) {

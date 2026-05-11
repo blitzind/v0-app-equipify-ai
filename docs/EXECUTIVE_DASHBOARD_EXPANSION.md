@@ -2,6 +2,8 @@
 
 Focused **owner/operator visibility** on the staff home dashboard (`/`) using **bounded Supabase head counts** and existing UX patterns — not a second dashboard product.
 
+**Status / window definitions** for the metrics below are centralized in **`lib/kpi/definitions.ts`** and described in **`docs/KPI_AND_ANALYTICS_STANDARDIZATION.md`** (Phase 63.3).
+
 ## What was added
 
 | Metric | Source | Definition |

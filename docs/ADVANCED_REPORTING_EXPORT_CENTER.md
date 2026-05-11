@@ -2,6 +2,8 @@
 
 Focused **export infrastructure** pass: shared CSV helpers, consistent filenames, permission-safe behavior, and honest UX — not a new BI product.
 
+**KPI definitions** used by the underlying analytics engine are documented in **`docs/KPI_AND_ANALYTICS_STANDARDIZATION.md`** and implemented in **`lib/kpi/definitions.ts`** (Phase 63.3).
+
 ## Architecture
 
 | Layer | Role |

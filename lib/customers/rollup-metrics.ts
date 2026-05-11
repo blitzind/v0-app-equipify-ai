@@ -14,6 +14,7 @@ import {
   loadCustomerRollupTree,
   type CustomerTreeNode,
 } from "@/lib/customers/consolidated-rollup"
+import { QUOTE_PIPELINE_DB_STATUSES, WORK_ORDER_OPEN_PIPELINE_DB } from "@/lib/kpi/definitions"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -113,10 +114,10 @@ const EMPTY_INVOICE_COUNTS: Record<InvoiceStatusKey, number> = {
   void: 0,
 }
 
-const OPEN_WO_STATUSES: WorkOrderStatusKey[] = ["open", "scheduled", "in_progress"]
+const OPEN_WO_STATUSES = WORK_ORDER_OPEN_PIPELINE_DB as unknown as WorkOrderStatusKey[]
 const UNPAID_INVOICE_STATUSES: InvoiceStatusKey[] = ["sent", "unpaid", "overdue"]
 const OPEN_SR_STATUSES = ["new", "reviewing", "approved", "needs_info"] as const
-const OPEN_QUOTE_STATUSES = ["draft", "sent", "pending_approval"] as const
+const OPEN_QUOTE_STATUSES = QUOTE_PIPELINE_DB_STATUSES
 
 const TODAY_ISO = (): string => {
   const d = new Date()
