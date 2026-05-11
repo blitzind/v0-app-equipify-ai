@@ -57,7 +57,23 @@ export async function ensureBlitzPayOrgSettings(
   if (error && !isUniqueViolation(error)) throw new Error(error.message)
 }
 
+export async function fetchBlitzpayOrgSettingsRow(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<Record<string, unknown> | null> {
+  assertUuid(organizationId, "organizationId")
+  const { data, error } = await admin
+    .from("blitzpay_org_settings")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as Record<string, unknown> | null) ?? null
+}
+
 export type CreateBlitzpayPaymentIntentInput = {
+  /** When set, row uses this UUID (e.g. pre-generated before Stripe Checkout create). */
+  id?: string
   organizationId: string
   stripeConnectAccountId: string
   stripePaymentIntentId: string
@@ -328,4 +344,20 @@ export async function fetchBlitzpayPaymentIntentByStripeId(
     .maybeSingle()
   if (error) throw new Error(error.message)
   return data ?? null
+}
+
+export async function updateBlitzpayInvoicePaymentAttemptsForInternalIntent(
+  admin: SupabaseClient,
+  internalPaymentIntentId: string,
+  patch: { status: BlitzpayInvoicePaymentAttemptStatus; failureCode?: string | null },
+): Promise<void> {
+  assertUuid(internalPaymentIntentId, "internalPaymentIntentId")
+  const { error } = await admin
+    .from("blitzpay_invoice_payment_attempts")
+    .update({
+      status: patch.status,
+      failure_code: patch.failureCode ?? null,
+    })
+    .eq("blitzpay_payment_intent_id", internalPaymentIntentId)
+  if (error) throw new Error(error.message)
 }

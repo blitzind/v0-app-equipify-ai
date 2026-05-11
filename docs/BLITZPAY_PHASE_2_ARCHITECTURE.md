@@ -429,8 +429,6 @@ Use this as a **checklist** when coding — not exhaustive.
 
 ---
 
----
-
 ## 12. Implementation status
 
 ### 12.1 Phase 2A (shipped in repo)
@@ -440,16 +438,26 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Migration** | `20260911120000_blitzpay_phase_2a_foundation.sql` — tables `blitzpay_org_settings`, `blitzpay_payment_intents`, `blitzpay_invoice_payment_attempts`, `blitzpay_fee_snapshots`, `blitzpay_ledger_entries`, `blitzpay_webhook_inbox`; indexes and uniqueness per §2. |
 | **RLS** | Org-scoped tables: `authenticated` **SELECT** only with `is_org_member(organization_id)`; **no** authenticated writes. `blitzpay_webhook_inbox`: no grants to `authenticated` (service role only). |
 | **Server libs** | `lib/blitzpay/payment-domain.ts`, `money.ts`, `fees.ts`, `idempotency-keys.ts`, `stripe-metadata.ts`, `phase2-feature-flag.ts`, `payment-repository.ts`, `webhook-inbox.ts`, `webhook-phase2-events.ts`, `webhook-phase2-dispatch.ts`. |
-| **Webhook** | `POST /api/blitzpay/webhook` — Phase 1 `account.updated` unchanged. Phase 2 event types: inbox row (`pending` → `done` / `dead` on failure) + **mirror-only** `blitzpay_payment_intents` status updates for `payment_intent.*`; structured **stubs** for Checkout / charge / dispute (no `org_invoice_payments` writes yet). |
-| **Env** | `BLITZPAY_INVOICE_PAY_ENABLED` — global gate (default off); see `.env.local.example`. Per-org `blitzpay_org_settings.blitzpay_invoice_pay_enabled` reserved for product rollout. |
+| **Webhook (2A baseline)** | `POST /api/blitzpay/webhook` — Phase 1 `account.updated` unchanged. Phase 2 inbox + **mirror** `blitzpay_payment_intents` for `payment_intent.*`; stubs for charge refund/dispute. **Phase 2B** extends dispatch for succeeded/failed/canceled PI and Checkout completion (see §12.2). |
+| **Env** | `BLITZPAY_INVOICE_PAY_ENABLED` — global gate (default off); see `.env.local.example`. Per-org `blitzpay_org_settings.blitzpay_invoice_pay_enabled` for rollout. |
 
-### 12.2 Phase 2B (next)
+### 12.2 Phase 2B (shipped in repo)
 
-- `POST …/blitzpay/invoices/[id]/prepare-pay` (or equivalent) behind **org setting + env** gate; Stripe **PaymentIntent** (or Checkout) on connected account with `application_fee_amount` and metadata.
-- On `payment_intent.succeeded`: idempotent **allocation** into `org_invoice_payments` via `lib/billing/invoice-payment-allocation.ts` (or sibling); append **ledger** rows; expand webhook handler beyond mirror update.
-- Rate limits per Phase 2 doc §6; structured logs for pay API.
-- Stripe Dashboard: register Phase 2 Connect events on the same BlitzPay webhook endpoint.
+| Area | Details |
+|------|---------|
+| **API** | `POST /api/organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay` — authenticated, org-scoped; gates: env `BLITZPAY_INVOICE_PAY_ENABLED`, `blitzpay_org_settings.blitzpay_invoice_pay_enabled`, Connect `charges_enabled` + account id; invoice must belong to org, not void/archived, balance due greater than zero; lightweight rate limits (`lib/blitzpay/blitzpay-rate-limit.ts`, optional `BLITZPAY_RATE_PREPARE_*` env). |
+| **Stripe** | **Checkout Session** `mode: payment` on **connected account** (`Stripe-Account`), `payment_intent_data.application_fee_amount`, metadata from `stripe-metadata.ts`, idempotency from `idempotency-keys.ts`, amounts/fees via `money.ts` / `fees.ts`. No client secret or card data in the app UI beyond redirect to Stripe-hosted Checkout. |
+| **Persistence** | Before/around Stripe: insert `blitzpay_payment_intents` (stable id), `blitzpay_fee_snapshots`, `blitzpay_invoice_payment_attempts` (`checkout` / `initiated`); retries use new `attemptToken` / idempotency key to avoid duplicate Checkout sessions for the same logical retry policy. |
+| **Webhook** | `payment_intent.succeeded` / `payment_intent.payment_failed` / `payment_intent.canceled` + `checkout.session.completed` (paid): mirror PI, then idempotent `org_invoice_payments` via `reference = blitzpay_pi:{payment_intent_id}` and `lib/billing/invoice-payment-allocation.ts` path; ledger `payment_captured` + optional `application_fee_received`; attempt row terminal status; inbox `done` / `dead` per existing inbox rules. |
+| **UI** | Minimal: invoice Payments tab — “Pay with BlitzPay (hosted)” when permitted (`components/drawers/invoice-detail-view.tsx`). |
+| **Tests** | `pnpm test:blitzpay-phase-2b` (`scripts/test-blitzpay-phase-2b.ts`) — eligibility, metadata, idempotency key shape, fee math. |
+
+### 12.3 Phase 2C (next)
+
+- Customer **portal** token-gated pay session; payment history list.  
+- Refund/dispute handling beyond stubs; admin diagnostics if needed.  
+- Payout visibility, richer failed-payment UX, async inbox worker hardening per `docs/SCALE_READINESS_AUDIT.md` where BlitzPay-specific.
 
 ---
 
-*Phase 2A foundation is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2B vertical slice for hosted invoice pay is implemented; sections §1–§11 remain the design reference for later sub-phases.*

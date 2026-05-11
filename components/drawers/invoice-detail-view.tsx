@@ -1467,12 +1467,26 @@ type QuickBooksInvoiceSyncResponse = {
   }>
 }
 
-function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
+function PaymentsTab({
+  invoice,
+  pushToast,
+}: {
+  invoice: AdminInvoice
+  pushToast: (message: string, kind?: "success" | "error") => void
+}) {
   const { permissions } = useOrgPermissions()
   const { refreshInvoices } = useInvoices()
   const activeOrg = useActiveOrganization()
   const orgId = activeOrg.status === "ready" ? activeOrg.organizationId : null
   const canEditPayments = permissions.canViewBilling && permissions.canEditInvoices
+  const canStartBlitzpayPay =
+    (permissions.canEditInvoices || permissions.canViewFinancials) &&
+    balance > 0 &&
+    !invoice.isArchived &&
+    invoice.status !== "Void" &&
+    invoice.status !== "Draft" &&
+    invoice.status !== "Paid"
+  const [blitzpayBusy, setBlitzpayBusy] = useState(false)
 
   const grandTotal = invoiceGrandTotalDollars(invoice)
   const totalPaid =
@@ -1716,6 +1730,52 @@ function PaymentsTab({ invoice }: { invoice: AdminInvoice }) {
           </p>
         </div>
       </div>
+
+      {canStartBlitzpayPay && orgId ? (
+        <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-border")}>
+          <p className="text-xs font-semibold">BlitzPay</p>
+          <p className="text-[10px] text-muted-foreground">
+            Opens Stripe Checkout on your connected account (test mode friendly). Requires env{" "}
+            <span className="font-mono">BLITZPAY_INVOICE_PAY_ENABLED=true</span> and org BlitzPay pay enabled in
+            settings.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-8 text-[11px] gap-1.5"
+            disabled={blitzpayBusy}
+            onClick={() => {
+              void (async () => {
+                setBlitzpayBusy(true)
+                try {
+                  const res = await fetch(
+                    `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
+                    { method: "POST", credentials: "include" },
+                  )
+                  const body = (await res.json()) as { error?: string; message?: string; url?: string }
+                  if (!res.ok) {
+                    pushToast(body.message ?? body.error ?? "Could not start BlitzPay checkout.", "error")
+                    return
+                  }
+                  if (body.url) {
+                    window.location.assign(body.url)
+                  } else {
+                    pushToast("Checkout URL missing.", "error")
+                  }
+                } catch (e) {
+                  pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                } finally {
+                  setBlitzpayBusy(false)
+                }
+              })()
+            }}
+          >
+            {blitzpayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+            Pay with BlitzPay (hosted)
+          </Button>
+        </div>
+      ) : null}
 
       {canViewQbFinancialSync ? (
         <div className={cn(DRAWER_NESTED_CARD, "p-3 space-y-2 border-[color:var(--ds-info-border)]/40")}>
@@ -2955,7 +3015,7 @@ export function InvoiceDetailView({ invoice, onClose }: InvoiceDetailViewProps) 
                 />
               </div>
             )}
-            {activeTab === "payments"    && <PaymentsTab   invoice={invoice} />}
+            {activeTab === "payments" && <PaymentsTab invoice={invoice} pushToast={toast} />}
             {activeTab === "files"       && <FilesTab      invoice={invoice} />}
             {activeTab === "comments"    && <CommentsTab />}
             {activeTab === "work-orders" && <WorkOrdersTab invoice={invoice} />}

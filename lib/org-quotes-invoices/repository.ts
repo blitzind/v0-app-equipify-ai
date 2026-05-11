@@ -402,6 +402,7 @@ export async function markOrgInvoicePaidFromQuickBooksInbound(
   return { ok: true }
 }
 
+/** Staff UI path (uses auth user as created_by). */
 export async function insertOrgInvoicePayment(
   supabase: SupabaseClient,
   args: {
@@ -412,6 +413,32 @@ export async function insertOrgInvoicePayment(
     paymentMethod: InvoicePaymentMethodDb
     reference?: string | null
     note?: string | null
+  },
+): Promise<{ error?: string }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return insertOrgInvoicePaymentWithActor(supabase, {
+    ...args,
+    createdByUserId: user?.id ?? null,
+  })
+}
+
+/**
+ * Webhooks / automation: insert a payment row with an explicit actor (null for system).
+ * Reuses the same reconcile path as staff-recorded payments.
+ */
+export async function insertOrgInvoicePaymentWithActor(
+  supabase: SupabaseClient,
+  args: {
+    organizationId: string
+    invoiceId: string
+    amountCents: number
+    paidOn: string
+    paymentMethod: InvoicePaymentMethodDb
+    reference?: string | null
+    note?: string | null
+    createdByUserId: string | null
   },
 ): Promise<{ error?: string }> {
   if (!Number.isFinite(args.amountCents) || args.amountCents <= 0) {
@@ -427,10 +454,6 @@ export async function insertOrgInvoicePayment(
 
   if (!invRow) return { error: "Invoice not found." }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
   const { error } = await supabase.from("org_invoice_payments").insert({
     organization_id: args.organizationId,
     invoice_id: args.invoiceId,
@@ -439,7 +462,7 @@ export async function insertOrgInvoicePayment(
     payment_method: args.paymentMethod,
     reference: args.reference?.trim() ? args.reference.trim() : null,
     note: args.note?.trim() ? args.note.trim() : null,
-    created_by: user?.id ?? null,
+    created_by: args.createdByUserId,
   })
 
   if (error) return { error: error.message }

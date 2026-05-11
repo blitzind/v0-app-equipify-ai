@@ -258,4 +258,6 @@ Existing `STRIPE_SECRET_KEY` for Connect API calls typically uses the **platform
 
 ## Related docs
 
+- [BLITZPAY_PHASE_2_ARCHITECTURE.md](./BLITZPAY_PHASE_2_ARCHITECTURE.md) — **Phase 2 (pre-implementation):** invoice pay, Connect charges, application fees, webhooks, rate limits, ledger — design before coding.  
+- [BLITZPAY_REMAINING_PHASES_ROADMAP.md](./BLITZPAY_REMAINING_PHASES_ROADMAP.md) — **Phases 3–15** roadmap (UX, dashboard, refunds, disputes, payouts, fees, portal, admin tools, packaging, automation, scale, mobile, future ideas).
 - [STRIPE_PRODUCTION_READINESS.md](./STRIPE_PRODUCTION_READINESS.md) — SaaS subscription production checklist (separate from BlitzPay).
