@@ -14,6 +14,8 @@ export type StaffBlitzpayAttemptActivityItem = {
   createdAt: string
   amountCents: number | null
   currency: string | null
+  /** Internal FK for staff actions (e.g. receipt resend); not shown to portal customers. */
+  blitzpayPaymentIntentId: string | null
   /** Last 6 chars of Stripe PaymentIntent id for support correlation — not a full secret */
   stripePiTail: string | null
   /** Last 8 chars of Checkout Session id when present */
@@ -105,6 +107,7 @@ export async function fetchStaffBlitzpayInvoiceAttemptActivity(
       createdAt: r.created_at,
       amountCents,
       currency: pi?.currency?.trim()?.toLowerCase() ?? null,
+      blitzpayPaymentIntentId: r.blitzpay_payment_intent_id,
       stripePiTail: tailFromStripeId(pi?.stripe_payment_intent_id, 6),
       checkoutSessionTail: tailFromStripeId(pi?.stripe_checkout_session_id ?? undefined, 8),
     }

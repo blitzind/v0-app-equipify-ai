@@ -3,7 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { BlitzPayConnectOnboardingErrorCode } from "@/lib/blitzpay/stripe-connect-onboarding-errors"
 
-/** Columns on `organizations` — see migration `blitzpay_onboarding_diagnostics`. */
+/** Columns on `organizations` — see `supabase/migrations/20260910160000_blitzpay_onboarding_diagnostics.sql`. */
 export type BlitzPayOnboardingDiagnosticsRow = {
   blitzpay_last_onboarding_attempt_at: string | null
   blitzpay_last_onboarding_failure_at: string | null

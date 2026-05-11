@@ -16,6 +16,7 @@
     "test:blitzpay-phase-2c-portal": "tsx scripts/test-blitzpay-phase-2c-portal.ts",
     "test:blitzpay-phase-2d": "tsx scripts/test-blitzpay-phase-2d.ts",
     "test:blitzpay-phase-2e": "tsx scripts/test-blitzpay-phase-2e.ts",
+    "test:blitzpay-phase-2f": "tsx scripts/test-blitzpay-phase-2f.ts",
     "ai:evals": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ai-evals.ts",
     "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs",
     "update:master-context": "tsx scripts/update-master-context.ts"

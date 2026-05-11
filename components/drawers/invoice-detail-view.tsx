@@ -1474,6 +1474,8 @@ function PaymentsTab({
   invoice: AdminInvoice
   pushToast: (message: string, kind?: "success" | "error") => void
 }) {
+  const BLITZPAY_PI_UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
   const { permissions } = useOrgPermissions()
   const { refreshInvoices } = useInvoices()
   const activeOrg = useActiveOrganization()
@@ -1489,10 +1491,12 @@ function PaymentsTab({
     createdAt: string
     amountCents: number | null
     currency: string | null
+    blitzpayPaymentIntentId: string | null
     stripePiTail: string | null
     checkoutSessionTail: string | null
   }
   const [blitzpayActivity, setBlitzpayActivity] = useState<BlitzpayActivityRow[]>([])
+  const [blitzpayOutboundEmailConfigured, setBlitzpayOutboundEmailConfigured] = useState(false)
   const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
   const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
   type BlitzpayRefundActivityRow = {
@@ -1517,6 +1521,7 @@ function PaymentsTab({
   const [refundTarget, setRefundTarget] = useState<{ paymentId: string; maxCents: number } | null>(null)
   const [refundDollarsInput, setRefundDollarsInput] = useState("")
   const [refundBusy, setRefundBusy] = useState(false)
+  const [receiptResendBusyPi, setReceiptResendBusyPi] = useState<string | null>(null)
   const [diagOpen, setDiagOpen] = useState(false)
   const [diagBody, setDiagBody] = useState("")
   const [diagLoading, setDiagLoading] = useState(false)
@@ -1616,6 +1621,7 @@ function PaymentsTab({
           attempts?: BlitzpayActivityRow[]
           refunds?: BlitzpayRefundActivityRow[]
           disputes?: BlitzpayDisputeActivityRow[]
+          outboundEmail?: { configured?: boolean }
           error?: string
           message?: string
         }
@@ -1625,10 +1631,12 @@ function PaymentsTab({
           setBlitzpayActivity([])
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
+          setBlitzpayOutboundEmailConfigured(false)
         } else {
           setBlitzpayActivity(body.attempts ?? [])
           setBlitzpayRefunds(body.refunds ?? [])
           setBlitzpayDisputes(body.disputes ?? [])
+          setBlitzpayOutboundEmailConfigured(Boolean(body.outboundEmail?.configured))
         }
       } catch (e) {
         if (!cancelled) {
@@ -1636,6 +1644,7 @@ function PaymentsTab({
           setBlitzpayActivity([])
           setBlitzpayRefunds([])
           setBlitzpayDisputes([])
+          setBlitzpayOutboundEmailConfigured(false)
         }
       } finally {
         if (!cancelled) setBlitzpayActivityLoading(false)
@@ -1915,6 +1924,13 @@ function PaymentsTab({
             Hosted Checkout sessions for this invoice. Status comes from Stripe via webhooks — use this when helping a
             customer who paid from the portal or from staff.
           </p>
+          {!blitzpayOutboundEmailConfigured ? (
+            <p className="text-[10px] text-muted-foreground border border-dashed border-border rounded-md px-2 py-1.5">
+              Automatic payment receipts email customers when outbound mail is configured. Resend receipt is available
+              here once <span className="font-mono">RESEND_API_KEY</span> and{" "}
+              <span className="font-mono">EMAIL_FROM_ADDRESS</span> are set on the server.
+            </p>
+          ) : null}
           {blitzpayActivityLoading ? (
             <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
               <Loader2 className="w-3 h-3 animate-spin" /> Loading…
@@ -1933,6 +1949,9 @@ function PaymentsTab({
                     <th className="px-2 py-1.5 font-semibold">Status</th>
                     <th className="px-2 py-1.5 font-semibold text-right">Amount</th>
                     <th className="px-2 py-1.5 font-semibold hidden sm:table-cell">Correlation</th>
+                    {blitzpayOutboundEmailConfigured ? (
+                      <th className="px-2 py-1.5 font-semibold text-right">Receipt</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -1953,6 +1972,11 @@ function PaymentsTab({
                       [a.checkoutSessionTail ? `cs…${a.checkoutSessionTail}` : null, a.stripePiTail ? `pi…${a.stripePiTail}` : null]
                         .filter(Boolean)
                         .join(" · ") || "—"
+                    const canResendReceipt =
+                      blitzpayOutboundEmailConfigured &&
+                      a.displayStatus === "succeeded" &&
+                      typeof a.blitzpayPaymentIntentId === "string" &&
+                      BLITZPAY_PI_UUID_RE.test(a.blitzpayPaymentIntentId)
                     return (
                       <tr key={`${a.attemptNo}-${a.createdAt}`} className="border-b border-border last:border-0">
                         <td className="px-2 py-1.5 whitespace-nowrap text-foreground">
@@ -1991,6 +2015,55 @@ function PaymentsTab({
                         <td className="px-2 py-1.5 text-muted-foreground hidden sm:table-cell font-mono text-[10px]">
                           {corr}
                         </td>
+                        {blitzpayOutboundEmailConfigured ? (
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                            {canResendReceipt && a.blitzpayPaymentIntentId && orgId ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-[10px] font-medium"
+                                disabled={receiptResendBusyPi === a.blitzpayPaymentIntentId}
+                                onClick={() => {
+                                  void (async () => {
+                                    setReceiptResendBusyPi(a.blitzpayPaymentIntentId)
+                                    try {
+                                      const res = await fetch(
+                                        `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/resend-receipt`,
+                                        {
+                                          method: "POST",
+                                          credentials: "include",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            blitzpayPaymentIntentInternalId: a.blitzpayPaymentIntentId,
+                                          }),
+                                        },
+                                      )
+                                      const j = (await res.json()) as { error?: string; message?: string }
+                                      if (!res.ok) {
+                                        pushToast(j.message ?? j.error ?? "Could not resend receipt.", "error")
+                                        return
+                                      }
+                                      pushToast("Receipt email sent.", "success")
+                                    } catch (e) {
+                                      pushToast(e instanceof Error ? e.message : "Network error.", "error")
+                                    } finally {
+                                      setReceiptResendBusyPi(null)
+                                    }
+                                  })()
+                                }}
+                              >
+                                {receiptResendBusyPi === a.blitzpayPaymentIntentId ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  "Resend"
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        ) : null}
                       </tr>
                     )
                   })}

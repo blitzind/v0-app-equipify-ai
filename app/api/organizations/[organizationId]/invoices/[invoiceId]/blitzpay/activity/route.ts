@@ -6,6 +6,7 @@ import {
   fetchStaffBlitzpayInvoiceDisputes,
   fetchStaffBlitzpayInvoiceRefunds,
 } from "@/lib/blitzpay/staff-blitzpay-invoice-support"
+import { isOutboundEmailConfigured } from "@/lib/email/config"
 
 export const runtime = "nodejs"
 
@@ -39,7 +40,12 @@ export async function GET(
       fetchStaffBlitzpayInvoiceRefunds(admin, organizationId, invoiceId),
       fetchStaffBlitzpayInvoiceDisputes(admin, organizationId, invoiceId),
     ])
-    return NextResponse.json({ attempts, refunds, disputes })
+    return NextResponse.json({
+      attempts,
+      refunds,
+      disputes,
+      outboundEmail: { configured: isOutboundEmailConfigured() },
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json(

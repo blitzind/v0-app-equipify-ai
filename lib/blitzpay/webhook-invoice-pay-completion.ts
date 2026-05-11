@@ -9,6 +9,7 @@ import {
   fetchBlitzpayPaymentIntentByStripeId,
   updateBlitzpayInvoicePaymentAttemptsForInternalIntent,
 } from "@/lib/blitzpay/payment-repository"
+import { dispatchBlitzpayPaymentReceiptEmails } from "@/lib/blitzpay/blitzpay-receipt-email-dispatch"
 
 function blitzpayPiReference(piId: string): string {
   return `blitzpay_pi:${piId}`
@@ -93,6 +94,17 @@ export async function completeBlitzpayPaymentIntentSucceeded(
       blitzpayPaymentIntentId: row.id,
       orgInvoiceId: row.org_invoice_id,
       metadata: { stripe_payment_intent_id: pi.id },
+    })
+
+    void dispatchBlitzpayPaymentReceiptEmails(admin, {
+      organizationId: row.organization_id,
+      orgInvoiceId: row.org_invoice_id,
+      internalBlitzpayPaymentIntentId: row.id,
+      stripePaymentIntentId: pi.id,
+      invoicePortionCents,
+      paidOnYyyyMmDd: paidOn,
+      currency: row.currency || "usd",
+      sourceKind: "webhook_auto",
     })
 
     const appFee = pi.application_fee_amount

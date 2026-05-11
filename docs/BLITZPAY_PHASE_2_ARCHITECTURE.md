@@ -487,7 +487,7 @@ Use this as a **checklist** when coding — not exhaustive.
 | **Portal confirmation** | After Stripe success (`?blitzpay=1&status=success`), **Payment update** explains webhook delay; if invoice is already paid / zero balance → **Payment received**; otherwise **confirming** copy + short poll of `GET /api/portal/invoices/[id]` until paid or timeout. Does **not** assert funds captured until allocation shows on the invoice. |
 | **Portal payment history** | `GET /api/portal/invoices/[invoiceId]` returns `paymentHistory` (from `org_invoice_payments`) via `mapOrgInvoicePaymentRowToPortalHistory` — masks `blitzpay_pi:*` references as **Electronic confirmation on file**; no Stripe ids, fees, or internal UUIDs in payloads. |
 | **Staff visibility** | `GET …/blitzpay/activity` — same permissions; returns **attempts** (as above) plus **refunds** and **disputes** summary rows (tails only where applicable). **Payments tab** lists attempts with source (staff vs customer portal) and status (pending / succeeded / failed / canceled / expired). Recorded payments table shows **BlitzPay (online)** instead of raw `blitzpay_pi:` reference. **Phase 2E** adds per-payment refund sub-rows, disputes card, and **BlitzPay diagnostics** (`GET …/blitzpay/diagnostics`). |
-| **Receipt foundation** | `lib/blitzpay/invoice-payment-receipt.ts` — `InvoicePaymentReceiptShape` + `buildInvoicePaymentReceiptShape` for future email/PDF; **no outbound email in Phase 2D** (email receipts = next). |
+| **Receipt foundation** | `lib/blitzpay/invoice-payment-receipt.ts` — `InvoicePaymentReceiptShape` + `buildInvoicePaymentReceiptShape`. **Phase 2F** wires customer + staff emails and resend (§12.6). |
 | **Tests** | `pnpm test:blitzpay-phase-2d` — portal history masking + receipt builder. |
 
 #### Manual test checklist (Phase 2D)
@@ -524,6 +524,26 @@ Use this as a **checklist** when coding — not exhaustive.
 5. **Diagnostics** JSON shows PI rows + inbox tail + replay-safety notes.  
 6. **Idempotency-Key** / server idempotency: repeat staff refund POST with same key returns the same outcome without double Stripe calls (Stripe idempotency window).
 
+### 12.6 Phase 2F (shipped in repo) — receipt email, staff alerts, resend, idempotency
+
+| Area | Details |
+|------|---------|
+| **Migration** | `20260913150000_blitzpay_phase_2f_receipt_dispatches.sql` — `blitzpay_payment_receipt_dispatches` (append-only log + idempotency). **Partial unique indexes:** at most one `webhook_auto` row per `(blitzpay_payment_intent_id, customer_receipt)` and per `(blitzpay_payment_intent_id, staff_alert)` so Stripe webhook replays do not enqueue duplicate automatic sends. `20260913151000_blitzpay_receipt_dispatch_skipped_preference.sql` extends `send_status` with `skipped_preference` when automatic customer email is suppressed by `customers.invoice_delivery_preference`. |
+| **View model** | `lib/blitzpay/blitzpay-payment-receipt-view-model.ts` + `blitzPayPaymentReceiptViewModelToCustomerJson` — customer-safe fields only (no raw Stripe ids, fees, or ledger metadata). |
+| **Dispatch** | `lib/blitzpay/blitzpay-receipt-email-dispatch.ts` — builds receipt from `buildInvoicePaymentReceiptShape` + Resend templates in `lib/email/templates/blitzpay-payment-receipt-content.ts`. **Webhook:** `completeBlitzpayPaymentIntentSucceeded` calls `dispatchBlitzpayPaymentReceiptEmails` **after** first successful `org_invoice_payments` insert (same block as ledger `payment_captured`), wrapped so email never fails booking. **Staff resend:** `POST …/blitzpay/resend-receipt` with `{ blitzpayPaymentIntentInternalId }` → `executeStaffBlitzpayReceiptResend`. |
+| **Preferences** | `lib/blitzpay/blitzpay-receipt-email-policy.ts` — automatic customer receipt is skipped when `invoice_delivery_preference` is `portal`, `mail`, or `manual` (null/`email` allows send). Staff resend **overrides** preference. |
+| **Staff UI** | Invoice **Payments** tab: **Resend** on succeeded BlitzPay attempts when `GET …/blitzpay/activity` reports `outboundEmail.configured` (mirrors `isOutboundEmailConfigured()`). |
+| **Tests** | `pnpm test:blitzpay-phase-2f` — receipt JSON safety + policy + idempotency notes. |
+
+#### Manual test checklist (Phase 2F)
+
+1. With Resend env set, pay an invoice via BlitzPay: customer receives **Payment received** email (masked reference, portal link, no `pi_` in body).  
+2. Replay the same `payment_intent.succeeded` delivery (Stripe CLI or duplicate event): **no second** automatic customer receipt (DB unique + skip).  
+3. Customer with **no** invoice/customer billing email: payment still books; dispatch row `skipped_no_email` (check logs / DB if needed).  
+4. Customer with `invoice_delivery_preference = portal`: automatic receipt skipped (`skipped_preference`); **Resend** from staff still sends if mail is configured.  
+5. Staff digest email arrives for owner/admin when configured; contains no Stripe object ids.  
+6. **Resend** from Payments tab succeeds and appends a `staff_resend` dispatch row (multiple resends allowed).
+
 ---
 
-*Phase 2A–2E vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2F vertical slice for hosted invoice pay (staff + portal + confirmation/history + operational refunds/disputes + receipt comms) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

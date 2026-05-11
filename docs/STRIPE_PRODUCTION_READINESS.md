@@ -131,4 +131,6 @@ If you already applied historical migrations, **no** extra `supabase db push` is
 
 ## Related: BlitzPay / customer payments (Phase 54.3)
 
-SaaS subscription Stripe setup above is **not** used for **end-customer invoice** collection. Architecture for Connect, application fees, and future webhooks is documented in [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md) (design-only; no live BlitzPay in 54.3).
+SaaS subscription Stripe setup above is **not** used for **end-customer invoice** collection. Architecture for Connect, application fees, and webhooks is documented in [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md) and [BLITZPAY_PHASE_1.md](./BLITZPAY_PHASE_1.md).
+
+**Supabase:** BlitzPay reads/writes `organizations` columns added by migrations under `equipify-app/supabase/migrations/` (notably `20260813100000_blitzpay_connect_phase1.sql` and `20260910160000_blitzpay_onboarding_diagnostics.sql`). If the app errors with **column `blitzpay_last_onboarding_attempt_at` does not exist**, apply pending migrations: from `equipify-app`, run `supabase db push` against the linked project (or run the SQL from `20260910160000_blitzpay_onboarding_diagnostics.sql` in the Supabase SQL editor).

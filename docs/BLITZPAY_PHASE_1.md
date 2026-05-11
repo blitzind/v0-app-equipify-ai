@@ -11,7 +11,7 @@ Phase 1 adds **organization-level Stripe Connect Express** account creation, **A
 
 | Area | Details |
 |------|---------|
-| **Database** | New columns on `public.organizations` for Connect id, aggregate status, capability flags, requirements JSON arrays, last sync time. New table `public.blitzpay_stripe_webhook_events` for idempotency (mirrors `stripe_webhook_events` pattern). |
+| **Database** | New columns on `public.organizations` for Connect id, aggregate status, capability flags, requirements JSON arrays, last sync time, plus **onboarding diagnostics** (last attempt / failure / error category / Stripe request id). New table `public.blitzpay_stripe_webhook_events` for idempotency (mirrors `stripe_webhook_events` pattern). |
 | **Server helpers** | `lib/blitzpay/access.ts` (owner/admin + platform admin gate), `lib/blitzpay/map-account.ts` (Stripe Account → org columns), `lib/blitzpay/connect-stripe.ts` (Express create, retrieve, Account Link), `lib/blitzpay/org-write-client.ts` (JWT vs service role for org updates). |
 | **API routes** | `GET/POST` under `/api/organizations/[organizationId]/blitzpay/…` — see below. |
 | **Webhook** | `POST /api/blitzpay/webhook` — signature with `STRIPE_BLITZPAY_WEBHOOK_SECRET`, handles `account.updated` only. |
@@ -40,6 +40,17 @@ Phase 1 adds **organization-level Stripe Connect Express** account creation, **A
 | `stripe_details_submitted` | boolean default false | From Stripe Account |
 | `stripe_requirements_*` | jsonb default `[]` | `currently_due`, `eventually_due`, `past_due` |
 | `last_stripe_connect_sync_at` | timestamptz nullable | Set on sync + webhook update |
+| `blitzpay_last_onboarding_attempt_at` | timestamptz nullable | Set on each Connect onboarding API attempt (success path clears failure fields); migration `20260910160000_blitzpay_onboarding_diagnostics.sql` |
+| `blitzpay_last_onboarding_failure_at` | timestamptz nullable | When the last categorized Stripe/API failure occurred |
+| `blitzpay_last_onboarding_error_category` | text nullable | Normalized code (e.g. `connect_rate_limited`); not raw Stripe text |
+| `blitzpay_last_stripe_request_id` | text nullable | Stripe `req_*` from last failed onboarding call (support correlation) |
+
+**Migrations (BlitzPay on `organizations` — apply in repo order via `supabase db push`):**
+
+1. `20260813100000_blitzpay_connect_phase1.sql` — Connect columns + `blitzpay_stripe_webhook_events`  
+2. `20260910160000_blitzpay_onboarding_diagnostics.sql` — columns above + partial index on `blitzpay_last_onboarding_failure_at`
+
+If PostgREST returns **`blitzpay_last_onboarding_attempt_at` does not exist**, the diagnostics migration has not been applied to that database; run `supabase db push` (or apply the SQL from that file in the SQL editor) against the same project your app uses.
 
 ### Status mapping (heuristic)
 

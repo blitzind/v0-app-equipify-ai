@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 238,
-  sqlMigrations: 151,
+  apiRouteHandlers: 239,
+  sqlMigrations: 153,
   dashboardPages: 60,
   componentsTsx: 254,
-  libTsFiles: 521,
+  libTsFiles: 525,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **238** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **151** |
+| API route handlers (\`app/api/**/route.ts\`) | **239** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **153** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **60** |
 | \`components/**/*.tsx\` | **254** |
-| \`lib/**/*.ts\` | **521** |
+| \`lib/**/*.ts\` | **525** |
 
 ### Vercel crons
 
@@ -167,6 +167,7 @@ organizations/[organizationId]/invoices/[invoiceId]/blitzpay/activity/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/diagnostics/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/blitzpay/refund/route.ts
+organizations/[organizationId]/invoices/[invoiceId]/blitzpay/resend-receipt/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/certificate-release-override/route.ts
 organizations/[organizationId]/invoices/[invoiceId]/quickbooks-sync/route.ts
 organizations/[organizationId]/members/[userId]/avatar/route.ts
