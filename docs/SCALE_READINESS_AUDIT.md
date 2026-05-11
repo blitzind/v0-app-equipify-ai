@@ -161,6 +161,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Refund idempotency:** unique `stripe_refund_id` on `blitzpay_invoice_refunds` plus ledger `(organization_id, entry_type, stripe_object_id)` dedupe replays; ingress still dedupes by `blitzpay_stripe_webhook_events.id`.
 - **Volume:** refund/dispute rows are **low cardinality** per invoice; `blitzpay_webhook_inbox` remains the first place to watch if Stripe retry storms grow — same async-worker note as §8.3.
 
+### 8.5 BlitzPay Phase 2G (merchant controls + fee disclosure + payout visibility)
+
+- Tenant-level fee policy now lives in `blitzpay_org_settings` (pass-through toggle, disclosure copy, percentage snapshot).
+- Staff/portal prepare-pay preview endpoints provide pricing disclosure before redirect, reducing charge-surprise support incidents.
+- Reporting adds estimated Stripe fee / net payout fields; still estimate-based and not a full payout-ledger sync.
+
 ---
 
 ## 9. AI / Usage Scale Risks

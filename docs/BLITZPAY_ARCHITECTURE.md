@@ -1,6 +1,6 @@
 # BlitzPay / Equipify Payments — architecture (Phase 54.3)
 
-Design document for BlitzPay / Connect. **Phase 1** (`docs/BLITZPAY_PHASE_1.md`) implements **Stripe Connect Express onboarding**. **Phases 2A–2E** (`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12) add hosted **Stripe Checkout** for **org invoices** on the **connected account** (staff dashboard + **customer portal**), `application_fee_amount`, webhook-driven `org_invoice_payments`, fee snapshots, ledger rows, **staff refunds**, **dispute visibility**, and **diagnostics** APIs.  
+Design document for BlitzPay / Connect. **Phase 1** (`docs/BLITZPAY_PHASE_1.md`) implements **Stripe Connect Express onboarding**. **Phases 2A–2G** (`docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12) add hosted **Stripe Checkout** for **org invoices** on the **connected account** (staff dashboard + **customer portal**), `application_fee_amount`, webhook-driven `org_invoice_payments`, fee snapshots, ledger rows, **staff refunds**, **dispute visibility**, diagnostics APIs, and merchant controls for convenience-fee disclosure/payout visibility.  
 SaaS subscription billing stays on the existing platform Stripe account and `/api/stripe/webhook` flow (Phases 54.1–54.2) — **unchanged**.
 
 ---
@@ -50,7 +50,7 @@ SaaS subscription billing stays on the existing platform Stripe account and `/ap
 | OAuth + sync | `organization_integration_oauth_tokens`, QuickBooks invoice sync |
 | `lib/integrations/quickbooks/invoice-inbound-reconcile.ts`, `apply-inbound-paid` | When QB shows paid, can **mark Equipify invoice paid**; reconciles with recorded payments |
 
-**Remaining gaps:** Dispute evidence workflow, richer pay failure UX, dedicated analytics dashboards — see `docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12.5 and `docs/BLITZPAY_REMAINING_PHASES_ROADMAP.md`.
+**Remaining gaps:** Dispute evidence workflow, richer payout sync, and dedicated accounting dashboards — see `docs/BLITZPAY_PHASE_2_ARCHITECTURE.md` §12 and `docs/BLITZPAY_REMAINING_PHASES_ROADMAP.md`.
 
 ---
 

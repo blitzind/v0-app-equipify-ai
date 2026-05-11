@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { requireOrgMemberSession } from "@/lib/api/require-org-permission"
 import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+import { fetchBlitzpayOrgReportingSnapshot } from "@/lib/blitzpay/blitzpay-reporting-snapshot"
 
 export const runtime = "nodejs"
 
@@ -54,5 +56,50 @@ export async function GET(
     return NextResponse.json({ error: "query_failed", message: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ organizationId, blitzpay: org ?? {} })
+  const { data: settings } = await supabase
+    .from("blitzpay_org_settings")
+    .select(
+      [
+        "blitzpay_invoice_pay_enabled",
+        "blitzpay_pass_processing_fees_to_customer",
+        "blitzpay_fee_mode",
+        "blitzpay_fee_percentage_snapshot",
+        "blitzpay_fee_cap_cents",
+        "blitzpay_fee_disclosure_copy",
+      ].join(", "),
+    )
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  let reporting: Awaited<ReturnType<typeof fetchBlitzpayOrgReportingSnapshot>> | null = null
+  try {
+    const admin = createServiceRoleSupabaseClient()
+    const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
+    reporting = await fetchBlitzpayOrgReportingSnapshot(admin, organizationId, { sinceIso })
+  } catch {
+    reporting = null
+  }
+
+  const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim() ?? ""
+  const stripeMode = stripeSecret.startsWith("sk_live_") ? "live" : stripeSecret.startsWith("sk_test_") ? "test" : "unknown"
+
+  return NextResponse.json({
+    organizationId,
+    blitzpay: {
+      ...(org ?? {}),
+      settings: settings ?? null,
+      payoutVisibility: reporting
+        ? {
+            estimatedNetPayoutCents: reporting.estimatedNetMerchantPayoutCents,
+            estimatedStripeFeesCents: reporting.estimatedStripeFeesCents,
+            recentOnlinePaymentTotalCents: reporting.grossProcessedVolumeCents,
+            recentRefundedTotalCents: reporting.refundedVolumeCents,
+            payoutStatus: (org as { stripe_payouts_enabled?: boolean | null } | null)?.stripe_payouts_enabled
+              ? "payouts_enabled"
+              : "payouts_not_ready",
+          }
+        : null,
+      stripeMode,
+    },
+  })
 }

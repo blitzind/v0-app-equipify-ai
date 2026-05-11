@@ -8,6 +8,10 @@ export type BlitzpayOrgReportingSnapshot = {
   grossProcessedVolumeCents: number
   refundedVolumeCents: number
   netCollectedCents: number
+  convenienceFeeCollectedCents: number
+  estimatedStripeFeesCents: number
+  refundedFeesCents: number
+  estimatedNetMerchantPayoutCents: number
   onlinePaymentCount: number
   paymentSourceSplit: { customer_portal: number; staff_dashboard: number }
 }
@@ -49,6 +53,9 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     refunded = (data ?? []).reduce((s, r) => s + Math.round(Number((r as { amount_cents: number }).amount_cents)), 0)
   }
 
+  let convenienceFeeCollectedCents = 0
+  let estimatedStripeFeesCents = 0
+  let refundedFeesCents = 0
   let onlinePaymentCount = 0
   {
     let q = admin.from("org_invoice_payments").select("id, reference").eq("organization_id", organizationId)
@@ -56,8 +63,31 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     const { data, error } = await q
     if (error) throw new Error(error.message)
     const rows = (data ?? []) as Array<{ reference?: string | null }>
-    onlinePaymentCount = rows.filter((r) => String(r.reference ?? "").startsWith("blitzpay_pi:")).length
+    const blitzRows = rows.filter((r) => String(r.reference ?? "").startsWith("blitzpay_pi:"))
+    onlinePaymentCount = blitzRows.length
+    if (blitzRows.length > 0) {
+      const piIds = blitzRows
+        .map((r) => String(r.reference ?? ""))
+        .map((ref) => ref.replace(/^blitzpay_pi:/, ""))
+        .filter((id) => id.startsWith("pi_"))
+      if (piIds.length > 0) {
+        const { data: pis, error: piErr } = await admin
+          .from("blitzpay_payment_intents")
+          .select("stripe_payment_intent_id, amount_cents, convenience_fee_cents")
+          .eq("organization_id", organizationId)
+          .in("stripe_payment_intent_id", piIds)
+        if (piErr) throw new Error(piErr.message)
+        for (const p of (pis ?? []) as Array<{ amount_cents: string | number; convenience_fee_cents: string | number }>) {
+          const amt = Math.max(0, Math.round(Number(p.amount_cents)))
+          const conv = Math.max(0, Math.round(Number(p.convenience_fee_cents)))
+          convenienceFeeCollectedCents += conv
+          estimatedStripeFeesCents += Math.round(amt * 0.029) + 30
+        }
+      }
+    }
   }
+
+  refundedFeesCents = Math.min(estimatedStripeFeesCents, Math.round(refunded * 0.029))
 
   let portalCompleted = 0
   let staffCompleted = 0
@@ -82,6 +112,10 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     grossProcessedVolumeCents: gross,
     refundedVolumeCents: refunded,
     netCollectedCents: Math.max(0, gross - refunded),
+    convenienceFeeCollectedCents,
+    estimatedStripeFeesCents,
+    refundedFeesCents,
+    estimatedNetMerchantPayoutCents: Math.max(0, gross - refunded - estimatedStripeFeesCents + refundedFeesCents),
     onlinePaymentCount,
     paymentSourceSplit: {
       customer_portal: portalCompleted,

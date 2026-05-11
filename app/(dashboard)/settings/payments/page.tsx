@@ -27,6 +27,22 @@ type BlitzPayStatusPayload = {
   blitzpay_last_onboarding_failure_at?: string | null
   blitzpay_last_onboarding_error_category?: string | null
   blitzpay_last_stripe_request_id?: string | null
+  settings?: {
+    blitzpay_invoice_pay_enabled?: boolean
+    blitzpay_pass_processing_fees_to_customer?: boolean
+    blitzpay_fee_mode?: "merchant_absorbs" | "customer_pass_through" | "customer_partial_pass_through"
+    blitzpay_fee_percentage_snapshot?: number
+    blitzpay_fee_cap_cents?: number | null
+    blitzpay_fee_disclosure_copy?: string
+  } | null
+  payoutVisibility?: {
+    estimatedNetPayoutCents: number
+    estimatedStripeFeesCents: number
+    recentOnlinePaymentTotalCents: number
+    recentRefundedTotalCents: number
+    payoutStatus: string
+  } | null
+  stripeMode?: "test" | "live" | "unknown"
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -74,6 +90,13 @@ function BlitzPaySettingsPageInner() {
   const [enableBusy, setEnableBusy] = useState(false)
   const [linkBusy, setLinkBusy] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
+  const [saveFeesBusy, setSaveFeesBusy] = useState(false)
+  const [onlinePayEnabled, setOnlinePayEnabled] = useState(false)
+  const [passFees, setPassFees] = useState(false)
+  const [feePct, setFeePct] = useState("2.90")
+  const [feeDisclosure, setFeeDisclosure] = useState(
+    "A processing fee is applied for online card payments.",
+  )
 
   const loadStatus = useCallback(async () => {
     if (!organizationId || orgStatus !== "ready") {
@@ -97,6 +120,15 @@ function BlitzPaySettingsPageInner() {
         return
       }
       setBp((json.blitzpay as BlitzPayStatusPayload) ?? null)
+      const s = (json.blitzpay as BlitzPayStatusPayload | undefined)?.settings
+      if (s) {
+        setOnlinePayEnabled(Boolean(s.blitzpay_invoice_pay_enabled))
+        setPassFees(Boolean(s.blitzpay_pass_processing_fees_to_customer))
+        setFeePct(Number(s.blitzpay_fee_percentage_snapshot ?? 0).toFixed(2))
+        setFeeDisclosure(
+          (s.blitzpay_fee_disclosure_copy ?? "A processing fee is applied for online card payments.").trim(),
+        )
+      }
     } finally {
       setLoading(false)
     }
@@ -199,6 +231,37 @@ function BlitzPaySettingsPageInner() {
     }
   }
 
+  async function handleSaveFeeSettings() {
+    if (!organizationId || !canConfigure) return
+    setSaveFeesBusy(true)
+    try {
+      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/blitzpay/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blitzpay_invoice_pay_enabled: onlinePayEnabled,
+          blitzpay_pass_processing_fees_to_customer: passFees,
+          blitzpay_fee_mode: passFees ? "customer_pass_through" : "merchant_absorbs",
+          blitzpay_fee_percentage_snapshot: Number(feePct),
+          blitzpay_fee_disclosure_copy: feeDisclosure,
+        }),
+      })
+      const j = (await res.json()) as { error?: string; message?: string }
+      if (!res.ok) {
+        toast({
+          variant: "destructive",
+          title: "Could not save fee settings",
+          description: j.message ?? j.error ?? res.statusText,
+        })
+        return
+      }
+      toast({ title: "Fee settings saved" })
+      await loadStatus()
+    } finally {
+      setSaveFeesBusy(false)
+    }
+  }
+
   if (orgStatus !== "ready" || !organizationId) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -293,6 +356,10 @@ function BlitzPaySettingsPageInner() {
                 <dt className="text-muted-foreground text-xs">Last synced</dt>
                 <dd className="font-medium">{formatWhen(bp?.last_stripe_connect_sync_at)}</dd>
               </div>
+              <div>
+                <dt className="text-muted-foreground text-xs">Environment mode</dt>
+                <dd className="font-medium">{bp?.stripeMode === "live" ? "Live mode" : bp?.stripeMode === "test" ? "Test mode" : "Unknown"}</dd>
+              </div>
             </dl>
 
             {(dueNow.length > 0 || duePast.length > 0) && (
@@ -339,6 +406,73 @@ function BlitzPaySettingsPageInner() {
               >
                 {linkBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Continue onboarding
+              </Button>
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-xs font-semibold">Online payments</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={onlinePayEnabled}
+                  onChange={(e) => setOnlinePayEnabled(e.target.checked)}
+                  disabled={!canConfigure || !bp?.stripe_charges_enabled}
+                />
+                Enable BlitzPay hosted checkout
+              </label>
+              {!bp?.stripe_charges_enabled ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Stripe charges must be enabled before online payments can be turned on.
+                </p>
+              ) : null}
+
+              <p className="text-xs font-semibold">Convenience fee settings</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={passFees}
+                  onChange={(e) => setPassFees(e.target.checked)}
+                  disabled={!canConfigure}
+                />
+                Pass processing fee to customer
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs text-muted-foreground">
+                  Fee percent snapshot
+                  <input
+                    className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                    value={feePct}
+                    onChange={(e) => setFeePct(e.target.value)}
+                    disabled={!canConfigure || !passFees}
+                  />
+                </label>
+                <div className="text-xs text-muted-foreground">
+                  Payout visibility (last 30 days)
+                  <p className="mt-1 text-sm text-foreground">
+                    Est. net payout: {bp?.payoutVisibility ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bp.payoutVisibility.estimatedNetPayoutCents / 100) : "—"}
+                  </p>
+                  <p className="text-[11px]">
+                    Online volume: {bp?.payoutVisibility ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bp.payoutVisibility.recentOnlinePaymentTotalCents / 100) : "—"}
+                  </p>
+                </div>
+              </div>
+              <label className="text-xs text-muted-foreground block">
+                Customer disclosure copy
+                <textarea
+                  className="mt-1 min-h-[68px] w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                  value={feeDisclosure}
+                  onChange={(e) => setFeeDisclosure(e.target.value)}
+                  disabled={!canConfigure}
+                />
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                Deposits and payouts are handled by Stripe based on your connected account schedule. Refunds and disputes can affect net deposits.
+              </p>
+              <Button type="button" size="sm" onClick={() => void handleSaveFeeSettings()} disabled={!canConfigure || saveFeesBusy}>
+                {saveFeesBusy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Save fee settings
               </Button>
             </div>
           </div>

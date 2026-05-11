@@ -24,12 +24,29 @@ import { blitzpayInvoicePaymentMetadata } from "@/lib/blitzpay/stripe-metadata"
 import { tryConsumeBlitzpayPreparePaySlots } from "@/lib/blitzpay/blitzpay-rate-limit"
 import { DEFAULT_BLITZPAY_FEE_POLICY_VERSION } from "@/lib/blitzpay/payment-domain"
 import type { BlitzpayInvoicePayChannel } from "@/lib/blitzpay/payment-domain"
+import {
+  computeBlitzpayConvenienceFeePreview,
+  DEFAULT_BLITZPAY_DISCLOSURE_COPY,
+  type BlitzpayConvenienceFeeSettings,
+  type BlitzpayConvenienceFeePreview,
+} from "@/lib/blitzpay/convenience-fees"
 
 export type PrepareBlitzpayInvoicePayResult = {
   url: string
   checkoutSessionId: string
   stripePaymentIntentId: string
   blitzpayPaymentIntentRowId: string
+}
+
+export type BlitzpayCheckoutDisclosurePreview = {
+  invoiceBalanceCents: number
+  convenienceFeeCents: number
+  totalChargeCents: number
+  appliesToCustomer: boolean
+  disclosureCopy: string
+  connectChargesEnabled: boolean
+  connectPayoutsEnabled: boolean
+  connectStatus: string | null
 }
 
 type PrepareBlitzpayInvoiceHostedCheckoutStaffInput = {
@@ -56,6 +73,143 @@ export type PrepareBlitzpayInvoiceHostedCheckoutInput =
 
 function errCode(e: unknown): string {
   return e instanceof Error ? e.message : "prepare_failed"
+}
+
+function convenienceSettingsFromRow(settings: Record<string, unknown>): BlitzpayConvenienceFeeSettings {
+  const disclosure =
+    typeof settings.blitzpay_fee_disclosure_copy === "string" && settings.blitzpay_fee_disclosure_copy.trim().length > 0
+      ? settings.blitzpay_fee_disclosure_copy.trim()
+      : DEFAULT_BLITZPAY_DISCLOSURE_COPY
+  return {
+    passProcessingFeesToCustomer: Boolean(settings.blitzpay_pass_processing_fees_to_customer),
+    feeMode:
+      typeof settings.blitzpay_fee_mode === "string" &&
+      (settings.blitzpay_fee_mode === "customer_pass_through" ||
+        settings.blitzpay_fee_mode === "customer_partial_pass_through")
+        ? settings.blitzpay_fee_mode
+        : "merchant_absorbs",
+    feePercentageSnapshot: Math.max(0, Number(settings.blitzpay_fee_percentage_snapshot ?? 0)),
+    feeCapCents:
+      settings.blitzpay_fee_cap_cents == null ? null : Math.max(0, Math.round(Number(settings.blitzpay_fee_cap_cents))),
+    disclosureCopy: disclosure,
+  }
+}
+
+async function loadPrepareContext(input: PrepareBlitzpayInvoiceHostedCheckoutInput): Promise<
+  | {
+      settings: Record<string, unknown>
+      orgRow: { stripe_connect_account_id?: string | null; stripe_charges_enabled?: boolean; stripe_connect_status?: string | null; stripe_payouts_enabled?: boolean | null }
+      inv: Awaited<ReturnType<typeof loadInvoiceForBlitzpayPay>>
+      paidSum: number
+      balanceDue: number
+    }
+  | { error: { ok: false; status: number; code: string; message: string } }
+> {
+  const { admin, organizationId, invoiceId } = input
+  const settings = await fetchBlitzpayOrgSettingsRow(admin, organizationId)
+  if (!settings || !(settings as { blitzpay_invoice_pay_enabled?: boolean }).blitzpay_invoice_pay_enabled) {
+    return {
+      error: {
+        ok: false,
+        status: 403,
+        code: "org_pay_disabled",
+        message: "BlitzPay online pay is not enabled for this workspace.",
+      },
+    }
+  }
+
+  const { data: orgRow, error: orgErr } = await admin
+    .from("organizations")
+    .select("stripe_connect_account_id, stripe_charges_enabled, stripe_connect_status, stripe_payouts_enabled")
+    .eq("id", organizationId)
+    .maybeSingle()
+
+  if (orgErr || !orgRow) {
+    return { error: { ok: false, status: 500, code: "org_load_failed", message: "Could not load workspace." } }
+  }
+
+  const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
+  const chargesOk = Boolean((orgRow as { stripe_charges_enabled?: boolean }).stripe_charges_enabled)
+  if (!acct || !chargesOk) {
+    return {
+      error: {
+        ok: false,
+        status: 409,
+        code: "connect_not_ready",
+        message: "Stripe Connect is not ready to accept charges. Finish BlitzPay onboarding in Settings → Payments.",
+      },
+    }
+  }
+
+  const inv = await loadInvoiceForBlitzpayPay(admin, organizationId, invoiceId)
+  if (!inv) {
+    return { error: { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." } }
+  }
+  if (input.initiatedBy === "customer_portal" && inv.customer_id !== input.portalCustomerId) {
+    return { error: { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." } }
+  }
+  const paidSum = await sumNetRecordedPaymentsCentsForBlitzpay(admin, organizationId, invoiceId)
+  try {
+    assertInvoicePayableForBlitzpay(inv, paidSum)
+  } catch (e) {
+    const code = errCode(e)
+    const map: Record<string, string> = {
+      invoice_archived: "This invoice is archived.",
+      invoice_not_payable_status: "This invoice cannot be paid online.",
+      invoice_no_balance_due: "There is no balance due for this invoice.",
+    }
+    return {
+      error: {
+        ok: false,
+        status: 409,
+        code,
+        message: map[code] ?? "This invoice cannot be paid online.",
+      },
+    }
+  }
+  const balanceDue = balanceDueCentsForBlitzpay(inv, paidSum)
+  if (balanceDue < 50) {
+    return {
+      error: {
+        ok: false,
+        status: 409,
+        code: "amount_below_minimum",
+        message: "Balance due is below the card minimum (USD 0.50). Record a manual payment instead.",
+      },
+    }
+  }
+
+  return {
+    settings: settings as Record<string, unknown>,
+    orgRow: orgRow as { stripe_connect_account_id?: string | null; stripe_charges_enabled?: boolean; stripe_connect_status?: string | null; stripe_payouts_enabled?: boolean | null },
+    inv,
+    paidSum,
+    balanceDue,
+  }
+}
+
+export async function previewBlitzpayInvoiceHostedCheckout(
+  input: PrepareBlitzpayInvoiceHostedCheckoutInput,
+): Promise<{ ok: true; data: BlitzpayCheckoutDisclosurePreview } | { ok: false; status: number; code: string; message: string }> {
+  if (!isBlitzPayInvoicePayEnabledEnv()) {
+    return { ok: false, status: 403, code: "feature_disabled", message: "BlitzPay invoice pay is not enabled for this deployment." }
+  }
+  const ctx = await loadPrepareContext(input)
+  if ("error" in ctx) return ctx.error
+
+  const pricing = computeBlitzpayConvenienceFeePreview({
+    invoiceBalanceCents: ctx.balanceDue,
+    settings: convenienceSettingsFromRow(ctx.settings),
+  })
+  return {
+    ok: true,
+    data: {
+      ...pricing,
+      connectChargesEnabled: Boolean(ctx.orgRow.stripe_charges_enabled),
+      connectPayoutsEnabled: Boolean(ctx.orgRow.stripe_payouts_enabled),
+      connectStatus: typeof ctx.orgRow.stripe_connect_status === "string" ? ctx.orgRow.stripe_connect_status : null,
+    },
+  }
 }
 
 function buildPreparePayAttemptToken(input: PrepareBlitzpayInvoiceHostedCheckoutInput): string {
@@ -125,72 +279,17 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   }
 
   const settings = await fetchBlitzpayOrgSettingsRow(admin, organizationId)
-  if (!settings || !(settings as { blitzpay_invoice_pay_enabled?: boolean }).blitzpay_invoice_pay_enabled) {
-    return {
-      ok: false,
-      status: 403,
-      code: "org_pay_disabled",
-      message: "BlitzPay online pay is not enabled for this workspace.",
-    }
+  const loaded = await loadPrepareContext(input)
+  if ("error" in loaded) return loaded.error
+  const { orgRow, inv, balanceDue } = loaded
+  if (!settings) {
+    return { ok: false, status: 500, code: "settings_missing", message: "BlitzPay settings are unavailable." }
   }
-
-  const { data: orgRow, error: orgErr } = await admin
-    .from("organizations")
-    .select("stripe_connect_account_id, stripe_charges_enabled, stripe_connect_status")
-    .eq("id", organizationId)
-    .maybeSingle()
-
-  if (orgErr || !orgRow) {
-    return { ok: false, status: 500, code: "org_load_failed", message: "Could not load workspace." }
-  }
-
   const acct = String((orgRow as { stripe_connect_account_id?: string | null }).stripe_connect_account_id ?? "").trim()
-  const chargesOk = Boolean((orgRow as { stripe_charges_enabled?: boolean }).stripe_charges_enabled)
-  if (!acct || !chargesOk) {
-    return {
-      ok: false,
-      status: 409,
-      code: "connect_not_ready",
-      message: "Stripe Connect is not ready to accept charges. Finish BlitzPay onboarding in Settings → Payments.",
-    }
-  }
-
-  const inv = await loadInvoiceForBlitzpayPay(admin, organizationId, invoiceId)
-  if (!inv) {
-    return { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." }
-  }
-
-  if (input.initiatedBy === "customer_portal" && inv.customer_id !== input.portalCustomerId) {
-    return { ok: false, status: 404, code: "invoice_not_found", message: "Invoice not found." }
-  }
-
-  const paidSum = await sumNetRecordedPaymentsCentsForBlitzpay(admin, organizationId, invoiceId)
-  try {
-    assertInvoicePayableForBlitzpay(inv, paidSum)
-  } catch (e) {
-    const code = errCode(e)
-    const map: Record<string, string> = {
-      invoice_archived: "This invoice is archived.",
-      invoice_not_payable_status: "This invoice cannot be paid online.",
-      invoice_no_balance_due: "There is no balance due for this invoice.",
-    }
-    return {
-      ok: false,
-      status: 409,
-      code,
-      message: map[code] ?? "This invoice cannot be paid online.",
-    }
-  }
-
-  const balanceDue = balanceDueCentsForBlitzpay(inv, paidSum)
-  if (balanceDue < 50) {
-    return {
-      ok: false,
-      status: 409,
-      code: "amount_below_minimum",
-      message: "Balance due is below the card minimum (USD 0.50). Record a manual payment instead.",
-    }
-  }
+  const conveniencePreview = computeBlitzpayConvenienceFeePreview({
+    invoiceBalanceCents: balanceDue,
+    settings: convenienceSettingsFromRow(settings as Record<string, unknown>),
+  })
 
   const s = settings as {
     platform_fee_bps: number
@@ -200,11 +299,11 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   }
 
   const feeInputs: BlitzpayFeeInputs = {
-    amountCents: BigInt(balanceDue),
+    amountCents: BigInt(conveniencePreview.totalChargeCents),
     platformFeeBps: Math.max(0, Math.min(10_000, Number(s.platform_fee_bps) || 0)),
     platformFeeFixedCents: Math.max(0, Number(s.platform_fee_fixed_cents) || 0),
-    convenienceFeeBps: s.convenience_fee_bps ?? 0,
-    convenienceFeeFixedCents: s.convenience_fee_fixed_cents ?? 0,
+    convenienceFeeBps: 0,
+    convenienceFeeFixedCents: 0,
   }
 
   let breakdown: ReturnType<typeof computeBlitzpayApplicationFeeBreakdown>
@@ -252,7 +351,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
   try {
     session = await createBlitzpayInvoiceCheckoutSession({
       stripeConnectAccountId: acct,
-      amountCents: balanceDue,
+      amountCents: conveniencePreview.totalChargeCents,
       applicationFeeCents,
       currency: "usd",
       productName,
@@ -293,7 +392,7 @@ export async function prepareBlitzpayInvoiceHostedCheckout(
       amountCents: BigInt(balanceDue),
       currency: "usd",
       applicationFeeCents: breakdown.computedTotalApplicationFeeCents,
-      convenienceFeeCents: 0n,
+      convenienceFeeCents: BigInt(conveniencePreview.convenienceFeeCents),
       invoiceAmountCents: BigInt(balanceDue),
       orgInvoiceId: invoiceId,
       customerId: inv.customer_id,

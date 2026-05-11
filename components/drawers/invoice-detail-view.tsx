@@ -1496,6 +1496,13 @@ function PaymentsTab({
     checkoutSessionTail: string | null
   }
   const [blitzpayActivity, setBlitzpayActivity] = useState<BlitzpayActivityRow[]>([])
+  const [blitzpayPricingPreview, setBlitzpayPricingPreview] = useState<{
+    invoiceBalanceCents: number
+    convenienceFeeCents: number
+    totalChargeCents: number
+    appliesToCustomer: boolean
+    disclosureCopy: string
+  } | null>(null)
   const [blitzpayOutboundEmailConfigured, setBlitzpayOutboundEmailConfigured] = useState(false)
   const [blitzpayActivityErr, setBlitzpayActivityErr] = useState<string | null>(null)
   const [blitzpayActivityLoading, setBlitzpayActivityLoading] = useState(false)
@@ -1600,6 +1607,31 @@ function PaymentsTab({
       cancelled = true
     }
   }, [orgId, invoice.id, invoice.totalPaidCents])
+
+  useEffect(() => {
+    if (!canStartBlitzpayPay || !orgId) {
+      setBlitzpayPricingPreview(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/organizations/${encodeURIComponent(orgId)}/invoices/${encodeURIComponent(invoice.id)}/blitzpay/prepare-pay`,
+          { method: "GET", credentials: "include", cache: "no-store" },
+        )
+        const body = (await res.json()) as { pricing?: typeof blitzpayPricingPreview }
+        if (!cancelled && res.ok) {
+          setBlitzpayPricingPreview((body.pricing ?? null) as typeof blitzpayPricingPreview)
+        }
+      } catch {
+        if (!cancelled) setBlitzpayPricingPreview(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [canStartBlitzpayPay, orgId, invoice.id, balance])
 
   useEffect(() => {
     if (!orgId || !canViewBlitzpayActivity) {
@@ -1879,6 +1911,27 @@ function PaymentsTab({
             <span className="font-mono">BLITZPAY_INVOICE_PAY_ENABLED=true</span> and org BlitzPay pay enabled in
             settings.
           </p>
+          {blitzpayPricingPreview ? (
+            <div className="rounded-md border border-border/80 p-2 space-y-1 text-[10px]">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Invoice balance</span>
+                <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.invoiceBalanceCents / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Processing fee</span>
+                <span className="text-foreground">{fmtCurrency(blitzpayPricingPreview.convenienceFeeCents / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold text-foreground">
+                <span>Total charged</span>
+                <span>{fmtCurrency(blitzpayPricingPreview.totalChargeCents / 100)}</span>
+              </div>
+              <p className="text-muted-foreground">
+                {blitzpayPricingPreview.appliesToCustomer
+                  ? blitzpayPricingPreview.disclosureCopy
+                  : "Merchant is absorbing processing costs for this payment."}
+              </p>
+            </div>
+          ) : null}
           <Button
             type="button"
             variant="secondary"

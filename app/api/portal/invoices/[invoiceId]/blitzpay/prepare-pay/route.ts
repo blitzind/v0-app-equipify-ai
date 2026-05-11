@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { getPublicAppOrigin } from "@/lib/email/config"
-import { prepareBlitzpayInvoiceHostedCheckout } from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
+import {
+  prepareBlitzpayInvoiceHostedCheckout,
+  previewBlitzpayInvoiceHostedCheckout,
+} from "@/lib/blitzpay/blitzpay-prepare-invoice-pay"
 import { blitzpaySchemaDriftIfUnhealthy } from "@/lib/blitzpay/blitzpay-schema-health"
 import { requirePortalSession } from "@/lib/portal/require-portal-session"
 
@@ -63,4 +66,45 @@ export async function POST(
     stripePaymentIntentId: result.data.stripePaymentIntentId,
     blitzpayPaymentIntentRowId: result.data.blitzpayPaymentIntentRowId,
   })
+}
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ invoiceId: string }> },
+) {
+  const portalCtx = await requirePortalSession()
+  if (portalCtx instanceof NextResponse) return portalCtx
+  const { invoiceId } = await context.params
+  if (!UUID_RE.test(invoiceId)) {
+    return NextResponse.json({ error: "invalid_request", message: "Invalid invoice id." }, { status: 400 })
+  }
+  const organizationId = portalCtx.portalUser.organization_id
+  const portalUserId = portalCtx.portalUser.id
+  const portalCustomerId = portalCtx.portalUser.customer_id
+
+  let admin: ReturnType<typeof createServiceRoleSupabaseClient>
+  try {
+    admin = createServiceRoleSupabaseClient()
+  } catch {
+    return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
+  }
+  const drift = await blitzpaySchemaDriftIfUnhealthy(
+    admin,
+    "GET /api/portal/invoices/[invoiceId]/blitzpay/prepare-pay",
+  )
+  if (drift) return drift
+
+  const preview = await previewBlitzpayInvoiceHostedCheckout({
+    admin,
+    organizationId,
+    invoiceId,
+    initiatedBy: "customer_portal",
+    portalUserId,
+    portalCustomerId,
+    returnUrls: { successUrl: "", cancelUrl: "" },
+  })
+  if (!preview.ok) {
+    return NextResponse.json({ error: preview.code, message: preview.message }, { status: preview.status })
+  }
+  return NextResponse.json({ pricing: preview.data })
 }

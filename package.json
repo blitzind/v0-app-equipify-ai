@@ -20,7 +20,8 @@
     "test:blitzpay-schema-health": "tsx scripts/test-blitzpay-schema-health.ts",
     "ai:evals": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/run-ai-evals.ts",
     "seed:demo-precision": "node scripts/seed-precision-biomedical-demo.cjs",
-    "update:master-context": "tsx scripts/update-master-context.ts"
+    "update:master-context": "tsx scripts/update-master-context.ts",
+    "test:blitzpay-phase-2g": "tsx scripts/test-blitzpay-phase-2g.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

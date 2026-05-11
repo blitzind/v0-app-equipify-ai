@@ -53,6 +53,14 @@ type PortalBlitzpayHostedCheckoutPayload = {
   unavailableReason: "feature_disabled" | "org_disabled" | "connect_not_ready" | null
 }
 
+type BlitzpayPricingPreview = {
+  invoiceBalanceCents: number
+  convenienceFeeCents: number
+  totalChargeCents: number
+  appliesToCustomer: boolean
+  disclosureCopy: string
+}
+
 type PortalPaymentHistoryItem = {
   paidOn: string
   amountCents: number
@@ -123,6 +131,7 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
   const [confirmPollExhausted, setConfirmPollExhausted] = useState(false)
   const [prepareError, setPrepareError] = useState<string | null>(null)
   const [blitzpayBusy, setBlitzpayBusy] = useState(false)
+  const [pricing, setPricing] = useState<BlitzpayPricingPreview | null>(null)
 
   useEffect(() => {
     const b = searchParams.get("blitzpay")
@@ -183,6 +192,23 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
       .catch((e) =>
         setError(e instanceof Error && e.message === "not_found" ? "Invoice not found." : "This invoice could not be loaded."),
       )
+  }, [invoiceId])
+
+  useEffect(() => {
+    fetch(`/api/portal/invoices/${encodeURIComponent(invoiceId)}/blitzpay/prepare-pay`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(async (r) => {
+        const j = (await r.json()) as { pricing?: BlitzpayPricingPreview }
+        if (!r.ok || !j.pricing) return null
+        return j.pricing
+      })
+      .then((p) => {
+        if (p) setPricing(p)
+      })
+      .catch(() => {})
   }, [invoiceId])
 
   if (error) {
@@ -526,6 +552,27 @@ function PortalInvoiceDetailPageInner({ params }: { params: Promise<{ invoiceId:
             Secure card payment through Stripe Checkout on your service provider&apos;s connected account. Final
             confirmation may take a moment after you return from Stripe.
           </p>
+          {pricing ? (
+            <div className="rounded-md border px-3 py-2 text-xs space-y-1" style={{ borderColor: "var(--portal-border-light)" }}>
+              <div className="flex items-center justify-between">
+                <span style={{ color: "var(--portal-nav-text)" }}>Invoice balance</span>
+                <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.invoiceBalanceCents)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span style={{ color: "var(--portal-nav-text)" }}>Processing fee</span>
+                <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.convenienceFeeCents)}</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold">
+                <span style={{ color: "var(--portal-foreground)" }}>Total charged</span>
+                <span style={{ color: "var(--portal-foreground)" }}>{fmtCurrency(pricing.totalChargeCents)}</span>
+              </div>
+              {pricing.appliesToCustomer ? (
+                <p style={{ color: "var(--portal-nav-text)" }}>{pricing.disclosureCopy}</p>
+              ) : (
+                <p style={{ color: "var(--portal-nav-text)" }}>Your service provider is absorbing processing costs for this payment.</p>
+              )}
+            </div>
+          ) : null}
           {fullyPaid ? (
             <p className="text-sm font-medium" style={{ color: "var(--portal-success)" }}>
               This invoice is already paid — no balance is due.
