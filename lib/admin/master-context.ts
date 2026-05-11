@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T16:44:34.469Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-11T16:57:47.601Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -37,6 +37,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Auth:** Supabase Auth sessions; middleware refreshes session; dashboard routes protected; portal uses signed cookie session (\`/portal/*\`).
 - **Billing:** Stripe (checkout + webhooks), plan entitlements and usage limits in app logic.
 - **Deploy:** Vercel (\`vercel.json\` cron schedules). Analytics: Vercel Analytics package present.
+- **Repo validation:** \`pnpm check:tracked-imports\` scans tracked files under \`app/\`, \`components/\`, \`lib/\`, \`hooks/\`, and \`actions/\` for local imports (\`@/\` or relative) that resolve to files on disk but are **not** in the git index — a common cause of Vercel-only "module not found" when a module was never committed. The same check runs automatically as \`prebuild\` before \`pnpm build\`. Implementation: \`scripts/check-tracked-imports.ts\`.
 - **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; Stripe **billing** lives under Settings → Billing (not a generic tenant “Stripe Connect”); marketing **Integrations** catalog uses **Live / Limited / Beta / Planned** labels from \`lib/integrations/catalog-metadata.ts\` — see \`docs/INTEGRATION_CATALOG_INVENTORY.md\`; **no Gmail OAuth** in app code today (\`docs/GMAIL_INTEGRATION.md\`).
 
 ## App Architecture

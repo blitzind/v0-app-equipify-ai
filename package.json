@@ -5,6 +5,8 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "next dev",
+    "check:tracked-imports": "tsx scripts/check-tracked-imports.ts",
+    "prebuild": "pnpm check:tracked-imports",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
