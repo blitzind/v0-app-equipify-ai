@@ -33,6 +33,12 @@ type SeedResult = {
     quotes?: number
     invoices?: number
     purchaseOrders?: number
+    prospects?: number
+    inventoryLocations?: number
+    inventoryStockRows?: number
+    communications?: number
+    aiOpsRecommendations?: number
+    technicianSkillTags?: number
     calibrationTemplates?: number
     calibrationRecords?: number
   }

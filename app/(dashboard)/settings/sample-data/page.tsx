@@ -214,6 +214,18 @@ export default function SampleDataSettingsPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
+            <div className="rounded-md border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">What gets seeded</p>
+              <ul className="mt-2 list-disc pl-5 space-y-1">
+                <li>Customers, contacts, sites, equipment, work orders, and maintenance plans</li>
+                <li>Prospects, quotes, invoices, purchase orders, vendors, catalog lines, and inventory (demo locations + on-hand quantities)</li>
+                <li>Starter calibration templates (full calibration record payloads stay on the rich biomedical profile)</li>
+                <li>Demo technician roster, industry skill-tag options, sample communications, and sample AI Ops cards</li>
+              </ul>
+              <p className="mt-2 text-xs">
+                Equipment categories on seeded assets follow your industry. The separate Equipment types screen still uses lightweight in-app presets for UI demos.
+              </p>
+            </div>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Database className="w-5 h-5 text-primary" />
@@ -284,11 +296,11 @@ export default function SampleDataSettingsPage() {
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
                   This permanently removes demo-only rows for this workspace: customers, equipment, work orders,
-                  maintenance plans, prospects, catalog and inventory (including precision-demo locations under{" "}
-                  <span className="font-mono text-foreground">PBS-SEED-*</span>), sample vendors, quotes and invoices
-                  marked sample, demo communications (including timeline entries tagged in seed metadata), and demo
-                  technician memberships from the importer. Organization profile, subscriptions, non-sample users,
-                  billing, and workspace settings are preserved.
+                  maintenance plans, prospects, catalog and inventory tied to demo location codes, sample vendors,
+                  quotes and invoices marked sample, sample technician skill tags, demo communications on timelines,
+                  sample AI Ops recommendation rows, and demo technician memberships from the importer. Your
+                  organization profile, subscriptions, non-sample users, billing, and workspace settings stay in
+                  place.
                 </p>
                 <div>
                   <label className="block text-xs font-medium text-foreground mb-1">Confirmation phrase</label>

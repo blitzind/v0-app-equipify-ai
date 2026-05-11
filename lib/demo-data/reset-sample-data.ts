@@ -4,13 +4,18 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 const ID_CHUNK = 120
 
-/** Precision biomedical inventory locations from seed-precision-biomedical-demo.cjs */
-const DEMO_INVENTORY_LOCATION_CODE_PREFIX = "PBS-SEED-%"
+/** Precision biomedical inventory locations (legacy script + rich medical seed). */
+const DEMO_INVENTORY_LOCATION_CODE_PREFIX_PBS = "PBS-SEED-%"
+/** Generic industry demo locations from `lib/demo-seeding/industry-sample-packs.ts`. */
+const DEMO_INVENTORY_LOCATION_CODE_PREFIX_EQ = "EQ-DEMO-LOC-%"
 
 export type ResetSampleSummary = {
   organizationInvoices: number
   organizationQuotes: number
   organizationPurchaseOrders: number
+  aiOpsRecommendationEvents: number
+  aiOpsRecommendationLifecycle: number
+  technicianSkillTags: number
   communicationEvents: number
   calibrationRecords: number
   certificateAttachments: number
@@ -97,6 +102,9 @@ export async function resetSampleDataForOrganization(
     organizationInvoices: 0,
     organizationQuotes: 0,
     organizationPurchaseOrders: 0,
+    aiOpsRecommendationEvents: 0,
+    aiOpsRecommendationLifecycle: 0,
+    technicianSkillTags: 0,
     communicationEvents: 0,
     calibrationRecords: 0,
     certificateAttachments: 0,
@@ -131,7 +139,8 @@ export async function resetSampleDataForOrganization(
     { data: quoteRows },
     { data: invoiceRows },
     { data: mpRows },
-    { data: demoLocRows },
+    { data: demoLocRowsPbs },
+    { data: demoLocRowsEq },
     { data: serviceRequestRows },
   ] = await Promise.all([
     admin.from("organization_members").select("user_id").eq("organization_id", organizationId).eq("is_sample", true),
@@ -148,7 +157,12 @@ export async function resetSampleDataForOrganization(
       .from("inventory_locations")
       .select("id")
       .eq("organization_id", organizationId)
-      .like("code", DEMO_INVENTORY_LOCATION_CODE_PREFIX),
+      .like("code", DEMO_INVENTORY_LOCATION_CODE_PREFIX_PBS),
+    admin
+      .from("inventory_locations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .like("code", DEMO_INVENTORY_LOCATION_CODE_PREFIX_EQ),
     admin.from("org_service_requests").select("id").eq("organization_id", organizationId).eq("is_sample", true),
   ])
 
@@ -162,7 +176,11 @@ export async function resetSampleDataForOrganization(
   const sampleQuoteIds = (quoteRows ?? []).map((r) => (r as { id: string }).id)
   const sampleInvoiceIds = (invoiceRows ?? []).map((r) => (r as { id: string }).id)
   const sampleMpIds = (mpRows ?? []).map((r) => (r as { id: string }).id)
-  const demoLocationIds = (demoLocRows ?? []).map((r) => (r as { id: string }).id)
+  const demoLocationIds = [
+    ...new Set(
+      [...(demoLocRowsPbs ?? []), ...(demoLocRowsEq ?? [])].map((r) => (r as { id: string }).id),
+    ),
+  ]
   const sampleServiceRequestIds = (serviceRequestRows ?? []).map((r) => (r as { id: string }).id)
 
   if (sampleUserIds.length > 0) {
@@ -224,6 +242,30 @@ export async function resetSampleDataForOrganization(
     "service_request",
     sampleServiceRequestIds,
   )
+
+  const delAiOpsEv = await admin
+    .from("ai_ops_recommendation_events")
+    .delete()
+    .eq("organization_id", organizationId)
+    .like("recommendation_key", "demo_seed%")
+    .select("id")
+  summary.aiOpsRecommendationEvents = countDeleted(delAiOpsEv)
+
+  const delAiOpsLc = await admin
+    .from("ai_ops_recommendation_lifecycle")
+    .delete()
+    .eq("organization_id", organizationId)
+    .like("recommendation_key", "demo_seed%")
+    .select("id")
+  summary.aiOpsRecommendationLifecycle = countDeleted(delAiOpsLc)
+
+  const delSkillTags = await admin
+    .from("technician_skill_tags")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("is_sample", true)
+    .select("id")
+  summary.technicianSkillTags = countDeleted(delSkillTags)
 
   const delServiceRequests = await admin
     .from("org_service_requests")

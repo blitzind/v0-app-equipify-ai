@@ -5,6 +5,15 @@ import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-clie
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { DEMO_INDUSTRY_PROFILES, type DemoIndustryKey } from "@/lib/demo-seeding/profiles"
 import { getStarterTemplatesForIndustry } from "@/lib/demo-seeding/industry-templates"
+import {
+  contactRolesForIndustry,
+  getCatalogPartTemplates,
+  getSampleModuleTargets,
+  getVendorsForIndustry,
+  siteLabelsForIndustry,
+  slugifySkillTag,
+} from "@/lib/demo-seeding/industry-sample-packs"
+import { PROSPECT_STATUSES } from "@/lib/prospects/types"
 
 export type DemoSeedCounts = {
   customers: number
@@ -18,6 +27,12 @@ export type DemoSeedCounts = {
   quotes: number
   invoices: number
   purchaseOrders: number
+  prospects: number
+  inventoryLocations: number
+  inventoryStockRows: number
+  communications: number
+  aiOpsRecommendations: number
+  technicianSkillTags: number
   calibrationTemplates: number
   calibrationRecords: number
 }
@@ -121,6 +136,7 @@ async function seedTechnicianAuthMembers(params: {
   industry: DemoIndustryKey
   specialties: string[]
   rosterSize: number
+  jobTitles: readonly string[]
 }): Promise<boolean> {
   const admin = createServiceRoleClient()
   if (!admin) return false
@@ -128,7 +144,7 @@ async function seedTechnicianAuthMembers(params: {
   const roster = TECH_ROSTER.slice(0, Math.min(params.rosterSize, TECH_ROSTER.length))
   for (let i = 0; i < roster.length; i += 1) {
     const { fullName, region } = roster[i]!
-    const jobTitle = TECH_JOB_TITLES[i % TECH_JOB_TITLES.length]!
+    const jobTitle = params.jobTitles[i % params.jobTitles.length]!
     const skillsForMember = [
       params.specialties[i % params.specialties.length]!,
       params.specialties[(i + 1) % params.specialties.length]!,
@@ -203,7 +219,7 @@ async function syncOperationalTechnicians(supabase: SupabaseClient, organization
       email: pr?.email ?? null,
       region: typeof m.region === "string" ? m.region : null,
       skills,
-      job_title: typeof m.job_title === "string" ? m.job_title : "Clinical Engineering Technician",
+      job_title: typeof m.job_title === "string" ? m.job_title : "Field service technician",
       availability_status: pick(["Available", "Available", "On Job"], n),
       operational_status: "active",
       is_sample: true,
@@ -261,17 +277,18 @@ function completedAtFor(status: string, i: number): string | null {
 export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<ExecuteDemoSeedResult> {
   const profile = DEMO_INDUSTRY_PROFILES[args.industry]
   const rich = args.industry === "biomedical_medical_equipment"
+  const targets = getSampleModuleTargets(args.industry)
 
   const customerTarget = Math.max(profile.dashboardMetricTargets.customers, rich ? 25 : 20)
   const equipmentTarget = Math.max(profile.dashboardMetricTargets.equipment, rich ? 68 : 50)
   const workOrderTarget = Math.max(profile.dashboardMetricTargets.workOrders, rich ? 150 : 34)
   const planTarget = Math.max(profile.dashboardMetricTargets.maintenancePlans, rich ? 22 : 12)
 
-  const vendorTarget = rich ? 12 : 0
-  const catalogTarget = rich ? 56 : 0
-  const quoteTarget = rich ? 20 : 0
-  const invoiceTarget = rich ? 15 : 0
-  const poTarget = rich ? 12 : 0
+  const vendorTarget = targets.vendors
+  const catalogTarget = targets.catalogItems
+  const quoteTarget = targets.quotes
+  const invoiceTarget = targets.invoices
+  const poTarget = targets.purchaseOrders
   const certTarget = rich ? 48 : 0
 
   const customerRows = Array.from({ length: customerTarget }, (_, i) => ({
@@ -303,15 +320,15 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   if (parentDemoId) {
     const { error: parentNameErr } = await args.supabase
       .from("customers")
-      .update({ company_name: "Demo Regional Medical System (Parent)" })
+      .update({ company_name: `${profile.demoCompanyName} — parent account (sample)` })
       .eq("organization_id", args.organizationId)
       .eq("id", parentDemoId)
     if (parentNameErr) throw new Error(parentNameErr.message)
 
     const childSpecs: Array<{ code: string; name: string }> = [
-      { code: "DEMO-C02", name: "Demo RMS — North Campus" },
-      { code: "DEMO-C03", name: "Demo RMS — South Campus" },
-      { code: "DEMO-C04", name: "Demo RMS — East Imaging Center" },
+      { code: "DEMO-C02", name: `${profile.demoCompanyName} — North site (sample)` },
+      { code: "DEMO-C03", name: `${profile.demoCompanyName} — South site (sample)` },
+      { code: "DEMO-C04", name: `${profile.demoCompanyName} — East campus (sample)` },
     ]
     for (const ch of childSpecs) {
       const cid = customerIndex.get(ch.code)
@@ -410,8 +427,8 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
       ],
       i,
     ),
-    role: pick(["Clinical Engineering", "Facilities", "Imaging Director", "SPD Manager", "Biomed Lead"], i),
-    email: `operations${i + 1}@${profile.industry}.demo`,
+    role: pick(contactRolesForIndustry(args.industry), i),
+    email: `operations${i + 1}@${String(profile.industry).replace(/_/g, "")}.demo`,
     phone: `(209) 555-${String(2100 + i).slice(-4)}`,
     is_primary: true,
   }))
@@ -454,10 +471,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
         : warrantyEnd,
       last_service_at: addDays(new Date(), -(15 + (i % 40))),
       next_due_at: addDays(new Date(), (i % 55) - 18),
-      location_label: pick(
-        ["ICU", "Radiology", "SPD / Sterile Processing", "Infusion Bay", "Emergency", "Lab — Blood Bank", "Oncology Suite"],
-        i,
-      ),
+      location_label: pick(siteLabelsForIndustry(args.industry), i),
       notes:
         underWarrantyNote ?
           "Under OEM warranty — PM aligned with manufacturer IFU; traceable cal stickers current."
@@ -490,13 +504,21 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
     })
   }
 
+  const techJobTitlePool =
+    args.industry === "biomedical_medical_equipment"
+      ? TECH_JOB_TITLES
+      : profile.technicianSpecialties.length > 0
+        ? profile.technicianSpecialties.map((s) => `${s} specialist`)
+        : (["Field service technician", "Installations lead", "Service coordinator"] as const)
+
   const techSeeded = await seedTechnicianAuthMembers({
     supabase: args.supabase,
     organizationId: args.organizationId,
     ownerUserId: args.ownerUserId,
     industry: args.industry,
     specialties: profile.technicianSpecialties,
-    rosterSize: rich ? 12 : 6,
+    rosterSize: rich ? 12 : 8,
+    jobTitles: techJobTitlePool,
   })
 
   const operationalN = techSeeded ? await syncOperationalTechnicians(args.supabase, args.organizationId) : 0
@@ -553,8 +575,8 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
           )
         : null,
       repair_log: {
-        problemReported: "Clinical engineering service request — seeded demo dataset.",
-        diagnosis: "Assessment and documentation per OEM service literature.",
+        problemReported: "Sample service request — workspace demo data for training and screenshots.",
+        diagnosis: "Assessment and documentation aligned to common field-service workflows.",
         partsUsed: [],
         laborHours: 0,
         technicianNotes: "Demo seed entry.",
@@ -617,6 +639,44 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   const { error: mpErr } = await args.supabase.from("maintenance_plans").insert(planRows)
   if (mpErr) throw new Error(mpErr.message)
 
+  let technicianSkillTagsInserted = 0
+  if (targets.skillTags > 0 && profile.technicianSpecialties.length > 0) {
+    const tagRows = profile.technicianSpecialties.slice(0, targets.skillTags).map((name, i) => ({
+      organization_id: args.organizationId,
+      name,
+      slug: `${slugifySkillTag(name)}-${i}`,
+      color: ["#2563eb", "#0891b2", "#d97706", "#0f766e", "#dc2626", "#7c3aed"][i % 6],
+      sort_order: (i + 1) * 10,
+      is_sample: true,
+    }))
+    const { error: tgErr } = await args.supabase.from("technician_skill_tags").insert(tagRows)
+    if (tgErr) throw new Error(tgErr.message)
+    technicianSkillTagsInserted = tagRows.length
+  }
+
+  let prospectsInserted = 0
+  if (targets.prospects > 0) {
+    const prospectRows = Array.from({ length: targets.prospects }, (_, i) => ({
+      organization_id: args.organizationId,
+      company_name: `${pick(profile.customerTypes, i)} — sample lead`,
+      contact_name: pick(
+        ["Alex Rivera", "Jordan Kim", "Priya Shah", "Chris Okonkwo", "Sofia Martinez", "Daniel Cho"],
+        i,
+      ),
+      contact_email: `lead${i + 1}@${String(args.industry).replace(/_/g, "")}-prospect.demo`,
+      contact_phone: `(408) 555-${String(2100 + i).slice(-4)}`,
+      lead_source: "Sample data",
+      status: pick(PROSPECT_STATUSES, i),
+      estimated_value_cents: 25_000 + i * 4_000,
+      notes: "Sample prospect for pipeline demos — not a real sales opportunity.",
+      created_by: args.ownerUserId,
+      is_sample: true,
+    }))
+    const { error: prErr } = await args.supabase.from("prospects").insert(prospectRows)
+    if (prErr) throw new Error(prErr.message)
+    prospectsInserted = targets.prospects
+  }
+
   let calibrationTemplates = 0
   let calibrationRecords = 0
   const templateIds: string[] = []
@@ -667,8 +727,11 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
 
   let vendorsInserted = 0
   const vendorIdByIndex: string[] = []
-  if (rich && vendorTarget > 0) {
-    const vRows = BIOMED_VENDOR_NAMES.slice(0, vendorTarget).map((v, i) => ({
+  const vendorNameById = new Map<string, string>()
+  if (vendorTarget > 0) {
+    const vendorSource =
+      rich ? BIOMED_VENDOR_NAMES.slice(0, vendorTarget) : getVendorsForIndustry(args.industry, vendorTarget)
+    const vRows = vendorSource.map((v, i) => ({
       organization_id: args.organizationId,
       name: v.name,
       email: v.email,
@@ -680,45 +743,58 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
     }))
     const { data: vIns, error: vErr } = await args.supabase.from("org_vendors").insert(vRows).select("id")
     if (vErr) throw new Error(vErr.message)
-    for (const v of vIns ?? []) vendorIdByIndex.push((v as { id: string }).id)
+    for (let vi = 0; vi < (vIns ?? []).length; vi += 1) {
+      const row = vIns![vi] as { id: string }
+      vendorIdByIndex.push(row.id)
+      vendorNameById.set(row.id, vendorSource[vi]!.name)
+    }
     vendorsInserted = vendorIdByIndex.length
   }
 
   let catalogInserted = 0
   const catalogIds: string[] = []
-  if (rich && catalogTarget > 0 && vendorIdByIndex.length > 0) {
-    const catPartNames = [
-      { n: "Sterilizer door gasket kit", t: "part" as const, cat: "Sterilization" },
-      { n: "Infusion pump pole clamp assembly", t: "part" as const, cat: "Infusion" },
-      { n: "Defibrillator battery pack (LiMnO2)", t: "part" as const, cat: "Emergency Care" },
-      { n: "Patient monitor NBP hose & cuff set", t: "accessory" as const, cat: "Patient Monitoring" },
-      { n: "Ultrasound probe lens assembly", t: "part" as const, cat: "Imaging" },
-      { n: "Sterilizer BI test pack (spore)", t: "accessory" as const, cat: "Sterilization" },
-      { n: "Annual electrical safety & performance (SEP)", t: "service" as const, cat: "Compliance" },
-      { n: "Imaging QA phantom session", t: "service" as const, cat: "Imaging QA" },
-      { n: "Centrifuge rotor bucket set", t: "part" as const, cat: "Laboratory" },
-      { n: "Audiometer daily bioacoustic check kit", t: "accessory" as const, cat: "Diagnostics / Audiology" },
-      { n: "Low-temp sterilizer sterilant cassette", t: "part" as const, cat: "Sterilization" },
-      { n: "Infusion dedicated IV set (needle-free)", t: "part" as const, cat: "Infusion" },
-      { n: "Patient monitor SpO₂ finger sensor", t: "accessory" as const, cat: "Patient Monitoring" },
-      { n: "Portable X-ray DR detector tether cable", t: "part" as const, cat: "Imaging" },
-      { n: "ECG acquisition module battery", t: "part" as const, cat: "Diagnostics" },
-      { n: "SPD instrument tray seal gasket", t: "part" as const, cat: "Sterilization" },
-      { n: "Quarterly infusion fleet PM bundle", t: "service" as const, cat: "Infusion" },
-      { n: "Sterilizer chamber leak test service", t: "service" as const, cat: "Sterilization" },
-    ]
+  if (catalogTarget > 0 && vendorIdByIndex.length > 0) {
+    const catPartNames = rich
+      ? [
+          { name: "Sterilizer door gasket kit", itemType: "part" as const, cat: "Sterilization" },
+          { name: "Infusion pump pole clamp assembly", itemType: "part" as const, cat: "Infusion" },
+          { name: "Defibrillator battery pack (LiMnO2)", itemType: "part" as const, cat: "Emergency Care" },
+          { name: "Patient monitor NBP hose & cuff set", itemType: "accessory" as const, cat: "Patient Monitoring" },
+          { name: "Ultrasound probe lens assembly", itemType: "part" as const, cat: "Imaging" },
+          { name: "Sterilizer BI test pack (spore)", itemType: "accessory" as const, cat: "Sterilization" },
+          { name: "Annual electrical safety & performance (SEP)", itemType: "service" as const, cat: "Compliance" },
+          { name: "Imaging QA phantom session", itemType: "service" as const, cat: "Imaging QA" },
+          { name: "Centrifuge rotor bucket set", itemType: "part" as const, cat: "Laboratory" },
+          { name: "Audiometer daily bioacoustic check kit", itemType: "accessory" as const, cat: "Diagnostics / Audiology" },
+          { name: "Low-temp sterilizer sterilant cassette", itemType: "part" as const, cat: "Sterilization" },
+          { name: "Infusion dedicated IV set (needle-free)", itemType: "part" as const, cat: "Infusion" },
+          { name: "Patient monitor SpO₂ finger sensor", itemType: "accessory" as const, cat: "Patient Monitoring" },
+          { name: "Portable X-ray DR detector tether cable", itemType: "part" as const, cat: "Imaging" },
+          { name: "ECG acquisition module battery", itemType: "part" as const, cat: "Diagnostics" },
+          { name: "SPD instrument tray seal gasket", itemType: "part" as const, cat: "Sterilization" },
+          { name: "Quarterly infusion fleet PM bundle", itemType: "service" as const, cat: "Infusion" },
+          { name: "Sterilizer chamber leak test service", itemType: "service" as const, cat: "Sterilization" },
+        ]
+      : null
+    const catalogIndustryParts = rich ? null : getCatalogPartTemplates(profile, args.industry, catalogTarget)
     const catRows = Array.from({ length: catalogTarget }, (_, i) => {
-      const part = pick(catPartNames, i)
+      const part = rich ? pick(catPartNames!, i) : catalogIndustryParts![i]!
+      const mfr = pick(
+        profile.equipmentAssetTypes.map((e) => e.manufacturer),
+        i,
+      )
+      const partNoPrefix = rich ? "PBS-PART" : "DEMO-PART"
+      const skuPrefix = rich ? "PBS-SKU" : "DEMO-SKU"
       return {
         organization_id: args.organizationId,
         vendor_id: pick(vendorIdByIndex, i),
-        manufacturer_name: pick(["STERIS", "BD", "Philips", "GE HealthCare", "ZOLL", "Mindray"], i),
+        manufacturer_name: mfr,
         category: part.cat,
-        item_type: part.t,
-        part_number: `PBS-PART-${String(i + 1).padStart(4, "0")}`,
-        sku: `PBS-SKU-${String(i + 1).padStart(4, "0")}`,
-        name: part.n,
-        description: "Precision Biomedical demo catalog line.",
+        item_type: part.itemType,
+        part_number: `${partNoPrefix}-${String(i + 1).padStart(4, "0")}`,
+        sku: `${skuPrefix}-${String(i + 1).padStart(4, "0")}`,
+        name: part.name,
+        description: `${profile.demoCompanyName} — sample catalog line for demos.`,
         list_price: 120 + (i % 50) * 7,
         sale_price: 110 + (i % 50) * 6,
         unit: "ea",
@@ -734,9 +810,14 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   }
 
   let quotesInserted = 0
-  if (rich && quoteTarget > 0 && insertedWOs && insertedWOs.length > 0) {
+  if (quoteTarget > 0 && insertedWOs && insertedWOs.length > 0) {
     const quoteStatuses = ["draft", "draft", "sent", "sent", "approved", "declined", "pending_approval", "expired"] as const
     const custIds = customerRows.map((c) => customerIndex.get(c.external_code)!)
+    const quoteTitlePool = [
+      ...profile.workOrderTitleExamples.slice(0, Math.min(8, profile.workOrderTitleExamples.length)),
+      "Preventive maintenance bundle (sample quote)",
+      "Emergency dispatch estimate (sample)",
+    ]
     const qRows = Array.from({ length: quoteTarget }, (_, i) => {
       const cid = pick(custIds, i)
       const eid = equipmentIndex.get(`DEMO-E${String((i % equipmentTarget) + 1).padStart(3, "0")}`)!.id
@@ -749,15 +830,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
         work_order_id: woLink,
         seed_key: `demo-import-qt-${String(i + 1).padStart(5, "0")}`,
         quote_number: `Q-DEMO-${String(i + 1).padStart(4, "0")}`,
-        title: pick(
-          [
-            "Sterilizer temperature uniformity study",
-            "Infusion pump fleet PM",
-            "Imaging QA & calibration visit",
-            "Monitor alarm verification",
-          ],
-          i,
-        ),
+        title: pick(quoteTitlePool, i),
         amount_cents: amt,
         status: pick(quoteStatuses, i),
         expires_at: addDays(new Date(), 10 + (i % 40)),
@@ -765,7 +838,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
           { description: "Labor — clinical engineering", qty: 1, unit: amt / 100 / 2 },
           { description: "Parts / consumables", qty: 1, unit: amt / 100 / 2 },
         ],
-        notes: "Hospital-approved scope — demo quote.",
+        notes: "Sample quote for workspace demos — not a customer-facing proposal.",
         created_by: args.ownerUserId,
         is_sample: true,
       }
@@ -776,7 +849,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   }
 
   let invoicesInserted = 0
-  if (rich && invoiceTarget > 0 && insertedWOs && insertedWOs.length > 0) {
+  if (invoiceTarget > 0 && insertedWOs && insertedWOs.length > 0) {
     const invStatuses = ["draft", "sent", "unpaid", "paid", "overdue", "paid", "sent", "overdue", "void"] as const
     const custIds = customerRows.map((c) => customerIndex.get(c.external_code)!)
     const invRows = Array.from({ length: invoiceTarget }, (_, i) => {
@@ -802,13 +875,16 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
         work_order_id: wo?.id ?? null,
         seed_key: `demo-import-inv-${String(i + 1).padStart(5, "0")}`,
         invoice_number: `I-DEMO-${String(i + 1).padStart(4, "0")}`,
-        title: pick(["Field service invoice", "Preventive maintenance billing", "Calibration services"], i),
+        title: pick(
+          ["Field service invoice (sample)", "Preventive maintenance billing (sample)", "Quoted services (sample)"],
+          i,
+        ),
         amount_cents: amt,
         status: st,
         issued_at: issued,
         due_date: due,
         paid_at: paidAt,
-        line_items: [{ description: "Biomedical field labor & travel", qty: 1, unit: amt / 100 }],
+        line_items: [{ description: "Field labor & materials (sample)", qty: 1, unit: amt / 100 }],
         notes: "Demo AR row — not a real bill.",
         created_by: args.ownerUserId,
         is_sample: true,
@@ -820,11 +896,11 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
   }
 
   let posInserted = 0
-  if (rich && poTarget > 0 && vendorIdByIndex.length > 0 && catalogIds.length > 0 && insertedWOs && insertedWOs.length > 0) {
+  if (poTarget > 0 && vendorIdByIndex.length > 0 && catalogIds.length > 0 && insertedWOs && insertedWOs.length > 0) {
     const poStatuses = ["draft", "sent", "approved", "ordered", "partially_received", "received", "closed"] as const
     const poRows = Array.from({ length: poTarget }, (_, i) => {
       const vid = pick(vendorIdByIndex, i)
-      const vname = BIOMED_VENDOR_NAMES[i % BIOMED_VENDOR_NAMES.length]!.name
+      const vname = vendorNameById.get(vid) ?? "Sample vendor"
       const cid = pick(customerRows.map((c) => customerIndex.get(c.external_code)!), i)
       const eid = equipmentIndex.get(`DEMO-E${String((i % equipmentTarget) + 1).padStart(3, "0")}`)!.id
       const woid = (insertedWOs as { id: string }[])[i % insertedWOs.length]!.id
@@ -868,7 +944,7 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
             lineTotalCents: lt3,
           },
         ],
-        notes: "Demo PO — SPD restock.",
+        notes: "Sample purchase order for inventory demos — not a live vendor order.",
         customer_id: cid,
         equipment_id: eid,
         work_order_id: woid,
@@ -878,6 +954,121 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
     const { error: poErr } = await args.supabase.from("org_purchase_orders").insert(poRows)
     if (poErr) throw new Error(poErr.message)
     posInserted = poTarget
+  }
+
+  let inventoryLocationsInserted = 0
+  let inventoryStockRowsInserted = 0
+  if (targets.inventoryLocations > 0 && catalogIds.length > 0) {
+    const locSpecs =
+      targets.inventoryLocations >= 3
+        ? [
+            { code: "EQ-DEMO-LOC-WH1", name: "Main warehouse (sample)", location_type: "warehouse" as const },
+            { code: "EQ-DEMO-LOC-VAN1", name: "Service van 1 (sample)", location_type: "vehicle" as const },
+            { code: "EQ-DEMO-LOC-STG", name: "Staging / returns (sample)", location_type: "staging" as const },
+          ]
+        : [
+            { code: "EQ-DEMO-LOC-WH1", name: "Main warehouse (sample)", location_type: "warehouse" as const },
+            { code: "EQ-DEMO-LOC-VAN1", name: "Service van 1 (sample)", location_type: "vehicle" as const },
+          ]
+    const locSlice = locSpecs.slice(0, targets.inventoryLocations)
+    const { data: locIns, error: locErr } = await args.supabase
+      .from("inventory_locations")
+      .insert(
+        locSlice.map((l) => ({
+          organization_id: args.organizationId,
+          code: l.code,
+          name: l.name,
+          location_type: l.location_type,
+          is_active: true,
+        })),
+      )
+      .select("id, code")
+    if (locErr) throw new Error(locErr.message)
+    inventoryLocationsInserted = locIns?.length ?? 0
+    const whId =
+      (locIns ?? []).find((r) => (r as { code: string }).code === "EQ-DEMO-LOC-WH1")?.id ??
+      (locIns?.[0] as { id: string } | undefined)?.id
+    if (whId) {
+      const stockSlice = catalogIds.slice(0, Math.min(12, catalogIds.length))
+      const stockRows = stockSlice.map((catalog_item_id, i) => {
+        const onHand = 3 + (i % 6)
+        const alloc = i % 5 === 0 ? 1 : 0
+        return {
+          organization_id: args.organizationId,
+          catalog_item_id,
+          location_id: whId,
+          quantity_on_hand: onHand,
+          quantity_allocated: Math.min(alloc, onHand),
+        }
+      })
+      if (stockRows.length > 0) {
+        const { error: stErr } = await args.supabase.from("inventory_stock").insert(stockRows)
+        if (stErr) throw new Error(stErr.message)
+        inventoryStockRowsInserted = stockRows.length
+      }
+    }
+  }
+
+  let communicationsInserted = 0
+  if (targets.communications > 0 && insertedWOs && insertedWOs.length > 0) {
+    const woPick = insertedWOs as { id: string; customer_id: string }[]
+    const commRows = Array.from({ length: targets.communications }, (_, i) => {
+      const wo = woPick[i % woPick.length]!
+      return {
+        organization_id: args.organizationId,
+        channel: "email",
+        direction: "outbound",
+        event_type: "sample_demo_thread",
+        title: "Sample customer update",
+        summary: "Seeded thread for onboarding — not sent to a real inbox.",
+        audience: "customer_timeline",
+        counts_toward_unread: false,
+        delivery_status: "delivered",
+        recipient_kind: "customer",
+        recipient_customer_id: wo.customer_id,
+        related_entity_type: "work_order",
+        related_entity_id: wo.id,
+        provider: "manual",
+        metadata: { equipify_demo_seed: true },
+        created_by: args.ownerUserId,
+        sent_at: new Date().toISOString(),
+      }
+    })
+    const { error: cmErr } = await args.supabase.from("communication_events").insert(commRows)
+    if (cmErr) throw new Error(cmErr.message)
+    communicationsInserted = commRows.length
+  }
+
+  let aiOpsRecommendationsInserted = 0
+  if (targets.aiOpsRecommendations > 0) {
+    const baseKeys = [
+      "demo_seed_pm_backlog",
+      "demo_seed_stock_risk",
+      "demo_seed_dispatch_density",
+      "demo_seed_invoice_touch",
+    ]
+    const lcRows = Array.from({ length: targets.aiOpsRecommendations }, (_, i) => ({
+      organization_id: args.organizationId,
+      recommendation_key: `${baseKeys[i % baseKeys.length]}_${i}`,
+      category: "Operations",
+      state: pick(["pending", "acknowledged", "in_progress"], i),
+      notes: "Sample AI Ops recommendation — illustrative only.",
+      updated_by: args.ownerUserId,
+    }))
+    const { error: lcErr } = await args.supabase.from("ai_ops_recommendation_lifecycle").insert(lcRows)
+    if (lcErr) throw new Error(lcErr.message)
+    const evRows = lcRows.map((row) => ({
+      organization_id: args.organizationId,
+      recommendation_key: row.recommendation_key,
+      category: row.category,
+      event_type: "seed_snapshot",
+      actor_user_id: args.ownerUserId,
+      outcome: "shown",
+      metadata: { equipify_demo_seed: true },
+    }))
+    const { error: evErr2 } = await args.supabase.from("ai_ops_recommendation_events").insert(evRows)
+    if (evErr2) throw new Error(evErr2.message)
+    aiOpsRecommendationsInserted = lcRows.length
   }
 
   try {
@@ -904,13 +1095,19 @@ export async function executeDemoSeed(args: ExecuteDemoSeedArgs): Promise<Execut
       equipment: equipmentTarget,
       workOrders: workOrderTarget,
       maintenancePlans: planTarget,
-      technicians: rich ? 12 : 6,
+      technicians: rich ? 12 : 8,
       techniciansOperational: operationalN,
       vendors: vendorsInserted,
       catalogItems: catalogInserted,
       quotes: quotesInserted,
       invoices: invoicesInserted,
       purchaseOrders: posInserted,
+      prospects: prospectsInserted,
+      inventoryLocations: inventoryLocationsInserted,
+      inventoryStockRows: inventoryStockRowsInserted,
+      communications: communicationsInserted,
+      aiOpsRecommendations: aiOpsRecommendationsInserted,
+      technicianSkillTags: technicianSkillTagsInserted,
       calibrationTemplates,
       calibrationRecords,
     },
