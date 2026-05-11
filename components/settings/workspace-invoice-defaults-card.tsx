@@ -189,11 +189,11 @@ export function WorkspaceInvoiceDefaultsCard({
                 disabled={!canEdit || schemaPending || saving || !dirty}
                 onClick={() => void handleSave()}
               >
-                {saving ? "Saving…" : dirty ? "Save default" : "Saved"}
+                {saving ? "Saving…" : dirty ? "Save default" : "No changes to save"}
               </Button>
               {!canEdit ? (
                 <p className="text-[11px] text-muted-foreground">
-                  Owners and admins can change this.
+                  Workspace owners and admins with billing access can change this.
                 </p>
               ) : null}
             </div>

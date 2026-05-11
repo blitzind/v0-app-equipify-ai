@@ -257,6 +257,9 @@ function BillingPageContent() {
   const { workspace, dispatch, workspaceUsers } = useTenant()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const orgPermissions = useOrgPermissions()
+  /** `useOrgPermissions()` exposes capabilities via `.has()` / `.permissions`, not top-level flags. */
+  const canEditOrgInvoiceDefaults =
+    orgPermissions.status === "ready" && orgPermissions.has("canEditOrgBilling")
 
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(workspace.billingCycle)
   const [checkoutBusy, setCheckoutBusy] = useState(false)
@@ -607,7 +610,7 @@ function BillingPageContent() {
             <div className="rounded-lg border border-[color:var(--ds-info-border)] bg-[color:var(--ds-info-bg)] px-4 py-3 mb-4 space-y-2">
               <p className="text-sm font-semibold text-foreground">Billing setup</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{MISSING_SUBSCRIPTION_BILLING_NOTE}</p>
-              {orgPermissions.canEditOrgBilling && (
+              {canEditOrgInvoiceDefaults && (
                 <Button type="button" variant="outline" size="sm" className="mt-1" onClick={jumpToPlanComparison}>
                   Choose a plan
                 </Button>
@@ -1292,7 +1295,7 @@ function BillingPageContent() {
       {/* ── Workspace operational: customer invoice payment defaults (Invoicing Phase 3) ── */}
       <WorkspaceInvoiceDefaultsCard
         organizationId={orgStatus === "ready" ? organizationId : null}
-        canEdit={orgPermissions.canEditOrgBilling}
+        canEdit={canEditOrgInvoiceDefaults}
       />
 
       {setupOpen && (
