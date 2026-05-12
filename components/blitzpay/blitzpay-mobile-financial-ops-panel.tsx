@@ -209,7 +209,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Offline / queued intents</p>
           <ul className="space-y-1.5 text-sm max-h-48 overflow-y-auto pr-1">
             {intents.length === 0 ? (
-              <li className="text-muted-foreground text-xs">No intents in the current sample.</li>
+              <li className="text-muted-foreground text-xs">
+                No field intents in the recent bounded window — new captures appear here after mobile sync.
+              </li>
             ) : (
               intents.map((it) => (
                 <li key={it.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
@@ -233,7 +235,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Signature authorizations</p>
           <ul className="space-y-1.5 text-sm max-h-48 overflow-y-auto pr-1">
             {signatures.length === 0 ? (
-              <li className="text-muted-foreground text-xs">No authorizations in the current sample.</li>
+              <li className="text-muted-foreground text-xs">
+                No signature authorizations in the recent window — completed authorizations list here once recorded.
+              </li>
             ) : (
               signatures.map((s) => (
                 <li key={s.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
@@ -252,7 +256,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payroll approval queue</p>
           <ul className="space-y-1.5 text-sm max-h-40 overflow-y-auto pr-1">
             {payroll.length === 0 ? (
-              <li className="text-muted-foreground text-xs">No payroll approval rows in the current sample.</li>
+              <li className="text-muted-foreground text-xs">
+                Payroll approvals will list here when items are queued for field or manager sign-off.
+              </li>
             ) : (
               payroll.map((r) => (
                 <li key={r.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
@@ -271,7 +277,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sync health</p>
           <ul className="space-y-1.5 text-sm max-h-40 overflow-y-auto pr-1">
             {syncBatches.length === 0 ? (
-              <li className="text-muted-foreground text-xs">No sync batches in the current sample.</li>
+              <li className="text-muted-foreground text-xs">
+                No sync batches in the recent window — batches appear as technicians upload offline work.
+              </li>
             ) : (
               syncBatches.map((b) => (
                 <li key={b.id} className="rounded-md border border-border/60 px-2 py-1.5 text-xs min-w-0 break-words">
@@ -291,7 +299,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
       <div className="space-y-2 min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Field treasury summary (bands)</p>
         {treasury.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No treasury snapshots in the current sample.</p>
+          <p className="text-xs text-muted-foreground">
+            No field treasury band snapshots yet — summaries populate when mobile treasury capture runs for the org.
+          </p>
         ) : (
           <ul className="space-y-1 text-sm">
             {treasury.map((row, idx) => (

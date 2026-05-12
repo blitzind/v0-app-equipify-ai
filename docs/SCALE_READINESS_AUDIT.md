@@ -271,6 +271,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Platform observability rollup:** explicit caps `BLITZPAY_PLATFORM_OBSERVABILITY_QUEUE_SNAPSHOT_ROW_CAP` / `BLITZPAY_PLATFORM_OBSERVABILITY_MAX_ORGS`.
 - **Regression test:** `pnpm test:blitzpay-phase-7a4-performance`.
 
+### 8.21 BlitzPay Phase 7A.5 (demo data & showcase readiness)
+
+- **Deterministic presets:** `lib/blitzpay/blitzpay-demo-presets.ts` defines bounded archetype bundles, FCC-style showcase snapshots, humanized activity lines, and coherence validation — **in-memory only** in this phase (no large seed payloads, no UUID storms).
+- **Sales posture:** mixed `healthy` / `attention` / `elevated` module tags and staggered reference-day offsets keep demos from reading as uniformly green while staying realistic on totals.
+- **Regression test:** `pnpm test:blitzpay-phase-7a5-demo-data`.
+
 ---
 
 ## 9. AI / Usage Scale Risks

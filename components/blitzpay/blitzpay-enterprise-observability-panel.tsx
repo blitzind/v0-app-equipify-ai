@@ -181,7 +181,9 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent workflows (sample)</p>
               {workflows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No workflow rows in the recent sample.</p>
+                <p className="text-sm text-muted-foreground">
+                  No workflow executions in the recent bounded window — new rows appear as BlitzPay jobs run for this org.
+                </p>
               ) : (
                 <ul className="space-y-2 text-sm">
                   {workflows.slice(0, 12).map((w) => (

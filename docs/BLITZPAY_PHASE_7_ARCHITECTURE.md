@@ -12,7 +12,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - Provide entitlement **definitions** and helpers (`lib/billing/blitzpay-entitlements.ts`) while keeping **all modules enabled** for every tier until product turns gates on.
 - Add FCC **operational readiness** strip (additive JSON + UI) summarizing recursion policy, mobile signal score, replay governance, and a short permission-audit note.
 - Stripe / Connect **readiness notes** and JSON token scanners for QA (`lib/blitzpay/blitzpay-stripe-readiness-guards.ts`).
-- Deterministic **demo metric presets** for believable fixtures (`lib/blitzpay/blitzpay-demo-presets.ts`) — no randomness, no fake PII.
+- Deterministic **demo metric presets** for believable fixtures (`lib/blitzpay/blitzpay-demo-presets.ts`) — no randomness, no fake PII; **Phase 7A.5** expands archetypes, FCC showcase snapshots, activity feeds, and bounded coherence checks for sales-ready narratives (still in-memory; no seed bloat).
 
 **Non-goals**
 
@@ -77,6 +77,7 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - `pnpm test:blitzpay-phase-7a2-entitlements` — `scripts/test-blitzpay-phase-7a2-entitlements.ts` covers catalog uniqueness, enforced vs permissive `canAccessBlitzpayFeature`, plan feature sets, recommended tier, upgrade metadata, commercial category labels, platform-admin classification, and audit snapshots.
 - `pnpm test:blitzpay-phase-7a3-security-hardening` — `scripts/test-blitzpay-phase-7a3-security-hardening.ts` covers payload shaping (observability, idempotency, claims payouts, portal prepare-pay), replay route wiring assertions, platform rollup safe errors, technician intent filtering, and staff `load_failed` JSON shape.
 - `pnpm test:blitzpay-phase-7a4-performance` — `scripts/test-blitzpay-phase-7a4-performance.ts` covers nesting clamp/skip propagation, schema-health probe batching, multi-entity parallel snapshot fetch constant, platform observability rollup caps, FCC duplicate snapshot elimination wiring, and observability list row shaping compactness.
+- `pnpm test:blitzpay-phase-7a5-demo-data` — `scripts/test-blitzpay-phase-7a5-demo-data.ts` covers deterministic demo presets, bounded activity feeds, showcase metric human labels, fixture coherence rules, mixed operational-readiness inputs, and module health tone diversity.
 
 ## 9. Phase 7A.3 — security, permissions & sensitive data audit hardening
 
@@ -102,8 +103,26 @@ Phase 7A is intentionally **not** a feature-expansion release. It hardens operat
 - **FCC UI:** `blitzpay-financial-command-center-panel.tsx` caps rendered checklist lines, risk notes, scorecards, and command-center recommendation bullets to modest fixed maximums (payload unchanged; display-only).
 - **SQL migrations:** none in 7A.4 (no new indexes in this pass; large-window ledger scans remain a documented future risk when `sinceIso` is absent).
 
-## 11. Related documents
+## 11. Phase 7A.5 — demo data, showcase environment & sales readiness
+
+**Intent:** strengthen **sales and demo** storytelling with **deterministic**, **bounded** sample narratives across BlitzPay modules — **without** weakening tenant isolation, **without** fake production PII, **without** uncontrolled randomness, **without** hidden demo-only business logic, **without** changing financial calculations, permissions, or RLS, and **without** giant DB seed payloads.
+
+**Module:** `lib/blitzpay/blitzpay-demo-presets.ts`
+
+- **Org archetypes:** `small_contractor`, `growing_field_service`, `mature_multi_department`, `franchise_style_network` — each maps to a **coherent** operational + FCC-style metric bundle (treasury, AP, payroll signals, mobile and observability rates, procurement and claims exposure, AI and revenue-optimization scores).
+- **Human copy:** `describeBlitzpayDemoOrgArchetype`, `getBlitzpayDemoScenarioCard`, `getBlitzpayDemoActivityFeedLines` — operator language only on exported strings (showcase labels map internal keys through `getBlitzpayDemoShowcaseMetricLabel` and never echo raw key text).
+- **FCC showcase snapshot:** `buildBlitzpayDemoFccShowcaseSnapshot` plus `validateBlitzpayDemoFixtureCoherence` — enforces modest **claims versus AP**, bounded **reference day offsets**, and **integer non-negative** currency fields for believable screenshots.
+- **Operational readiness demo inputs:** `buildBlitzpayDemoOperationalReadinessInputs` feeds the existing `computeBlitzpayOperationalReadinessStrip` for **mixed** comfort scores (not uniformly “green”).
+- **Module health tags:** `getBlitzpayDemoModuleHealthTags` returns a **mix** of `healthy`, `attention`, and `elevated` tones for narrative balance.
+
+**Performance safety:** fixed maxima (`BLITZPAY_DEMO_MAX_ACTIVITY_FEED_LINES`, `BLITZPAY_DEMO_MAX_SCENARIO_BULLETS`, `BLITZPAY_DEMO_MAX_REFERENCE_DAY_OFFSETS`); no UUID generation; no bulk writes — presets are **in-memory** fixtures until an explicit product seed path opts in.
+
+**UI polish (bounded):** clearer **empty-state** copy on mobile financial ops and enterprise observability panels where lists are legitimately empty — still honest about **bounded windows**, not placeholder lorem.
+
+**Regression test:** `pnpm test:blitzpay-phase-7a5-demo-data`.
+
+## 12. Related documents
 
 - [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md)
-- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.20
+- [SCALE_READINESS_AUDIT.md](./SCALE_READINESS_AUDIT.md) §8.18–§8.21
 - [STRIPE_PRODUCTION_READINESS.md](./STRIPE_PRODUCTION_READINESS.md) — BlitzPay Connect supplement
