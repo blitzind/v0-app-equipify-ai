@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense } from "react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { loadStripe } from "@stripe/stripe-js"
@@ -24,7 +24,6 @@ import { getUsageWithLimits, planIdFromSubscriptionRow, type UsageWithLimits } f
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
-import { createPortalSession } from "@/app/actions/stripe"
 import {
   createSetupIntent,
   getSaaSBillingSetupPrefill,
@@ -158,51 +157,63 @@ function flattenZodFieldErrors(
   return out
 }
 
-function SaasCardConfirmStep({
+function SaasSetupCardRowAndSave({
   clientSecret,
   billingValues,
   onSuccess,
+  onValidationFailed,
 }: {
   clientSecret: string
   billingValues: SaasSubscriptionBillingFormValues
   onSuccess: () => void
+  onValidationFailed: (errors: Partial<Record<keyof SaasSubscriptionBillingFormValues, string>>) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const submitLockRef = useRef(false)
   const { toast } = useToast()
 
   async function submit() {
-    if (!stripe || !elements) return
+    if (!stripe || !elements || submitLockRef.current) return
+    const parsed = saasSubscriptionBillingFormSchema.safeParse(billingValues)
+    if (!parsed.success) {
+      onValidationFailed(flattenZodFieldErrors(parsed.error))
+      return
+    }
+    submitLockRef.current = true
     setBusy(true)
     setError(null)
     const cardElement = elements.getElement(CardElement)
     if (!cardElement) {
       setError("Card form is not ready yet. Try again in a moment.")
       setBusy(false)
+      submitLockRef.current = false
       return
     }
-    const sync = await updateSaaSSubscriptionStripeCustomerBilling(billingValues)
+    const sync = await updateSaaSSubscriptionStripeCustomerBilling(parsed.data)
     if (!sync.ok) {
       setBusy(false)
+      submitLockRef.current = false
       setError(sync.error)
       return
     }
     const result = await stripe.confirmCardSetup(clientSecret, {
       payment_method: {
         card: cardElement,
-        billing_details: buildStripeElementsBillingDetails(billingValues),
+        billing_details: buildStripeElementsBillingDetails(parsed.data),
       },
     })
     setBusy(false)
+    submitLockRef.current = false
     if (result.error) {
       setError(safeStripeClientMessage(result.error.message, "Could not save your payment method."))
       return
     }
     toast({
       title: "Payment method saved",
-      description: "Your billing details were applied to Stripe for receipts and verification.",
+      description: "Your billing details will appear on receipts and future subscription payments.",
     })
     onSuccess()
   }
@@ -212,15 +223,12 @@ function SaasCardConfirmStep({
       <div className="rounded-md border border-border px-3 py-2 bg-background min-w-0">
         <CardElement options={{ hidePostalCode: true }} />
       </div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        You can still edit the billing fields above; we send the latest values to Stripe when you save.
-      </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
         <Button
           type="button"
           size="sm"
-          className="min-h-[44px] sm:min-h-8"
+          className="min-h-[44px] sm:min-h-8 w-full sm:w-auto"
           onClick={() => void submit()}
           disabled={busy || !stripe || !elements}
         >
@@ -368,8 +376,6 @@ function BillingPageContent() {
   const [billingLoadError, setBillingLoadError] = useState<string | null>(null)
   const [billingLoading, setBillingLoading] = useState(true)
   const [manageBillingOpen, setManageBillingOpen] = useState(false)
-  const [externalPortalBusy, setExternalPortalBusy] = useState(false)
-  const [portalMessage, setPortalMessage] = useState<string | null>(null)
 
   const [stripeBillingLoading, setStripeBillingLoading] = useState(false)
   const [stripePaymentMethod, setStripePaymentMethod] = useState<StripeBillingPaymentMethod | null>(null)
@@ -378,7 +384,8 @@ function BillingPageContent() {
   const [billingRefreshTick, setBillingRefreshTick] = useState(0)
   const [setupOpen, setSetupOpen] = useState(false)
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null)
-  const [setupBusy, setSetupBusy] = useState(false)
+  const [setupPrefillBusy, setSetupPrefillBusy] = useState(false)
+  const [setupIntentBootstrapping, setSetupIntentBootstrapping] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
   const [setupBillingForm, setSetupBillingForm] = useState<SaasSubscriptionBillingFormValues>(() =>
     emptySaasSubscriptionBillingForm(),
@@ -502,6 +509,7 @@ function BillingPageContent() {
       setStripeInvoices([])
       const lowNoise =
         res.error === "Stripe is not configured." ||
+        res.error === "Saved payment details are not available in this environment." ||
         res.error === "You must be signed in."
       if (!lowNoise) setStripeBillingNote(res.error)
     })()
@@ -589,26 +597,7 @@ function BillingPageContent() {
           : null
 
   function openManageBillingModal() {
-    setPortalMessage(null)
     setManageBillingOpen(true)
-  }
-
-  async function openExternalStripeBillingPortal() {
-    setPortalMessage(null)
-    setExternalPortalBusy(true)
-    try {
-      const { url, error } = await createPortalSession()
-      if (url) {
-        window.location.href = url
-        return
-      }
-      setPortalMessage(
-        error ??
-          "We couldn't open the external billing page. Please try again or contact support.",
-      )
-    } finally {
-      setExternalPortalBusy(false)
-    }
   }
 
   function handleAddPaymentFromManageBilling() {
@@ -630,7 +619,6 @@ function BillingPageContent() {
 
   function handleBillingPrimaryAction() {
     if (!hasStripeCustomer) {
-      setPortalMessage(null)
       jumpToPlanComparison()
       return
     }
@@ -655,7 +643,7 @@ function BillingPageContent() {
         window.location.href = data.url
         return
       }
-      setCheckoutError("Stripe did not return a checkout URL.")
+      setCheckoutError("Could not start checkout. Please try again or contact support.")
     } catch {
       setCheckoutError("Could not start checkout.")
     } finally {
@@ -692,7 +680,7 @@ function BillingPageContent() {
     setSetupBillingFieldErrors({})
     setSetupClientSecret(null)
     setSetupOpen(true)
-    setSetupBusy(true)
+    setSetupPrefillBusy(true)
     const ws = defaultSaasBillingFormFromWorkspace(workspace)
     const pre = await getSaaSBillingSetupPrefill()
     const merged = pre.ok ? mergeStripeCustomerBillingPrefill(ws, pre.stripeOverlay) : ws
@@ -716,25 +704,7 @@ function BillingPageContent() {
       setSetupPrefillKind("none")
     }
     if (!pre.ok) setSetupError(pre.error)
-    setSetupBusy(false)
-  }
-
-  async function handlePrepareSetupIntent() {
-    setSetupError(null)
-    setSetupBillingFieldErrors({})
-    const parsed = saasSubscriptionBillingFormSchema.safeParse(setupBillingForm)
-    if (!parsed.success) {
-      setSetupBillingFieldErrors(flattenZodFieldErrors(parsed.error))
-      return
-    }
-    setSetupBusy(true)
-    const res = await createSetupIntent(parsed.data)
-    setSetupBusy(false)
-    if (!res.clientSecret) {
-      setSetupError(res.error ?? "Could not initialize card setup.")
-      return
-    }
-    setSetupClientSecret(res.clientSecret)
+    setSetupPrefillBusy(false)
   }
 
   function closePaymentSetupModal() {
@@ -744,6 +714,7 @@ function BillingPageContent() {
     setSetupBillingFieldErrors({})
     setSetupBillingForm(emptySaasSubscriptionBillingForm())
     setSetupPrefillKind("none")
+    setSetupIntentBootstrapping(false)
   }
 
   function handleSetupSuccess() {
@@ -751,14 +722,45 @@ function BillingPageContent() {
     setBillingRefreshTick((n) => n + 1)
   }
 
+  const billingFormValidForSetup = useMemo(
+    () => saasSubscriptionBillingFormSchema.safeParse(setupBillingForm).success,
+    [setupBillingForm],
+  )
+
+  useEffect(() => {
+    if (!setupOpen || !hasStripe || setupClientSecret) return
+    const parsed = saasSubscriptionBillingFormSchema.safeParse(setupBillingForm)
+    if (!parsed.success) {
+      setSetupIntentBootstrapping(false)
+      return
+    }
+    let ignore = false
+    const t = window.setTimeout(async () => {
+      setSetupIntentBootstrapping(true)
+      setSetupError(null)
+      const res = await createSetupIntent(parsed.data)
+      if (ignore) {
+        setSetupIntentBootstrapping(false)
+        return
+      }
+      setSetupIntentBootstrapping(false)
+      if (res.clientSecret) {
+        setSetupClientSecret(res.clientSecret)
+      } else if (res.error) {
+        setSetupError(res.error)
+      }
+    }, 450)
+    return () => {
+      ignore = true
+      window.clearTimeout(t)
+    }
+  }, [setupOpen, hasStripe, setupClientSecret, setupBillingForm])
+
   return (
     <div className="flex flex-col gap-6">
       <Dialog
         open={manageBillingOpen}
-        onOpenChange={(open) => {
-          setManageBillingOpen(open)
-          if (!open) setPortalMessage(null)
-        }}
+        onOpenChange={setManageBillingOpen}
       >
         <DialogContent
           showCloseButton
@@ -771,22 +773,12 @@ function BillingPageContent() {
             <DialogHeader className="text-left">
               <DialogTitle className="text-base">Manage billing</DialogTitle>
               <DialogDescription className="text-xs leading-relaxed">
-                Subscription and payment details for this workspace. Changes sync to our payment processor; sensitive
-                identifiers are never shown here.
+                Subscription and payment details for this workspace.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5">
-            {portalMessage && (
-              <div
-                className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-foreground leading-relaxed"
-                role="status"
-              >
-                {portalMessage}
-              </div>
-            )}
-
             <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
               <h4 className="text-xs font-semibold text-foreground">Plan & status</h4>
               <p className="text-sm text-foreground">
@@ -916,30 +908,12 @@ function BillingPageContent() {
               </Button>
               <div className="rounded-md bg-muted/50 px-2.5 py-2 text-[11px] text-muted-foreground leading-snug">
                 Canceling or downgrading your subscription through a self-serve control is not available in this dialog
-                yet.{" "}
-                <span className="font-medium text-foreground/90">This billing action will be available here soon.</span>
+                yet. This billing action will be available here soon.
               </div>
             </section>
           </div>
 
           <div className="flex shrink-0 flex-col gap-3 border-t border-border bg-muted/20 px-5 py-4">
-            <div className="rounded-md border border-border bg-background/80 px-3 py-2.5 space-y-2">
-              <p className="text-[11px] font-medium text-foreground">Advanced billing (external)</p>
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                Only use this if you need an account change we have not moved into Equipify yet. This opens a secure
-                external billing page hosted by our payment processor.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={externalPortalBusy || !hasStripeCustomer}
-                onClick={() => void openExternalStripeBillingPortal()}
-              >
-                {externalPortalBusy ? "Opening…" : "Continue to external billing page"}
-              </Button>
-            </div>
             <p className="text-[10px] text-muted-foreground leading-snug text-center sm:text-left">
               You will be billed by Blitz Industries, Inc., the parent company of Equipify.ai.
             </p>
@@ -951,7 +925,7 @@ function BillingPageContent() {
       <div className="rounded-lg border border-border bg-muted/15 px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">Equipify subscription & account billing</h2>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-          Manage your workspace plan, Stripe payment method, and Equipify subscription invoices. Defaults for{" "}
+          Manage your workspace plan, saved payment method, and Equipify subscription invoices. Defaults for{" "}
           <strong className="font-medium text-foreground/90">customer invoices</strong> you issue in Equipify live under{" "}
           <Link href="/settings/payments" className="text-primary font-medium underline-offset-4 hover:underline">
             Settings → Payments
@@ -1162,10 +1136,10 @@ function BillingPageContent() {
                     variant="ghost"
                     size="sm"
                     className={cn("h-7 text-xs", trialDaysLeft <= 6 && "text-foreground")}
-                    disabled={setupBusy}
+                    disabled={setupPrefillBusy}
                     onClick={() => void openAddCardModal()}
                   >
-                    {setupBusy ? "Loading…" : "Add card (optional)"}
+                    {setupPrefillBusy ? "Loading…" : "Add card (optional)"}
                   </Button>
                 </div>
                 {setupError && <p className="text-xs text-destructive">{setupError}</p>}
@@ -1193,9 +1167,6 @@ function BillingPageContent() {
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Choose a plan to continue after trial. No card required until you choose a plan.
                 </p>
-              )}
-              {hasStripeCustomer && portalMessage && !manageBillingOpen && (
-                <p className="text-xs text-muted-foreground">{portalMessage}</p>
               )}
             </div>
           </div>
@@ -1295,7 +1266,7 @@ function BillingPageContent() {
         </p>
       </div>
 
-      {/* ── Payment method (Stripe) ── */}
+      {/* ── Subscription payment method ── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Payment method</h3>
@@ -1354,17 +1325,16 @@ function BillingPageContent() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
-                        disabled={setupBusy}
+                        disabled={setupPrefillBusy}
                         onClick={() => void openAddCardModal()}
                         className="flex min-h-[44px] items-center justify-center rounded-md border border-primary bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60 sm:h-8 sm:min-h-0"
                       >
-                        {setupBusy ? "Loading…" : "Add payment method"}
+                        {setupPrefillBusy ? "Loading…" : "Add payment method"}
                       </button>
                       <button
                         type="button"
                         disabled={checkoutBusy}
                         onClick={() => {
-                          setPortalMessage(null)
                           jumpToPlanComparison()
                         }}
                         className="flex min-h-[44px] items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60 sm:h-8 sm:min-h-0"
@@ -1376,21 +1346,16 @@ function BillingPageContent() {
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Card setup requires Stripe to be configured for this app (publishable key missing).
+                  Card setup is not available in this environment.
                 </p>
               )}
             </div>
-            {portalMessage && !manageBillingOpen ? (
-              <div
-                className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-foreground leading-relaxed"
-                role="status"
-              >
-                {portalMessage}
-              </div>
-            ) : null}
           </div>
           <p className="text-xs text-muted-foreground mt-4">
             Your card is charged automatically each billing cycle. We accept Visa, Mastercard, American Express, and Discover.
+          </p>
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+            You can add a card on file for your subscription. If you&apos;re still in a trial, this does not charge you immediately.
           </p>
         </div>
       </div>
@@ -1600,7 +1565,7 @@ function BillingPageContent() {
         </div>
       </div>
 
-      {/* ── Invoice history (Stripe) ── */}
+      {/* ── Invoice history ── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <h3 className="text-sm font-semibold text-foreground">Invoice history</h3>
@@ -1727,9 +1692,11 @@ function BillingPageContent() {
               </Button>
             </div>
             <div className="p-4 sm:p-5 space-y-4 overflow-y-auto min-w-0 min-h-0 flex-1">
+              {setupPrefillBusy ? (
+                <p className="text-xs text-muted-foreground">Loading your billing profile…</p>
+              ) : null}
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Add a card on file for when your trial ends. This does not charge you immediately unless your plan
-                requires it at checkout.
+                Enter your billing details and card information below. We&apos;ll use this for future subscription payments and receipts.
               </p>
               {setupError && <p className="text-xs text-destructive">{setupError}</p>}
               {setupPrefillKind === "workspace" && (
@@ -1931,43 +1898,48 @@ function BillingPageContent() {
                 </div>
               </div>
 
-              {!setupClientSecret ? (
-                <div className="space-y-2">
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    First we save your billing contact to Stripe, then you can enter your card on the next step.
-                  </p>
-                  <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                    <Button type="button" variant="outline" size="sm" className="min-h-[44px] sm:min-h-8" onClick={closePaymentSetupModal}>
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="min-h-[44px] sm:min-h-8"
-                      onClick={() => void handlePrepareSetupIntent()}
-                      disabled={setupBusy}
-                    >
-                      {setupBusy ? "Continuing…" : "Save payment method"}
-                    </Button>
-                  </div>
-                </div>
-              ) : hasStripe ? (
-                <div className="space-y-3 min-w-0">
-                  <p className="text-[11px] text-muted-foreground leading-snug">
-                    Enter your card below, then tap <span className="font-medium text-foreground">Save payment method</span>{" "}
-                    again.
-                  </p>
-                  <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
-                    <SaasCardConfirmStep
-                      onSuccess={handleSetupSuccess}
-                      clientSecret={setupClientSecret}
-                      billingValues={setupBillingForm}
-                    />
-                  </Elements>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Stripe is not configured for card setup.</p>
-              )}
+              <div className="space-y-3 min-w-0 border-t border-border pt-4">
+                <h4 className="text-xs font-semibold text-foreground">Card</h4>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Your card details are collected securely. Saving a card here does not charge you by itself.
+                </p>
+                {hasStripe ? (
+                  setupClientSecret ? (
+                    <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+                      <SaasSetupCardRowAndSave
+                        clientSecret={setupClientSecret}
+                        billingValues={setupBillingForm}
+                        onSuccess={handleSetupSuccess}
+                        onValidationFailed={(errs) => setSetupBillingFieldErrors(errs)}
+                      />
+                    </Elements>
+                  ) : (
+                    <div className="flex min-h-[72px] items-center justify-center rounded-md border border-dashed border-border bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground leading-relaxed">
+                      {setupIntentBootstrapping
+                        ? "Preparing secure card field…"
+                        : !billingFormValidForSetup
+                          ? "Complete the required billing fields above to enter your card."
+                          : setupError
+                            ? "Check the message above and adjust your billing details if needed."
+                            : "Preparing secure card field…"}
+                    </div>
+                  )
+                ) : (
+                  <p className="text-xs text-muted-foreground">Card setup is not available in this environment.</p>
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[44px] w-full sm:min-h-8 sm:w-auto"
+                  onClick={closePaymentSetupModal}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>

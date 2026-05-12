@@ -165,7 +165,7 @@ export async function updateSaaSSubscriptionStripeCustomerBilling(
   billing: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!process.env.STRIPE_SECRET_KEY?.trim()) {
-    return { ok: false, error: "Stripe is not configured." }
+    return { ok: false, error: "Payment setup is not available in this environment." }
   }
   const parsed = saasSubscriptionBillingFormSchema.safeParse(billing)
   if (!parsed.success) {
@@ -211,7 +211,11 @@ export async function updateSaaSSubscriptionStripeCustomerBilling(
 
   let stripeCustomerId = normalizeStripeIdColumn(sub.stripe_customer_id)
   if (!stripeCustomerId) {
-    return { ok: false, error: "Could not find a Stripe customer for this workspace yet. Use the first step again." }
+    return {
+      ok: false,
+      error:
+        "Billing profile is not ready yet. Try saving your payment method again, or choose a plan below to finish setup.",
+    }
   }
 
   try {
@@ -228,7 +232,7 @@ export async function createSetupIntent(
   billing: unknown,
 ): Promise<{ clientSecret: string | null; error?: string }> {
   if (!process.env.STRIPE_SECRET_KEY?.trim()) {
-    return { clientSecret: null, error: "Stripe is not configured." }
+    return { clientSecret: null, error: "Payment setup is not available in this environment." }
   }
   const parsed = saasSubscriptionBillingFormSchema.safeParse(billing)
   if (!parsed.success) {
@@ -287,7 +291,9 @@ export async function createSetupIntent(
       })
 
       stripeCustomerId = normalizeStripeIdColumn(customer.id)
-      if (!stripeCustomerId) return { clientSecret: null, error: "Stripe did not return a valid customer id." }
+      if (!stripeCustomerId) {
+        return { clientSecret: null, error: "Could not create a billing profile. Please try again or contact support." }
+      }
 
       const { error: saveCustomerErr } = await admin
         .from("organization_subscriptions")

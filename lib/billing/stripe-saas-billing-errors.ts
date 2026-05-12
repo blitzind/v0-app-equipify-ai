@@ -132,7 +132,7 @@ export function userFacingStripeSaaSBillingError(err: unknown, kind: StripeSaaSB
     return "Billing server is not configured (missing SUPABASE_SERVICE_ROLE_KEY)."
   }
   if (raw.includes("STRIPE_SECRET_KEY")) {
-    return "Stripe is not configured."
+    return "Payment setup is not available in this environment."
   }
 
   return kind === "portal"

@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T15:28:05.984Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T15:44:08.140Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -35,7 +35,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Styling:** Tailwind CSS v4, shadcn-style \`components/ui\`, \`class-variance-authority\`, \`tailwind-merge\`.
 - **Backend / data:** Supabase (PostgreSQL, Row Level Security, Auth, Storage). Server automation uses the **service role** only in trusted Route Handlers and cron jobs — never expose service keys to the client.
 - **Auth:** Supabase Auth sessions; middleware refreshes session; dashboard routes protected; portal uses signed cookie session (\`/portal/*\`).
-- **Billing:** Stripe (checkout + webhooks), plan entitlements and usage limits in app logic. **Settings → Billing** uses an in-app **Manage billing** dialog (plan, status, payment method, invoices, billing contact, add/update card) with optional explicit navigation to the Stripe-hosted portal via \`createPortalSession\`; optional trial **SetupIntent** flow collects billing contact + address (\`app/actions/stripe-setup.ts\`), updates the **Stripe subscription customer** only, and passes \`billing_details\` into \`confirmCardSetup\`; **no** Supabase \`organizations\` profile writes on that path.
+- **Billing:** Stripe (checkout + webhooks), plan entitlements and usage limits in app logic. **Settings → Billing** uses an in-app **Manage billing** dialog (plan, status, payment method, invoices, billing contact, add/update card). **Add payment method** is a single-step billing + card flow: a debounced **SetupIntent** is created when the billing form validates (\`app/actions/stripe-setup.ts\`), then **Elements** collects the card and **confirmCardSetup** runs on **Save payment method**; the subscription billing customer is updated on that path. There is **no** self-serve external billing portal entry point in the dialog (cancel/downgrade copy is “coming soon”). **No** Supabase \`organizations\` profile writes on the setup path.
 - **Deploy:** Vercel (\`vercel.json\` cron schedules). Analytics: Vercel Analytics package present.
 - **Repo validation:** \`pnpm check:tracked-imports\` scans tracked files under \`app/\`, \`components/\`, \`lib/\`, \`hooks/\`, and \`actions/\` for local imports (\`@/\` or relative) that resolve to files on disk but are **not** in the git index — a common cause of Vercel-only "module not found" when a module was never committed. The same check runs automatically as \`prebuild\` before \`pnpm build\`. Implementation: \`scripts/check-tracked-imports.ts\`.
 - **Integrations (product):** QuickBooks Online OAuth + export sync (customers, catalog items, invoices) + optional invoice auto-sync; Stripe **billing** lives under Settings → Billing (not a generic tenant “Stripe Connect”); marketing **Integrations** catalog uses **Live / Limited / Beta / Planned** labels from \`lib/integrations/catalog-metadata.ts\` — see \`docs/INTEGRATION_CATALOG_INVENTORY.md\`; **no Gmail OAuth** in app code today (\`docs/GMAIL_INTEGRATION.md\`).

@@ -41,9 +41,9 @@ The repo also contains **Equipify SaaS subscription billing** on the **platform*
 | Env guards | `lib/billing/stripe-env.ts` — live vs test enforcement (`VERCEL_ENV`, `STRIPE_LIVE_MODE`), publishable key alignment, webhook secret presence helper |
 | Hosted Checkout | `lib/billing/hosted-subscription-checkout.ts` + `app/api/billing/checkout/route.ts` — subscription Checkout with org metadata / `client_reference_id` |
 | Embedded Checkout (optional) | `app/actions/stripe.ts` — `createCheckoutSession` for billing page |
-| Customer Portal (optional fallback) | `app/actions/stripe.ts` — `createPortalSession` — **not** the default UX; `/settings/billing` opens an in-app **Manage billing** dialog first; portal only after explicit user consent in that dialog |
+| Customer Portal (server-only) | `app/actions/stripe.ts` — `createPortalSession` — **not** linked from product UI; `/settings/billing` uses an in-app **Manage billing** dialog |
 | SetupIntent (platform customer PM) | `app/actions/stripe-setup.ts` — attaches PM to **subscription** Stripe customer |
-| Billing UI | `app/(dashboard)/settings/billing/page.tsx` — `loadStripe` / `Elements` / `CardElement` for **Equipify subscription** card setup only |
+| Billing UI | `app/(dashboard)/settings/billing/page.tsx` — `loadStripe` / `Elements` / `CardElement` for **Equipify subscription** card setup; **single-step** billing + card modal |
 | Stripe invoice list (SaaS) | `app/actions/stripe-billing-data.ts` — lists **Stripe Billing** invoices for the org’s `stripe_customer_id`; sanitizes output (no raw Customer object) |
 | Webhook HTTP handler | `app/api/stripe/webhook/route.ts` — raw body, `stripe-signature`, `constructEvent`, service-role Supabase |
 | Webhook idempotency | Insert into `stripe_webhook_events` by Stripe `event.id`; duplicate → 200 `duplicate: true` |

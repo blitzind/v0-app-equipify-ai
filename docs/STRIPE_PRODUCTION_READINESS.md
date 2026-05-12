@@ -52,15 +52,15 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 
 ## Settings → Billing (SaaS subscription customer)
 
-When a member with **`canEditOrgBilling`** adds an optional payment method before checkout, the app collects **billing contact + structured address** on `/settings/billing`, validates with `saasSubscriptionBillingFormSchema` (`lib/billing/saas-subscription-billing-setup.ts`), and:
+When a member with **`canEditOrgBilling`** adds an optional payment method before checkout, the app collects **billing contact + structured address** and the **card** in one modal on `/settings/billing`, validates with `saasSubscriptionBillingFormSchema` (`lib/billing/saas-subscription-billing-setup.ts`), and:
 
 1. **`getSaaSBillingSetupPrefill()`** — merges existing Stripe `Customer` billing fields (when `stripe_customer_id` exists) over workspace company profile defaults for the modal only; **does not** write to `organizations`.
-2. **`createSetupIntent(billing)`** — same permission gate; creates or updates the **Stripe** subscription customer from the form; persists `stripe_customer_id` only when newly created; returns a card **SetupIntent** client secret.
-3. **`updateSaaSSubscriptionStripeCustomerBilling(billing)`** + **`confirmCardSetup`** — immediately before confirmation, re-applies the latest form values to the Stripe customer and passes matching **`billing_details`** on the PaymentMethod so receipts/invoices align with what the user entered.
+2. **`createSetupIntent(billing)`** (debounced when the form validates) — same permission gate; creates or updates the **Stripe** subscription customer from the form; persists `stripe_customer_id` only when newly created; returns a card **SetupIntent** client secret so **Elements** can mount.
+3. **`updateSaaSSubscriptionStripeCustomerBilling(billing)`** + **`confirmCardSetup`** on **Save payment method** — re-applies the latest form values to the Stripe customer and passes matching **`billing_details`** on the PaymentMethod so receipts/invoices align with what the user entered.
 
 **Operational customers** (CRM `customers` billing profiles) are separate from this SaaS flow; there is no distinct “billing contact” row for the workspace itself beyond company profile + Stripe.
 
-**Manage billing (in-app):** **Manage billing** opens a **Dialog** on `/settings/billing` with plan/status, payment method summary, add/update card (existing SetupIntent flow), workspace billing contact (read-only; edits under Settings → Workspace), recent SaaS invoices with View/PDF links, compare-plans navigation, and an explicit **“Continue to external billing page”** control that calls `createPortalSession` only after clear copy (Stripe-hosted portal for rare advanced changes). Bulk invoice download and self-serve subscription cancel remain **coming soon** in-app (disabled / copy).
+**Manage billing (in-app):** **Manage billing** opens a **Dialog** on `/settings/billing` with plan/status, payment method summary, add/update card (single-step billing + **SetupIntent** / **Elements** flow), workspace billing contact (read-only; edits under Settings → Workspace), recent SaaS invoices with View/PDF links, compare-plans navigation, and honest **coming soon** copy for self-serve cancel/downgrade. There is **no** in-dialog link to an external hosted billing portal (`createPortalSession` remains server-only for non-UI flows). Bulk invoice download remains **coming soon** in-app (disabled / copy).
 
 ## BlitzPay (Connect) vs SaaS subscription webhooks
 

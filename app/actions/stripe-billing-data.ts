@@ -78,7 +78,7 @@ export async function getStripeBillingSummary(): Promise<StripeBillingSummaryRes
   if (!process.env.STRIPE_SECRET_KEY?.trim()) {
     return {
       ok: false,
-      error: "Stripe is not configured.",
+      error: "Saved payment details are not available in this environment.",
       paymentMethod: null,
       invoices: [],
     }
