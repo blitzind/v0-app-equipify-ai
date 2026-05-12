@@ -79,13 +79,13 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Assets",
     items: [
       { label: "Equipment", href: "/equipment", icon: Wrench, anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
+      { label: "Catalog", href: "/catalog", icon: Package, anyOf: ["canViewBilling"] },
       {
         label: "Inventory",
         href: "/inventory",
         icon: Warehouse,
         anyOf: ["canManageInventory", "canConsumePartsOnWorkOrders"],
       },
-      { label: "Catalog", href: "/catalog", icon: Package, anyOf: ["canViewBilling"] },
       {
         label: "Certificates",
         href: "/calibration-templates",

@@ -24,7 +24,7 @@ import {
   Search,
   Sparkles,
   TrendingUp,
-  Users,
+  UserPlus,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -422,7 +422,7 @@ function ProspectsPageInner() {
               borderColor: "color-mix(in srgb, var(--primary) 24%, var(--border))",
             }}
           >
-            <Users className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
+            <UserPlus className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-primary shrink-0" aria-hidden />
           </div>
           <div className="min-w-0 pt-0.5">
             <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground text-balance">
