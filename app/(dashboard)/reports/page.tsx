@@ -81,6 +81,21 @@ function savePresets(orgId: string, presets: SavedPreset[]) {
   localStorage.setItem(presetsStorageKey(orgId), JSON.stringify(presets))
 }
 
+function userFacingAnalyticsFallback(httpStatus?: number): string {
+  if (httpStatus === 401) return "Sign in to load analytics."
+  if (httpStatus === 403) return "You do not have permission to view this report."
+  if (httpStatus === 400) return "Invalid date range or filters. Adjust and try again."
+  return "We could not load analytics for this organization. Please try again in a moment."
+}
+
+function analyticsErrorFromResponse(httpStatus: number, bodyError: string | undefined): string {
+  const trimmed = bodyError?.trim()
+  if (trimmed && trimmed.length < 200 && !/is not a function|undefined|internal server/i.test(trimmed)) {
+    return trimmed
+  }
+  return userFacingAnalyticsFallback(httpStatus)
+}
+
 function fmtFull$(n: number) {
   return `$${n.toLocaleString()}`
 }
@@ -263,59 +278,72 @@ export default function ReportsPage() {
     const supabase = createBrowserSupabaseClient()
 
     void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user || !orgId || cancelled) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user || !orgId || cancelled) {
+          if (!cancelled) {
+            setCustomerOptions([])
+            setTechnicianOptions([])
+            setCategoryOptions([])
+          }
+          return
+        }
+
+        const [{ data: custRows }, { data: memberRows }, { data: eqCatRows }] = await Promise.all([
+          supabase
+            .from("customers")
+            .select("id, company_name")
+            .eq("organization_id", orgId)
+            .eq("status", "active")
+            .is("archived_at", null)
+            .order("company_name"),
+          supabase
+            .from("organization_members")
+            .select("user_id")
+            .eq("organization_id", orgId)
+            .eq("status", "active")
+            .in("role", ["owner", "admin", "manager", "tech"]),
+          supabase
+            .from("equipment")
+            .select("category, subcategory")
+            .eq("organization_id", orgId)
+            .is("archived_at", null),
+        ])
+
+        if (cancelled) return
+
+        setCustomerOptions((custRows as Array<{ id: string; company_name: string }>) ?? [])
+
+        const userIds = [...new Set((memberRows ?? []).map((m: { user_id: string }) => m.user_id))]
+        let techOpts: Array<{ id: string; label: string }> = []
+        if (userIds.length > 0) {
+          const { data: profRows } = await supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", userIds)
+          techOpts =
+            (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null)?.map((p) => ({
+              id: p.id,
+              label: (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
+            })) ?? []
+        }
+        setTechnicianOptions(techOpts.sort((a, b) => a.label.localeCompare(b.label)))
+
+        const cats = new Set<string>()
+        for (const r of (eqCatRows ?? []) as Array<{ category: string | null; subcategory: string | null }>) {
+          cats.add(equipmentTypeLabel(r))
+        }
+        setCategoryOptions([...cats].sort((a, b) => a.localeCompare(b)))
+      } catch (err) {
+        console.error("[reports] filter options load", err)
         if (!cancelled) {
           setCustomerOptions([])
           setTechnicianOptions([])
           setCategoryOptions([])
         }
-        return
       }
-
-      const [{ data: custRows }, { data: memberRows }, { data: eqCatRows }] = await Promise.all([
-        supabase
-          .from("customers")
-          .select("id, company_name")
-          .eq("organization_id", orgId)
-          .eq("status", "active")
-          .is("archived_at", null)
-          .order("company_name"),
-        supabase
-          .from("organization_members")
-          .select("user_id")
-          .eq("organization_id", orgId)
-          .eq("status", "active")
-          .in("role", ["owner", "admin", "manager", "tech"]),
-        supabase.from("equipment").select("category, subcategory").eq("organization_id", orgId).is("archived_at", null),
-      ])
-
-      if (cancelled) return
-
-      setCustomerOptions((custRows as Array<{ id: string; company_name: string }>) ?? [])
-
-      const userIds = [...new Set((memberRows ?? []).map((m: { user_id: string }) => m.user_id))]
-      let techOpts: Array<{ id: string; label: string }> = []
-      if (userIds.length > 0) {
-        const { data: profRows } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", userIds)
-        techOpts =
-          (profRows as Array<{ id: string; full_name: string | null; email: string | null }> | null)?.map((p) => ({
-            id: p.id,
-            label: (p.full_name && p.full_name.trim()) || (p.email && p.email.trim()) || "Team member",
-          })) ?? []
-      }
-      setTechnicianOptions(techOpts.sort((a, b) => a.label.localeCompare(b.label)))
-
-      const cats = new Set<string>()
-      for (const r of (eqCatRows ?? []) as Array<{ category: string | null; subcategory: string | null }>) {
-        cats.add(equipmentTypeLabel(r))
-      }
-      setCategoryOptions([...cats].sort((a, b) => a.localeCompare(b)))
     })()
 
     return () => {
@@ -342,13 +370,16 @@ export default function ReportsPage() {
       const res = await fetch(`/api/organizations/${orgId}/reports/analytics?${qs}`)
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(j.error ?? `HTTP ${res.status}`)
+        setAnalytics(null)
+        setAnalyticsError(analyticsErrorFromResponse(res.status, j.error))
+        return
       }
       const data = (await res.json()) as ReportAnalyticsResponse
       setAnalytics(data)
     } catch (e) {
       setAnalytics(null)
-      setAnalyticsError(e instanceof Error ? e.message : "Failed to load analytics.")
+      console.error("[reports] analytics fetch", e)
+      setAnalyticsError(userFacingAnalyticsFallback())
     } finally {
       setAnalyticsLoading(false)
     }

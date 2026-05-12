@@ -79,6 +79,6 @@ export async function GET(
     return NextResponse.json(payload)
   } catch (e) {
     console.error("[reports/analytics]", e)
-    return jsonError(e instanceof Error ? e.message : "Failed to compute analytics.", 500)
+    return jsonError("Unable to load analytics right now. Please try again shortly.", 500)
   }
 }

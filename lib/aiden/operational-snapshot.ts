@@ -64,8 +64,12 @@ export async function buildOperationalSnapshot(
   const assigned = isAssignedWorkOnly(args.permissions)
   const equipIds = assigned ? args.assignedScope?.equipmentIds ?? [] : null
 
-  function woBase() {
-    let q = supabase.from("work_orders").eq("organization_id", orgId).is("archived_at", null)
+  function woQuery(select: string, selectOpts?: { count: "exact" | "planned" | "estimated"; head?: boolean }) {
+    let q = supabase
+      .from("work_orders")
+      .select(select, selectOpts)
+      .eq("organization_id", orgId)
+      .is("archived_at", null)
     if (scope.woIds) q = q.in("id", scope.woIds)
     return q
   }
@@ -115,36 +119,30 @@ export async function buildOperationalSnapshot(
     plansOverdueRes,
     scheduleDensityRes,
   ] = await Promise.all([
-    woBase()
+    woQuery("id", { count: "exact", head: true })
       .in("status", [...ACTIVE_STATUSES])
-      .lt("updated_at", `${fourteenDaysAgo}`)
-      .select("id", { count: "exact", head: true }),
-    woBase()
+      .lt("updated_at", `${fourteenDaysAgo}`),
+    woQuery("id", { count: "exact", head: true })
       .in("status", ["open", "scheduled", "in_progress"])
       .not("scheduled_on", "is", null)
-      .lt("scheduled_on", today)
-      .select("id", { count: "exact", head: true }),
-    woBase()
+      .lt("scheduled_on", today),
+    woQuery("id", { count: "exact", head: true })
       .in("status", [...ACTIVE_STATUSES])
       .is("assigned_user_id", null)
-      .is("assigned_technician_id", null)
-      .select("id", { count: "exact", head: true }),
-    woBase()
+      .is("assigned_technician_id", null),
+    woQuery("id, customer_id, equipment_id, status, scheduled_on, updated_at")
       .in("status", [...ACTIVE_STATUSES])
-      .select("id, customer_id, equipment_id, status, scheduled_on, updated_at")
       .order("updated_at", { ascending: true })
       .limit(40),
-    woBase()
+    woQuery("equipment_id")
       .gte("created_at", ninetyDaysAgo)
-      .not("equipment_id", "is", null)
-      .select("equipment_id"),
+      .not("equipment_id", "is", null),
     equipDuePromise,
     plansDuePromise,
-    woBase()
+    woQuery("scheduled_on, assigned_user_id, assigned_technician_id")
       .in("status", ["scheduled", "in_progress"])
       .gte("scheduled_on", today)
       .lte("scheduled_on", weekAheadYmd)
-      .select("scheduled_on, assigned_user_id, assigned_technician_id")
       .limit(400),
   ])
 

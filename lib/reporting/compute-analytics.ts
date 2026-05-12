@@ -104,6 +104,10 @@ function resolveEquipmentTypeLabel(row: Pick<EquipmentReportRow, "category" | "s
   return "Uncategorized"
 }
 
+/** Default columns for analytics work-order pulls (must be listed before `.eq` in Supabase v2). */
+const WORK_ORDER_ANALYTICS_COLUMNS =
+  "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents"
+
 function applyWorkOrderScope(
   supabase: SupabaseClient,
   organizationId: string,
@@ -112,8 +116,14 @@ function applyWorkOrderScope(
     technicianId: string | null
     equipmentFilterIds: string[] | null
   },
+  select: string,
+  selectOptions?: { count: "exact" | "planned" | "estimated"; head?: boolean },
 ) {
-  let q = supabase.from("work_orders").eq("organization_id", organizationId).is("archived_at", null)
+  let q = supabase
+    .from("work_orders")
+    .select(select, selectOptions)
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
   if (params.customerId) q = q.eq("customer_id", params.customerId)
   if (params.technicianId) q = q.eq("assigned_user_id", params.technicianId)
   if (params.equipmentFilterIds) q = q.in("equipment_id", params.equipmentFilterIds)
@@ -177,29 +187,23 @@ export async function computeReportAnalytics(
     custAllRes,
   ] = await Promise.all([
     (async () => {
-      let q = applyWorkOrderScope(supabase, organizationId, scope).select(
-        "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
-      )
+      let q = applyWorkOrderScope(supabase, organizationId, scope, WORK_ORDER_ANALYTICS_COLUMNS)
       if (statusFilter) q = q.eq("status", statusFilter)
       return await q.gte("created_at", fromStart).lte("created_at", toEnd)
     })(),
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select(
-        "id, created_at, updated_at, completed_at, status, type, customer_id, equipment_id, assigned_user_id, maintenance_plan_id, total_labor_cents, total_parts_cents",
-      )
+    applyWorkOrderScope(supabase, organizationId, scope, WORK_ORDER_ANALYTICS_COLUMNS)
       .in("status", [...WORK_ORDER_ANALYTICS_REVENUE_PERIOD_DB])
       .gte("updated_at", fromStart)
       .lte("updated_at", toEnd),
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select("id, created_at, updated_at, completed_at, status")
+    applyWorkOrderScope(supabase, organizationId, scope, "id, created_at, updated_at, completed_at, status")
       .in("status", [...WORK_ORDER_ANALYTICS_EXTENDED_COMPLETION_DB])
       .gte("updated_at", fromStart)
       .lte("updated_at", toEnd),
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select("*", { count: "exact", head: true })
-      .in("status", [...WORK_ORDER_OPEN_PIPELINE_DB]),
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select("equipment_id, created_at, title")
+    applyWorkOrderScope(supabase, organizationId, scope, "*", { count: "exact", head: true }).in(
+      "status",
+      [...WORK_ORDER_OPEN_PIPELINE_DB],
+    ),
+    applyWorkOrderScope(supabase, organizationId, scope, "equipment_id, created_at, title")
       .gte("created_at", `${ninetyLookbackFrom}T00:00:00.000Z`)
       .lte("created_at", toEnd)
       .not("equipment_id", "is", null),
@@ -260,8 +264,7 @@ export async function computeReportAnalytics(
       .select("id, status, next_due_date, customer_id")
       .eq("organization_id", organizationId)
       .is("archived_at", null),
-    applyWorkOrderScope(supabase, organizationId, scope)
-      .select("id")
+    applyWorkOrderScope(supabase, organizationId, scope, "id")
       .not("maintenance_plan_id", "is", null)
       .in("status", [...WORK_ORDER_ANALYTICS_PM_LINKED_DB])
       .gte("updated_at", fromStart)
