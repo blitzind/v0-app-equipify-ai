@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Bot, Filter, Loader2, RefreshCw, Search, Sparkles } from "lucide-react"
+import { Brain, Filter, Loader2, RefreshCw, Search, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -122,7 +122,7 @@ export function AiOpsPage() {
       <section className="rounded-xl border border-border bg-card px-4 sm:px-6 py-4 sm:py-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-10 w-10 rounded-xl border border-violet-500/30 bg-violet-500/[0.08] flex items-center justify-center shrink-0">
-            <Bot className="h-5 w-5 text-violet-600 dark:text-violet-400" aria-hidden />
+            <Brain className="h-5 w-5 text-violet-600 dark:text-violet-400" aria-hidden />
           </div>
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-semibold tracking-tight">AI Operations</h1>

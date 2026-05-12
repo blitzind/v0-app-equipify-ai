@@ -13,7 +13,7 @@ import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } fro
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
-  ChevronLeft, Sparkles, ChevronDown, Check, Bot,
+  ChevronLeft, Sparkles, ChevronDown, Check, Bot, Brain,
   Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark,
   Bell,
   Warehouse,
@@ -143,7 +143,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "AI Operations",
         href: "/ai-ops",
-        icon: Bot,
+        icon: Brain,
         highlight: true,
         anyOf: ["canViewInsights"],
       },
