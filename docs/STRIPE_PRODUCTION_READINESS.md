@@ -52,6 +52,13 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 
 **BlitzPay** end-customer invoice payments use **`POST /api/blitzpay/webhook`** and the **Connect** webhook secret (`STRIPE_BLITZPAY_WEBHOOK_SECRET` / env naming per deploy). That path is **separate** from **`POST /api/stripe/webhook`** (SaaS subscriptions). Phase **2O** financing/installment features **do not** add new Stripe event types to the SaaS webhook; future third-party financing integrations must keep **PII and application payloads out of Equipify** and use **opaque provider references** only.
 
+### BlitzPay Phase 3A (internal general ledger)
+
+- **Stripe** remains the system of record for **money movement** (charges, refunds, disputes, payouts, balance transactions).
+- **BlitzPay GL** (new `blitzpay_chart_of_accounts`, `blitzpay_journal_*`, periods, deferred schedules) is the system of record for **posted internal journals** — integer cents, double-entry, **immutable after post**; corrections use **reversal batches**, not edits.
+- **Optional env:** `BLITZPAY_GL_SOURCE_PEPPER` (server-only) for deterministic fingerprints of external references — see `.env.local.example` and `docs/BLITZPAY_PHASE_3_ARCHITECTURE.md`.
+- **No new Stripe webhook types** are required for Phase 3A; schema health guards apply to accounting APIs same as other BlitzPay staff routes.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

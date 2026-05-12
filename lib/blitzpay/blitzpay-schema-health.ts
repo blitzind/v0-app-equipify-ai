@@ -70,6 +70,13 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_collection_attempts", select: "id, organization_id, invoice_id" },
   { name: "blitzpay_collection_recovery_flows", select: "id, organization_id, flow_status" },
   { name: "blitzpay_collection_activity_log", select: "id, organization_id, activity_type" },
+  { name: "blitzpay_chart_of_accounts", select: "id, organization_id, account_code" },
+  { name: "blitzpay_journal_batches", select: "id, organization_id, status" },
+  { name: "blitzpay_journal_entries", select: "id, organization_id, batch_id" },
+  { name: "blitzpay_journal_lines", select: "id, organization_id, journal_entry_id" },
+  { name: "blitzpay_financial_periods", select: "id, organization_id, status" },
+  { name: "blitzpay_deferred_revenue_schedules", select: "id, organization_id, status" },
+  { name: "blitzpay_account_balances", select: "id, organization_id, account_id" },
 ]
 
 export type BlitzpaySchemaHealthResult =

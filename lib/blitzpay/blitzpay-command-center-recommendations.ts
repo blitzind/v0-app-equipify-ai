@@ -30,6 +30,10 @@ export type FinancialCommandCenterRecommendationInput = {
   expectedInflows30Cents?: number
   expectedOutflows30Cents?: number
   recurringPlannedInflow30dCents?: number
+  /** Phase 3A — optional GL control totals from reporting snapshot. */
+  trialBalanceHealthy?: boolean
+  unreconciledBatchCount?: number
+  pendingRevenueRecognitionCount?: number
 }
 
 export function buildFinancialCommandCenterRecommendations(
@@ -140,6 +144,30 @@ export function buildFinancialCommandCenterRecommendations(
       id: "membership_renewal_confidence",
       severity: "info",
       message: "Upcoming membership renewals improve cash-flow confidence.",
+    })
+  }
+
+  if (input.trialBalanceHealthy === false) {
+    out.push({
+      id: "gl_trial_balance_review",
+      severity: "warning",
+      message: "Internal books trial balance does not tie — review posted journals before period close.",
+    })
+  }
+  const drafts = input.unreconciledBatchCount ?? 0
+  if (drafts > 0) {
+    out.push({
+      id: "gl_draft_batches",
+      severity: "info",
+      message: `You have ${Math.min(99_999, drafts)} draft journal batch(es) — post or archive before relying on books.`,
+    })
+  }
+  const pendingRev = input.pendingRevenueRecognitionCount ?? 0
+  if (pendingRev > 0) {
+    out.push({
+      id: "gl_revenue_recognition_due",
+      severity: "info",
+      message: `${Math.min(99_999, pendingRev)} deferred revenue schedule(s) are due for recognition — run the staff revenue recognition job when ready.`,
     })
   }
 

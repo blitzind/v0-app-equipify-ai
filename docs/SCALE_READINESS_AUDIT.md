@@ -2,7 +2,7 @@
 
 **Scope:** Read-only review of database design, API/query patterns, frontend data loading, caching, RLS, Stripe/BlitzPay, AI metering, jobs, observability, rate limits, and deployment/runtime. No code or schema changes were made for this document.
 
-**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses.
+**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale.
 
 ---
 

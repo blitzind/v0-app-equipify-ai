@@ -73,6 +73,17 @@ export type BlitzpayFinancialCommandCenterPayload = {
     expectedOutflows30dCents: number
     payrollReserveCoverageBasisPoints: number
     apReserveCoverageBasisPoints: number
+    /** Phase 3A — internal GL snapshot (from reporting; bounded). */
+    totalAssetsCents: number
+    totalLiabilitiesCents: number
+    totalEquityCents: number
+    deferredRevenueCents: number
+    accountsReceivableCents: number
+    accountsPayableCents: number
+    payrollLiabilityGlCents: number
+    trialBalanceHealthy: boolean
+    unreconciledBatchCount: number
+    pendingRevenueRecognitionCount: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -98,6 +109,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     memberships: { href: "/memberships", label: "Memberships & agreements" },
     payroll: { href: "/settings/payments#blitzpay-payroll-anchor", label: "Payroll & commissions (Settings → Payments)" },
     cashPlanning: { href: "/settings/payments#blitzpay-cash-accounts-anchor", label: "Operating cash & runway (Settings → Payments)" },
+    accounting: { href: "/settings/payments#blitzpay-accounting-overview-anchor", label: "Internal books & trial balance (Settings → Payments)" },
   }
 }
 
@@ -196,6 +208,9 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     expectedInflows30Cents: reporting.expectedInflows30dCents,
     expectedOutflows30Cents: reporting.expectedOutflows30dCents,
     recurringPlannedInflow30dCents: reporting.blitzpayRecurringPlannedInflow30dCents,
+    trialBalanceHealthy: reporting.trialBalanceHealthy,
+    unreconciledBatchCount: reporting.unreconciledBatchCount,
+    pendingRevenueRecognitionCount: reporting.pendingRevenueRecognitionCount,
   })
 
   return {
@@ -250,6 +265,16 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       expectedOutflows30dCents: reporting.expectedOutflows30dCents,
       payrollReserveCoverageBasisPoints: reporting.payrollReserveCoverageBasisPoints,
       apReserveCoverageBasisPoints: reporting.apReserveCoverageBasisPoints,
+      totalAssetsCents: reporting.totalAssetsCents,
+      totalLiabilitiesCents: reporting.totalLiabilitiesCents,
+      totalEquityCents: reporting.totalEquityCents,
+      deferredRevenueCents: reporting.deferredRevenueCents,
+      accountsReceivableCents: reporting.accountsReceivableCents,
+      accountsPayableCents: reporting.accountsPayableCents,
+      payrollLiabilityGlCents: reporting.glPayrollLiabilityCents,
+      trialBalanceHealthy: reporting.trialBalanceHealthy,
+      unreconciledBatchCount: reporting.unreconciledBatchCount,
+      pendingRevenueRecognitionCount: reporting.pendingRevenueRecognitionCount,
     },
     combinedForecast,
     scorecards,

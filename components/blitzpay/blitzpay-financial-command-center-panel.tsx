@@ -57,6 +57,16 @@ type CommandCenterPayload = {
     expectedOutflows30dCents?: number
     payrollReserveCoverageBasisPoints?: number
     apReserveCoverageBasisPoints?: number
+    totalAssetsCents?: number
+    totalLiabilitiesCents?: number
+    totalEquityCents?: number
+    deferredRevenueCents?: number
+    accountsReceivableCents?: number
+    accountsPayableCents?: number
+    payrollLiabilityGlCents?: number
+    trialBalanceHealthy?: boolean
+    unreconciledBatchCount?: number
+    pendingRevenueRecognitionCount?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -209,6 +219,16 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Upcoming obligations (30d est.)", v: fmtMoney(data.tiles.expectedOutflows30dCents ?? 0) },
               { k: "Payroll reserve coverage (bps)", v: String(data.tiles.payrollReserveCoverageBasisPoints ?? 0) },
               { k: "AP reserve coverage (bps)", v: String(data.tiles.apReserveCoverageBasisPoints ?? 0) },
+              { k: "Internal books — assets", v: fmtMoney(data.tiles.totalAssetsCents ?? 0) },
+              { k: "Internal books — liabilities", v: fmtMoney(data.tiles.totalLiabilitiesCents ?? 0) },
+              { k: "Internal books — equity", v: fmtMoney(data.tiles.totalEquityCents ?? 0) },
+              { k: "Deferred revenue (on books)", v: fmtMoney(data.tiles.deferredRevenueCents ?? 0) },
+              { k: "Receivables (on books)", v: fmtMoney(data.tiles.accountsReceivableCents ?? 0) },
+              { k: "Payables (on books)", v: fmtMoney(data.tiles.accountsPayableCents ?? 0) },
+              { k: "Payroll owed (on books)", v: fmtMoney(data.tiles.payrollLiabilityGlCents ?? 0) },
+              { k: "Books balanced (trial)", v: data.tiles.trialBalanceHealthy === false ? "Review" : "Healthy" },
+              { k: "Draft journal batches", v: String(data.tiles.unreconciledBatchCount ?? 0) },
+              { k: "Revenue recognition due", v: String(data.tiles.pendingRevenueRecognitionCount ?? 0) },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

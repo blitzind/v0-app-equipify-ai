@@ -13,6 +13,7 @@ import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 import { deriveBlitzpayCashPlanningMetrics, type BlitzpayCashReserveRuleInput } from "@/lib/blitzpay/blitzpay-cash-accounts"
 import { fetchBlitzpayPhase2aaReportingRates } from "@/lib/blitzpay/blitzpay-billing-profiles-service"
 import { fetchBlitzpayPhase2abCollectionReporting } from "@/lib/blitzpay/blitzpay-collections-service"
+import { fetchGlReportingSnapshotFields } from "@/lib/blitzpay/blitzpay-general-ledger-service"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -148,6 +149,18 @@ export type BlitzpayOrgReportingSnapshot = {
   delinquencyRate: number
   recoveryFlowCompletionRate: number
   averageRecoveryDurationDays: number
+  /** Phase 3A — general ledger / internal accounting (bounded). */
+  totalAssetsCents: number
+  totalLiabilitiesCents: number
+  totalEquityCents: number
+  deferredRevenueCents: number
+  accountsReceivableCents: number
+  accountsPayableCents: number
+  /** GL account 2200 (ledger); distinct from payroll accrual `payrollLiabilityCents` above. */
+  glPayrollLiabilityCents: number
+  trialBalanceHealthy: boolean
+  unreconciledBatchCount: number
+  pendingRevenueRecognitionCount: number
 }
 
 /**
@@ -699,6 +712,32 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* Phase 2AB tables optional until migration applied */
   }
 
+  let totalAssetsCents = 0
+  let totalLiabilitiesCents = 0
+  let totalEquityCents = 0
+  let deferredRevenueCents = 0
+  let accountsReceivableCents = 0
+  let accountsPayableCents = 0
+  let glPayrollLiabilityCents = 0
+  let trialBalanceHealthy = true
+  let unreconciledBatchCount = 0
+  let pendingRevenueRecognitionCount = 0
+  try {
+    const gl = await fetchGlReportingSnapshotFields(admin, organizationId)
+    totalAssetsCents = gl.totalAssetsCents
+    totalLiabilitiesCents = gl.totalLiabilitiesCents
+    totalEquityCents = gl.totalEquityCents
+    deferredRevenueCents = gl.deferredRevenueCents
+    accountsReceivableCents = gl.accountsReceivableCents
+    accountsPayableCents = gl.accountsPayableCents
+    glPayrollLiabilityCents = gl.glPayrollLiabilityCents
+    trialBalanceHealthy = gl.trialBalanceHealthy
+    unreconciledBatchCount = gl.unreconciledBatchCount
+    pendingRevenueRecognitionCount = gl.pendingRevenueRecognitionCount
+  } catch {
+    /* Phase 3A GL tables optional until migration applied */
+  }
+
   const cash2z = deriveBlitzpayCashPlanningMetrics({
     treasuryOperatingCents: tmSnapshot?.operatingBalanceCents ?? 0,
     heldReserveCents: tmSnapshot?.heldReserveCents ?? 0,
@@ -825,5 +864,15 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     delinquencyRate,
     recoveryFlowCompletionRate,
     averageRecoveryDurationDays,
+    totalAssetsCents,
+    totalLiabilitiesCents,
+    totalEquityCents,
+    deferredRevenueCents,
+    accountsReceivableCents,
+    accountsPayableCents,
+    glPayrollLiabilityCents,
+    trialBalanceHealthy,
+    unreconciledBatchCount,
+    pendingRevenueRecognitionCount,
   }
 }

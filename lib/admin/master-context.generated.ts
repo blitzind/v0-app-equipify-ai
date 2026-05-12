@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 326,
-  sqlMigrations: 170,
+  apiRouteHandlers: 336,
+  sqlMigrations: 171,
   dashboardPages: 62,
-  componentsTsx: 275,
-  libTsFiles: 612,
+  componentsTsx: 276,
+  libTsFiles: 617,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **326** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **170** |
+| API route handlers (\`app/api/**/route.ts\`) | **336** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **171** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **275** |
-| \`lib/**/*.ts\` | **612** |
+| \`components/**/*.tsx\` | **276** |
+| \`lib/**/*.ts\` | **617** |
 
 ### Vercel crons
 
@@ -97,6 +97,16 @@ organizations/[organizationId]/attachments/[attachmentId]/route.ts
 organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
+organizations/[organizationId]/blitzpay/accounting/account-balances/route.ts
+organizations/[organizationId]/blitzpay/accounting/chart-of-accounts/route.ts
+organizations/[organizationId]/blitzpay/accounting/financial-periods/[periodId]/close/route.ts
+organizations/[organizationId]/blitzpay/accounting/financial-periods/route.ts
+organizations/[organizationId]/blitzpay/accounting/journal-batches/route.ts
+organizations/[organizationId]/blitzpay/accounting/journal-entries/[entryId]/post/route.ts
+organizations/[organizationId]/blitzpay/accounting/journal-entries/[entryId]/reverse/route.ts
+organizations/[organizationId]/blitzpay/accounting/journal-entries/route.ts
+organizations/[organizationId]/blitzpay/accounting/revenue-recognition/run/route.ts
+organizations/[organizationId]/blitzpay/accounting/trial-balance/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
 organizations/[organizationId]/blitzpay/autopay/[enrollmentId]/route.ts
 organizations/[organizationId]/blitzpay/autopay/route.ts
