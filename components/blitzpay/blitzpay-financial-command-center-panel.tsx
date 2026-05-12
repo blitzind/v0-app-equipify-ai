@@ -84,6 +84,14 @@ type CommandCenterPayload = {
     vendor1099ReadinessRate?: number
     filingReadinessScore?: number
     complianceHealthScore?: number
+    financingApplicationApprovalRate?: number
+    averageApprovedFinancingAmount?: number
+    financingMarketplaceCoverage?: number
+    contractorAdvanceExposure?: number
+    financingRevenueOpportunity?: number
+    financingRiskScore?: number
+    financingConversionRate?: number
+    financingTreasuryImpactScore?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -270,6 +278,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Vendor 1099 readiness", v: `${data.tiles.vendor1099ReadinessRate ?? 0}/100` },
               { k: "Filing readiness (internal)", v: `${data.tiles.filingReadinessScore ?? 0}/100` },
               { k: "Compliance health (internal)", v: `${data.tiles.complianceHealthScore ?? 0}/100` },
+              { k: "Financing — application approval rate (est.)", v: `${data.tiles.financingApplicationApprovalRate ?? 0}%` },
+              { k: "Financing — avg approved amount (internal)", v: fmtMoney(data.tiles.averageApprovedFinancingAmount ?? 0) },
+              { k: "Financing — marketplace coverage (est.)", v: `${data.tiles.financingMarketplaceCoverage ?? 0}/100` },
+              { k: "Financing — contractor advance exposure (models)", v: fmtMoney(data.tiles.contractorAdvanceExposure ?? 0) },
+              { k: "Financing — revenue opportunity (pipeline est.)", v: fmtMoney(data.tiles.financingRevenueOpportunity ?? 0) },
+              { k: "Financing — risk score (operational)", v: `${data.tiles.financingRiskScore ?? 0}/100` },
+              { k: "Financing — conversion (funded vs pipeline)", v: `${data.tiles.financingConversionRate ?? 0}%` },
+              { k: "Financing — treasury impact (est.)", v: `${data.tiles.financingTreasuryImpactScore ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

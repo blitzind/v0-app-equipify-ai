@@ -178,6 +178,15 @@ export type BlitzpayOrgReportingSnapshot = {
   vendor1099ReadinessRate: number
   filingReadinessScore: number
   complianceHealthScore: number
+  /** Phase 3D — financing marketplace (bounded; orchestration only). */
+  financingApplicationApprovalRate: number
+  averageApprovedFinancingAmount: number
+  financingMarketplaceCoverage: number
+  contractorAdvanceExposure: number
+  financingRevenueOpportunity: number
+  financingRiskScore: number
+  financingConversionRate: number
+  financingTreasuryImpactScore: number
 }
 
 /**
@@ -770,6 +779,14 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let vendor1099ReadinessRate = 0
   let filingReadinessScore = 0
   let complianceHealthScore = 0
+  let financingApplicationApprovalRate = 0
+  let averageApprovedFinancingAmount = 0
+  let financingMarketplaceCoverage = 0
+  let contractorAdvanceExposure = 0
+  let financingRevenueOpportunity = 0
+  let financingRiskScore = 0
+  let financingConversionRate = 0
+  let financingTreasuryImpactScore = 0
   try {
     const { fetchApReportingSnapshotFields } = await import("@/lib/blitzpay/blitzpay-ap-service")
     const ap = await fetchApReportingSnapshotFields(admin, organizationId)
@@ -797,6 +814,21 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     complianceHealthScore = tx.complianceHealthScore
   } catch {
     /* Phase 3C tax tables optional until migration applied */
+  }
+
+  try {
+    const { fetchFinancingMarketplaceReportingFields } = await import("@/lib/blitzpay/blitzpay-financing-service")
+    const fm = await fetchFinancingMarketplaceReportingFields(admin, organizationId)
+    financingApplicationApprovalRate = fm.financingApplicationApprovalRate
+    averageApprovedFinancingAmount = fm.averageApprovedFinancingAmount
+    financingMarketplaceCoverage = fm.financingMarketplaceCoverage
+    contractorAdvanceExposure = fm.contractorAdvanceExposure
+    financingRevenueOpportunity = fm.financingRevenueOpportunity
+    financingRiskScore = fm.financingRiskScore
+    financingConversionRate = fm.financingConversionRate
+    financingTreasuryImpactScore = fm.financingTreasuryImpactScore
+  } catch {
+    /* Phase 3D financing tables optional until migration applied */
   }
 
   const cash2z = deriveBlitzpayCashPlanningMetrics({
@@ -950,5 +982,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     vendor1099ReadinessRate,
     filingReadinessScore,
     complianceHealthScore,
+    financingApplicationApprovalRate,
+    averageApprovedFinancingAmount,
+    financingMarketplaceCoverage,
+    contractorAdvanceExposure,
+    financingRevenueOpportunity,
+    financingRiskScore,
+    financingConversionRate,
+    financingTreasuryImpactScore,
   }
 }

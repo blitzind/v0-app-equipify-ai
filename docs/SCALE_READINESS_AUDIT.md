@@ -2,7 +2,7 @@
 
 **Scope:** Read-only review of database design, API/query patterns, frontend data loading, caching, RLS, Stripe/BlitzPay, AI metering, jobs, observability, rate limits, and deployment/runtime. No code or schema changes were made for this document.
 
-**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale. **Update (BlitzPay Phase 3B):** vendor bill / pay-run / allocation tables are **staff-only** (finance roles), **capped** list queries per org, and **not** on portal or public caches — treat like other BlitzPay internal finance surfaces. **Update (BlitzPay Phase 3C):** tax jurisdictions/rules/calculations, compliance audit, ACH authorization metadata, vendor tax profiles, and liability snapshots are **finance-role reads** with **explicit list caps** in services; **no portal routes** — same “internal books” traffic profile as Phase **3A–3B** (avoid high-frequency polling).
+**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale. **Update (BlitzPay Phase 3B):** vendor bill / pay-run / allocation tables are **staff-only** (finance roles), **capped** list queries per org, and **not** on portal or public caches — treat like other BlitzPay internal finance surfaces. **Update (BlitzPay Phase 3C):** tax jurisdictions/rules/calculations, compliance audit, ACH authorization metadata, vendor tax profiles, and liability snapshots are **finance-role reads** with **explicit list caps** in services; **no portal routes** — same “internal books” traffic profile as Phase **3A–3B** (avoid high-frequency polling). **Update (BlitzPay Phase 3D):** financing marketplace tables (`blitzpay_marketplace_financing_providers`, applications, application offers, contractor advance models, financing audit, provider matches) are **staff-first** with **capped** reads; **portal** exposure is limited to **narrow** `/api/portal/financing/*` summaries scoped to the signed-in customer — avoid expanding payloads with internal match scores or treasury diagnostics.
 
 ---
 
@@ -212,6 +212,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Staff-only finance APIs** under `…/blitzpay/tax/*`, `…/blitzpay/compliance/*`, `…/blitzpay/ach-authorizations`, and `…/blitzpay/vendor-tax-profiles` — **no customer portal** exposure; payloads avoid raw TINs and raw ACH references (hashed retention only).
 - **Append-only audit:** `blitzpay_compliance_audit_log` is **update/delete blocked** at the database — growth is **append-mostly** like other audit tables; retention/archival policy is a future ops concern if volume spikes.
 - **Bounded reads:** list caps in `blitzpay-tax-engine.ts` / `blitzpay-tax-service.ts` bound jurisdictions, rules, calculations, audit tail, ACH rows, and vendor tax profiles per request — keep reporting snapshot enrichers on the same modest cadence as other BlitzPay snapshot fields.
+
+### 8.12 BlitzPay Phase 3D (financing marketplace foundations)
+
+- **Staff finance APIs** under `…/blitzpay/financing/*` with **row caps** in `blitzpay-financing-service.ts` / `blitzpay-financing-marketplace.ts` — orchestration only; **no** custodial balances or autonomous underwriting.
+- **Append-only audit:** `blitzpay_financing_audit_log` is **update/delete blocked** in Postgres — growth is append-mostly; keep staff list reads capped (`BLITZPAY_FINANCING_AUDIT_LIST_CAP`).
+- **Portal:** `/api/portal/financing/applications` + `/api/portal/financing/offers` must remain **summary-only** (status, amounts, illustrative APR where present) — do not expose internal compatibility scores or staff treasury payloads to customers.
 
 ---
 

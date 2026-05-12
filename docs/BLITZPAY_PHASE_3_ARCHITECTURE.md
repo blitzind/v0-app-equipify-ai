@@ -152,3 +152,55 @@ Under `…/blitzpay/`: `tax/jurisdictions`, `tax/rules`, `tax/calculations`, `ta
 ## Tests
 
 - `pnpm test:blitzpay-phase-3c-tax-compliance` — deterministic pure helpers, migration immutability strings, API guards, schema health table list (no DB).
+
+---
+
+# BlitzPay Phase 3D — Native financing marketplace foundations
+
+Phase **3D** adds **org + platform marketplace financing provider rows** (distinct table name from Phase **2O** platform catalog `blitzpay_financing_providers` / session offers — see migration comments), **financing application orchestration**, **application-scoped offers** in `blitzpay_financing_application_offers`, **contractor advance planning models**, **append-only financing audit log**, and **deterministic provider match rows**. It extends the **COA** via **`ensureBlitzpayDefaultFinancingAccounts()`** (`BLITZPAY_FINANCING_COA_EXTENSION`: financing receivable placeholder, deferred financing revenue, contractor advance liability planning, financing fee revenue).
+
+## Naming note (Phase 2O vs 3D)
+
+- **Phase 2O** already defines `blitzpay_financing_providers` (**`code` PK**, platform-wide catalog) and `blitzpay_financing_offers` (**session-scoped**).
+- **Phase 3D** uses **`blitzpay_marketplace_financing_providers`** (UUID rows, optional `organization_id` for platform templates) and **`blitzpay_financing_application_offers`** so migrations and RLS stay orthogonal to 2O session flows.
+
+## Non-goals
+
+- **No loan origination, underwriting, custody, or guaranteed approvals** — orchestration and visibility only.
+- **No credit bureau** integration in this phase.
+- **Staff APIs** do not return raw provider API keys or private provider payloads — **hashed references** only where stored.
+
+## Deterministic logic
+
+- `lib/blitzpay/blitzpay-financing-qualification.ts` — bounded **qualification score** from operational proxies (recurring revenue, invoice counts, collections health, membership renewal proxy, treasury coverage bps).
+- `lib/blitzpay/blitzpay-financing-marketplace.ts` — provider **compatibility** score, deterministic **match** and **offer** sort orders, **treasury impact** mapping from coverage bps, expiration day math.
+- `lib/blitzpay/blitzpay-contractor-advances.ts` — payback **estimate** and **exposure** aggregation (capped list).
+- `lib/blitzpay/blitzpay-financing-service.ts` — CRUD-ish flows, **submit** (draft → submitted + refresh matches), **cancel** (reversible states only), reporting snapshot enricher, health dashboard (includes required **third-party provider** disclaimer).
+
+## APIs
+
+- **Staff (org-scoped):** `…/blitzpay/financing/providers`, `…/financing/applications`, `POST …/applications/[id]/submit`, `POST …/applications/[id]/cancel`, `…/financing/offers`, `…/financing/provider-matches`, `…/financing/contractor-advances`, `…/financing/health` — all **`requireAnyOrgPermission`** + **`blitzpaySchemaGuardNextResponse`** + UUID org gate.
+- **Portal (customer-safe):** `GET /api/portal/financing/applications`, `GET /api/portal/financing/offers` — **`requirePortalSession`** + service-role queries filtered to **portal customer_id**; summaries only (no internal risk breakdown).
+
+## Reporting & UI
+
+- `fetchFinancingMarketplaceReportingFields` merges **bounded** financing KPIs into `fetchBlitzpayOrgReportingSnapshot`.
+- `BlitzpayFinancingMarketplacePanel` on **Settings → Payments** and **Insights → Financial command center**; portal **Billing** page shows a short financing summary when data exists.
+
+## Key files
+
+| Area | Path |
+|------|------|
+| Migration | `supabase/migrations/20261014120000_blitzpay_phase_3d_financing_marketplace.sql` |
+| Marketplace math | `lib/blitzpay/blitzpay-financing-marketplace.ts` |
+| Qualification | `lib/blitzpay/blitzpay-financing-qualification.ts` |
+| Contractor advances | `lib/blitzpay/blitzpay-contractor-advances.ts` |
+| Service | `lib/blitzpay/blitzpay-financing-service.ts` |
+| COA extension | `BLITZPAY_FINANCING_COA_EXTENSION` in `lib/blitzpay/blitzpay-general-ledger.ts` |
+| Org APIs | `app/api/organizations/[organizationId]/blitzpay/financing/**` |
+| Portal APIs | `app/api/portal/financing/**` |
+| Staff UI | `components/blitzpay/blitzpay-financing-marketplace-panel.tsx` |
+
+## Tests
+
+- `pnpm test:blitzpay-phase-3d-financing-marketplace` — deterministic helpers, migration audit guard strings, API guards, schema health table list (no DB).

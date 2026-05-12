@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 353,
-  sqlMigrations: 173,
+  apiRouteHandlers: 363,
+  sqlMigrations: 174,
   dashboardPages: 62,
-  componentsTsx: 278,
-  libTsFiles: 624,
+  componentsTsx: 279,
+  libTsFiles: 628,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **353** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **173** |
+| API route handlers (\`app/api/**/route.ts\`) | **363** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **174** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **278** |
-| \`lib/**/*.ts\` | **624** |
+| \`components/**/*.tsx\` | **279** |
+| \`lib/**/*.ts\` | **628** |
 
 ### Vercel crons
 
@@ -140,6 +140,14 @@ organizations/[organizationId]/blitzpay/compliance/audit-log/route.ts
 organizations/[organizationId]/blitzpay/compliance/health/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
 organizations/[organizationId]/blitzpay/financial-command-center/route.ts
+organizations/[organizationId]/blitzpay/financing/applications/[applicationId]/cancel/route.ts
+organizations/[organizationId]/blitzpay/financing/applications/[applicationId]/submit/route.ts
+organizations/[organizationId]/blitzpay/financing/applications/route.ts
+organizations/[organizationId]/blitzpay/financing/contractor-advances/route.ts
+organizations/[organizationId]/blitzpay/financing/health/route.ts
+organizations/[organizationId]/blitzpay/financing/offers/route.ts
+organizations/[organizationId]/blitzpay/financing/provider-matches/route.ts
+organizations/[organizationId]/blitzpay/financing/providers/route.ts
 organizations/[organizationId]/blitzpay/financing/summary/route.ts
 organizations/[organizationId]/blitzpay/launch-readiness/route.ts
 organizations/[organizationId]/blitzpay/membership-insights/route.ts
@@ -358,6 +366,8 @@ portal/dashboard/route.ts
 portal/documents/route.ts
 portal/equipment/[equipmentId]/route.ts
 portal/equipment/route.ts
+portal/financing/applications/route.ts
+portal/financing/offers/route.ts
 portal/invoices/[invoiceId]/blitzpay/prepare-pay/route.ts
 portal/invoices/[invoiceId]/blitzpay/scheduled-payments/route.ts
 portal/invoices/[invoiceId]/route.ts

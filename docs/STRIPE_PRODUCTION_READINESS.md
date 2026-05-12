@@ -72,6 +72,13 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Stripe / webhooks:** no new Connect webhook types are required for Phase **3C**; settlement and charge behavior remain unchanged. Optional server-only pepper `BLITZPAY_GL_SOURCE_PEPPER` also seeds **compliance audit row hashes** (same as GL reference fingerprinting) — rotate with care across environments.
 - **Client exposure:** staff UI shows **operational indicators** only; do not surface raw tax identifiers, TINs, or bank/ACH authorization text from these tables.
 
+### BlitzPay Phase 3D (financing marketplace foundations)
+
+- **Orchestration only:** Phase **3D** records **marketplace provider rows** (`blitzpay_marketplace_financing_providers`), **financing applications**, **application offers** (`blitzpay_financing_application_offers`), **contractor advance planning models**, **append-only financing audit**, and **provider match rows** — Equipify does **not** originate credit, hold funds, or auto-approve third-party financing.
+- **Schema:** apply `20261014120000_blitzpay_phase_3d_financing_marketplace.sql` so staff `…/blitzpay/financing/*` routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise). This phase is **orthogonal** to Phase **2O** `blitzpay_financing_sessions` / catalog `blitzpay_financing_providers` — keep integrations explicit in product docs.
+- **Stripe / webhooks:** no new Connect webhook types are required for Phase **3D**; any future financing partner would add **separate** ingress (not in this phase).
+- **Portal:** `/api/portal/financing/*` returns **customer-scoped summaries** only; hashes replace raw provider references in storage.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

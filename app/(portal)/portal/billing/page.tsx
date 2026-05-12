@@ -35,6 +35,9 @@ export default function PortalBillingPage() {
   const [err, setErr] = useState<string | null>(null)
   const [autopayBusy, setAutopayBusy] = useState(false)
   const [autopayMsg, setAutopayMsg] = useState<string | null>(null)
+  const [financingApps, setFinancingApps] = useState<Array<{ id: string; applicationStatus: string; requestedAmountCents: number }>>([])
+  const [financingOffersCount, setFinancingOffersCount] = useState(0)
+  const [financingDisclaimer, setFinancingDisclaimer] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -55,6 +58,41 @@ export default function PortalBillingPage() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([fetch("/api/portal/financing/applications", { credentials: "include" }), fetch("/api/portal/financing/offers", { credentials: "include" })])
+      .then(async ([ra, ro]) => {
+        const aj = (await ra.json()) as {
+          applications?: Array<{ id: string; applicationStatus: string; requestedAmountCents: number }>
+          disclaimer?: string
+          error?: string
+        }
+        const oj = (await ro.json()) as { offers?: unknown[]; disclaimer?: string; error?: string }
+        if (!ra.ok || !ro.ok) {
+          if (!cancelled) {
+            setFinancingApps([])
+            setFinancingOffersCount(0)
+            setFinancingDisclaimer(null)
+          }
+          return
+        }
+        if (cancelled) return
+        setFinancingApps(aj.applications ?? [])
+        setFinancingOffersCount((oj.offers ?? []).length)
+        setFinancingDisclaimer(aj.disclaimer ?? oj.disclaimer ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFinancingApps([])
+          setFinancingOffersCount(0)
+          setFinancingDisclaimer(null)
+        }
       })
     return () => {
       cancelled = true
@@ -206,6 +244,30 @@ export default function PortalBillingPage() {
           ) : null}
         </div>
       </div>
+
+      {financingApps.length > 0 || financingOffersCount > 0 ? (
+        <div className="portal-card p-4 space-y-2">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--portal-foreground)" }}>
+            Financing activity
+          </h2>
+          {financingDisclaimer ? (
+            <p className="text-xs leading-relaxed" style={{ color: "var(--portal-nav-text)" }}>
+              {financingDisclaimer}
+            </p>
+          ) : null}
+          <p className="text-xs" style={{ color: "var(--portal-nav-text)" }}>
+            Open applications: {financingApps.length} · Offers on file: {financingOffersCount}
+          </p>
+          <ul className="text-sm space-y-1">
+            {financingApps.slice(0, 6).map((a) => (
+              <li key={a.id} className="flex justify-between gap-2" style={{ color: "var(--portal-foreground)" }}>
+                <span className="text-muted-foreground">{a.applicationStatus}</span>
+                <span className="tabular-nums font-medium">{fmtCurrency(a.requestedAmountCents)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <Link href="/portal/dashboard" className="text-sm font-medium inline-block" style={{ color: "var(--portal-accent)" }}>
         ← Back to dashboard

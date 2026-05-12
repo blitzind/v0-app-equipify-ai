@@ -187,3 +187,15 @@ export const BLITZPAY_TAX_COA_EXTENSION: ReadonlyArray<{
   { code: "5750", name: "Payroll Tax Expense", type: "expense" },
   { code: "5760", name: "Sales Tax Expense", type: "expense" },
 ]
+
+/** Phase 3D — financing marketplace GL placeholders (merged by ensureBlitzpayDefaultFinancingAccounts). */
+export const BLITZPAY_FINANCING_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "1250", name: "Financing Receivable (Placeholder)", type: "asset" },
+  { code: "2115", name: "Deferred Financing Revenue", type: "liability" },
+  { code: "2325", name: "Contractor Advance Liability (Planning)", type: "liability" },
+  { code: "4350", name: "Financing Fee Revenue", type: "revenue" },
+]

@@ -101,6 +101,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     vendor1099ReadinessRate: number
     filingReadinessScore: number
     complianceHealthScore: number
+    /** Phase 3D — financing marketplace (bounded; orchestration only). */
+    financingApplicationApprovalRate: number
+    averageApprovedFinancingAmount: number
+    financingMarketplaceCoverage: number
+    contractorAdvanceExposure: number
+    financingRevenueOpportunity: number
+    financingRiskScore: number
+    financingConversionRate: number
+    financingTreasuryImpactScore: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -129,6 +138,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     accounting: { href: "/settings/payments#blitzpay-accounting-overview-anchor", label: "Internal books & trial balance (Settings → Payments)" },
     apBillPay: { href: "/settings/payments#blitzpay-ap-bill-pay-anchor", label: "Vendor bills & pay planning (Settings → Payments)" },
     taxCompliance: { href: "/settings/payments#blitzpay-tax-compliance-anchor", label: "Tax & compliance overview (Settings → Payments)" },
+    financingMarketplace: {
+      href: "/settings/payments#blitzpay-financing-marketplace-anchor",
+      label: "Financing marketplace (Settings → Payments)",
+    },
   }
 }
 
@@ -309,6 +322,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       vendor1099ReadinessRate: reporting.vendor1099ReadinessRate,
       filingReadinessScore: reporting.filingReadinessScore,
       complianceHealthScore: reporting.complianceHealthScore,
+      financingApplicationApprovalRate: reporting.financingApplicationApprovalRate,
+      averageApprovedFinancingAmount: reporting.averageApprovedFinancingAmount,
+      financingMarketplaceCoverage: reporting.financingMarketplaceCoverage,
+      contractorAdvanceExposure: reporting.contractorAdvanceExposure,
+      financingRevenueOpportunity: reporting.financingRevenueOpportunity,
+      financingRiskScore: reporting.financingRiskScore,
+      financingConversionRate: reporting.financingConversionRate,
+      financingTreasuryImpactScore: reporting.financingTreasuryImpactScore,
     },
     combinedForecast,
     scorecards,
