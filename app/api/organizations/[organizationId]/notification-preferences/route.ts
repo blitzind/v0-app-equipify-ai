@@ -190,9 +190,16 @@ export async function PATCH(
     const raw = await request.json().catch(() => ({}))
     body = PatchBodySchema.parse(raw)
   } catch (e) {
-    const msg =
-      e instanceof z.ZodError ? e.issues.map((x) => x.message).join(" ") : "Invalid JSON body."
-    return NextResponse.json({ error: "bad_request", message: msg || "Invalid request." }, { status: 400 })
+    if (e instanceof z.ZodError) {
+      console.warn("[notification-preferences PATCH] validation failed", {
+        issues: e.issues.map((i) => ({ path: i.path, code: i.code })),
+      })
+      return NextResponse.json(
+        { error: "bad_request", message: "Check your notification settings and try again." },
+        { status: 400 },
+      )
+    }
+    return NextResponse.json({ error: "bad_request", message: "Invalid request body." }, { status: 400 })
   }
 
   if (body.preferences) {

@@ -7,6 +7,7 @@ import {
   isWorkspaceAlertType,
   type WorkspaceAlertType,
 } from "@/lib/notifications/workspace-alert-registry"
+import { DEFAULT_DIGEST_TIME_LOCAL, normalizeLocalHm } from "@/lib/notifications/notification-time-local"
 
 export type NotificationPreferenceDto = {
   alertType: WorkspaceAlertType
@@ -103,20 +104,22 @@ export function normalizeDigestRow(row: DigestRow | null): DigestSettingsDto {
     return {
       digestEnabled: false,
       digestFrequency: "daily",
-      digestTimeLocal: "08:00",
+      digestTimeLocal: DEFAULT_DIGEST_TIME_LOCAL,
       quietHoursEnabled: false,
       quietHoursStartLocal: null,
       quietHoursEndLocal: null,
     }
   }
   const freq = row.digest_frequency === "weekly" ? "weekly" : "daily"
+  const digestTimeLocal = normalizeLocalHm(row.digest_time_local, DEFAULT_DIGEST_TIME_LOCAL)
+  const qh = Boolean(row.quiet_hours_enabled)
   return {
     digestEnabled: Boolean(row.digest_enabled),
     digestFrequency: freq,
-    digestTimeLocal: row.digest_time_local,
-    quietHoursEnabled: Boolean(row.quiet_hours_enabled),
-    quietHoursStartLocal: row.quiet_hours_start_local,
-    quietHoursEndLocal: row.quiet_hours_end_local,
+    digestTimeLocal,
+    quietHoursEnabled: qh,
+    quietHoursStartLocal: qh ? normalizeLocalHm(row.quiet_hours_start_local, "22:00") : null,
+    quietHoursEndLocal: qh ? normalizeLocalHm(row.quiet_hours_end_local, "07:00") : null,
   }
 }
 

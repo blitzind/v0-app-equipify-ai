@@ -8,7 +8,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import { WORKSPACE_ALERT_REGISTRY, WORKSPACE_ALERT_TYPES, type WorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
+import {
+  WORKSPACE_ALERT_REGISTRY,
+  WORKSPACE_ALERT_TYPES,
+  isWorkspaceAlertType,
+  type WorkspaceAlertType,
+} from "@/lib/notifications/workspace-alert-registry"
+import { DEFAULT_DIGEST_TIME_LOCAL, normalizeLocalHm } from "@/lib/notifications/notification-time-local"
 import { cn } from "@/lib/utils"
 
 const TIMES = [
@@ -44,32 +50,104 @@ type ApiResponse = ApiBundle & {
   meta?: { persistenceReady?: boolean }
 }
 
-function isValidPreferencesPayload(prefs: unknown): prefs is ApiPreference[] {
-  return (
-    Array.isArray(prefs) &&
-    prefs.length === WORKSPACE_ALERT_TYPES.length &&
-    prefs.every(
-      (p) =>
-        p &&
-        typeof p === "object" &&
-        typeof (p as ApiPreference).alertType === "string" &&
-        typeof (p as ApiPreference).inAppEnabled === "boolean" &&
-        typeof (p as ApiPreference).emailEnabled === "boolean",
-    )
-  )
+const LOCAL_HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
+
+function defaultDigest(): ApiDigest {
+  return {
+    digestEnabled: false,
+    digestFrequency: "daily",
+    digestTimeLocal: DEFAULT_DIGEST_TIME_LOCAL,
+    quietHoursEnabled: false,
+    quietHoursStartLocal: null,
+    quietHoursEndLocal: null,
+  }
 }
 
-function isValidDigestPayload(d: unknown): d is ApiDigest {
-  if (!d || typeof d !== "object") return false
-  const x = d as Record<string, unknown>
-  return (
-    typeof x.digestEnabled === "boolean" &&
-    (x.digestFrequency === "daily" || x.digestFrequency === "weekly") &&
-    typeof x.digestTimeLocal === "string" &&
-    typeof x.quietHoursEnabled === "boolean" &&
-    (x.quietHoursStartLocal === null || typeof x.quietHoursStartLocal === "string") &&
-    (x.quietHoursEndLocal === null || typeof x.quietHoursEndLocal === "string")
+/** Merge API rows with registry defaults so GET/PATCH hydration never fails on shape drift. */
+function normalizeApiPreferences(raw: unknown): ApiPreference[] {
+  const base: ApiPreference[] = WORKSPACE_ALERT_REGISTRY.map((r) => ({
+    alertType: r.alertType,
+    inAppEnabled: r.defaultInApp,
+    emailEnabled: r.defaultEmail,
+    smsEnabled: false,
+  }))
+  if (!Array.isArray(raw)) return base
+  const by = new Map<WorkspaceAlertType, ApiPreference>()
+  for (const p of base) by.set(p.alertType, { ...p })
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const o = item as Record<string, unknown>
+    if (typeof o.alertType !== "string" || !isWorkspaceAlertType(o.alertType)) continue
+    by.set(o.alertType, {
+      alertType: o.alertType,
+      inAppEnabled: Boolean(o.inAppEnabled),
+      emailEnabled: Boolean(o.emailEnabled),
+      smsEnabled: false,
+    })
+  }
+  return WORKSPACE_ALERT_TYPES.map((t) => by.get(t)!)
+}
+
+function normalizeApiDigest(raw: unknown): ApiDigest {
+  const d = defaultDigest()
+  if (!raw || typeof raw !== "object") return d
+  const o = raw as Record<string, unknown>
+  const freq = o.digestFrequency === "weekly" ? "weekly" : "daily"
+  const digestEnabled = Boolean(o.digestEnabled)
+  const digestTimeLocal = normalizeLocalHm(
+    typeof o.digestTimeLocal === "string" ? o.digestTimeLocal : null,
+    DEFAULT_DIGEST_TIME_LOCAL,
   )
+  const quietHoursEnabled = Boolean(o.quietHoursEnabled)
+  const qs =
+    o.quietHoursStartLocal === null || o.quietHoursStartLocal === undefined
+      ? null
+      : typeof o.quietHoursStartLocal === "string"
+        ? o.quietHoursStartLocal
+        : null
+  const qe =
+    o.quietHoursEndLocal === null || o.quietHoursEndLocal === undefined
+      ? null
+      : typeof o.quietHoursEndLocal === "string"
+        ? o.quietHoursEndLocal
+        : null
+  return {
+    digestEnabled,
+    digestFrequency: freq,
+    digestTimeLocal: LOCAL_HM.test(digestTimeLocal) ? digestTimeLocal : DEFAULT_DIGEST_TIME_LOCAL,
+    quietHoursEnabled,
+    quietHoursStartLocal: quietHoursEnabled ? normalizeLocalHm(qs, "22:00") : null,
+    quietHoursEndLocal: quietHoursEnabled ? normalizeLocalHm(qe, "07:00") : null,
+  }
+}
+
+function friendLoadMessage(res: Response, json: { message?: string; error?: string } | null): string {
+  if (res.status === 401) {
+    return "You must be signed in to view these settings."
+  }
+  if (typeof json?.message === "string" && json.message.trim()) {
+    return json.message.trim()
+  }
+  return "Could not load notification settings."
+}
+
+function friendMutateMessage(res: Response, json: { message?: string; error?: string } | null): string {
+  if (json?.error === "not_configured") {
+    return "Notification storage is not set up on this server yet. Ask an administrator to apply the latest update, then try again."
+  }
+  if (json?.error === "server_misconfigured") {
+    return "The server could not save settings right now. Please try again later."
+  }
+  if (res.status === 401) {
+    return "You must be signed in to change these settings."
+  }
+  if (res.status === 403) {
+    return "You do not have permission to change these settings."
+  }
+  if (typeof json?.message === "string" && json.message.trim()) {
+    return json.message.trim()
+  }
+  return "Could not save settings."
 }
 
 function Toggle({
@@ -112,12 +190,16 @@ function Toggle({
 }
 
 function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
-  return prefs.map((p) => ({
-    alertType: p.alertType,
-    inAppEnabled: p.inAppEnabled,
-    emailEnabled: p.emailEnabled,
-    smsEnabled: false,
-  }))
+  const map = new Map(prefs.map((p) => [p.alertType, p]))
+  return WORKSPACE_ALERT_TYPES.map((t) => {
+    const p = map.get(t)
+    return {
+      alertType: t,
+      inAppEnabled: p?.inAppEnabled ?? false,
+      emailEnabled: p?.emailEnabled ?? false,
+      smsEnabled: false,
+    }
+  })
 }
 
 export default function NotificationsPage() {
@@ -134,6 +216,7 @@ export default function NotificationsPage() {
   const [bundle, setBundle] = useState<ApiBundle | null>(null)
   const [saving, setSaving] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const saveLockRef = useRef(false)
 
   const prefsByType = useMemo(() => {
     const m = new Map<WorkspaceAlertType, ApiPreference>()
@@ -146,10 +229,10 @@ export default function NotificationsPage() {
   const digest = bundle?.digest
 
   const applyApiNotificationResponse = useCallback((json: ApiResponse) => {
-    if (!isValidPreferencesPayload(json.preferences) || !isValidDigestPayload(json.digest)) {
-      throw new Error("Invalid response from server.")
-    }
-    setBundle({ preferences: json.preferences, digest: json.digest })
+    setBundle({
+      preferences: normalizeApiPreferences(json.preferences),
+      digest: normalizeApiDigest(json.digest),
+    })
     setPersistenceReady(json.meta?.persistenceReady !== false)
   }, [])
 
@@ -171,10 +254,11 @@ export default function NotificationsPage() {
       })
       const json = (await res.json().catch(() => null)) as ApiResponse | null
       if (!res.ok) {
-        throw new Error(typeof json?.message === "string" ? json.message : "Could not load notification settings.")
+        const msg = friendLoadMessage(res, json)
+        throw new Error(msg)
       }
       if (!json) {
-        throw new Error("Invalid response from server.")
+        throw new Error("Could not load notification settings.")
       }
       applyApiNotificationResponse(json)
       setLoadState("ready")
@@ -195,6 +279,8 @@ export default function NotificationsPage() {
   const patch = useCallback(
     async (body: { preferences?: ApiPreference[]; digest?: ApiDigest }, rollback: ApiBundle | null) => {
       if (!organizationId || !rollback) return
+      if (saveLockRef.current) return
+      saveLockRef.current = true
       setSaving(true)
       try {
         const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
@@ -204,18 +290,20 @@ export default function NotificationsPage() {
         })
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!res.ok) {
-          throw new Error(typeof json?.message === "string" ? json.message : "Could not save settings.")
+          const msg = friendMutateMessage(res, json)
+          throw new Error(msg)
         }
         if (!json) {
-          throw new Error("Invalid response from server.")
+          throw new Error("Could not save settings.")
         }
         applyApiNotificationResponse(json)
-        toast({ title: "Saved", description: "Workspace notification settings were updated." })
+        toast({ title: "Saved", description: "Notification preferences were updated." })
       } catch (e) {
         setBundle(rollback)
         const msg = e instanceof Error ? e.message : "Could not save settings."
         toast({ variant: "destructive", title: "Save failed", description: msg })
       } finally {
+        saveLockRef.current = false
         setSaving(false)
       }
     },
@@ -224,7 +312,7 @@ export default function NotificationsPage() {
 
   const updatePreferenceChannel = useCallback(
     async (alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
-      if (!bundle || !canMutate || saving) return
+      if (!bundle || !canMutate || saving || saveLockRef.current) return
       const rollback = bundle
       const nextPrefs = bundle.preferences.map((p) =>
         p.alertType === alertType ?
@@ -244,7 +332,7 @@ export default function NotificationsPage() {
 
   const updateDigest = useCallback(
     async (nextDigest: ApiDigest) => {
-      if (!bundle || !canMutate || saving) return
+      if (!bundle || !canMutate || saving || saveLockRef.current) return
       const rollback = bundle
       setBundle({ ...bundle, digest: nextDigest })
       await patch({ preferences: preferencesPayload(bundle.preferences), digest: nextDigest }, rollback)
