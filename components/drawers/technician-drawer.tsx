@@ -61,6 +61,7 @@ import {
   DRAWER_NESTED_CARD,
   type ToastItem,
 } from "@/components/detail-drawer"
+import type { LucideIcon } from "lucide-react"
 import {
   Mail,
   Calendar,
@@ -77,6 +78,11 @@ import {
   Award,
   Plus,
   TrendingUp,
+  LayoutDashboard,
+  CalendarDays,
+  BadgeCheck,
+  History,
+  BarChart3,
 } from "lucide-react"
 import { TechnicianAvatar } from "@/components/technician/technician-avatar"
 import {
@@ -89,6 +95,15 @@ import { TechnicianDrawerTruckStock } from "@/components/inventory/technician-dr
 let toastCounter = 0
 
 type DrawerTab = "overview" | "schedule" | "certifications" | "history" | "performance" | "notes"
+
+const TECHNICIAN_DRAWER_TAB_CONFIG: { id: DrawerTab; label: string; Icon: LucideIcon }[] = [
+  { id: "overview", label: "Overview", Icon: LayoutDashboard },
+  { id: "schedule", label: "Schedule", Icon: CalendarDays },
+  { id: "certifications", label: "Certifications", Icon: BadgeCheck },
+  { id: "history", label: "History", Icon: History },
+  { id: "performance", label: "Performance", Icon: BarChart3 },
+  { id: "notes", label: "Notes", Icon: StickyNote },
+]
 
 const ORG_ROLES = ["owner", "admin", "manager", "tech", "viewer"] as const
 const MEMBER_STATUSES = ["invited", "active", "suspended"] as const
@@ -1398,8 +1413,6 @@ export function TechnicianDrawer({
     viewerOrgRole === "manager" ||
     (viewerUserId !== null && techId === viewerUserId)
 
-  const TABS: DrawerTab[] = ["overview", "schedule", "certifications", "history", "performance", "notes"]
-
   if (!techId) return null
 
   return (
@@ -1447,22 +1460,16 @@ export function TechnicianDrawer({
           </div>
         </div>
 
-        <div className="flex gap-1 border-b border-border shrink-0 px-2 py-2 overflow-x-auto">
-          {TABS.map((t) => (
+        <div className="flex gap-1 border-b border-border shrink-0 px-2 py-2 overflow-x-auto overflow-y-hidden overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TECHNICIAN_DRAWER_TAB_CONFIG.map(({ id, label, Icon }) => (
             <button
-              key={t}
+              key={id}
               type="button"
-              onClick={() => setTab(t)}
-              className={cnDrawerTabButton(tab === t, "capitalize text-sm py-3 px-2.5 font-medium")}
+              onClick={() => setTab(id)}
+              className={cnDrawerTabButton(tab === id, "gap-2 text-sm py-3 px-2.5 font-medium whitespace-nowrap shrink-0")}
             >
-              {t === "notes" ? (
-                <span className="flex items-center gap-1">
-                  <StickyNote className="w-3.5 h-3.5" />
-                  Notes
-                </span>
-              ) : (
-                t
-              )}
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              {label}
             </button>
           ))}
         </div>

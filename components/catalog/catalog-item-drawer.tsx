@@ -14,6 +14,11 @@ import {
   Archive,
   Upload,
   Warehouse,
+  FileText,
+  Receipt,
+  ClipboardList,
+  ShoppingCart,
+  Wrench,
 } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { getCatalogAiStatusLabel } from "@/lib/catalog/catalog-ai-status"
@@ -408,20 +413,35 @@ export function CatalogItemDrawer({
       actions={
         item ? (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-              <Link href={`/quotes?catalogItem=${encodeURIComponent(item.id)}`}>Add to quote</Link>
+            <Button size="sm" variant="secondary" className="h-8 gap-2 text-xs" asChild>
+              <Link href={`/quotes?catalogItem=${encodeURIComponent(item.id)}`}>
+                <FileText className="h-4 w-4 shrink-0" aria-hidden />
+                Add to quote
+              </Link>
             </Button>
-            <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-              <Link href={`/invoices?catalogItem=${encodeURIComponent(item.id)}`}>Add to invoice</Link>
+            <Button size="sm" variant="secondary" className="h-8 gap-2 text-xs" asChild>
+              <Link href={`/invoices?catalogItem=${encodeURIComponent(item.id)}`}>
+                <Receipt className="h-4 w-4 shrink-0" aria-hidden />
+                Add to invoice
+              </Link>
             </Button>
-            <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-              <Link href={`/work-orders?catalogItem=${encodeURIComponent(item.id)}`}>Add to work order</Link>
+            <Button size="sm" variant="secondary" className="h-8 gap-2 text-xs" asChild>
+              <Link href={`/work-orders?catalogItem=${encodeURIComponent(item.id)}`}>
+                <ClipboardList className="h-4 w-4 shrink-0" aria-hidden />
+                Add to work order
+              </Link>
             </Button>
-            <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-              <Link href={`/purchase-orders?catalogItem=${encodeURIComponent(item.id)}`}>Add to PO</Link>
+            <Button size="sm" variant="secondary" className="h-8 gap-2 text-xs" asChild>
+              <Link href={`/purchase-orders?catalogItem=${encodeURIComponent(item.id)}`}>
+                <ShoppingCart className="h-4 w-4 shrink-0" aria-hidden />
+                Add to PO
+              </Link>
             </Button>
-            <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
-              <Link href="/equipment">Equipment assets</Link>
+            <Button size="sm" variant="outline" className="h-8 gap-2 text-xs" asChild>
+              <Link href="/equipment">
+                <Wrench className="h-4 w-4 shrink-0" aria-hidden />
+                Equipment assets
+              </Link>
             </Button>
             {canManage ? (
               <Button
