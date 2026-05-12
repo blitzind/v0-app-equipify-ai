@@ -14,6 +14,7 @@ import { deriveBlitzpayCashPlanningMetrics, type BlitzpayCashReserveRuleInput } 
 import { fetchBlitzpayPhase2aaReportingRates } from "@/lib/blitzpay/blitzpay-billing-profiles-service"
 import { fetchBlitzpayPhase2abCollectionReporting } from "@/lib/blitzpay/blitzpay-collections-service"
 import { fetchGlReportingSnapshotFields } from "@/lib/blitzpay/blitzpay-general-ledger-service"
+import { computeBlitzpayPhase4aReportingScores } from "@/lib/blitzpay/blitzpay-ai-snapshot-scores"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -196,6 +197,15 @@ export type BlitzpayOrgReportingSnapshot = {
   serializedAssetExposure: number
   procurementTreasuryImpactScore: number
   inventoryMarginHealthScore: number
+  /** Phase 4A — AI financial copilot advisory scores (deterministic; 0–100). */
+  aiFinancialRiskScore: number
+  treasuryPressureScore: number
+  marginRiskScore: number
+  collectionsOptimizationScore: number
+  payrollPressureScore: number
+  procurementEfficiencyScore: number
+  vendorConcentrationRiskScore: number
+  aiInsightCoverageRate: number
 }
 
 /**
@@ -883,6 +893,37 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     recurringPlannedInflow30dCents: blitzpayRecurringPlannedInflow30dCents,
   })
 
+  const netCollectedCentsForPhase = Math.max(0, gross - refunded)
+  const phase4a = computeBlitzpayPhase4aReportingScores({
+    cashRunwayStatus: cash2z.cashRunwayStatus,
+    cashReserveGapCents: cash2z.cashReserveGapCents,
+    estimatedOperatingCashCents: cash2z.estimatedOperatingCashCents,
+    expectedInflows7dCents: cash2z.expectedInflows7dCents,
+    expectedInflows30dCents: cash2z.expectedInflows30dCents,
+    expectedOutflows30dCents: cash2z.expectedOutflows30dCents,
+    treasuryFailedPayoutCount30d,
+    treasuryPendingPayoutTotalsCents,
+    treasuryEstimateUpcomingTransferCents,
+    inventoryMarginHealthScore,
+    failedPaymentRate,
+    delinquencyRate,
+    collectionSuccessRate,
+    estimatedRecoverableOverdueCents,
+    accountsReceivableCents,
+    payrollLiabilityCents,
+    estimatedPayrollBurdenCents,
+    procurementTreasuryImpactScore,
+    payableAgingHealthScore,
+    inventoryTurnoverScore,
+    vendorConcentrationRisk,
+    trialBalanceHealthy,
+    unreconciledBatchCount,
+    openDisputesAmountCents,
+    netCollectedCents: netCollectedCentsForPhase,
+    blitzpayChurnRiskScore0to100,
+    financingRiskScore,
+  })
+
   return {
     sinceIso,
     grossProcessedVolumeCents: gross,
@@ -1030,5 +1071,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     serializedAssetExposure,
     procurementTreasuryImpactScore,
     inventoryMarginHealthScore,
+    aiFinancialRiskScore: phase4a.aiFinancialRiskScore,
+    treasuryPressureScore: phase4a.treasuryPressureScore,
+    marginRiskScore: phase4a.marginRiskScore,
+    collectionsOptimizationScore: phase4a.collectionsOptimizationScore,
+    payrollPressureScore: phase4a.payrollPressureScore,
+    procurementEfficiencyScore: phase4a.procurementEfficiencyScore,
+    vendorConcentrationRiskScore: phase4a.vendorConcentrationRiskScore,
+    aiInsightCoverageRate: phase4a.aiInsightCoverageRate,
   }
 }

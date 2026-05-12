@@ -106,6 +106,10 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_reorder_forecasts", select: "id, organization_id, forecast_status" },
   { name: "blitzpay_serialized_asset_financials", select: "id, organization_id, asset_status" },
   { name: "blitzpay_procurement_audit_log", select: "id, organization_id, audit_type" },
+  { name: "blitzpay_ai_financial_insights", select: "id, organization_id, insight_type" },
+  { name: "blitzpay_ai_recommendation_actions", select: "id, organization_id, action_status" },
+  { name: "blitzpay_ai_forecast_snapshots", select: "id, organization_id, snapshot_type" },
+  { name: "blitzpay_ai_audit_log", select: "id, organization_id, audit_type" },
 ]
 
 export type BlitzpaySchemaHealthResult =

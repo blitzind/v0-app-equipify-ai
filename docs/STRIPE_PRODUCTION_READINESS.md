@@ -85,6 +85,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Schema:** apply `20261015120000_blitzpay_phase_3e_procurement_inventory_finance.sql` so staff `…/blitzpay/procurement/*` routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise).
 - **Stripe / webhooks:** no new Connect webhook types are required for Phase **3E**; inventory and procurement signals are **internal** to Postgres reporting surfaces.
 
+### BlitzPay Phase 4A (AI financial copilot — advisory only)
+
+- **No autonomous execution:** insights, forecasts, and recommendation rows are **operational recommendations**; APIs only dismiss/acknowledge/complete advisory queue items.
+- **Schema:** apply `20261116120000_blitzpay_phase_4a_ai_financial_copilot.sql` so staff `…/blitzpay/ai/*` routes pass **schema health** checks.
+- **Optional env:** `BLITZPAY_AI_AUDIT_PEPPER` (server-only) — strengthens immutable audit hashes; distinct from `BLITZPAY_GL_SOURCE_PEPPER`. See `docs/BLITZPAY_PHASE_4_ARCHITECTURE.md`.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

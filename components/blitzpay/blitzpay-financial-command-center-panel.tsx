@@ -100,6 +100,14 @@ type CommandCenterPayload = {
     serializedAssetExposure?: number
     procurementTreasuryImpactScore?: number
     inventoryMarginHealthScore?: number
+    aiFinancialRiskScore?: number
+    treasuryPressureScore?: number
+    marginRiskScore?: number
+    collectionsOptimizationScore?: number
+    payrollPressureScore?: number
+    procurementEfficiencyScore?: number
+    vendorConcentrationRiskScore?: number
+    aiInsightCoverageRate?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number

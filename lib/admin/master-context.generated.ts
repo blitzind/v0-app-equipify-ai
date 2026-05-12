@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 370,
-  sqlMigrations: 175,
+  apiRouteHandlers: 378,
+  sqlMigrations: 176,
   dashboardPages: 62,
-  componentsTsx: 280,
-  libTsFiles: 633,
+  componentsTsx: 281,
+  libTsFiles: 638,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **370** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **175** |
+| API route handlers (\`app/api/**/route.ts\`) | **378** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **176** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **280** |
-| \`lib/**/*.ts\` | **633** |
+| \`components/**/*.tsx\` | **281** |
+| \`lib/**/*.ts\` | **638** |
 
 ### Vercel crons
 
@@ -108,6 +108,14 @@ organizations/[organizationId]/blitzpay/accounting/journal-entries/route.ts
 organizations/[organizationId]/blitzpay/accounting/revenue-recognition/run/route.ts
 organizations/[organizationId]/blitzpay/accounting/trial-balance/route.ts
 organizations/[organizationId]/blitzpay/ach-authorizations/route.ts
+organizations/[organizationId]/blitzpay/ai/executive-summary/route.ts
+organizations/[organizationId]/blitzpay/ai/forecasts/route.ts
+organizations/[organizationId]/blitzpay/ai/health/route.ts
+organizations/[organizationId]/blitzpay/ai/insights/[insightId]/dismiss/route.ts
+organizations/[organizationId]/blitzpay/ai/insights/route.ts
+organizations/[organizationId]/blitzpay/ai/recommendations/[recommendationId]/acknowledge/route.ts
+organizations/[organizationId]/blitzpay/ai/recommendations/[recommendationId]/complete/route.ts
+organizations/[organizationId]/blitzpay/ai/recommendations/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
 organizations/[organizationId]/blitzpay/ap/ap-health/route.ts
 organizations/[organizationId]/blitzpay/ap/bills/[billId]/approve/route.ts

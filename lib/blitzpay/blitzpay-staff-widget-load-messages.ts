@@ -4,6 +4,7 @@ export const blitzpayStaffWidgetLoadCopy = {
   recurringRevenue: "Recurring revenue data is temporarily unavailable.",
   collectionsCopilot: "Collections insights are temporarily unavailable.",
   financialCommandCenter: "Financial command center data is temporarily unavailable.",
+  aiFinancialCopilot: "AI financial copilot data is temporarily unavailable.",
   cashPlanning: "Cash planning data is temporarily unavailable.",
   payroll: "Payroll insights are temporarily unavailable.",
   commissions: "Commissions data is temporarily unavailable.",

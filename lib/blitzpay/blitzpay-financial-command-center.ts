@@ -119,6 +119,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     serializedAssetExposure: number
     procurementTreasuryImpactScore: number
     inventoryMarginHealthScore: number
+    /** Phase 4A — deterministic copilot scores (0–100; advisory). */
+    aiFinancialRiskScore: number
+    treasuryPressureScore: number
+    marginRiskScore: number
+    collectionsOptimizationScore: number
+    payrollPressureScore: number
+    procurementEfficiencyScore: number
+    vendorConcentrationRiskScore: number
+    aiInsightCoverageRate: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -349,9 +358,17 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       reorderExposureCents: reporting.reorderExposureCents,
       rebateOpportunityCents: reporting.rebateOpportunityCents,
       serializedAssetExposure: reporting.serializedAssetExposure,
-      procurementTreasuryImpactScore: reporting.procurementTreasuryImpactScore,
-      inventoryMarginHealthScore: reporting.inventoryMarginHealthScore,
-    },
+    procurementTreasuryImpactScore: reporting.procurementTreasuryImpactScore,
+    inventoryMarginHealthScore: reporting.inventoryMarginHealthScore,
+    aiFinancialRiskScore: reporting.aiFinancialRiskScore,
+    treasuryPressureScore: reporting.treasuryPressureScore,
+    marginRiskScore: reporting.marginRiskScore,
+    collectionsOptimizationScore: reporting.collectionsOptimizationScore,
+    payrollPressureScore: reporting.payrollPressureScore,
+    procurementEfficiencyScore: reporting.procurementEfficiencyScore,
+    vendorConcentrationRiskScore: reporting.vendorConcentrationRiskScore,
+    aiInsightCoverageRate: reporting.aiInsightCoverageRate,
+  },
     combinedForecast,
     scorecards,
     commandCenterRecommendations,

@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T03:02:10.008Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T03:19:43.786Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -215,8 +215,9 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 - **Gaps:** Future SQL/materialized reporting views for very large tenants.
 
 ### Insights & AI Assistants
-- **Routes:** \`/insights\`, \`/ai-assistants\`; in-app AIden help chat via \`/api/organizations/[organizationId]/aiden/chat\`.
+- **Routes:** \`/insights\`, \`/insights/financial-command-center\`, \`/ai-assistants\`; in-app AIden help chat via \`/api/organizations/[organizationId]/aiden/chat\`.
 - **Purpose:** AI insights generation; operational assistants; job queue processing; AIden provides step-by-step in-app product help grounded in this master context.
+- **BlitzPay Phase 4A:** Deterministic-first **AI financial copilot** (staff-only APIs \`/api/organizations/[organizationId]/blitzpay/ai/*\`, FCC + Insights hub panel) — advisory artifacts only; see \`docs/BLITZPAY_PHASE_4_ARCHITECTURE.md\`.
 - **Status:** Implemented; cron processes AI jobs; AIden is lightweight, session-only chat in the dashboard shell.
 - **Layout note (Phase 56.6):** The AIden launcher owns the bottom-right (\`z-[95]\`). Fixed drawer toasts, billing trial chip, and similar stacks use \`.br-stack-clear-aiden\` + \`--aiden-launcher-*\` CSS vars (\`app/globals.css\`) so they sit above the launcher; Radix \`ToastViewport\` uses the same offset on \`sm+\`.
 - **Gaps:** Plan/budget gating UX; task coverage.
