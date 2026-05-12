@@ -60,6 +60,8 @@ When a member with **`canEditOrgBilling`** adds an optional payment method befor
 
 **Operational customers** (CRM `customers` billing profiles) are separate from this SaaS flow; there is no distinct “billing contact” row for the workspace itself beyond company profile + Stripe.
 
+**Manage billing (in-app):** **Manage billing** opens a **Dialog** on `/settings/billing` with plan/status, payment method summary, add/update card (existing SetupIntent flow), workspace billing contact (read-only; edits under Settings → Workspace), recent SaaS invoices with View/PDF links, compare-plans navigation, and an explicit **“Continue to external billing page”** control that calls `createPortalSession` only after clear copy (Stripe-hosted portal for rare advanced changes). Bulk invoice download and self-serve subscription cancel remain **coming soon** in-app (disabled / copy).
+
 ## BlitzPay (Connect) vs SaaS subscription webhooks
 
 **BlitzPay** end-customer invoice payments use **`POST /api/blitzpay/webhook`** and the **Connect** webhook secret (`STRIPE_BLITZPAY_WEBHOOK_SECRET` / env naming per deploy). That path is **separate** from **`POST /api/stripe/webhook`** (SaaS subscriptions). Phase **2O** financing/installment features **do not** add new Stripe event types to the SaaS webhook; future third-party financing integrations must keep **PII and application payloads out of Equipify** and use **opaque provider references** only.

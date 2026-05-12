@@ -243,6 +243,11 @@ export async function createCheckoutSession(
   }
 }
 
+/**
+ * Stripe Billing Portal session for the SaaS subscription customer.
+ * **Primary UX** is the in-app Manage billing dialog on `/settings/billing`; call this only after the user explicitly
+ * opts in to an external Stripe-hosted page (advanced changes not yet mirrored in-app).
+ */
 export async function createPortalSession(): Promise<{ url: string | null; error?: string }> {
   const origin = (await headers()).get("origin") ?? "http://localhost:3000"
   let stripe: ReturnType<typeof getStripe>

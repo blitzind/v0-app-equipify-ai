@@ -26,7 +26,7 @@ SaaS subscription billing stays on the existing platform Stripe account and `/ap
 |--------|------|
 | `app/api/billing/checkout/route.ts` | Hosted Checkout Session for **Equipify plan** subscriptions |
 | `app/actions/stripe.ts`, `lib/billing/hosted-subscription-checkout.ts` | Embedded / admin checkout paths; metadata ties session to `organization_id` |
-| `app/(dashboard)/settings/billing/page.tsx` | Plan purchase, portal, Stripe customer payment methods for **Equipify subscription** |
+| `app/(dashboard)/settings/billing/page.tsx` | Plan purchase, **in-app Manage billing** dialog (payment method, invoices, contact), optional SetupIntent card flow; explicit fallback to Stripe Billing Portal only from that dialog |
 | `app/actions/stripe-setup.ts` | Setup intents for SaaS subscription billing; validates billing address, updates Stripe **Customer**, `confirmCardSetup` billing_details |
 | `app/actions/stripe-billing-data.ts` | Reads Stripe **subscription** invoices / PMs for settings UI |
 | `organization_subscriptions` | SaaS tier, Stripe customer/subscription/price ids, status, periods |

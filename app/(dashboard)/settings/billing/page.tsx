@@ -49,6 +49,13 @@ import {
   Users, Package, Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -360,7 +367,8 @@ function BillingPageContent() {
   const [seatMetrics, setSeatMetrics] = useState<SeatMetricsApi | null>(null)
   const [billingLoadError, setBillingLoadError] = useState<string | null>(null)
   const [billingLoading, setBillingLoading] = useState(true)
-  const [portalBusy, setPortalBusy] = useState(false)
+  const [manageBillingOpen, setManageBillingOpen] = useState(false)
+  const [externalPortalBusy, setExternalPortalBusy] = useState(false)
   const [portalMessage, setPortalMessage] = useState<string | null>(null)
 
   const [stripeBillingLoading, setStripeBillingLoading] = useState(false)
@@ -571,9 +579,23 @@ function BillingPageContent() {
   const nextRenewalDate = periodEndIso ? fmtIsoDate(periodEndIso.slice(0, 10)) : ""
   const billingCycleLabel = subscription?.billing_cycle ?? workspace.billingCycle
 
-  async function openBillingPortal() {
+  const manageDialogScheduleLine =
+    trialLive && subscription?.trial_ends_at
+      ? `Trial ends ${fmtIsoDate(subscription.trial_ends_at.slice(0, 10))}`
+      : nextRenewalDate && subscription && subscription.status !== "trialing"
+        ? `Next renewal ${nextRenewalDate}`
+        : periodEndIso
+          ? `Billing period through ${fmtIsoDate(periodEndIso.slice(0, 10))}`
+          : null
+
+  function openManageBillingModal() {
     setPortalMessage(null)
-    setPortalBusy(true)
+    setManageBillingOpen(true)
+  }
+
+  async function openExternalStripeBillingPortal() {
+    setPortalMessage(null)
+    setExternalPortalBusy(true)
     try {
       const { url, error } = await createPortalSession()
       if (url) {
@@ -582,12 +604,21 @@ function BillingPageContent() {
       }
       setPortalMessage(
         error ??
-          "We couldn't open billing management right now. Please try again or contact support.",
+          "We couldn't open the external billing page. Please try again or contact support.",
       )
-      setBillingRefreshTick((n) => n + 1)
     } finally {
-      setPortalBusy(false)
+      setExternalPortalBusy(false)
     }
+  }
+
+  function handleAddPaymentFromManageBilling() {
+    setManageBillingOpen(false)
+    window.setTimeout(() => void openAddCardModal(), 120)
+  }
+
+  function handleComparePlansFromManageBilling() {
+    setManageBillingOpen(false)
+    window.setTimeout(() => jumpToPlanComparison(), 120)
   }
 
   function jumpToPlanComparison() {
@@ -603,7 +634,7 @@ function BillingPageContent() {
       jumpToPlanComparison()
       return
     }
-    void openBillingPortal()
+    openManageBillingModal()
   }
 
   async function startHostedCheckout(planId: PlanId) {
@@ -722,6 +753,200 @@ function BillingPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Dialog
+        open={manageBillingOpen}
+        onOpenChange={(open) => {
+          setManageBillingOpen(open)
+          if (!open) setPortalMessage(null)
+        }}
+      >
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "flex w-[calc(100%-1.25rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-lg",
+            "max-h-[min(90vh,680px)]",
+          )}
+        >
+          <div className="shrink-0 border-b border-border px-5 pb-4 pt-5 pr-12">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-base">Manage billing</DialogTitle>
+              <DialogDescription className="text-xs leading-relaxed">
+                Subscription and payment details for this workspace. Changes sync to our payment processor; sensitive
+                identifiers are never shown here.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {portalMessage && (
+              <div
+                className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-foreground leading-relaxed"
+                role="status"
+              >
+                {portalMessage}
+              </div>
+            )}
+
+            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+              <h4 className="text-xs font-semibold text-foreground">Plan & status</h4>
+              <p className="text-sm text-foreground">
+                {trialLive ? "Scale trial" : `${currentPlanData.name} plan`}{" "}
+                <span className="text-muted-foreground">({billingCycleLabel})</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Status: <span className="font-medium text-foreground">{subscriptionStatusDisplay}</span>
+              </p>
+              {manageDialogScheduleLine ? (
+                <p className="text-xs text-muted-foreground">{manageDialogScheduleLine}</p>
+              ) : null}
+            </section>
+
+            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+              <h4 className="text-xs font-semibold text-foreground">Default payment method</h4>
+              {stripeBillingLoading ? (
+                <p className="text-xs text-muted-foreground">Loading…</p>
+              ) : stripePaymentMethod?.last4 ? (
+                <p className="text-sm text-foreground">
+                  {formatCardBrand(stripePaymentMethod.brand)} ending in {stripePaymentMethod.last4}
+                  {stripePaymentMethod.expMonth != null && stripePaymentMethod.expYear != null
+                    ? ` · Expires ${String(stripePaymentMethod.expMonth).padStart(2, "0")} / ${stripePaymentMethod.expYear}`
+                    : null}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">No card on file yet.</p>
+              )}
+              {!stripeBillingLoading && stripeBillingNote ? (
+                <p className="text-[11px] text-muted-foreground leading-snug">{stripeBillingNote}</p>
+              ) : null}
+              {canEditOrgInvoiceDefaults && hasStripe ? (
+                <Button type="button" variant="outline" size="sm" className="mt-1 w-full sm:w-auto" onClick={handleAddPaymentFromManageBilling}>
+                  Add or update payment method
+                </Button>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Ask a workspace billing admin to update the card on file.</p>
+              )}
+            </section>
+
+            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+              <h4 className="text-xs font-semibold text-foreground">Billing contact</h4>
+              <dl className="space-y-1.5 text-xs text-muted-foreground">
+                <div>
+                  <dt className="font-medium text-foreground/90">Company</dt>
+                  <dd className="break-words">{workspace.name || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground/90">Email</dt>
+                  <dd className="break-all">{workspace.companyEmail?.trim() || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground/90">Phone</dt>
+                  <dd>{workspace.companyPhone?.trim() || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground/90">Address</dt>
+                  <dd className="whitespace-pre-wrap break-words">
+                    {workspace.companyAddress?.trim() || "—"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-[10px] text-muted-foreground leading-snug pt-1">
+                Company profile edits are under{" "}
+                <Link href="/settings/workspace" className="text-primary font-medium underline-offset-2 hover:underline">
+                  Settings → Workspace
+                </Link>
+                .
+              </p>
+            </section>
+
+            <section className="space-y-2 rounded-lg border border-border bg-secondary/30 px-3 py-3">
+              <h4 className="text-xs font-semibold text-foreground">Invoices & receipts</h4>
+              {stripeBillingLoading ? (
+                <p className="text-xs text-muted-foreground">Loading…</p>
+              ) : stripeInvoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {stripeBillingNote ?? "No invoices yet. They will appear after your first charge."}
+                </p>
+              ) : (
+                <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {stripeInvoices.slice(0, 12).map((inv) => {
+                    const statusLabel = inv.status ? formatBillingStatus(inv.status) : "—"
+                    const label = inv.number?.trim() || "Subscription invoice"
+                    return (
+                      <li
+                        key={inv.id}
+                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-background/80 px-2.5 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">{label}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {fmtIsoDate(inv.created.slice(0, 10))} · {invoiceAmountLabel(inv)} · {statusLabel}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-1">
+                          {inv.hostedInvoiceUrl ? (
+                            <Button variant="ghost" size="sm" className="h-7 text-xs px-2" asChild>
+                              <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
+                                View
+                              </a>
+                            </Button>
+                          ) : null}
+                          {inv.invoicePdf ? (
+                            <Button variant="ghost" size="sm" className="h-7 text-xs px-2 gap-1" asChild>
+                              <a href={inv.invoicePdf} target="_blank" rel="noopener noreferrer">
+                                <Download size={12} /> PDF
+                              </a>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section className="space-y-2 rounded-lg border border-dashed border-border px-3 py-3">
+              <h4 className="text-xs font-semibold text-foreground">Change or cancel plan</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="font-medium text-foreground">Compare and change plan:</span> choose a plan on this page
+                to start checkout (you may leave Equipify briefly for secure payment).
+              </p>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleComparePlansFromManageBilling}>
+                Compare plans on this page
+              </Button>
+              <div className="rounded-md bg-muted/50 px-2.5 py-2 text-[11px] text-muted-foreground leading-snug">
+                Canceling or downgrading your subscription through a self-serve control is not available in this dialog
+                yet.{" "}
+                <span className="font-medium text-foreground/90">This billing action will be available here soon.</span>
+              </div>
+            </section>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-3 border-t border-border bg-muted/20 px-5 py-4">
+            <div className="rounded-md border border-border bg-background/80 px-3 py-2.5 space-y-2">
+              <p className="text-[11px] font-medium text-foreground">Advanced billing (external)</p>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Only use this if you need an account change we have not moved into Equipify yet. This opens a secure
+                external billing page hosted by our payment processor.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                disabled={externalPortalBusy || !hasStripeCustomer}
+                onClick={() => void openExternalStripeBillingPortal()}
+              >
+                {externalPortalBusy ? "Opening…" : "Continue to external billing page"}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-snug text-center sm:text-left">
+              You will be billed by Blitz Industries, Inc., the parent company of Equipify.ai.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Equipify account subscription billing — customer invoice defaults live under Settings → Payments */}
       <div className="rounded-lg border border-border bg-muted/15 px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">Equipify subscription & account billing</h2>
@@ -770,10 +995,9 @@ function BillingPageContent() {
                 variant="outline"
                 size="sm"
                 className="mt-1"
-                disabled={portalBusy}
                 onClick={handleBillingPrimaryAction}
               >
-                {portalBusy && hasStripeCustomer ? "Opening…" : hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
+                {hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
               </Button>
             </div>
           )}
@@ -954,23 +1178,23 @@ function BillingPageContent() {
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
-                    disabled={portalBusy && hasStripeCustomer}
                     onClick={handleBillingPrimaryAction}
                     className="flex items-center justify-center gap-1.5 min-h-[44px] sm:h-8 px-3 text-sm font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60">
-                    <CreditCard size={13} /> {portalBusy && hasStripeCustomer ? "Opening…" : hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
+                    <CreditCard size={13} /> {hasStripeCustomer ? portalPrimaryLabel : "Choose a plan"}
                   </button>
                 </div>
               )}
               {hasStripeCustomer ? (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Need to change or cancel? Manage billing in the customer portal.
+                  Need to change or cancel? Open <span className="font-medium text-foreground/90">Manage billing</span>{" "}
+                  for plan details, payment method, invoices, and billing contact — without leaving Equipify.
                 </p>
               ) : (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Choose a plan to continue after trial. No card required until you choose a plan.
                 </p>
               )}
-              {hasStripeCustomer && portalMessage && (
+              {hasStripeCustomer && portalMessage && !manageBillingOpen && (
                 <p className="text-xs text-muted-foreground">{portalMessage}</p>
               )}
             </div>
@@ -984,7 +1208,13 @@ function BillingPageContent() {
                 Your subscription payment is past due. Update your payment method to keep your subscription active and avoid
                 interruption.
               </span>
-              <Button type="button" variant="ghost" size="sm" className="ml-auto text-xs h-7" onClick={() => void openBillingPortal()}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-xs h-7"
+                onClick={() => (hasStripeCustomer ? openManageBillingModal() : void openAddCardModal())}
+              >
                 Update now
               </Button>
             </div>
@@ -1108,11 +1338,10 @@ function BillingPageContent() {
               {hasStripeCustomer ? (
                 <button
                   type="button"
-                  disabled={portalBusy}
-                  onClick={() => void openBillingPortal()}
+                  onClick={openManageBillingModal}
                   className="flex items-center justify-center min-h-[44px] sm:h-8 px-3 text-xs font-medium rounded-md border border-border bg-card hover:bg-secondary text-foreground transition-colors w-full sm:w-auto disabled:opacity-60"
                 >
-                  {portalBusy ? "Opening…" : "Manage billing"}
+                  Manage billing
                 </button>
               ) : hasStripe ? (
                 <div className="flex w-full flex-col gap-2 sm:max-w-xl">
@@ -1125,7 +1354,7 @@ function BillingPageContent() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
-                        disabled={setupBusy || portalBusy}
+                        disabled={setupBusy}
                         onClick={() => void openAddCardModal()}
                         className="flex min-h-[44px] items-center justify-center rounded-md border border-primary bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60 sm:h-8 sm:min-h-0"
                       >
@@ -1151,7 +1380,7 @@ function BillingPageContent() {
                 </p>
               )}
             </div>
-            {portalMessage ? (
+            {portalMessage && !manageBillingOpen ? (
               <div
                 className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-foreground leading-relaxed"
                 role="status"
@@ -1373,18 +1602,23 @@ function BillingPageContent() {
 
       {/* ── Invoice history (Stripe) ── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-border flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <h3 className="text-sm font-semibold text-foreground">Invoice history</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-xs h-7 gap-1.5"
-            disabled={portalBusy || !hasStripeCustomer}
-            onClick={() => void openBillingPortal()}
-          >
-            <Download size={12} /> Download all
-          </Button>
+          <div className="flex flex-col items-stretch sm:items-end gap-1 min-w-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs h-7 gap-1.5"
+              disabled
+              title="This billing action will be available here soon."
+            >
+              <Download size={12} /> Download all
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center sm:text-right leading-snug max-w-xs">
+              This billing action will be available here soon. Open each invoice below for PDF or hosted receipt.
+            </p>
+          </div>
         </div>
         <table className="w-full text-sm">
           <thead>
