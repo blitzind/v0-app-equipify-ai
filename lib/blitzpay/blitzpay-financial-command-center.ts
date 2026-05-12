@@ -145,6 +145,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     sharedBenchmarkCoverage: number
     multiEntityRiskScore: number
     consolidatedOrganizationCount: number
+    /** Phase 5B — supplier network (aggregate / advisory only). */
+    supplierNetworkParticipationScore: number
+    procurementBenchmarkScore: number
+    preferredPricingOpportunityCents: number
+    bulkPurchaseOpportunityCents: number
+    supplierPerformanceHealthScore: number
+    rebateCaptureOpportunityScore: number
+    vendorFinancingOpportunityScore: number
+    supplierNetworkCoverageRate: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -184,6 +193,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     multiEntityFinance: {
       href: "/insights/financial-command-center#blitzpay-multi-entity-finance",
       label: "Multi-entity finance (linked locations)",
+    },
+    supplierNetwork: {
+      href: "/insights/financial-command-center#blitzpay-supplier-network",
+      label: "Supplier network (opt-in coordination)",
     },
   }
 }
@@ -405,6 +418,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     sharedBenchmarkCoverage: reporting.sharedBenchmarkCoverage,
     multiEntityRiskScore: reporting.multiEntityRiskScore,
     consolidatedOrganizationCount: reporting.consolidatedOrganizationCount,
+    supplierNetworkParticipationScore: reporting.supplierNetworkParticipationScore,
+    procurementBenchmarkScore: reporting.procurementBenchmarkScore,
+    preferredPricingOpportunityCents: reporting.preferredPricingOpportunityCents,
+    bulkPurchaseOpportunityCents: reporting.bulkPurchaseOpportunityCents,
+    supplierPerformanceHealthScore: reporting.supplierPerformanceHealthScore,
+    rebateCaptureOpportunityScore: reporting.rebateCaptureOpportunityScore,
+    vendorFinancingOpportunityScore: reporting.vendorFinancingOpportunityScore,
+    supplierNetworkCoverageRate: reporting.supplierNetworkCoverageRate,
   },
     combinedForecast,
     scorecards,

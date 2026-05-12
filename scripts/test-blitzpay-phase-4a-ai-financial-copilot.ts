@@ -198,6 +198,14 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     sharedBenchmarkCoverage: 0,
     multiEntityRiskScore: 0,
     consolidatedOrganizationCount: 0,
+    supplierNetworkParticipationScore: 0,
+    procurementBenchmarkScore: 0,
+    preferredPricingOpportunityCents: 0,
+    bulkPurchaseOpportunityCents: 0,
+    supplierPerformanceHealthScore: 0,
+    rebateCaptureOpportunityScore: 0,
+    vendorFinancingOpportunityScore: 0,
+    supplierNetworkCoverageRate: 0,
   }) as BlitzpayOrgReportingSnapshot
 
 // --- Phase 4a scores ---

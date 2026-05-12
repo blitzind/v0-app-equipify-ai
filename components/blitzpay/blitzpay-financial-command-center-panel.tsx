@@ -124,6 +124,14 @@ type CommandCenterPayload = {
     sharedBenchmarkCoverage?: number
     multiEntityRiskScore?: number
     consolidatedOrganizationCount?: number
+    supplierNetworkParticipationScore?: number
+    procurementBenchmarkScore?: number
+    preferredPricingOpportunityCents?: number
+    bulkPurchaseOpportunityCents?: number
+    supplierPerformanceHealthScore?: number
+    rebateCaptureOpportunityScore?: number
+    vendorFinancingOpportunityScore?: number
+    supplierNetworkCoverageRate?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -334,6 +342,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Linked locations — benchmark coverage", v: `${data.tiles.sharedBenchmarkCoverage ?? 0}/100` },
               { k: "Linked locations — multi-entity risk (mean)", v: `${data.tiles.multiEntityRiskScore ?? 0}/100` },
               { k: "Linked locations — orgs in rollups", v: String(data.tiles.consolidatedOrganizationCount ?? 0) },
+              { k: "Supplier network — participation (advisory)", v: `${data.tiles.supplierNetworkParticipationScore ?? 0}/100` },
+              { k: "Supplier network — procurement benchmark (aggregate)", v: `${data.tiles.procurementBenchmarkScore ?? 0}/100` },
+              { k: "Supplier network — preferred pricing signal (upper bound est.)", v: fmtMoney(data.tiles.preferredPricingOpportunityCents ?? 0) },
+              { k: "Supplier network — bulk coordination savings (est.)", v: fmtMoney(data.tiles.bulkPurchaseOpportunityCents ?? 0) },
+              { k: "Supplier network — supplier performance health", v: `${data.tiles.supplierPerformanceHealthScore ?? 0}/100` },
+              { k: "Supplier network — rebate capture opportunity (score)", v: `${data.tiles.rebateCaptureOpportunityScore ?? 0}/100` },
+              { k: "Supplier network — vendor financing visibility (score)", v: `${data.tiles.vendorFinancingOpportunityScore ?? 0}/100` },
+              { k: "Supplier network — coverage (networks + seats)", v: `${data.tiles.supplierNetworkCoverageRate ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

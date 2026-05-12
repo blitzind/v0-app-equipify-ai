@@ -243,6 +243,7 @@ export async function buildPhase5aLinkedOrgReportingSlice(
       await fetchBlitzpayOrgReportingSnapshot(admin, oid, {
         sinceIso,
         skipMultiEntity: true,
+        skipSupplierNetwork: true,
       }),
     )
   }

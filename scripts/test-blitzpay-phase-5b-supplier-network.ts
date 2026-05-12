@@ -1,21 +1,24 @@
 /**
- * BlitzPay Phase 5A — multi-entity / franchise finance foundations (deterministic helpers + route guards).
- * Run: pnpm test:blitzpay-phase-5a-multi-entity-finance
+ * BlitzPay Phase 5B — supplier / vendor network foundations (deterministic helpers + route presence).
+ * Run: pnpm test:blitzpay-phase-5b-supplier-network
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { mergePhase5aFromSnapshotsAndIntercompany, zeroPhase5aOrgReportingExtension } from "../lib/blitzpay/blitzpay-consolidated-reporting"
+import { hashBlitzpaySupplierNetworkAudit } from "../lib/blitzpay/blitzpay-supplier-network-audit"
 import {
-  rollupPayrollExposureCentsFromSnapshots,
-  rollupProcurementInventoryCentsFromSnapshots,
-  rollupTreasuryExposureCentsFromSnapshots,
-  sortIntercompanyBalancesDeterministic,
-  sumActiveIntercompanyExposureCents,
-} from "../lib/blitzpay/blitzpay-intercompany-balances"
-import { hashBlitzpayMultiEntityAudit } from "../lib/blitzpay/blitzpay-multi-entity-audit"
-import { computeSharedBenchmarkCoverage0to100 } from "../lib/blitzpay/blitzpay-shared-benchmarks"
+  averageProcurementBenchmarkScore0to100,
+  mergePhase5bFromAggregateContext,
+  procurementBenchmarkFromLocalSnapshot0to100,
+  zeroPhase5bReportingExtension,
+} from "../lib/blitzpay/blitzpay-procurement-benchmarks"
+import {
+  sumActiveBulkPurchaseSavingsCents,
+  sumActiveBulkPurchaseVolumeCents,
+  sumPreferredPricingOpportunityCents,
+} from "../lib/blitzpay/blitzpay-bulk-purchasing"
+import { averageOverallScoresDeterministic, computeSupplierOverallScore0to100 } from "../lib/blitzpay/blitzpay-vendor-performance"
 import type { BlitzpayOrgReportingSnapshot } from "../lib/blitzpay/blitzpay-reporting-snapshot"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -205,77 +208,116 @@ const snap = (partial: Partial<BlitzpayOrgReportingSnapshot>): BlitzpayOrgReport
     ...partial,
   }) as BlitzpayOrgReportingSnapshot
 
-const z = zeroPhase5aOrgReportingExtension()
-assert.equal(z.multiEntityRevenueExposureCents, 0)
+const z = zeroPhase5bReportingExtension()
+assert.equal(z.supplierNetworkParticipationScore, 0)
 
-const a = snap({
-  churnRiskRevenueCents: 1000,
-  openDisputesAmountCents: 500,
-  treasuryReserveExposureCents: 2000,
-  treasuryPendingPayoutTotalsCents: 300,
-  collectionSuccessRate: 80,
-  aiFinancialRiskScore: 40,
-  collectionsOptimizationScore: 60,
+assert.equal(
+  averageProcurementBenchmarkScore0to100([
+    { benchmark_score: 40, benchmark_type: "z" },
+    { benchmark_score: 60, benchmark_type: "a" },
+  ]),
+  50,
+)
+
+const localBench = procurementBenchmarkFromLocalSnapshot0to100({
+  procurementTreasuryImpactScore: 30,
+  inventoryTurnoverScore: 60,
+  inventoryMarginHealthScore: 90,
 })
-const b = snap({
-  churnRiskRevenueCents: 200,
-  collectionSuccessRate: 60,
-  aiFinancialRiskScore: 60,
-  collectionsOptimizationScore: 40,
+assert.equal(localBench, 60)
+
+const merged = mergePhase5bFromAggregateContext(
+  snap({
+    rebateOpportunityCents: 50_000,
+    totalInventoryValueCents: 1_000_000,
+    procurementTreasuryImpactScore: 70,
+    inventoryTurnoverScore: 70,
+    inventoryMarginHealthScore: 70,
+    reorderExposureCents: 0,
+  }),
+  {
+    visibleNetworkCount: 2,
+    activeMembershipRows: 1,
+    benchmarkRows: [{ benchmark_score: 80, benchmark_type: "procurement_cost" }],
+    preferredPricingOpportunityCents: 1_000,
+    bulkPurchaseOpportunityCents: 2_000,
+    supplierPerformanceAvg0to100: 75,
+    vendorFinancingCapacityCentsSum: 500_000,
+  },
+)
+assert.equal(merged.procurementBenchmarkScore, 80)
+assert.equal(merged.preferredPricingOpportunityCents, 1_000)
+assert.equal(merged.bulkPurchaseOpportunityCents, 2_000)
+assert.ok(merged.supplierNetworkParticipationScore > 0)
+
+assert.equal(
+  sumPreferredPricingOpportunityCents([
+    { id: "b", program_status: "active", estimated_savings_basis_points: 100, minimum_volume_cents: 10_000 },
+    { id: "a", program_status: "active", estimated_savings_basis_points: 100, minimum_volume_cents: 10_000 },
+  ]),
+  200,
+)
+
+assert.equal(
+  sumActiveBulkPurchaseSavingsCents([
+    { id: "y", opportunity_status: "active", estimated_savings_cents: 100 },
+    { id: "x", opportunity_status: "expired", estimated_savings_cents: 999 },
+  ]),
+  100,
+)
+
+assert.equal(
+  sumActiveBulkPurchaseVolumeCents([
+    { id: "a", opportunity_status: "active", estimated_total_volume_cents: 50 },
+    { id: "b", opportunity_status: "active", estimated_total_volume_cents: 50 },
+  ]),
+  100,
+)
+
+assert.equal(computeSupplierOverallScore0to100({ fulfillment_score: 80, pricing_score: null, rebate_score: 40, delivery_score: null, support_score: null }), 60)
+assert.equal(averageOverallScoresDeterministic([{ vendor_id: "b", overall_score: 40 }, { vendor_id: "a", overall_score: 60 }]), 50)
+
+const h1 = hashBlitzpaySupplierNetworkAudit({
+  audit_type: "network_created",
+  supplier_network_id: null,
+  organization_id: "11111111-1111-4111-8111-111111111111",
+  audit_summary: "test",
+  actor_type: "system",
+  actor_id: null,
+  metadata: { a: 1 },
 })
-const merged = mergePhase5aFromSnapshotsAndIntercompany([b, a], [{ balance_amount_cents: 1000, balance_status: "active" }], 2)
-assert.equal(merged.consolidatedOrganizationCount, 2)
-assert.equal(merged.intercompanyBalanceExposureCents, 1000)
-assert.ok(merged.multiEntityTreasuryExposureCents > 0)
-
-const treasuryRoll = rollupTreasuryExposureCentsFromSnapshots([a, b])
-assert.ok(treasuryRoll >= 2300)
-const payrollRoll = rollupPayrollExposureCentsFromSnapshots([snap({ payrollLiabilityCents: 100, estimatedPayrollBurdenCents: 50 })])
-assert.equal(payrollRoll, 150)
-const invRoll = rollupProcurementInventoryCentsFromSnapshots([snap({ totalInventoryValueCents: 1000, reorderExposureCents: 200 })])
-assert.equal(invRoll, 1200)
-
-const sorted = sortIntercompanyBalancesDeterministic([
-  { balance_amount_cents: 1, balance_status: "active", financial_group_id: "b", id: "2" },
-  { balance_amount_cents: 1, balance_status: "active", financial_group_id: "a", id: "1" },
-])
-assert.equal(sorted[0]?.financial_group_id, "a")
-
-const sumIc = sumActiveIntercompanyExposureCents([
-  { balance_amount_cents: 100, balance_status: "active" },
-  { balance_amount_cents: 50, balance_status: "settled" },
-])
-assert.equal(sumIc, 100)
-
-const cov = computeSharedBenchmarkCoverage0to100([
-  snap({ collectionSuccessRate: 10, payrollPressureScore: 0, annualRecurringRevenueCents: 0, financingRiskScore: 0, procurementEfficiencyScore: 0, totalInventoryValueCents: 0, treasuryPressureScore: 0, netCollectedCents: 0 }),
-])
-assert.ok(cov >= 10 && cov <= 100)
-
-const h1 = hashBlitzpayMultiEntityAudit({ a: 1, b: "x" })
-const h2 = hashBlitzpayMultiEntityAudit({ b: "x", a: 1 })
+const h2 = hashBlitzpaySupplierNetworkAudit({
+  audit_type: "network_created",
+  supplier_network_id: null,
+  organization_id: "11111111-1111-4111-8111-111111111111",
+  audit_summary: "test",
+  actor_type: "system",
+  actor_id: null,
+  metadata: { a: 1 },
+})
 assert.equal(h1, h2)
 assert.equal(h1.length, 64)
 
-const routes = [
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/groups/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/group-members/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/intercompany-balances/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/consolidated-snapshots/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/benchmarks/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/multi-entity/health/route.ts",
+const orgIds = ["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"].sort((a, b) => a.localeCompare(b))
+assert.deepEqual(orgIds, ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"])
+
+const routePaths = [
+  "organizations/[organizationId]/blitzpay/supplier-network/networks/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/members/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/preferred-programs/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/bulk-opportunities/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/vendor-performance/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/benchmarks/route.ts",
+  "organizations/[organizationId]/blitzpay/supplier-network/health/route.ts",
 ]
-for (const r of routes) {
-  const src = read(r)
-  assert.match(src, /blitzpaySchemaGuardNextResponse/)
-  assert.match(src, /requireAnyOrgPermission/)
+for (const p of routePaths) {
+  const src = read(path.join("app/api", p))
+  assert.ok(src.includes("requireAnyOrgPermission"), p)
+  assert.ok(src.includes("blitzpaySchemaGuardNextResponse"), p)
 }
 
 const schema = read("lib/blitzpay/blitzpay-schema-health.ts")
-assert.match(schema, /blitzpay_financial_groups/)
-assert.match(schema, /blitzpay_multi_entity_audit_log/)
+assert.ok(schema.includes("blitzpay_supplier_networks"))
+assert.ok(schema.includes("blitzpay_shared_procurement_benchmarks"))
 
-const migration = read("supabase/migrations/20261118120000_blitzpay_phase_5a_multi_entity_finance.sql")
-assert.match(migration, /blitzpay_multi_entity_audit_block_mutation/)
-
-console.log("blitzpay phase 5a multi-entity finance tests passed")
+console.log("blitzpay phase 5b supplier network tests ok")

@@ -237,6 +237,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Append-only audit:** `blitzpay_multi_entity_audit_log` is **update/delete blocked** — bounded staff reads only; optional `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` strengthens hashes.
 - **RLS:** policies require finance roles and **explicit** group anchor or active membership visibility — treat growth as low-volume configuration + reporting.
 
+### 8.16 BlitzPay Phase 5B (supplier / vendor network foundations)
+
+- **Staff finance APIs** under `…/blitzpay/supplier-network/*` with **bounded** lists (networks, members, programs, bulk rows, benchmarks, scores) — **no** portal routes, **no** autonomous procurement or financing execution.
+- **Append-only audit:** `blitzpay_supplier_network_audit_log` is **update/delete blocked** — optional `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` strengthens hashes.
+- **Reporting:** `fetchBlitzpayOrgReportingSnapshot` supports `skipSupplierNetwork` on nested linked-org fetches to cap extra reads; treat Phase **5B** enrichers like other bounded snapshot modules.
+
 ---
 
 ## 9. AI / Usage Scale Risks

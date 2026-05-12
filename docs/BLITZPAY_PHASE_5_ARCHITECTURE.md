@@ -6,6 +6,69 @@ Phase **5A** adds deterministic **multi-entity financial infrastructure** for fr
 
 ---
 
+# BlitzPay Phase 5B — Vendor & supplier network foundations
+
+**Status:** shipped (orchestration + aggregate reporting only).
+
+Phase **5B** adds **opt-in supplier / procurement networks**: explicit anchor orgs, membership rows, preferred vendor programs (informational), bulk coordination placeholders, aggregate-only shared procurement benchmarks, vendor financing **visibility** rows, org-local supplier performance scores, and an append-only network audit log. It does **not** negotiate pricing, execute procurement, originate financing, merge AP systems, or expose customer-level data across tenants.
+
+---
+
+## Phase 5B — Database
+
+Migration: `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`
+
+| Table | Role |
+|-------|------|
+| `blitzpay_supplier_networks` | Network metadata (type, visibility scope, status) |
+| `blitzpay_supplier_network_members` | Explicit org ↔ network membership |
+| `blitzpay_preferred_vendor_programs` | Preferred pricing structures (orchestration signals; optional `supplier_network_id`) |
+| `blitzpay_bulk_purchase_opportunities` | Bulk coordination placeholders (no auto-buy) |
+| `blitzpay_supplier_performance_scores` | Org-local vendor score rows |
+| `blitzpay_vendor_financing_network_offers` | Financing visibility placeholders (no execution) |
+| `blitzpay_supplier_network_audit_log` | Append-only audit (mutations blocked by trigger) |
+| `blitzpay_shared_procurement_benchmarks` | **Aggregate-only** benchmark rows for a network |
+
+**RLS:** finance-role visibility consistent with other BlitzPay staff tables — membership or anchor org required; no unscoped cross-org reads.
+
+---
+
+## Phase 5B — Services
+
+- `lib/blitzpay/blitzpay-supplier-network.ts` — bounded list/create helpers, Phase **5B** reporting slice (`buildPhase5bSupplierNetworkReportingSlice`), `skipSupplierNetwork` recursion guard input for nested snapshot fetches.
+- `lib/blitzpay/blitzpay-supplier-network-audit.ts` — SHA-256 audit hash (`BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` optional).
+- `lib/blitzpay/blitzpay-procurement-benchmarks.ts` — merge Phase **5B** extension fields from aggregate context (integer cents + 0–100 scores).
+- `lib/blitzpay/blitzpay-vendor-performance.ts` — deterministic overall score + averages.
+- `lib/blitzpay/blitzpay-bulk-purchasing.ts` — preferred-pricing opportunity cents + bulk savings sums (integer math, per-row caps).
+
+**Integration:** `fetchBlitzpayOrgReportingSnapshot` merges eight Phase **5B** fields when `skipSupplierNetwork` is false. Nested multi-entity snapshot fetches pass `skipSupplierNetwork: true` to cap load. Financial Command Center tiles mirror the same fields.
+
+---
+
+## Phase 5B — Org APIs
+
+Base: `/api/organizations/[organizationId]/blitzpay/supplier-network/…`
+
+| Method | Path | Notes |
+|--------|------|------|
+| GET/POST | `…/networks` | List visible networks; create (anchor org) |
+| GET/POST | `…/members` | `GET ?supplier_network_id=`; `POST` anchor-only |
+| GET/POST | `…/preferred-programs` | Bounded list; anchor creates programs |
+| GET/POST | `…/bulk-opportunities` | List for visible networks; anchor creates rows |
+| GET | `…/vendor-performance` | Org-local scores (bounded) |
+| GET | `…/benchmarks` | Aggregate benchmarks for visible networks |
+| GET | `…/health` | Phase **5B** slice + disclaimer |
+
+---
+
+## Phase 5B — Ops checklist
+
+- Apply migration `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`
+- Optional: `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` in production
+- Run `pnpm test:blitzpay-schema-health` and `pnpm test:blitzpay-phase-5b-supplier-network` after deploy
+
+---
+
 ## 1. Explicit visibility model
 
 - **Anchor org:** each `blitzpay_financial_groups` row is owned by `organization_id` (the anchor). Only the anchor may **mutate** group membership and inter-company tracking rows via org APIs (service role after staff permission gates).
@@ -58,13 +121,14 @@ All routes call `blitzpaySchemaGuardNextResponse` and `requireAnyOrgPermission` 
 
 ## 5. Reporting snapshot + FCC
 
-`fetchBlitzpayOrgReportingSnapshot` adds eight Phase **5A** integer fields (`multiEntityRevenueExposure`, `multiEntityTreasuryExposure`, …) populated from linked org snapshots **only** when `skipMultiEntity` is false. The Financial Command Center tiles mirror those fields for staff visibility.
+`fetchBlitzpayOrgReportingSnapshot` adds eight Phase **5A** integer fields (`multiEntityRevenueExposure`, `multiEntityTreasuryExposure`, …) populated from linked org snapshots **only** when `skipMultiEntity` is false. It adds eight Phase **5B** fields (`supplierNetworkParticipationScore`, `procurementBenchmarkScore`, `preferredPricingOpportunityCents`, …) when `skipSupplierNetwork` is false (nested linked-org fetches pass `skipSupplierNetwork: true` to cap extra reads). The Financial Command Center tiles mirror both Phase **5A** and **5B** fields for staff visibility.
 
 ---
 
 ## 6. UI
 
 - `BlitzpayMultiEntityFinancePanel` — Insights hub + Financial Command Center page; includes the disclaimer: *“Multi-entity reporting reflects linked organizations with authorized visibility permissions. Financial actions remain scoped to each organization.”*
+- `BlitzpaySupplierNetworkPanel` — same surfaces; includes the supplier-network disclaimer (see Phase **5B** section above).
 
 ---
 
@@ -79,6 +143,6 @@ All routes call `blitzpaySchemaGuardNextResponse` and `requireAnyOrgPermission` 
 
 ## 8. Ops checklist
 
-- Apply migration `20261118120000_blitzpay_phase_5a_multi_entity_finance.sql`
-- Set `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` in production (optional but recommended)
+- Apply migrations `20261118120000_blitzpay_phase_5a_multi_entity_finance.sql` and `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`
+- Set `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` and optionally `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` in production (recommended)
 - Run `pnpm test:blitzpay-schema-health` after deploy

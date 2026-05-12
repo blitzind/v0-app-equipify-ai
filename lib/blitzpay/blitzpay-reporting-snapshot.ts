@@ -228,6 +228,15 @@ export type BlitzpayOrgReportingSnapshot = {
   sharedBenchmarkCoverage: number
   multiEntityRiskScore: number
   consolidatedOrganizationCount: number
+  /** Phase 5B — supplier network / aggregate procurement (opt-in membership; integer scores + cents). */
+  supplierNetworkParticipationScore: number
+  procurementBenchmarkScore: number
+  preferredPricingOpportunityCents: number
+  bulkPurchaseOpportunityCents: number
+  supplierPerformanceHealthScore: number
+  rebateCaptureOpportunityScore: number
+  vendorFinancingOpportunityScore: number
+  supplierNetworkCoverageRate: number
 }
 
 /**
@@ -241,6 +250,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     collectionsPulse?: { reminderEffectivenessRatePct: number }
     /** When true, skips Phase 5A linked-org aggregation (prevents recursion when loading member org snapshots). */
     skipMultiEntity?: boolean
+    /** When true, skips Phase 5B supplier-network aggregation (nested snapshot fetches / health endpoints). */
+    skipSupplierNetwork?: boolean
   },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
@@ -984,6 +995,41 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  let phase5bSupplierNetworkParticipationScore = 0
+  let phase5bProcurementBenchmarkScore = 0
+  let phase5bPreferredPricingOpportunityCents = 0
+  let phase5bBulkPurchaseOpportunityCents = 0
+  let phase5bSupplierPerformanceHealthScore = 0
+  let phase5bRebateCaptureOpportunityScore = 0
+  let phase5bVendorFinancingOpportunityScore = 0
+  let phase5bSupplierNetworkCoverageRate = 0
+  if (!options?.skipSupplierNetwork) {
+    try {
+      const { buildPhase5bSupplierNetworkReportingSlice } = await import("@/lib/blitzpay/blitzpay-supplier-network")
+      const p5b = await buildPhase5bSupplierNetworkReportingSlice(admin, organizationId, {
+        rebateOpportunityCents,
+        totalInventoryValueCents,
+        procurementTreasuryImpactScore,
+        inventoryTurnoverScore,
+        inventoryMarginHealthScore,
+        reorderExposureCents,
+        payableAgingHealthScore,
+        vendorConcentrationRisk,
+        treasuryCoverageForPayables,
+      })
+      phase5bSupplierNetworkParticipationScore = p5b.supplierNetworkParticipationScore
+      phase5bProcurementBenchmarkScore = p5b.procurementBenchmarkScore
+      phase5bPreferredPricingOpportunityCents = p5b.preferredPricingOpportunityCents
+      phase5bBulkPurchaseOpportunityCents = p5b.bulkPurchaseOpportunityCents
+      phase5bSupplierPerformanceHealthScore = p5b.supplierPerformanceHealthScore
+      phase5bRebateCaptureOpportunityScore = p5b.rebateCaptureOpportunityScore
+      phase5bVendorFinancingOpportunityScore = p5b.vendorFinancingOpportunityScore
+      phase5bSupplierNetworkCoverageRate = p5b.supplierNetworkCoverageRate
+    } catch {
+      /* optional until Phase 5B migration applied */
+    }
+  }
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1185,5 +1231,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     sharedBenchmarkCoverage: phase5aSharedBenchmarkCoverage,
     multiEntityRiskScore: phase5aMultiEntityRiskScore,
     consolidatedOrganizationCount: phase5aConsolidatedOrganizationCount,
+    supplierNetworkParticipationScore: phase5bSupplierNetworkParticipationScore,
+    procurementBenchmarkScore: phase5bProcurementBenchmarkScore,
+    preferredPricingOpportunityCents: phase5bPreferredPricingOpportunityCents,
+    bulkPurchaseOpportunityCents: phase5bBulkPurchaseOpportunityCents,
+    supplierPerformanceHealthScore: phase5bSupplierPerformanceHealthScore,
+    rebateCaptureOpportunityScore: phase5bRebateCaptureOpportunityScore,
+    vendorFinancingOpportunityScore: phase5bVendorFinancingOpportunityScore,
+    supplierNetworkCoverageRate: phase5bSupplierNetworkCoverageRate,
   }
 }

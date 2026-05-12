@@ -50,7 +50,8 @@
     "test:blitzpay-phase-3e-procurement-finance": "tsx scripts/test-blitzpay-phase-3e-procurement-finance.ts",
     "test:blitzpay-phase-4a-ai-financial-copilot": "tsx scripts/test-blitzpay-phase-4a-ai-financial-copilot.ts",
     "test:blitzpay-phase-4b-revenue-optimization": "tsx scripts/test-blitzpay-phase-4b-revenue-optimization.ts",
-    "test:blitzpay-phase-5a-multi-entity-finance": "tsx scripts/test-blitzpay-phase-5a-multi-entity-finance.ts"
+    "test:blitzpay-phase-5a-multi-entity-finance": "tsx scripts/test-blitzpay-phase-5a-multi-entity-finance.ts",
+    "test:blitzpay-phase-5b-supplier-network": "tsx scripts/test-blitzpay-phase-5b-supplier-network.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
