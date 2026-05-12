@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 400,
-  sqlMigrations: 179,
+  apiRouteHandlers: 406,
+  sqlMigrations: 180,
   dashboardPages: 62,
-  componentsTsx: 284,
-  libTsFiles: 652,
+  componentsTsx: 285,
+  libTsFiles: 657,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **400** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **179** |
+| API route handlers (\`app/api/**/route.ts\`) | **406** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **180** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **284** |
-| \`lib/**/*.ts\` | **652** |
+| \`components/**/*.tsx\` | **285** |
+| \`lib/**/*.ts\` | **657** |
 
 ### Vercel crons
 
@@ -134,6 +134,10 @@ organizations/[organizationId]/blitzpay/cash-accounts/route.ts
 organizations/[organizationId]/blitzpay/cash-reserve-rules/[ruleId]/route.ts
 organizations/[organizationId]/blitzpay/cash-reserve-rules/route.ts
 organizations/[organizationId]/blitzpay/cash-runway/route.ts
+organizations/[organizationId]/blitzpay/claims/health/route.ts
+organizations/[organizationId]/blitzpay/claims/payouts/route.ts
+organizations/[organizationId]/blitzpay/claims/reserves/route.ts
+organizations/[organizationId]/blitzpay/claims/route.ts
 organizations/[organizationId]/blitzpay/collections-copilot/route.ts
 organizations/[organizationId]/blitzpay/collections/attempts/route.ts
 organizations/[organizationId]/blitzpay/collections/mark-uncollectible/route.ts
@@ -186,6 +190,7 @@ organizations/[organizationId]/blitzpay/procurement/reorder-forecasts/route.ts
 organizations/[organizationId]/blitzpay/procurement/serialized-assets/route.ts
 organizations/[organizationId]/blitzpay/procurement/valuation/route.ts
 organizations/[organizationId]/blitzpay/procurement/vendor-rebates/route.ts
+organizations/[organizationId]/blitzpay/protection-plans/route.ts
 organizations/[organizationId]/blitzpay/recurring-revenue/route.ts
 organizations/[organizationId]/blitzpay/retention-report/route.ts
 organizations/[organizationId]/blitzpay/revenue-intelligence/route.ts
@@ -200,6 +205,7 @@ organizations/[organizationId]/blitzpay/revenue-optimization/opportunities/route
 organizations/[organizationId]/blitzpay/revenue-optimization/payment-behavior/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
+organizations/[organizationId]/blitzpay/storm-events/route.ts
 organizations/[organizationId]/blitzpay/supplier-network/benchmarks/route.ts
 organizations/[organizationId]/blitzpay/supplier-network/bulk-opportunities/route.ts
 organizations/[organizationId]/blitzpay/supplier-network/health/route.ts

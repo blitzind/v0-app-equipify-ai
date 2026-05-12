@@ -154,6 +154,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     rebateCaptureOpportunityScore: number
     vendorFinancingOpportunityScore: number
     supplierNetworkCoverageRate: number
+    /** Phase 5C — claims / warranty / protection (tracking only). */
+    warrantyReserveExposure: number
+    claimsExposureCents: number
+    claimsReserveCoverageScore: number
+    protectionPlanRecurringRevenue: number
+    stormEventTreasuryPressure: number
+    contractorProtectionHealthScore: number
+    claimsPayoutExposure: number
+    protectionPlanCoverageRate: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -197,6 +206,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     supplierNetwork: {
       href: "/insights/financial-command-center#blitzpay-supplier-network",
       label: "Supplier network (opt-in coordination)",
+    },
+    claimsProtection: {
+      href: "/insights/financial-command-center#blitzpay-claims-protection",
+      label: "Claims & protection (tracking)",
     },
   }
 }
@@ -426,6 +439,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     rebateCaptureOpportunityScore: reporting.rebateCaptureOpportunityScore,
     vendorFinancingOpportunityScore: reporting.vendorFinancingOpportunityScore,
     supplierNetworkCoverageRate: reporting.supplierNetworkCoverageRate,
+    warrantyReserveExposure: reporting.warrantyReserveExposure,
+    claimsExposureCents: reporting.claimsExposureCents,
+    claimsReserveCoverageScore: reporting.claimsReserveCoverageScore,
+    protectionPlanRecurringRevenue: reporting.protectionPlanRecurringRevenue,
+    stormEventTreasuryPressure: reporting.stormEventTreasuryPressure,
+    contractorProtectionHealthScore: reporting.contractorProtectionHealthScore,
+    claimsPayoutExposure: reporting.claimsPayoutExposure,
+    protectionPlanCoverageRate: reporting.protectionPlanCoverageRate,
   },
     combinedForecast,
     scorecards,

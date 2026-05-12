@@ -14,6 +14,7 @@ import {
   BLITZPAY_GL_SNAPSHOT_AGGREGATION_DAYS,
   BLITZPAY_GL_TRIAL_BALANCE_ACCOUNT_CAP,
   BLITZPAY_INTERCOMPANY_COA_EXTENSION,
+  BLITZPAY_CLAIMS_COA_EXTENSION,
   type BlitzpayCoaAccountType,
   type BlitzpayJournalBatchType,
   type BlitzpayJournalLineInput,
@@ -110,6 +111,38 @@ export async function ensureBlitzpayDefaultIntercompanyAccounts(admin: SupabaseC
       reporting_category: "system_seed_phase_5a_intercompany",
       currency: "usd",
       metadata: { seed: "blitzpay_phase_5a_multi_entity" },
+    })
+    if (error) throw new Error(error.message)
+    created += 1
+  }
+  return { created }
+}
+
+export async function ensureBlitzpayDefaultClaimsAccounts(admin: SupabaseClient, organizationId: string): Promise<{ created: number }> {
+  assertUuid(organizationId, "organizationId")
+  await ensureBlitzpayDefaultChartOfAccounts(admin, organizationId)
+  let created = 0
+  for (const row of BLITZPAY_CLAIMS_COA_EXTENSION) {
+    const normal = normalBalanceForAccountType(row.type)
+    const { data: existing } = await admin
+      .from("blitzpay_chart_of_accounts")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("account_code", row.code)
+      .maybeSingle()
+    if (existing) continue
+    const { error } = await admin.from("blitzpay_chart_of_accounts").insert({
+      organization_id: organizationId,
+      account_code: row.code,
+      account_name: row.name,
+      account_type: row.type,
+      parent_account_id: null,
+      is_system_account: true,
+      is_active: true,
+      normal_balance: normal,
+      reporting_category: "system_seed_phase_5c_claims",
+      currency: "usd",
+      metadata: { seed: "blitzpay_phase_5c_insurance_warranty_claims" },
     })
     if (error) throw new Error(error.message)
     created += 1
@@ -724,6 +757,11 @@ export async function fetchGlReportingSnapshotFields(
     await ensureBlitzpayDefaultIntercompanyAccounts(admin, organizationId)
   } catch {
     /* optional until Phase 5A migration applied */
+  }
+  try {
+    await ensureBlitzpayDefaultClaimsAccounts(admin, organizationId)
+  } catch {
+    /* optional until Phase 5C migration applied */
   }
 
   const asOf = new Date().toISOString().slice(0, 10)

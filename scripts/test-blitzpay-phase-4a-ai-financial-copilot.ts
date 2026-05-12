@@ -206,6 +206,14 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     rebateCaptureOpportunityScore: 0,
     vendorFinancingOpportunityScore: 0,
     supplierNetworkCoverageRate: 0,
+    warrantyReserveExposure: 0,
+    claimsExposureCents: 0,
+    claimsReserveCoverageScore: 0,
+    protectionPlanRecurringRevenue: 0,
+    stormEventTreasuryPressure: 0,
+    contractorProtectionHealthScore: 0,
+    claimsPayoutExposure: 0,
+    protectionPlanCoverageRate: 0,
   }) as BlitzpayOrgReportingSnapshot
 
 // --- Phase 4a scores ---

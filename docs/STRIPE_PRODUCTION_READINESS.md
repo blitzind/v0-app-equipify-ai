@@ -109,6 +109,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Schema:** apply `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql` so staff `…/blitzpay/supplier-network/*` routes pass **schema health** checks.
 - **Optional env:** `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` (server-only) — strengthens immutable supplier-network audit hashes. See `docs/BLITZPAY_PHASE_5_ARCHITECTURE.md`.
 
+### BlitzPay Phase 5C (warranty / claims / protection — tracking & orchestration only)
+
+- **No autonomous adjudication or payouts:** warranty reserves, claims, protection plans, storm financials, and payout tracking rows are **internal workflow + visibility** artifacts; APIs are org-scoped with bounded reads; **no** portal claim administration; payout payloads expose **hashed** references only (no raw external payout identifiers).
+- **Schema:** apply `20261120120000_blitzpay_phase_5c_insurance_warranty_claims.sql` so staff `…/blitzpay/claims/*`, `…/protection-plans`, and `…/storm-events` routes pass **schema health** checks.
+- **Optional env:** `BLITZPAY_CLAIMS_AUDIT_PEPPER` (server-only) — strengthens immutable claims audit hashes. See `docs/BLITZPAY_PHASE_5_ARCHITECTURE.md`.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

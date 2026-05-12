@@ -237,6 +237,15 @@ export type BlitzpayOrgReportingSnapshot = {
   rebateCaptureOpportunityScore: number
   vendorFinancingOpportunityScore: number
   supplierNetworkCoverageRate: number
+  /** Phase 5C — warranty / claims / protection (orchestration visibility; integer cents + scores). */
+  warrantyReserveExposure: number
+  claimsExposureCents: number
+  claimsReserveCoverageScore: number
+  protectionPlanRecurringRevenue: number
+  stormEventTreasuryPressure: number
+  contractorProtectionHealthScore: number
+  claimsPayoutExposure: number
+  protectionPlanCoverageRate: number
 }
 
 /**
@@ -252,6 +261,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     skipMultiEntity?: boolean
     /** When true, skips Phase 5B supplier-network aggregation (nested snapshot fetches / health endpoints). */
     skipSupplierNetwork?: boolean
+    /** When true, skips Phase 5C claims / warranty / protection aggregation (nested snapshot fetches / health endpoints). */
+    skipClaimsWarranty?: boolean
   },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
@@ -1030,6 +1041,36 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  let phase5cWarrantyReserveExposure = 0
+  let phase5cClaimsExposureCents = 0
+  let phase5cClaimsReserveCoverageScore = 0
+  let phase5cProtectionPlanRecurringRevenue = 0
+  let phase5cStormEventTreasuryPressure = 0
+  let phase5cContractorProtectionHealthScore = 0
+  let phase5cClaimsPayoutExposure = 0
+  let phase5cProtectionPlanCoverageRate = 0
+  if (!options?.skipClaimsWarranty) {
+    try {
+      const { buildPhase5cClaimsReportingSlice } = await import("@/lib/blitzpay/blitzpay-claims-orchestration")
+      const p5c = await buildPhase5cClaimsReportingSlice(admin, organizationId, {
+        openDisputesAmountCents,
+        treasuryPendingPayoutTotalsCents,
+        apDue30OpenCents,
+        estimatedOperatingCashCents: cash2z.estimatedOperatingCashCents,
+      })
+      phase5cWarrantyReserveExposure = p5c.warrantyReserveExposure
+      phase5cClaimsExposureCents = p5c.claimsExposureCents
+      phase5cClaimsReserveCoverageScore = p5c.claimsReserveCoverageScore
+      phase5cProtectionPlanRecurringRevenue = p5c.protectionPlanRecurringRevenue
+      phase5cStormEventTreasuryPressure = p5c.stormEventTreasuryPressure
+      phase5cContractorProtectionHealthScore = p5c.contractorProtectionHealthScore
+      phase5cClaimsPayoutExposure = p5c.claimsPayoutExposure
+      phase5cProtectionPlanCoverageRate = p5c.protectionPlanCoverageRate
+    } catch {
+      /* optional until Phase 5C migration applied */
+    }
+  }
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1239,5 +1280,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     rebateCaptureOpportunityScore: phase5bRebateCaptureOpportunityScore,
     vendorFinancingOpportunityScore: phase5bVendorFinancingOpportunityScore,
     supplierNetworkCoverageRate: phase5bSupplierNetworkCoverageRate,
+    warrantyReserveExposure: phase5cWarrantyReserveExposure,
+    claimsExposureCents: phase5cClaimsExposureCents,
+    claimsReserveCoverageScore: phase5cClaimsReserveCoverageScore,
+    protectionPlanRecurringRevenue: phase5cProtectionPlanRecurringRevenue,
+    stormEventTreasuryPressure: phase5cStormEventTreasuryPressure,
+    contractorProtectionHealthScore: phase5cContractorProtectionHealthScore,
+    claimsPayoutExposure: phase5cClaimsPayoutExposure,
+    protectionPlanCoverageRate: phase5cProtectionPlanCoverageRate,
   }
 }

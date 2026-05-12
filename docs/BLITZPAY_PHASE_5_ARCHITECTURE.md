@@ -14,6 +14,48 @@ Phase **5B** adds **opt-in supplier / procurement networks**: explicit anchor or
 
 ---
 
+# BlitzPay Phase 5C — Warranty reserves, claims workflow & protection foundations
+
+**Status:** shipped (orchestration + reporting + accounting placeholders only).
+
+Phase **5C** adds **deterministic** warranty **reserve** rows, **claims** workflow tracking (statuses and amounts only), **reserve movements**, **equipment protection plans** (operational exposure tracking), **claims payout tracking** with **opaque** `payout_reference_hash` (no external payment identifiers), **storm-event financial** planning rows, **append-only claims audit** (`immutable_hash`), **protection-plan reporting snapshots**, **GL claims COA placeholders** via `ensureBlitzpayDefaultClaimsAccounts`, bounded org-scoped APIs, eight new **reporting snapshot + FCC** fields, and **Claims & protection** UI on Insights + Financial Command Center. It does **not** underwrite insurance, autonomously approve or deny claims, issue payouts, act as an insurer, create legal warranties, adjudicate claims, automate disaster response, or expose customer-sensitive claim data across organizations.
+
+## Phase 5C — Database
+
+Migration: `20261120120000_blitzpay_phase_5c_insurance_warranty_claims.sql`
+
+| Table | Role |
+|-------|------|
+| `blitzpay_warranty_reserves` | Tracked reserve buckets (integer cents; optional GL `linked_account_id`) |
+| `blitzpay_claims` | Workflow rows (status/type/reference/amounts; **no** autonomous adjudication) |
+| `blitzpay_claim_reserve_movements` | Accrual / adjustment / utilization / reversal / replenishment movements |
+| `blitzpay_equipment_protection_plans` | Operational protection-plan tracking (not legal coverage) |
+| `blitzpay_claims_payout_tracking` | Internal payout **tracking** rows + opaque reference hash |
+| `blitzpay_storm_event_financials` | Storm-season **forecasting** placeholders (no response automation) |
+| `blitzpay_claims_audit_log` | Append-only audit (`immutable_hash`; updates blocked) |
+| `blitzpay_protection_plan_snapshots` | Point-in-time reporting snapshots |
+
+**RLS:** authenticated finance-role reads on own `organization_id` only; authenticated writes are not used — APIs use service role after Next.js permission gates (same BlitzPay staff pattern).
+
+## Phase 5C — Services & APIs
+
+- `lib/blitzpay/blitzpay-warranty-reserves.ts`, `blitzpay-protection-plans.ts`, `blitzpay-storm-financials.ts` — pure integer math + deterministic scores.
+- `lib/blitzpay/blitzpay-claims-audit.ts` — audit + payout reference hashing (`BLITZPAY_CLAIMS_AUDIT_PEPPER` optional).
+- `lib/blitzpay/blitzpay-claims-orchestration.ts` — bounded reads, `prioritizeClaimsDeterministic`, `buildPhase5cClaimsReportingSlice`, create helpers + audit inserts (**no** auto-approval / **no** payouts).
+
+Base: `/api/organizations/[organizationId]/blitzpay/…`
+
+| Method | Path | Notes |
+|--------|------|------|
+| GET/POST | `…/claims/reserves` | Bounded list; POST creates reserve + audit |
+| GET/POST | `…/claims` | Bounded list (no raw customer/equipment ids in GET select); POST creates claim + audit |
+| GET/POST | `…/claims/payouts` | Tracking rows only; responses use `payout_reference_hash` only |
+| GET | `…/claims/health` | Phase **5C** slice + disclaimer |
+| GET/POST | `…/protection-plans` | Bounded list; POST creates plan + audit |
+| GET/POST | `…/storm-events` | Bounded list; POST creates storm row + audit |
+
+---
+
 ## Phase 5B — Database
 
 Migration: `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`
@@ -121,7 +163,7 @@ All routes call `blitzpaySchemaGuardNextResponse` and `requireAnyOrgPermission` 
 
 ## 5. Reporting snapshot + FCC
 
-`fetchBlitzpayOrgReportingSnapshot` adds eight Phase **5A** integer fields (`multiEntityRevenueExposure`, `multiEntityTreasuryExposure`, …) populated from linked org snapshots **only** when `skipMultiEntity` is false. It adds eight Phase **5B** fields (`supplierNetworkParticipationScore`, `procurementBenchmarkScore`, `preferredPricingOpportunityCents`, …) when `skipSupplierNetwork` is false (nested linked-org fetches pass `skipSupplierNetwork: true` to cap extra reads). The Financial Command Center tiles mirror both Phase **5A** and **5B** fields for staff visibility.
+`fetchBlitzpayOrgReportingSnapshot` adds eight Phase **5A** integer fields (`multiEntityRevenueExposure`, `multiEntityTreasuryExposure`, …) populated from linked org snapshots **only** when `skipMultiEntity` is false. It adds eight Phase **5B** fields (`supplierNetworkParticipationScore`, `procurementBenchmarkScore`, `preferredPricingOpportunityCents`, …) when `skipSupplierNetwork` is false (nested linked-org fetches pass `skipSupplierNetwork: true` to cap extra reads). It adds eight Phase **5C** fields (`warrantyReserveExposure`, `claimsExposureCents`, `claimsReserveCoverageScore`, `protectionPlanRecurringRevenue`, `stormEventTreasuryPressure`, `contractorProtectionHealthScore`, `claimsPayoutExposure`, `protectionPlanCoverageRate`) when `skipClaimsWarranty` is false (nested fetches pass `skipClaimsWarranty: true` where needed). The Financial Command Center tiles mirror Phase **5A**, **5B**, and **5C** fields for staff visibility.
 
 ---
 
@@ -129,6 +171,7 @@ All routes call `blitzpaySchemaGuardNextResponse` and `requireAnyOrgPermission` 
 
 - `BlitzpayMultiEntityFinancePanel` — Insights hub + Financial Command Center page; includes the disclaimer: *“Multi-entity reporting reflects linked organizations with authorized visibility permissions. Financial actions remain scoped to each organization.”*
 - `BlitzpaySupplierNetworkPanel` — same surfaces; includes the supplier-network disclaimer (see Phase **5B** section above).
+- `BlitzpayClaimsProtectionPanel` — same surfaces; includes the Phase **5C** disclaimer (claims / warranty / protection tracking only; coverage and payouts remain with the org’s review processes).
 
 ---
 
@@ -143,6 +186,6 @@ All routes call `blitzpaySchemaGuardNextResponse` and `requireAnyOrgPermission` 
 
 ## 8. Ops checklist
 
-- Apply migrations `20261118120000_blitzpay_phase_5a_multi_entity_finance.sql` and `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`
-- Set `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` and optionally `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` in production (recommended)
-- Run `pnpm test:blitzpay-schema-health` after deploy
+- Apply migrations `20261118120000_blitzpay_phase_5a_multi_entity_finance.sql`, `20261119120000_blitzpay_phase_5b_vendor_supplier_network.sql`, and `20261120120000_blitzpay_phase_5c_insurance_warranty_claims.sql`
+- Set `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` and optionally `BLITZPAY_SUPPLIER_NETWORK_AUDIT_PEPPER` / `BLITZPAY_CLAIMS_AUDIT_PEPPER` in production (recommended)
+- Run `pnpm test:blitzpay-schema-health`, `pnpm test:blitzpay-phase-5b-supplier-network`, and `pnpm test:blitzpay-phase-5c-insurance-warranty-claims` after deploy

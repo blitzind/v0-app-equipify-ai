@@ -132,6 +132,14 @@ type CommandCenterPayload = {
     rebateCaptureOpportunityScore?: number
     vendorFinancingOpportunityScore?: number
     supplierNetworkCoverageRate?: number
+    warrantyReserveExposure?: number
+    claimsExposureCents?: number
+    claimsReserveCoverageScore?: number
+    protectionPlanRecurringRevenue?: number
+    stormEventTreasuryPressure?: number
+    contractorProtectionHealthScore?: number
+    claimsPayoutExposure?: number
+    protectionPlanCoverageRate?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -350,6 +358,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Supplier network — rebate capture opportunity (score)", v: `${data.tiles.rebateCaptureOpportunityScore ?? 0}/100` },
               { k: "Supplier network — vendor financing visibility (score)", v: `${data.tiles.vendorFinancingOpportunityScore ?? 0}/100` },
               { k: "Supplier network — coverage (networks + seats)", v: `${data.tiles.supplierNetworkCoverageRate ?? 0}/100` },
+              { k: "Claims & protection — reserve exposure (est.)", v: fmtMoney(data.tiles.warrantyReserveExposure ?? 0) },
+              { k: "Claims & protection — open work exposure (est.)", v: fmtMoney(data.tiles.claimsExposureCents ?? 0) },
+              { k: "Claims & protection — reserve comfort vs open work", v: `${data.tiles.claimsReserveCoverageScore ?? 0}/100` },
+              { k: "Claims & protection — plan recurring proxy (annual est.)", v: fmtMoney(data.tiles.protectionPlanRecurringRevenue ?? 0) },
+              { k: "Claims & protection — storm treasury pressure (active max)", v: `${data.tiles.stormEventTreasuryPressure ?? 0}/100` },
+              { k: "Claims & protection — contractor health (advisory)", v: `${data.tiles.contractorProtectionHealthScore ?? 0}/100` },
+              { k: "Claims & protection — payout tracking exposure (in-flight est.)", v: fmtMoney(data.tiles.claimsPayoutExposure ?? 0) },
+              { k: "Claims & protection — active plan coverage signal", v: `${data.tiles.protectionPlanCoverageRate ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

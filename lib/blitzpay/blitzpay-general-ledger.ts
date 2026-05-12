@@ -221,3 +221,13 @@ export const BLITZPAY_INTERCOMPANY_COA_EXTENSION: ReadonlyArray<{
   { code: "1180", name: "Due from Affiliates (Inter-Company)", type: "asset" },
   { code: "2180", name: "Due to Affiliates (Inter-Company)", type: "liability" },
 ]
+
+/** Phase 5C — warranty / claims planning placeholders (merged by ensureBlitzpayDefaultClaimsAccounts; no auto-posting). */
+export const BLITZPAY_CLAIMS_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "2335", name: "Warranty & Claims Reserve (Planning)", type: "liability" },
+  { code: "5785", name: "Warranty & Claims Expense (Planning)", type: "expense" },
+]

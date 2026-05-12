@@ -129,6 +129,14 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_vendor_financing_network_offers", select: "id, offer_status" },
   { name: "blitzpay_supplier_network_audit_log", select: "id, audit_type, created_at" },
   { name: "blitzpay_shared_procurement_benchmarks", select: "id, supplier_network_id, benchmark_type" },
+  { name: "blitzpay_warranty_reserves", select: "id, organization_id, reserve_status" },
+  { name: "blitzpay_claims", select: "id, organization_id, claim_status" },
+  { name: "blitzpay_claim_reserve_movements", select: "id, organization_id, movement_type" },
+  { name: "blitzpay_equipment_protection_plans", select: "id, organization_id, plan_status" },
+  { name: "blitzpay_claims_payout_tracking", select: "id, organization_id, payout_status" },
+  { name: "blitzpay_storm_event_financials", select: "id, organization_id, event_status" },
+  { name: "blitzpay_claims_audit_log", select: "id, organization_id, audit_type" },
+  { name: "blitzpay_protection_plan_snapshots", select: "id, organization_id, snapshot_date" },
 ]
 
 export type BlitzpaySchemaHealthResult =

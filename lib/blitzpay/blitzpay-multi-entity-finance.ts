@@ -244,6 +244,7 @@ export async function buildPhase5aLinkedOrgReportingSlice(
         sinceIso,
         skipMultiEntity: true,
         skipSupplierNetwork: true,
+        skipClaimsWarranty: true,
       }),
     )
   }
