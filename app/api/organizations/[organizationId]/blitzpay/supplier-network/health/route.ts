@@ -45,6 +45,7 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
       sinceIso,
       skipMultiEntity: true,
       skipSupplierNetwork: true,
+      skipMobilePhase6a: true,
     })
     const { phase5b, visibleNetworkCount } = await buildSupplierNetworkHealthPayload(admin, organizationId, snap)
     return NextResponse.json({

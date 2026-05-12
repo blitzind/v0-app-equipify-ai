@@ -7,6 +7,7 @@ export const blitzpayStaffWidgetLoadCopy = {
   multiEntityFinance: "Multi-entity finance data is temporarily unavailable.",
   supplierNetwork: "Supplier network data is temporarily unavailable.",
   claimsProtection: "Claims and protection data is temporarily unavailable.",
+  mobileFinancialOps: "Mobile financial operations data is temporarily unavailable.",
   aiFinancialCopilot: "AI financial copilot data is temporarily unavailable.",
   revenueOptimization: "Revenue optimization data is temporarily unavailable.",
   cashPlanning: "Cash planning data is temporarily unavailable.",

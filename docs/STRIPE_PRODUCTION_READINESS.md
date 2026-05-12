@@ -4,6 +4,8 @@ Operational checklist for **live** Stripe billing on Equipify. Test mode behavio
 
 Phase **54.2** adds subscription lifecycle validation: webhook behavior for each event type, safe catalog ↔ price mapping, structured observability, and manual QA below.
 
+**BlitzPay Phase 6A (mobile financial ops foundations)** does **not** add Stripe webhooks or new Connect capabilities; it introduces optional server-only peppers (`BLITZPAY_MOBILE_AUDIT_PEPPER`, `BLITZPAY_MOBILE_SIGNATURE_PEPPER`) for deterministic audit/signature hashing. Production should set strong random values.
+
 ## Live vs test enforcement
 
 The server treats a deploy as **live-enforced** when **either**:

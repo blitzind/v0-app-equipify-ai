@@ -163,6 +163,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     contractorProtectionHealthScore: number
     claimsPayoutExposure: number
     protectionPlanCoverageRate: number
+    /** Phase 6A — mobile field financial capture (offline intent; server-validated). */
+    mobileFinancialIntentCount: number
+    offlineFinancialIntentCount: number
+    mobileSyncFailureRate: number
+    mobileSignatureCoverageRate: number
+    mobilePayrollApprovalPendingCount: number
+    fieldCollectionsIntentCents: number
+    mobileTreasuryVisibilityScore: number
+    mobileConflictReviewCount: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -210,6 +219,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     claimsProtection: {
       href: "/insights/financial-command-center#blitzpay-claims-protection",
       label: "Claims & protection (tracking)",
+    },
+    mobileFinancialOps: {
+      href: "/settings/payments#blitzpay-mobile-financial-ops-anchor",
+      label: "Mobile financial ops (field capture)",
     },
   }
 }
@@ -447,6 +460,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     contractorProtectionHealthScore: reporting.contractorProtectionHealthScore,
     claimsPayoutExposure: reporting.claimsPayoutExposure,
     protectionPlanCoverageRate: reporting.protectionPlanCoverageRate,
+    mobileFinancialIntentCount: reporting.mobileFinancialIntentCount,
+    offlineFinancialIntentCount: reporting.offlineFinancialIntentCount,
+    mobileSyncFailureRate: reporting.mobileSyncFailureRate,
+    mobileSignatureCoverageRate: reporting.mobileSignatureCoverageRate,
+    mobilePayrollApprovalPendingCount: reporting.mobilePayrollApprovalPendingCount,
+    fieldCollectionsIntentCents: reporting.fieldCollectionsIntentCents,
+    mobileTreasuryVisibilityScore: reporting.mobileTreasuryVisibilityScore,
+    mobileConflictReviewCount: reporting.mobileConflictReviewCount,
   },
     combinedForecast,
     scorecards,

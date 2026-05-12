@@ -214,6 +214,14 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     contractorProtectionHealthScore: 0,
     claimsPayoutExposure: 0,
     protectionPlanCoverageRate: 0,
+    mobileFinancialIntentCount: 0,
+    offlineFinancialIntentCount: 0,
+    mobileSyncFailureRate: 0,
+    mobileSignatureCoverageRate: 0,
+    mobilePayrollApprovalPendingCount: 0,
+    fieldCollectionsIntentCents: 0,
+    mobileTreasuryVisibilityScore: 0,
+    mobileConflictReviewCount: 0,
   }) as BlitzpayOrgReportingSnapshot
 
 // --- Phase 4a scores ---

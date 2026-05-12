@@ -67,7 +67,15 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
     const sortedOrgIds = [...orgSet].sort((a, b) => a.localeCompare(b)).slice(0, 40)
     const snaps = []
     for (const oid of sortedOrgIds) {
-      snaps.push(await fetchBlitzpayOrgReportingSnapshot(admin, oid, { sinceIso, skipMultiEntity: true, skipSupplierNetwork: true, skipClaimsWarranty: true }))
+      snaps.push(
+        await fetchBlitzpayOrgReportingSnapshot(admin, oid, {
+          sinceIso,
+          skipMultiEntity: true,
+          skipSupplierNetwork: true,
+          skipClaimsWarranty: true,
+          skipMobilePhase6a: true,
+        }),
+      )
     }
     const pairs = sortedOrgIds.map((oid, i) => ({ oid, snap: snaps[i]! }))
     pairs.sort((a, b) => a.oid.localeCompare(b.oid))

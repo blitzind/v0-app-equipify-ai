@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 406,
-  sqlMigrations: 180,
+  apiRouteHandlers: 415,
+  sqlMigrations: 181,
   dashboardPages: 62,
-  componentsTsx: 285,
-  libTsFiles: 657,
+  componentsTsx: 286,
+  libTsFiles: 662,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **406** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **180** |
+| API route handlers (\`app/api/**/route.ts\`) | **415** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **181** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **285** |
-| \`lib/**/*.ts\` | **657** |
+| \`components/**/*.tsx\` | **286** |
+| \`lib/**/*.ts\` | **662** |
 
 ### Vercel crons
 
@@ -169,6 +169,15 @@ organizations/[organizationId]/blitzpay/memberships/[membershipId]/resume/route.
 organizations/[organizationId]/blitzpay/memberships/[membershipId]/retry-payment/route.ts
 organizations/[organizationId]/blitzpay/memberships/[membershipId]/route.ts
 organizations/[organizationId]/blitzpay/memberships/route.ts
+organizations/[organizationId]/blitzpay/mobile/health/route.ts
+organizations/[organizationId]/blitzpay/mobile/intents/route.ts
+organizations/[organizationId]/blitzpay/mobile/payroll-approvals/[id]/approve/route.ts
+organizations/[organizationId]/blitzpay/mobile/payroll-approvals/[id]/dispute/route.ts
+organizations/[organizationId]/blitzpay/mobile/payroll-approvals/route.ts
+organizations/[organizationId]/blitzpay/mobile/signatures/route.ts
+organizations/[organizationId]/blitzpay/mobile/sync-batches/route.ts
+organizations/[organizationId]/blitzpay/mobile/sync/route.ts
+organizations/[organizationId]/blitzpay/mobile/treasury-summary/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/benchmarks/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/consolidated-snapshots/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/group-members/route.ts

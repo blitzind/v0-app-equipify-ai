@@ -246,6 +246,15 @@ export type BlitzpayOrgReportingSnapshot = {
   contractorProtectionHealthScore: number
   claimsPayoutExposure: number
   protectionPlanCoverageRate: number
+  /** Phase 6A — mobile financial ops (offline capture; server-validated; bounded counts). */
+  mobileFinancialIntentCount: number
+  offlineFinancialIntentCount: number
+  mobileSyncFailureRate: number
+  mobileSignatureCoverageRate: number
+  mobilePayrollApprovalPendingCount: number
+  fieldCollectionsIntentCents: number
+  mobileTreasuryVisibilityScore: number
+  mobileConflictReviewCount: number
 }
 
 /**
@@ -263,6 +272,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     skipSupplierNetwork?: boolean
     /** When true, skips Phase 5C claims / warranty / protection aggregation (nested snapshot fetches / health endpoints). */
     skipClaimsWarranty?: boolean
+    /** When true, skips Phase 6A mobile financial ops aggregation (nested snapshot fetches / health endpoints). */
+    skipMobilePhase6a?: boolean
   },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
@@ -1071,6 +1082,34 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  let phase6aMobileFinancialIntentCount = 0
+  let phase6aOfflineFinancialIntentCount = 0
+  let phase6aMobileSyncFailureRate = 0
+  let phase6aMobileSignatureCoverageRate = 0
+  let phase6aMobilePayrollApprovalPendingCount = 0
+  let phase6aFieldCollectionsIntentCents = 0
+  let phase6aMobileTreasuryVisibilityScore = 0
+  let phase6aMobileConflictReviewCount = 0
+  if (!options?.skipMobilePhase6a) {
+    try {
+      const { buildPhase6aMobileReportingSlice } = await import("@/lib/blitzpay/blitzpay-mobile-financial-ops")
+      const p6a = await buildPhase6aMobileReportingSlice(admin, organizationId, {
+        treasuryFailedPayoutCount30d,
+        estimatedOperatingCashCents: cash2z.estimatedOperatingCashCents,
+      })
+      phase6aMobileFinancialIntentCount = p6a.mobileFinancialIntentCount
+      phase6aOfflineFinancialIntentCount = p6a.offlineFinancialIntentCount
+      phase6aMobileSyncFailureRate = p6a.mobileSyncFailureRate
+      phase6aMobileSignatureCoverageRate = p6a.mobileSignatureCoverageRate
+      phase6aMobilePayrollApprovalPendingCount = p6a.mobilePayrollApprovalPendingCount
+      phase6aFieldCollectionsIntentCents = p6a.fieldCollectionsIntentCents
+      phase6aMobileTreasuryVisibilityScore = p6a.mobileTreasuryVisibilityScore
+      phase6aMobileConflictReviewCount = p6a.mobileConflictReviewCount
+    } catch {
+      /* optional until Phase 6A migration applied */
+    }
+  }
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1288,5 +1327,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     contractorProtectionHealthScore: phase5cContractorProtectionHealthScore,
     claimsPayoutExposure: phase5cClaimsPayoutExposure,
     protectionPlanCoverageRate: phase5cProtectionPlanCoverageRate,
+    mobileFinancialIntentCount: phase6aMobileFinancialIntentCount,
+    offlineFinancialIntentCount: phase6aOfflineFinancialIntentCount,
+    mobileSyncFailureRate: phase6aMobileSyncFailureRate,
+    mobileSignatureCoverageRate: phase6aMobileSignatureCoverageRate,
+    mobilePayrollApprovalPendingCount: phase6aMobilePayrollApprovalPendingCount,
+    fieldCollectionsIntentCents: phase6aFieldCollectionsIntentCents,
+    mobileTreasuryVisibilityScore: phase6aMobileTreasuryVisibilityScore,
+    mobileConflictReviewCount: phase6aMobileConflictReviewCount,
   }
 }

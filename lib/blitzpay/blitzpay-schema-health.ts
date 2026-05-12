@@ -137,6 +137,12 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_storm_event_financials", select: "id, organization_id, event_status" },
   { name: "blitzpay_claims_audit_log", select: "id, organization_id, audit_type" },
   { name: "blitzpay_protection_plan_snapshots", select: "id, organization_id, snapshot_date" },
+  { name: "blitzpay_mobile_financial_intents", select: "id, organization_id, intent_status" },
+  { name: "blitzpay_mobile_signature_authorizations", select: "id, organization_id, authorization_status" },
+  { name: "blitzpay_mobile_payroll_approval_items", select: "id, organization_id, approval_status" },
+  { name: "blitzpay_mobile_treasury_snapshots", select: "id, organization_id, snapshot_date" },
+  { name: "blitzpay_mobile_sync_batches", select: "id, organization_id, batch_status" },
+  { name: "blitzpay_mobile_audit_log", select: "id, organization_id, audit_type" },
 ]
 
 export type BlitzpaySchemaHealthResult =

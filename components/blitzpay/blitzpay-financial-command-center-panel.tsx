@@ -140,6 +140,14 @@ type CommandCenterPayload = {
     contractorProtectionHealthScore?: number
     claimsPayoutExposure?: number
     protectionPlanCoverageRate?: number
+    mobileFinancialIntentCount?: number
+    offlineFinancialIntentCount?: number
+    mobileSyncFailureRate?: number
+    mobileSignatureCoverageRate?: number
+    mobilePayrollApprovalPendingCount?: number
+    fieldCollectionsIntentCents?: number
+    mobileTreasuryVisibilityScore?: number
+    mobileConflictReviewCount?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -366,6 +374,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Claims & protection — contractor health (advisory)", v: `${data.tiles.contractorProtectionHealthScore ?? 0}/100` },
               { k: "Claims & protection — payout tracking exposure (in-flight est.)", v: fmtMoney(data.tiles.claimsPayoutExposure ?? 0) },
               { k: "Claims & protection — active plan coverage signal", v: `${data.tiles.protectionPlanCoverageRate ?? 0}/100` },
+              { k: "Mobile ops — financial intents (recent sample)", v: String(data.tiles.mobileFinancialIntentCount ?? 0) },
+              { k: "Mobile ops — offline-captured intents (recent sample)", v: String(data.tiles.offlineFinancialIntentCount ?? 0) },
+              { k: "Mobile ops — sync batch failure rate (recent batches)", v: `${data.tiles.mobileSyncFailureRate ?? 0}%` },
+              { k: "Mobile ops — signature coverage vs intents (sample)", v: `${data.tiles.mobileSignatureCoverageRate ?? 0}/100` },
+              { k: "Mobile ops — payroll approvals pending (sample)", v: String(data.tiles.mobilePayrollApprovalPendingCount ?? 0) },
+              { k: "Mobile ops — field collection intents (draft/queued est.)", v: fmtMoney(data.tiles.fieldCollectionsIntentCents ?? 0) },
+              { k: "Mobile ops — treasury visibility comfort (field bands)", v: `${data.tiles.mobileTreasuryVisibilityScore ?? 0}/100` },
+              { k: "Mobile ops — conflict reviews logged (sample)", v: String(data.tiles.mobileConflictReviewCount ?? 0) },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
@@ -373,6 +389,11 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               </div>
             ))}
           </div>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed border border-border/60 rounded-lg px-3 py-2 bg-muted/20">
+            Mobile financial actions captured offline are reviewed and validated by the server before they become official
+            financial records. Mobile ops tiles use bounded samples — not payment confirmation.
+          </p>
 
           <div className="rounded-lg border border-border/80 px-4 py-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AR / AP combined cash outlook</p>
