@@ -204,3 +204,50 @@ Phase **3D** adds **org + platform marketplace financing provider rows** (distin
 ## Tests
 
 - `pnpm test:blitzpay-phase-3d-financing-marketplace` — deterministic helpers, migration audit guard strings, API guards, schema health table list (no DB).
+
+---
+
+# BlitzPay Phase 3E — Procurement & inventory finance foundations
+
+Phase **3E** adds **inventory financial profiles**, **append-only inventory movements** (reversal model only), **valuation snapshots**, **vendor rebate programs + accruals** (accrual tracking only), **deterministic reorder forecasts** (planning only), **serialized asset financial rows** (hashed serial references via `hashSerializedSerialForStorage` / `hashAccountingSourceReference`), and an **append-only procurement audit log**. It extends the **COA** via **`ensureBlitzpayDefaultInventoryAccounts()`** (`BLITZPAY_INVENTORY_COA_EXTENSION`: serialized inventory planning asset, vendor rebate accrual liability, inventory writeoff expense, vendor rebate income).
+
+## Non-goals
+
+- **No autonomous purchasing or reorder execution** — forecasts are operational estimates only.
+- **No supplier financing custody** or uncontrolled third-party money flows.
+- **No raw serial numbers** in APIs — only stable hashes.
+
+## Deterministic logic
+
+- `lib/blitzpay/blitzpay-inventory-finance.ts` — FIFO lot consumption, weighted-average unit cost (milli-quantity aware), quantity string conversions, list caps.
+- `lib/blitzpay/blitzpay-reorder-forecasting.ts` — bounded velocity from movement samples, confidence score, treasury impact from reorder vs cash proxy, deterministic forecast sort.
+- `lib/blitzpay/blitzpay-vendor-rebates.ts` — rebate accrual estimate (percentage / tiered / volume share math path; fixed uses `rebate_basis_points` as a capped fixed-cents amount for tests and simple programs).
+- `lib/blitzpay/blitzpay-procurement-finance.ts` — margin health (metadata-driven revenue cents), aging days, PO vs bill variance, procurement treasury impact, procurement audit payload hashing.
+- `lib/blitzpay/blitzpay-procurement-finance-service.ts` — org CRUD (service role), reporting field merge, health dashboard, reorder refresh after movements.
+
+## APIs
+
+- **Staff (org-scoped):** `…/blitzpay/procurement/inventory-items`, `…/inventory-movements`, `…/valuation`, `…/reorder-forecasts`, `…/vendor-rebates`, `…/serialized-assets`, `…/health` — **`requireAnyOrgPermission`** + **`blitzpaySchemaGuardNextResponse`** + UUID org gate. `POST /vendor-rebates` accepts `{ kind: "program" \| "accrual", … }`.
+
+## Reporting & UI
+
+- `fetchProcurementReportingFields` merges bounded procurement KPIs into `fetchBlitzpayOrgReportingSnapshot` and the **Financial Command Center** tiles.
+- `BlitzpayProcurementInventoryPanel` on **Settings → Payments** and **Insights → Financial command center** with the required **operational estimates** disclaimer.
+
+## Key files
+
+| Area | Path |
+|------|------|
+| Migration | `supabase/migrations/20261015120000_blitzpay_phase_3e_procurement_inventory_finance.sql` |
+| Inventory math | `lib/blitzpay/blitzpay-inventory-finance.ts` |
+| Reorder math | `lib/blitzpay/blitzpay-reorder-forecasting.ts` |
+| Rebates math | `lib/blitzpay/blitzpay-vendor-rebates.ts` |
+| Procurement helpers | `lib/blitzpay/blitzpay-procurement-finance.ts` |
+| Service | `lib/blitzpay/blitzpay-procurement-finance-service.ts` |
+| COA extension | `BLITZPAY_INVENTORY_COA_EXTENSION` in `lib/blitzpay/blitzpay-general-ledger.ts` |
+| Org APIs | `app/api/organizations/[organizationId]/blitzpay/procurement/**` |
+| Staff UI | `components/blitzpay/blitzpay-procurement-inventory-panel.tsx` |
+
+## Tests
+
+- `pnpm test:blitzpay-phase-3e-procurement-finance` — deterministic helpers, migration audit guard strings, API guards, schema health table list (no DB).

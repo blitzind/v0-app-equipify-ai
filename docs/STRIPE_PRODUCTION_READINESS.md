@@ -79,6 +79,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Stripe / webhooks:** no new Connect webhook types are required for Phase **3D**; any future financing partner would add **separate** ingress (not in this phase).
 - **Portal:** `/api/portal/financing/*` returns **customer-scoped summaries** only; hashes replace raw provider references in storage.
 
+### BlitzPay Phase 3E (procurement & inventory finance foundations)
+
+- **Orchestration only:** Phase **3E** records **inventory financial profiles**, **append-only movements**, **valuation snapshots**, **rebate programs + accruals** (accrual tracking only), **reorder forecasts** (planning estimates), **serialized asset financial rows** (hashed serial references), and **append-only procurement audit** — it does **not** auto-place purchase orders, execute reorders, or custody supplier financing balances.
+- **Schema:** apply `20261015120000_blitzpay_phase_3e_procurement_inventory_finance.sql` so staff `…/blitzpay/procurement/*` routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise).
+- **Stripe / webhooks:** no new Connect webhook types are required for Phase **3E**; inventory and procurement signals are **internal** to Postgres reporting surfaces.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

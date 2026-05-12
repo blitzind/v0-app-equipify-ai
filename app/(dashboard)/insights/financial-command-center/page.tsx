@@ -12,6 +12,7 @@ import { BlitzpayAccountingOverviewPanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpayApBillPayPanel } from "@/components/blitzpay/blitzpay-ap-bill-pay-panel"
 import { BlitzpayTaxCompliancePanel } from "@/components/blitzpay/blitzpay-tax-compliance-panel"
 import { BlitzpayFinancingMarketplacePanel } from "@/components/blitzpay/blitzpay-financing-marketplace-panel"
+import { BlitzpayProcurementInventoryPanel } from "@/components/blitzpay/blitzpay-procurement-inventory-panel"
 import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
 import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
 import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
@@ -84,6 +85,10 @@ export default function FinancialCommandCenterPage() {
         <Link href="/settings/payments#blitzpay-financing-marketplace-anchor" className="text-primary underline-offset-2 hover:underline">
           Settings → Payments → Financing marketplace
         </Link>
+        . Procurement &amp; inventory finance:{" "}
+        <Link href="/settings/payments#blitzpay-procurement-inventory-anchor" className="text-primary underline-offset-2 hover:underline">
+          Settings → Payments → Procurement &amp; inventory finance
+        </Link>
         .
       </p>
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
@@ -96,6 +101,7 @@ export default function FinancialCommandCenterPage() {
       <BlitzpayApBillPayPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayTaxCompliancePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancingMarketplacePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayProcurementInventoryPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCashAccountsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayPayrollDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCommissionQueue organizationId={organizationId} orgReady={orgStatus === "ready"} />

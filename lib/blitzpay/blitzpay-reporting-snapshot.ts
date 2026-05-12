@@ -187,6 +187,15 @@ export type BlitzpayOrgReportingSnapshot = {
   financingRiskScore: number
   financingConversionRate: number
   financingTreasuryImpactScore: number
+  /** Phase 3E — procurement & inventory finance (bounded; planning only). */
+  totalInventoryValueCents: number
+  inventoryWriteoffExposure: number
+  inventoryTurnoverScore: number
+  reorderExposureCents: number
+  rebateOpportunityCents: number
+  serializedAssetExposure: number
+  procurementTreasuryImpactScore: number
+  inventoryMarginHealthScore: number
 }
 
 /**
@@ -787,6 +796,14 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let financingRiskScore = 0
   let financingConversionRate = 0
   let financingTreasuryImpactScore = 0
+  let totalInventoryValueCents = 0
+  let inventoryWriteoffExposure = 0
+  let inventoryTurnoverScore = 0
+  let reorderExposureCents = 0
+  let rebateOpportunityCents = 0
+  let serializedAssetExposure = 0
+  let procurementTreasuryImpactScore = 0
+  let inventoryMarginHealthScore = 0
   try {
     const { fetchApReportingSnapshotFields } = await import("@/lib/blitzpay/blitzpay-ap-service")
     const ap = await fetchApReportingSnapshotFields(admin, organizationId)
@@ -829,6 +846,21 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     financingTreasuryImpactScore = fm.financingTreasuryImpactScore
   } catch {
     /* Phase 3D financing tables optional until migration applied */
+  }
+
+  try {
+    const { fetchProcurementReportingFields } = await import("@/lib/blitzpay/blitzpay-procurement-finance-service")
+    const p3e = await fetchProcurementReportingFields(admin, organizationId)
+    totalInventoryValueCents = p3e.totalInventoryValueCents
+    inventoryWriteoffExposure = p3e.inventoryWriteoffExposure
+    inventoryTurnoverScore = p3e.inventoryTurnoverScore
+    reorderExposureCents = p3e.reorderExposureCents
+    rebateOpportunityCents = p3e.rebateOpportunityCents
+    serializedAssetExposure = p3e.serializedAssetExposure
+    procurementTreasuryImpactScore = p3e.procurementTreasuryImpactScore
+    inventoryMarginHealthScore = p3e.inventoryMarginHealthScore
+  } catch {
+    /* Phase 3E procurement tables optional until migration applied */
   }
 
   const cash2z = deriveBlitzpayCashPlanningMetrics({
@@ -990,5 +1022,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     financingRiskScore,
     financingConversionRate,
     financingTreasuryImpactScore,
+    totalInventoryValueCents,
+    inventoryWriteoffExposure,
+    inventoryTurnoverScore,
+    reorderExposureCents,
+    rebateOpportunityCents,
+    serializedAssetExposure,
+    procurementTreasuryImpactScore,
+    inventoryMarginHealthScore,
   }
 }

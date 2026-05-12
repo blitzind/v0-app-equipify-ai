@@ -46,7 +46,8 @@
     "test:blitzpay-phase-3a-general-ledger": "tsx scripts/test-blitzpay-phase-3a-general-ledger.ts",
     "test:blitzpay-phase-3b-ap-automation": "tsx scripts/test-blitzpay-phase-3b-ap-automation.ts",
     "test:blitzpay-phase-3c-tax-compliance": "tsx scripts/test-blitzpay-phase-3c-tax-compliance.ts",
-    "test:blitzpay-phase-3d-financing-marketplace": "tsx scripts/test-blitzpay-phase-3d-financing-marketplace.ts"
+    "test:blitzpay-phase-3d-financing-marketplace": "tsx scripts/test-blitzpay-phase-3d-financing-marketplace.ts",
+    "test:blitzpay-phase-3e-procurement-finance": "tsx scripts/test-blitzpay-phase-3e-procurement-finance.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

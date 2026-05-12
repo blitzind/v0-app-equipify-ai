@@ -110,6 +110,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     financingRiskScore: number
     financingConversionRate: number
     financingTreasuryImpactScore: number
+    /** Phase 3E — procurement & inventory finance (bounded). */
+    totalInventoryValueCents: number
+    inventoryWriteoffExposure: number
+    inventoryTurnoverScore: number
+    reorderExposureCents: number
+    rebateOpportunityCents: number
+    serializedAssetExposure: number
+    procurementTreasuryImpactScore: number
+    inventoryMarginHealthScore: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -141,6 +150,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     financingMarketplace: {
       href: "/settings/payments#blitzpay-financing-marketplace-anchor",
       label: "Financing marketplace (Settings → Payments)",
+    },
+    procurementInventory: {
+      href: "/settings/payments#blitzpay-procurement-inventory-anchor",
+      label: "Procurement & inventory finance (Settings → Payments)",
     },
   }
 }
@@ -330,6 +343,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       financingRiskScore: reporting.financingRiskScore,
       financingConversionRate: reporting.financingConversionRate,
       financingTreasuryImpactScore: reporting.financingTreasuryImpactScore,
+      totalInventoryValueCents: reporting.totalInventoryValueCents,
+      inventoryWriteoffExposure: reporting.inventoryWriteoffExposure,
+      inventoryTurnoverScore: reporting.inventoryTurnoverScore,
+      reorderExposureCents: reporting.reorderExposureCents,
+      rebateOpportunityCents: reporting.rebateOpportunityCents,
+      serializedAssetExposure: reporting.serializedAssetExposure,
+      procurementTreasuryImpactScore: reporting.procurementTreasuryImpactScore,
+      inventoryMarginHealthScore: reporting.inventoryMarginHealthScore,
     },
     combinedForecast,
     scorecards,

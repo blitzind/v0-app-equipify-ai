@@ -92,6 +92,14 @@ type CommandCenterPayload = {
     financingRiskScore?: number
     financingConversionRate?: number
     financingTreasuryImpactScore?: number
+    totalInventoryValueCents?: number
+    inventoryWriteoffExposure?: number
+    inventoryTurnoverScore?: number
+    reorderExposureCents?: number
+    rebateOpportunityCents?: number
+    serializedAssetExposure?: number
+    procurementTreasuryImpactScore?: number
+    inventoryMarginHealthScore?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -286,6 +294,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Financing — risk score (operational)", v: `${data.tiles.financingRiskScore ?? 0}/100` },
               { k: "Financing — conversion (funded vs pipeline)", v: `${data.tiles.financingConversionRate ?? 0}%` },
               { k: "Financing — treasury impact (est.)", v: `${data.tiles.financingTreasuryImpactScore ?? 0}/100` },
+              { k: "Procurement — inventory value (internal est.)", v: fmtMoney(data.tiles.totalInventoryValueCents ?? 0) },
+              { k: "Procurement — write-off exposure (signals)", v: fmtMoney(data.tiles.inventoryWriteoffExposure ?? 0) },
+              { k: "Procurement — turnover comfort", v: `${data.tiles.inventoryTurnoverScore ?? 0}/100` },
+              { k: "Procurement — reorder cash call (30d est.)", v: fmtMoney(data.tiles.reorderExposureCents ?? 0) },
+              { k: "Procurement — rebate opportunity (annual est.)", v: fmtMoney(data.tiles.rebateOpportunityCents ?? 0) },
+              { k: "Procurement — serialized assets (est.)", v: fmtMoney(data.tiles.serializedAssetExposure ?? 0) },
+              { k: "Procurement — treasury vs reorder pressure", v: `${data.tiles.procurementTreasuryImpactScore ?? 0}/100` },
+              { k: "Procurement — parts margin health (metadata)", v: `${data.tiles.inventoryMarginHealthScore ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

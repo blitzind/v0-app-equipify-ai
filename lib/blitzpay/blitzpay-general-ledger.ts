@@ -199,3 +199,15 @@ export const BLITZPAY_FINANCING_COA_EXTENSION: ReadonlyArray<{
   { code: "2325", name: "Contractor Advance Liability (Planning)", type: "liability" },
   { code: "4350", name: "Financing Fee Revenue", type: "revenue" },
 ]
+
+/** Phase 3E — procurement / inventory finance GL placeholders (merged by ensureBlitzpayDefaultInventoryAccounts). */
+export const BLITZPAY_INVENTORY_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "1315", name: "Serialized Inventory Detail (Planning)", type: "asset" },
+  { code: "2390", name: "Vendor Rebate Accrual (Payable)", type: "liability" },
+  { code: "5770", name: "Inventory Writeoff Expense", type: "expense" },
+  { code: "4370", name: "Vendor Rebate Income (Accrual Release)", type: "revenue" },
+]
