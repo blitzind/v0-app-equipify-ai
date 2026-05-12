@@ -110,7 +110,7 @@ Canonical names should align with `lib/api/future-webhook-event-types.ts` (docum
 
 ## Related documents
 
-- `docs/SETTINGS_WIRING_AUDIT.md` — `/settings/api` status.
+- `docs/SETTINGS_WIRING_AUDIT.md` — `/settings/api` status (Phase 65.0 developer shell: gated UI, no live keys).
 - `docs/USAGE_METERING_ENFORCEMENT.md` — API monthly counter honesty.
 - `docs/PLAN_ENTITLEMENT_ENFORCEMENT_AUDIT.md` — `api_access` feature.
 - `docs/QUICKBOOKS_PRODUCTION_READINESS.md` — example of a **live** integration (contrast with this **planned** surface).

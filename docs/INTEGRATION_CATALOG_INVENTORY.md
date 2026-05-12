@@ -17,7 +17,7 @@ Single source for **what is real vs roadmap** in the Equipify product. UI copy s
 | **Microsoft 365 / Outlook Calendar** | No | — | No | — | No | **Planned** | Not on hub |
 | **DocuSign / PandaDoc** | No | — | No | — | No | **Planned** | DocuSign **Planned** on hub |
 | **Google Maps** | Platform keys only (not tenant OAuth) | — | Partial | — | No | **Planned** | Not on hub |
-| **Public HTTP API + outbound webhooks** | Not live | — | No | Planned `api_access` + `canManageApiKeys` | Spec only | N/A | `/settings/api` honesty shell |
+| **Public HTTP API + outbound webhooks** | Not live | — | No | Planned `api_access` + `canManageApiKeys` | Spec only | N/A | `/settings/api` developer shell (Phase 65.0); no issuance |
 
 ## Misleading patterns removed (61.3)
 

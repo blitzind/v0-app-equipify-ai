@@ -34,7 +34,7 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 | `/settings/integrations` | Gmail / other catalog entries | — | — | Same | **Planned** — disabled **No in-app setup yet** (Phase 61.3); readiness badges from `lib/integrations/catalog-metadata.ts` |
 | `/settings/integrations/quickbooks` | Connection, sync, auto-sync | QBO integration state | QuickBooks settings APIs | Same | **Wired** (labels reflect server state) |
 | `/settings/security` | MFA, sessions, timeout, events | — | — | `canManageSecuritySettings` | **Planned** — non-interactive honesty page (Phase 57.2) |
-| `/settings/api` | API keys / outbound webhooks | — | — | `canManageApiKeys` | **Planned** — honesty shell (Phase 61.2); roadmap + link to `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md`; no keys / no registrations |
+| `/settings/api` | Developer access, API keys shell, webhooks shell, usage preview | Client reads `organization_subscriptions` for tier; `lib/developers/developer-settings-access.ts` + `canAccessApiFeatures` | — (no key/webhook APIs yet) | Nav: `canManageWorkspaceSettings \|\| canManageApiKeys`; **Create key** / **Add endpoint**: `canManageApiKeys` + Scale-tier `api_access` | **Preview** — honest empty states + “not live yet” modals; no secret generation; usage “Not recording yet” + planned cap from `getApiCallLimitDisplay` only |
 | `/settings/audit-log` | Audit entries | Audit log tables | Read APIs | `canViewOperationalReports` or `canManageSecuritySettings` | **Wired** (read) |
 | `/settings/archived` | Archived records restore | Archive tables | Restore actions on page | `canArchiveRecords` | **Wired** |
 | `/settings/equipment-types` | Equipment types CRUD | Org equipment types | CRUD APIs on page | `canManageWorkspaceSettings` | **Wired** |
@@ -42,7 +42,7 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 ## Permission notes
 
 - **Do not** infer permissions from UI alone; Route Handlers re-check capabilities.
-- **Security** and **API / Developers** nav items use `canManageSecuritySettings` and `canManageApiKeys` respectively — narrower than full workspace admin in some org configurations.
+- **Security** uses `canManageSecuritySettings`. **API / Developers** nav uses `canManageWorkspaceSettings || canManageApiKeys` (managers may view the developer shell read-only; key/webhook actions require `canManageApiKeys` plus tier `api_access` for enabled controls).
 - **Migration center** is **`canManageHistoricalImports`** (owner/admin-style), not general workspace settings.
 
 ## Follow-up (out of scope for 57.2)
@@ -57,7 +57,7 @@ This matrix summarizes whether each **Settings** surface persists to the backend
 - **Phase 57.2:** Removed misleading password form, demo Security page, demo API keys, fake notification/automation saves; added this document.
 - **Phase 57.4:** Follow-up automation API/UI aligned on `canManageAutomations | canManageWorkspaceSettings`; AI Ops digest APIs aligned on `requireOrgPermission` (effective caps) + digest save toast; Integrations hub shows real QuickBooks connection status and honest Stripe label.
 - **Phase 61.2:** Added `docs/PUBLIC_API_AND_WEBHOOKS_ARCHITECTURE.md` (future public API + outbound webhooks); `/settings/api` expanded copy + doc links; scaffolding `lib/api/future-webhook-event-types.ts` (unused event name constants).
-- **Phase 61.3:** Integration catalog accuracy — `docs/INTEGRATION_CATALOG_INVENTORY.md`, shared `lib/integrations/catalog-metadata.ts`; product `/integrations` aligns QuickBooks (live), Stripe billing (limited), Fuzor (beta external); roadmap **Planned** + honest interest/request modals; settings hub removes fake Docs / “Connect (coming soon)” stubs.
 - **Phase 62.1:** Dead code cleanup — removed unused `requireOrgMemberPermission` file (`lib/permissions/require-org-permission.ts`); consolidated invoice status badge classes (`lib/invoices/invoice-status-badge-classes.ts`); integrations roadmap KPI uses planned count only. No settings persistence changes.
 - **Workspace notifications:** Alert channel matrix, digest, and quiet hours on `/settings/notifications` persist through `notification-preferences` (see `lib/notifications/organization-notification-preferences-repository.ts`); personal channel prefs remain follow-up.
 - **Billing UX:** `/settings/billing` — Manage billing dialog removes external portal CTA; add-payment modal is single-step billing + card; customer-facing copy avoids Stripe branding where practical.
+- **Phase 65.0:** `/settings/api` — structured developer settings foundation: tier + entitlement messaging (`lib/developers/developer-settings-access.ts`), API keys / webhooks cards with gated “coming soon” modals, usage preview (no live counters), security notes; nav visibility includes `canManageWorkspaceSettings` for read-only access.

@@ -48,7 +48,7 @@ const NAV_ITEMS: SettingsNavItem[] = [
   { label: "Customer Portal", href: "/settings/portal", icon: Globe, visible: (p) => p.canManagePortalSettings },
   { label: "Integrations", href: "/settings/integrations", icon: Plug, visible: (p) => p.canManageIntegrations },
   { label: "Security", href: "/settings/security", icon: Shield, visible: (p) => p.canManageSecuritySettings },
-  { label: "API / Developers", href: "/settings/api", icon: Code2, visible: (p) => p.canManageApiKeys },
+  { label: "API / Developers", href: "/settings/api", icon: Code2, visible: (p) => p.canManageWorkspaceSettings || p.canManageApiKeys },
   {
     label: "Audit Log",
     href: "/settings/audit-log",
