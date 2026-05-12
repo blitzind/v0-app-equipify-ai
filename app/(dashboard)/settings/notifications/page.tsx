@@ -1,287 +1,563 @@
 "use client"
 
-import { Bell, Mail, Smartphone, Monitor, AlertCircle, Repeat2, Shield, CalendarClock, UserCog, CheckCircle2, Info } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Bell, Mail, Smartphone, Monitor, Loader2 } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
-import { useActiveOrganization } from "@/lib/active-organization-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
+import { useActiveOrganization } from "@/lib/active-organization-context"
+import { useOrgPermissions } from "@/lib/org-permissions-context"
+import { WORKSPACE_ALERT_REGISTRY, type WorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
 import { cn } from "@/lib/utils"
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface NotifPreference {
-  id: string
-  label: string
-  description: string
-  icon: React.ComponentType<{ size?: number; className?: string }>
-  iconColor: string
-  channels: {
-    inApp: boolean
-    email: boolean
-    sms: boolean
-  }
-}
-
-// ─── Defaults ─────────────────────────────────────────────────────────────────
-
-const INITIAL_PREFS: NotifPreference[] = [
-  {
-    id: "overdue-wo",
-    label: "Overdue work orders",
-    description: "When a work order passes its due date without being closed.",
-    icon: AlertCircle,
-    iconColor: "text-destructive",
-    channels: { inApp: true, email: true, sms: false },
-  },
-  {
-    id: "repeat-repair",
-    label: "Repeat repair alerts",
-    description: "When the same equipment is flagged for repeated repairs.",
-    icon: Repeat2,
-    iconColor: "text-destructive",
-    channels: { inApp: true, email: true, sms: false },
-  },
-  {
-    id: "warranty-expiring",
-    label: "Warranty expiring",
-    description: "When equipment warranties are approaching expiration.",
-    icon: Shield,
-    iconColor: "text-[oklch(0.50_0.12_70)]",
-    channels: { inApp: true, email: true, sms: false },
-  },
-  {
-    id: "pm-due",
-    label: "Maintenance due",
-    description: "When scheduled preventive maintenance is upcoming.",
-    icon: CalendarClock,
-    iconColor: "text-primary",
-    channels: { inApp: true, email: false, sms: false },
-  },
-  {
-    id: "wo-completed",
-    label: "Work order completed",
-    description: "When a technician closes a work order.",
-    icon: CheckCircle2,
-    iconColor: "text-[oklch(0.42_0.17_145)]",
-    channels: { inApp: true, email: false, sms: false },
-  },
-  {
-    id: "schedule-change",
-    label: "Schedule changes",
-    description: "When a technician is reassigned or an appointment is rescheduled.",
-    icon: UserCog,
-    iconColor: "text-primary",
-    channels: { inApp: true, email: false, sms: false },
-  },
+const TIMES = [
+  "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00",
+  "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00",
+  "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00",
 ]
 
-// ─── Toggle ───────────────────────────────────────────────────────────────────
+type ApiPreference = {
+  alertType: WorkspaceAlertType
+  inAppEnabled: boolean
+  emailEnabled: boolean
+  smsEnabled: boolean
+}
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+type ApiDigest = {
+  digestEnabled: boolean
+  digestFrequency: "daily" | "weekly"
+  digestTimeLocal: string
+  quietHoursEnabled: boolean
+  quietHoursStartLocal: string | null
+  quietHoursEndLocal: string | null
+}
+
+type ApiBundle = {
+  preferences: ApiPreference[]
+  digest: ApiDigest
+}
+
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+  "aria-label"?: string
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       disabled={disabled}
-      onClick={() => { if (!disabled) onChange(!checked) }}
+      onClick={() => {
+        if (!disabled) onChange(!checked)
+      }}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent",
         "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-        checked ? "bg-primary" : "bg-border"
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+        checked ? "bg-primary" : "bg-border",
       )}
     >
-      <span className={cn(
-        "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm",
-        "transform transition-transform duration-150",
-        checked ? "translate-x-4" : "translate-x-0"
-      )} />
+      <span
+        className={cn(
+          "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm",
+          "transform transition-transform duration-150",
+          checked ? "translate-x-4" : "translate-x-0",
+        )}
+      />
     </button>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
+  return prefs.map((p) => ({
+    alertType: p.alertType,
+    inAppEnabled: p.inAppEnabled,
+    emailEnabled: p.emailEnabled,
+    smsEnabled: false,
+  }))
+}
 
 export default function NotificationsPage() {
+  const { toast } = useToast()
   const { organizationId, status: orgStatus } = useActiveOrganization()
-  /** Design preview only — not persisted (Phase 57.2). */
-  const prefs = INITIAL_PREFS
-  const digestEmail = true
-  const digestFrequency: "daily" | "weekly" = "daily"
-  const quietStart = "22:00"
-  const quietEnd = "07:00"
+  const { status: permStatus, has } = useOrgPermissions()
+  const canEdit = permStatus === "ready" && has("canManageWorkspaceSettings")
 
-  const TIMES = [
-    "00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00",
-    "08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00",
-    "16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00",
-  ]
+  const [loadState, setLoadState] = useState<"idle" | "loading" | "error" | "ready">("idle")
+  const [loadMessage, setLoadMessage] = useState<string | null>(null)
+  const [bundle, setBundle] = useState<ApiBundle | null>(null)
+  const [saving, setSaving] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const prefsByType = useMemo(() => {
+    const m = new Map<WorkspaceAlertType, ApiPreference>()
+    for (const p of bundle?.preferences ?? []) {
+      m.set(p.alertType, p)
+    }
+    return m
+  }, [bundle])
+
+  const digest = bundle?.digest
+
+  const applyBundle = useCallback((b: ApiBundle) => {
+    setBundle(b)
+  }, [])
+
+  const load = useCallback(async () => {
+    if (orgStatus !== "ready" || !organizationId) {
+      setLoadState("idle")
+      setBundle(null)
+      return
+    }
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+    setLoadState("loading")
+    setLoadMessage(null)
+    try {
+      const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
+        signal: ac.signal,
+      })
+      const json = (await res.json().catch(() => null)) as ApiBundle & { message?: string; error?: string }
+      if (!res.ok) {
+        throw new Error(typeof json?.message === "string" ? json.message : "Could not load notification settings.")
+      }
+      if (!json?.preferences || !json?.digest) {
+        throw new Error("Invalid response from server.")
+      }
+      applyBundle(json as ApiBundle)
+      setLoadState("ready")
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return
+      const msg = e instanceof Error ? e.message : "Could not load notification settings."
+      setLoadMessage(msg)
+      setLoadState("error")
+      setBundle(null)
+    }
+  }, [applyBundle, organizationId, orgStatus])
+
+  useEffect(() => {
+    void load()
+    return () => abortRef.current?.abort()
+  }, [load])
+
+  const patch = useCallback(
+    async (body: { preferences?: ApiPreference[]; digest?: ApiDigest }, rollback: ApiBundle | null) => {
+      if (!organizationId || !rollback) return
+      setSaving(true)
+      try {
+        const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const json = (await res.json().catch(() => null)) as ApiBundle & { message?: string }
+        if (!res.ok) {
+          throw new Error(typeof json?.message === "string" ? json.message : "Could not save settings.")
+        }
+        if (!json?.preferences || !json?.digest) {
+          throw new Error("Invalid response from server.")
+        }
+        applyBundle(json as ApiBundle)
+        toast({ title: "Saved", description: "Workspace notification settings were updated." })
+      } catch (e) {
+        setBundle(rollback)
+        const msg = e instanceof Error ? e.message : "Could not save settings."
+        toast({ variant: "destructive", title: "Save failed", description: msg })
+      } finally {
+        setSaving(false)
+      }
+    },
+    [applyBundle, organizationId, toast],
+  )
+
+  const updatePreferenceChannel = useCallback(
+    async (alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
+      if (!bundle || !canEdit || saving) return
+      const rollback = bundle
+      const nextPrefs = bundle.preferences.map((p) =>
+        p.alertType === alertType ?
+          {
+            ...p,
+            inAppEnabled: channel === "inApp" ? value : p.inAppEnabled,
+            emailEnabled: channel === "email" ? value : p.emailEnabled,
+            smsEnabled: false,
+          }
+        : p,
+      )
+      setBundle({ ...bundle, preferences: nextPrefs })
+      await patch({ preferences: preferencesPayload(nextPrefs), digest: bundle.digest }, rollback)
+    },
+    [bundle, canEdit, patch, saving],
+  )
+
+  const updateDigest = useCallback(
+    async (nextDigest: ApiDigest) => {
+      if (!bundle || !canEdit || saving) return
+      const rollback = bundle
+      setBundle({ ...bundle, digest: nextDigest })
+      await patch({ preferences: preferencesPayload(bundle.preferences), digest: nextDigest }, rollback)
+    },
+    [bundle, canEdit, patch, saving],
+  )
+
+  const showMatrix = loadState === "ready" && bundle
 
   return (
-    <div className="flex flex-col gap-6 pb-10">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Bell size={16} className="text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
+    <div className="flex max-w-full flex-col gap-6 overflow-x-hidden pb-10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2">
+            <Bell size={16} className="shrink-0 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Notification preferences</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Internal escalation rules and the AI Ops digest below are saved to your workspace. The personal alert matrix is a design preview only.
+            Choose which workspace alerts should be sent in-app, by email, or by SMS. Internal escalation rules and the
+            AI Ops digest below use their own saved settings.
           </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+          {loadState === "loading" ?
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading…
+            </span>
+          : null}
+          {saving ?
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Saving…
+            </span>
+          : null}
         </div>
       </div>
 
+      {loadState === "error" && loadMessage ?
+        <Alert variant="destructive">
+          <AlertTitle>Could not load settings</AlertTitle>
+          <AlertDescription>{loadMessage}</AlertDescription>
+        </Alert>
+      : null}
+
       <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Personal channel preferences are not saved yet</AlertTitle>
+        <Smartphone className="h-4 w-4" />
+        <AlertTitle>SMS alerts are not active yet.</AlertTitle>
         <AlertDescription>
-          The alert matrix, email digest options, and quiet hours below illustrate planned behavior. Toggles are read-only until notification preferences are backed by the API.
+          In-app and email toggles are saved for your workspace. SMS switches stay off until SMS delivery is enabled.
         </AlertDescription>
       </Alert>
 
-      {/* Alert matrix (preview) */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
+      {/* Alert matrix */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-4 sm:px-6">
           <h3 className="text-sm font-semibold text-foreground">Alert preferences</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Planned: control which events trigger notifications and on which channels.
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Workspace members still receive in-app notifications according to these toggles; delivery jobs will read this
+            table in a later release.
           </p>
         </div>
 
-        {/* Channel header */}
-        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-6 py-3 bg-secondary/40 border-b border-border">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Alert type</span>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-16 justify-center">
-            <Monitor size={12} /> In-app
+        {!showMatrix ?
+          <div className="flex items-center justify-center gap-2 px-4 py-16 text-center text-sm text-muted-foreground">
+            {orgStatus === "loading" ?
+              <>
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                Loading workspace…
+              </>
+            : orgStatus !== "ready" || !organizationId ?
+              "Select a workspace to manage notifications."
+            : loadState === "loading" ?
+              <>
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                Loading preferences…
+              </>
+            : loadState === "error" ?
+              "Could not load preferences. Refresh the page to try again."
+            : null}
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-14 justify-center">
-            <Mail size={12} /> Email
-          </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground w-12 justify-center">
-            <Smartphone size={12} /> SMS
-          </div>
-        </div>
-
-        <div className="divide-y divide-border">
-          {prefs.map((pref) => {
-            const Icon = pref.icon
-            return (
-              <div
-                key={pref.id}
-                className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-6 py-4 hover:bg-secondary/20 transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-secondary border border-border flex items-center justify-center shrink-0">
-                    <Icon size={14} className={pref.iconColor} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{pref.label}</p>
-                    <p className="text-xs text-muted-foreground leading-snug mt-0.5">{pref.description}</p>
-                  </div>
-                </div>
-                <div className="w-16 flex justify-center">
-                  <Toggle
-                    checked={pref.channels.inApp}
-                    onChange={() => {}}
-                    disabled
-                  />
-                </div>
-                <div className="w-14 flex justify-center">
-                  <Toggle
-                    checked={pref.channels.email}
-                    onChange={() => {}}
-                    disabled
-                  />
-                </div>
-                <div className="w-12 flex justify-center">
-                  <Toggle
-                    checked={pref.channels.sms}
-                    onChange={() => {}}
-                    disabled
-                  />
-                </div>
+        : (
+          <>
+            {/* Desktop header */}
+            <div className="hidden grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-4 border-b border-border bg-secondary/40 px-6 py-3 md:grid">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Alert type</span>
+              <div className="flex w-16 justify-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Monitor size={12} className="shrink-0" />
+                In-app
               </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Email digest */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Email digest</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Receive a summary of activity instead of individual emails for each event.</p>
-          </div>
-          <Toggle checked={digestEmail} onChange={() => {}} disabled />
-        </div>
-        {digestEmail && (
-          <div className="px-6 py-4">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Digest frequency</p>
-            <div className="flex items-center gap-2">
-              {(["daily", "weekly"] as const).map((freq) => (
-                <button
-                  key={freq}
-                  type="button"
-                  disabled
-                  className={cn(
-                    "px-4 py-2 rounded-lg border text-sm font-medium capitalize transition-all opacity-50 cursor-not-allowed",
-                    digestFrequency === freq
-                      ? "border-primary bg-primary/8 text-primary"
-                      : "border-border text-muted-foreground"
-                  )}
-                >
-                  {freq}
-                </button>
-              ))}
+              <div className="flex w-14 justify-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Mail size={12} className="shrink-0" />
+                Email
+              </div>
+              <div className="flex w-12 justify-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Smartphone size={12} className="shrink-0" />
+                SMS
+              </div>
             </div>
-          </div>
+
+            {/* Mobile cards */}
+            <div className="divide-y divide-border md:hidden">
+              {WORKSPACE_ALERT_REGISTRY.map((row) => {
+                const pref = prefsByType.get(row.alertType)
+                if (!pref) return null
+                const Icon = row.icon
+                const busy = saving || !canEdit
+                return (
+                  <div key={row.alertType} className="space-y-3 px-4 py-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary">
+                        <Icon size={14} className={row.iconColorClass} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{row.label}</p>
+                        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{row.description}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2 py-3">
+                        <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          In-app
+                        </span>
+                        <Toggle
+                          aria-label={`${row.label} in-app`}
+                          checked={pref.inAppEnabled}
+                          disabled={busy}
+                          onChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2 py-3">
+                        <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Email
+                        </span>
+                        <Toggle
+                          aria-label={`${row.label} email`}
+                          checked={pref.emailEnabled}
+                          disabled={busy}
+                          onChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-2 py-3">
+                        <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          SMS
+                        </span>
+                        <Toggle checked={false} disabled onChange={() => {}} aria-label={`${row.label} SMS (inactive)`} />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop rows */}
+            <div className="hidden divide-y divide-border md:block">
+              {WORKSPACE_ALERT_REGISTRY.map((row) => {
+                const pref = prefsByType.get(row.alertType)
+                if (!pref) return null
+                const Icon = row.icon
+                const busy = saving || !canEdit
+                return (
+                  <div
+                    key={row.alertType}
+                    className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-4 px-6 py-4 transition-colors hover:bg-secondary/20"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary">
+                        <Icon size={14} className={row.iconColorClass} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{row.label}</p>
+                        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{row.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex w-16 justify-center">
+                      <Toggle
+                        aria-label={`${row.label} in-app`}
+                        checked={pref.inAppEnabled}
+                        disabled={busy}
+                        onChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                      />
+                    </div>
+                    <div className="flex w-14 justify-center">
+                      <Toggle
+                        aria-label={`${row.label} email`}
+                        checked={pref.emailEnabled}
+                        disabled={busy}
+                        onChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                      />
+                    </div>
+                    <div className="flex w-12 justify-center">
+                      <Toggle checked={false} disabled onChange={() => {}} aria-label={`${row.label} SMS (inactive)`} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Quiet hours */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-foreground">Quiet hours</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Suppress all notifications during these hours. Applies to email and SMS only — in-app alerts are still recorded.</p>
+      {/* Email digest + quiet hours */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Email digest</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Receive a summary of activity instead of individual emails for each event. Times use each viewer&apos;s
+              local timezone when shown in the app; stored as HH:MM for the workspace default.
+            </p>
+          </div>
+          {digest ?
+            <Toggle
+              aria-label="Email digest enabled"
+              checked={digest.digestEnabled}
+              disabled={saving || !canEdit || !bundle}
+              onChange={(v) => {
+                if (!bundle) return
+                void updateDigest({ ...bundle.digest, digestEnabled: v })
+              }}
+            />
+          : null}
         </div>
-        <div className="px-6 py-4 flex items-center gap-3 flex-wrap">
-          <span className="text-sm text-muted-foreground">From</span>
-          <select
-            value={quietStart}
-            disabled
-            className="h-8 rounded-md border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground cursor-not-allowed"
-          >
-            {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <span className="text-sm text-muted-foreground">to</span>
-          <select
-            value={quietEnd}
-            disabled
-            className="h-8 rounded-md border border-border bg-muted/50 px-2.5 text-xs font-medium text-muted-foreground cursor-not-allowed"
-          >
-            {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <span className="text-xs text-muted-foreground">(your local time)</span>
-        </div>
+        {digest && digest.digestEnabled ?
+          <div className="space-y-4 px-4 py-4 sm:px-6">
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Digest frequency</p>
+              <div className="flex flex-wrap gap-2">
+                {(["daily", "weekly"] as const).map((freq) => (
+                  <button
+                    key={freq}
+                    type="button"
+                    disabled={saving || !canEdit || !bundle}
+                    onClick={() => {
+                      if (!bundle) return
+                      void updateDigest({ ...bundle.digest, digestFrequency: freq })
+                    }}
+                    className={cn(
+                      "rounded-lg border px-4 py-2 text-sm font-medium capitalize transition-all",
+                      digest.digestFrequency === freq ?
+                        "border-primary bg-primary/8 text-primary"
+                      : "border-border text-muted-foreground hover:bg-secondary/60",
+                      saving || !canEdit ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+                    )}
+                  >
+                    {freq}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Digest send time</p>
+              <select
+                className="h-9 max-w-full rounded-md border border-border bg-background px-2 text-sm"
+                value={digest.digestTimeLocal}
+                disabled={saving || !canEdit || !bundle}
+                onChange={(e) => {
+                  if (!bundle) return
+                  void updateDigest({ ...bundle.digest, digestTimeLocal: e.target.value })
+                }}
+              >
+                {TIMES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        : digest ?
+          <p className="px-4 py-3 text-xs text-muted-foreground sm:px-6">Turn on the digest to pick frequency and send time.</p>
+        : null}
       </div>
 
-      {/* Phase 48 — internal escalation rules (workspace managers edit; all staff preview within scope) */}
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Quiet hours</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              When enabled, suppress email (and future SMS) during this window. In-app alerts are still recorded.
+            </p>
+          </div>
+          {digest ?
+            <Toggle
+              aria-label="Quiet hours enabled"
+              checked={digest.quietHoursEnabled}
+              disabled={saving || !canEdit || !bundle}
+              onChange={(v) => {
+                if (!bundle) return
+                const d = bundle.digest
+                void updateDigest({
+                  ...d,
+                  quietHoursEnabled: v,
+                  quietHoursStartLocal: v ? (d.quietHoursStartLocal ?? "22:00") : d.quietHoursStartLocal,
+                  quietHoursEndLocal: v ? (d.quietHoursEndLocal ?? "07:00") : d.quietHoursEndLocal,
+                })
+              }}
+            />
+          : null}
+        </div>
+        {digest && digest.quietHoursEnabled ?
+          <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
+            <span className="text-sm text-muted-foreground">From</span>
+            <select
+              className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
+              value={digest.quietHoursStartLocal ?? "22:00"}
+              disabled={saving || !canEdit || !bundle}
+              onChange={(e) => {
+                if (!bundle) return
+                void updateDigest({ ...bundle.digest, quietHoursStartLocal: e.target.value })
+              }}
+            >
+              {TIMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <span className="text-sm text-muted-foreground">to</span>
+            <select
+              className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
+              value={digest.quietHoursEndLocal ?? "07:00"}
+              disabled={saving || !canEdit || !bundle}
+              onChange={(e) => {
+                if (!bundle) return
+                void updateDigest({ ...bundle.digest, quietHoursEndLocal: e.target.value })
+              }}
+            >
+              {TIMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">(local time)</span>
+          </div>
+        : digest ?
+          <p className="px-4 py-3 text-xs text-muted-foreground sm:px-6">Enable quiet hours to set a start and end time.</p>
+        : null}
+      </div>
+
       {orgStatus === "ready" && organizationId ?
         <InternalEscalationRulesPanel organizationId={organizationId} />
       : null}
 
-      {/* AI Ops daily digest (Phase 3 — internal staff only) */}
       <AiOpsDigestSettingsCard />
 
-      {/* Link to automations */}
-      <div className="rounded-lg border border-dashed border-border bg-secondary/30 px-5 py-4">
+      <div className="rounded-lg border border-dashed border-border bg-secondary/30 px-4 py-4 sm:px-5">
         <p className="text-sm font-medium text-foreground">Looking for email automation cadences?</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Configure appointment confirmations, maintenance reminders, quote follow-ups, and invoice follow-up sequences in{" "}
-          <a href="/settings/automations" className="text-primary hover:underline font-medium">Automations</a>.
+          <a href="/settings/automations" className="font-medium text-primary hover:underline">
+            Automations
+          </a>
+          .
         </p>
       </div>
     </div>

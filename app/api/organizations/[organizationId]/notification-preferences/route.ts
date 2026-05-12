@@ -1,0 +1,224 @@
+import { NextResponse } from "next/server"
+import { z } from "zod"
+import { UUID_RE } from "@/lib/aiden/prepared-actions/prepared-actions-shared"
+import { getServiceRoleOrNull } from "@/lib/aiden/prepared-actions/prepared-actions-api-helpers"
+import { requireOrgMemberSession, requireOrgPermission } from "@/lib/api/require-org-permission"
+import {
+  fetchOrganizationNotificationSettingsBundle,
+  upsertOrganizationDigestSettings,
+  upsertOrganizationNotificationPreferences,
+  type DigestSettingsDto,
+  type NotificationPreferenceDto,
+  type OrganizationNotificationSettingsBundle,
+} from "@/lib/notifications/organization-notification-preferences-repository"
+import { WORKSPACE_ALERT_TYPES, isWorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
+
+export const runtime = "nodejs"
+
+const LOCAL_HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
+
+function serializeBundle(bundle: OrganizationNotificationSettingsBundle) {
+  return {
+    preferences: bundle.preferences.map((p) => ({
+      alertType: p.alertType,
+      inAppEnabled: p.inAppEnabled,
+      emailEnabled: p.emailEnabled,
+      smsEnabled: p.smsEnabled,
+    })),
+    digest: {
+      digestEnabled: bundle.digest.digestEnabled,
+      digestFrequency: bundle.digest.digestFrequency,
+      digestTimeLocal: bundle.digest.digestTimeLocal,
+      quietHoursEnabled: bundle.digest.quietHoursEnabled,
+      quietHoursStartLocal: bundle.digest.quietHoursStartLocal,
+      quietHoursEndLocal: bundle.digest.quietHoursEndLocal,
+    },
+  }
+}
+
+const PreferenceItemSchema = z.object({
+  alertType: z.string(),
+  inAppEnabled: z.boolean(),
+  emailEnabled: z.boolean(),
+  smsEnabled: z.boolean().optional(),
+})
+
+const DigestPatchSchema = z.object({
+  digestEnabled: z.boolean(),
+  digestFrequency: z.enum(["daily", "weekly"]),
+  digestTimeLocal: z.string().regex(LOCAL_HM, "digestTimeLocal must be HH:MM (local)."),
+  quietHoursEnabled: z.boolean(),
+  quietHoursStartLocal: z
+    .string()
+    .regex(LOCAL_HM, "quietHoursStartLocal must be HH:MM (local).")
+    .nullable(),
+  quietHoursEndLocal: z
+    .string()
+    .regex(LOCAL_HM, "quietHoursEndLocal must be HH:MM (local).")
+    .nullable(),
+})
+
+const PatchBodySchema = z
+  .object({
+    preferences: z.array(PreferenceItemSchema).optional(),
+    digest: DigestPatchSchema.optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (body.preferences === undefined && body.digest === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Provide preferences and/or digest." })
+    }
+    if (body.preferences) {
+      if (body.preferences.length !== WORKSPACE_ALERT_TYPES.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `preferences must include exactly ${WORKSPACE_ALERT_TYPES.length} alert rows.`,
+          path: ["preferences"],
+        })
+      }
+      const unknown = body.preferences.find((p) => !isWorkspaceAlertType(p.alertType))
+      if (unknown) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Unknown alertType.",
+          path: ["preferences"],
+        })
+      }
+      const distinct = new Set(body.preferences.map((p) => p.alertType))
+      if (body.preferences.length === WORKSPACE_ALERT_TYPES.length && distinct.size !== WORKSPACE_ALERT_TYPES.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "preferences must include every alert type exactly once.",
+          path: ["preferences"],
+        })
+      }
+      if (body.preferences.some((p) => p.smsEnabled === true)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SMS alerts are not active yet.",
+          path: ["preferences"],
+        })
+      }
+      for (const t of WORKSPACE_ALERT_TYPES) {
+        if (!body.preferences.some((p) => p.alertType === t)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "preferences must include every alert type exactly once.",
+            path: ["preferences"],
+          })
+          break
+        }
+      }
+    }
+    if (body.digest?.quietHoursEnabled) {
+      if (!body.digest.quietHoursStartLocal || !body.digest.quietHoursEndLocal) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Quiet hours require start and end times.",
+          path: ["digest", "quietHoursStartLocal"],
+        })
+      }
+    }
+  })
+
+function orderPreferences(parsed: z.infer<typeof PreferenceItemSchema>[]): NotificationPreferenceDto[] {
+  const byType = new Map(parsed.map((p) => [p.alertType, p]))
+  return WORKSPACE_ALERT_TYPES.map((t) => {
+    const row = byType.get(t)
+    return {
+      alertType: t,
+      inAppEnabled: Boolean(row?.inAppEnabled),
+      emailEnabled: Boolean(row?.emailEnabled),
+      smsEnabled: false,
+    }
+  })
+}
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ organizationId: string }> },
+) {
+  const { organizationId } = await context.params
+  if (!UUID_RE.test(organizationId)) {
+    return NextResponse.json({ error: "bad_request", message: "Invalid organization id." }, { status: 400 })
+  }
+
+  const gate = await requireOrgMemberSession(organizationId)
+  if ("error" in gate) return gate.error
+
+  const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
+  if (loaded.error || !loaded.data) {
+    return NextResponse.json(
+      { error: "query_failed", message: "Could not load notification settings." },
+      { status: 500 },
+    )
+  }
+
+  return NextResponse.json(serializeBundle(loaded.data))
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ organizationId: string }> },
+) {
+  const { organizationId } = await context.params
+  if (!UUID_RE.test(organizationId)) {
+    return NextResponse.json({ error: "bad_request", message: "Invalid organization id." }, { status: 400 })
+  }
+
+  const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
+  if ("error" in gate) return gate.error
+
+  const svc = getServiceRoleOrNull()
+  if (!svc) {
+    return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
+  }
+
+  let body: z.infer<typeof PatchBodySchema>
+  try {
+    const raw = await request.json().catch(() => ({}))
+    body = PatchBodySchema.parse(raw)
+  } catch (e) {
+    const msg =
+      e instanceof z.ZodError ? e.issues.map((x) => x.message).join(" ") : "Invalid JSON body."
+    return NextResponse.json({ error: "bad_request", message: msg || "Invalid request." }, { status: 400 })
+  }
+
+  if (body.preferences) {
+    const ordered = orderPreferences(body.preferences)
+    const up = await upsertOrganizationNotificationPreferences(svc, organizationId, ordered)
+    if (up.error) {
+      return NextResponse.json(
+        { error: "update_failed", message: "Could not save notification preferences." },
+        { status: 500 },
+      )
+    }
+  }
+
+  if (body.digest) {
+    const digest: DigestSettingsDto = {
+      digestEnabled: body.digest.digestEnabled,
+      digestFrequency: body.digest.digestFrequency,
+      digestTimeLocal: body.digest.digestTimeLocal,
+      quietHoursEnabled: body.digest.quietHoursEnabled,
+      quietHoursStartLocal: body.digest.quietHoursEnabled ? body.digest.quietHoursStartLocal : null,
+      quietHoursEndLocal: body.digest.quietHoursEnabled ? body.digest.quietHoursEndLocal : null,
+    }
+    const upD = await upsertOrganizationDigestSettings(svc, organizationId, digest)
+    if (upD.error) {
+      return NextResponse.json(
+        { error: "update_failed", message: "Could not save digest settings." },
+        { status: 500 },
+      )
+    }
+  }
+
+  const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
+  if (loaded.error || !loaded.data) {
+    return NextResponse.json(
+      { error: "query_failed", message: "Saved, but settings could not be reloaded." },
+      { status: 500 },
+    )
+  }
+
+  return NextResponse.json(serializeBundle(loaded.data))
+}
