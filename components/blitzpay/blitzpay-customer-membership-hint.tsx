@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Repeat } from "lucide-react"
+import { MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 
 type Props = {
   organizationId: string | null
@@ -49,7 +49,7 @@ export function BlitzpayCustomerMembershipHint({ organizationId, orgReady, custo
 
   return (
     <div className="flex flex-wrap items-start gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] text-foreground">
-      <Repeat className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300 mt-0.5" aria-hidden />
+      <MembershipsLucideIcon className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300 mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-emerald-900 dark:text-emerald-100">Recurring membership</p>
         <p className="text-muted-foreground mt-0.5 leading-snug">{summary}</p>

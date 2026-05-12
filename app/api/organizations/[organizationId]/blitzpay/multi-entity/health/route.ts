@@ -74,6 +74,7 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
           skipSupplierNetwork: true,
           skipClaimsWarranty: true,
           skipMobilePhase6a: true,
+          skipObservabilityPhase6b: true,
         }),
       )
     }

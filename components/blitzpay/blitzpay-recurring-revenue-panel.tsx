@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CalendarClock, Loader2, RefreshCw, Repeat } from "lucide-react"
 import type { BlitzpayRecurringRevenuePulsePayload } from "@/lib/blitzpay/blitzpay-recurring-revenue-types"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -148,7 +149,7 @@ export function BlitzpayRecurringRevenuePanel({ organizationId, orgReady }: Prop
                 <ul className="text-[11px] space-y-1">
                   {data.atRiskCustomers.map((c) => (
                     <li key={c.customerId} className="flex flex-wrap items-center gap-2">
-                      <span className="text-muted-foreground">{c.band.replace(/_/g, " ")}</span>
+                      <span className="text-muted-foreground">{formatBlitzpayUiLabel(c.band)}</span>
                       <Button asChild variant="link" className="h-auto p-0 text-[11px]">
                         <Link href={`/customers/${encodeURIComponent(c.customerId)}`}>Open customer</Link>
                       </Button>
@@ -237,7 +238,7 @@ export function BlitzpayRecurringRevenuePanel({ organizationId, orgReady }: Prop
           ) : null}
 
           <p className="text-[10px] text-muted-foreground">
-            Org membership health (aggregate): {data.membershipHealthOrg.band.replace(/_/g, " ")} · score{" "}
+            Org membership health (aggregate): {formatBlitzpayUiLabel(data.membershipHealthOrg.band)} · score{" "}
             {data.membershipHealthOrg.score0to100}/100
           </p>
         </div>

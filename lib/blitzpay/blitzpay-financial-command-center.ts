@@ -172,6 +172,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     fieldCollectionsIntentCents: number
     mobileTreasuryVisibilityScore: number
     mobileConflictReviewCount: number
+    /** Phase 6B — enterprise observability (bounded metrics; no autonomous execution). */
+    queueHealthScore: number
+    workflowFailureRate: number
+    idempotencyConflictRate: number
+    replayPendingCount: number
+    observabilityCoverageRate: number
+    workerHealthScore: number
+    multiRegionReadinessScore: number
+    replayIntegrityScore: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -223,6 +232,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     mobileFinancialOps: {
       href: "/settings/payments#blitzpay-mobile-financial-ops-anchor",
       label: "Mobile financial ops (field capture)",
+    },
+    enterpriseObservability: {
+      href: "/settings/payments#blitzpay-enterprise-observability-anchor",
+      label: "Enterprise observability (queues & replays)",
     },
   }
 }
@@ -468,6 +481,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     fieldCollectionsIntentCents: reporting.fieldCollectionsIntentCents,
     mobileTreasuryVisibilityScore: reporting.mobileTreasuryVisibilityScore,
     mobileConflictReviewCount: reporting.mobileConflictReviewCount,
+    queueHealthScore: reporting.queueHealthScore,
+    workflowFailureRate: reporting.workflowFailureRate,
+    idempotencyConflictRate: reporting.idempotencyConflictRate,
+    replayPendingCount: reporting.replayPendingCount,
+    observabilityCoverageRate: reporting.observabilityCoverageRate,
+    workerHealthScore: reporting.workerHealthScore,
+    multiRegionReadinessScore: reporting.multiRegionReadinessScore,
+    replayIntegrityScore: reporting.replayIntegrityScore,
   },
     combinedForecast,
     scorecards,

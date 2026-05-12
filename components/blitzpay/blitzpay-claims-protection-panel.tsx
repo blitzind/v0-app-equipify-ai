@@ -6,6 +6,7 @@ import { Loader2, RefreshCw, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { reserveReplenishmentIndicator0to100, reserveUtilizationScore0to100 } from "@/lib/blitzpay/blitzpay-warranty-reserves"
 
 type Phase5c = {
@@ -206,7 +207,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
         </>
       : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty-style reserves</p>
           {reserves.length === 0 ?
@@ -219,9 +220,10 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
                   : reserveUtilizationScore0to100(r.reserve_balance_cents, r.projected_exposure_cents)
                 const repl = reserveReplenishmentIndicator0to100(r.reserve_balance_cents, r.projected_exposure_cents)
                 return (
-                  <li key={r.id} className="tabular-nums">
+                  <li key={r.id} className="tabular-nums min-w-0 break-words">
                     <span className="font-medium text-foreground">{r.reserve_name}</span> ·{" "}
-                    {String(r.reserve_type).replace(/_/g, " ")} · {r.reserve_status} · balance {fmtMoney(r.reserve_balance_cents)}
+                    {formatBlitzpayUiLabel(String(r.reserve_type))} · {formatBlitzpayUiLabel(r.reserve_status)} · balance{" "}
+                    {fmtMoney(r.reserve_balance_cents)}
                     {r.projected_exposure_cents != null ? ` · projected ${fmtMoney(r.projected_exposure_cents)}` : ""}
                     {` · utilization ${util}/100`}
                     {repl > 0 ? ` · top-up signal ${repl}/100` : ""}
@@ -239,7 +241,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
               {claims.slice(0, 10).map((c) => (
                 <li key={c.id} className="tabular-nums">
                   <span className="font-medium text-foreground">{c.claim_reference}</span> ·{" "}
-                  {String(c.claim_type).replace(/_/g, " ")} · {c.claim_status}
+                  {formatBlitzpayUiLabel(String(c.claim_type))} · {formatBlitzpayUiLabel(c.claim_status)}
                   {c.estimated_claim_amount_cents != null ?
                     ` · est. ${fmtMoney(Math.max(0, Math.round(Number(c.estimated_claim_amount_cents))))}`
                   : ""}
@@ -250,7 +252,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Protection plans (bounded)</p>
           {plans.length === 0 ?
@@ -258,7 +260,8 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
           : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
               {plans.slice(0, 8).map((p) => (
                 <li key={p.id} className="tabular-nums">
-                  <span className="font-medium text-foreground">{String(p.plan_type).replace(/_/g, " ")}</span> · {p.plan_status}
+                  <span className="font-medium text-foreground">{formatBlitzpayUiLabel(String(p.plan_type))}</span> ·{" "}
+                  {formatBlitzpayUiLabel(p.plan_status)}
                   {p.monthly_price_cents != null ? ` · ${fmtMoney(Math.max(0, Math.round(Number(p.monthly_price_cents))))}/mo` : ""}
                   {p.estimated_exposure_cents != null ?
                     ` · exposure est. ${fmtMoney(Math.max(0, Math.round(Number(p.estimated_exposure_cents))))}`
@@ -275,7 +278,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
           : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
               {storms.slice(0, 8).map((s) => (
                 <li key={s.id} className="tabular-nums">
-                  <span className="font-medium text-foreground">{s.event_name}</span> · {s.event_status}
+                  <span className="font-medium text-foreground">{s.event_name}</span> · {formatBlitzpayUiLabel(s.event_status)}
                   {s.event_region ? ` · ${s.event_region}` : ""}
                   {s.estimated_claim_exposure_cents != null ?
                     ` · claim exposure est. ${fmtMoney(Math.max(0, Math.round(Number(s.estimated_claim_exposure_cents))))}`
@@ -294,8 +297,9 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
           <p className="text-sm text-muted-foreground">No payout tracking rows yet.</p>
         : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
             {payouts.slice(0, 10).map((p) => (
-              <li key={p.id} className="tabular-nums">
-                {String(p.payout_type).replace(/_/g, " ")} · {p.payout_status} · {fmtMoney(Math.max(0, Math.round(Number(p.payout_amount_cents))))}
+              <li key={p.id} className="tabular-nums min-w-0 break-words">
+                {formatBlitzpayUiLabel(String(p.payout_type))} · {formatBlitzpayUiLabel(p.payout_status)} ·{" "}
+                {fmtMoney(Math.max(0, Math.round(Number(p.payout_amount_cents))))}
                 {p.payout_reference_hash ? ` · ref ${String(p.payout_reference_hash).slice(0, 10)}…` : ""}
               </li>
             ))}

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ClipboardList, Loader2, RefreshCw, Target } from "lucide-react"
 import type { BlitzpayCollectionsCopilotPayload } from "@/lib/blitzpay/blitzpay-collections-copilot-types"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -162,7 +163,7 @@ export function BlitzpayCollectionsCopilotPanel({ organizationId, orgReady }: Pr
             <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-4">
               {data.customerBehaviorSegments.map((s) => (
                 <li key={s.segment}>
-                  <span className="text-foreground capitalize">{s.segment.replace(/_/g, " ")}</span> (~{s.countApprox}) — {s.note}
+                  <span className="text-foreground">{formatBlitzpayUiLabel(s.segment)}</span> (~{s.countApprox}) — {s.note}
                 </li>
               ))}
             </ul>

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, RefreshCw, Repeat } from "lucide-react"
+import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
+import { MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 
 type Dashboard = {
   activeCount: number
@@ -110,7 +112,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Repeat className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
+          <MembershipsLucideIcon className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
           <div>
             <p className="text-xs font-semibold">Memberships & recurring agreements</p>
             <p className="text-[10px] text-muted-foreground">
@@ -204,7 +206,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-border/40">
                     <td className="py-1 pr-2 font-medium">{r.membership_number}</td>
-                    <td className="py-1 pr-2">{r.status}</td>
+                    <td className="py-1 pr-2">{formatBlitzpayUiLabel(r.status)}</td>
                     <td className="py-1 pr-2">{r.billing_frequency}</td>
                     <td className="py-1 pr-2 tabular-nums">{fmtMoney(r.recurring_amount_cents)}</td>
                     <td className="py-1 pr-2">{r.next_invoice_at ? new Date(r.next_invoice_at).toLocaleDateString() : "—"}</td>

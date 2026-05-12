@@ -1,4 +1,6 @@
-# BlitzPay Phase 6A — Native mobile financial ops foundations
+# BlitzPay Phase 6 — mobile financial ops (6A) & enterprise observability (6B)
+
+## Phase 6A — Native mobile financial ops foundations
 
 Phase **6A** adds **org-scoped** tables and **staff** APIs for **mobile-first field finance capture**. It is **infrastructure only**: intents, signature authorization **hashes**, payroll approval queue rows, field-safe treasury snapshot bands, sync batch metadata, and an **append-only** mobile audit log.
 
@@ -33,3 +35,26 @@ Tables include **RLS** for authenticated reads (finance vs technician scoping). 
 ## Tests
 
 - `pnpm test:blitzpay-phase-6a-mobile-financial-ops`
+
+## Phase 6B — Enterprise scale & financial observability foundations
+
+Phase **6B** adds **deterministic metadata** for enterprise-scale **visibility**: financial **event** rows (hashed payloads for integrity signals), **workflow execution** lifecycle tracking, **queue health snapshots** (org or platform scope), **idempotency records** (duplicate suppression metadata), append-only **observability audit** (`immutable_hash` with optional `BLITZPAY_OBSERVABILITY_AUDIT_PEPPER`), and **multi-region readiness** rows (metadata only — **no active multi-region writes** in this phase).
+
+### Boundaries (non-goals)
+
+- **No autonomous financial execution**, remediation, or background money movement from observability APIs.
+- **No automatic replay storms** — `POST …/observability/workflows/[id]/replay` only marks **replayed** visibility for **failed** workflows and writes an audit row; downstream recovery remains explicit in product flows.
+- **No uncontrolled retries** — workflow helpers model bounded transitions only; APIs do not enqueue workers.
+- **Platform queue rows** (`snapshot_scope=platform`, `organization_id` null) have **no** member-facing RLS SELECT policies (service role / platform routes only).
+
+### Optional environment variables (Phase 6B)
+
+- `BLITZPAY_OBSERVABILITY_AUDIT_PEPPER` — strengthens `immutable_hash` on `blitzpay_observability_audit_log` rows (replay route uses it when set).
+
+### Reporting + nested fetches
+
+`fetchBlitzpayOrgReportingSnapshot` adds eight bounded Phase **6B** fields and supports `skipObservabilityPhase6b: true` on nested health-style fetches (alongside existing Phase **6A** skips) to cap redundant observability reads.
+
+### Tests
+
+- `pnpm test:blitzpay-phase-6b-scale-observability`

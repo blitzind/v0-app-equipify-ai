@@ -18,6 +18,7 @@ import { BlitzpayMultiEntityFinancePanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpaySupplierNetworkPanel } from "@/components/blitzpay/blitzpay-supplier-network-panel"
 import { BlitzpayClaimsProtectionPanel } from "@/components/blitzpay/blitzpay-claims-protection-panel"
 import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-mobile-financial-ops-panel"
+import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
 import { BlitzpayProcurementInventoryPanel } from "@/components/blitzpay/blitzpay-procurement-inventory-panel"
 import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
 import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
@@ -109,6 +110,7 @@ export default function FinancialCommandCenterPage() {
       <BlitzpaySupplierNetworkPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayClaimsProtectionPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayMobileFinancialOpsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayEnterpriseObservabilityPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayAccountingOverviewPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayApBillPayPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayTaxCompliancePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />

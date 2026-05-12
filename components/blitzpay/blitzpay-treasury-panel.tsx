@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Landmark, Loader2, RefreshCw, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type TreasuryPayload = {
   availableBalanceCents: number
@@ -280,7 +281,7 @@ export function BlitzpayTreasuryPanel({ organizationId, orgReady }: Props) {
                     {treasury.recentPayouts.map((p) => (
                       <tr key={p.id} className="border-t border-border">
                         <td className="p-2 whitespace-nowrap">{p.arrivalDate ?? fmtWhen(p.stripeCreatedAt)}</td>
-                        <td className="p-2">{p.status}</td>
+                        <td className="p-2">{formatBlitzpayUiLabel(p.status)}</td>
                         <td className="p-2 text-muted-foreground">{p.method ?? "—"}</td>
                         <td className="p-2 text-right font-medium">{fmtMoney(p.amountCents)}</td>
                         <td className="p-2 font-mono text-muted-foreground">…{p.payoutRefTail}</td>

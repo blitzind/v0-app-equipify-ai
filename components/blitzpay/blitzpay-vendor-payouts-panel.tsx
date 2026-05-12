@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { cn } from "@/lib/utils"
 
 type SettlementRow = {
@@ -102,7 +103,7 @@ export function BlitzpayVendorPayoutsPanel({ organizationId, orgReady }: Props) 
           {rows.map((r) => (
             <li key={r.id} className="rounded-md border border-border/70 px-2 py-1.5 flex justify-between gap-2">
               <span className="text-muted-foreground">
-                {r.settlement_type.replace(/_/g, " ")} · {r.settlement_status}
+                {formatBlitzpayUiLabel(r.settlement_type)} · {formatBlitzpayUiLabel(r.settlement_status)}
                 {r.work_order_id ? (
                   <>
                     {" "}

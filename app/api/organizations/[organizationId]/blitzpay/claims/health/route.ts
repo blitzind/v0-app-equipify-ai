@@ -47,6 +47,7 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
       skipSupplierNetwork: true,
       skipClaimsWarranty: true,
       skipMobilePhase6a: true,
+      skipObservabilityPhase6b: true,
     })
     const { phase5c } = await buildClaimsProtectionHealthPayload(admin, organizationId, snap)
     return NextResponse.json({ disclaimer: DISCLAIMER, sinceIso, phase5c })

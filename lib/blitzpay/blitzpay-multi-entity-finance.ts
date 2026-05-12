@@ -246,6 +246,7 @@ export async function buildPhase5aLinkedOrgReportingSlice(
         skipSupplierNetwork: true,
         skipClaimsWarranty: true,
         skipMobilePhase6a: true,
+        skipObservabilityPhase6b: true,
       }),
     )
   }

@@ -6,6 +6,7 @@ import { Building2, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type Phase5a = {
   multiEntityRevenueExposureCents: number
@@ -185,10 +186,10 @@ export function BlitzpayMultiEntityFinancePanel({ organizationId, orgReady }: Pr
           <p className="text-sm text-muted-foreground">No groups visible for this organization.</p>
         : <ul className="space-y-2 text-sm">
             {groups.map((g) => (
-              <li key={g.id} className="rounded-lg border border-border/70 px-3 py-2 flex flex-wrap justify-between gap-2">
-                <span className="font-medium text-foreground">{g.group_name}</span>
-                <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                  {g.group_type.replace(/_/g, " ")} · {g.group_status}
+              <li key={g.id} className="rounded-lg border border-border/70 px-3 py-2 flex flex-wrap justify-between gap-2 min-w-0">
+                <span className="font-medium text-foreground min-w-0 break-words">{g.group_name}</span>
+                <span className="text-muted-foreground text-xs min-w-0 break-words text-right">
+                  {formatBlitzpayUiLabel(g.group_type)} · {formatBlitzpayUiLabel(g.group_status)}
                 </span>
               </li>
             ))}
@@ -196,7 +197,7 @@ export function BlitzpayMultiEntityFinancePanel({ organizationId, orgReady }: Pr
         }
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inter-company summary</p>
           {balances.length === 0 ?
@@ -204,7 +205,7 @@ export function BlitzpayMultiEntityFinancePanel({ organizationId, orgReady }: Pr
           : <ul className="text-sm space-y-1 text-muted-foreground max-h-40 overflow-y-auto">
               {balances.slice(0, 12).map((b, idx) => (
                 <li key={idx} className="tabular-nums">
-                  {String(b.balance_status)} · {fmtMoney(b.balance_amount_cents)}
+                  {formatBlitzpayUiLabel(String(b.balance_status))} · {fmtMoney(b.balance_amount_cents)}
                 </li>
               ))}
             </ul>

@@ -6,6 +6,7 @@ import { Loader2, RefreshCw, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 const DISCLAIMER =
   "Mobile financial actions captured offline are reviewed and validated by the server before they become official financial records."
@@ -200,17 +201,17 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
+        <div className="space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Offline / queued intents</p>
           <ul className="space-y-1.5 text-sm max-h-48 overflow-y-auto pr-1">
             {intents.length === 0 ? (
               <li className="text-muted-foreground text-xs">No intents in the current sample.</li>
             ) : (
               intents.map((it) => (
-                <li key={it.id} className="rounded-md border border-border/60 px-2 py-1.5">
-                  <span className="font-medium">{it.intent_type}</span>
-                  <span className="text-muted-foreground"> · {it.intent_status}</span>
+                <li key={it.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
+                  <span className="font-medium">{formatBlitzpayUiLabel(it.intent_type)}</span>
+                  <span className="text-muted-foreground"> · {formatBlitzpayUiLabel(it.intent_status)}</span>
                   {it.captured_offline ? (
                     <span className="ml-2 text-[10px] uppercase font-semibold text-amber-800 dark:text-amber-200">Offline</span>
                   ) : (
@@ -225,16 +226,16 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           </ul>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Signature authorizations</p>
           <ul className="space-y-1.5 text-sm max-h-48 overflow-y-auto pr-1">
             {signatures.length === 0 ? (
               <li className="text-muted-foreground text-xs">No authorizations in the current sample.</li>
             ) : (
               signatures.map((s) => (
-                <li key={s.id} className="rounded-md border border-border/60 px-2 py-1.5">
-                  <span className="font-medium">{s.authorization_type}</span>
-                  <span className="text-muted-foreground"> · {s.authorization_status}</span>
+                <li key={s.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
+                  <span className="font-medium">{formatBlitzpayUiLabel(s.authorization_type)}</span>
+                  <span className="text-muted-foreground"> · {formatBlitzpayUiLabel(s.authorization_status)}</span>
                   {s.signature_reference_recorded ? (
                     <span className="ml-2 text-[10px] text-muted-foreground">Reference on file</span>
                   ) : null}
@@ -244,16 +245,16 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           </ul>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payroll approval queue</p>
           <ul className="space-y-1.5 text-sm max-h-40 overflow-y-auto pr-1">
             {payroll.length === 0 ? (
               <li className="text-muted-foreground text-xs">No payroll approval rows in the current sample.</li>
             ) : (
               payroll.map((r) => (
-                <li key={r.id} className="rounded-md border border-border/60 px-2 py-1.5">
-                  <span className="font-medium">{r.approval_type}</span>
-                  <span className="text-muted-foreground"> · {r.approval_status}</span>
+                <li key={r.id} className="rounded-md border border-border/60 px-2 py-1.5 min-w-0 break-words">
+                  <span className="font-medium">{formatBlitzpayUiLabel(r.approval_type)}</span>
+                  <span className="text-muted-foreground"> · {formatBlitzpayUiLabel(r.approval_status)}</span>
                   {r.amount_cents != null ? (
                     <span className="block text-xs tabular-nums text-muted-foreground">{fmtMoney(r.amount_cents)}</span>
                   ) : null}
@@ -263,15 +264,15 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
           </ul>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sync health</p>
           <ul className="space-y-1.5 text-sm max-h-40 overflow-y-auto pr-1">
             {syncBatches.length === 0 ? (
               <li className="text-muted-foreground text-xs">No sync batches in the current sample.</li>
             ) : (
               syncBatches.map((b) => (
-                <li key={b.id} className="rounded-md border border-border/60 px-2 py-1.5 text-xs">
-                  <span className="font-semibold">{b.batch_status}</span>
+                <li key={b.id} className="rounded-md border border-border/60 px-2 py-1.5 text-xs min-w-0 break-words">
+                  <span className="font-semibold">{formatBlitzpayUiLabel(b.batch_status)}</span>
                   <span className="text-muted-foreground">
                     {" "}
                     · items {b.processed_item_count}/{b.offline_item_count}
@@ -284,15 +285,15 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Field treasury summary (bands)</p>
         {treasury.length === 0 ? (
           <p className="text-xs text-muted-foreground">No treasury snapshots in the current sample.</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {treasury.map((row, idx) => (
-              <li key={idx} className="rounded-md border border-border/60 px-2 py-1.5 text-xs leading-relaxed">
-                <span className="font-medium">{String(row.visible_to_role ?? "—")}</span>
+              <li key={idx} className="rounded-md border border-border/60 px-2 py-1.5 text-xs leading-relaxed min-w-0 break-words">
+                <span className="font-medium">{formatBlitzpayUiLabel(String(row.visible_to_role ?? ""))}</span>
                 <span className="text-muted-foreground"> · {String(row.snapshot_date ?? "")}</span>
                 {row.available_cash_cents != null ? (
                   <span className="block text-muted-foreground tabular-nums">
@@ -305,15 +306,15 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Field finance activity</p>
-        <ul className="space-y-1 max-h-40 overflow-y-auto text-xs text-muted-foreground pr-1">
+        <ul className="space-y-1 max-h-40 overflow-y-auto text-xs text-muted-foreground pr-1 min-w-0">
           {(health?.recentActivity ?? []).length === 0 ? (
             <li>No recent activity in this view.</li>
           ) : (
             (health?.recentActivity ?? []).map((a, i) => (
-              <li key={`${a.created_at}-${i}`}>
-                <span className="font-medium text-foreground">{a.audit_type}</span> — {a.audit_summary}
+              <li key={`${a.created_at}-${i}`} className="break-words">
+                <span className="font-medium text-foreground">{formatBlitzpayUiLabel(a.audit_type)}</span> — {a.audit_summary}
               </li>
             ))
           )}

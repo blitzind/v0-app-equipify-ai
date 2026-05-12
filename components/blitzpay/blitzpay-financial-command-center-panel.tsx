@@ -148,6 +148,14 @@ type CommandCenterPayload = {
     fieldCollectionsIntentCents?: number
     mobileTreasuryVisibilityScore?: number
     mobileConflictReviewCount?: number
+    queueHealthScore?: number
+    workflowFailureRate?: number
+    idempotencyConflictRate?: number
+    replayPendingCount?: number
+    observabilityCoverageRate?: number
+    workerHealthScore?: number
+    multiRegionReadinessScore?: number
+    replayIntegrityScore?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -382,6 +390,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Mobile ops — field collection intents (draft/queued est.)", v: fmtMoney(data.tiles.fieldCollectionsIntentCents ?? 0) },
               { k: "Mobile ops — treasury visibility comfort (field bands)", v: `${data.tiles.mobileTreasuryVisibilityScore ?? 0}/100` },
               { k: "Mobile ops — conflict reviews logged (sample)", v: String(data.tiles.mobileConflictReviewCount ?? 0) },
+              { k: "Observability — queue health (derived)", v: `${data.tiles.queueHealthScore ?? 0}/100` },
+              { k: "Observability — worker health (derived)", v: `${data.tiles.workerHealthScore ?? 0}/100` },
+              { k: "Observability — workflow failure rate (sample %)", v: `${data.tiles.workflowFailureRate ?? 0}%` },
+              { k: "Observability — idempotency conflict rate (sample %)", v: `${data.tiles.idempotencyConflictRate ?? 0}%` },
+              { k: "Observability — replay backlog (capped)", v: String(data.tiles.replayPendingCount ?? 0) },
+              { k: "Observability — event hash coverage (sample %)", v: `${data.tiles.observabilityCoverageRate ?? 0}%` },
+              { k: "Observability — multi-region readiness", v: `${data.tiles.multiRegionReadinessScore ?? 0}/100` },
+              { k: "Observability — replay integrity (sample %)", v: `${data.tiles.replayIntegrityScore ?? 0}%` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
@@ -393,6 +409,11 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
           <p className="text-[11px] text-muted-foreground leading-relaxed border border-border/60 rounded-lg px-3 py-2 bg-muted/20">
             Mobile financial actions captured offline are reviewed and validated by the server before they become official
             financial records. Mobile ops tiles use bounded samples — not payment confirmation.
+          </p>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed border border-border/60 rounded-lg px-3 py-2 bg-muted/20">
+            Observability and replay tooling support operational visibility and controlled recovery workflows. Financial
+            actions remain subject to validation and approval safeguards. Enterprise tiles are metrics-only (bounded reads).
           </p>
 
           <div className="rounded-lg border border-border/80 px-4 py-3 space-y-3">

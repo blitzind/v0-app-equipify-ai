@@ -14,13 +14,13 @@ import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
   ChevronLeft, Sparkles, ChevronDown, Check, Bot,
-  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark, Repeat,
+  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark,
   Bell,
   Warehouse,
   UserPlus,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
-import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
+import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 import {
   NAV_ICON_ACTIVE_SIDEBAR,
   NAV_ICON_INACTIVE_SIDEBAR,
@@ -120,7 +120,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "Memberships",
         href: "/memberships",
-        icon: Repeat,
+        icon: MembershipsLucideIcon,
         anyOf: ["canViewFinancialReports", "canViewFinancials"],
       },
       { label: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, anyOf: ["canViewBilling"] },

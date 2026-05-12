@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Briefcase, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type ApDashboard = {
   todayYmd: string
@@ -325,13 +326,13 @@ export function BlitzpayApPanel({ organizationId, orgReady }: Props) {
                     <td className="p-1.5">
                       <span className="font-medium">{p.counterpartyLabel}</span>
                       <span className="text-muted-foreground block text-[9px]">
-                        {p.vendorKind.replace(/_/g, " ")}
+                        {formatBlitzpayUiLabel(p.vendorKind)}
                         {p.reimbursementFlag ? " · reimb" : ""}
                         {p.materialCostFlag ? " · material" : ""}
                       </span>
                     </td>
                     <td className="p-1.5 tabular-nums">{p.dueDate}</td>
-                    <td className="p-1.5">{p.status}</td>
+                    <td className="p-1.5">{formatBlitzpayUiLabel(p.status)}</td>
                     <td className="p-1.5 text-right tabular-nums">{fmtMoney(p.amountCents)}</td>
                   </tr>
                 ))}

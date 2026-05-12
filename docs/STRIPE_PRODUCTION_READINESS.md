@@ -211,6 +211,10 @@ Phase 54.1 required no schema changes. Phase 54.2 reuses existing `organization_
 
 If you already applied historical migrations, **no** extra `supabase db push` is needed solely for 54.2.
 
+## Related: BlitzPay Phase 6B (observability metadata)
+
+Phase **6B** tables and APIs are **internal staff / admin visibility** only (queue snapshots, workflow rows, idempotency metadata). They **do not** change Stripe objects, Connect balances, or payout timing. Production readiness still depends on **Connect webhooks**, **idempotent invoice side effects**, and **migration application** for `blitzpay_*` tables — see [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md) and [BLITZPAY_PHASE_6_ARCHITECTURE.md](./BLITZPAY_PHASE_6_ARCHITECTURE.md).
+
 ## Related: BlitzPay / customer payments (Phase 54.3)
 
 SaaS subscription Stripe setup above is **not** used for **end-customer invoice** collection. Architecture for Connect, application fees, and webhooks is documented in [BLITZPAY_ARCHITECTURE.md](./BLITZPAY_ARCHITECTURE.md) and [BLITZPAY_PHASE_1.md](./BLITZPAY_PHASE_1.md).

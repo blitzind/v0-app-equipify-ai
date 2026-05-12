@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2, Package, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -181,7 +182,7 @@ export function BlitzpayProcurementInventoryPanel({ organizationId, orgReady }: 
               {movements.map((m) => (
                 <li key={m.id} className="flex justify-between gap-2">
                   <span className="truncate">
-                    {m.movement_date} · {m.movement_type.replace(/_/g, " ")}
+                    {m.movement_date} · {formatBlitzpayUiLabel(m.movement_type)}
                   </span>
                   <span className="shrink-0 tabular-nums font-medium text-foreground">{fmtMoney(m.total_cost_cents)}</span>
                 </li>
@@ -214,7 +215,7 @@ export function BlitzpayProcurementInventoryPanel({ organizationId, orgReady }: 
           <ul className="space-y-1 text-xs text-muted-foreground">
             {health.recentAudit.slice(0, 8).map((a) => (
               <li key={a.id} className="leading-relaxed">
-                <span className="font-medium text-foreground">{a.audit_type.replace(/_/g, " ")}</span> — {a.audit_summary}
+                <span className="font-medium text-foreground">{formatBlitzpayUiLabel(a.audit_type)}</span> — {a.audit_summary}
               </li>
             ))}
           </ul>

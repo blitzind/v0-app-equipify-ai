@@ -15,11 +15,14 @@ import {
   CalendarRange, Store, Package, Upload, Bell,
   Warehouse,
   Landmark,
-  Repeat,
 } from "lucide-react"
 import Image from "next/image"
 import type { LucideIcon } from "lucide-react"
-import { MaintenancePlansBrandTile, MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
+import {
+  MaintenancePlansBrandTile,
+  MaintenancePlansLucideIcon,
+  MembershipsLucideIcon,
+} from "@/lib/navigation/module-icons"
 
 // ─── Route meta ───────────────────────────────────────────────────────────────
 
@@ -151,7 +154,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
     title: "Memberships & recurring agreements",
     subtitle:
       "Track service memberships, preventive agreements, renewal pipeline, autopilot coverage, and native recurring billing health.",
-    icon: Repeat,
+    icon: MembershipsLucideIcon,
   },
   "/insights/financial-command-center": {
     title: "BlitzPay Financial Command Center",

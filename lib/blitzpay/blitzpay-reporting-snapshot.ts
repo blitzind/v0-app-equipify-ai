@@ -255,6 +255,15 @@ export type BlitzpayOrgReportingSnapshot = {
   fieldCollectionsIntentCents: number
   mobileTreasuryVisibilityScore: number
   mobileConflictReviewCount: number
+  /** Phase 6B — enterprise observability / queue orchestration metadata (bounded; metrics only). */
+  queueHealthScore: number
+  workflowFailureRate: number
+  idempotencyConflictRate: number
+  replayPendingCount: number
+  observabilityCoverageRate: number
+  workerHealthScore: number
+  multiRegionReadinessScore: number
+  replayIntegrityScore: number
 }
 
 /**
@@ -274,6 +283,8 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     skipClaimsWarranty?: boolean
     /** When true, skips Phase 6A mobile financial ops aggregation (nested snapshot fetches / health endpoints). */
     skipMobilePhase6a?: boolean
+    /** When true, skips Phase 6B observability aggregation (nested snapshot fetches / health endpoints). */
+    skipObservabilityPhase6b?: boolean
   },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
@@ -1110,6 +1121,31 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     }
   }
 
+  let phase6bQueueHealthScore = 100
+  let phase6bWorkflowFailureRate = 0
+  let phase6bIdempotencyConflictRate = 0
+  let phase6bReplayPendingCount = 0
+  let phase6bObservabilityCoverageRate = 0
+  let phase6bWorkerHealthScore = 100
+  let phase6bMultiRegionReadinessScore = 100
+  let phase6bReplayIntegrityScore = 0
+  if (!options?.skipObservabilityPhase6b) {
+    try {
+      const { buildPhase6bObservabilityReportingSlice } = await import("@/lib/blitzpay/blitzpay-observability")
+      const p6b = await buildPhase6bObservabilityReportingSlice(admin, organizationId)
+      phase6bQueueHealthScore = p6b.queueHealthScore
+      phase6bWorkflowFailureRate = p6b.workflowFailureRate
+      phase6bIdempotencyConflictRate = p6b.idempotencyConflictRate
+      phase6bReplayPendingCount = p6b.replayPendingCount
+      phase6bObservabilityCoverageRate = p6b.observabilityCoverageRate
+      phase6bWorkerHealthScore = p6b.workerHealthScore
+      phase6bMultiRegionReadinessScore = p6b.multiRegionReadinessScore
+      phase6bReplayIntegrityScore = p6b.replayIntegrityScore
+    } catch {
+      /* optional until Phase 6B migration applied */
+    }
+  }
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1335,5 +1371,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     fieldCollectionsIntentCents: phase6aFieldCollectionsIntentCents,
     mobileTreasuryVisibilityScore: phase6aMobileTreasuryVisibilityScore,
     mobileConflictReviewCount: phase6aMobileConflictReviewCount,
+    queueHealthScore: phase6bQueueHealthScore,
+    workflowFailureRate: phase6bWorkflowFailureRate,
+    idempotencyConflictRate: phase6bIdempotencyConflictRate,
+    replayPendingCount: phase6bReplayPendingCount,
+    observabilityCoverageRate: phase6bObservabilityCoverageRate,
+    workerHealthScore: phase6bWorkerHealthScore,
+    multiRegionReadinessScore: phase6bMultiRegionReadinessScore,
+    replayIntegrityScore: phase6bReplayIntegrityScore,
   }
 }

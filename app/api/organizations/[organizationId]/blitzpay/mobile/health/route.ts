@@ -50,6 +50,7 @@ export async function GET(request: Request, context: { params: Promise<{ organiz
       skipSupplierNetwork: true,
       skipClaimsWarranty: true,
       skipMobilePhase6a: true,
+      skipObservabilityPhase6b: true,
     })
     const privileged = isBlitzpayMobileFinancePrivilegedRole(gate.role)
     const { buildPhase6aMobileReportingSlice } = await import("@/lib/blitzpay/blitzpay-mobile-financial-ops")

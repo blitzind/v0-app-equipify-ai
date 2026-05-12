@@ -20,6 +20,7 @@ import { BlitzpayTaxCompliancePanel } from "@/components/blitzpay/blitzpay-tax-c
 import { BlitzpayFinancingMarketplacePanel } from "@/components/blitzpay/blitzpay-financing-marketplace-panel"
 import { BlitzpayProcurementInventoryPanel } from "@/components/blitzpay/blitzpay-procurement-inventory-panel"
 import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-mobile-financial-ops-panel"
+import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
 import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll-dashboard"
 import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
 import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
@@ -30,6 +31,7 @@ import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-p
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { blitzpayConnectOnboardingToastDescription } from "@/lib/blitzpay/connect-onboarding-client-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { cn } from "@/lib/utils"
 
 type BlitzPayStatusPayload = {
@@ -500,7 +502,7 @@ function BlitzPaySettingsPageInner() {
   }
 
   const statusKey = bp?.stripe_connect_status ?? "not_started"
-  const statusLabel = STATUS_LABEL[statusKey] ?? statusKey.replace(/_/g, " ")
+  const statusLabel = STATUS_LABEL[statusKey] ?? formatBlitzpayUiLabel(statusKey)
   const hasAccount = Boolean(bp?.stripe_connect_account_id && String(bp.stripe_connect_account_id).trim())
   const dueNow = asStringList(bp?.stripe_requirements_currently_due)
   const duePast = asStringList(bp?.stripe_requirements_past_due)
@@ -1022,6 +1024,12 @@ function BlitzPaySettingsPageInner() {
                   <BlitzpayMobileFinancialOpsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
+
+              {canViewFinancialCommandCenter && organizationId ? (
+                <div className="border-t border-border pt-4">
+                  <BlitzpayEnterpriseObservabilityPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                </div>
+              ) : null}
             </div>
 
               {canViewPayoutLedger && hasAccount ? (
@@ -1104,8 +1112,8 @@ function BlitzPaySettingsPageInner() {
                       </p>
                     </div>
                     {payoutLedgerPanel.payouts.length > 0 ? (
-                      <div className="overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full text-left text-[11px]">
+                      <div className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full min-w-0 text-left text-sm">
                           <thead className="bg-muted/40">
                             <tr>
                               <th className="p-2 font-medium">Arrival</th>

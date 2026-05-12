@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw, Landmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -201,7 +202,7 @@ export function BlitzpayFinancingMarketplacePanel({ organizationId, orgReady }: 
         <ul className="space-y-1.5 text-xs text-muted-foreground">
           {(health?.recentAudit ?? []).slice(0, 8).map((e) => (
             <li key={e.id} className="flex gap-2">
-              <span className="shrink-0 text-[10px] uppercase">{e.audit_type}</span>
+              <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{formatBlitzpayUiLabel(e.audit_type)}</span>
               <span className="leading-snug">{e.audit_summary}</span>
             </li>
           ))}

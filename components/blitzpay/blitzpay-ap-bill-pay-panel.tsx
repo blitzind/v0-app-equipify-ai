@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { FileSpreadsheet, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type VendorAgingBuckets = {
   currentDueCents: number
@@ -87,7 +88,7 @@ function billStatusLabel(status: string): string {
     case "draft":
       return "Draft"
     default:
-      return status.replace(/_/g, " ")
+      return formatBlitzpayUiLabel(status)
   }
 }
 

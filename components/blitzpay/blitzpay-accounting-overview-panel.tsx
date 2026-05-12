@@ -5,6 +5,7 @@ import { AlertTriangle, BookMarked, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -174,7 +175,7 @@ export function BlitzpayAccountingOverviewPanel({ organizationId, orgReady }: Pr
                       {a.account_name}
                       {a.is_system_account ? <span className="text-muted-foreground"> · default</span> : null}
                     </td>
-                    <td className="px-2 py-1 capitalize">{a.account_type.replace(/_/g, " ")}</td>
+                    <td className="px-2 py-1">{formatBlitzpayUiLabel(a.account_type)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -224,7 +225,7 @@ export function BlitzpayAccountingOverviewPanel({ organizationId, orgReady }: Pr
               <li key={`${b.batch_reference}-${b.created_at}`} className="flex justify-between gap-2">
                 <span className="truncate">{b.batch_reference}</span>
                 <span className="shrink-0 tabular-nums">
-                  {b.batch_type} · {b.status}
+                  {formatBlitzpayUiLabel(b.batch_type)} · {formatBlitzpayUiLabel(b.status)}
                 </span>
               </li>
             ))}
@@ -240,7 +241,7 @@ export function BlitzpayAccountingOverviewPanel({ organizationId, orgReady }: Pr
               <li key={p.period_name} className="flex justify-between gap-2">
                 <span className="truncate">{p.period_name}</span>
                 <span className="shrink-0 tabular-nums">
-                  {p.start_date} → {p.end_date} · {p.status}
+                  {p.start_date} → {p.end_date} · {formatBlitzpayUiLabel(p.status)}
                 </span>
               </li>
             ))}

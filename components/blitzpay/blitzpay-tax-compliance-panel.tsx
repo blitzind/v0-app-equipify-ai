@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Scale, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
@@ -221,7 +222,7 @@ export function BlitzpayTaxCompliancePanel({ organizationId, orgReady }: Props) 
                   {(auditTail.length ? auditTail : health?.recentAudit ?? []).map((e) => (
                     <li key={e.id} className="border-b border-border/40 pb-2 last:border-0 last:pb-0">
                       <span className="text-muted-foreground text-xs tabular-nums">
-                        {new Date(e.created_at).toLocaleString()} · {e.audit_type.replace(/_/g, " ")}
+                        {new Date(e.created_at).toLocaleString()} · {formatBlitzpayUiLabel(e.audit_type)}
                       </span>
                       <p className="text-foreground mt-0.5 leading-snug">{e.audit_summary}</p>
                     </li>

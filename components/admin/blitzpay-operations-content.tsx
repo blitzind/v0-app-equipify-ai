@@ -77,6 +77,17 @@ type CashAccountsPlatformRollup = {
   outflowStressOrgsApprox: number
 }
 
+type ObservabilityPlatformRollup = {
+  reportingWindowDays: number
+  generatedAt: string
+  orgSnapshotsSampled: number
+  averageQueueHealthScoreApprox: number
+  averageWorkerHealthScoreApprox: number
+  orgsWithReplayBacklogApprox: number
+  orgsWithQueueDepthApprox: number
+  disclaimer: string
+}
+
 type BusinessHealthPlatformRollup = {
   reportingWindowDays: number
   generatedAt: string
@@ -154,6 +165,7 @@ export function BlitzpayOperationsContent() {
   const [membershipRollup, setMembershipRollup] = useState<MembershipPlatformRollup | null>(null)
   const [payrollRollup, setPayrollRollup] = useState<PayrollPlatformRollup | null>(null)
   const [cashRollup, setCashRollup] = useState<CashAccountsPlatformRollup | null>(null)
+  const [observabilityRollup, setObservabilityRollup] = useState<ObservabilityPlatformRollup | null>(null)
   const [runs, setRuns] = useState<Array<Record<string, unknown>>>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -192,7 +204,7 @@ export function BlitzpayOperationsContent() {
   useEffect(() => {
     void (async () => {
       try {
-        const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
+        const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await Promise.all([
           fetch("/api/platform/blitzpay/revenue-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/command-center-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/business-health-rollup", { cache: "no-store" }),
@@ -201,6 +213,7 @@ export function BlitzpayOperationsContent() {
           fetch("/api/platform/blitzpay/membership-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/payroll-rollup", { cache: "no-store" }),
           fetch("/api/platform/blitzpay/cash-accounts-rollup", { cache: "no-store" }),
+          fetch("/api/platform/blitzpay/observability-rollup", { cache: "no-store" }),
         ])
         const j1 = (await r1.json()) as { rollup?: RevenueRollup }
         const j2 = (await r2.json()) as { rollup?: CommandCenterPlatformRollup }
@@ -210,6 +223,7 @@ export function BlitzpayOperationsContent() {
         const j6 = (await r6.json()) as { rollup?: MembershipPlatformRollup }
         const j7 = (await r7.json()) as { rollup?: PayrollPlatformRollup }
         const j8 = (await r8.json()) as { rollup?: CashAccountsPlatformRollup }
+        const j9 = (await r9.json()) as { rollup?: ObservabilityPlatformRollup }
         if (r1.ok) setRevenueRollup(j1.rollup ?? null)
         else setRevenueRollup(null)
         if (r2.ok) setCommandRollup(j2.rollup ?? null)
@@ -226,6 +240,8 @@ export function BlitzpayOperationsContent() {
         else setPayrollRollup(null)
         if (r8.ok) setCashRollup(j8.rollup ?? null)
         else setCashRollup(null)
+        if (r9.ok) setObservabilityRollup(j9.rollup ?? null)
+        else setObservabilityRollup(null)
       } catch {
         setRevenueRollup(null)
         setCommandRollup(null)
@@ -235,6 +251,7 @@ export function BlitzpayOperationsContent() {
         setMembershipRollup(null)
         setPayrollRollup(null)
         setCashRollup(null)
+        setObservabilityRollup(null)
       }
     })()
   }, [])
@@ -447,6 +464,37 @@ export function BlitzpayOperationsContent() {
             <div className="rounded-lg border border-border p-3">
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending refunds</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.pendingRefundsPlatform}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {observabilityRollup ? (
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Enterprise observability (platform sample)
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{observabilityRollup.disclaimer}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Org snapshots (sample)</p>
+              <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgSnapshotsSampled}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg queue health</p>
+              <p className="text-lg font-semibold tabular-nums">{observabilityRollup.averageQueueHealthScoreApprox}/100</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg worker health</p>
+              <p className="text-lg font-semibold tabular-nums">{observabilityRollup.averageWorkerHealthScoreApprox}/100</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Replay backlog orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgsWithReplayBacklogApprox}</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase font-medium">Queue depth pressure orgs</p>
+              <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgsWithQueueDepthApprox}</p>
             </div>
           </div>
         </div>

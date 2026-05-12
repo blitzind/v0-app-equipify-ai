@@ -6,6 +6,7 @@ import { Loader2, Network, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type Phase5b = {
   supplierNetworkParticipationScore: number
@@ -177,10 +178,11 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
           <p className="text-sm text-muted-foreground">No networks listed for this organization.</p>
         : <ul className="space-y-2 text-sm">
             {networks.map((n) => (
-              <li key={n.id} className="rounded-lg border border-border/70 px-3 py-2 flex flex-wrap justify-between gap-2">
-                <span className="font-medium text-foreground">{n.network_name}</span>
-                <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                  {n.network_type.replace(/_/g, " ")} · {n.network_status} · {n.visibility_scope}
+              <li key={n.id} className="rounded-lg border border-border/70 px-3 py-2 flex flex-wrap justify-between gap-2 min-w-0">
+                <span className="font-medium text-foreground min-w-0 break-words">{n.network_name}</span>
+                <span className="text-muted-foreground text-xs min-w-0 break-words text-right">
+                  {formatBlitzpayUiLabel(n.network_type)} · {formatBlitzpayUiLabel(n.network_status)} ·{" "}
+                  {formatBlitzpayUiLabel(n.visibility_scope)}
                 </span>
               </li>
             ))}
@@ -188,7 +190,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
         }
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preferred programs (bounded)</p>
           {programs.length === 0 ?
@@ -197,7 +199,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
               {programs.slice(0, 8).map((p) => (
                 <li key={String(p.id)} className="tabular-nums">
                   <span className="font-medium text-foreground">{String(p.program_name ?? "Program")}</span> ·{" "}
-                  {String(p.pricing_structure ?? "").replace(/_/g, " ")} · {String(p.program_status ?? "")}
+                  {formatBlitzpayUiLabel(String(p.pricing_structure ?? ""))} · {formatBlitzpayUiLabel(String(p.program_status ?? ""))}
                 </li>
               ))}
             </ul>
@@ -210,8 +212,8 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
           : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
               {bulk.slice(0, 8).map((o) => (
                 <li key={String(o.id)} className="tabular-nums">
-                  <span className="font-medium text-foreground">{String(o.opportunity_type ?? "").replace(/_/g, " ")}</span> ·{" "}
-                  {String(o.opportunity_status ?? "")}
+                  <span className="font-medium text-foreground">{formatBlitzpayUiLabel(String(o.opportunity_type ?? ""))}</span> ·{" "}
+                  {formatBlitzpayUiLabel(String(o.opportunity_status ?? ""))}
                   {o.estimated_savings_cents != null ?
                     ` · est. savings ${fmtMoney(Math.max(0, Math.round(Number(o.estimated_savings_cents))))}`
                   : ""}
@@ -222,7 +224,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
         <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier scorecards (org-local)</p>
           {scores.length === 0 ?
@@ -244,7 +246,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
           : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
               {benchmarks.slice(0, 8).map((b) => (
                 <li key={String(b.id)}>
-                  {String(b.benchmark_type ?? "").replace(/_/g, " ")} · {String(b.benchmark_period ?? "")} · score{" "}
+                  {formatBlitzpayUiLabel(String(b.benchmark_type ?? ""))} · {formatBlitzpayUiLabel(String(b.benchmark_period ?? ""))} · score{" "}
                   {String(b.benchmark_score ?? "—")}
                 </li>
               ))}

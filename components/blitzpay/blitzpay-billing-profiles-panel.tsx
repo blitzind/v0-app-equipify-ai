@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { cn } from "@/lib/utils"
 
 type BillingProfileRow = {
@@ -226,11 +227,11 @@ export function BlitzpayBillingProfilesPanel({ organizationId, orgReady }: Props
                 profiles.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="text-xs font-medium">{p.customerLabel ?? p.customerId.slice(0, 8)}</TableCell>
-                    <TableCell className="text-xs capitalize">{p.status}</TableCell>
+                    <TableCell className="text-xs">{formatBlitzpayUiLabel(p.status)}</TableCell>
                     <TableCell className="text-xs">{p.autopayEnabled ? "On" : "Off"}</TableCell>
                     <TableCell className="text-xs">{p.defaultPaymentMethodLabel ?? "—"}</TableCell>
-                    <TableCell className="text-xs capitalize">{p.collectionReadiness.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="text-xs capitalize">{p.autopayReadiness.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="text-xs">{formatBlitzpayUiLabel(p.collectionReadiness)}</TableCell>
+                    <TableCell className="text-xs">{formatBlitzpayUiLabel(p.autopayReadiness)}</TableCell>
                     <TableCell className="text-xs capitalize">{p.billingRisk}</TableCell>
                   </TableRow>
                 ))
@@ -265,7 +266,7 @@ export function BlitzpayBillingProfilesPanel({ organizationId, orgReady }: Props
               {autopay.slice(0, 12).map((a) => (
                 <li key={a.id} className="flex justify-between gap-2">
                   <span className="capitalize">{a.enrollmentStatus}</span>
-                  <span className="text-muted-foreground">{a.paymentTiming.replace(/_/g, " ")}</span>
+                  <span className="text-muted-foreground">{formatBlitzpayUiLabel(a.paymentTiming)}</span>
                 </li>
               ))}
             </ul>

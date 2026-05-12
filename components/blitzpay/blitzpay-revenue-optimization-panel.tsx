@@ -5,6 +5,7 @@ import { BarChart3, CheckCircle2, ClipboardList, Loader2, RefreshCw, ShieldAlert
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 const DISCLAIMER =
   "Revenue optimization recommendations are advisory. Your team controls customer messaging, pricing, renewals, and payment actions."
@@ -84,7 +85,12 @@ function supportingWhy(metrics: Record<string, unknown>): string {
   const entries = Object.entries(metrics).slice(0, 6)
   if (entries.length === 0) return "Based on bounded billing and collections signals in your workspace."
   return entries
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "number" ? Math.round(v) : String(v)}`)
+    .map(([k, v]) => {
+      const keyLabel = formatBlitzpayUiLabel(k)
+      if (typeof v === "number") return `${keyLabel}: ${Math.round(v)}`
+      if (typeof v === "string") return `${keyLabel}: ${formatBlitzpayUiLabel(v)}`
+      return `${keyLabel}: ${String(v)}`
+    })
     .join(" · ")
 }
 
@@ -302,14 +308,16 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
         ) : (
           <ul className="space-y-2">
             {opportunities.map((o) => (
-              <li key={o.id} className="rounded-md border border-border p-3 space-y-2">
+              <li key={o.id} className="rounded-md border border-border p-3 space-y-2 min-w-0">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-xs font-medium">{o.title}</p>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">{o.summary}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[10px] uppercase text-muted-foreground">{o.priority} · {o.opportunity_type.replace(/_/g, " ")}</span>
+                    <span className="text-[10px] uppercase text-muted-foreground">
+                      {formatBlitzpayUiLabel(o.priority)} · {formatBlitzpayUiLabel(o.opportunity_type)}
+                    </span>
                     <div className="flex gap-1">
                       <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => void dismissOpp(o.id)}>
                         <XCircle className="h-3 w-3 mr-1" />
@@ -378,7 +386,7 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
         )}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
         <section className="space-y-2 rounded-md border border-dashed border-border/80 p-3">
           <h3 className="text-xs font-semibold">ACH nudge recommendations</h3>
           {achRows.length === 0 ? (
@@ -411,7 +419,7 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
         </section>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
         <section className="space-y-2 rounded-md border border-dashed border-border/80 p-3">
           <h3 className="text-xs font-semibold">Membership pricing review</h3>
           {membershipRows.length === 0 ? (
@@ -461,7 +469,9 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-[11px]">
                 <div className="space-y-0.5 max-w-xl">
                   <p className="font-medium">{a.action_summary}</p>
-                  <p className="text-muted-foreground">{a.action_type.replace(/_/g, " ")} · {a.action_status}</p>
+                  <p className="text-muted-foreground">
+                    {formatBlitzpayUiLabel(a.action_type)} · {formatBlitzpayUiLabel(a.action_status)}
+                  </p>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button
@@ -495,7 +505,7 @@ export function BlitzpayRevenueOptimizationPanel({ organizationId, orgReady }: P
               <li key={e.id} className="flex flex-wrap justify-between gap-2 border-b border-border/60 pb-1.5 last:border-0">
                 <span className="font-medium">{e.experiment_name}</span>
                 <span className="text-muted-foreground">
-                  {e.experiment_type.replace(/_/g, " ")} · {e.experiment_status}
+                  {formatBlitzpayUiLabel(e.experiment_type)} · {formatBlitzpayUiLabel(e.experiment_status)}
                   {e.estimated_lift_basis_points != null ? ` · lift ${e.estimated_lift_basis_points} bps` : ""}
                 </span>
               </li>

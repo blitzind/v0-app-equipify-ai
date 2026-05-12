@@ -5,6 +5,7 @@ import { ClipboardList, Loader2, RefreshCw, Scale, Sparkles } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 
 type InsightRow = {
   id: string
@@ -261,8 +262,10 @@ export function BlitzpayAiFinancialCopilotPanel({ organizationId, orgReady }: Pr
             {insights.map((ins) => (
               <div key={ins.id} className="rounded-lg border border-border bg-card/80 p-3 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className={cn("text-xs font-semibold", severityClass(ins.severity))}>{ins.severity}</span>
-                  <span className="text-[10px] uppercase text-muted-foreground">{ins.insight_type.replace(/_/g, " ")}</span>
+                  <span className={cn("text-xs font-semibold", severityClass(ins.severity))}>
+                    {formatBlitzpayUiLabel(ins.severity)}
+                  </span>
+                  <span className="text-[10px] uppercase text-muted-foreground">{formatBlitzpayUiLabel(ins.insight_type)}</span>
                 </div>
                 <p className="text-sm font-medium leading-snug">{ins.title}</p>
                 <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] font-mono text-muted-foreground">
@@ -317,8 +320,8 @@ export function BlitzpayAiFinancialCopilotPanel({ organizationId, orgReady }: Pr
               {recommendations.map((r) => (
                 <div key={r.id} className="rounded-md border border-border p-2 space-y-1">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <span className="font-medium">{r.action_type.replace(/_/g, " ")}</span>
-                    <span className="text-muted-foreground">{r.action_status}</span>
+                    <span className="font-medium">{formatBlitzpayUiLabel(r.action_type)}</span>
+                    <span className="text-muted-foreground">{formatBlitzpayUiLabel(r.action_status)}</span>
                   </div>
                   <p className="text-muted-foreground leading-relaxed">{r.action_summary}</p>
                   {r.ai_reasoning_summary ? (

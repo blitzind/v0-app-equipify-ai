@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
 import { buildDeterministicRetryTimeline } from "@/lib/blitzpay/blitzpay-collections-engine"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { cn } from "@/lib/utils"
 
 type Summary = {
@@ -68,6 +69,76 @@ function escalationBadge(level: number) {
   if (level <= 0) return { label: "Standard", className: "bg-muted text-muted-foreground" }
   if (level <= 2) return { label: "Review", className: "bg-amber-500/15 text-amber-900 dark:text-amber-100" }
   return { label: "Priority review", className: "bg-red-500/15 text-red-900 dark:text-red-100" }
+}
+
+function CollectionInvoiceActions({
+  row,
+  busyKey,
+  onPost,
+}: {
+  row: StateRow
+  busyKey: string | null
+  onPost: (path: string, invoiceId: string, customerId: string) => void | Promise<void>
+}) {
+  const bkey = (action: string) => `${action}:${row.invoiceId}`
+  return (
+    <div className="flex flex-wrap gap-2 min-w-0">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0 text-sm inline-flex items-center gap-1.5"
+        disabled={busyKey !== null}
+        onClick={() => void onPost("retry", row.invoiceId, row.customerId)}
+      >
+        {busyKey === bkey("retry") ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden /> : null}
+        <span className="whitespace-normal text-left leading-snug">Schedule follow-up</span>
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="shrink-0"
+        disabled={busyKey !== null}
+        onClick={() => void onPost("pause", row.invoiceId, row.customerId)}
+        aria-label="Pause recovery"
+      >
+        <Pause className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="shrink-0"
+        disabled={busyKey !== null}
+        onClick={() => void onPost("resume", row.invoiceId, row.customerId)}
+        aria-label="Resume recovery"
+      >
+        <Play className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="shrink-0"
+        disabled={busyKey !== null}
+        onClick={() => void onPost("resolve", row.invoiceId, row.customerId)}
+        aria-label="Mark settled"
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0 text-sm text-destructive border-destructive/40 whitespace-normal leading-snug"
+        disabled={busyKey !== null}
+        onClick={() => void onPost("mark-uncollectible", row.invoiceId, row.customerId)}
+      >
+        Not collectible
+      </Button>
+    </div>
+  )
 }
 
 export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Props) {
@@ -157,9 +228,12 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
     summary?.healthBand === "strong" ? "Solid" : summary?.healthBand === "steady" ? "Stable" : "Needs care"
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-5" aria-labelledby="blitzpay-collections-engine-heading">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <section
+      className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-5 min-w-0 max-w-full overflow-hidden"
+      aria-labelledby="blitzpay-collections-engine-heading"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 id="blitzpay-collections-engine-heading" className="text-base font-semibold tracking-tight">
             Collection rhythm
           </h2>
@@ -208,18 +282,79 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-3">
+      <div className="grid gap-6 lg:grid-cols-3 min-w-0">
+        <div className="lg:col-span-2 space-y-3 min-w-0">
           <h3 className="text-sm font-semibold">Open invoices on file</h3>
-          <div className="rounded-lg border border-border overflow-x-auto">
-            <Table>
+
+          {/* Mobile: stacked cards (avoids wide multi-column table + action overflow) */}
+          <div className="space-y-3 md:hidden min-w-0">
+            {loading && states.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Loading collection rows…</p>
+            ) : null}
+            {states.length === 0 && !loading ? (
+              <div className="rounded-lg border border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground break-words">
+                No collection rows yet. Use an action on an invoice after it is tracked, or schedule a follow-up from
+                your workflow.
+              </div>
+            ) : null}
+            {states.map((s) => {
+              const badge = escalationBadge(s.escalationLevel)
+              return (
+                <article
+                  key={s.id}
+                  className="rounded-lg border border-border bg-muted/10 p-4 space-y-3 min-w-0 overflow-hidden shadow-sm"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <h4 className="text-sm font-semibold text-foreground break-words">{s.invoiceNumber ?? "Invoice"}</h4>
+                    {s.invoiceTitle ? (
+                      <p className="text-sm text-muted-foreground break-words leading-snug">{s.invoiceTitle}</p>
+                    ) : null}
+                  </div>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm min-w-0">
+                    <div className="min-w-0">
+                      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Balance</dt>
+                      <dd className="font-semibold tabular-nums text-foreground mt-0.5">{formatMoney(s.amountCents)}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Escalation</dt>
+                      <dd className="mt-0.5">
+                        <span className={cn("inline-flex text-xs font-medium rounded-full px-2.5 py-1", badge.className)}>
+                          {badge.label}
+                        </span>
+                      </dd>
+                    </div>
+                    <div className="min-w-0 sm:col-span-2">
+                      <dt className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</dt>
+                      <dd className="text-sm text-foreground mt-0.5 break-words">{s.statusLabel}</dd>
+                      {s.nextRetryAt ? (
+                        <div className="text-sm text-muted-foreground flex items-start gap-1.5 mt-1.5 min-w-0">
+                          <CalendarClock className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                          <span className="break-words">Next window {s.nextRetryAt.slice(0, 10)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </dl>
+                  <div className="pt-1 border-t border-border/60 min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Actions</p>
+                    <div className="flex justify-start min-w-0">
+                      <CollectionInvoiceActions row={s} busyKey={busyKey} onPost={postAction} />
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden md:block min-w-0 overflow-x-auto rounded-lg border border-border">
+            <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice</TableHead>
+                  <TableHead className="min-w-0">Invoice</TableHead>
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Escalation</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right min-w-[12rem]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -233,20 +368,19 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
                 ) : null}
                 {states.map((s) => {
                   const badge = escalationBadge(s.escalationLevel)
-                  const bkey = (action: string) => `${action}:${s.invoiceId}`
                   return (
                     <TableRow key={s.id}>
-                      <TableCell>
-                        <div className="font-medium">{s.invoiceNumber ?? "Invoice"}</div>
-                        <div className="text-xs text-muted-foreground line-clamp-1">{s.invoiceTitle}</div>
+                      <TableCell className="min-w-0 max-w-[14rem]">
+                        <div className="font-medium break-words">{s.invoiceNumber ?? "Invoice"}</div>
+                        <div className="text-sm text-muted-foreground line-clamp-2 break-words">{s.invoiceTitle}</div>
                       </TableCell>
-                      <TableCell className="tabular-nums">{formatMoney(s.amountCents)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm">{s.statusLabel}</span>
+                      <TableCell className="tabular-nums whitespace-nowrap">{formatMoney(s.amountCents)}</TableCell>
+                      <TableCell className="min-w-0 max-w-[12rem]">
+                        <span className="text-sm break-words">{s.statusLabel}</span>
                         {s.nextRetryAt ? (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <CalendarClock className="h-3 w-3" aria-hidden />
-                            Next window {s.nextRetryAt.slice(0, 10)}
+                          <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 min-w-0">
+                            <CalendarClock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span className="break-words">Next {s.nextRetryAt.slice(0, 10)}</span>
                           </div>
                         ) : null}
                       </TableCell>
@@ -255,55 +389,9 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
                           {badge.label}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-wrap justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={busyKey !== null}
-                            onClick={() => void postAction("retry", s.invoiceId, s.customerId)}
-                          >
-                            {busyKey === bkey("retry") ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                            Schedule follow-up
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={busyKey !== null}
-                            onClick={() => void postAction("pause", s.invoiceId, s.customerId)}
-                          >
-                            <Pause className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={busyKey !== null}
-                            onClick={() => void postAction("resume", s.invoiceId, s.customerId)}
-                          >
-                            <Play className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={busyKey !== null}
-                            onClick={() => void postAction("resolve", s.invoiceId, s.customerId)}
-                          >
-                            <CheckCircle2 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/40"
-                            disabled={busyKey !== null}
-                            onClick={() => void postAction("mark-uncollectible", s.invoiceId, s.customerId)}
-                          >
-                            Not collectible
-                          </Button>
+                      <TableCell className="text-right align-top min-w-0">
+                        <div className="flex justify-end min-w-0">
+                          <CollectionInvoiceActions row={s} busyKey={busyKey} onPost={postAction} />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -314,7 +402,7 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div>
             <h3 className="text-sm font-semibold mb-2">Suggested cadence</h3>
             <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
@@ -344,10 +432,10 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
               <Shield className="h-4 w-4 text-muted-foreground" aria-hidden />
               Recovery overview
             </h3>
-            <ul className="text-sm text-muted-foreground space-y-1">
+            <ul className="text-sm text-muted-foreground space-y-1 min-w-0">
               {flows.slice(0, 6).map((f) => (
-                <li key={f.id}>
-                  {f.triggerType.replace(/_/g, " ")} — {f.flowStatus}
+                <li key={f.id} className="break-words">
+                  {formatBlitzpayUiLabel(f.triggerType)} — {formatBlitzpayUiLabel(f.flowStatus)}
                 </li>
               ))}
               {flows.length === 0 ? <li>No active recovery paths recorded.</li> : null}
@@ -356,31 +444,31 @@ export function BlitzpayCollectionsEnginePanel({ organizationId, orgReady }: Pro
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div>
+      <div className="grid gap-6 lg:grid-cols-2 min-w-0">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold mb-2">Recent attempts</h3>
-          <ul className="text-sm space-y-2 text-muted-foreground max-h-48 overflow-y-auto pr-1">
+          <ul className="text-sm space-y-2 text-muted-foreground max-h-48 overflow-y-auto pr-1 min-w-0">
             {attempts.slice(0, 12).map((a) => (
-              <li key={a.id} className="flex justify-between gap-2 border-b border-border/60 pb-2">
-                <span>
-                  {a.attemptType.replace(/_/g, " ")} · {a.attemptStatus}
+              <li key={a.id} className="flex justify-between gap-2 border-b border-border/60 pb-2 min-w-0">
+                <span className="min-w-0 break-words">
+                  {formatBlitzpayUiLabel(a.attemptType)} · {formatBlitzpayUiLabel(a.attemptStatus)}
                 </span>
-                <span className="text-xs shrink-0">{a.attemptedAt.slice(0, 16)}</span>
+                <span className="text-sm shrink-0 tabular-nums">{a.attemptedAt.slice(0, 16)}</span>
               </li>
             ))}
             {attempts.length === 0 ? <li>No attempts logged yet.</li> : null}
           </ul>
         </div>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <Activity className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
             Activity
           </h3>
-          <ul className="text-sm space-y-2 max-h-48 overflow-y-auto pr-1">
+          <ul className="text-sm space-y-2 max-h-48 overflow-y-auto pr-1 min-w-0">
             {activities.slice(0, 14).map((a) => (
-              <li key={a.id} className="border-b border-border/60 pb-2">
-                <p>{a.activitySummary}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{a.createdAt.slice(0, 16)}</p>
+              <li key={a.id} className="border-b border-border/60 pb-2 min-w-0">
+                <p className="break-words">{a.activitySummary}</p>
+                <p className="text-sm text-muted-foreground mt-0.5 tabular-nums">{a.createdAt.slice(0, 16)}</p>
               </li>
             ))}
             {activities.length === 0 ? <li className="text-muted-foreground">No activity yet.</li> : null}

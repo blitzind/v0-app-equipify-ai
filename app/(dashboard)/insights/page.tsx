@@ -28,6 +28,7 @@ import { BlitzpayMultiEntityFinancePanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpaySupplierNetworkPanel } from "@/components/blitzpay/blitzpay-supplier-network-panel"
 import { BlitzpayClaimsProtectionPanel } from "@/components/blitzpay/blitzpay-claims-protection-panel"
 import { BlitzpayMobileFinancialOpsPanel } from "@/components/blitzpay/blitzpay-mobile-financial-ops-panel"
+import { BlitzpayEnterpriseObservabilityPanel } from "@/components/blitzpay/blitzpay-enterprise-observability-panel"
 import { Toaster } from "@/components/ui/toaster"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -655,6 +656,13 @@ export default function InsightsPage() {
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay mobile financial ops</p>
             <BlitzpayMobileFinancialOpsPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
+          </section>
+        ) : null}
+
+        {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay enterprise observability</p>
+            <BlitzpayEnterpriseObservabilityPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 

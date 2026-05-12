@@ -247,7 +247,7 @@ Evidence from migrations under `supabase/migrations/`:
 
 - **Staff finance APIs** under `…/blitzpay/claims/*`, `…/protection-plans`, and `…/storm-events` with **bounded** list caps — **no** portal routes, **no** autonomous claim approval, **no** money movement from these tables.
 - **Append-only audit:** `blitzpay_claims_audit_log` is **update/delete blocked** — optional `BLITZPAY_CLAIMS_AUDIT_PEPPER` strengthens hashes.
-- **Reporting:** `fetchBlitzpayOrgReportingSnapshot` supports `skipClaimsWarranty` and `skipMobilePhase6a` on nested linked-org / health-style fetches to cap extra reads; treat Phase **5C** / **6A** enrichers like other bounded snapshot modules.
+- **Reporting:** `fetchBlitzpayOrgReportingSnapshot` supports `skipClaimsWarranty`, `skipMobilePhase6a`, and `skipObservabilityPhase6b` on nested linked-org / health-style fetches to cap extra reads; treat Phase **5C** / **6A** / **6B** enrichers like other bounded snapshot modules.
 
 ---
 

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 415,
-  sqlMigrations: 181,
+  apiRouteHandlers: 423,
+  sqlMigrations: 182,
   dashboardPages: 62,
-  componentsTsx: 286,
-  libTsFiles: 662,
+  componentsTsx: 287,
+  libTsFiles: 668,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **415** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **181** |
+| API route handlers (\`app/api/**/route.ts\`) | **423** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **182** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **286** |
-| \`lib/**/*.ts\` | **662** |
+| \`components/**/*.tsx\` | **287** |
+| \`lib/**/*.ts\` | **668** |
 
 ### Vercel crons
 
@@ -184,6 +184,13 @@ organizations/[organizationId]/blitzpay/multi-entity/group-members/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/groups/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/health/route.ts
 organizations/[organizationId]/blitzpay/multi-entity/intercompany-balances/route.ts
+organizations/[organizationId]/blitzpay/observability/events/route.ts
+organizations/[organizationId]/blitzpay/observability/health/route.ts
+organizations/[organizationId]/blitzpay/observability/idempotency/route.ts
+organizations/[organizationId]/blitzpay/observability/queue-health/route.ts
+organizations/[organizationId]/blitzpay/observability/regions/route.ts
+organizations/[organizationId]/blitzpay/observability/workflows/[workflowId]/replay/route.ts
+organizations/[organizationId]/blitzpay/observability/workflows/route.ts
 organizations/[organizationId]/blitzpay/payment-methods/route.ts
 organizations/[organizationId]/blitzpay/payment-methods/sync/route.ts
 organizations/[organizationId]/blitzpay/payment-plans/[planId]/link-work-order/route.ts
@@ -393,6 +400,7 @@ platform/blitzpay/cash-accounts-rollup/route.ts
 platform/blitzpay/collections-rollup/route.ts
 platform/blitzpay/command-center-rollup/route.ts
 platform/blitzpay/membership-rollup/route.ts
+platform/blitzpay/observability-rollup/route.ts
 platform/blitzpay/operations/route.ts
 platform/blitzpay/payroll-rollup/route.ts
 platform/blitzpay/recurring-revenue-rollup/route.ts

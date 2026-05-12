@@ -222,6 +222,14 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     fieldCollectionsIntentCents: 0,
     mobileTreasuryVisibilityScore: 0,
     mobileConflictReviewCount: 0,
+    queueHealthScore: 100,
+    workflowFailureRate: 0,
+    idempotencyConflictRate: 0,
+    replayPendingCount: 0,
+    observabilityCoverageRate: 0,
+    workerHealthScore: 100,
+    multiRegionReadinessScore: 100,
+    replayIntegrityScore: 0,
   }) as BlitzpayOrgReportingSnapshot
 
 // --- Phase 4a scores ---
