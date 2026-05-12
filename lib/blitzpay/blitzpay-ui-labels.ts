@@ -94,6 +94,8 @@ const BLITZPAY_UI_LABELS: Record<string, string> = {
   manual_review: "Manual review",
   reminder_sent: "Reminder sent",
   retry_scheduled: "Retry scheduled",
+  /** Collection activity / engine (some payloads use this key) */
+  scheduled_retry: "Scheduled follow-up",
   retry_attempted: "Retry attempted",
   payment_collected: "Payment collected",
   escalation_triggered: "Escalation started",
@@ -102,7 +104,6 @@ const BLITZPAY_UI_LABELS: Record<string, string> = {
   marked_uncollectible: "Marked uncollectible",
   manual_resolution: "Manually resolved",
   manual_retry: "Manual retry",
-  scheduled_retry: "Scheduled retry",
   autopay: "Autopay",
 
   // Multi-region sync (Phase 6B)
@@ -140,6 +141,42 @@ const BLITZPAY_UI_LABELS: Record<string, string> = {
   reminder: "Reminder",
   escalation: "Escalation",
   settlement: "Settlement",
+
+  // Memberships / billing cadence
+  monthly: "Monthly",
+  weekly: "Weekly",
+  quarterly: "Quarterly",
+  annual: "Annual",
+  yearly: "Yearly",
+  biweekly: "Every two weeks",
+  semiannual: "Twice a year",
+
+  // Procurement inventory movements (Phase 3E)
+  purchase: "Purchase",
+  adjustment: "Adjustment",
+  transfer: "Transfer",
+  work_order_usage: "Work order usage",
+  invoice_sale: "Invoice sale",
+  return: "Return",
+  writeoff: "Write-off",
+  reconciliation: "Reconciliation",
+
+  // Common vendor / AP wording
+  pending_approval: "Needs approval",
+  partially_paid: "Partially paid",
+  vendor_internal: "Internal vendor",
+  vendor_external: "External vendor",
+
+  // Multi-entity / supplier visibility (when surfaced as raw keys)
+  private: "Private",
+  network_only: "Network only",
+  shared_aggregate: "Shared aggregate",
+
+  // Claims / protection (extra enums)
+  open: "Open",
+  closed: "Closed",
+  in_review: "In review",
+  awaiting_documents: "Awaiting documents",
 }
 
 function titleCaseWordsFromSnake(raw: string): string {

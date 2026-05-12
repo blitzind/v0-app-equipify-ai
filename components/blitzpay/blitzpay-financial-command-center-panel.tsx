@@ -251,6 +251,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
       className={cn(
         "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+        "min-w-0 max-w-full overflow-x-hidden",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -318,7 +319,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
             </div>
           ) : null}
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 min-w-0">
             {[
               { k: "Cash collected", v: fmtMoney(data.tiles.cashCollectedWindowCents) },
               { k: "Expected collections (7d)", v: fmtMoney(data.tiles.expectedCollections7Cents) },
@@ -447,7 +448,7 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Observability — replay integrity (sample %)", v: `${data.tiles.replayIntegrityScore ?? 0}%` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 min-w-0">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug break-words">{x.k}</p>
                 <p className="text-sm font-semibold tabular-nums mt-1 text-foreground">{x.v}</p>
               </div>
             ))}

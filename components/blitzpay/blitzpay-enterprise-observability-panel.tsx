@@ -6,7 +6,7 @@ import { Activity, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { blitzpayStaffWidgetLoadCopy } from "@/lib/blitzpay/blitzpay-staff-widget-load-messages"
-import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
+import { blitzpayWorkflowExecutionPillClass, formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-formatters"
 
 const DISCLAIMER =
   "Observability and replay tooling support operational visibility and controlled recovery workflows. Financial actions remain subject to validation and approval safeguards."
@@ -121,7 +121,10 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
   const p6 = health?.phase6b
 
   return (
-    <div id="blitzpay-enterprise-observability-anchor" className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+    <div
+      id="blitzpay-enterprise-observability-anchor"
+      className="rounded-xl border border-border bg-card text-card-foreground shadow-sm min-w-0 max-w-full overflow-x-hidden"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
           <Activity className="w-5 h-5 text-muted-foreground shrink-0" />
@@ -154,7 +157,7 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
               {DISCLAIMER}
             </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm min-w-0">
               <Score label="Queue health" value={p6?.queueHealthScore ?? 0} warn={(p6?.queueHealthScore ?? 100) < 60} />
               <Score label="Worker health" value={p6?.workerHealthScore ?? 0} warn={(p6?.workerHealthScore ?? 100) < 60} />
               <Score label="Workflow failures %" value={p6?.workflowFailureRate ?? 0} warn={(p6?.workflowFailureRate ?? 0) > 25} suffix="%" />
@@ -182,12 +185,19 @@ export function BlitzpayEnterpriseObservabilityPanel({ organizationId, orgReady 
               ) : (
                 <ul className="space-y-2 text-sm">
                   {workflows.slice(0, 12).map((w) => (
-                    <li key={w.id} className="rounded-md border border-border/60 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{formatBlitzpayUiLabel(w.workflow_type)}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {formatBlitzpayUiLabel(w.execution_status)}
-                          {w.last_error ? ` — ${w.last_error.slice(0, 120)}` : ""}
+                    <li
+                      key={w.id}
+                      className="rounded-md border border-border/60 px-3 py-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between min-w-0"
+                    >
+                      <div className="min-w-0 space-y-1.5">
+                        <p className="font-medium text-foreground break-words">{formatBlitzpayUiLabel(w.workflow_type)}</p>
+                        <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 min-w-0">
+                          <span className={blitzpayWorkflowExecutionPillClass(w.execution_status)}>
+                            {formatBlitzpayUiLabel(w.execution_status)}
+                          </span>
+                          {w.last_error ? (
+                            <span className="break-words text-muted-foreground">— {w.last_error.slice(0, 160)}</span>
+                          ) : null}
                         </p>
                       </div>
                       {w.execution_status === "failed" && health.replayAuthorized ? (
@@ -249,7 +259,7 @@ function Score(props: { label: string; value: number; warn: boolean; suffix?: st
         props.warn ? "border-[color:var(--status-warning)]/50 bg-[color:var(--status-warning)]/5" : "border-border/70 bg-background/40",
       )}
     >
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide leading-snug">{props.label}</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{props.label}</p>
       <p className="text-base font-semibold tabular-nums mt-1 text-foreground">
         {props.value}
         {props.suffix ?? ""}

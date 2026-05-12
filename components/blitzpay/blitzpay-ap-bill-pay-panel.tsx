@@ -204,7 +204,7 @@ export function BlitzpayApBillPayPanel({ organizationId, orgReady }: Props) {
   return (
     <div
       id="blitzpay-ap-bill-pay-anchor"
-      className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]"
+      className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] min-w-0 max-w-full overflow-x-hidden"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -237,7 +237,7 @@ export function BlitzpayApBillPayPanel({ organizationId, orgReady }: Props) {
             {aging ? ` · Vendor aging as-of ${aging.asOfDate} (UTC date)` : null}
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
             <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Open vendor bills</p>
               <p className="text-sm font-semibold tabular-nums mt-1">{fmtMoney(health.reporting.accountsPayableOutstandingCents)}</p>
@@ -319,8 +319,8 @@ export function BlitzpayApBillPayPanel({ organizationId, orgReady }: Props) {
               <summary className="text-sm font-medium cursor-pointer text-foreground">Vendor spend snapshot (open balances)</summary>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                 {topSpend.map((v) => (
-                  <li key={v.vendorId} className="flex justify-between gap-2">
-                    <span className="truncate text-foreground">{v.vendor_name ?? "Vendor"}</span>
+                  <li key={v.vendorId} className="flex justify-between gap-2 min-w-0">
+                    <span className="min-w-0 break-words text-foreground">{v.vendor_name ?? "Vendor"}</span>
                     <span className="shrink-0 tabular-nums font-medium">{fmtMoney(v.buckets.totalOutstandingCents)}</span>
                   </li>
                 ))}

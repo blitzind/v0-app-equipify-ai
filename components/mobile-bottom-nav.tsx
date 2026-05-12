@@ -15,7 +15,7 @@ import {
   Wrench, ClipboardList, FileText, Receipt, BarChart3, Sparkles,
   Settings, X, UserPlus, CalendarPlus, ClipboardPlus, FilePlus, ReceiptText, ShoppingCart, HardHat,
 } from "lucide-react"
-import { MaintenancePlansLucideIcon } from "@/lib/navigation/module-icons"
+import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -214,6 +214,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     { icon: Wrench, label: "Equipment", href: "/equipment", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
     { icon: ClipboardList, label: "Work Orders", href: "/work-orders", anyOf: ["canViewAllWorkOrders", "canViewAssignedWorkOrdersOnly", "canEditWorkOrders"] },
     { icon: MaintenancePlansLucideIcon, label: "Maintenance", href: "/maintenance-plans", anyOf: ["canManageDispatch"] },
+    { icon: MembershipsLucideIcon, label: "Memberships", href: "/memberships", anyOf: ["canViewFinancialReports", "canViewFinancials"] },
     { icon: FileText, label: "Quotes", href: "/quotes", anyOf: ["canViewQuotes", "canEditQuotes"] },
     { icon: Receipt, label: "Invoices", href: "/invoices", anyOf: ["canViewBilling", "canEditInvoices"] },
     { icon: ShoppingCart, label: "Purchase Orders", href: "/purchase-orders", anyOf: ["canViewBilling"] },

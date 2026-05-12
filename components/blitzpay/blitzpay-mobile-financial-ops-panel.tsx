@@ -135,12 +135,15 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
   return (
     <div
       id="blitzpay-mobile-financial-ops"
-      className={cn("rounded-xl border border-border bg-card p-4 shadow-sm space-y-4")}
+      className={cn(
+        "rounded-xl border border-border bg-card p-4 shadow-sm space-y-4",
+        "min-w-0 max-w-full overflow-x-hidden",
+      )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <Smartphone className="h-5 w-5 text-muted-foreground shrink-0" aria-hidden />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Mobile financial ops</p>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-prose">
               Field capture for intents, approvals, and visibility summaries. Offline queue only — no money movement from this
@@ -161,37 +164,37 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
       {p6 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Intents (sample)</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm min-w-0">
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Intents (sample)</p>
             <p className="font-semibold tabular-nums">{p6.mobileFinancialIntentCount}</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Offline capture</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Offline capture</p>
             <p className="font-semibold tabular-nums">{p6.offlineFinancialIntentCount}</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Sync issues</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Sync issues</p>
             <p className="font-semibold tabular-nums">{p6.mobileSyncFailureRate}%</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Conflicts</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Conflicts</p>
             <p className="font-semibold tabular-nums">{p6.mobileConflictReviewCount}</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Signatures vs intents</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground leading-snug">Signatures vs intents</p>
             <p className="font-semibold tabular-nums">{p6.mobileSignatureCoverageRate}/100</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Payroll pending</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Payroll pending</p>
             <p className="font-semibold tabular-nums">{p6.mobilePayrollApprovalPendingCount}</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Field collection intents</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground leading-snug">Field collection intents</p>
             <p className="font-semibold tabular-nums">{fmtMoney(p6.fieldCollectionsIntentCents)}</p>
           </div>
-          <div className="rounded-lg border border-border/70 px-2 py-2">
-            <p className="text-[10px] uppercase text-muted-foreground">Treasury visibility</p>
+          <div className="rounded-lg border border-border/70 px-2 py-2 min-w-0">
+            <p className="text-xs text-muted-foreground">Treasury visibility</p>
             <p className="font-semibold tabular-nums">{p6.mobileTreasuryVisibilityScore}/100</p>
           </div>
         </div>
@@ -213,9 +216,9 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
                   <span className="font-medium">{formatBlitzpayUiLabel(it.intent_type)}</span>
                   <span className="text-muted-foreground"> · {formatBlitzpayUiLabel(it.intent_status)}</span>
                   {it.captured_offline ? (
-                    <span className="ml-2 text-[10px] uppercase font-semibold text-amber-800 dark:text-amber-200">Offline</span>
+                    <span className="ml-2 text-xs font-semibold text-amber-800 dark:text-amber-200">Offline</span>
                   ) : (
-                    <span className="ml-2 text-[10px] uppercase font-semibold text-emerald-800 dark:text-emerald-200">Online</span>
+                    <span className="ml-2 text-xs font-semibold text-emerald-800 dark:text-emerald-200">Online</span>
                   )}
                   {it.amount_cents != null ? (
                     <span className="block text-xs text-muted-foreground tabular-nums">{fmtMoney(it.amount_cents)}</span>
@@ -237,7 +240,7 @@ export function BlitzpayMobileFinancialOpsPanel({ organizationId, orgReady }: Pr
                   <span className="font-medium">{formatBlitzpayUiLabel(s.authorization_type)}</span>
                   <span className="text-muted-foreground"> · {formatBlitzpayUiLabel(s.authorization_status)}</span>
                   {s.signature_reference_recorded ? (
-                    <span className="ml-2 text-[10px] text-muted-foreground">Reference on file</span>
+                    <span className="ml-2 text-xs text-muted-foreground">Reference on file</span>
                   ) : null}
                 </li>
               ))

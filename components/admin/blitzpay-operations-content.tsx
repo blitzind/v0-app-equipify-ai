@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { CreditCard, Loader2, Play, FlaskConical, AlertTriangle, Info, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { formatBlitzpayUiLabel } from "@/lib/blitzpay/blitzpay-ui-labels"
 import { cn } from "@/lib/utils"
 
 type CommandCenterPlatformRollup = {
@@ -304,7 +305,7 @@ export function BlitzpayOperationsContent() {
   }
 
   return (
-    <div className="space-y-8 text-sm">
+    <div className="space-y-8 text-sm min-w-0 max-w-full overflow-x-hidden">
       <div className="flex items-start gap-3">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary shrink-0">
           <CreditCard className="w-5 h-5" />
@@ -340,37 +341,37 @@ export function BlitzpayOperationsContent() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">BlitzPay orgs</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">BlitzPay orgs</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.orgsBlitzpayEnabled ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Charges-ready orgs</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Charges-ready orgs</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.orgsConnectChargesReady ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Captured (30d)</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Captured (30d)</p>
           <p className="text-lg font-semibold tabular-nums">{fmtMoney(summary?.volumeCapturedCents30d ?? 0)}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed attempts (7d)</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Failed attempts (7d)</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.failedPaymentAttempts7d ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Open disputes</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Open disputes</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.openDisputes ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending refunds</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Pending refunds</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.pendingRefunds ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Webhook dead (24h)</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Webhook dead (24h)</p>
           <p className="text-lg font-semibold tabular-nums">{summary?.webhookDead24h ?? "—"}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[10px] text-muted-foreground uppercase font-medium">Schema</p>
+        <div className="rounded-lg border border-border p-3 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase font-medium">Schema</p>
           <p className="text-lg font-semibold">{summary?.schemaHealth?.ok ? "OK" : "Issue"}</p>
         </div>
       </div>
@@ -382,45 +383,45 @@ export function BlitzpayOperationsContent() {
             Bounded aggregates across workspaces ({revenueRollup.reportingWindowDays}d window). Ledger sum uses capped
             reads; wallet liability sums up to 5k wallet rows.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Ledger captured</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Ledger captured</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.ledgerPaymentCapturedCentsWindow)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Succeeded PIs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Succeeded PIs</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.succeededPaymentIntentsCountWindow}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.openDisputesPlatformCount}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Wallet liability (approx)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Wallet liability (approx)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.walletLiabilityTotalCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">In-flight payouts (approx)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">In-flight payouts (approx)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.treasuryPendingInFlightPayoutCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed payouts (30d)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Failed payouts (30d)</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.treasuryFailedPayouts30dCount}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Instant payout interest orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Instant payout interest orgs</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.treasuryInstantPayoutInterestOrgsCount}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — orgs w/ open payables</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">AP — orgs w/ open payables</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.apOpenPayablesOrgsApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — open outstanding (approx)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">AP — open outstanding (approx)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(revenueRollup.apOpenOutstandingCentsTotalApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — overdue open lines</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">AP — overdue open lines</p>
               <p className="text-lg font-semibold tabular-nums">{revenueRollup.apOverdueOpenLinesApprox}</p>
             </div>
           </div>
@@ -436,33 +437,33 @@ export function BlitzpayOperationsContent() {
             Bounded scans across workspaces — use with BlitzPay Ops playbooks. Schema:{" "}
             {commandRollup.schemaHealthOk ? "OK" : "check failures"}.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — orgs (sample)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">AP — orgs (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsWithOpenVendorPayablesApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">AP — overdue orgs (sample)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">AP — overdue orgs (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsVendorPayablesOverdueApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Connect launch gaps</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Connect launch gaps</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsLaunchReadinessConnectGapApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Stale Connect sync (7d)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Stale Connect sync (7d)</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.orgsStaleConnectSync7d}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed pay attempts (7d)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Failed pay attempts (7d)</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.failedPaymentAttempts7d}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Open disputes (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.openDisputesPlatformSample}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending refunds</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Pending refunds</p>
               <p className="text-lg font-semibold tabular-nums">{commandRollup.pendingRefundsPlatform}</p>
             </div>
           </div>
@@ -475,25 +476,25 @@ export function BlitzpayOperationsContent() {
             Enterprise observability (platform sample)
           </p>
           <p className="text-[11px] text-muted-foreground leading-relaxed">{observabilityRollup.disclaimer}</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Org snapshots (sample)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Org snapshots (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgSnapshotsSampled}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg queue health</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg queue health</p>
               <p className="text-lg font-semibold tabular-nums">{observabilityRollup.averageQueueHealthScoreApprox}/100</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg worker health</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg worker health</p>
               <p className="text-lg font-semibold tabular-nums">{observabilityRollup.averageWorkerHealthScoreApprox}/100</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Replay backlog orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Replay backlog orgs</p>
               <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgsWithReplayBacklogApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Queue depth pressure orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Queue depth pressure orgs</p>
               <p className="text-lg font-semibold tabular-nums">{observabilityRollup.orgsWithQueueDepthApprox}</p>
             </div>
           </div>
@@ -509,37 +510,37 @@ export function BlitzpayOperationsContent() {
             Sampled up to {healthRollup.orgsSampled} active Connect workspaces ({healthRollup.reportingWindowDays}d window).
             Deterministic scores — not a credit score; use for internal monitoring only.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg overall health</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg overall health</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.averageOverallHealth}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg financial</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg financial</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.averageFinancialHealth}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg collections</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg collections</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.averageCollectionsHealth}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Orgs under stress</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Orgs under stress</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.orgsUnderStressApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg AR pressure ratio</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg AR pressure ratio</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.averageArPressureRatio}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Financing adoption %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Financing adoption %</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.financingAdoptionRatePct}%</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
               <p className="text-lg font-semibold tabular-nums">{healthRollup.averageReminderDispatchPct}%</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg payout delay (d)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg payout delay (d)</p>
               <p className="text-lg font-semibold tabular-nums">
                 {healthRollup.averagePayoutDelayDays == null ? "—" : healthRollup.averagePayoutDelayDays}
               </p>
@@ -577,31 +578,31 @@ export function BlitzpayOperationsContent() {
             Sampled {collectionsRollup.orgsSampled} Connect workspaces ({collectionsRollup.reportingWindowDays}d). Totals
             are directional, not audited cash forecasts.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Overdue AR (approx sum)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Overdue AR (approx sum)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(collectionsRollup.overdueCollectibleCentsTotalApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Recoverable overdue (heuristic)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Recoverable overdue (heuristic)</p>
               <p className="text-lg font-semibold tabular-nums">
                 {fmtMoney(collectionsRollup.estimatedRecoverableOverdueCentsApprox)}
               </p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Field opportunity (approx)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Field opportunity (approx)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(collectionsRollup.fieldCollectibleCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg active plans / org</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg active plans / org</p>
               <p className="text-lg font-semibold tabular-nums">{collectionsRollup.installmentPlansActiveApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">ACH-heavy orgs (sample)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">ACH-heavy orgs (sample)</p>
               <p className="text-lg font-semibold tabular-nums">{collectionsRollup.achAdoptionOrgsApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg reminder dispatch %</p>
               <p className="text-lg font-semibold tabular-nums">{collectionsRollup.averageReminderDispatchPct}%</p>
             </div>
           </div>
@@ -627,25 +628,25 @@ export function BlitzpayOperationsContent() {
             Sampled {recurringRollup.orgsSampled} Connect workspaces ({recurringRollup.reportingWindowDays}d). Averages are
             directional; bounded reads only.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg planned renewals (30d)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg planned renewals (30d)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(recurringRollup.averagePlannedRecurring30dCents)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg autopay adoption %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg autopay adoption %</p>
               <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageAutopayAdoptionPct}%</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg renewal success proxy %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg renewal success proxy %</p>
               <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageRenewalSuccessProxyPct}%</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg churn-risk score</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg churn-risk score</p>
               <p className="text-lg font-semibold tabular-nums">{recurringRollup.averageChurnRiskScore0to100}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Orgs w/ failed renewals</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Orgs w/ failed renewals</p>
               <p className="text-lg font-semibold tabular-nums">{recurringRollup.orgsWithFailedRenewalsApprox}</p>
             </div>
           </div>
@@ -671,31 +672,31 @@ export function BlitzpayOperationsContent() {
             Sampled {cashRollup.orgsSampled} recent orgs ({cashRollup.reportingWindowDays}d). Estimates are internal planning
             only; not custodial balances.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Reserve gap orgs</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Reserve gap orgs</p>
               <p className="text-lg font-semibold tabular-nums">{cashRollup.orgsWithReserveGapApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Runway risk / watch</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Runway risk / watch</p>
               <p className="text-lg font-semibold tabular-nums">
                 {cashRollup.orgsRunwayRiskApprox} / {cashRollup.orgsRunwayWatchApprox}
               </p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Sample operating cash sum</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Sample operating cash sum</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(cashRollup.sampleEstimatedOperatingCashTotalApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Low payroll coverage orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Low payroll coverage orgs</p>
               <p className="text-lg font-semibold tabular-nums">{cashRollup.payrollReserveLowCoverageOrgsApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Low AP coverage orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Low AP coverage orgs</p>
               <p className="text-lg font-semibold tabular-nums">{cashRollup.apReserveLowCoverageOrgsApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Outflow stress orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Outflow stress orgs</p>
               <p className="text-lg font-semibold tabular-nums">{cashRollup.outflowStressOrgsApprox}</p>
             </div>
           </div>
@@ -711,29 +712,29 @@ export function BlitzpayOperationsContent() {
             Sampled {payrollRollup.orgsSampled} recent orgs ({payrollRollup.reportingWindowDays}d window). Directional totals;
             bounded reads only. Not ACH payroll processing.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Draft payroll runs (orgs)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Draft payroll runs (orgs)</p>
               <p className="text-lg font-semibold tabular-nums">{payrollRollup.orgsWithDraftPayrollApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Failed payroll (orgs)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Failed payroll (orgs)</p>
               <p className="text-lg font-semibold tabular-nums">{payrollRollup.orgsWithFailedPayrollApprox}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Pending commissions (sample sum)</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Pending commissions (sample sum)</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.pendingCommissionExposureCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Contractor settlements pending</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Contractor settlements pending</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.contractorSettlementPendingCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Revenue-share pending</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Revenue-share pending</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(payrollRollup.recurringSharePendingCentsApprox)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">High commission exposure orgs</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">High commission exposure orgs</p>
               <p className="text-lg font-semibold tabular-nums">{payrollRollup.highCommissionExposureOrgsApprox}</p>
             </div>
           </div>
@@ -749,29 +750,29 @@ export function BlitzpayOperationsContent() {
             Sampled {membershipRollup.sampledOrganizations} recent orgs; {membershipRollup.organizationsWithMemberships} show
             membership rows. Bounded reads only.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Active memberships</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Active memberships</p>
               <p className="text-lg font-semibold tabular-nums">{membershipRollup.totalActiveMembershipsSample}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">MRR sample total</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">MRR sample total</p>
               <p className="text-lg font-semibold tabular-nums">{fmtMoney(membershipRollup.totalMrrCentsSample)}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Delinquents</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Delinquents</p>
               <p className="text-lg font-semibold tabular-nums">{membershipRollup.delinquentMembershipsSample}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Open failures</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Open failures</p>
               <p className="text-lg font-semibold tabular-nums">{membershipRollup.openFailuresSample}</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Avg autopay %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Avg autopay %</p>
               <p className="text-lg font-semibold tabular-nums">{membershipRollup.avgAutopayAdoptionPctSample}%</p>
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase font-medium">Delinquency pressure %</p>
+            <div className="rounded-lg border border-border p-3 min-w-0">
+              <p className="text-xs text-muted-foreground uppercase font-medium">Delinquency pressure %</p>
               <p className="text-lg font-semibold tabular-nums">{membershipRollup.delinquencyPressurePct}%</p>
             </div>
           </div>
@@ -818,8 +819,8 @@ export function BlitzpayOperationsContent() {
         <div className="px-4 py-2 border-b border-border bg-muted/40">
           <p className="text-xs font-semibold">Recent reminder runs</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+        <div className="overflow-x-auto min-w-0 -mx-1 px-1">
+          <table className="w-full min-w-[720px] text-xs">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-3 py-2 font-medium">When</th>
@@ -839,12 +840,12 @@ export function BlitzpayOperationsContent() {
                 return (
                   <tr key={id || created} className="border-b border-border last:border-0">
                     <td className="px-3 py-1.5 whitespace-nowrap">{created ? new Date(created).toLocaleString() : "—"}</td>
-                    <td className="px-3 py-1.5">{String(r.trigger ?? "")}</td>
-                    <td className="px-3 py-1.5">{String(r.status ?? "")}</td>
+                    <td className="px-3 py-1.5 min-w-0 break-words">{formatBlitzpayUiLabel(String(r.trigger ?? ""))}</td>
+                    <td className="px-3 py-1.5 min-w-0 break-words">{formatBlitzpayUiLabel(String(r.status ?? ""))}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{r.reminders_evaluated ?? r.remindersEvaluated ?? "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{r.reminders_sent ?? r.remindersSent ?? "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{r.reminders_skipped ?? r.remindersSkipped ?? "—"}</td>
-                    <td className="px-3 py-1.5 max-w-[220px] truncate text-muted-foreground">
+                    <td className="px-3 py-1.5 min-w-0 max-w-[min(100%,18rem)] break-words text-muted-foreground">
                       {r.error ? String(r.error) : "—"}
                     </td>
                   </tr>

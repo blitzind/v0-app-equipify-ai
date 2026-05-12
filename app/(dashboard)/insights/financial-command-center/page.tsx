@@ -54,7 +54,7 @@ export default function FinancialCommandCenterPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 min-w-0 max-w-full overflow-x-hidden">
       <p className="text-sm text-muted-foreground leading-relaxed max-w-4xl">
         The same command center lives under{" "}
         <Link href="/settings/payments#blitzpay-financial-command-center-anchor" className="text-primary underline-offset-2 hover:underline">

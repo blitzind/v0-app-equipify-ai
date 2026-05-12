@@ -107,7 +107,7 @@ export function BlitzpayProcurementInventoryPanel({ organizationId, orgReady }: 
   return (
     <div
       id="blitzpay-procurement-inventory-anchor"
-      className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]"
+      className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-4 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] min-w-0 max-w-full overflow-x-hidden"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -173,33 +173,33 @@ export function BlitzpayProcurementInventoryPanel({ organizationId, orgReady }: 
       ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
+        <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent inventory movements</p>
           {movements.length === 0 ? (
             <p className="text-xs text-muted-foreground">No movements recorded yet.</p>
           ) : (
-            <ul className="space-y-1.5 text-xs text-muted-foreground">
+            <ul className="space-y-2 text-xs text-muted-foreground min-w-0">
               {movements.map((m) => (
-                <li key={m.id} className="flex justify-between gap-2">
-                  <span className="truncate">
+                <li key={m.id} className="flex flex-col gap-0.5 rounded-md border border-border/50 px-2 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2 min-w-0">
+                  <span className="min-w-0 break-words text-foreground">
                     {m.movement_date} · {formatBlitzpayUiLabel(m.movement_type)}
                   </span>
-                  <span className="shrink-0 tabular-nums font-medium text-foreground">{fmtMoney(m.total_cost_cents)}</span>
+                  <span className="shrink-0 tabular-nums font-medium text-foreground sm:text-right">{fmtMoney(m.total_cost_cents)}</span>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2">
+        <div className="rounded-lg border border-border/70 px-3 py-3 space-y-2 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reorder summaries</p>
           {forecasts.length === 0 ? (
             <p className="text-xs text-muted-foreground">Forecasts appear after items and usage history exist.</p>
           ) : (
-            <ul className="space-y-1.5 text-xs text-muted-foreground">
+            <ul className="space-y-2 text-xs text-muted-foreground min-w-0">
               {forecasts.map((f) => (
-                <li key={f.id} className="flex justify-between gap-2">
-                  <span className="truncate">Item {f.inventory_financial_item_id.slice(0, 8)}…</span>
-                  <span className="shrink-0 tabular-nums text-foreground">
+                <li key={f.id} className="flex flex-col gap-0.5 rounded-md border border-border/50 px-2 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-2 min-w-0">
+                  <span className="min-w-0 break-words text-foreground">Item {f.inventory_financial_item_id.slice(0, 8)}…</span>
+                  <span className="shrink-0 tabular-nums text-foreground sm:text-right">
                     {f.projected_reorder_date ?? "—"} · {fmtMoney(f.projected_reorder_cost_cents ?? 0)}
                   </span>
                 </li>

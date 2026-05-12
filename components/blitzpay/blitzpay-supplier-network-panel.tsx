@@ -110,6 +110,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
       className={cn(
         "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+        "min-w-0 max-w-full overflow-x-hidden",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -147,7 +148,7 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
             Reporting window since {health?.sinceIso ? new Date(health.sinceIso).toLocaleDateString() : "—"} · Visible
             networks {health?.visibleNetworkCount ?? 0}
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
             {[
               { k: "Network participation (advisory score)", v: `${p5.supplierNetworkParticipationScore}/100` },
               { k: "Procurement benchmark (aggregate)", v: `${p5.procurementBenchmarkScore}/100` },
@@ -158,8 +159,8 @@ export function BlitzpaySupplierNetworkPanel({ organizationId, orgReady }: Props
               { k: "Vendor financing visibility (score)", v: `${p5.vendorFinancingOpportunityScore}/100` },
               { k: "Network coverage (networks + seats)", v: `${p5.supplierNetworkCoverageRate}/100` },
             ].map((x) => (
-              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
+              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 min-w-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug break-words">{x.k}</p>
                 <p className="text-sm font-semibold tabular-nums mt-1 text-foreground">{x.v}</p>
               </div>
             ))}

@@ -108,6 +108,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
       className={cn(
         "rounded-xl border border-border bg-card px-3 py-4 sm:px-5 sm:py-5 space-y-4",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+        "min-w-0 max-w-full overflow-x-hidden",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -115,7 +116,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
           <MembershipsLucideIcon className="h-4 w-4 text-emerald-600 shrink-0" aria-hidden />
           <div>
             <p className="text-xs font-semibold">Memberships & recurring agreements</p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Native recurring revenue (no Stripe subscription ids). Reads are bounded; renewals run on the membership cron.
             </p>
           </div>
@@ -130,7 +131,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
 
       {dash ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 min-w-0">
             {[
               { k: "Active", v: String(dash.activeCount) },
               { k: "Paused", v: String(dash.pausedCount) },
@@ -145,8 +146,8 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
               { k: "Deferred revenue (proxy)", v: fmtMoney(dash.deferredRevenueProxyCents) },
               { k: "Recoveries (30d est.)", v: String(dash.recoveredFailureWindowCount) },
             ].map((x) => (
-              <div key={x.k} className="rounded border border-border/70 bg-background/40 px-2 py-1.5">
-                <p className="text-[9px] text-muted-foreground uppercase leading-tight">{x.k}</p>
+              <div key={x.k} className="rounded border border-border/70 bg-background/40 px-2 py-1.5 min-w-0">
+                <p className="text-xs text-muted-foreground uppercase leading-tight break-words">{x.k}</p>
                 <p className="text-xs font-semibold tabular-nums mt-0.5">{x.v}</p>
               </div>
             ))}
@@ -167,8 +168,8 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
 
       {snapshots.length > 0 ? (
         <div className="rounded-lg border border-border/80 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase text-muted-foreground mb-2">Recent retention snapshots</p>
-          <div className="grid grid-cols-3 gap-2 text-[11px]">
+          <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Recent retention snapshots</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs min-w-0">
             {snapshots.slice(0, 6).map((s) => (
               <div key={s.snapshot_date} className="rounded border border-border/60 px-2 py-1">
                 <p className="text-muted-foreground">{s.snapshot_date}</p>
@@ -182,16 +183,16 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
 
       <div className="rounded-lg border border-border/80 px-3 py-2 space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold uppercase text-muted-foreground">Membership register</p>
-          <Link href="/settings/payments" className="text-[10px] font-medium text-primary underline-offset-2 hover:underline">
+          <p className="text-xs font-semibold uppercase text-muted-foreground">Membership register</p>
+          <Link href="/settings/payments" className="text-xs font-medium text-primary underline-offset-2 hover:underline">
             Payments settings
           </Link>
         </div>
         {rows.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">No memberships yet — cron + staff-created plans will appear here.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
+          <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full min-w-[520px] text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border/70">
                   <th className="py-1 pr-2">Number</th>
@@ -207,7 +208,7 @@ export function BlitzpayMembershipsDashboard({ organizationId, orgReady }: Props
                   <tr key={r.id} className="border-b border-border/40">
                     <td className="py-1 pr-2 font-medium">{r.membership_number}</td>
                     <td className="py-1 pr-2">{formatBlitzpayUiLabel(r.status)}</td>
-                    <td className="py-1 pr-2">{r.billing_frequency}</td>
+                    <td className="py-1 pr-2">{formatBlitzpayUiLabel(r.billing_frequency)}</td>
                     <td className="py-1 pr-2 tabular-nums">{fmtMoney(r.recurring_amount_cents)}</td>
                     <td className="py-1 pr-2">{r.next_invoice_at ? new Date(r.next_invoice_at).toLocaleDateString() : "—"}</td>
                     <td className="py-1">{r.auto_bill_enabled ? "On" : "Off"}</td>

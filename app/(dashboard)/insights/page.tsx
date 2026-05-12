@@ -617,50 +617,50 @@ export default function InsightsPage() {
       </div>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="flex-1 bg-zinc-50 p-6 space-y-6">
+      <div className="flex-1 bg-zinc-50 p-6 space-y-6 min-w-0 max-w-full overflow-x-hidden">
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay financial copilot</p>
             <BlitzpayAiFinancialCopilotPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay revenue optimization</p>
             <BlitzpayRevenueOptimizationPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay multi-entity finance</p>
             <BlitzpayMultiEntityFinancePanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay supplier network</p>
             <BlitzpaySupplierNetworkPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay claims &amp; protection</p>
             <BlitzpayClaimsProtectionPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay mobile financial ops</p>
             <BlitzpayMobileFinancialOpsPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 
         {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0 max-w-full overflow-x-hidden">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay enterprise observability</p>
             <BlitzpayEnterpriseObservabilityPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>

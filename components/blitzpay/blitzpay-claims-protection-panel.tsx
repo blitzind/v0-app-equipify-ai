@@ -151,6 +151,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
       className={cn(
         "rounded-xl border border-border bg-card px-4 py-5 sm:px-6 sm:py-6 space-y-5",
         "shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]",
+        "min-w-0 max-w-full overflow-x-hidden",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -187,7 +188,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
           <p className="text-xs text-muted-foreground tabular-nums">
             Reporting window since {health?.sinceIso ? new Date(health.sinceIso).toLocaleDateString() : "—"}
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
             {[
               { k: "Reserve & exposure (upper-bound est.)", v: fmtMoney(p5.warrantyReserveExposure) },
               { k: "Open items — estimated exposure (tracked)", v: fmtMoney(p5.claimsExposureCents) },
@@ -198,8 +199,8 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
               { k: "Payout tracking — in-flight exposure (est.)", v: fmtMoney(p5.claimsPayoutExposure) },
               { k: "Active plan coverage signal", v: `${p5.protectionPlanCoverageRate}/100` },
             ].map((x) => (
-              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>
+              <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5 min-w-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug break-words">{x.k}</p>
                 <p className="text-sm font-semibold tabular-nums mt-1 text-foreground">{x.v}</p>
               </div>
             ))}
@@ -239,7 +240,7 @@ export function BlitzpayClaimsProtectionPanel({ organizationId, orgReady }: Prop
             <p className="text-sm text-muted-foreground">No tracked items yet.</p>
           : <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
               {claims.slice(0, 10).map((c) => (
-                <li key={c.id} className="tabular-nums">
+                <li key={c.id} className="tabular-nums min-w-0 break-words">
                   <span className="font-medium text-foreground">{c.claim_reference}</span> ·{" "}
                   {formatBlitzpayUiLabel(String(c.claim_type))} · {formatBlitzpayUiLabel(c.claim_status)}
                   {c.estimated_claim_amount_cents != null ?
