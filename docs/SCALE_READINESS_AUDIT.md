@@ -140,6 +140,8 @@ Evidence from migrations under `supabase/migrations/`:
 
 **Phase 2Z (cash planning):** `blitzpay-cash-accounts-service.ts` caps cash account rows (**`CASH_ACCOUNTS_ROW_CAP`**), reserve rules (**`CASH_RESERVE_RULES_CAP`**), allocation history (**`CASH_ALLOCATIONS_SCAN_CAP`**), and open-dispute scan (80 rows) inside reporting snapshot. Platform cash rollup samples at most **`PLATFORM_CASH_ORG_SAMPLE_CAP`** orgs per request — planning payloads must stay read-only for members except explicit reserve-rule mutations.
 
+**Phase 3A (billing profiles + payment method metadata + autopay enrollments):** `blitzpay-billing-profiles-service.ts` uses explicit caps (**`BLITZPAY_BILLING_PROFILE_LIST_CAP`**, **`BLITZPAY_PAYMENT_METHOD_LIST_CAP`**, **`BLITZPAY_AUTOPAY_LIST_CAP`**, **`BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP`**) on all list/reporting paths; only **hashed** Stripe references and **masked** display fields are persisted. Portal billing routes must remain narrow (no staff treasury/reporting payloads). Sync is **metadata-only** — watch Stripe list API volume only if orgs trigger sync very frequently; prefer debounced staff actions until a webhook-driven incremental sync exists.
+
 ### 8.1 SaaS Stripe (`/api/stripe/webhook`)
 
 - **Idempotency:** insert into `stripe_webhook_events` by `event.id`; duplicate → `200` + `duplicate: true`.
@@ -184,6 +186,12 @@ Evidence from migrations under `supabase/migrations/`:
 - Reminder suppression should remain strict for paid/void invoices, archived customers, and non-email preferences to avoid noisy/unsafe outreach.
 - Hosted payment links use hashed opaque tokens and route into portal-safe pay pages; no raw banking or Stripe method secrets are exposed.
 - New scaling watchpoint: reminder cron fan-out across large org counts. Add per-org batching/leases when volume grows.
+
+### 8.8 BlitzPay Phase 3A (billing profiles, saved method metadata, autopay preferences)
+
+- Tables are **low cardinality** per customer; unique constraints dedupe hashed payment-method rows per org.
+- **No** full credential storage; RLS grants members **read** on profile/method/enrollment rows for support visibility — **writes** remain on authenticated org APIs using service role after permission gates (same pattern as other BlitzPay staff tables).
+- Portal surface is intentionally minimal to avoid leaking internal billing ops or raw processor references at scale.
 
 ---
 

@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 308,
-  sqlMigrations: 168,
+  apiRouteHandlers: 316,
+  sqlMigrations: 169,
   dashboardPages: 62,
-  componentsTsx: 273,
-  libTsFiles: 608,
+  componentsTsx: 274,
+  libTsFiles: 610,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **308** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **168** |
+| API route handlers (\`app/api/**/route.ts\`) | **316** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **169** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **273** |
-| \`lib/**/*.ts\` | **608** |
+| \`components/**/*.tsx\` | **274** |
+| \`lib/**/*.ts\` | **610** |
 
 ### Vercel crons
 
@@ -98,6 +98,10 @@ organizations/[organizationId]/attachments/route.ts
 organizations/[organizationId]/billing/default-invoice-terms/route.ts
 organizations/[organizationId]/blitzpay/account-link/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
+organizations/[organizationId]/blitzpay/autopay/[enrollmentId]/route.ts
+organizations/[organizationId]/blitzpay/autopay/route.ts
+organizations/[organizationId]/blitzpay/billing-profiles/[profileId]/route.ts
+organizations/[organizationId]/blitzpay/billing-profiles/route.ts
 organizations/[organizationId]/blitzpay/business-health/route.ts
 organizations/[organizationId]/blitzpay/cash-accounts/route.ts
 organizations/[organizationId]/blitzpay/cash-reserve-rules/[ruleId]/route.ts
@@ -116,6 +120,8 @@ organizations/[organizationId]/blitzpay/memberships/[membershipId]/resume/route.
 organizations/[organizationId]/blitzpay/memberships/[membershipId]/retry-payment/route.ts
 organizations/[organizationId]/blitzpay/memberships/[membershipId]/route.ts
 organizations/[organizationId]/blitzpay/memberships/route.ts
+organizations/[organizationId]/blitzpay/payment-methods/route.ts
+organizations/[organizationId]/blitzpay/payment-methods/sync/route.ts
 organizations/[organizationId]/blitzpay/payment-plans/[planId]/link-work-order/route.ts
 organizations/[organizationId]/blitzpay/payout-ledger/route.ts
 organizations/[organizationId]/blitzpay/payroll-runs/[runId]/approve/route.ts
@@ -305,6 +311,8 @@ platform/import-operations/route.ts
 platform/import-operations/runs/[runId]/notes/route.ts
 portal/access/exchange/route.ts
 portal/attachments/[attachmentId]/download/route.ts
+portal/billing/autopay/route.ts
+portal/billing/payment-methods/route.ts
 portal/bootstrap/route.ts
 portal/certificate-attachments/[attachmentId]/download/route.ts
 portal/certificates/[recordId]/download/route.ts

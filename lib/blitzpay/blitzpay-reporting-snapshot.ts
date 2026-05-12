@@ -11,6 +11,7 @@ import { fetchBlitzpayMembershipReportingSlice } from "@/lib/blitzpay/blitzpay-m
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 import { deriveBlitzpayCashPlanningMetrics, type BlitzpayCashReserveRuleInput } from "@/lib/blitzpay/blitzpay-cash-accounts"
+import { fetchBlitzpayPhase3aReportingRates } from "@/lib/blitzpay/blitzpay-billing-profiles-service"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -134,6 +135,11 @@ export type BlitzpayOrgReportingSnapshot = {
   cashRunwayStatus: "healthy" | "watch" | "risk"
   payrollReserveCoverageBasisPoints: number
   apReserveCoverageBasisPoints: number
+  /** Phase 3A — customer billing profiles + saved methods + autopay enrollments (bounded; 0–100). */
+  autopayEnrollmentRate: number
+  savedPaymentMethodRate: number
+  billingReadinessRate: number
+  delinquencyRiskRate: number
 }
 
 /**
@@ -653,6 +659,20 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   const walletL = customerWalletSpendableCreditTotalCents
   const depL = customerUnappliedEstimateDepositTotalCents
   const overlapWd = Math.min(walletL, depL)
+  let autopayEnrollmentRate = 0
+  let savedPaymentMethodRate = 0
+  let billingReadinessRate = 0
+  let delinquencyRiskRate = 0
+  try {
+    const r3 = await fetchBlitzpayPhase3aReportingRates(admin, organizationId)
+    autopayEnrollmentRate = r3.autopayEnrollmentRate
+    savedPaymentMethodRate = r3.savedPaymentMethodRate
+    billingReadinessRate = r3.billingReadinessRate
+    delinquencyRiskRate = r3.delinquencyRiskRate
+  } catch {
+    /* Phase 3A tables optional until migration applied */
+  }
+
   const cash2z = deriveBlitzpayCashPlanningMetrics({
     treasuryOperatingCents: tmSnapshot?.operatingBalanceCents ?? 0,
     heldReserveCents: tmSnapshot?.heldReserveCents ?? 0,
@@ -769,5 +789,9 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     cashRunwayStatus: cash2z.cashRunwayStatus,
     payrollReserveCoverageBasisPoints: cash2z.payrollReserveCoverageBasisPoints,
     apReserveCoverageBasisPoints: cash2z.apReserveCoverageBasisPoints,
+    autopayEnrollmentRate,
+    savedPaymentMethodRate,
+    billingReadinessRate,
+    delinquencyRiskRate,
   }
 }

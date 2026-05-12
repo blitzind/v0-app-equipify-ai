@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import { BlitzpayBillingProfilesPanel } from "@/components/blitzpay/blitzpay-billing-profiles-panel"
 import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-collections-copilot-panel"
 import { BlitzpayRecurringRevenuePanel } from "@/components/blitzpay/blitzpay-recurring-revenue-panel"
 import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
@@ -67,6 +68,7 @@ export default function FinancialCommandCenterPage() {
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayRecurringRevenuePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayBillingProfilesPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayFinancialCommandCenterPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCashAccountsPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayPayrollDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />

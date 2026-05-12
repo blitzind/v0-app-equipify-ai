@@ -63,6 +63,9 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_cash_account_allocations", select: "id, organization_id, cash_account_id" },
   { name: "blitzpay_cash_reserve_rules", select: "id, organization_id, rule_type" },
   { name: "blitzpay_cash_runway_snapshots", select: "id, organization_id, snapshot_date" },
+  { name: "blitzpay_customer_billing_profiles", select: "id, organization_id, customer_id" },
+  { name: "blitzpay_customer_payment_methods", select: "id, organization_id, customer_id" },
+  { name: "blitzpay_autopay_enrollments", select: "id, organization_id, customer_id" },
 ]
 
 export type BlitzpaySchemaHealthResult =
