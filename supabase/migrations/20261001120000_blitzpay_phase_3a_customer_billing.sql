@@ -1,4 +1,5 @@
--- BlitzPay Phase 3A — customer billing profiles, saved payment method metadata, autopay enrollments.
+-- BlitzPay Phase 2AA — customer billing profiles, saved payment method metadata, autopay enrollments.
+-- Product/docs label: Phase 2AA. Migration filename retains `phase_3a` for historical applied-migration integrity.
 -- Stripe remains vault; only safe metadata + hashed references stored here.
 
 create table if not exists public.blitzpay_customer_billing_profiles (

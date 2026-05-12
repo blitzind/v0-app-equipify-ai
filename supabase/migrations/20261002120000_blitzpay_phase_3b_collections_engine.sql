@@ -1,5 +1,6 @@
--- BlitzPay Phase 3B — invoice collection states, attempts, recovery flows, activity log.
--- Orchestration and metadata only; Stripe remains payment authority; no autonomous charges.
+-- BlitzPay Phase 2AB — invoice collection states, attempts, recovery flows, activity log.
+-- Product/docs label: Phase 2AB (collections orchestration). Migration filename retains `phase_3b` for historical integrity.
+-- This is not enterprise "Phase 3B — Native AP"; orchestration and metadata only; Stripe remains payment authority; no autonomous charges.
 
 create table if not exists public.blitzpay_invoice_collection_states (
   id uuid primary key default gen_random_uuid(),

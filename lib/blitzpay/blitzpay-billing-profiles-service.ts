@@ -9,7 +9,7 @@ import {
   BLITZPAY_AUTOPAY_LIST_CAP,
   BLITZPAY_BILLING_PROFILE_LIST_CAP,
   BLITZPAY_PAYMENT_METHOD_LIST_CAP,
-  BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP,
+  BLITZPAY_PHASE_2AA_REPORTING_PROFILE_CAP,
   type AutopayEnrollmentSource,
   type AutopayEnrollmentStatus,
   type BillingProfileStatus,
@@ -19,7 +19,7 @@ import {
   computeInvoiceCollectionReadiness,
   formatMaskedPaymentMethodLabel,
   hashStripeReference,
-  phase3aReportingRates,
+  phase2aaReportingRates,
 } from "@/lib/blitzpay/blitzpay-billing-profiles"
 import { logBlitzpayServerFailure } from "@/lib/blitzpay/blitzpay-server-failure-log"
 
@@ -93,13 +93,13 @@ function bankBrand(pm: Stripe.PaymentMethod): string | null {
   return "Bank account"
 }
 
-export async function fetchBlitzpayPhase3aReportingRates(admin: SupabaseClient, organizationId: string) {
+export async function fetchBlitzpayPhase2aaReportingRates(admin: SupabaseClient, organizationId: string) {
   assertUuid(organizationId, "organizationId")
   const { data: profiles, error: pErr } = await admin
     .from("blitzpay_customer_billing_profiles")
     .select("id, customer_id, status, autopay_enabled")
     .eq("organization_id", organizationId)
-    .limit(BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP)
+    .limit(BLITZPAY_PHASE_2AA_REPORTING_PROFILE_CAP)
   if (pErr) throw new Error(pErr.message)
   const plist = (profiles ?? []) as Array<{ id: string; customer_id: string; status: string; autopay_enabled: boolean }>
   const profileIds = plist.map((p) => p.id)
@@ -159,7 +159,7 @@ export async function fetchBlitzpayPhase3aReportingRates(admin: SupabaseClient, 
     if (coll === "ready" || coll === "partial") billingReady += 1
   }
 
-  return phase3aReportingRates({
+  return phase2aaReportingRates({
     profileCount: plist.length,
     profilesWithActiveAutopayEnrollment: withAutopay,
     profilesWithSavedMethod: withPm,

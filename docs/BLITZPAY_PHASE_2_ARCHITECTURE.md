@@ -952,21 +952,21 @@ Use this as a **checklist** when coding — not exhaustive.
 | **UX** | Contractor-friendly copy (“Available operating cash”, “Money to reserve”, “Upcoming obligations”) — **no** “bank account” / “insured balance” claims. **Portal:** no cash-planning APIs. |
 | **Tests** | `pnpm test:blitzpay-phase-2z` — migration tables, pure math, double-count guard, runway status, route permission strings, portal exclusion grep, no Stripe id patterns in new panel, schema-health table names, bounded caps. |
 
-### 12.28 Phase 3A (customer billing profiles, saved method metadata, autopay preferences — Stripe vault only)
+### 12.28 Phase 2AA (customer billing profiles, saved method metadata, autopay preferences — Stripe vault only)
 
 | Area | Details |
 |------|---------|
-| **Schema** | `blitzpay_customer_billing_profiles` (per org + customer; status, autopay toggles, delivery preference, billing contact fields, **masked** default method brand/last4/type, optional `stripe_customer_reference_hash`), `blitzpay_customer_payment_methods` (provider `stripe`, `provider_reference_hash`, display metadata, exp, default flag, status), `blitzpay_autopay_enrollments` (one row per billing profile; timing, caps, retry flags, last charge timestamps for future orchestration). RLS: org-member **SELECT** only; mutations through **service-role** org APIs after permission checks. |
-| **Pure libs** | `blitzpay-billing-profiles.ts` — `hashStripeReference`, `formatMaskedPaymentMethodLabel`, `computeAutopayReadinessState`, `computeBillingRiskIndicator`, `computeInvoiceCollectionReadiness`, `phase3aReportingRates`, `redactStripeLikeStrings`, explicit list caps. |
+| **Schema** | `blitzpay_customer_billing_profiles` (per org + customer; status, autopay toggles, delivery preference, billing contact fields, **masked** default method brand/last4/type, optional `stripe_customer_reference_hash`), `blitzpay_customer_payment_methods` (provider `stripe`, `provider_reference_hash`, display metadata, exp, default flag, status), `blitzpay_autopay_enrollments` (one row per billing profile; timing, caps, retry flags, last charge timestamps for future orchestration). RLS: org-member **SELECT** only; mutations through **service-role** org APIs after permission checks. **Migration file:** `20261001120000_blitzpay_phase_3a_customer_billing.sql` — filename retains `phase_3a` for historical applied-migration integrity; docs/product label **Phase 2AA**. |
+| **Pure libs** | `blitzpay-billing-profiles.ts` — `hashStripeReference`, `formatMaskedPaymentMethodLabel`, `computeAutopayReadinessState`, `computeBillingRiskIndicator`, `computeInvoiceCollectionReadiness`, `phase2aaReportingRates`, `redactStripeLikeStrings`, explicit list caps. |
 | **Server** | `blitzpay-billing-profiles-service.ts` — bounded lists, profile upsert/update, autopay upsert, **Stripe list/retrieve for metadata sync only** (no PaymentIntent charges, no Subscription/Invoice auto-debit in this phase). |
 | **Org APIs** | `GET/POST …/blitzpay/billing-profiles`, `PATCH …/billing-profiles/[id]`, `GET …/blitzpay/payment-methods`, `POST …/payment-methods/sync`, `GET/POST …/blitzpay/autopay`, `PATCH …/autopay/[id]` — all gated with `blitzpaySchemaGuardNextResponse` + financial/billing permissions (`requireAnyOrgPermission` on writes). |
 | **Portal** | `GET /api/portal/billing/payment-methods` — masked labels + type + default + status **only** (no DB ids, no Stripe ids). `GET/POST /api/portal/billing/autopay` — minimal enrollment status + customer toggle **active/paused** with ownership check on `billing_profile_id`. **No** treasury, reserves, staff reporting, or internal collections tools. |
-| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `autopayEnrollmentRate`, `savedPaymentMethodRate`, `billingReadinessRate`, `delinquencyRiskRate` from capped profile scans (`fetchBlitzpayPhase3aReportingRates`). |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `autopayEnrollmentRate`, `savedPaymentMethodRate`, `billingReadinessRate`, `delinquencyRiskRate` from capped profile scans (`fetchBlitzpayPhase2aaReportingRates`). |
 | **UX** | `BlitzpayBillingProfilesPanel` — Settings → Payments (`#blitzpay-billing-profiles-anchor`) + Insights → Financial command center; disclosure that full credentials stay in Stripe. |
 | **Env** | Optional `BLITZPAY_STRIPE_REF_PEPPER` — strengthens `provider_reference_hash` / customer reference hash in production (document in `.env.local.example`). |
-| **Tests** | `pnpm test:blitzpay-phase-3a` — migration + RLS markers, pure helpers, caps, route guards, portal payload shape, schema-health table names, reporting fields, no raw Stripe substrings in portal map. |
+| **Tests** | `pnpm test:blitzpay-phase-2aa` — migration header + RLS markers, pure helpers, caps, route guards, portal payload shape, schema-health table names, reporting fields, no raw Stripe substrings in portal map. |
 
-#### Manual test checklist (Phase 3A)
+#### Manual test checklist (Phase 2AA)
 
 1. Staff (billing/financial): **Settings → Payments** — billing profiles panel loads; create/ensure profile; **Sync from Stripe** returns counts or clear precondition message when Connect customer missing.  
 2. **Insights → Financial command center** — same panel visible; masked labels match Stripe test cards where applicable.  
@@ -974,26 +974,58 @@ Use this as a **checklist** when coding — not exhaustive.
 4. Portal session: **GET** payment-methods and autopay — only masked / minimal fields; toggling autopay for another customer’s profile returns **403**.  
 5. Confirm UI copy includes Stripe vault disclosure; no `pm_` / `cus_` strings in network responses for portal billing routes.
 
-### 12.29 Phase 3B (invoice collections engine — deterministic orchestration, no autonomous outreach)
+### 12.29 Phase 2AB (invoice collections engine — deterministic orchestration, no autonomous outreach)
 
 | Area | Details |
 |------|---------|
-| **Schema** | `blitzpay_invoice_collection_states` (per invoice; status, retry counters, `next_retry_at`, failure categories, escalation level, pause flags), `blitzpay_collection_attempts` (orchestration + optional hashed PI reference), `blitzpay_collection_recovery_flows`, `blitzpay_collection_activity_log`. RLS: org-member **SELECT**; writes via **service-role** org APIs after authz. |
-| **Pure libs** | `blitzpay-collections-engine.ts` — capped retry day offsets **1 / 3 / 7 / 14**, `MAX_DETERMINISTIC_RETRY_SLOTS`, `MAX_PAYMENT_ATTEMPT_COUNT`, eligibility, escalation, health score, `phase3bReportingMetrics`, human labels, **no I/O**. |
+| **Schema** | `blitzpay_invoice_collection_states` (per invoice; status, retry counters, `next_retry_at`, failure categories, escalation level, pause flags), `blitzpay_collection_attempts` (orchestration + optional hashed PI reference), `blitzpay_collection_recovery_flows`, `blitzpay_collection_activity_log`. RLS: org-member **SELECT**; writes via **service-role** org APIs after authz. **Migration file:** `20261002120000_blitzpay_phase_3b_collections_engine.sql` — filename retains `phase_3b` for historical integrity; docs/product label **Phase 2AB** (not enterprise Phase 3B AP). |
+| **Pure libs** | `blitzpay-collections-engine.ts` — capped retry day offsets **1 / 3 / 7 / 14**, `MAX_DETERMINISTIC_RETRY_SLOTS`, `MAX_PAYMENT_ATTEMPT_COUNT`, eligibility, escalation, health score, `phase2abReportingMetrics`, human labels, **no I/O**. |
 | **Server** | `blitzpay-collections-service.ts` — bounded lists, `syncCollectionMetadataFromPaymentIntents` (reads **local** `blitzpay_payment_intents` only), staff schedule/pause/resume/resolve/mark-uncollectible, activity append. **No** email/SMS send, **no** Stripe charge API calls. |
 | **Org APIs** | `GET …/blitzpay/collections` (summary + states + activity), `GET …/collections/attempts`, `GET …/collections/recovery-flows`, `POST …/collections/retry|pause|resume|resolve|mark-uncollectible` — schema guard + `requireAnyOrgPermission`. |
 | **Portal** | `GET /api/portal/billing/invoices`, `GET /api/portal/billing/payment-status`, `/portal/billing` page — **no** internal escalation math, **no** raw Stripe ids; optional pause autopay uses `billingProfileId` from portal autopay GET. |
 | **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `collectionSuccessRate`, `retryRecoveryRate`, `failedPaymentRate`, `delinquencyRate`, `recoveryFlowCompletionRate`, `averageRecoveryDurationDays` (best-effort; migration optional). |
 | **UX** | `BlitzpayCollectionsEnginePanel` — Settings → Payments (`#blitzpay-collections-engine-anchor`) + Financial command center; calm copy (“Collection rhythm”, “Follow-up scheduled”). |
-| **Tests** | `pnpm test:blitzpay-phase-3b` — migration markers, retry caps, route guards, portal isolation strings, schema-health tables, reporting fields. |
+| **Tests** | `pnpm test:blitzpay-phase-2ab` — migration header, retry caps, route guards, portal isolation strings, schema-health tables, reporting fields. |
 
-#### Manual test checklist (Phase 3B)
+#### Manual test checklist (Phase 2AB)
 
 1. Staff: **Settings → Payments** — Collection rhythm panel loads; **Schedule follow-up** on a tracked invoice returns **200** or **409** when caps apply; **Pause / Resume / Settled / Not collectible** update activity feed.  
 2. **Insights → Financial command center** — same panel renders.  
 3. Portal: **`/portal/billing`** — summary + invoice list; pause autopay when enrollment exists.  
 4. Confirm **no** autonomous messages sent from these routes; network responses contain **no** `pm_` / `cus_` tails in new portal billing payloads.
 
+### 12.30 BlitzPay roadmap — phase series + Phase 3 enterprise (planned)
+
+**Phase series (product language):**
+
+- **Phase 2** = Stripe-backed payments, billing, treasury visibility, payroll/payout, cash planning, recurring/membership signals, **Phase 2AA** (customer billing profiles, saved payment methods, autopay foundations), **Phase 2AB** (deterministic collections orchestration on top of Connect + local mirrors) — movement- and processor-centric, not a full accounting system.
+- **Phase 3** = native **enterprise financial operations / contractor-native accounting** layer — **planned** in this document; not implied by historical migration filenames `phase_3a` / `phase_3b` (those map to **2AA** / **2AB** above).
+- **Phase 4** = deterministic-first **AI-assisted** financial operations.
+- **Phase 5** = **network / ecosystem** expansion.
+- **Phase 6** = **mobile / scale / observability** maturity.
+
+#### Phase 3A — General Ledger & Accounting Engine (planned)
+
+**Adds:** chart of accounts; double-entry ledger; journal entries; deferred revenue; revenue recognition; membership accrual accounting; AP/AR balancing; treasury reconciliation; payroll liabilities.
+
+**Outcome:** BlitzPay evolves from payments orchestration into **contractor-native accounting infrastructure** (still layered on truth from Stripe/Connect where movement occurs).
+
+#### Phase 3B — Native AP Automation & Bill Pay (planned)
+
+**Adds:** OCR invoice intake; vendor bill ingestion; approval routing; scheduled pay runs; bill-pay automation; purchase-order reconciliation; AP cash optimization.
+
+#### Phase 3C — Tax & Compliance Engine (planned)
+
+**Adds:** sales tax engine; multi-state rules; contractor tax handling; 1099 preparation; payroll tax estimates; convenience-fee compliance rules; ACH authorization retention; audit trails.
+
+#### Phase 3D — Native Financing Marketplace (planned)
+
+**Adds:** financing provider marketplace; customer financing approvals; equipment financing; membership financing; instant qualification; revenue-share financing logic; contractor cash-advance models.
+
+#### Phase 3E — Procurement & Inventory Finance (planned)
+
+**Adds:** inventory valuation; parts margin tracking; vendor rebate programs; automated reorder forecasting; purchase financing; serialized asset financial tracking.
+
 ---
 
-*Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*
+*Phase 2A–2T plus **Phase 2AA–2AB** (customer billing profiles + saved payment metadata + autopay foundations; deterministic invoice collections orchestration) vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases. **Phase 3A–3E** enterprise accounting/AP/tax/financing/procurement roadmap is §12.30 (planned).*

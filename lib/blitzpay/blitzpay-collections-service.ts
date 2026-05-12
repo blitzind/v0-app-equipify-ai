@@ -8,7 +8,7 @@ import {
   BLITZPAY_COLLECTION_ATTEMPT_LIST_CAP,
   BLITZPAY_COLLECTION_FLOW_LIST_CAP,
   BLITZPAY_COLLECTION_STATE_LIST_CAP,
-  BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP,
+  BLITZPAY_PHASE_2AB_REPORTING_SCAN_CAP,
   type CollectionStateStatus,
   computeCollectionHealthBand,
   computeCollectionHealthScore0to100,
@@ -18,7 +18,7 @@ import {
   computeRetryEligibility,
   deriveCollectionStatusFromInvoice,
   humanCollectionStatusLabel,
-  phase3bReportingMetrics,
+  phase2abReportingMetrics,
   categorizePaymentFailure,
   MAX_DETERMINISTIC_RETRY_SLOTS,
   MAX_PAYMENT_ATTEMPT_COUNT,
@@ -109,21 +109,21 @@ async function appendActivity(
   if (error) throw new Error(error.message)
 }
 
-export async function fetchBlitzpayPhase3bCollectionReporting(admin: SupabaseClient, organizationId: string) {
+export async function fetchBlitzpayPhase2abCollectionReporting(admin: SupabaseClient, organizationId: string) {
   assertUuid(organizationId, "organizationId")
   const { data: states, error: sErr } = await admin
     .from("blitzpay_invoice_collection_states")
     .select("collection_status, failed_attempt_count")
     .eq("organization_id", organizationId)
-    .limit(BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP)
+    .limit(BLITZPAY_PHASE_2AB_REPORTING_SCAN_CAP)
   if (sErr) throw new Error(sErr.message)
   const { data: flows, error: fErr } = await admin
     .from("blitzpay_collection_recovery_flows")
     .select("flow_status, resolved_at, created_at")
     .eq("organization_id", organizationId)
-    .limit(BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP)
+    .limit(BLITZPAY_PHASE_2AB_REPORTING_SCAN_CAP)
   if (fErr) throw new Error(fErr.message)
-  return phase3bReportingMetrics({
+  return phase2abReportingMetrics({
     collectionStates: (states ?? []) as Array<{ collection_status: string; failed_attempt_count: number }>,
     recoveryFlows: (flows ?? []) as Array<{ flow_status: string; resolved_at: string | null; created_at: string }>,
   })

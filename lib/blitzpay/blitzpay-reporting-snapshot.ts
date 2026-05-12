@@ -11,8 +11,8 @@ import { fetchBlitzpayMembershipReportingSlice } from "@/lib/blitzpay/blitzpay-m
 import { summarizeBlitzpayBalanceTransactions } from "@/lib/blitzpay/blitzpay-reconciliation-math"
 import { summarizePayrollHealth } from "@/lib/blitzpay/blitzpay-payroll-runs"
 import { deriveBlitzpayCashPlanningMetrics, type BlitzpayCashReserveRuleInput } from "@/lib/blitzpay/blitzpay-cash-accounts"
-import { fetchBlitzpayPhase3aReportingRates } from "@/lib/blitzpay/blitzpay-billing-profiles-service"
-import { fetchBlitzpayPhase3bCollectionReporting } from "@/lib/blitzpay/blitzpay-collections-service"
+import { fetchBlitzpayPhase2aaReportingRates } from "@/lib/blitzpay/blitzpay-billing-profiles-service"
+import { fetchBlitzpayPhase2abCollectionReporting } from "@/lib/blitzpay/blitzpay-collections-service"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -136,12 +136,12 @@ export type BlitzpayOrgReportingSnapshot = {
   cashRunwayStatus: "healthy" | "watch" | "risk"
   payrollReserveCoverageBasisPoints: number
   apReserveCoverageBasisPoints: number
-  /** Phase 3A — customer billing profiles + saved methods + autopay enrollments (bounded; 0–100). */
+  /** Phase 2AA — customer billing profiles + saved methods + autopay enrollments (bounded; 0–100). */
   autopayEnrollmentRate: number
   savedPaymentMethodRate: number
   billingReadinessRate: number
   delinquencyRiskRate: number
-  /** Phase 3B — collections engine snapshot (bounded; 0–100 or days). */
+  /** Phase 2AB — collections engine snapshot (bounded; 0–100 or days). */
   collectionSuccessRate: number
   retryRecoveryRate: number
   failedPaymentRate: number
@@ -678,17 +678,17 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   let recoveryFlowCompletionRate = 0
   let averageRecoveryDurationDays = 0
   try {
-    const r3 = await fetchBlitzpayPhase3aReportingRates(admin, organizationId)
+    const r3 = await fetchBlitzpayPhase2aaReportingRates(admin, organizationId)
     autopayEnrollmentRate = r3.autopayEnrollmentRate
     savedPaymentMethodRate = r3.savedPaymentMethodRate
     billingReadinessRate = r3.billingReadinessRate
     delinquencyRiskRate = r3.delinquencyRiskRate
   } catch {
-    /* Phase 3A tables optional until migration applied */
+    /* Phase 2AA tables optional until migration applied */
   }
 
   try {
-    const r3b = await fetchBlitzpayPhase3bCollectionReporting(admin, organizationId)
+    const r3b = await fetchBlitzpayPhase2abCollectionReporting(admin, organizationId)
     collectionSuccessRate = r3b.collectionSuccessRate
     retryRecoveryRate = r3b.retryRecoveryRate
     failedPaymentRate = r3b.failedPaymentRate
@@ -696,7 +696,7 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     recoveryFlowCompletionRate = r3b.recoveryFlowCompletionRate
     averageRecoveryDurationDays = r3b.averageRecoveryDurationDays
   } catch {
-    /* Phase 3B tables optional until migration applied */
+    /* Phase 2AB tables optional until migration applied */
   }
 
   const cash2z = deriveBlitzpayCashPlanningMetrics({

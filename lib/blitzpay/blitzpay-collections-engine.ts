@@ -1,5 +1,5 @@
 /**
- * BlitzPay Phase 3B — deterministic collections orchestration (pure logic, no I/O).
+ * BlitzPay Phase 2AB — deterministic collections orchestration (pure logic, no I/O).
  * Retry windows are anchored to first failure; caps prevent infinite retries.
  */
 
@@ -7,7 +7,7 @@ export const BLITZPAY_COLLECTION_STATE_LIST_CAP = 100
 export const BLITZPAY_COLLECTION_ATTEMPT_LIST_CAP = 150
 export const BLITZPAY_COLLECTION_FLOW_LIST_CAP = 80
 export const BLITZPAY_COLLECTION_ACTIVITY_LIST_CAP = 120
-export const BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP = 200
+export const BLITZPAY_PHASE_2AB_REPORTING_SCAN_CAP = 200
 
 /** Offsets in days from `first_failure_at` for each automated retry slot (deterministic). */
 export const RETRY_DAY_OFFSETS_FROM_FIRST_FAILURE = [1, 3, 7, 14] as const
@@ -205,7 +205,7 @@ export function buildDeterministicRetryTimeline(firstFailureIso: string | null):
   return out
 }
 
-export function phase3bReportingMetrics(args: {
+export function phase2abReportingMetrics(args: {
   collectionStates: Array<{ collection_status: string; failed_attempt_count: number }>
   recoveryFlows: Array<{ flow_status: string; resolved_at: string | null; created_at: string }>
 }): {

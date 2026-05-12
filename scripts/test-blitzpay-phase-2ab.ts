@@ -1,6 +1,6 @@
 /**
- * BlitzPay Phase 3B — collections engine, deterministic retries, recovery flows (orchestration only).
- * Run: pnpm test:blitzpay-phase-3b
+ * BlitzPay Phase 2AB — collections engine, deterministic retries, recovery flows (orchestration only).
+ * Run: pnpm test:blitzpay-phase-2ab
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -16,7 +16,7 @@ import {
   deriveCollectionStatusFromInvoice,
   MAX_DETERMINISTIC_RETRY_SLOTS,
   MAX_PAYMENT_ATTEMPT_COUNT,
-  phase3bReportingMetrics,
+  phase2abReportingMetrics,
   RETRY_DAY_OFFSETS_FROM_FIRST_FAILURE,
   retryScheduleExhausted,
 } from "../lib/blitzpay/blitzpay-collections-engine"
@@ -31,6 +31,7 @@ function read(rel: string) {
 function testMigration() {
   const p = "supabase/migrations/20261002120000_blitzpay_phase_3b_collections_engine.sql"
   const s = read(p)
+  assert.match(s, /^-- BlitzPay Phase 2AB/m)
   assert.match(s, /blitzpay_invoice_collection_states/)
   assert.match(s, /blitzpay_collection_attempts/)
   assert.match(s, /blitzpay_collection_recovery_flows/)
@@ -85,7 +86,7 @@ function testDeriveStatus() {
 }
 
 function testReportingMetrics() {
-  const m = phase3bReportingMetrics({
+  const m = phase2abReportingMetrics({
     collectionStates: [
       { collection_status: "resolved", failed_attempt_count: 1 },
       { collection_status: "failed", failed_attempt_count: 2 },
@@ -118,7 +119,7 @@ function testOrgApisGated() {
 function testServiceBounded() {
   const svc = read("lib/blitzpay/blitzpay-collections-service.ts")
   assert.match(svc, /\.limit\(BLITZPAY_COLLECTION_STATE_LIST_CAP\)/)
-  assert.match(svc, /BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP/)
+  assert.match(svc, /BLITZPAY_PHASE_2AB_REPORTING_SCAN_CAP/)
 }
 
 function testNoStripeInPortalBilling() {
@@ -169,7 +170,7 @@ function main() {
   testReportingSnapshot()
   testStaffPanelNoRawStripe()
   testCapsConstant()
-  console.log("blitzpay phase 3b tests passed")
+  console.log("blitzpay phase 2ab tests passed")
 }
 
 main()

@@ -1,6 +1,6 @@
 /**
- * BlitzPay Phase 3A — billing profiles, saved payment method metadata, autopay enrollments.
- * Run: pnpm test:blitzpay-phase-3a
+ * BlitzPay Phase 2AA — billing profiles, saved payment method metadata, autopay enrollments.
+ * Run: pnpm test:blitzpay-phase-2aa
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -13,7 +13,7 @@ import {
   computeInvoiceCollectionReadiness,
   formatMaskedPaymentMethodLabel,
   hashStripeReference,
-  phase3aReportingRates,
+  phase2aaReportingRates,
   redactStripeLikeStrings,
 } from "../lib/blitzpay/blitzpay-billing-profiles"
 
@@ -27,6 +27,7 @@ function read(rel: string) {
 function testMigration() {
   const p = "supabase/migrations/20261001120000_blitzpay_phase_3a_customer_billing.sql"
   const s = read(p)
+  assert.match(s, /^-- BlitzPay Phase 2AA/m)
   assert.match(s, /blitzpay_customer_billing_profiles/)
   assert.match(s, /blitzpay_customer_payment_methods/)
   assert.match(s, /blitzpay_autopay_enrollments/)
@@ -94,7 +95,7 @@ function testPureHelpers() {
   })
   assert.equal(coll, "not_ready")
 
-  const rates = phase3aReportingRates({
+  const rates = phase2aaReportingRates({
     profileCount: 4,
     profilesWithActiveAutopayEnrollment: 1,
     profilesWithSavedMethod: 2,
@@ -124,7 +125,7 @@ function testBoundedReads() {
   assert.match(svc, /\.limit\(BLITZPAY_BILLING_PROFILE_LIST_CAP\)/)
   assert.match(svc, /\.limit\(BLITZPAY_PAYMENT_METHOD_LIST_CAP\)/)
   assert.match(svc, /\.limit\(BLITZPAY_AUTOPAY_LIST_CAP\)/)
-  assert.match(svc, /\.limit\(BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP\)/)
+  assert.match(svc, /\.limit\(BLITZPAY_PHASE_2AA_REPORTING_PROFILE_CAP\)/)
 }
 
 function testOrgApisGated() {
@@ -193,7 +194,7 @@ function main() {
   testSchemaHealthTables()
   testReportingSnapshotFields()
   testStaffUiNoRawStripeIds()
-  console.log("blitzpay phase 3a tests passed")
+  console.log("blitzpay phase 2aa tests passed")
 }
 
 main()

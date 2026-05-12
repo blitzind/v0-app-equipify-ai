@@ -52,14 +52,14 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 
 **BlitzPay** end-customer invoice payments use **`POST /api/blitzpay/webhook`** and the **Connect** webhook secret (`STRIPE_BLITZPAY_WEBHOOK_SECRET` / env naming per deploy). That path is **separate** from **`POST /api/stripe/webhook`** (SaaS subscriptions). Phase **2O** financing/installment features **do not** add new Stripe event types to the SaaS webhook; future third-party financing integrations must keep **PII and application payloads out of Equipify** and use **opaque provider references** only.
 
-### BlitzPay Phase 3A (billing profiles and payment method metadata)
+### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.
 - **Optional env:** `BLITZPAY_STRIPE_REF_PEPPER` (server-only) — set in **production** to a long random secret so reference hashes are not reversible across environments. Documented in `.env.local.example`.
-- **No new money-movement paths:** Phase 3A does **not** add Checkout, PaymentIntents, subscriptions, or ACH debits; staff “sync” calls **list/retrieve** payment methods for metadata only. Webhook configuration is unchanged from existing BlitzPay Connect setup.
-- **Client exposure:** Portal billing APIs return **masked** labels only; staff UIs must not print raw `pm_` / `cus_` ids from Phase 3A tables (hashes are internal).
+- **No new money-movement paths:** Phase **2AA** does **not** add Checkout, PaymentIntents, subscriptions, or ACH debits; staff “sync” calls **list/retrieve** payment methods for metadata only. Webhook configuration is unchanged from existing BlitzPay Connect setup.
+- **Client exposure:** Portal billing APIs return **masked** labels only; staff UIs must not print raw `pm_` / `cus_` ids from Phase **2AA** tables (hashes are internal).
 
-### BlitzPay Phase 3B (collections engine — orchestration only)
+### BlitzPay Phase 2AB (collections engine — orchestration only)
 
 - **No autonomous collections:** routes record **state + activity** and deterministic **retry windows**; they do **not** send email/SMS or trigger Stripe charges.
 - **Retry caps:** engine constants bound automated retry slots; staff actions log to `blitzpay_collection_activity_log` for auditability.

@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto"
 
-/** Bounded list caps for Phase 3A reads (org staff + reporting). */
+/** Bounded list caps for Phase 2AA reads (org staff + reporting). */
 export const BLITZPAY_BILLING_PROFILE_LIST_CAP = 80
 export const BLITZPAY_PAYMENT_METHOD_LIST_CAP = 200
 export const BLITZPAY_AUTOPAY_LIST_CAP = 120
-export const BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP = 400
+export const BLITZPAY_PHASE_2AA_REPORTING_PROFILE_CAP = 400
 
 const STRIPE_REF_PEPPER = process.env.BLITZPAY_STRIPE_REF_PEPPER ?? "blitzpay_ref_pepper_dev_only"
 
@@ -92,7 +92,7 @@ export function redactStripeLikeStrings<T extends Record<string, unknown>>(row: 
   return out as T
 }
 
-export function phase3aReportingRates(args: {
+export function phase2aaReportingRates(args: {
   profileCount: number
   profilesWithActiveAutopayEnrollment: number
   profilesWithSavedMethod: number
