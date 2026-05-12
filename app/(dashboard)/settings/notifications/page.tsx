@@ -914,6 +914,14 @@ export default function NotificationsPage() {
           </AlertDescription>
         </Alert>
       : null}
+
+      {/* Temporary deploy/render proof — remove after confirming production shows this route */}
+      <p
+        className="mt-2 text-center text-[10px] text-muted-foreground"
+        data-equipify-notifications-settings="v2"
+      >
+        Notifications settings v2
+      </p>
     </div>
   )
 }
