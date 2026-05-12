@@ -3,7 +3,7 @@
 import { Fragment, useState, useRef, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import { BR_STACK_CLEAR_AIDEN } from "@/lib/layout/aiden-safe-area"
-import { cn } from "@/lib/utils"
+import { cn, looksLikeUuid } from "@/lib/utils"
 import type { AdminInvoice, InvoiceStatus } from "@/lib/mock-data"
 import { INVOICE_STATUS_BADGE_CLASSNAME } from "@/lib/invoices/invoice-status-badge-classes"
 import { useInvoices } from "@/lib/quote-invoice-store"
@@ -20,6 +20,7 @@ import { RestrictedNotice } from "@/components/permissions/restricted-notice"
 import type { updateOrgInvoice } from "@/lib/org-quotes-invoices/repository"
 import {
   buildInvoiceTextualDetailFallback,
+  filterLineItemsForDisplay,
   type QuoteInvoiceLineItem,
 } from "@/lib/org-quotes-invoices/map"
 import type { CatalogListItemRow } from "@/lib/catalog/catalog-line-snapshots"
@@ -393,21 +394,7 @@ function InvoicePreview({
   device: PreviewDevice
   documentBranding: OrganizationDocumentBranding
 }) {
-  const previewLines = useMemo(
-    () =>
-      invoice.lineItems.filter((item) => {
-        const desc = (item.description ?? "").trim()
-        const hasMoney = Math.abs(item.qty * item.unit) > 1e-9
-        return (
-          desc.length > 0 ||
-          hasMoney ||
-          Boolean(item.sku?.trim()) ||
-          Boolean(item.catalog_item_id) ||
-          Boolean(item.item_type?.trim())
-        )
-      }),
-    [invoice.lineItems],
-  )
+  const previewLines = useMemo(() => filterLineItemsForDisplay(invoice.lineItems), [invoice.lineItems])
   const titleText = (invoice.title ?? "").trim()
   const textualFallback = useMemo(
     () => buildInvoiceTextualDetailFallback(invoice),
@@ -579,14 +566,16 @@ function InvoicePreview({
                       {settings.showLineItemNames && (
                         <td className="py-2.5 pr-4">
                           <p className="text-xs text-gray-800 font-medium">{item.description?.trim() ? item.description : "—"}</p>
-                          {settings.showLineItemDescriptions && item.item_type?.trim() ? (
+                          {settings.showLineItemDescriptions &&
+                          item.item_type?.trim() &&
+                          !looksLikeUuid(item.item_type.trim()) ? (
                             <p className="text-[10px] text-gray-400 mt-0.5">{item.item_type.trim()}</p>
                           ) : null}
                         </td>
                       )}
                       {settings.showSku && (
                         <td className="py-2.5 text-[10px] font-mono text-gray-400">
-                          {item.sku?.trim() || "—"}
+                          {item.sku?.trim() && !looksLikeUuid(item.sku.trim()) ? item.sku : "—"}
                         </td>
                       )}
                       {settings.showQty && <td className="py-2.5 text-right text-[10px] text-gray-600">{item.qty}</td>}
@@ -616,22 +605,6 @@ function InvoicePreview({
                       {textualFallback}
                     </td>
                   </tr>
-                ) : titleText ? (
-                  <tr>
-                    <td
-                      colSpan={Math.max(
-                        1,
-                        (settings.showLineItemNames ? 1 : 0) +
-                          (settings.showSku ? 1 : 0) +
-                          (settings.showQty ? 1 : 0) +
-                          (settings.showUnitPrice ? 1 : 0) +
-                          (settings.showTotalPrice ? 1 : 0),
-                      )}
-                      className="py-3 text-[10px] text-gray-500 italic"
-                    >
-                      No structured line items — totals below use the stored invoice amounts. See invoice subject above.
-                    </td>
-                  </tr>
                 ) : (
                   <tr>
                     <td
@@ -645,7 +618,7 @@ function InvoicePreview({
                       )}
                       className="py-4 text-[10px] text-gray-500 italic"
                     >
-                      No line items or invoice description on file — totals reflect the stored invoice amounts.
+                      No line-item rows on file — totals below use the stored invoice amounts.
                     </td>
                   </tr>
                 )}
@@ -4111,21 +4084,7 @@ function ReadOnlyLineItems({
   /** When there are no displayable line items, show notes / instructions / internal notes instead. */
   detailFallback?: string | null
 }) {
-  const displayItems = useMemo(
-    () =>
-      items.filter((item) => {
-        const desc = (item.description ?? "").trim()
-        const hasMoney = Math.abs(item.qty * item.unit) > 1e-9
-        return (
-          desc.length > 0 ||
-          hasMoney ||
-          Boolean(item.sku?.trim()) ||
-          Boolean(item.catalog_item_id) ||
-          Boolean(item.item_type?.trim())
-        )
-      }),
-    [items],
-  )
+  const displayItems = useMemo(() => filterLineItemsForDisplay(items), [items])
 
   return (
     <table className="w-full text-xs">
@@ -4144,7 +4103,7 @@ function ReadOnlyLineItems({
             <tr key={i}>
               <td className="px-3 py-2 text-foreground">
                 <span className="block">{item.description?.trim() ? item.description : "—"}</span>
-                {item.item_type?.trim() ? (
+                {item.item_type?.trim() && !looksLikeUuid(item.item_type.trim()) ? (
                   <span className="block text-[10px] text-muted-foreground mt-0.5">{item.item_type.trim()}</span>
                 ) : null}
               </td>
@@ -4169,7 +4128,7 @@ function ReadOnlyLineItems({
         ) : (
           <tr>
             <td colSpan={5} className="px-3 py-3 text-muted-foreground italic text-center">
-              No structured line items on file — stored invoice total is shown below.
+              No line-item rows on file — stored invoice total is shown below.
             </td>
           </tr>
         )}

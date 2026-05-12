@@ -1,4 +1,5 @@
 import type { AdminInvoice, AdminQuote, InvoiceStatus, QuoteStatus } from "@/lib/mock-data"
+import { looksLikeUuid } from "@/lib/utils"
 import { rowIsArchived } from "@/lib/archive-scope"
 import { quoteRemainingAfterDepositCents } from "@/lib/blitzpay/blitzpay-estimate-deposit-math"
 import type { InvoicePaymentAllocationState } from "@/lib/billing/invoice-payment-allocation"
@@ -116,13 +117,21 @@ export type LineItemJson = {
 
 export type QuoteInvoiceLineItem = LineItemJson
 
-/** Notes / instructions when structured `line_items` JSON is empty or legacy. */
-export function buildInvoiceTextualDetailFallback(inv: {
-  notes?: string | null
-  internalNotes?: string | null
-  invoiceInstructions?: string | null
-}): string | null {
+/** Notes / instructions / optional invoice subject when structured `line_items` JSON is empty or legacy. */
+export function buildInvoiceTextualDetailFallback(
+  inv: {
+    title?: string | null
+    notes?: string | null
+    internalNotes?: string | null
+    invoiceInstructions?: string | null
+  },
+  opts?: { includeInvoiceSubject?: boolean },
+): string | null {
   const parts: string[] = []
+  if (opts?.includeInvoiceSubject) {
+    const subj = inv.title?.trim()
+    if (subj) parts.push(subj)
+  }
   const n = inv.notes?.trim()
   if (n) parts.push(n)
   const ins = inv.invoiceInstructions?.trim()
@@ -147,6 +156,7 @@ function coerceLineItemsArray(raw: unknown): unknown[] | null {
         if (Array.isArray(o.lines)) return o.lines
         if (Array.isArray(o.items)) return o.items
         if (Array.isArray(o.line_items)) return o.line_items
+        if (Array.isArray(o.lineItems)) return o.lineItems
       }
     } catch {
       return null
@@ -158,6 +168,7 @@ function coerceLineItemsArray(raw: unknown): unknown[] | null {
     if (Array.isArray(o.lines)) return o.lines
     if (Array.isArray(o.items)) return o.items
     if (Array.isArray(o.line_items)) return o.line_items
+    if (Array.isArray(o.lineItems)) return o.lineItems
   }
   return null
 }
@@ -183,6 +194,12 @@ function pickLineItemDescription(o: Record<string, unknown>): string {
     o.line_description,
     o.title,
     o.service_description,
+    o.detail,
+    o.Detail,
+    o.text,
+    o.label,
+    o.Line,
+    o.Service,
     refName,
   )
 }
@@ -205,18 +222,44 @@ function pickLineItemQty(o: Record<string, unknown>): number {
 }
 
 function pickLineItemUnitDollars(o: Record<string, unknown>, qty: number): number {
-  const direct = pickNumeric(o.unit, o.unit_price, o.unitPrice, o.rate, o.UnitPrice, o.price, o.unit_amount)
+  const unitFromCentsFields = pickNumeric(o.unitCents, o.unit_cost_cents)
+  if (unitFromCentsFields != null && unitFromCentsFields !== 0) {
+    return unitFromCentsFields / 100
+  }
+
+  const direct = pickNumeric(
+    o.unit,
+    o.unit_price,
+    o.unitPrice,
+    o.rate,
+    o.UnitPrice,
+    o.price,
+    o.unit_amount,
+  )
   if (direct != null && direct !== 0) return direct
 
-  const totalD = pickNumeric(o.amount, o.line_total, o.total, o.lineTotal, o.Amount, o.subtotal, o.line_amount)
+  const totalD = pickNumeric(
+    o.amount,
+    o.line_total,
+    o.total,
+    o.lineTotal,
+    o.Amount,
+    o.subtotal,
+    o.line_amount,
+    o.extended,
+    o.extendedTotal,
+  )
   if (totalD != null && qty > 0) return totalD / qty
 
   const cents = pickNumeric(
+    o.lineTotalCents,
     o.line_total_cents,
     o.amount_cents,
     o.total_cents,
     o.line_amount_cents,
     o.extended_price_cents,
+    o.extended_cents,
+    o.extendedCents,
   )
   if (cents != null && qty > 0) return cents / 100 / qty
 
@@ -234,6 +277,7 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
     const qty = pickLineItemQty(o)
     let unit = pickLineItemUnitDollars(o, qty)
     let description = pickLineItemDescription(o)
+    if (description && looksLikeUuid(description)) description = ""
 
     const lineTotal = qty * unit
     if (!description && lineTotal !== 0) {
@@ -257,8 +301,14 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
     const sku = o.sku
     const itemType = o.item_type
     const unitLabel = o.unit_label
-    if (typeof sku === "string" && sku.trim()) row.sku = sku.trim()
-    if (typeof itemType === "string" && itemType.trim()) row.item_type = itemType.trim()
+    if (typeof sku === "string" && sku.trim()) {
+      const s = sku.trim()
+      if (!looksLikeUuid(s)) row.sku = s
+    }
+    if (typeof itemType === "string" && itemType.trim()) {
+      const t = itemType.trim()
+      if (!looksLikeUuid(t)) row.item_type = t
+    }
     if (typeof unitLabel === "string" && unitLabel.trim()) row.unit_label = unitLabel.trim()
 
     const hasMoney = Math.abs(row.qty * row.unit) > 1e-9
@@ -269,6 +319,21 @@ export function parseLineItems(raw: unknown): LineItemJson[] {
     out.push(row)
   }
   return out
+}
+
+/** Line items suitable for invoice/quote tables and previews (non-trivial description, money, sku, catalog, or type). */
+export function filterLineItemsForDisplay(items: QuoteInvoiceLineItem[]): QuoteInvoiceLineItem[] {
+  return items.filter((item) => {
+    const desc = (item.description ?? "").trim()
+    const hasMoney = Math.abs(item.qty * item.unit) > 1e-9
+    return (
+      desc.length > 0 ||
+      hasMoney ||
+      Boolean(item.sku?.trim()) ||
+      Boolean(item.catalog_item_id) ||
+      Boolean(item.item_type?.trim())
+    )
+  })
 }
 
 export function quoteStatusDbToUi(s: string): QuoteStatus {
