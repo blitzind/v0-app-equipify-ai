@@ -1,6 +1,6 @@
 import "server-only"
 
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 import {
   WORKSPACE_ALERT_TYPES,
   getWorkspaceAlertEntry,
@@ -28,6 +28,36 @@ export type DigestSettingsDto = {
 export type OrganizationNotificationSettingsBundle = {
   preferences: NotificationPreferenceDto[]
   digest: DigestSettingsDto
+}
+
+/** True when both notification tables are available for read/write (false if migration not applied or schema drift). */
+export type FetchNotificationSettingsBundleResult = {
+  data: OrganizationNotificationSettingsBundle | null
+  error: Error | null
+  persistenceReady: boolean
+}
+
+export function looksLikeMissingNotificationTablesError(err: { message?: string; code?: string } | null): boolean {
+  if (!err) return false
+  const m = String(err.message ?? "").toLowerCase()
+  const code = String(err.code ?? "")
+  if (code === "42P01" || code === "PGRST205" || code === "42703") return true
+  if (m.includes("schema cache") && m.includes("could not find")) return true
+  if (m.includes("does not exist") && (m.includes("relation") || m.includes("column"))) return true
+  if (
+    m.includes("organization_notification_preferences") ||
+    m.includes("organization_notification_digest")
+  ) {
+    return m.includes("does not exist") || m.includes("could not find")
+  }
+  return false
+}
+
+export function defaultNotificationSettingsBundle(): OrganizationNotificationSettingsBundle {
+  return {
+    preferences: mergePreferenceDtos(null),
+    digest: normalizeDigestRow(null),
+  }
 }
 
 function defaultPreferenceDto(alertType: WorkspaceAlertType): NotificationPreferenceDto {
@@ -93,7 +123,7 @@ export function normalizeDigestRow(row: DigestRow | null): DigestSettingsDto {
 export async function fetchOrganizationNotificationSettingsBundle(
   client: SupabaseClient,
   organizationId: string,
-): Promise<{ data: OrganizationNotificationSettingsBundle | null; error: Error | null }> {
+): Promise<FetchNotificationSettingsBundleResult> {
   const [prefsRes, digestRes] = await Promise.all([
     client
       .from("organization_notification_preferences")
@@ -108,19 +138,58 @@ export async function fetchOrganizationNotificationSettingsBundle(
       .maybeSingle(),
   ])
 
-  if (prefsRes.error) return { data: null, error: new Error(prefsRes.error.message) }
-  if (digestRes.error) return { data: null, error: new Error(digestRes.error.message) }
+  let persistenceReady = true
+  let prefsRows: { alert_type: string; in_app_enabled: boolean; email_enabled: boolean; sms_enabled: boolean }[] | null =
+    null
+  let digestRow: DigestRow | null = null
+
+  if (prefsRes.error) {
+    if (looksLikeMissingNotificationTablesError(prefsRes.error)) {
+      console.warn("[notification-preferences] organization_notification_preferences unavailable; using defaults.", {
+        organizationId,
+        code: prefsRes.error.code,
+      })
+      persistenceReady = false
+      prefsRows = null
+    } else {
+      return {
+        data: null,
+        error: new Error(prefsRes.error.message),
+        persistenceReady: false,
+      }
+    }
+  } else {
+    prefsRows = prefsRes.data as
+      | { alert_type: string; in_app_enabled: boolean; email_enabled: boolean; sms_enabled: boolean }[]
+      | null
+  }
+
+  if (digestRes.error) {
+    if (looksLikeMissingNotificationTablesError(digestRes.error)) {
+      console.warn("[notification-preferences] organization_notification_digest_settings unavailable; using defaults.", {
+        organizationId,
+        code: digestRes.error.code,
+      })
+      persistenceReady = false
+      digestRow = null
+    } else {
+      return {
+        data: null,
+        error: new Error(digestRes.error.message),
+        persistenceReady: false,
+      }
+    }
+  } else {
+    digestRow = digestRes.data as DigestRow | null
+  }
 
   return {
     data: {
-      preferences: mergePreferenceDtos(
-        prefsRes.data as
-          | { alert_type: string; in_app_enabled: boolean; email_enabled: boolean; sms_enabled: boolean }[]
-          | null,
-      ),
-      digest: normalizeDigestRow(digestRes.data as DigestRow | null),
+      preferences: mergePreferenceDtos(prefsRows),
+      digest: normalizeDigestRow(digestRow),
     },
     error: null,
+    persistenceReady,
   }
 }
 
@@ -128,7 +197,7 @@ export async function upsertOrganizationNotificationPreferences(
   svc: SupabaseClient,
   organizationId: string,
   preferences: NotificationPreferenceDto[],
-): Promise<{ error: Error | null }> {
+): Promise<{ error: PostgrestError | null }> {
   const rows = preferences.map((p) => ({
     organization_id: organizationId,
     alert_type: p.alertType,
@@ -139,15 +208,14 @@ export async function upsertOrganizationNotificationPreferences(
   const { error } = await svc.from("organization_notification_preferences").upsert(rows, {
     onConflict: "organization_id,alert_type",
   })
-  if (error) return { error: new Error(error.message) }
-  return { error: null }
+  return { error }
 }
 
 export async function upsertOrganizationDigestSettings(
   svc: SupabaseClient,
   organizationId: string,
   digest: DigestSettingsDto,
-): Promise<{ error: Error | null }> {
+): Promise<{ error: PostgrestError | null }> {
   const { error } = await svc.from("organization_notification_digest_settings").upsert(
     {
       organization_id: organizationId,
@@ -160,6 +228,5 @@ export async function upsertOrganizationDigestSettings(
     },
     { onConflict: "organization_id" },
   )
-  if (error) return { error: new Error(error.message) }
-  return { error: null }
+  return { error }
 }

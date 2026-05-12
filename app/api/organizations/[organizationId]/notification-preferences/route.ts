@@ -5,6 +5,7 @@ import { getServiceRoleOrNull } from "@/lib/aiden/prepared-actions/prepared-acti
 import { requireOrgMemberSession, requireOrgPermission } from "@/lib/api/require-org-permission"
 import {
   fetchOrganizationNotificationSettingsBundle,
+  looksLikeMissingNotificationTablesError,
   upsertOrganizationDigestSettings,
   upsertOrganizationNotificationPreferences,
   type DigestSettingsDto,
@@ -33,6 +34,13 @@ function serializeBundle(bundle: OrganizationNotificationSettingsBundle) {
       quietHoursStartLocal: bundle.digest.quietHoursStartLocal,
       quietHoursEndLocal: bundle.digest.quietHoursEndLocal,
     },
+  }
+}
+
+function notificationPreferencesJsonResponse(bundle: OrganizationNotificationSettingsBundle, persistenceReady: boolean) {
+  return {
+    ...serializeBundle(bundle),
+    meta: { persistenceReady },
   }
 }
 
@@ -147,13 +155,17 @@ export async function GET(
 
   const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
   if (loaded.error || !loaded.data) {
+    console.error("[notification-preferences GET]", {
+      organizationId,
+      message: loaded.error?.message ?? "no data",
+    })
     return NextResponse.json(
       { error: "query_failed", message: "Could not load notification settings." },
       { status: 500 },
     )
   }
 
-  return NextResponse.json(serializeBundle(loaded.data))
+  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady))
 }
 
 export async function PATCH(
@@ -187,6 +199,21 @@ export async function PATCH(
     const ordered = orderPreferences(body.preferences)
     const up = await upsertOrganizationNotificationPreferences(svc, organizationId, ordered)
     if (up.error) {
+      console.error("[notification-preferences PATCH] preferences upsert", {
+        organizationId,
+        code: up.error.code,
+        message: up.error.message,
+      })
+      if (looksLikeMissingNotificationTablesError(up.error)) {
+        return NextResponse.json(
+          {
+            error: "not_configured",
+            message:
+              "Notification preference storage is not set up on this server yet. Ask an administrator to apply the latest database migration, then try again.",
+          },
+          { status: 503 },
+        )
+      }
       return NextResponse.json(
         { error: "update_failed", message: "Could not save notification preferences." },
         { status: 500 },
@@ -205,6 +232,21 @@ export async function PATCH(
     }
     const upD = await upsertOrganizationDigestSettings(svc, organizationId, digest)
     if (upD.error) {
+      console.error("[notification-preferences PATCH] digest upsert", {
+        organizationId,
+        code: upD.error.code,
+        message: upD.error.message,
+      })
+      if (looksLikeMissingNotificationTablesError(upD.error)) {
+        return NextResponse.json(
+          {
+            error: "not_configured",
+            message:
+              "Notification preference storage is not set up on this server yet. Ask an administrator to apply the latest database migration, then try again.",
+          },
+          { status: 503 },
+        )
+      }
       return NextResponse.json(
         { error: "update_failed", message: "Could not save digest settings." },
         { status: 500 },
@@ -214,11 +256,15 @@ export async function PATCH(
 
   const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
   if (loaded.error || !loaded.data) {
+    console.error("[notification-preferences PATCH] reload after save", {
+      organizationId,
+      message: loaded.error?.message ?? "no data",
+    })
     return NextResponse.json(
       { error: "query_failed", message: "Saved, but settings could not be reloaded." },
       { status: 500 },
     )
   }
 
-  return NextResponse.json(serializeBundle(loaded.data))
+  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady))
 }

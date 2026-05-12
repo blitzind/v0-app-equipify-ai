@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Bell, Mail, Smartphone, Monitor, Loader2 } from "lucide-react"
+import { Bell, Mail, Smartphone, Monitor, Loader2, Info } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
-import { WORKSPACE_ALERT_REGISTRY, type WorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
+import { WORKSPACE_ALERT_REGISTRY, WORKSPACE_ALERT_TYPES, type WorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
 import { cn } from "@/lib/utils"
 
 const TIMES = [
@@ -36,6 +36,40 @@ type ApiDigest = {
 type ApiBundle = {
   preferences: ApiPreference[]
   digest: ApiDigest
+}
+
+type ApiResponse = ApiBundle & {
+  message?: string
+  error?: string
+  meta?: { persistenceReady?: boolean }
+}
+
+function isValidPreferencesPayload(prefs: unknown): prefs is ApiPreference[] {
+  return (
+    Array.isArray(prefs) &&
+    prefs.length === WORKSPACE_ALERT_TYPES.length &&
+    prefs.every(
+      (p) =>
+        p &&
+        typeof p === "object" &&
+        typeof (p as ApiPreference).alertType === "string" &&
+        typeof (p as ApiPreference).inAppEnabled === "boolean" &&
+        typeof (p as ApiPreference).emailEnabled === "boolean",
+    )
+  )
+}
+
+function isValidDigestPayload(d: unknown): d is ApiDigest {
+  if (!d || typeof d !== "object") return false
+  const x = d as Record<string, unknown>
+  return (
+    typeof x.digestEnabled === "boolean" &&
+    (x.digestFrequency === "daily" || x.digestFrequency === "weekly") &&
+    typeof x.digestTimeLocal === "string" &&
+    typeof x.quietHoursEnabled === "boolean" &&
+    (x.quietHoursStartLocal === null || typeof x.quietHoursStartLocal === "string") &&
+    (x.quietHoursEndLocal === null || typeof x.quietHoursEndLocal === "string")
+  )
 }
 
 function Toggle({
@@ -91,6 +125,9 @@ export default function NotificationsPage() {
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { status: permStatus, has } = useOrgPermissions()
   const canEdit = permStatus === "ready" && has("canManageWorkspaceSettings")
+  const [persistenceReady, setPersistenceReady] = useState(true)
+
+  const canMutate = useMemo(() => canEdit && persistenceReady, [canEdit, persistenceReady])
 
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error" | "ready">("idle")
   const [loadMessage, setLoadMessage] = useState<string | null>(null)
@@ -108,14 +145,19 @@ export default function NotificationsPage() {
 
   const digest = bundle?.digest
 
-  const applyBundle = useCallback((b: ApiBundle) => {
-    setBundle(b)
+  const applyApiNotificationResponse = useCallback((json: ApiResponse) => {
+    if (!isValidPreferencesPayload(json.preferences) || !isValidDigestPayload(json.digest)) {
+      throw new Error("Invalid response from server.")
+    }
+    setBundle({ preferences: json.preferences, digest: json.digest })
+    setPersistenceReady(json.meta?.persistenceReady !== false)
   }, [])
 
   const load = useCallback(async () => {
     if (orgStatus !== "ready" || !organizationId) {
       setLoadState("idle")
       setBundle(null)
+      setPersistenceReady(true)
       return
     }
     abortRef.current?.abort()
@@ -127,14 +169,14 @@ export default function NotificationsPage() {
       const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
         signal: ac.signal,
       })
-      const json = (await res.json().catch(() => null)) as ApiBundle & { message?: string; error?: string }
+      const json = (await res.json().catch(() => null)) as ApiResponse | null
       if (!res.ok) {
         throw new Error(typeof json?.message === "string" ? json.message : "Could not load notification settings.")
       }
-      if (!json?.preferences || !json?.digest) {
+      if (!json) {
         throw new Error("Invalid response from server.")
       }
-      applyBundle(json as ApiBundle)
+      applyApiNotificationResponse(json)
       setLoadState("ready")
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return
@@ -143,7 +185,7 @@ export default function NotificationsPage() {
       setLoadState("error")
       setBundle(null)
     }
-  }, [applyBundle, organizationId, orgStatus])
+  }, [applyApiNotificationResponse, organizationId, orgStatus])
 
   useEffect(() => {
     void load()
@@ -160,14 +202,14 @@ export default function NotificationsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         })
-        const json = (await res.json().catch(() => null)) as ApiBundle & { message?: string }
+        const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!res.ok) {
           throw new Error(typeof json?.message === "string" ? json.message : "Could not save settings.")
         }
-        if (!json?.preferences || !json?.digest) {
+        if (!json) {
           throw new Error("Invalid response from server.")
         }
-        applyBundle(json as ApiBundle)
+        applyApiNotificationResponse(json)
         toast({ title: "Saved", description: "Workspace notification settings were updated." })
       } catch (e) {
         setBundle(rollback)
@@ -177,12 +219,12 @@ export default function NotificationsPage() {
         setSaving(false)
       }
     },
-    [applyBundle, organizationId, toast],
+    [applyApiNotificationResponse, organizationId, toast],
   )
 
   const updatePreferenceChannel = useCallback(
     async (alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
-      if (!bundle || !canEdit || saving) return
+      if (!bundle || !canMutate || saving) return
       const rollback = bundle
       const nextPrefs = bundle.preferences.map((p) =>
         p.alertType === alertType ?
@@ -197,17 +239,17 @@ export default function NotificationsPage() {
       setBundle({ ...bundle, preferences: nextPrefs })
       await patch({ preferences: preferencesPayload(nextPrefs), digest: bundle.digest }, rollback)
     },
-    [bundle, canEdit, patch, saving],
+    [bundle, canMutate, patch, saving],
   )
 
   const updateDigest = useCallback(
     async (nextDigest: ApiDigest) => {
-      if (!bundle || !canEdit || saving) return
+      if (!bundle || !canMutate || saving) return
       const rollback = bundle
       setBundle({ ...bundle, digest: nextDigest })
       await patch({ preferences: preferencesPayload(bundle.preferences), digest: nextDigest }, rollback)
     },
-    [bundle, canEdit, patch, saving],
+    [bundle, canMutate, patch, saving],
   )
 
   const showMatrix = loadState === "ready" && bundle
@@ -221,8 +263,8 @@ export default function NotificationsPage() {
             <h2 className="text-lg font-semibold text-foreground">Notification preferences</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose which workspace alerts should be sent in-app, by email, or by SMS. Internal escalation rules and the
-            AI Ops digest below use their own saved settings.
+            Choose which workspace alerts your team receives and how they are delivered. Escalation rules and the AI Ops
+            digest below are configured separately.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
@@ -248,11 +290,34 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
+      {loadState === "ready" && bundle && !persistenceReady ?
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Database setup needed</AlertTitle>
+          <AlertDescription>
+            Preferences cannot be saved on this server until the latest database migration is applied. You can still review
+            the default options below. Ask your workspace administrator or hosting provider to run migrations.
+          </AlertDescription>
+        </Alert>
+      : null}
+
+      {permStatus === "ready" && !canEdit && bundle && persistenceReady ?
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>View only</AlertTitle>
+          <AlertDescription>
+            You can see this workspace&apos;s notification settings. Only members who manage workspace settings can change
+            them.
+          </AlertDescription>
+        </Alert>
+      : null}
+
       <Alert>
         <Smartphone className="h-4 w-4" />
         <AlertTitle>SMS alerts are not active yet.</AlertTitle>
         <AlertDescription>
-          In-app and email toggles are saved for your workspace. SMS switches stay off until SMS delivery is enabled.
+          In-app and email choices are saved for your workspace. SMS stays off until SMS delivery is enabled for these
+          alerts.
         </AlertDescription>
       </Alert>
 
@@ -261,8 +326,7 @@ export default function NotificationsPage() {
         <div className="border-b border-border px-4 py-4 sm:px-6">
           <h3 className="text-sm font-semibold text-foreground">Alert preferences</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Workspace members still receive in-app notifications according to these toggles; delivery jobs will read this
-            table in a later release.
+            Turn channels on or off for each kind of alert. Changes apply to this workspace.
           </p>
         </div>
 
@@ -309,7 +373,7 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
-                const busy = saving || !canEdit
+                const busy = saving || !canMutate
                 return (
                   <div key={row.alertType} className="space-y-3 px-4 py-4">
                     <div className="flex min-w-0 items-start gap-3">
@@ -362,7 +426,7 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
-                const busy = saving || !canEdit
+                const busy = saving || !canMutate
                 return (
                   <div
                     key={row.alertType}
@@ -418,7 +482,7 @@ export default function NotificationsPage() {
             <Toggle
               aria-label="Email digest enabled"
               checked={digest.digestEnabled}
-              disabled={saving || !canEdit || !bundle}
+              disabled={saving || !canMutate || !bundle}
               onChange={(v) => {
                 if (!bundle) return
                 void updateDigest({ ...bundle.digest, digestEnabled: v })
@@ -435,7 +499,7 @@ export default function NotificationsPage() {
                   <button
                     key={freq}
                     type="button"
-                    disabled={saving || !canEdit || !bundle}
+                    disabled={saving || !canMutate || !bundle}
                     onClick={() => {
                       if (!bundle) return
                       void updateDigest({ ...bundle.digest, digestFrequency: freq })
@@ -445,7 +509,7 @@ export default function NotificationsPage() {
                       digest.digestFrequency === freq ?
                         "border-primary bg-primary/8 text-primary"
                       : "border-border text-muted-foreground hover:bg-secondary/60",
-                      saving || !canEdit ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+                      saving || !canMutate ? "cursor-not-allowed opacity-70" : "cursor-pointer",
                     )}
                   >
                     {freq}
@@ -458,7 +522,7 @@ export default function NotificationsPage() {
               <select
                 className="h-9 max-w-full rounded-md border border-border bg-background px-2 text-sm"
                 value={digest.digestTimeLocal}
-                disabled={saving || !canEdit || !bundle}
+                disabled={saving || !canMutate || !bundle}
                 onChange={(e) => {
                   if (!bundle) return
                   void updateDigest({ ...bundle.digest, digestTimeLocal: e.target.value })
@@ -489,7 +553,7 @@ export default function NotificationsPage() {
             <Toggle
               aria-label="Quiet hours enabled"
               checked={digest.quietHoursEnabled}
-              disabled={saving || !canEdit || !bundle}
+              disabled={saving || !canMutate || !bundle}
               onChange={(v) => {
                 if (!bundle) return
                 const d = bundle.digest
@@ -509,7 +573,7 @@ export default function NotificationsPage() {
             <select
               className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
               value={digest.quietHoursStartLocal ?? "22:00"}
-              disabled={saving || !canEdit || !bundle}
+              disabled={saving || !canMutate || !bundle}
               onChange={(e) => {
                 if (!bundle) return
                 void updateDigest({ ...bundle.digest, quietHoursStartLocal: e.target.value })
@@ -525,7 +589,7 @@ export default function NotificationsPage() {
             <select
               className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
               value={digest.quietHoursEndLocal ?? "07:00"}
-              disabled={saving || !canEdit || !bundle}
+              disabled={saving || !canMutate || !bundle}
               onChange={(e) => {
                 if (!bundle) return
                 void updateDigest({ ...bundle.digest, quietHoursEndLocal: e.target.value })
