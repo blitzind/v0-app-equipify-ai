@@ -394,6 +394,22 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     maxRetries: 2,
     confidenceThreshold: null,
   },
+  aiden_prepared_workspace_intent_llm: {
+    id: "aiden_prepared_workspace_intent_llm",
+    label: "AIden prepared workspace intent (LLM assist)",
+    requiredPlan: "core",
+    costTier: "low",
+    modelTier: "fast",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.1,
+    maxOutputTokens: 2048,
+    structuredMode: "json_object",
+    timeoutMs: 45_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://equipify.local/schemas/aiden-prepared-workspace-intent-llm.json",
+  "title": "AIdenPreparedWorkspaceIntentLlm",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actionId", "confidence"],
+  "properties": {
+    "actionId": {
+      "type": "string",
+      "enum": [
+        "create_invoice_from_work_order",
+        "create_quote_from_work_order",
+        "draft_customer_message",
+        "summarize_customer_history",
+        "create_follow_up_task",
+        "schedule_maintenance_visit",
+        "create_maintenance_plan_from_equipment",
+        "create_parts_reorder_request",
+        "prepare_invoice_payment_link",
+        "prepare_quickbooks_invoice_sync",
+        "bulk_invoice_completed_work_orders"
+      ]
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "customerReference": { "type": ["string", "null"], "maxLength": 200 },
+    "equipmentReference": { "type": ["string", "null"], "maxLength": 200 },
+    "workOrderReference": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "enum": ["latest", "latest_completed"], "maxLength": 64 },
+        { "type": "string", "maxLength": 64 }
+      ]
+    },
+    "bulkInvoiceDateRange": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rangeStartIso", "rangeEndIso", "label"],
+          "properties": {
+            "rangeStartIso": { "type": "string", "maxLength": 40 },
+            "rangeEndIso": { "type": "string", "maxLength": 40 },
+            "label": { "type": "string", "maxLength": 120 }
+          }
+        }
+      ]
+    },
+    "suggestedDraftCopy": { "type": ["string", "null"], "maxLength": 8000 },
+    "clarificationQuestion": { "type": ["string", "null"], "maxLength": 500 },
+    "rationale": { "type": ["string", "null"], "maxLength": 1200 }
+  }
+}

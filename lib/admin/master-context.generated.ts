@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 423,
-  sqlMigrations: 182,
-  dashboardPages: 62,
-  componentsTsx: 288,
-  libTsFiles: 683,
+  apiRouteHandlers: 432,
+  sqlMigrations: 185,
+  dashboardPages: 63,
+  componentsTsx: 298,
+  libTsFiles: 754,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **423** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **182** |
-| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **288** |
-| \`lib/**/*.ts\` | **683** |
+| API route handlers (\`app/api/**/route.ts\`) | **432** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **185** |
+| Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **63** |
+| \`components/**/*.tsx\` | **298** |
+| \`lib/**/*.ts\` | **754** |
 
 ### Vercel crons
 
@@ -86,9 +86,18 @@ organizations/[organizationId]/aiden/actions/cancel/route.ts
 organizations/[organizationId]/aiden/actions/confirm/route.ts
 organizations/[organizationId]/aiden/actions/execute/route.ts
 organizations/[organizationId]/aiden/actions/prepare/route.ts
+organizations/[organizationId]/aiden/approval-settings/route.ts
 organizations/[organizationId]/aiden/chat/route.ts
 organizations/[organizationId]/aiden/feature-requests/route.ts
 organizations/[organizationId]/aiden/operational-recommendations/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/audit-log/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/cancel/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/confirm/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/execute/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/preview/route.ts
+organizations/[organizationId]/aiden/prepared-actions/[actionId]/route.ts
+organizations/[organizationId]/aiden/prepared-actions/prepare/route.ts
+organizations/[organizationId]/aiden/prepared-actions/route.ts
 organizations/[organizationId]/aiden/productivity/customer-summary/route.ts
 organizations/[organizationId]/aiden/productivity/draft/route.ts
 organizations/[organizationId]/aiden/productivity/eligibility/route.ts

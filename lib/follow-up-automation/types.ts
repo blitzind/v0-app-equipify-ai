@@ -20,6 +20,8 @@ export const FOLLOW_UP_RULE_KEYS = [
   "equipment_service_overdue",
   "equipment_calibration_due_soon",
   "equipment_warranty_expiring_soon",
+  /** Staff-initiated queue row from AIden prepared workspace action (no auto-send). */
+  "aiden_manual_follow_up",
 ] as const
 
 export type FollowUpRuleKey = (typeof FOLLOW_UP_RULE_KEYS)[number]
@@ -31,6 +33,7 @@ export const FOLLOW_UP_ENTITY_TYPES = [
   "customer",
   "equipment",
   "maintenance_plan",
+  "quote",
 ] as const
 export type FollowUpEntityType = (typeof FOLLOW_UP_ENTITY_TYPES)[number]
 

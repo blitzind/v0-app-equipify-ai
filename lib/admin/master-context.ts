@@ -6,7 +6,7 @@
 import { MCG_SCAN_SECTION } from "./master-context.generated"
 
 /** Updated by `scripts/update-master-context.ts` alongside generated scan output. */
-export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T06:48:34.349Z"
+export const MASTER_CONTEXT_LAST_UPDATED_ISO = "2026-05-12T13:29:54.146Z"
 
 function formatUtc(iso: string): string {
   try {
@@ -230,6 +230,7 @@ Equipify.ai is a multi-tenant field-service operations platform for commercial e
 ### Insights & AI Assistants
 - **Routes:** \`/insights\`, \`/insights/financial-command-center\`, \`/ai-assistants\`; in-app AIden help chat via \`/api/organizations/[organizationId]/aiden/chat\`.
 - **Purpose:** AI insights generation; operational assistants; job queue processing; AIden provides step-by-step in-app product help grounded in this master context.
+- **AIden prepared workspace actions:** Review → confirm → execute for registry-backed intents (\`aiden_prepared_actions\`, \`aiden_action_audit_log\`); APIs \`/api/organizations/{organizationId}/aiden/prepared-actions/*\`; UI in AIden chat and \`/aiden/actions\`. Deterministic NL intent + optional LLM assist (\`AIDEN_PREPARED_INTENT_LLM_ENABLED\`); tier packaging when \`AIDEN_PREPARED_WORKSPACE_TIER_GATING=1\`. **Client/server split:** \`lib/aiden/prepared-actions/prepared-actions-shared.ts\` exports \`UUID_RE\` and \`isPreparedWorkspaceActionId\` for browser code — do not import \`prepared-actions-api-helpers\` (server-only) from client components. QA matrix: \`docs/AIDEN_PREPARED_WORKSPACE_ACTIONS.md\` (QA & hardening).
 - **BlitzPay Phase 4A:** Deterministic-first **AI financial copilot** (staff-only APIs \`/api/organizations/[organizationId]/blitzpay/ai/*\`, FCC + Insights hub panel) — advisory artifacts only; see \`docs/BLITZPAY_PHASE_4_ARCHITECTURE.md\`.
 - **BlitzPay Phase 4B:** Deterministic-first **revenue optimization** (staff-only APIs \`/api/organizations/[organizationId]/blitzpay/revenue-optimization/*\`, FCC + Insights hub panel, reporting snapshot fields) — recommendations and bounded queue refresh only; no autonomous customer contact, pricing, renewals, financing approval, or money movement; see \`docs/BLITZPAY_PHASE_4_ARCHITECTURE.md\`.
 - **Status:** Implemented; cron processes AI jobs; AIden is lightweight, session-only chat in the dashboard shell.

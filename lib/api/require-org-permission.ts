@@ -28,6 +28,8 @@ type Success = {
   supabase: SupabaseClient
   role: string | null
   permissions: OrgPermissions
+  /** True when the authenticated user is on the platform-admin allowlist (email). */
+  isPlatformAdmin: boolean
 }
 
 const UUID_RE =
@@ -111,6 +113,7 @@ export async function requireOrgPermission(
       ? // Platform admins see effective owner permissions regardless of org role.
         getOrgPermissionsForRole("owner")
       : permissions,
+    isPlatformAdmin: platformAdmin,
   }
 }
 
@@ -182,6 +185,7 @@ export async function requireAnyOrgPermission(
     supabase,
     role: rawRole,
     permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
+    isPlatformAdmin: platformAdmin,
   }
 }
 
@@ -239,5 +243,6 @@ export async function requireOrgMemberSession(
     supabase,
     role: rawRole,
     permissions: platformAdmin ? getOrgPermissionsForRole("owner") : permissions,
+    isPlatformAdmin: platformAdmin,
   }
 }

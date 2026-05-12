@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server"
 import { canUseAidenCapability } from "@/lib/aiden/tier-capabilities"
+import { AIDEN_PREPARED_WORKSPACE_ACTION_IDS } from "@/lib/aiden/actions/action-types"
+import { isAidenPreparedWorkspaceTierGatingEnabled } from "@/lib/aiden/prepared-workspace-tier-gate-env"
+import {
+  getMinimumPlanForPreparedWorkspaceAction,
+  preparedWorkspaceActionAllowedByTierMatrix,
+} from "@/lib/aiden/prepared-workspace-tier-policy"
 import { canAccessApp } from "@/lib/billing/access"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
-import { getOrganizationSubscription } from "@/lib/billing/subscriptions"
+import { getOrganizationSubscription, isTrialActive } from "@/lib/billing/subscriptions"
+import { getAidenActionAvailability } from "@/lib/permissions/aiden-actions"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -47,6 +54,21 @@ export async function GET(
   const productivityEnabled = billingOk && canUseAidenCapability(planId, "productivity_ai")
   const operationalCopilotEnabled = billingOk && canUseAidenCapability(planId, "operational_copilot")
   const safeActionsEnabled = billingOk && canUseAidenCapability(planId, "safe_aiden_actions")
+  const aidenActions = await getAidenActionAvailability({ supabase, organizationId })
+  const preparedWorkspaceActionsEnabled = billingOk && aidenActions.enabled
+  const trialActive = isTrialActive(subscription)
+  const tierGating = isAidenPreparedWorkspaceTierGatingEnabled()
+  const preparedWorkspaceActionAccess = AIDEN_PREPARED_WORKSPACE_ACTION_IDS.map((actionId) => ({
+    actionId,
+    allowed:
+      !tierGating ||
+      preparedWorkspaceActionAllowedByTierMatrix({
+        actionId,
+        storedPlanId: subscription?.plan_id ?? "solo",
+        trialActive,
+      }),
+    minPlan: getMinimumPlanForPreparedWorkspaceAction(actionId),
+  }))
   /** Growth / Scale when billing ok — used for Scale-only messaging without exposing nag copy to Solo/Core. */
   const operationalGrowthHint = billingOk && productivityEnabled && !operationalCopilotEnabled
   /** Growth — calm Scale upsell for prepared actions (Phase 6); Solo/Core unchanged (productivity false). */
@@ -57,8 +79,11 @@ export async function GET(
     productivityEnabled,
     operationalCopilotEnabled,
     safeActionsEnabled,
+    preparedWorkspaceActionsEnabled,
     operationalGrowthHint,
     safeActionsGrowthHint,
     planTier: planId,
+    preparedWorkspaceTierGatingEnabled: tierGating,
+    preparedWorkspaceActionAccess,
   })
 }

@@ -61,7 +61,13 @@
     "test:blitzpay-phase-7a4-performance": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a4-performance.ts",
     "test:blitzpay-phase-7a5-demo-data": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-blitzpay-phase-7a5-demo-data.ts",
     "test:blitzpay-phase-7a6-stripe-live-readiness": "tsx scripts/test-blitzpay-phase-7a6-stripe-live-readiness.ts",
-    "test:blitzpay-phase-7a7-commercialization": "tsx scripts/test-blitzpay-phase-7a7-commercialization.ts"
+    "test:blitzpay-phase-7a7-commercialization": "tsx scripts/test-blitzpay-phase-7a7-commercialization.ts",
+    "test:aiden-intent-parser": "tsx scripts/test-aiden-intent-parser.ts",
+    "test:aiden-intent-llm-merge": "tsx scripts/test-aiden-intent-llm-merge.ts",
+    "test:create-invoice-from-work-order-resolver": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-resolver.ts",
+    "test:create-invoice-from-work-order-executor": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-create-invoice-from-work-order-executor.ts",
+    "test:bulk-invoice-completed-work-orders": "tsx scripts/test-bulk-invoice-completed-work-orders.ts",
+    "test:aiden-prepared-workspace-tier-policy": "tsx scripts/test-aiden-prepared-workspace-tier-policy.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

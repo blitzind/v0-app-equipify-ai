@@ -26,6 +26,7 @@ export type AiTaskId =
   | "aiden_draft_generation"
   | "aiden_operational_recommendations"
   | "aiden_safe_action_prepare"
+  | "aiden_prepared_workspace_intent_llm"
 
 export type AiProviderId = "openai" | "anthropic" | "google" | "mock"
 

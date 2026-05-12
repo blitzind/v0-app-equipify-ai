@@ -13,6 +13,14 @@ export type AidenEligibilityForMessaging = {
   safeActionsGrowthHint: boolean
   productivityEnabled?: boolean
   operationalCopilotEnabled?: boolean
+  /** Plan + org flag: `aiden_actions` feature (prepared workspace prepare/confirm/execute APIs). */
+  preparedWorkspaceActionsEnabled?: boolean
+  /** Effective product tier for messaging (`getEffectivePlanId`). */
+  planTier?: string
+  /** True when `AIDEN_PREPARED_WORKSPACE_TIER_GATING=1` on the server. */
+  preparedWorkspaceTierGatingEnabled?: boolean
+  /** Per-action tier allowance when tier gating is enabled (all `allowed: true` when gating is off). */
+  preparedWorkspaceActionAccess?: Array<{ actionId: string; allowed: boolean; minPlan: string }>
 }
 
 export type AidenCapabilityBadgeId = "guidance" | "action_assist" | "operational_assistant"
@@ -34,9 +42,42 @@ export function aidenCapabilityBadgeLabel(id: AidenCapabilityBadgeId): string {
   return BADGE_LABEL[id]
 }
 
+/** Copy under “Billing prepared actions” (AIden Actions entitlement). */
+export const PREPARED_WORKSPACE_BILLING_INTRO =
+  "Describe the invoice you want from a work order (for example: “Invoice latest completed job for Acme”). AIden prepares a draft preview only — you confirm before any draft invoice is created."
+
 /** Copy under "Prepared workspace action" (Scale). */
 export const PREPARED_WORKSPACE_ACTION_INTRO =
   "AIden can prepare workspace actions for your review before anything is saved. Describe what you want to capture (task, internal note, reminder, or unsent communications draft)."
+
+/** Shown ahead of a normal chat answer when the user’s message sounds like a prepared billing action but the plan lacks AIden Actions / prepared workspace billing. */
+export const AIDEN_PREPARED_WORKSPACE_TIER_CHAT_PREFIX =
+  "Your workspace does not include Prepared billing from this chat (reviewable draft invoices before anything saves). Ask an owner about upgrading if you need that workflow. Here is general guidance for what you asked:\n\n"
+
+/** Heuristic: user likely wanted a draft-invoice–style prepared action (tier-gated UX only). */
+export function userMessageMentionsBillingPreparedIntent(text: string): boolean {
+  const n = text.trim().toLowerCase()
+  if (!n) return false
+  const billing = /\binvoice\b/.test(n) || /\bbill(?:ing)?\b/.test(n)
+  if (!billing) return false
+  const actiony = /\b(make|create|draft|generate|prepare)\b/.test(n)
+  const contextual =
+    /\b(work order|wo|job|visit|ticket)\b/.test(n) ||
+    /\b(last|latest|recent|this|that)\b/.test(n) ||
+    /\b(from|based on|for)\b/.test(n) ||
+    /\b(customer|client|account)\b/.test(n)
+  return actiony && contextual
+}
+
+/** Non-empty prefix to prepend to the next assistant chat answer, or null when no extra tier note should appear. */
+export function buildAidenPreparedWorkspaceTierChatPrefix(
+  userText: string,
+  eligibility: AidenEligibilityForMessaging | null,
+): string | null {
+  if (!eligibility || eligibility.preparedWorkspaceActionsEnabled) return null
+  if (!userMessageMentionsBillingPreparedIntent(userText)) return null
+  return AIDEN_PREPARED_WORKSPACE_TIER_CHAT_PREFIX
+}
 
 /**
  * Short contextual focus for the current module (shown beside generic in-panel help hints).
@@ -89,10 +130,15 @@ export function buildAidenWelcomeContent(args: AidenWelcomeArgs): string {
   }
 
   if (e.safeActionsEnabled) {
+    const billingChat =
+      e.preparedWorkspaceActionsEnabled === true
+        ? "You can also describe billing actions in this chat (for example drafting an invoice from a work order) — I’ll show a review card before anything saves."
+        : null
     let body = joinSentences(
       "Hi — I'm AIden. I help you operate Equipify with guidance tailored to the screen you're on.",
       focus,
       "I can walk you through workflows, explain permissions, and help you decide what to do next.",
+      billingChat,
       "On your workspace, you can also use Prepared workspace actions below: I draft bounded items such as follow-up tasks, internal notes, reminders, and unsent communication drafts for you to review - nothing saves until you confirm.",
       "This chat stream stays read-only; structured captures run through Prepare action and your confirmation.",
     )
@@ -139,13 +185,22 @@ export function buildAidenIdlePanelHint(args: AidenWelcomeArgs): string {
   }
   if (e.safeActionsEnabled) {
     return joinSentences(
-      "Ask how to complete work in Equipify, or use Prepared workspace actions below for reviewable drafts.",
+      e.preparedWorkspaceActionsEnabled === true
+        ? "Ask how to complete work, describe billing in this chat for a review card, or use Prepared workspace actions below for tasks and notes."
+        : "Ask how to complete work in Equipify, or use Prepared workspace actions below for reviewable drafts.",
       focus,
     )
   }
   if (e.productivityEnabled) {
+    if (e.preparedWorkspaceActionsEnabled === true) {
+      return joinSentences(
+        "Ask how to use Equipify, or describe a billing action here for a reviewable draft preview when your page context applies.",
+        focus,
+      )
+    }
     return joinSentences(
       "Ask how to use Equipify; use AI helpers in their own screens where available.",
+      "Prepared billing previews from this chat need AIden Actions on your plan — ask an owner about upgrading.",
       focus,
     )
   }

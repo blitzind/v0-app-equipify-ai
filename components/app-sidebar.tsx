@@ -18,6 +18,7 @@ import {
   Bell,
   Warehouse,
   UserPlus,
+  ListChecks,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
@@ -143,6 +144,13 @@ const NAV_GROUPS: NavGroup[] = [
         label: "AI Operations",
         href: "/ai-ops",
         icon: Bot,
+        highlight: true,
+        anyOf: ["canViewInsights"],
+      },
+      {
+        label: "AIden Actions",
+        href: "/aiden/actions",
+        icon: ListChecks,
         highlight: true,
         anyOf: ["canViewInsights"],
       },

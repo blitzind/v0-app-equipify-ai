@@ -10,6 +10,7 @@ export function filterFollowUpTasksForViewer(
 ): FollowUpTaskRow[] {
   return rows.filter((r) => {
     if (r.entity_type === "invoice" && !canAccessInvoiceFollowUpTasks(permissions)) return false
+    if (r.entity_type === "quote" && !canAccessInvoiceFollowUpTasks(permissions)) return false
 
     if (permissions.canViewAssignedWorkOrdersOnly) {
       const meta = r.metadata ?? {}

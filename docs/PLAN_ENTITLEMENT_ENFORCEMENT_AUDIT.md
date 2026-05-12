@@ -24,7 +24,7 @@ This document maps **how Equipify ties Stripe / `organization_subscriptions` to 
 | Client billing context | `BillingAccessProvider` | `lib/billing-access-context.tsx` — subscription + `getUsageWithLimits` + seat count. |
 | AI execution mode | `resolveAiExecutionMode` | `lib/ai/execution-mode.ts` — live vs mock vs disabled from subscription **status** + env overrides. |
 | AI task / plan gate | `isTaskAllowedOnPlan`, `isPlanGatingDisabled` | `lib/ai/plan-gate.ts`, `lib/ai/plan-ai-config.ts`. |
-| AIden capability matrix | `canUseAidenCapability` | `lib/aiden/tier-capabilities.ts` — orthogonal to `canUseFeature` for some surfaces. |
+| AIden capability matrix | `canUseAidenCapability`, **prepared-workspace tier matrix** (`preparedWorkspaceActionAllowedByTierMatrix` when `AIDEN_PREPARED_WORKSPACE_TIER_GATING=1`) | `lib/aiden/tier-capabilities.ts`, `lib/aiden/prepared-workspace-tier-policy.ts`, `lib/aiden/actions/action-permissions.ts` — see `docs/AIDEN_PREPARED_WORKSPACE_TIER_GATING.md`. |
 
 ### What subscription states mean in practice
 

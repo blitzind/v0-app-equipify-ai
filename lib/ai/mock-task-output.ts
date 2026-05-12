@@ -9,6 +9,8 @@ import {
   AidenWorkOrderProductivityAnswerSchema,
 } from "@/lib/aiden/productivity-schemas"
 import { SafeActionPrepareAnswerSchema } from "@/lib/aiden/safe-actions/schema"
+import { AidenPreparedWorkspaceIntentLlmSchema } from "@/lib/aiden/intent/aiden-prepared-intent-llm-schema"
+import type { AidenPreparedWorkspaceActionId } from "@/lib/aiden/actions/action-types"
 import { priceListAiResponseSchema } from "@/lib/catalog/import-types"
 import { aiImportResponseSchema } from "@/lib/calibration-templates/ai-import-schema"
 import { parseWithSchemaSafe } from "@/lib/ai/structured"
@@ -402,6 +404,38 @@ export async function buildMockStructuredOutput<T>(params: {
       }
       break
     }
+    case "aiden_prepared_workspace_intent_llm": {
+      const snippet = pickUserSnippet(params.input).toLowerCase()
+      let actionId: AidenPreparedWorkspaceActionId = "draft_customer_message"
+      if (
+        /\bbulk\b.*\binvoice/.test(snippet) ||
+        /\binvoice\s+all\s+completed/.test(snippet) ||
+        (/\ball\b.*\bcompleted\b.*\b(work\s+orders?|jobs)\b/.test(snippet) && /\b(invoice|invoices|bill|draft)\b/.test(snippet))
+      ) {
+        actionId = "bulk_invoice_completed_work_orders"
+      } else if (/\binvoice\b/.test(snippet) && !/\bquote\b/.test(snippet)) {
+        actionId = "create_invoice_from_work_order"
+      } else if (/\bquote\b|\bestimate\b/.test(snippet)) {
+        actionId = "create_quote_from_work_order"
+      } else if (/\bsummar(y|ize)\b/.test(snippet) && /\bcustomer\b/.test(snippet)) {
+        actionId = "summarize_customer_history"
+      }
+      rawObj = {
+        actionId,
+        confidence: /\b(?:maybe|not sure|idk)\b/.test(snippet) ? 0.48 : 0.78,
+        customerReference: /\bacme\b/i.test(snippet) ? "Acme LLC" : null,
+        equipmentReference: null,
+        workOrderReference: /\blast\b.*\bjob\b|\blast\b.*\bwork\s*order\b/.test(snippet) ? "latest" : null,
+        bulkInvoiceDateRange: null,
+        suggestedDraftCopy:
+          actionId === "draft_customer_message" ?
+            "Mock trial draft — replace with your tone. Quick update: we're aligning on next steps and will follow up shortly."
+          : null,
+        clarificationQuestion: null,
+        rationale: "Mock structured intent for trial or offline AI routing — server merge + resolvers still validate.",
+      }
+      break
+    }
     case "insights_generation":
       rawObj = buildInsightsFromWorkspaceStats(params.context)
       break
@@ -623,6 +657,13 @@ export async function buildMockStructuredOutput<T>(params: {
     }
     if (!schemaResult.ok && params.task === "aiden_safe_action_prepare") {
       const normalized = SafeActionPrepareAnswerSchema.safeParse(rawObj)
+      if (normalized.success) {
+        rawText = JSON.stringify(normalized.data)
+        schemaResult = await parseWithSchemaSafe(rawText, params.schema)
+      }
+    }
+    if (!schemaResult.ok && params.task === "aiden_prepared_workspace_intent_llm") {
+      const normalized = AidenPreparedWorkspaceIntentLlmSchema.safeParse(rawObj)
       if (normalized.success) {
         rawText = JSON.stringify(normalized.data)
         schemaResult = await parseWithSchemaSafe(rawText, params.schema)

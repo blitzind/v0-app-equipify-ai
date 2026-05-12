@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle, Bot, ClipboardList, Clock3, Loader2, MessageSquarePlus, Send, User } from "lucide-react"
 import { AidenWordmark } from "@/components/aiden/aiden-wordmark"
 import { Button } from "@/components/ui/button"
@@ -14,14 +14,18 @@ import {
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import { AidenFeatureRequestFlow, type AidenFrFormValues } from "@/components/aiden/aiden-feature-request-flow"
+import { PreparedActionCard } from "@/components/aiden/prepared-actions/PreparedActionCard"
+import type { SerializedPreparedAction } from "@/components/aiden/prepared-actions/types"
 import {
   aidenCapabilityBadgeLabel,
   buildAidenIdlePanelHint,
+  buildAidenPreparedWorkspaceTierChatPrefix,
   buildAidenWelcomeContent,
   PREPARED_WORKSPACE_ACTION_INTRO,
   resolveAidenCapabilityBadge,
   type AidenEligibilityForMessaging,
 } from "@/lib/aiden/aiden-capability-messaging"
+import { buildWorkspacePrepareContext } from "@/lib/aiden/aiden-workspace-page-context"
 import { moduleFromPath, type AidenModuleId } from "@/lib/aiden/module-context"
 import {
   clearAidenChatSession,
@@ -42,6 +46,11 @@ type ChatMessage = {
   role: "user" | "assistant"
   content: string
   answer?: AidenSupportPhase2Answer
+  /** Inline prepared workspace action (billing) after successful prepare. */
+  preparedAction?: SerializedPreparedAction
+  /** Prepare endpoint failed; user can retry the same utterance. */
+  prepareFailure?: boolean
+  retryUserText?: string
   createdAt: Date
 }
 
@@ -108,7 +117,13 @@ function formatTime(date: Date): string {
 function safeActionOutcomeHint(actionType: string): string {
   switch (actionType) {
     case "create_follow_up_task":
-      return "Adds one checklist item on the work order. Nothing is emailed, invoiced, or scheduled."
+      return "Creates a follow-up task in your queue. Nothing is emailed, invoiced, or sent to the customer automatically."
+    case "schedule_maintenance_visit":
+      return "Creates a scheduled work order for the visit. Customer email is not sent automatically from this step."
+    case "create_maintenance_plan_from_equipment":
+      return "Creates a recurring maintenance plan on the asset. Confirming inserts the plan; auto work orders follow your plan settings."
+    case "create_parts_reorder_request":
+      return "Creates an internal draft PO or inventory restock signals from the preview. Purchase orders are not emailed or transmitted to vendors from this step."
     case "create_internal_note":
       return "Appends an internal note or staff-visible timeline entry only—no email or SMS."
     case "create_reminder":
@@ -165,6 +180,8 @@ function MarkdownMessage({ text }: { text: string }) {
 
 export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const { organizationId, status: orgStatus } = useActiveOrganization()
   const { toast } = useToast()
   const currentModule = useMemo(() => moduleFromPath(pathname), [pathname])
@@ -255,6 +272,10 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
           safeActionsGrowthHint?: boolean
           productivityEnabled?: boolean
           operationalCopilotEnabled?: boolean
+          preparedWorkspaceActionsEnabled?: boolean
+          planTier?: string
+          preparedWorkspaceTierGatingEnabled?: boolean
+          preparedWorkspaceActionAccess?: Array<{ actionId: string; allowed: boolean; minPlan: string }>
         }
         if (cancelled) return
         if (res.ok && data.ok) {
@@ -263,6 +284,12 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
             safeActionsGrowthHint: Boolean(data.safeActionsGrowthHint),
             productivityEnabled: Boolean(data.productivityEnabled),
             operationalCopilotEnabled: Boolean(data.operationalCopilotEnabled),
+            preparedWorkspaceActionsEnabled: Boolean(data.preparedWorkspaceActionsEnabled),
+            planTier: typeof data.planTier === "string" ? data.planTier : undefined,
+            preparedWorkspaceTierGatingEnabled: Boolean(data.preparedWorkspaceTierGatingEnabled),
+            preparedWorkspaceActionAccess: Array.isArray(data.preparedWorkspaceActionAccess)
+              ? data.preparedWorkspaceActionAccess
+              : undefined,
           })
         } else {
           setAidenEligibility(null)
@@ -296,6 +323,9 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     aidenEligibility?.safeActionsGrowthHint,
     aidenEligibility?.productivityEnabled,
     aidenEligibility?.operationalCopilotEnabled,
+    aidenEligibility?.preparedWorkspaceActionsEnabled,
+    aidenEligibility?.preparedWorkspaceTierGatingEnabled,
+    aidenEligibility?.planTier,
   ])
 
   /** Persist session (best-effort). */
@@ -323,7 +353,7 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
 
   const chatMessagesForContext = useMemo((): AidenChatMessage[] => {
     return messages
-      .filter((m) => m.id !== "welcome")
+      .filter((m) => m.id !== "welcome" && !m.prepareFailure)
       .map((m) => ({ role: m.role, content: m.content }))
   }, [messages])
 
@@ -500,6 +530,44 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     }
   }
 
+  async function runSupportChat(thread: ChatMessage[], options?: { tierChatPrefix?: string | null }) {
+    const apiMessages: AidenChatMessage[] = thread
+      .filter((m) => m.id !== "welcome" && !m.prepareFailure)
+      .map((m) => ({ role: m.role, content: m.content }))
+
+    const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId!)}/aiden/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: apiMessages,
+        currentPath: pathname,
+        currentModule: currentModule.label,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      answer?: AidenSupportPhase2Answer
+      message?: string
+      error?: string
+    }
+    if (!res.ok || !data.ok || !data.answer) {
+      throw new Error(data.message ?? data.error ?? "AIden could not answer right now.")
+    }
+    const answer = data.answer
+    const tier = options?.tierChatPrefix?.trim() ?? ""
+    const answerForStore: AidenSupportPhase2Answer = tier ? { ...answer, answer: `${tier}${answer.answer}` } : answer
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: answerToContent(answerForStore),
+        answer: answerForStore,
+        createdAt: new Date(),
+      },
+    ])
+  }
+
   async function sendMessage(text: string) {
     const content = text.trim()
     if (!content || loading) return
@@ -521,39 +589,147 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
     setError(null)
     setLoading(true)
 
-    try {
-      const apiMessages: AidenChatMessage[] = nextMessages
-        .filter((m) => m.id !== "welcome")
-        .map((m) => ({ role: m.role, content: m.content }))
+    const tierChatPrefix = buildAidenPreparedWorkspaceTierChatPrefix(content, aidenEligibility)
 
-      const res = await fetch(`/api/organizations/${encodeURIComponent(organizationId)}/aiden/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: apiMessages,
-          currentPath: pathname,
-          currentModule: currentModule.label,
-        }),
-      })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        answer?: AidenSupportPhase2Answer
-        message?: string
-        error?: string
+    try {
+      const shouldTryPrepare = aidenEligibility?.preparedWorkspaceActionsEnabled === true
+
+      if (shouldTryPrepare) {
+        try {
+          const context = buildWorkspacePrepareContext({
+            pathname,
+            drawerOpenId: searchParams.get("open"),
+            currentModuleLabel: currentModule.label,
+          })
+          const prepRes = await fetch(
+            `/api/organizations/${encodeURIComponent(organizationId)}/aiden/prepared-actions/prepare`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: content, context }),
+            },
+          )
+          const pdata = (await prepRes.json().catch(() => ({}))) as {
+            preparedAction?: SerializedPreparedAction
+            message?: string
+            error?: string
+            requiredPlan?: string
+            actionId?: string
+          }
+
+          if (prepRes.ok && pdata.preparedAction) {
+            const pa = pdata.preparedAction
+            const intro =
+              pa.status === "needs_clarification"
+                ? "I need a bit more detail before I can show a billing preview. Use the card below, then reply in chat with specifics (for example which customer or work order)."
+                : pa.status === "failed"
+                  ? "I matched that to a billing action, but the preview could not be built. Details are in the card — you can dismiss it and try again with more context."
+                  : pa.actionId === "prepare_invoice_payment_link"
+                    ? "I parsed that as preparing a BlitzPay payment link. Review the preview below — nothing is sent or charged until you confirm and copy the link yourself."
+                    : pa.actionId === "prepare_quickbooks_invoice_sync"
+                      ? "I matched that to preparing a QuickBooks invoice sync. Review the preview — nothing is sent to QuickBooks until you confirm sync in the card."
+                      : pa.actionId === "create_quote_from_work_order"
+                        ? "I parsed that as creating a draft quote from a work order. Review the preview below — nothing is emailed or sent to the customer until you confirm and later send from Quotes if you choose."
+                        : pa.actionId === "draft_customer_message"
+                          ? "I drafted customer-facing message copy for you to review. Nothing is sent until you save it to Communications and use your normal send flow later."
+                          : pa.actionId === "create_follow_up_task"
+                            ? "I parsed that as creating an internal follow-up task. Review and edit the card below — confirming adds it to your follow-up queue only; customers are not contacted automatically."
+                            : pa.actionId === "create_maintenance_plan_from_equipment"
+                              ? "I parsed that as creating a recurring maintenance plan for this equipment. Review the card — confirming saves an active plan (billing and maintenance plan entitlements apply)."
+                              : pa.actionId === "create_parts_reorder_request"
+                                ? "I parsed that as a parts reorder or low-stock request. Review the card — confirming saves an internal draft PO or inventory restock signals only; nothing is sent to vendors automatically."
+                                : pa.actionId === "schedule_maintenance_visit"
+                                ? "I parsed that as scheduling a maintenance or service visit. Review the card — confirming creates a scheduled work order (dispatch or work order permissions required)."
+                                : pa.actionId === "summarize_customer_history"
+                                  ? "Here is a read-only snapshot of this customer’s recent work, equipment, maintenance, and open items. Review the card below — no records were changed."
+                                  : "I parsed that as a billing action. Review the preview below — nothing saves until you create a draft invoice."
+
+            setMessages((p) => [
+              ...p,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: intro,
+                preparedAction: pa,
+                createdAt: new Date(),
+              },
+            ])
+            return
+          }
+
+          if (prepRes.status === 422) {
+            const amb =
+              typeof pdata.message === "string" && pdata.message.trim()
+                ? pdata.message.trim()
+                : "That request matches more than one action. Please say exactly what you want (for example only creating a draft invoice from one work order)."
+            setMessages((p) => [
+              ...p,
+              { id: crypto.randomUUID(), role: "assistant", content: amb, createdAt: new Date() },
+            ])
+            return
+          }
+
+          if (prepRes.status === 403) {
+            const err = pdata.error
+            let explain =
+              typeof pdata.message === "string" && pdata.message.trim()
+                ? pdata.message.trim()
+                : "That request is not allowed for this workspace."
+            if (err === "plan_upgrade_required") {
+              const tier = typeof pdata.requiredPlan === "string" && pdata.requiredPlan.trim() ? pdata.requiredPlan.trim() : "the right plan"
+              explain = `${explain}\n\nUpgrade to ${tier} (or higher) under Settings → Billing to use this prepared workspace action. I can still help with general how-to questions below.`
+            } else if (err === "insufficient_permissions") {
+              explain = `${explain}\n\nThis billing action requires invoice and work order editing access. Ask an owner or admin if you need it. I can still answer general questions below.`
+            } else if (err === "aiden_actions_disabled") {
+              explain = `${explain}\n\nYour subscription or workspace may need AIden Actions enabled for prepared billing. I can still help with how-to guidance below.`
+            } else if (err === "aiden_actions_denied") {
+              explain = `${explain}\n\nFor technician-style roles, an owner or manager may need to run this kind of billing step. General guidance follows.`
+            }
+            const explMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: explain,
+              createdAt: new Date(),
+            }
+            setMessages((p) => [...p, explMsg])
+            await runSupportChat([...nextMessages, explMsg], {})
+            return
+          }
+
+          const unsupported = prepRes.status === 400 && pdata.error === "unsupported_intent"
+          const okWithoutPrepared = prepRes.ok && !pdata.preparedAction
+          if (!unsupported && !okWithoutPrepared) {
+            const failMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content:
+                prepRes.status >= 500
+                  ? "The billing preview service had a server problem. You can retry in a moment."
+                  : "AIden could not prepare a billing preview from that message. Check your connection or retry.",
+              prepareFailure: true,
+              retryUserText: content,
+              createdAt: new Date(),
+            }
+            setMessages((p) => [...p, failMsg])
+            return
+          }
+        } catch {
+          setMessages((p) => [
+            ...p,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "Something went wrong while contacting the billing preview service.",
+              prepareFailure: true,
+              retryUserText: content,
+              createdAt: new Date(),
+            },
+          ])
+          return
+        }
       }
-      if (!res.ok || !data.ok || !data.answer) {
-        throw new Error(data.message ?? data.error ?? "AIden could not answer right now.")
-      }
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: answerToContent(data.answer!),
-          answer: data.answer,
-          createdAt: new Date(),
-        },
-      ])
+
+      await runSupportChat(nextMessages, { tierChatPrefix })
     } catch (e) {
       const msg = e instanceof Error ? e.message : "AIden could not answer right now."
       setError(msg)
@@ -648,7 +824,8 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                 ) : null}
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-xs",
+                    "rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-xs",
+                    message.preparedAction ? "max-w-[96%] w-full min-w-0" : "max-w-[85%]",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "border border-border bg-card text-foreground",
@@ -682,6 +859,53 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   ) : null}
                   {message.answer?.limitation ? (
                     <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{message.answer.limitation}</p>
+                  ) : null}
+                  {message.prepareFailure ? (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 text-xs"
+                        disabled={loading}
+                        onClick={() => void sendMessage(message.retryUserText ?? "")}
+                      >
+                        Retry billing preview
+                      </Button>
+                    </div>
+                  ) : null}
+                  {message.preparedAction && organizationId ? (
+                    <div className="mt-3 w-full min-w-0 space-y-2">
+                      <PreparedActionCard
+                        organizationId={organizationId}
+                        preparedAction={message.preparedAction}
+                        onPreparedActionUpdated={(next) =>
+                          setMessages((prev) =>
+                            prev.map((m) => (m.id === message.id ? { ...m, preparedAction: next } : m)),
+                          )
+                        }
+                        onDismiss={() =>
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === message.id
+                                ? {
+                                    ...m,
+                                    preparedAction: undefined,
+                                    content: `${m.content}\n\n_(Preview dismissed.)_`,
+                                  }
+                                : m,
+                            ),
+                          )
+                        }
+                        onEditBeforeCreating={(ctx) => {
+                          const q = new URLSearchParams()
+                          q.set("action", "new-invoice")
+                          if (ctx.workOrderId) q.set("workOrderId", ctx.workOrderId)
+                          router.push(`/invoices?${q.toString()}`)
+                        }}
+                        onPrefillChat={(text) => setInput(text)}
+                      />
+                    </div>
                   ) : null}
                   {message.role === "assistant" &&
                   message.answer?.classification === "not_built_feature_candidate" &&
@@ -902,7 +1126,11 @@ export function AidenChatPanel({ open, onOpenChange }: AidenChatPanelProps) {
                   void sendMessage(input)
                 }
               }}
-              placeholder={`Ask about ${currentModule.label.toLowerCase()}…`}
+              placeholder={
+                aidenEligibility?.preparedWorkspaceActionsEnabled
+                  ? `Ask about ${currentModule.label.toLowerCase()}, or e.g. draft an invoice from a work order…`
+                  : `Ask about ${currentModule.label.toLowerCase()}…`
+              }
               className="max-h-32 min-h-10 resize-none text-sm"
               disabled={loading}
               aria-label="Message to AIden"

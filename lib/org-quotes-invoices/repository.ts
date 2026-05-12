@@ -756,7 +756,13 @@ export async function insertOrgInvoice(
     taxProviderReference?: string | null
     taxSnapshotJson?: unknown
   },
-): Promise<{ id?: string; error?: string }> {
+  options?: {
+    /** When true, do not enqueue QuickBooks auto-sync (e.g. AIden draft-only paths). */
+    skipQuickBooksQueue?: boolean
+    /** When true, do not set linked work orders to `invoiced` (e.g. draft invoice from AIden). */
+    skipWorkOrderBillingStateSync?: boolean
+  },
+): Promise<{ id?: string; invoiceNumber?: string; error?: string }> {
   const seedKey = `live-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())}`
   const {
     data: { user },
@@ -812,10 +818,11 @@ export async function insertOrgInvoice(
   if (payload.taxProviderReference !== undefined) insertRow.tax_provider_reference = payload.taxProviderReference?.trim() || null
   if (payload.taxSnapshotJson !== undefined) insertRow.tax_snapshot_json = payload.taxSnapshotJson
 
-  const { data, error } = await supabase.from("org_invoices").insert(insertRow).select("id").maybeSingle()
+  const { data, error } = await supabase.from("org_invoices").insert(insertRow).select("id, invoice_number").maybeSingle()
 
   if (error) return { error: error.message }
-  const id = (data as { id: string } | null)?.id
+  const inserted = data as { id: string; invoice_number: string } | null
+  const id = inserted?.id
   if (id) {
     if (payload.workOrderId) {
       const { error: linkErr } = await supabase.from("invoice_work_order_links").insert({
@@ -829,11 +836,15 @@ export async function insertOrgInvoice(
       if (linkErr && !String(linkErr.message).includes("duplicate")) {
         return { error: linkErr.message }
       }
-      await syncLinkedWorkOrdersBillingState(supabase, payload.organizationId, id, "invoiced")
+      if (!options?.skipWorkOrderBillingStateSync) {
+        await syncLinkedWorkOrdersBillingState(supabase, payload.organizationId, id, "invoiced")
+      }
     }
-    queueQuickBooksInvoiceAutoSync(payload.organizationId, id)
+    if (!options?.skipQuickBooksQueue) {
+      queueQuickBooksInvoiceAutoSync(payload.organizationId, id)
+    }
   }
-  return { id }
+  return { id, invoiceNumber: inserted?.invoice_number }
 }
 
 export async function updateOrgInvoice(

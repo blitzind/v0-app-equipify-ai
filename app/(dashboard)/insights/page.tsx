@@ -34,6 +34,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { aiFeatureUpgradeMessage } from "@/lib/billing/feature-access"
+import { AiInsightActions } from "@/components/insights/ai-insight-actions"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

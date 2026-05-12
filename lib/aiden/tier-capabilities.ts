@@ -1,6 +1,13 @@
 import type { PlanId } from "@/lib/plans"
 import { planRank } from "@/lib/ai/plan-ai-config"
 
+export {
+  getMinimumPlanForPreparedWorkspaceAction,
+  listPreparedWorkspaceActionsWithTierMin,
+  preparedWorkspaceActionAllowedByTierMatrix,
+  getEffectivePlanIdForPreparedWorkspaceTierGate,
+} from "@/lib/aiden/prepared-workspace-tier-policy"
+
 /** Tracked + gated AIden surfaces (Phase 3 foundation + Phase 4 productivity usage keys). */
 export const AIDEN_TRACKED_FEATURES = [
   "support_chat",

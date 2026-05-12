@@ -40,6 +40,8 @@ export function resolveDraftCategorySettings(
       return cfg.categories.customers
     case "equipment":
       return cfg.categories.equipment
+    case "quote":
+      return cfg.categories.invoices
     default:
       return null
   }
