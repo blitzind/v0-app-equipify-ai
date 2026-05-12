@@ -286,7 +286,8 @@ export async function createPortalSession(): Promise<{ url: string | null; error
   if (!customerId) {
     return {
       url: null,
-      error: "No Stripe customer on file for this organization. Complete checkout or add a payment method first.",
+      error:
+        "No billing profile on file yet. Add a payment method on this page, or choose a plan below to complete checkout.",
     }
   }
 

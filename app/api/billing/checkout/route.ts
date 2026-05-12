@@ -11,6 +11,7 @@ import {
   isStripeLiveEnforced,
   validateResolvedStripePriceIds,
 } from "@/lib/billing/stripe-env"
+import { sanitizeBillingEndpointUserMessage } from "@/lib/billing/stripe-saas-billing-errors"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -101,9 +102,10 @@ export async function POST(request: Request) {
   try {
     assertPublishableKeyMatchesDeployment(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stripe billing environment is misconfigured."
+    const raw = e instanceof Error ? e.message : String(e)
+    console.error("[billing/checkout] publishable key / deployment check failed", raw)
     return NextResponse.json(
-      { error: "billing_misconfigured", message },
+      { error: "billing_misconfigured", message: sanitizeBillingEndpointUserMessage(raw) },
       { status: 503 },
     )
   }
@@ -111,11 +113,11 @@ export async function POST(request: Request) {
   if (isStripeLiveEnforced()) {
     const priceCheck = validateResolvedStripePriceIds()
     if (!priceCheck.ok) {
+      console.error("[billing/checkout] missing or invalid Stripe price ids", priceCheck.errors)
       return NextResponse.json(
         {
           error: "billing_misconfigured",
-          message: priceCheck.errors[0] ?? "Invalid Stripe price configuration.",
-          details: priceCheck.errors,
+          message: "Billing is not fully configured for this environment. Please contact support.",
         },
         { status: 503 },
       )

@@ -13,6 +13,14 @@ import {
   tryClearStaleStripeCustomerId,
   userFacingStripeSaaSBillingError,
 } from "@/lib/billing/stripe-saas-billing-errors"
+import {
+  getOrganizationSubscription,
+  getTrialDaysRemaining,
+  isTrialActive,
+  normalizeOrganizationSubscription,
+  normalizeStripeIdColumn,
+  type OrganizationSubscription,
+} from "@/lib/billing/subscriptions"
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 const HOSTED_SOURCE = "equipify_hosted_checkout"

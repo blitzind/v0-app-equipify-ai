@@ -9,6 +9,12 @@ import {
   tryClearStaleStripeCustomerId,
   userFacingStripeSaaSBillingError,
 } from "@/lib/billing/stripe-saas-billing-errors"
+import {
+  getOrganizationSubscription,
+  normalizeOrganizationSubscription,
+  normalizeStripeIdColumn,
+  type OrganizationSubscription,
+} from "@/lib/billing/subscriptions"
 
 const BILLING_SOURCE = "equipify_billing_page_setup"
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
@@ -35,7 +41,7 @@ async function ensureOrganizationSubscriptionRow(
     .maybeSingle()
 
   if (!error && inserted) {
-    return inserted as OrganizationSubscription
+    return normalizeOrganizationSubscription(inserted as OrganizationSubscription)
   }
   if (error?.code === "23505") {
     row = await getOrganizationSubscription(admin, organizationId)

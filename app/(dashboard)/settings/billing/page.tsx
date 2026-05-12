@@ -92,6 +92,20 @@ function formatCardBrand(brand: string | null) {
   return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase()
 }
 
+/** Avoid echoing Stripe ids / mode hints from Elements into the DOM. */
+function safeStripeClientMessage(raw: string | undefined, fallback: string) {
+  if (!raw?.trim()) return fallback
+  const m = raw.trim()
+  if (/\bcus_[a-z0-9]+/i.test(m)) return fallback
+  if (/\bsub_[a-z0-9]+/i.test(m)) return fallback
+  if (/\bprice_[a-z0-9]+/i.test(m)) return fallback
+  if (/\b(pk|sk|rk)_(live|test)_/i.test(m)) return fallback
+  if (/livemode|test mode|live mode/i.test(m)) {
+    return "Billing could not be completed in this environment. Please contact support."
+  }
+  return m.length > 280 ? fallback : m
+}
+
 function invoiceAmountLabel(inv: StripeBillingInvoiceRow) {
   const parts: string[] = []
   if (inv.amountPaid > 0) parts.push(`Paid ${formatStripeMoney(inv.amountPaid, inv.currency)}`)
@@ -230,7 +244,7 @@ function AddCardTrialForm({
     })
     setBusy(false)
     if (result.error) {
-      setError(result.error.message ?? "Could not save your card.")
+      setError(safeStripeClientMessage(result.error.message, "Could not save your card."))
       return
     }
     toast({ title: "Card saved", description: "Card saved. Choose a plan anytime." })
@@ -980,8 +994,41 @@ function BillingPageContent() {
                 >
                   {portalBusy ? "Opening…" : "Manage billing"}
                 </button>
+              ) : hasStripe ? (
+                <div className="flex w-full flex-col gap-2 sm:max-w-xl">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Add a payment method now so your service continues after the trial. Saving a card does not end your trial
+                    early; you are only charged when your plan billing starts (for example after checkout confirms your
+                    subscription).
+                  </p>
+                  {canEditOrgInvoiceDefaults ?
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button
+                        type="button"
+                        disabled={setupBusy || portalBusy}
+                        onClick={() => void openAddCardModal()}
+                        className="flex min-h-[44px] items-center justify-center rounded-md border border-primary bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60 sm:h-8 sm:min-h-0"
+                      >
+                        {setupBusy ? "Loading…" : "Add payment method"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={checkoutBusy}
+                        onClick={() => {
+                          setPortalMessage(null)
+                          jumpToPlanComparison()
+                        }}
+                        className="flex min-h-[44px] items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60 sm:h-8 sm:min-h-0"
+                      >
+                        Choose plan & checkout
+                      </button>
+                    </div>
+                  : <p className="text-xs text-muted-foreground">Ask a workspace billing admin to add a payment method.</p>}
+                </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Available after checkout</p>
+                <p className="text-xs text-muted-foreground">
+                  Card setup requires Stripe to be configured for this app (publishable key missing).
+                </p>
               )}
             </div>
             {portalMessage ? (
@@ -1213,7 +1260,7 @@ function BillingPageContent() {
             variant="outline"
             size="sm"
             className="text-xs h-7 gap-1.5"
-            disabled={portalBusy}
+            disabled={portalBusy || !hasStripeCustomer}
             onClick={() => void openBillingPortal()}
           >
             <Download size={12} /> Download all
@@ -1313,7 +1360,7 @@ function BillingPageContent() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                 <CreditCard size={15} />
-                Add card for trial
+                Add payment method
               </h3>
               <Button variant="ghost" size="icon-sm" onClick={() => setSetupOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={18} />
@@ -1321,7 +1368,8 @@ function BillingPageContent() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-xs text-muted-foreground">
-                Save a card now so plan activation is faster before trial ends.
+                Add a card on file for when your trial ends. This does not charge you immediately unless your plan requires
+                it at checkout.
               </p>
               {setupError && <p className="text-xs text-destructive">{setupError}</p>}
               {!setupClientSecret ? (

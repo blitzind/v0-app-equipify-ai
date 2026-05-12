@@ -24,6 +24,8 @@ export function stripeSaaSBillingMessageLooksSensitive(raw: string): boolean {
   const s = raw.toLowerCase()
   return (
     /\bcus_[a-z0-9]+\b/i.test(raw) ||
+    /\bsub_[a-z0-9]+\b/i.test(raw) ||
+    /\bprice_[a-z0-9]+\b/i.test(raw) ||
     /\bsk_(live|test)_[a-z0-9]+\b/i.test(raw) ||
     /\bpk_(live|test)_[a-z0-9]+\b/i.test(raw) ||
     /\brk_(live|test)_[a-z0-9]+\b/i.test(raw) ||
@@ -34,6 +36,18 @@ export function stripeSaaSBillingMessageLooksSensitive(raw: string): boolean {
     s.includes("no such customer") ||
     s.includes("similar object exists in")
   )
+}
+
+/** User-facing copy for billing API routes when env / Stripe assertions throw (never leak keys or mode hints). */
+export const BILLING_ENDPOINT_GENERIC_MISCONFIG =
+  "Billing is not available right now. Please try again later or contact support." as const
+
+export function sanitizeBillingEndpointUserMessage(raw: string): string {
+  const t = raw.trim()
+  if (!t) return BILLING_ENDPOINT_GENERIC_MISCONFIG
+  if (stripeSaaSBillingMessageLooksSensitive(t)) return BILLING_ENDPOINT_GENERIC_MISCONFIG
+  if (t.length > 240) return BILLING_ENDPOINT_GENERIC_MISCONFIG
+  return t
 }
 
 /**
