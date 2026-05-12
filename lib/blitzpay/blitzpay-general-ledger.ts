@@ -211,3 +211,13 @@ export const BLITZPAY_INVENTORY_COA_EXTENSION: ReadonlyArray<{
   { code: "5770", name: "Inventory Writeoff Expense", type: "expense" },
   { code: "4370", name: "Vendor Rebate Income (Accrual Release)", type: "revenue" },
 ]
+
+/** Phase 5A — inter-company tracking placeholders (merged by ensureBlitzpayDefaultIntercompanyAccounts; no auto-posting). */
+export const BLITZPAY_INTERCOMPANY_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "1180", name: "Due from Affiliates (Inter-Company)", type: "asset" },
+  { code: "2180", name: "Due to Affiliates (Inter-Company)", type: "liability" },
+]

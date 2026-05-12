@@ -97,6 +97,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Schema:** apply `20261117120000_blitzpay_phase_4b_revenue_optimization.sql` so staff `…/blitzpay/revenue-optimization/*` routes pass **schema health** checks.
 - **Optional env:** `BLITZPAY_REVENUE_OPT_AUDIT_PEPPER` (server-only) — strengthens immutable optimization audit hashes. See `docs/BLITZPAY_PHASE_4_ARCHITECTURE.md`.
 
+### BlitzPay Phase 5A (multi-entity / franchise finance — reporting & linkage only)
+
+- **No autonomous cross-org control:** groups, membership, inter-company rows, and consolidated snapshots are **explicit configuration + reporting**; APIs validate anchor org for mutations; RLS remains org-isolated with finance roles.
+- **Schema:** apply `20261118120000_blitzpay_phase_5a_multi_entity_finance.sql` so staff `…/blitzpay/multi-entity/*` routes pass **schema health** checks.
+- **Optional env:** `BLITZPAY_MULTI_ENTITY_AUDIT_PEPPER` (server-only) — strengthens immutable multi-entity audit hashes. See `docs/BLITZPAY_PHASE_5_ARCHITECTURE.md`.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

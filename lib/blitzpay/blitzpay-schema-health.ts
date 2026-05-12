@@ -115,6 +115,12 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_revenue_optimization_experiments", select: "id, organization_id, experiment_status" },
   { name: "blitzpay_customer_payment_behavior_scores", select: "id, organization_id, customer_id" },
   { name: "blitzpay_revenue_optimization_audit_log", select: "id, organization_id, audit_type" },
+  { name: "blitzpay_financial_groups", select: "id, organization_id, group_status" },
+  { name: "blitzpay_financial_group_members", select: "id, financial_group_id, organization_id" },
+  { name: "blitzpay_intercompany_balances", select: "id, financial_group_id, balance_status" },
+  { name: "blitzpay_consolidated_snapshots", select: "id, financial_group_id, snapshot_date" },
+  { name: "blitzpay_multi_entity_audit_log", select: "id, audit_type, created_at" },
+  { name: "blitzpay_shared_operational_benchmarks", select: "id, financial_group_id, benchmark_type" },
 ]
 
 export type BlitzpaySchemaHealthResult =

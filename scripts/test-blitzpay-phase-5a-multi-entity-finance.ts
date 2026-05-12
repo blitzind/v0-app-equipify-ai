@@ -1,42 +1,38 @@
 /**
- * BlitzPay Phase 4A — AI financial copilot (deterministic helpers + static guards).
- * Run: pnpm test:blitzpay-phase-4a-ai-financial-copilot
+ * BlitzPay Phase 5A — multi-entity / franchise finance foundations (deterministic helpers + route guards).
+ * Run: pnpm test:blitzpay-phase-5a-multi-entity-finance
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { buildAiAuditImmutableHash, composeBlitzpayAiPrioritizedInsights } from "../lib/blitzpay/blitzpay-ai-financial-copilot"
-import { detectBlitzpayFinancialAnomalies } from "../lib/blitzpay/blitzpay-ai-anomaly-detection"
-import { buildBlitzpayAiForecastSnapshots } from "../lib/blitzpay/blitzpay-ai-forecasting"
+import { mergePhase5aFromSnapshotsAndIntercompany, zeroPhase5aOrgReportingExtension } from "../lib/blitzpay/blitzpay-consolidated-reporting"
 import {
-  buildExecutiveFinancialSummaryLines,
-  compareInsightsDeterministic,
-  sortInsightsDeterministic,
-} from "../lib/blitzpay/blitzpay-ai-recommendations"
-import {
-  computeAiFinancialRiskScore0to100,
-  computeBlitzpayPhase4aReportingScores,
-  computeCollectionsOptimizationScore0to100,
-  computeTreasuryPressureScore0to100,
-} from "../lib/blitzpay/blitzpay-ai-snapshot-scores"
+  rollupPayrollExposureCentsFromSnapshots,
+  rollupProcurementInventoryCentsFromSnapshots,
+  rollupTreasuryExposureCentsFromSnapshots,
+  sortIntercompanyBalancesDeterministic,
+  sumActiveIntercompanyExposureCents,
+} from "../lib/blitzpay/blitzpay-intercompany-balances"
+import { hashBlitzpayMultiEntityAudit } from "../lib/blitzpay/blitzpay-multi-entity-audit"
+import { computeSharedBenchmarkCoverage0to100 } from "../lib/blitzpay/blitzpay-shared-benchmarks"
 import type { BlitzpayOrgReportingSnapshot } from "../lib/blitzpay/blitzpay-reporting-snapshot"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_ROOT = path.resolve(__dirname, "..")
 
-function readUtf8(rel: string): string {
+function read(rel: string): string {
   return fs.readFileSync(path.join(APP_ROOT, rel), "utf8")
 }
 
-const baseReporting = (): BlitzpayOrgReportingSnapshot =>
+const snap = (partial: Partial<BlitzpayOrgReportingSnapshot>): BlitzpayOrgReportingSnapshot =>
   ({
     sinceIso: null,
     grossProcessedVolumeCents: 0,
     estimateDepositCapturedCents: 0,
     invoiceStylePaymentCapturedCents: 0,
     refundedVolumeCents: 0,
-    netCollectedCents: 100_000,
+    netCollectedCents: 0,
     convenienceFeeCollectedCents: 0,
     estimatedStripeFeesCents: 0,
     refundedFeesCents: 0,
@@ -79,7 +75,7 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     apDue60OpenCents: 0,
     apVendorInternalVelocity7dCents: 0,
     apProjectedOutgoingCents7d: 0,
-    estimatedRecoverableOverdueCents: 50_000,
+    estimatedRecoverableOverdueCents: 0,
     likelyFieldCollectibleCents: 0,
     achAccelerationOpportunityCents: 0,
     installmentConversionOpportunityCents: 0,
@@ -93,7 +89,7 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     blitzpayRecurringMixOfWindowPct: 0,
     blitzpayAutopayAdoptionPct: 0,
     blitzpayRenewalSuccessProxyPct: 0,
-    blitzpayChurnRiskScore0to100: 40,
+    blitzpayChurnRiskScore0to100: 0,
     blitzpayRecurringStabilityScore0to100: 0,
     blitzpayProjectedRenewalRevenue90dCents: 0,
     blitzpayRenewalRecoveryOpportunityCents: 0,
@@ -101,43 +97,43 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     recurringRevenueCents: 0,
     annualRecurringRevenueCents: 0,
     delinquentMembershipRevenueCents: 0,
-    renewalPipelineCents: 10_000,
+    renewalPipelineCents: 0,
     recoveredMembershipRevenueCents: 0,
     membershipAutoPayAdoptionBasisPoints: 0,
     churnRiskRevenueCents: 0,
     payrollPendingCommissionCents: 0,
-    payrollLiabilityCents: 20_000,
+    payrollLiabilityCents: 0,
     contractorSettlementExposureCents: 0,
     recurringRevenueSharePendingCents: 0,
-    estimatedPayrollBurdenCents: 5000,
+    estimatedPayrollBurdenCents: 0,
     commissionVelocity7dCents: 0,
     recurringMemberPayoutStability0to100: 0,
     openDisputesAmountCents: 0,
-    estimatedOperatingCashCents: 80_000,
+    estimatedOperatingCashCents: 0,
     cashReserveTargetCents: 0,
-    cashReserveGapCents: 10_000,
-    expectedInflows7dCents: 5000,
-    expectedInflows30dCents: 40_000,
-    expectedOutflows7dCents: 10_000,
-    expectedOutflows30dCents: 55_000,
-    cashRunwayStatus: "watch",
+    cashReserveGapCents: 0,
+    expectedInflows7dCents: 0,
+    expectedInflows30dCents: 0,
+    expectedOutflows7dCents: 0,
+    expectedOutflows30dCents: 0,
+    cashRunwayStatus: "healthy",
     payrollReserveCoverageBasisPoints: 0,
     apReserveCoverageBasisPoints: 0,
     autopayEnrollmentRate: 0,
     savedPaymentMethodRate: 0,
     billingReadinessRate: 0,
     delinquencyRiskRate: 0,
-    collectionSuccessRate: 70,
+    collectionSuccessRate: 0,
     retryRecoveryRate: 0,
-    failedPaymentRate: 15,
-    delinquencyRate: 10,
+    failedPaymentRate: 0,
+    delinquencyRate: 0,
     recoveryFlowCompletionRate: 0,
     averageRecoveryDurationDays: 0,
     totalAssetsCents: 0,
     totalLiabilitiesCents: 0,
     totalEquityCents: 0,
     deferredRevenueCents: 0,
-    accountsReceivableCents: 100_000,
+    accountsReceivableCents: 0,
     accountsPayableCents: 0,
     glPayrollLiabilityCents: 0,
     trialBalanceHealthy: true,
@@ -147,9 +143,9 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     approvedBillsAwaitingPaymentCents: 0,
     overdueVendorBillsCents: 0,
     averageVendorPaymentDays: null,
-    vendorConcentrationRisk: 65,
+    vendorConcentrationRisk: 0,
     treasuryCoverageForPayables: 0,
-    payableAgingHealthScore: 60,
+    payableAgingHealthScore: 0,
     salesTaxPayableCents: 0,
     payrollTaxPayableCents: 0,
     contractorTaxEstimateCents: 0,
@@ -163,17 +159,17 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     financingMarketplaceCoverage: 0,
     contractorAdvanceExposure: 0,
     financingRevenueOpportunity: 0,
-    financingRiskScore: 30,
+    financingRiskScore: 0,
     financingConversionRate: 0,
     financingTreasuryImpactScore: 0,
     totalInventoryValueCents: 0,
     inventoryWriteoffExposure: 0,
-    inventoryTurnoverScore: 50,
-    reorderExposureCents: 20_000,
+    inventoryTurnoverScore: 0,
+    reorderExposureCents: 0,
     rebateOpportunityCents: 0,
     serializedAssetExposure: 0,
-    procurementTreasuryImpactScore: 40,
-    inventoryMarginHealthScore: 55,
+    procurementTreasuryImpactScore: 0,
+    inventoryMarginHealthScore: 0,
     aiFinancialRiskScore: 0,
     treasuryPressureScore: 0,
     marginRiskScore: 0,
@@ -198,104 +194,80 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     sharedBenchmarkCoverage: 0,
     multiEntityRiskScore: 0,
     consolidatedOrganizationCount: 0,
+    ...partial,
   }) as BlitzpayOrgReportingSnapshot
 
-// --- Phase 4a scores ---
-const m = {
-  cashRunwayStatus: "watch" as const,
-  cashReserveGapCents: 10_000,
-  estimatedOperatingCashCents: 80_000,
-  expectedInflows7dCents: 5000,
-  expectedInflows30dCents: 40_000,
-  expectedOutflows30dCents: 55_000,
-  treasuryFailedPayoutCount30d: 2,
-  treasuryPendingPayoutTotalsCents: 5000,
-  treasuryEstimateUpcomingTransferCents: 5000,
-  inventoryMarginHealthScore: 55,
-  failedPaymentRate: 15,
-  delinquencyRate: 10,
-  collectionSuccessRate: 70,
-  estimatedRecoverableOverdueCents: 50_000,
-  accountsReceivableCents: 100_000,
-  payrollLiabilityCents: 20_000,
-  estimatedPayrollBurdenCents: 5000,
-  procurementTreasuryImpactScore: 40,
-  payableAgingHealthScore: 60,
-  inventoryTurnoverScore: 50,
-  vendorConcentrationRisk: 65,
-  trialBalanceHealthy: true,
-  unreconciledBatchCount: 0,
-  openDisputesAmountCents: 2000,
-  netCollectedCents: 100_000,
-  blitzpayChurnRiskScore0to100: 40,
-  financingRiskScore: 30,
-}
-const tp = computeTreasuryPressureScore0to100(m)
-assert.ok(tp >= 20 && tp <= 100)
-const co = computeCollectionsOptimizationScore0to100(m)
-assert.ok(co >= 0 && co <= 100)
-const p4 = computeBlitzpayPhase4aReportingScores(m)
-assert.equal(typeof p4.aiFinancialRiskScore, "number")
-const air = computeAiFinancialRiskScore0to100({
-  treasuryPressureScore: 60,
-  marginRiskScore: 40,
-  collectionsOptimizationScore: 50,
-  payrollPressureScore: 30,
-  vendorConcentrationRiskScore: 70,
-  procurementStressScore: 35,
-  financingRiskScore: 40,
-  churnRisk: 50,
+const z = zeroPhase5aOrgReportingExtension()
+assert.equal(z.multiEntityRevenueExposureCents, 0)
+
+const a = snap({
+  churnRiskRevenueCents: 1000,
+  openDisputesAmountCents: 500,
+  treasuryReserveExposureCents: 2000,
+  treasuryPendingPayoutTotalsCents: 300,
+  collectionSuccessRate: 80,
+  aiFinancialRiskScore: 40,
+  collectionsOptimizationScore: 60,
 })
-assert.equal(air, 70)
+const b = snap({
+  churnRiskRevenueCents: 200,
+  collectionSuccessRate: 60,
+  aiFinancialRiskScore: 60,
+  collectionsOptimizationScore: 40,
+})
+const merged = mergePhase5aFromSnapshotsAndIntercompany([b, a], [{ balance_amount_cents: 1000, balance_status: "active" }], 2)
+assert.equal(merged.consolidatedOrganizationCount, 2)
+assert.equal(merged.intercompanyBalanceExposureCents, 1000)
+assert.ok(merged.multiEntityTreasuryExposureCents > 0)
 
-// --- Anomalies ---
-const r = baseReporting()
-const anomalies = detectBlitzpayFinancialAnomalies(r)
-assert.ok(Array.isArray(anomalies))
+const treasuryRoll = rollupTreasuryExposureCentsFromSnapshots([a, b])
+assert.ok(treasuryRoll >= 2300)
+const payrollRoll = rollupPayrollExposureCentsFromSnapshots([snap({ payrollLiabilityCents: 100, estimatedPayrollBurdenCents: 50 })])
+assert.equal(payrollRoll, 150)
+const invRoll = rollupProcurementInventoryCentsFromSnapshots([snap({ totalInventoryValueCents: 1000, reorderExposureCents: 200 })])
+assert.equal(invRoll, 1200)
 
-// --- Forecasts ---
-const fc = buildBlitzpayAiForecastSnapshots(r, 30)
-assert.equal(fc.length, 7)
+const sorted = sortIntercompanyBalancesDeterministic([
+  { balance_amount_cents: 1, balance_status: "active", financial_group_id: "b", id: "2" },
+  { balance_amount_cents: 1, balance_status: "active", financial_group_id: "a", id: "1" },
+])
+assert.equal(sorted[0]?.financial_group_id, "a")
 
-// --- Executive summary ---
-const ex = buildExecutiveFinancialSummaryLines(r, p4)
-assert.ok(ex.bullets.length >= 3)
+const sumIc = sumActiveIntercompanyExposureCents([
+  { balance_amount_cents: 100, balance_status: "active" },
+  { balance_amount_cents: 50, balance_status: "settled" },
+])
+assert.equal(sumIc, 100)
 
-// --- Insight ordering ---
-const insights = composeBlitzpayAiPrioritizedInsights(r)
-assert.ok(insights.length >= 1)
-const sorted = sortInsightsDeterministic([...insights].reverse())
-assert.equal(sorted[0]?.insight_type, [...insights].sort(compareInsightsDeterministic)[0]?.insight_type)
+const cov = computeSharedBenchmarkCoverage0to100([
+  snap({ collectionSuccessRate: 10, payrollPressureScore: 0, annualRecurringRevenueCents: 0, financingRiskScore: 0, procurementEfficiencyScore: 0, totalInventoryValueCents: 0, treasuryPressureScore: 0, netCollectedCents: 0 }),
+])
+assert.ok(cov >= 10 && cov <= 100)
 
-// --- Audit hash stable ---
-const h1 = buildAiAuditImmutableHash({ a: 1, z: 2, t: "x" })
-const h2 = buildAiAuditImmutableHash({ z: 2, a: 1, t: "x" })
+const h1 = hashBlitzpayMultiEntityAudit({ a: 1, b: "x" })
+const h2 = hashBlitzpayMultiEntityAudit({ b: "x", a: 1 })
 assert.equal(h1, h2)
+assert.equal(h1.length, 64)
 
-// --- Migration ---
-const mig = readUtf8("supabase/migrations/20261116120000_blitzpay_phase_4a_ai_financial_copilot.sql")
-assert.match(mig, /blitzpay_ai_audit_block_mutation/)
-assert.match(mig, /blitzpay_ai_financial_insights/)
-
-// --- API gates ---
-for (const rel of [
-  "app/api/organizations/[organizationId]/blitzpay/ai/insights/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/forecasts/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/recommendations/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/executive-summary/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/health/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/insights/[insightId]/dismiss/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/recommendations/[recommendationId]/acknowledge/route.ts",
-  "app/api/organizations/[organizationId]/blitzpay/ai/recommendations/[recommendationId]/complete/route.ts",
-]) {
-  const src = readUtf8(rel)
-  assert.match(src, /requireAnyOrgPermission/)
+const routes = [
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/groups/route.ts",
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/group-members/route.ts",
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/intercompany-balances/route.ts",
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/consolidated-snapshots/route.ts",
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/benchmarks/route.ts",
+  "app/api/organizations/[organizationId]/blitzpay/multi-entity/health/route.ts",
+]
+for (const r of routes) {
+  const src = read(r)
   assert.match(src, /blitzpaySchemaGuardNextResponse/)
+  assert.match(src, /requireAnyOrgPermission/)
 }
 
-// --- Schema health lists new tables ---
-const schemaSrc = readUtf8("lib/blitzpay/blitzpay-schema-health.ts")
-assert.match(schemaSrc, /blitzpay_ai_financial_insights/)
-assert.match(schemaSrc, /blitzpay_ai_audit_log/)
+const schema = read("lib/blitzpay/blitzpay-schema-health.ts")
+assert.match(schema, /blitzpay_financial_groups/)
+assert.match(schema, /blitzpay_multi_entity_audit_log/)
 
-console.log("blitzpay phase 4a ai financial copilot tests passed")
+const migration = read("supabase/migrations/20261118120000_blitzpay_phase_5a_multi_entity_finance.sql")
+assert.match(migration, /blitzpay_multi_entity_audit_block_mutation/)
+
+console.log("blitzpay phase 5a multi-entity finance tests passed")

@@ -108,6 +108,22 @@ type CommandCenterPayload = {
     procurementEfficiencyScore?: number
     vendorConcentrationRiskScore?: number
     aiInsightCoverageRate?: number
+    revenueOptimizationScore?: number
+    estimatedRevenueOpportunityCents?: number
+    paymentBehaviorCoverageRate?: number
+    churnPreventionOpportunityCount?: number
+    achNudgeOpportunityCount?: number
+    renewalOptimizationOpportunityCount?: number
+    technicianCoachingOpportunityCount?: number
+    optimizationExperimentCount?: number
+    multiEntityRevenueExposure?: number
+    multiEntityTreasuryExposure?: number
+    intercompanyBalanceExposure?: number
+    consolidatedCollectionsRate?: number
+    franchiseHealthScore?: number
+    sharedBenchmarkCoverage?: number
+    multiEntityRiskScore?: number
+    consolidatedOrganizationCount?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -310,6 +326,14 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Procurement — serialized assets (est.)", v: fmtMoney(data.tiles.serializedAssetExposure ?? 0) },
               { k: "Procurement — treasury vs reorder pressure", v: `${data.tiles.procurementTreasuryImpactScore ?? 0}/100` },
               { k: "Procurement — parts margin health (metadata)", v: `${data.tiles.inventoryMarginHealthScore ?? 0}/100` },
+              { k: "Linked locations — revenue exposure (aggregate est.)", v: fmtMoney(data.tiles.multiEntityRevenueExposure ?? 0) },
+              { k: "Linked locations — treasury exposure (aggregate est.)", v: fmtMoney(data.tiles.multiEntityTreasuryExposure ?? 0) },
+              { k: "Linked locations — inter-company tracking (active)", v: fmtMoney(data.tiles.intercompanyBalanceExposure ?? 0) },
+              { k: "Linked locations — collections rate (mean)", v: `${data.tiles.consolidatedCollectionsRate ?? 0}/100` },
+              { k: "Linked locations — franchise health (advisory)", v: `${data.tiles.franchiseHealthScore ?? 0}/100` },
+              { k: "Linked locations — benchmark coverage", v: `${data.tiles.sharedBenchmarkCoverage ?? 0}/100` },
+              { k: "Linked locations — multi-entity risk (mean)", v: `${data.tiles.multiEntityRiskScore ?? 0}/100` },
+              { k: "Linked locations — orgs in rollups", v: String(data.tiles.consolidatedOrganizationCount ?? 0) },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

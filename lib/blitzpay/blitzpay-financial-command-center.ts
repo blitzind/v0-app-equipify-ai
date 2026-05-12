@@ -136,6 +136,15 @@ export type BlitzpayFinancialCommandCenterPayload = {
     renewalOptimizationOpportunityCount: number
     technicianCoachingOpportunityCount: number
     optimizationExperimentCount: number
+    /** Phase 5A — multi-entity / franchise rollups (explicit linkage; advisory). */
+    multiEntityRevenueExposure: number
+    multiEntityTreasuryExposure: number
+    intercompanyBalanceExposure: number
+    consolidatedCollectionsRate: number
+    franchiseHealthScore: number
+    sharedBenchmarkCoverage: number
+    multiEntityRiskScore: number
+    consolidatedOrganizationCount: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -171,6 +180,10 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     procurementInventory: {
       href: "/settings/payments#blitzpay-procurement-inventory-anchor",
       label: "Procurement & inventory finance (Settings → Payments)",
+    },
+    multiEntityFinance: {
+      href: "/insights/financial-command-center#blitzpay-multi-entity-finance",
+      label: "Multi-entity finance (linked locations)",
     },
   }
 }
@@ -384,6 +397,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     renewalOptimizationOpportunityCount: reporting.renewalOptimizationOpportunityCount,
     technicianCoachingOpportunityCount: reporting.technicianCoachingOpportunityCount,
     optimizationExperimentCount: reporting.optimizationExperimentCount,
+    multiEntityRevenueExposure: reporting.multiEntityRevenueExposure,
+    multiEntityTreasuryExposure: reporting.multiEntityTreasuryExposure,
+    intercompanyBalanceExposure: reporting.intercompanyBalanceExposure,
+    consolidatedCollectionsRate: reporting.consolidatedCollectionsRate,
+    franchiseHealthScore: reporting.franchiseHealthScore,
+    sharedBenchmarkCoverage: reporting.sharedBenchmarkCoverage,
+    multiEntityRiskScore: reporting.multiEntityRiskScore,
+    consolidatedOrganizationCount: reporting.consolidatedOrganizationCount,
   },
     combinedForecast,
     scorecards,

@@ -219,6 +219,15 @@ export type BlitzpayOrgReportingSnapshot = {
   renewalOptimizationOpportunityCount: number
   technicianCoachingOpportunityCount: number
   optimizationExperimentCount: number
+  /** Phase 5A — multi-entity / franchise reporting (explicit linkage; cents are integers). */
+  multiEntityRevenueExposure: number
+  multiEntityTreasuryExposure: number
+  intercompanyBalanceExposure: number
+  consolidatedCollectionsRate: number
+  franchiseHealthScore: number
+  sharedBenchmarkCoverage: number
+  multiEntityRiskScore: number
+  consolidatedOrganizationCount: number
 }
 
 /**
@@ -227,7 +236,12 @@ export type BlitzpayOrgReportingSnapshot = {
 export async function fetchBlitzpayOrgReportingSnapshot(
   admin: SupabaseClient,
   organizationId: string,
-  options?: { sinceIso?: string | null; collectionsPulse?: { reminderEffectivenessRatePct: number } },
+  options?: {
+    sinceIso?: string | null
+    collectionsPulse?: { reminderEffectivenessRatePct: number }
+    /** When true, skips Phase 5A linked-org aggregation (prevents recursion when loading member org snapshots). */
+    skipMultiEntity?: boolean
+  },
 ): Promise<BlitzpayOrgReportingSnapshot> {
   assertUuid(organizationId, "organizationId")
   const sinceIso = options?.sinceIso?.trim() ? options.sinceIso.trim() : null
@@ -945,6 +959,31 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     { activeExperimentCount: optimizationExperimentCount },
   )
 
+  let phase5aMultiEntityRevenueExposure = 0
+  let phase5aMultiEntityTreasuryExposure = 0
+  let phase5aIntercompanyBalanceExposure = 0
+  let phase5aConsolidatedCollectionsRate = 0
+  let phase5aFranchiseHealthScore = 0
+  let phase5aSharedBenchmarkCoverage = 0
+  let phase5aMultiEntityRiskScore = 0
+  let phase5aConsolidatedOrganizationCount = 0
+  if (!options?.skipMultiEntity) {
+    try {
+      const { buildPhase5aLinkedOrgReportingSlice } = await import("@/lib/blitzpay/blitzpay-multi-entity-finance")
+      const slice = await buildPhase5aLinkedOrgReportingSlice(admin, organizationId, sinceIso)
+      phase5aMultiEntityRevenueExposure = slice.multiEntityRevenueExposureCents
+      phase5aMultiEntityTreasuryExposure = slice.multiEntityTreasuryExposureCents
+      phase5aIntercompanyBalanceExposure = slice.intercompanyBalanceExposureCents
+      phase5aConsolidatedCollectionsRate = slice.consolidatedCollectionsRate
+      phase5aFranchiseHealthScore = slice.franchiseHealthScore
+      phase5aSharedBenchmarkCoverage = slice.sharedBenchmarkCoverage
+      phase5aMultiEntityRiskScore = slice.multiEntityRiskScore
+      phase5aConsolidatedOrganizationCount = slice.consolidatedOrganizationCount
+    } catch {
+      /* optional until Phase 5A migration applied */
+    }
+  }
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1138,5 +1177,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     renewalOptimizationOpportunityCount: phase4b.renewalOptimizationOpportunityCount,
     technicianCoachingOpportunityCount: phase4b.technicianCoachingOpportunityCount,
     optimizationExperimentCount: phase4b.optimizationExperimentCount,
+    multiEntityRevenueExposure: phase5aMultiEntityRevenueExposure,
+    multiEntityTreasuryExposure: phase5aMultiEntityTreasuryExposure,
+    intercompanyBalanceExposure: phase5aIntercompanyBalanceExposure,
+    consolidatedCollectionsRate: phase5aConsolidatedCollectionsRate,
+    franchiseHealthScore: phase5aFranchiseHealthScore,
+    sharedBenchmarkCoverage: phase5aSharedBenchmarkCoverage,
+    multiEntityRiskScore: phase5aMultiEntityRiskScore,
+    consolidatedOrganizationCount: phase5aConsolidatedOrganizationCount,
   }
 }

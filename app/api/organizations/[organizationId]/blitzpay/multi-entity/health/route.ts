@@ -1,0 +1,95 @@
+import { NextResponse } from "next/server"
+import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
+import { blitzpaySchemaGuardNextResponse } from "@/lib/blitzpay/blitzpay-schema-health"
+import { blitzpayStaffLoadFailedResponse } from "@/lib/blitzpay/blitzpay-staff-load-error-response"
+import {
+  rollupPayrollExposureCentsFromSnapshots,
+  rollupProcurementInventoryCentsFromSnapshots,
+  rollupTreasuryExposureCentsFromSnapshots,
+} from "@/lib/blitzpay/blitzpay-intercompany-balances"
+import {
+  buildMultiEntityHealthPayload,
+  listActiveMembersForGroup,
+  listIntercompanyBalancesForGroupIds,
+  listVisibleFinancialGroupsForOrganization,
+} from "@/lib/blitzpay/blitzpay-multi-entity-finance"
+import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
+
+export const runtime = "nodejs"
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const DISCLAIMER =
+  "Multi-entity reporting reflects linked organizations with authorized visibility permissions. Financial actions remain scoped to each organization."
+
+export async function GET(request: Request, context: { params: Promise<{ organizationId: string }> }) {
+  const { organizationId } = await context.params
+  if (!UUID_RE.test(organizationId)) {
+    return NextResponse.json({ error: "bad_request", message: "Invalid organization." }, { status: 400 })
+  }
+  const gate = await requireAnyOrgPermission(organizationId, ["canViewFinancialReports", "canViewFinancials"])
+  if ("error" in gate) return gate.error
+  const schemaResp = await blitzpaySchemaGuardNextResponse(
+    "GET /api/organizations/[organizationId]/blitzpay/multi-entity/health",
+  )
+  if (schemaResp) return schemaResp
+  let sinceIso: string | null = null
+  try {
+    const u = new URL(request.url)
+    const raw = u.searchParams.get("since")
+    if (raw && raw.trim()) sinceIso = new Date(raw).toISOString()
+  } catch {
+    /* ignore */
+  }
+  if (!sinceIso) {
+    sinceIso = new Date(Date.now() - 30 * 86400_000).toISOString()
+  }
+  let admin: ReturnType<typeof createServiceRoleSupabaseClient>
+  try {
+    admin = createServiceRoleSupabaseClient()
+  } catch {
+    return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
+  }
+  try {
+    const health = await buildMultiEntityHealthPayload(admin, organizationId, sinceIso)
+    const groups = await listVisibleFinancialGroupsForOrganization(admin, organizationId)
+    const groupIds = groups.map((g) => g.id).sort((a, b) => a.localeCompare(b))
+    const icRows = await listIntercompanyBalancesForGroupIds(admin, groupIds)
+    const { fetchBlitzpayOrgReportingSnapshot } = await import("@/lib/blitzpay/blitzpay-reporting-snapshot")
+    const orgSet = new Set<string>()
+    orgSet.add(organizationId)
+    for (const g of groups) orgSet.add(g.organization_id)
+    for (const g of groups) {
+      const members = await listActiveMembersForGroup(admin, g.id)
+      for (const m of members) orgSet.add(m.organization_id)
+    }
+    const sortedOrgIds = [...orgSet].sort((a, b) => a.localeCompare(b)).slice(0, 40)
+    const snaps = []
+    for (const oid of sortedOrgIds) {
+      snaps.push(await fetchBlitzpayOrgReportingSnapshot(admin, oid, { sinceIso, skipMultiEntity: true }))
+    }
+    const pairs = sortedOrgIds.map((oid, i) => ({ oid, snap: snaps[i]! }))
+    pairs.sort((a, b) => a.oid.localeCompare(b.oid))
+    const orderedSnaps = pairs.map((p) => p.snap)
+    const regionalTreasuryRollupCents = rollupTreasuryExposureCentsFromSnapshots(orderedSnaps)
+    const regionalPayrollRollupCents = rollupPayrollExposureCentsFromSnapshots(orderedSnaps)
+    const regionalProcurementInventoryCents = rollupProcurementInventoryCentsFromSnapshots(orderedSnaps)
+
+    return NextResponse.json({
+      disclaimer: DISCLAIMER,
+      sinceIso,
+      phase5a: health.phase5a,
+      visibleGroupCount: health.visibleGroupCount,
+      activeMemberOrgApprox: health.activeMemberOrgApprox,
+      rollups: {
+        regionalTreasuryRollupCents,
+        regionalPayrollRollupCents,
+        regionalProcurementInventoryCents,
+      },
+      intercompanyBalanceRows: icRows.length,
+    })
+  } catch (e) {
+    return blitzpayStaffLoadFailedResponse("GET blitzpay/multi-entity/health", e)
+  }
+}
