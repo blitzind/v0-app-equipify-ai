@@ -5,6 +5,7 @@ import { Bell, Mail, Smartphone, Monitor, Loader2, Info } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -136,7 +137,7 @@ function friendMutateMessage(res: Response, json: { message?: string; error?: st
     return "Notification storage is not set up on this server yet. Ask an administrator to apply the latest update, then try again."
   }
   if (json?.error === "server_misconfigured") {
-    return "The server could not save settings right now. Please try again later."
+    return "Database setup needed on the server (missing service configuration). Ask an administrator to verify environment variables, then try again."
   }
   if (res.status === 401) {
     return "You must be signed in to change these settings."
@@ -148,45 +149,6 @@ function friendMutateMessage(res: Response, json: { message?: string; error?: st
     return json.message.trim()
   }
   return "Could not save settings."
-}
-
-function Toggle({
-  checked,
-  onChange,
-  disabled,
-  "aria-label": ariaLabel,
-}: {
-  checked: boolean
-  onChange: (v: boolean) => void
-  disabled?: boolean
-  "aria-label"?: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => {
-        if (!disabled) onChange(!checked)
-      }}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent",
-        "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
-        checked ? "bg-primary" : "bg-border",
-      )}
-    >
-      <span
-        className={cn(
-          "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm",
-          "transform transition-transform duration-150",
-          checked ? "translate-x-4" : "translate-x-0",
-        )}
-      />
-    </button>
-  )
 }
 
 function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
@@ -205,11 +167,27 @@ function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
 export default function NotificationsPage() {
   const { toast } = useToast()
   const { organizationId, status: orgStatus } = useActiveOrganization()
-  const { status: permStatus, has } = useOrgPermissions()
-  const canEdit = permStatus === "ready" && has("canManageWorkspaceSettings")
+  const { status: permStatus, permissions } = useOrgPermissions()
+  const canManageWorkspaceSettings =
+    permStatus === "ready" && permissions.canManageWorkspaceSettings
   const [persistenceReady, setPersistenceReady] = useState(true)
 
-  const canMutate = useMemo(() => canEdit && persistenceReady, [canEdit, persistenceReady])
+  const mutateBlockReason = useMemo(() => {
+    if (orgStatus !== "ready" || !organizationId) return "no_workspace" as const
+    if (permStatus === "loading") return "permissions_loading" as const
+    if (permStatus === "no_org") return "no_workspace" as const
+    if (!persistenceReady) return "database_setup" as const
+    if (!canManageWorkspaceSettings) return "view_only" as const
+    return null
+  }, [
+    orgStatus,
+    organizationId,
+    permStatus,
+    persistenceReady,
+    canManageWorkspaceSettings,
+  ])
+
+  const canMutate = mutateBlockReason === null
 
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error" | "ready">("idle")
   const [loadMessage, setLoadMessage] = useState<string | null>(null)
@@ -217,6 +195,16 @@ export default function NotificationsPage() {
   const [saving, setSaving] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const saveLockRef = useRef(false)
+  const sawPermissionsLoadingRef = useRef(false)
+
+  /** Dev-only: surface save pipeline without exposing secrets (never shown in production UI). */
+  const showNotifPrefsDebug = process.env.NODE_ENV === "development"
+  const [devDiag, setDevDiag] = useState({
+    patchAttempts: 0,
+    lastPatchAt: null as number | null,
+    lastSaveStatus: "idle" as "idle" | "success" | "error",
+    lastHttpStatus: null as number | null,
+  })
 
   const prefsByType = useMemo(() => {
     const m = new Map<WorkspaceAlertType, ApiPreference>()
@@ -277,12 +265,45 @@ export default function NotificationsPage() {
     return () => abortRef.current?.abort()
   }, [load])
 
+  useEffect(() => {
+    if (permStatus === "loading") sawPermissionsLoadingRef.current = true
+    if (
+      orgStatus !== "ready" ||
+      !organizationId ||
+      permStatus !== "ready" ||
+      !sawPermissionsLoadingRef.current
+    ) {
+      return
+    }
+    sawPermissionsLoadingRef.current = false
+    void load()
+  }, [orgStatus, organizationId, permStatus, load])
+
   const patch = useCallback(
     async (body: { preferences?: ApiPreference[]; digest?: ApiDigest }, rollback: ApiBundle | null) => {
       if (!organizationId || !rollback) return
-      if (saveLockRef.current) return
+      if (saveLockRef.current) {
+        if (showNotifPrefsDebug) {
+          setDevDiag((d) => ({
+            ...d,
+            lastSaveStatus: "error",
+            lastHttpStatus: null,
+            lastPatchAt: Date.now(),
+          }))
+        }
+        return
+      }
       saveLockRef.current = true
       setSaving(true)
+      if (showNotifPrefsDebug) {
+        setDevDiag((d) => ({
+          ...d,
+          patchAttempts: d.patchAttempts + 1,
+          lastPatchAt: Date.now(),
+          lastSaveStatus: "idle",
+          lastHttpStatus: null,
+        }))
+      }
       try {
         const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
           method: "PATCH",
@@ -291,6 +312,9 @@ export default function NotificationsPage() {
           cache: "no-store",
         })
         const json = (await res.json().catch(() => null)) as ApiResponse | null
+        if (showNotifPrefsDebug) {
+          setDevDiag((d) => ({ ...d, lastHttpStatus: res.status }))
+        }
         if (!res.ok) {
           const msg = friendMutateMessage(res, json)
           throw new Error(msg)
@@ -299,22 +323,28 @@ export default function NotificationsPage() {
           throw new Error("Could not save settings.")
         }
         applyApiNotificationResponse(json)
-        toast({ title: "Saved", description: "Your notification settings were saved." })
+        toast({ title: "Your notification settings were saved." })
+        if (showNotifPrefsDebug) {
+          setDevDiag((d) => ({ ...d, lastSaveStatus: "success" }))
+        }
       } catch (e) {
         setBundle(rollback)
         const msg = e instanceof Error ? e.message : "Could not save settings."
         toast({ variant: "destructive", title: "Save failed", description: msg })
+        if (showNotifPrefsDebug) {
+          setDevDiag((d) => ({ ...d, lastSaveStatus: "error" }))
+        }
       } finally {
         saveLockRef.current = false
         setSaving(false)
       }
     },
-    [applyApiNotificationResponse, organizationId, toast],
+    [applyApiNotificationResponse, organizationId, toast, showNotifPrefsDebug],
   )
 
   const updatePreferenceChannel = useCallback(
     async (alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
-      if (!bundle || !canMutate || saving || saveLockRef.current) return
+      if (!bundle || !canMutate || saveLockRef.current) return
       const rollback = bundle
       const nextPrefs = bundle.preferences.map((p) =>
         p.alertType === alertType ?
@@ -329,17 +359,17 @@ export default function NotificationsPage() {
       setBundle({ ...bundle, preferences: nextPrefs })
       await patch({ preferences: preferencesPayload(nextPrefs), digest: bundle.digest }, rollback)
     },
-    [bundle, canMutate, patch, saving],
+    [bundle, canMutate, patch],
   )
 
   const updateDigest = useCallback(
     async (nextDigest: ApiDigest) => {
-      if (!bundle || !canMutate || saving || saveLockRef.current) return
+      if (!bundle || !canMutate || saveLockRef.current) return
       const rollback = bundle
       setBundle({ ...bundle, digest: nextDigest })
       await patch({ preferences: preferencesPayload(bundle.preferences), digest: nextDigest }, rollback)
     },
-    [bundle, canMutate, patch, saving],
+    [bundle, canMutate, patch],
   )
 
   const showMatrix = loadState === "ready" && bundle
@@ -380,6 +410,34 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
+      {showNotifPrefsDebug && orgStatus === "ready" && organizationId ?
+        <Alert className="border-dashed">
+          <AlertTitle className="text-xs font-mono">Notification prefs (dev only)</AlertTitle>
+          <AlertDescription className="space-y-1 font-mono text-[11px] leading-relaxed">
+            <div>persistenceReady: {String(persistenceReady)}</div>
+            <div>permStatus: {permStatus}</div>
+            <div>canManageWorkspaceSettings: {String(permissions.canManageWorkspaceSettings)}</div>
+            <div>mutateBlockReason: {mutateBlockReason ?? "null (can save)"}</div>
+            <div>canMutate: {String(canMutate)}</div>
+            <div>saving (PATCH in flight): {String(saving)}</div>
+            <div>patchAttempts: {devDiag.patchAttempts}</div>
+            <div>lastHttpStatus: {devDiag.lastHttpStatus ?? "—"}</div>
+            <div>lastSaveStatus: {devDiag.lastSaveStatus}</div>
+          </AlertDescription>
+        </Alert>
+      : null}
+
+      {loadState === "ready" && bundle && mutateBlockReason === "permissions_loading" ?
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Checking permissions…</AlertTitle>
+          <AlertDescription>
+            Your workspace membership is loading. Alert toggles stay read-only until that finishes (usually under a
+            second).
+          </AlertDescription>
+        </Alert>
+      : null}
+
       {loadState === "ready" && bundle && !persistenceReady ?
         <Alert>
           <Info className="h-4 w-4" />
@@ -391,7 +449,7 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
-      {permStatus === "ready" && !canEdit && bundle && persistenceReady ?
+      {mutateBlockReason === "view_only" && bundle && persistenceReady ?
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>View only</AlertTitle>
@@ -399,6 +457,14 @@ export default function NotificationsPage() {
             You can see this workspace&apos;s notification settings. Only members who manage workspace settings can change
             them.
           </AlertDescription>
+        </Alert>
+      : null}
+
+      {mutateBlockReason === "no_workspace" && loadState !== "loading" && loadState !== "error" ?
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Select a workspace</AlertTitle>
+          <AlertDescription>Choose a workspace above to load and edit notification preferences.</AlertDescription>
         </Alert>
       : null}
 
@@ -480,29 +546,33 @@ export default function NotificationsPage() {
                         <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           In-app
                         </span>
-                        <Toggle
+                        <Switch
                           aria-label={`${row.label} in-app`}
                           checked={pref.inAppEnabled}
                           disabled={busy}
-                          onChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                          onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2 py-3">
                         <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           Email
                         </span>
-                        <Toggle
+                        <Switch
                           aria-label={`${row.label} email`}
                           checked={pref.emailEnabled}
                           disabled={busy}
-                          onChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                          onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-2 py-3">
                         <span className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           SMS
                         </span>
-                        <Toggle checked={false} disabled onChange={() => {}} aria-label={`${row.label} SMS (inactive)`} />
+                        <Switch
+                          checked={false}
+                          disabled
+                          aria-label={`${row.label} SMS (inactive)`}
+                        />
                       </div>
                     </div>
                   </div>
@@ -532,23 +602,23 @@ export default function NotificationsPage() {
                       </div>
                     </div>
                     <div className="flex w-16 justify-center">
-                      <Toggle
+                      <Switch
                         aria-label={`${row.label} in-app`}
                         checked={pref.inAppEnabled}
                         disabled={busy}
-                        onChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                        onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
                       />
                     </div>
                     <div className="flex w-14 justify-center">
-                      <Toggle
+                      <Switch
                         aria-label={`${row.label} email`}
                         checked={pref.emailEnabled}
                         disabled={busy}
-                        onChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                        onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
                       />
                     </div>
                     <div className="flex w-12 justify-center">
-                      <Toggle checked={false} disabled onChange={() => {}} aria-label={`${row.label} SMS (inactive)`} />
+                      <Switch checked={false} disabled aria-label={`${row.label} SMS (inactive)`} />
                     </div>
                   </div>
                 )
@@ -569,11 +639,11 @@ export default function NotificationsPage() {
             </p>
           </div>
           {digest ?
-            <Toggle
+            <Switch
               aria-label="Email digest enabled"
               checked={digest.digestEnabled}
               disabled={saving || !canMutate || !bundle}
-              onChange={(v) => {
+              onCheckedChange={(v) => {
                 if (!bundle) return
                 void updateDigest({ ...bundle.digest, digestEnabled: v })
               }}
@@ -640,11 +710,11 @@ export default function NotificationsPage() {
             </p>
           </div>
           {digest ?
-            <Toggle
+            <Switch
               aria-label="Quiet hours enabled"
               checked={digest.quietHoursEnabled}
               disabled={saving || !canMutate || !bundle}
-              onChange={(v) => {
+              onCheckedChange={(v) => {
                 if (!bundle) return
                 const d = bundle.digest
                 void updateDigest({

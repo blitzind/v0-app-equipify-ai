@@ -184,6 +184,8 @@ export async function PATCH(
   const gate = await requireOrgPermission(organizationId, "canManageWorkspaceSettings")
   if ("error" in gate) return gate.error
 
+  console.info("[notification-preferences PATCH] accepted", { organizationId })
+
   const svc = getServiceRoleOrNull()
   if (!svc) {
     return NextResponse.json({ error: "server_misconfigured", message: "Server is not configured." }, { status: 503 })
