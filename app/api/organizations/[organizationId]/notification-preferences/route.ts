@@ -21,20 +21,33 @@ export const dynamic = "force-dynamic"
 const LOCAL_HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
 
 function serializeBundle(bundle: OrganizationNotificationSettingsBundle) {
+  const d = bundle.digest
   return {
     preferences: bundle.preferences.map((p) => ({
       alertType: p.alertType,
       inAppEnabled: p.inAppEnabled,
       emailEnabled: p.emailEnabled,
       smsEnabled: p.smsEnabled,
+      /** Short aliases for clients / docs (same values as *Enabled fields). */
+      inApp: p.inAppEnabled,
+      email: p.emailEnabled,
+      sms: p.smsEnabled,
     })),
     digest: {
-      digestEnabled: bundle.digest.digestEnabled,
-      digestFrequency: bundle.digest.digestFrequency,
-      digestTimeLocal: bundle.digest.digestTimeLocal,
-      quietHoursEnabled: bundle.digest.quietHoursEnabled,
-      quietHoursStartLocal: bundle.digest.quietHoursStartLocal,
-      quietHoursEndLocal: bundle.digest.quietHoursEndLocal,
+      digestEnabled: d.digestEnabled,
+      digestFrequency: d.digestFrequency,
+      digestTimeLocal: d.digestTimeLocal,
+      quietHoursEnabled: d.quietHoursEnabled,
+      quietHoursStartLocal: d.quietHoursStartLocal,
+      quietHoursEndLocal: d.quietHoursEndLocal,
+      enabled: d.digestEnabled,
+      frequency: d.digestFrequency,
+      timeLocal: d.digestTimeLocal,
+    },
+    quietHours: {
+      enabled: d.quietHoursEnabled,
+      startLocal: d.quietHoursStartLocal,
+      endLocal: d.quietHoursEndLocal,
     },
   }
 }
@@ -185,6 +198,7 @@ export async function PATCH(
   if ("error" in gate) return gate.error
 
   console.info("[notification-preferences PATCH] accepted", { organizationId })
+  console.info("[notification-preferences PATCH] gate_passed", { organizationId })
 
   const svc = getServiceRoleOrNull()
   if (!svc) {
@@ -195,6 +209,11 @@ export async function PATCH(
   try {
     const raw = await request.json().catch(() => ({}))
     body = PatchBodySchema.parse(raw)
+    console.info("[notification-preferences PATCH] body_parsed", {
+      organizationId,
+      preferenceRowsInBody: body.preferences?.length ?? 0,
+      hasDigest: body.digest !== undefined,
+    })
   } catch (e) {
     if (e instanceof z.ZodError) {
       console.warn("[notification-preferences PATCH] validation failed", {
@@ -210,6 +229,10 @@ export async function PATCH(
 
   if (body.preferences) {
     const ordered = orderPreferences(body.preferences)
+    console.info("[notification-preferences PATCH] preferences_upsert_attempt", {
+      organizationId,
+      rowCount: ordered.length,
+    })
     const up = await upsertOrganizationNotificationPreferences(svc, organizationId, ordered)
     if (up.error) {
       console.error("[notification-preferences PATCH] preferences upsert", {
@@ -247,6 +270,7 @@ export async function PATCH(
       quietHoursStartLocal: body.digest.quietHoursEnabled ? body.digest.quietHoursStartLocal : null,
       quietHoursEndLocal: body.digest.quietHoursEnabled ? body.digest.quietHoursEndLocal : null,
     }
+    console.info("[notification-preferences PATCH] digest_upsert_attempt", { organizationId })
     const upD = await upsertOrganizationDigestSettings(svc, organizationId, digest)
     if (upD.error) {
       console.error("[notification-preferences PATCH] digest upsert", {
@@ -284,6 +308,13 @@ export async function PATCH(
       { status: 500 },
     )
   }
+
+  console.info("[notification-preferences PATCH] response_bundle", {
+    organizationId,
+    preferenceRowCount: loaded.data.preferences.length,
+    digestReloaded: true,
+    persistenceReady: loaded.persistenceReady,
+  })
 
   return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady), {
     headers: { "Cache-Control": "private, no-store, max-age=0" },

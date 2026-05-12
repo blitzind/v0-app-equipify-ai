@@ -5,6 +5,7 @@ import { Bell, Mail, Smartphone, Monitor, Loader2, Info } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -49,6 +50,11 @@ type ApiResponse = ApiBundle & {
   message?: string
   error?: string
   meta?: { persistenceReady?: boolean }
+  quietHours?: {
+    enabled?: unknown
+    startLocal?: unknown
+    endLocal?: unknown
+  }
 }
 
 const LOCAL_HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
@@ -79,39 +85,42 @@ function normalizeApiPreferences(raw: unknown): ApiPreference[] {
     if (!item || typeof item !== "object") continue
     const o = item as Record<string, unknown>
     if (typeof o.alertType !== "string" || !isWorkspaceAlertType(o.alertType)) continue
+    const inAppEnabled = Boolean(o.inAppEnabled ?? o.inApp)
+    const emailEnabled = Boolean(o.emailEnabled ?? o.email)
     by.set(o.alertType, {
       alertType: o.alertType,
-      inAppEnabled: Boolean(o.inAppEnabled),
-      emailEnabled: Boolean(o.emailEnabled),
+      inAppEnabled,
+      emailEnabled,
       smsEnabled: false,
     })
   }
   return WORKSPACE_ALERT_TYPES.map((t) => by.get(t)!)
 }
 
-function normalizeApiDigest(raw: unknown): ApiDigest {
+function normalizeApiDigest(raw: unknown, root?: ApiResponse | null): ApiDigest {
   const d = defaultDigest()
   if (!raw || typeof raw !== "object") return d
   const o = raw as Record<string, unknown>
-  const freq = o.digestFrequency === "weekly" ? "weekly" : "daily"
-  const digestEnabled = Boolean(o.digestEnabled)
+  const qh = root?.quietHours
+  const qhObj = qh && typeof qh === "object" ? (qh as Record<string, unknown>) : null
+  const freq = o.digestFrequency === "weekly" || o.frequency === "weekly" ? "weekly" : "daily"
+  const digestEnabled = Boolean(o.digestEnabled ?? o.enabled)
   const digestTimeLocal = normalizeLocalHm(
-    typeof o.digestTimeLocal === "string" ? o.digestTimeLocal : null,
+    typeof (o.digestTimeLocal ?? o.timeLocal) === "string" ? String(o.digestTimeLocal ?? o.timeLocal) : null,
     DEFAULT_DIGEST_TIME_LOCAL,
   )
-  const quietHoursEnabled = Boolean(o.quietHoursEnabled)
+  const hasExplicitQuietTop = qhObj != null && "enabled" in qhObj
+  const quietHoursEnabled = hasExplicitQuietTop ? Boolean(qhObj!.enabled) : Boolean(o.quietHoursEnabled)
   const qs =
-    o.quietHoursStartLocal === null || o.quietHoursStartLocal === undefined
-      ? null
-      : typeof o.quietHoursStartLocal === "string"
-        ? o.quietHoursStartLocal
-        : null
+    qhObj && typeof qhObj.startLocal === "string" ? qhObj.startLocal
+    : o.quietHoursStartLocal === null || o.quietHoursStartLocal === undefined ? null
+    : typeof o.quietHoursStartLocal === "string" ? o.quietHoursStartLocal
+    : null
   const qe =
-    o.quietHoursEndLocal === null || o.quietHoursEndLocal === undefined
-      ? null
-      : typeof o.quietHoursEndLocal === "string"
-        ? o.quietHoursEndLocal
-        : null
+    qhObj && typeof qhObj.endLocal === "string" ? qhObj.endLocal
+    : o.quietHoursEndLocal === null || o.quietHoursEndLocal === undefined ? null
+    : typeof o.quietHoursEndLocal === "string" ? o.quietHoursEndLocal
+    : null
   return {
     digestEnabled,
     digestFrequency: freq,
@@ -164,6 +173,47 @@ function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
   })
 }
 
+function cloneBundle(b: ApiBundle): ApiBundle {
+  return {
+    preferences: b.preferences.map((p) => ({ ...p })),
+    digest: { ...b.digest },
+  }
+}
+
+function digestComparable(d: ApiDigest) {
+  return {
+    digestEnabled: d.digestEnabled,
+    digestFrequency: d.digestFrequency,
+    digestTimeLocal: d.digestTimeLocal,
+    quietHoursEnabled: d.quietHoursEnabled,
+    quietHoursStartLocal: d.quietHoursEnabled ? normalizeLocalHm(d.quietHoursStartLocal, "22:00") : null,
+    quietHoursEndLocal: d.quietHoursEnabled ? normalizeLocalHm(d.quietHoursEndLocal, "07:00") : null,
+  }
+}
+
+function bundlesEqual(a: ApiBundle, b: ApiBundle): boolean {
+  if (JSON.stringify(preferencesPayload(a.preferences)) !== JSON.stringify(preferencesPayload(b.preferences))) {
+    return false
+  }
+  return JSON.stringify(digestComparable(a.digest)) === JSON.stringify(digestComparable(b.digest))
+}
+
+/** Payload shape required by PATCH Zod schema (quiet-hour times null when disabled). */
+function digestForPatch(d: ApiDigest): ApiDigest {
+  if (!d.quietHoursEnabled) {
+    return {
+      ...d,
+      quietHoursStartLocal: null,
+      quietHoursEndLocal: null,
+    }
+  }
+  return {
+    ...d,
+    quietHoursStartLocal: normalizeLocalHm(d.quietHoursStartLocal, "22:00"),
+    quietHoursEndLocal: normalizeLocalHm(d.quietHoursEndLocal, "07:00"),
+  }
+}
+
 export default function NotificationsPage() {
   const { toast } = useToast()
   const { organizationId, status: orgStatus } = useActiveOrganization()
@@ -191,43 +241,50 @@ export default function NotificationsPage() {
 
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error" | "ready">("idle")
   const [loadMessage, setLoadMessage] = useState<string | null>(null)
-  const [bundle, setBundle] = useState<ApiBundle | null>(null)
+  const [serverBundle, setServerBundle] = useState<ApiBundle | null>(null)
+  const [draftBundle, setDraftBundle] = useState<ApiBundle | null>(null)
   const [saving, setSaving] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
-  const saveLockRef = useRef(false)
   const sawPermissionsLoadingRef = useRef(false)
 
-  /** Dev-only: surface save pipeline without exposing secrets (never shown in production UI). */
   const showNotifPrefsDebug = process.env.NODE_ENV === "development"
-  const [devDiag, setDevDiag] = useState({
-    patchAttempts: 0,
-    lastPatchAt: null as number | null,
-    lastSaveStatus: "idle" as "idle" | "success" | "error",
-    lastHttpStatus: null as number | null,
+  const [devTransport, setDevTransport] = useState({
+    lastGetStatus: null as number | null,
+    lastPatchStatus: null as number | null,
+    lastPatchPayloadCounts: null as { preferenceRows: number; digestFields: number } | null,
+    lastSaveResult: "idle" as "idle" | "success" | "error",
   })
+
+  const isDirty = useMemo(() => {
+    if (!serverBundle || !draftBundle) return false
+    return !bundlesEqual(serverBundle, draftBundle)
+  }, [serverBundle, draftBundle])
 
   const prefsByType = useMemo(() => {
     const m = new Map<WorkspaceAlertType, ApiPreference>()
-    for (const p of bundle?.preferences ?? []) {
+    for (const p of draftBundle?.preferences ?? []) {
       m.set(p.alertType, p)
     }
     return m
-  }, [bundle])
+  }, [draftBundle])
 
-  const digest = bundle?.digest
+  const digest = draftBundle?.digest
 
-  const applyApiNotificationResponse = useCallback((json: ApiResponse) => {
-    setBundle({
+  const applyServerPayload = useCallback((json: ApiResponse) => {
+    const next: ApiBundle = {
       preferences: normalizeApiPreferences(json.preferences),
-      digest: normalizeApiDigest(json.digest),
-    })
+      digest: normalizeApiDigest(json.digest, json),
+    }
+    setServerBundle(cloneBundle(next))
+    setDraftBundle(cloneBundle(next))
     setPersistenceReady(json.meta?.persistenceReady !== false)
   }, [])
 
   const load = useCallback(async () => {
     if (orgStatus !== "ready" || !organizationId) {
       setLoadState("idle")
-      setBundle(null)
+      setServerBundle(null)
+      setDraftBundle(null)
       setPersistenceReady(true)
       return
     }
@@ -241,6 +298,9 @@ export default function NotificationsPage() {
         signal: ac.signal,
         cache: "no-store",
       })
+      if (showNotifPrefsDebug) {
+        setDevTransport((d) => ({ ...d, lastGetStatus: res.status }))
+      }
       const json = (await res.json().catch(() => null)) as ApiResponse | null
       if (!res.ok) {
         const msg = friendLoadMessage(res, json)
@@ -249,16 +309,17 @@ export default function NotificationsPage() {
       if (!json) {
         throw new Error("Could not load notification settings.")
       }
-      applyApiNotificationResponse(json)
+      applyServerPayload(json)
       setLoadState("ready")
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return
       const msg = e instanceof Error ? e.message : "Could not load notification settings."
       setLoadMessage(msg)
       setLoadState("error")
-      setBundle(null)
+      setServerBundle(null)
+      setDraftBundle(null)
     }
-  }, [applyApiNotificationResponse, organizationId, orgStatus])
+  }, [applyServerPayload, organizationId, orgStatus, showNotifPrefsDebug])
 
   useEffect(() => {
     void load()
@@ -279,100 +340,119 @@ export default function NotificationsPage() {
     void load()
   }, [orgStatus, organizationId, permStatus, load])
 
-  const patch = useCallback(
-    async (body: { preferences?: ApiPreference[]; digest?: ApiDigest }, rollback: ApiBundle | null) => {
-      if (!organizationId || !rollback) return
-      if (saveLockRef.current) {
-        if (showNotifPrefsDebug) {
-          setDevDiag((d) => ({
-            ...d,
-            lastSaveStatus: "error",
-            lastHttpStatus: null,
-            lastPatchAt: Date.now(),
-          }))
-        }
-        return
-      }
-      saveLockRef.current = true
-      setSaving(true)
+  const handleDiscard = useCallback(() => {
+    if (serverBundle) setDraftBundle(cloneBundle(serverBundle))
+  }, [serverBundle])
+
+  const handleSave = useCallback(async () => {
+    if (!organizationId || !draftBundle || !isDirty) return
+    if (!canMutate || !persistenceReady) return
+    const body = {
+      preferences: preferencesPayload(draftBundle.preferences),
+      digest: digestForPatch(draftBundle.digest),
+    }
+    if (showNotifPrefsDebug) {
+      setDevTransport((d) => ({
+        ...d,
+        lastPatchPayloadCounts: { preferenceRows: body.preferences.length, digestFields: 7 },
+        lastSaveResult: "idle",
+      }))
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => null)) as ApiResponse | null
       if (showNotifPrefsDebug) {
-        setDevDiag((d) => ({
-          ...d,
-          patchAttempts: d.patchAttempts + 1,
-          lastPatchAt: Date.now(),
-          lastSaveStatus: "idle",
-          lastHttpStatus: null,
-        }))
+        setDevTransport((d) => ({ ...d, lastPatchStatus: res.status }))
       }
-      try {
-        const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          cache: "no-store",
-        })
-        const json = (await res.json().catch(() => null)) as ApiResponse | null
-        if (showNotifPrefsDebug) {
-          setDevDiag((d) => ({ ...d, lastHttpStatus: res.status }))
-        }
-        if (!res.ok) {
-          const msg = friendMutateMessage(res, json)
-          throw new Error(msg)
-        }
-        if (!json) {
-          throw new Error("Could not save settings.")
-        }
-        applyApiNotificationResponse(json)
-        toast({ title: "Your notification settings were saved." })
-        if (showNotifPrefsDebug) {
-          setDevDiag((d) => ({ ...d, lastSaveStatus: "success" }))
-        }
-      } catch (e) {
-        setBundle(rollback)
-        const msg = e instanceof Error ? e.message : "Could not save settings."
-        toast({ variant: "destructive", title: "Save failed", description: msg })
-        if (showNotifPrefsDebug) {
-          setDevDiag((d) => ({ ...d, lastSaveStatus: "error" }))
-        }
-      } finally {
-        saveLockRef.current = false
-        setSaving(false)
+      if (!res.ok) {
+        const msg = friendMutateMessage(res, json)
+        throw new Error(msg)
       }
-    },
-    [applyApiNotificationResponse, organizationId, toast, showNotifPrefsDebug],
-  )
+      if (!json) {
+        throw new Error("Could not save settings.")
+      }
+      applyServerPayload(json)
+      toast({ title: "Your notification settings were saved." })
+      if (showNotifPrefsDebug) {
+        setDevTransport((d) => ({ ...d, lastSaveResult: "success" }))
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not save settings."
+      toast({ variant: "destructive", title: "Save failed", description: msg })
+      if (showNotifPrefsDebug) {
+        setDevTransport((d) => ({ ...d, lastSaveResult: "error" }))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    organizationId,
+    draftBundle,
+    isDirty,
+    canMutate,
+    persistenceReady,
+    applyServerPayload,
+    toast,
+    showNotifPrefsDebug,
+  ])
 
-  const updatePreferenceChannel = useCallback(
-    async (alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
-      if (!bundle || !canMutate || saveLockRef.current) return
-      const rollback = bundle
-      const nextPrefs = bundle.preferences.map((p) =>
-        p.alertType === alertType ?
-          {
-            ...p,
-            inAppEnabled: channel === "inApp" ? value : p.inAppEnabled,
-            emailEnabled: channel === "email" ? value : p.emailEnabled,
-            smsEnabled: false,
-          }
-        : p,
-      )
-      setBundle({ ...bundle, preferences: nextPrefs })
-      await patch({ preferences: preferencesPayload(nextPrefs), digest: bundle.digest }, rollback)
-    },
-    [bundle, canMutate, patch],
-  )
+  const controlsDisabled = saving || !canMutate || !persistenceReady
 
-  const updateDigest = useCallback(
-    async (nextDigest: ApiDigest) => {
-      if (!bundle || !canMutate || saveLockRef.current) return
-      const rollback = bundle
-      setBundle({ ...bundle, digest: nextDigest })
-      await patch({ preferences: preferencesPayload(bundle.preferences), digest: nextDigest }, rollback)
-    },
-    [bundle, canMutate, patch],
-  )
+  const controlsDisableExplanation = useMemo(() => {
+    if (orgStatus !== "ready" || !organizationId) {
+      return "Workspace unavailable — select a workspace above to load preferences."
+    }
+    if (permStatus === "loading") {
+      return "Checking permissions — controls stay read-only until membership finishes loading."
+    }
+    if (!persistenceReady) {
+      return "Database setup needed — notification preference tables are not available on this server yet."
+    }
+    if (!canManageWorkspaceSettings) {
+      return "View only — only members who can manage workspace settings may save changes."
+    }
+    if (saving) {
+      return "Saving your notification settings…"
+    }
+    return null
+  }, [
+    orgStatus,
+    organizationId,
+    permStatus,
+    persistenceReady,
+    canManageWorkspaceSettings,
+    saving,
+  ])
 
-  const showMatrix = loadState === "ready" && bundle
+  const setDraftPreference = useCallback((alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
+    setDraftBundle((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        preferences: prev.preferences.map((p) =>
+          p.alertType === alertType ?
+            {
+              ...p,
+              inAppEnabled: channel === "inApp" ? value : p.inAppEnabled,
+              emailEnabled: channel === "email" ? value : p.emailEnabled,
+              smsEnabled: false,
+            }
+          : p,
+        ),
+      }
+    })
+  }, [])
+
+  const showMatrix = loadState === "ready" && draftBundle && serverBundle
+
+  const saveDisabled =
+    !isDirty || saving || !canMutate || !persistenceReady || !organizationId || !draftBundle
 
   return (
     <div className="flex max-w-full flex-col gap-6 overflow-x-hidden pb-10">
@@ -383,23 +463,49 @@ export default function NotificationsPage() {
             <h2 className="text-lg font-semibold text-foreground">Notification preferences</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose which workspace alerts your team receives and how they are delivered. Escalation rules and the AI Ops
-            digest below are configured separately.
+            Choose which workspace alerts your team receives and how they are delivered. Edit the matrix, digest, and
+            quiet hours, then save. Escalation rules and the AI Ops digest below are configured separately.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
-          {loadState === "loading" ?
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Loading…
-            </span>
-          : null}
-          {saving ?
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Saving…
-            </span>
-          : null}
+        <div className="flex min-w-0 flex-col items-stretch gap-2 sm:max-w-md sm:items-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {loadState === "loading" ?
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading…
+              </span>
+            : null}
+            {saving ?
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving…
+              </span>
+            : null}
+            {isDirty ?
+              <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-900 dark:text-amber-100">
+                Unsaved changes
+              </span>
+            : null}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!isDirty || saving}
+              onClick={handleDiscard}
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={saveDisabled}
+              onClick={() => void handleSave()}
+            >
+              Save notification settings
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -410,24 +516,7 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
-      {showNotifPrefsDebug && orgStatus === "ready" && organizationId ?
-        <Alert className="border-dashed">
-          <AlertTitle className="text-xs font-mono">Notification prefs (dev only)</AlertTitle>
-          <AlertDescription className="space-y-1 font-mono text-[11px] leading-relaxed">
-            <div>persistenceReady: {String(persistenceReady)}</div>
-            <div>permStatus: {permStatus}</div>
-            <div>canManageWorkspaceSettings: {String(permissions.canManageWorkspaceSettings)}</div>
-            <div>mutateBlockReason: {mutateBlockReason ?? "null (can save)"}</div>
-            <div>canMutate: {String(canMutate)}</div>
-            <div>saving (PATCH in flight): {String(saving)}</div>
-            <div>patchAttempts: {devDiag.patchAttempts}</div>
-            <div>lastHttpStatus: {devDiag.lastHttpStatus ?? "—"}</div>
-            <div>lastSaveStatus: {devDiag.lastSaveStatus}</div>
-          </AlertDescription>
-        </Alert>
-      : null}
-
-      {loadState === "ready" && bundle && mutateBlockReason === "permissions_loading" ?
+      {loadState === "ready" && draftBundle && mutateBlockReason === "permissions_loading" ?
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>Checking permissions…</AlertTitle>
@@ -438,18 +527,18 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
-      {loadState === "ready" && bundle && !persistenceReady ?
+      {loadState === "ready" && draftBundle && !persistenceReady ?
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>Database setup needed</AlertTitle>
           <AlertDescription>
-            Preferences cannot be saved on this server until the latest database migration is applied. You can still review
-            the default options below. Ask your workspace administrator or hosting provider to run migrations.
+            Preferences cannot be saved on this server until the latest database migration is applied. You can still
+            review the default options below. Ask your workspace administrator or hosting provider to run migrations.
           </AlertDescription>
         </Alert>
       : null}
 
-      {mutateBlockReason === "view_only" && bundle && persistenceReady ?
+      {mutateBlockReason === "view_only" && draftBundle && persistenceReady ?
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>View only</AlertTitle>
@@ -482,8 +571,12 @@ export default function NotificationsPage() {
         <div className="border-b border-border px-4 py-4 sm:px-6">
           <h3 className="text-sm font-semibold text-foreground">Alert preferences</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Turn channels on or off for each kind of alert. Changes apply to this workspace.
+            Turn channels on or off for each kind of alert. Use Save notification settings to write changes to this
+            workspace.
           </p>
+          {controlsDisableExplanation ?
+            <p className="mt-2 text-xs text-muted-foreground">{controlsDisableExplanation}</p>
+          : null}
         </div>
 
         {!showMatrix ?
@@ -529,7 +622,6 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
-                const busy = saving || !canMutate
                 return (
                   <div key={row.alertType} className="space-y-3 px-4 py-4">
                     <div className="flex min-w-0 items-start gap-3">
@@ -549,8 +641,8 @@ export default function NotificationsPage() {
                         <Switch
                           aria-label={`${row.label} in-app`}
                           checked={pref.inAppEnabled}
-                          disabled={busy}
-                          onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                          disabled={controlsDisabled}
+                          onCheckedChange={(v) => setDraftPreference(row.alertType, "inApp", v)}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-secondary/30 px-2 py-3">
@@ -560,8 +652,8 @@ export default function NotificationsPage() {
                         <Switch
                           aria-label={`${row.label} email`}
                           checked={pref.emailEnabled}
-                          disabled={busy}
-                          onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                          disabled={controlsDisabled}
+                          onCheckedChange={(v) => setDraftPreference(row.alertType, "email", v)}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-2 py-3">
@@ -586,7 +678,6 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
-                const busy = saving || !canMutate
                 return (
                   <div
                     key={row.alertType}
@@ -605,16 +696,16 @@ export default function NotificationsPage() {
                       <Switch
                         aria-label={`${row.label} in-app`}
                         checked={pref.inAppEnabled}
-                        disabled={busy}
-                        onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "inApp", v)}
+                        disabled={controlsDisabled}
+                        onCheckedChange={(v) => setDraftPreference(row.alertType, "inApp", v)}
                       />
                     </div>
                     <div className="flex w-14 justify-center">
                       <Switch
                         aria-label={`${row.label} email`}
                         checked={pref.emailEnabled}
-                        disabled={busy}
-                        onCheckedChange={(v) => void updatePreferenceChannel(row.alertType, "email", v)}
+                        disabled={controlsDisabled}
+                        onCheckedChange={(v) => setDraftPreference(row.alertType, "email", v)}
                       />
                     </div>
                     <div className="flex w-12 justify-center">
@@ -642,10 +733,12 @@ export default function NotificationsPage() {
             <Switch
               aria-label="Email digest enabled"
               checked={digest.digestEnabled}
-              disabled={saving || !canMutate || !bundle}
+              disabled={controlsDisabled || !draftBundle}
               onCheckedChange={(v) => {
-                if (!bundle) return
-                void updateDigest({ ...bundle.digest, digestEnabled: v })
+                setDraftBundle((prev) => {
+                  if (!prev) return prev
+                  return { ...prev, digest: { ...prev.digest, digestEnabled: v } }
+                })
               }}
             />
           : null}
@@ -659,17 +752,19 @@ export default function NotificationsPage() {
                   <button
                     key={freq}
                     type="button"
-                    disabled={saving || !canMutate || !bundle}
+                    disabled={controlsDisabled || !draftBundle}
                     onClick={() => {
-                      if (!bundle) return
-                      void updateDigest({ ...bundle.digest, digestFrequency: freq })
+                      setDraftBundle((prev) => {
+                        if (!prev) return prev
+                        return { ...prev, digest: { ...prev.digest, digestFrequency: freq } }
+                      })
                     }}
                     className={cn(
                       "rounded-lg border px-4 py-2 text-sm font-medium capitalize transition-all",
                       digest.digestFrequency === freq ?
                         "border-primary bg-primary/8 text-primary"
                       : "border-border text-muted-foreground hover:bg-secondary/60",
-                      saving || !canMutate ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+                      controlsDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
                     )}
                   >
                     {freq}
@@ -682,10 +777,12 @@ export default function NotificationsPage() {
               <select
                 className="h-9 max-w-full rounded-md border border-border bg-background px-2 text-sm"
                 value={digest.digestTimeLocal}
-                disabled={saving || !canMutate || !bundle}
+                disabled={controlsDisabled || !draftBundle}
                 onChange={(e) => {
-                  if (!bundle) return
-                  void updateDigest({ ...bundle.digest, digestTimeLocal: e.target.value })
+                  setDraftBundle((prev) => {
+                    if (!prev) return prev
+                    return { ...prev, digest: { ...prev.digest, digestTimeLocal: e.target.value } }
+                  })
                 }}
               >
                 {TIMES.map((t) => (
@@ -713,15 +810,20 @@ export default function NotificationsPage() {
             <Switch
               aria-label="Quiet hours enabled"
               checked={digest.quietHoursEnabled}
-              disabled={saving || !canMutate || !bundle}
+              disabled={controlsDisabled || !draftBundle}
               onCheckedChange={(v) => {
-                if (!bundle) return
-                const d = bundle.digest
-                void updateDigest({
-                  ...d,
-                  quietHoursEnabled: v,
-                  quietHoursStartLocal: v ? (d.quietHoursStartLocal ?? "22:00") : d.quietHoursStartLocal,
-                  quietHoursEndLocal: v ? (d.quietHoursEndLocal ?? "07:00") : d.quietHoursEndLocal,
+                setDraftBundle((prev) => {
+                  if (!prev) return prev
+                  const d = prev.digest
+                  return {
+                    ...prev,
+                    digest: {
+                      ...d,
+                      quietHoursEnabled: v,
+                      quietHoursStartLocal: v ? (d.quietHoursStartLocal ?? "22:00") : null,
+                      quietHoursEndLocal: v ? (d.quietHoursEndLocal ?? "07:00") : null,
+                    },
+                  }
                 })
               }}
             />
@@ -733,10 +835,12 @@ export default function NotificationsPage() {
             <select
               className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
               value={digest.quietHoursStartLocal ?? "22:00"}
-              disabled={saving || !canMutate || !bundle}
+              disabled={controlsDisabled || !draftBundle}
               onChange={(e) => {
-                if (!bundle) return
-                void updateDigest({ ...bundle.digest, quietHoursStartLocal: e.target.value })
+                setDraftBundle((prev) => {
+                  if (!prev) return prev
+                  return { ...prev, digest: { ...prev.digest, quietHoursStartLocal: e.target.value } }
+                })
               }}
             >
               {TIMES.map((t) => (
@@ -749,10 +853,12 @@ export default function NotificationsPage() {
             <select
               className="h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm sm:w-auto"
               value={digest.quietHoursEndLocal ?? "07:00"}
-              disabled={saving || !canMutate || !bundle}
+              disabled={controlsDisabled || !draftBundle}
               onChange={(e) => {
-                if (!bundle) return
-                void updateDigest({ ...bundle.digest, quietHoursEndLocal: e.target.value })
+                setDraftBundle((prev) => {
+                  if (!prev) return prev
+                  return { ...prev, digest: { ...prev.digest, quietHoursEndLocal: e.target.value } }
+                })
               }}
             >
               {TIMES.map((t) => (
@@ -784,6 +890,30 @@ export default function NotificationsPage() {
           .
         </p>
       </div>
+
+      {showNotifPrefsDebug ?
+        <Alert className="border-dashed">
+          <AlertTitle className="text-xs font-mono">Notification prefs — development diagnostics</AlertTitle>
+          <AlertDescription className="space-y-1 font-mono text-[11px] leading-relaxed">
+            <div>organizationId present: {organizationId ? "yes" : "no"}</div>
+            <div>persistenceReady: {String(persistenceReady)}</div>
+            <div>permission status (permStatus): {permStatus}</div>
+            <div>canManageWorkspaceSettings: {String(permissions.canManageWorkspaceSettings)}</div>
+            <div>canMutate: {String(canMutate)}</div>
+            <div>mutateBlockReason: {mutateBlockReason ?? "null (can save)"}</div>
+            <div>last GET HTTP status: {devTransport.lastGetStatus ?? "—"}</div>
+            <div>last PATCH HTTP status: {devTransport.lastPatchStatus ?? "—"}</div>
+            <div>
+              last PATCH payload preview:{" "}
+              {devTransport.lastPatchPayloadCounts ?
+                `preferences=${devTransport.lastPatchPayloadCounts.preferenceRows}, digestFieldCount=${devTransport.lastPatchPayloadCounts.digestFields}`
+              : "—"}
+            </div>
+            <div>last save result: {devTransport.lastSaveResult}</div>
+            <div>isDirty: {String(isDirty)}</div>
+          </AlertDescription>
+        </Alert>
+      : null}
     </div>
   )
 }
