@@ -480,7 +480,6 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
         <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-border shrink-0 relative isolate">
           <div className="flex flex-col gap-1 min-w-0 pr-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono text-muted-foreground">{plan.id}</span>
               <StatusBadge status={plan.status} />
               {plan.isArchived ? (
                 <Badge variant="outline" className="text-[10px] font-semibold bg-muted text-muted-foreground border-border">
@@ -961,7 +960,6 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
               <div>
                 <p className="text-sm font-semibold mb-1">Plan Info</p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                  <span className="text-muted-foreground">Plan ID</span>          <span className="font-mono text-foreground">{plan.id}</span>
                   <span className="text-muted-foreground">Created</span>          <span className="text-foreground">{new Date(plan.createdAt).toLocaleDateString()}</span>
                   <span className="text-muted-foreground">Services Completed</span> <span className="text-foreground">{plan.totalServicesCompleted}</span>
                   <span className="text-muted-foreground">Location</span>         <span className="text-foreground">{plan.location}</span>
