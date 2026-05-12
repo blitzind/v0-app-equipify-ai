@@ -5,10 +5,10 @@ import { useCallback, useEffect, useState } from "react"
 import {
   ExternalLink,
   Filter,
-  ListChecks,
   Loader2,
   MoreHorizontal,
   RefreshCw,
+  Sparkles,
   XCircle,
 } from "lucide-react"
 import { useActiveOrganization } from "@/lib/active-organization-context"
@@ -234,7 +234,7 @@ export function AidenActionCenterPage() {
       if (!res.ok) {
         throw new Error(data.message ?? data.error ?? "Cancel failed.")
       }
-      toast({ title: "Canceled", description: "This prepared action was canceled." })
+      toast({ title: "Canceled", description: "This AI-prepared action was canceled." })
       setSelected((s) => (s?.id === row.id ? null : s))
       void fetchPage(0, true, true)
     } catch (e) {
@@ -259,25 +259,34 @@ export function AidenActionCenterPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-8">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">AIden Action Center</h1>
-          <p className="text-xs text-muted-foreground sm:text-sm max-w-2xl">
-            Review prepared workspace actions across statuses. Use filters to narrow by lifecycle, action type, risk,
-            who requested them, and date range.
-          </p>
+      <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 gap-3">
+            <div
+              className="flex size-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-gradient-to-br from-sky-500/12 via-primary/10 to-blue-700/12 ring-1 ring-primary/10"
+              aria-hidden
+            >
+              <Sparkles className="size-[18px] text-primary drop-shadow-[0_1px_1px_rgba(0,0,0,0.08)]" strokeWidth={2} />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">AIden Action Center</h1>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                Review AI-prepared workspace actions, recommendations, and follow-ups before anything is applied.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-2 self-start text-xs sm:self-auto"
+            disabled={refreshing}
+            onClick={() => onRefresh()}
+          >
+            <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
+            Refresh
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 gap-1.5 self-start sm:self-auto"
-          disabled={refreshing}
-          onClick={() => onRefresh()}
-        >
-          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
-          Refresh
-        </Button>
       </div>
 
       <Card>
@@ -287,7 +296,7 @@ export function AidenActionCenterPage() {
             Filters
           </div>
           <CardDescription className="text-xs">
-            Filters apply to the list below. Clearing dates shows all time (up to the row limit).
+            Filters apply to the AI-prepared actions list below. Clearing dates shows all time (up to the row limit).
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -384,17 +393,17 @@ export function AidenActionCenterPage() {
       : null}
 
       {loading && items.length === 0 ?
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-16 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-16 text-sm text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          Loading actions…
+          Loading AI-prepared actions…
         </div>
       : null}
 
       {!loading && items.length === 0 && !error ?
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
-            <ListChecks className="size-8 opacity-40" aria-hidden />
-            <p>No prepared actions match these filters.</p>
+            <Sparkles className="size-8 opacity-40" aria-hidden strokeWidth={2} />
+            <p>No AI-prepared actions match these filters.</p>
             <Button type="button" variant="outline" size="sm" onClick={() => onRefresh()}>
               Refresh
             </Button>
@@ -585,7 +594,8 @@ export function AidenActionCenterPage() {
                       </Button>
                     : (
                       <p className="text-[11px] text-muted-foreground">
-                        No direct link for the source record. Open the original page where you started this action.
+                        No direct link for the source record. Open the original page where you started this AI-prepared
+                        action.
                       </p>
                     )}
                     {selected.targetHref && selected.status === "completed" ?
@@ -606,7 +616,7 @@ export function AidenActionCenterPage() {
                         onClick={() => void handleCancel(selected)}
                       >
                         <XCircle className="size-3.5 shrink-0" aria-hidden />
-                        Cancel prepared action
+                        Cancel AI-prepared action
                       </Button>
                     : null}
                   </div>

@@ -18,7 +18,7 @@ import {
   Bell,
   Warehouse,
   UserPlus,
-  ListChecks,
+  ChartNoAxesCombined,
 } from "lucide-react"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
@@ -135,7 +135,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "Insights",
         href: "/insights",
-        icon: Sparkles,
+        icon: ChartNoAxesCombined,
         highlight: true,
         anyOf: ["canViewInsights"],
         activeMatch: "exact",
@@ -150,7 +150,7 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "AIden Actions",
         href: "/aiden/actions",
-        icon: ListChecks,
+        icon: Sparkles,
         highlight: true,
         anyOf: ["canViewInsights"],
       },
