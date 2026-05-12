@@ -67,6 +67,14 @@ type CommandCenterPayload = {
     trialBalanceHealthy?: boolean
     unreconciledBatchCount?: number
     pendingRevenueRecognitionCount?: number
+    /** Phase 3B — vendor bills AP (bounded reporting). */
+    accountsPayableOutstandingCents?: number
+    approvedBillsAwaitingPaymentCents?: number
+    overdueVendorBillsCents?: number
+    averageVendorPaymentDays?: number | null
+    vendorConcentrationRisk?: number
+    treasuryCoverageForPayables?: number
+    payableAgingHealthScore?: number
   }
   combinedForecast: {
     netCashPosition7Cents: number
@@ -82,6 +90,12 @@ type CommandCenterPayload = {
 
 function fmtMoney(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100)
+}
+
+/** Reporting field is basis points from `computeTreasuryCoverageForPayablesBps` (see ap-service). */
+function treasuryCoverageTile(bps: number): string {
+  if (bps >= 999_000) return "—"
+  return `${Math.min(999, Math.round(bps / 100))}% (est.)`
 }
 
 function statusChipClass(status: OwnerScorecardStatus): string {
@@ -229,6 +243,16 @@ export function BlitzpayFinancialCommandCenterPanel({ organizationId, orgReady }
               { k: "Books balanced (trial)", v: data.tiles.trialBalanceHealthy === false ? "Review" : "Healthy" },
               { k: "Draft journal batches", v: String(data.tiles.unreconciledBatchCount ?? 0) },
               { k: "Revenue recognition due", v: String(data.tiles.pendingRevenueRecognitionCount ?? 0) },
+              { k: "Vendor bills — open balance", v: fmtMoney(data.tiles.accountsPayableOutstandingCents ?? 0) },
+              { k: "Vendor bills — approved, waiting to pay", v: fmtMoney(data.tiles.approvedBillsAwaitingPaymentCents ?? 0) },
+              { k: "Vendor bills — past due (open)", v: fmtMoney(data.tiles.overdueVendorBillsCents ?? 0) },
+              {
+                k: "Vendor bills — avg days after due (recent)",
+                v: data.tiles.averageVendorPaymentDays == null ? "—" : `${data.tiles.averageVendorPaymentDays} d`,
+              },
+              { k: "Vendor concentration (open)", v: `${data.tiles.vendorConcentrationRisk ?? 0}/100` },
+              { k: "Treasury vs approved payables (est.)", v: treasuryCoverageTile(data.tiles.treasuryCoverageForPayables ?? 0) },
+              { k: "Payable aging comfort", v: `${data.tiles.payableAgingHealthScore ?? 0}/100` },
             ].map((x) => (
               <div key={x.k} className="rounded-lg border border-border/70 bg-background/40 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide leading-snug">{x.k}</p>

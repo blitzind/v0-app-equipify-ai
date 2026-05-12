@@ -163,3 +163,16 @@ export const BLITZPAY_DEFAULT_COA_SEED: ReadonlyArray<{
   { code: "5100", name: "Processing Fees", type: "expense" },
   { code: "5200", name: "Cost of Goods Sold", type: "expense" },
 ]
+
+/** Phase 3B — additional system COA rows for AP / vendor bill posting (merged by ensureBlitzpayDefaultVendorAccounts). */
+export const BLITZPAY_VENDOR_COA_EXTENSION: ReadonlyArray<{
+  code: string
+  name: string
+  type: BlitzpayCoaAccountType
+}> = [
+  { code: "1300", name: "Inventory Asset", type: "asset" },
+  { code: "5300", name: "Utilities Expense", type: "expense" },
+  { code: "5400", name: "Subcontractor Expense", type: "expense" },
+  { code: "5500", name: "Inventory Expense", type: "expense" },
+  { code: "5600", name: "Vehicle Expense", type: "expense" },
+]

@@ -84,6 +84,14 @@ export type BlitzpayFinancialCommandCenterPayload = {
     trialBalanceHealthy: boolean
     unreconciledBatchCount: number
     pendingRevenueRecognitionCount: number
+    /** Phase 3B — vendor bills AP orchestration (from reporting; bounded). */
+    accountsPayableOutstandingCents: number
+    approvedBillsAwaitingPaymentCents: number
+    overdueVendorBillsCents: number
+    averageVendorPaymentDays: number | null
+    vendorConcentrationRisk: number
+    treasuryCoverageForPayables: number
+    payableAgingHealthScore: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -110,6 +118,7 @@ function drilldownsForOrg(overdueCount: number): Record<string, BlitzpayFinancia
     payroll: { href: "/settings/payments#blitzpay-payroll-anchor", label: "Payroll & commissions (Settings → Payments)" },
     cashPlanning: { href: "/settings/payments#blitzpay-cash-accounts-anchor", label: "Operating cash & runway (Settings → Payments)" },
     accounting: { href: "/settings/payments#blitzpay-accounting-overview-anchor", label: "Internal books & trial balance (Settings → Payments)" },
+    apBillPay: { href: "/settings/payments#blitzpay-ap-bill-pay-anchor", label: "Vendor bills & pay planning (Settings → Payments)" },
   }
 }
 
@@ -275,6 +284,13 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
       trialBalanceHealthy: reporting.trialBalanceHealthy,
       unreconciledBatchCount: reporting.unreconciledBatchCount,
       pendingRevenueRecognitionCount: reporting.pendingRevenueRecognitionCount,
+      accountsPayableOutstandingCents: reporting.accountsPayableOutstandingCents,
+      approvedBillsAwaitingPaymentCents: reporting.approvedBillsAwaitingPaymentCents,
+      overdueVendorBillsCents: reporting.overdueVendorBillsCents,
+      averageVendorPaymentDays: reporting.averageVendorPaymentDays,
+      vendorConcentrationRisk: reporting.vendorConcentrationRisk,
+      treasuryCoverageForPayables: reporting.treasuryCoverageForPayables,
+      payableAgingHealthScore: reporting.payableAgingHealthScore,
     },
     combinedForecast,
     scorecards,

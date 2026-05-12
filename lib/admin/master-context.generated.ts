@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 336,
-  sqlMigrations: 171,
+  apiRouteHandlers: 344,
+  sqlMigrations: 172,
   dashboardPages: 62,
-  componentsTsx: 276,
-  libTsFiles: 617,
+  componentsTsx: 277,
+  libTsFiles: 620,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **336** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **171** |
+| API route handlers (\`app/api/**/route.ts\`) | **344** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **172** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **276** |
-| \`lib/**/*.ts\` | **617** |
+| \`components/**/*.tsx\` | **277** |
+| \`lib/**/*.ts\` | **620** |
 
 ### Vercel crons
 
@@ -108,6 +108,14 @@ organizations/[organizationId]/blitzpay/accounting/journal-entries/route.ts
 organizations/[organizationId]/blitzpay/accounting/revenue-recognition/run/route.ts
 organizations/[organizationId]/blitzpay/accounting/trial-balance/route.ts
 organizations/[organizationId]/blitzpay/ap-dashboard/route.ts
+organizations/[organizationId]/blitzpay/ap/ap-health/route.ts
+organizations/[organizationId]/blitzpay/ap/bills/[billId]/approve/route.ts
+organizations/[organizationId]/blitzpay/ap/bills/[billId]/reject/route.ts
+organizations/[organizationId]/blitzpay/ap/bills/[billId]/schedule/route.ts
+organizations/[organizationId]/blitzpay/ap/bills/route.ts
+organizations/[organizationId]/blitzpay/ap/payment-runs/route.ts
+organizations/[organizationId]/blitzpay/ap/vendor-aging/route.ts
+organizations/[organizationId]/blitzpay/ap/vendors/route.ts
 organizations/[organizationId]/blitzpay/autopay/[enrollmentId]/route.ts
 organizations/[organizationId]/blitzpay/autopay/route.ts
 organizations/[organizationId]/blitzpay/billing-profiles/[profileId]/route.ts

@@ -59,6 +59,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Optional env:** `BLITZPAY_GL_SOURCE_PEPPER` (server-only) for deterministic fingerprints of external references — see `.env.local.example` and `docs/BLITZPAY_PHASE_3_ARCHITECTURE.md`.
 - **No new Stripe webhook types** are required for Phase 3A; schema health guards apply to accounting APIs same as other BlitzPay staff routes.
 
+### BlitzPay Phase 3B (vendor AP & bill pay foundations)
+
+- **Orchestration only:** payment runs and allocations **do not** trigger Stripe charges, ACH debits, or off-platform transfers automatically.
+- **Schema:** apply `20261012120000_blitzpay_phase_3b_ap_automation.sql` so staff `GET/POST …/blitzpay/ap/*` routes pass **schema health** checks (`blitzpay_schema_incomplete` otherwise).
+- **Money movement** remains on **existing Connect** flows when you pay through approved provider paths; Phase 3B adds **internal liability tracking** and **audit lineage** only.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

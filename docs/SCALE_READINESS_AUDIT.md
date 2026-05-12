@@ -2,7 +2,7 @@
 
 **Scope:** Read-only review of database design, API/query patterns, frontend data loading, caching, RLS, Stripe/BlitzPay, AI metering, jobs, observability, rate limits, and deployment/runtime. No code or schema changes were made for this document.
 
-**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale.
+**Stack context:** Next.js App Router (16.x per build output), Supabase (PostgreSQL + RLS + Auth), Vercel-style serverless, Stripe SaaS billing + BlitzPay Phase 1 (Connect onboarding only), multi-tenant SaaS for field service businesses. **Update (BlitzPay Phase 3A):** internal **general ledger** tables and capped staff reads add bounded accounting workload; keep GL APIs off hot navigation paths at very large scale. **Update (BlitzPay Phase 3B):** vendor bill / pay-run / allocation tables are **staff-only** (finance roles), **capped** list queries per org, and **not** on portal or public caches — treat like other BlitzPay internal finance surfaces.
 
 ---
 
@@ -200,6 +200,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Orchestration tables** (`blitzpay_invoice_collection_states`, `blitzpay_collection_attempts`, flows, activity log) stay **low volume** per invoice; indexes on `(organization_id, invoice_id)` / status support bounded staff queries.
 - **Stripe authority:** settlement truth remains on Stripe + existing PI mirror; Phase **2AB** only **reads** `blitzpay_payment_intents` to refresh safe failure categories — no new money-movement paths.
 - **Portal:** `/api/portal/billing/invoices` + `payment-status` + `/portal/billing` must stay summary-only as adoption grows (avoid expanding payloads with internal scoring).
+
+### 8.10 BlitzPay Phase 3B (vendor bills + pay-run orchestration)
+
+- **Staff-only finance APIs** under `…/blitzpay/ap/*` with explicit **row caps** on bills, vendors, and runs — keep off high-frequency customer paths.
+- **No autonomous payouts:** allocation rows are bookkeeping / planning; volume scales with **manual** scheduling discipline, not webhook fan-out.
+- **GL posting** on approve adds journal work bounded like other Phase **3A** batches — monitor orgs with very large daily bill volume separately.
 
 ---
 

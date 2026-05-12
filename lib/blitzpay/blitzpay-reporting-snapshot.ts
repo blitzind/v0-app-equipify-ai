@@ -161,6 +161,14 @@ export type BlitzpayOrgReportingSnapshot = {
   trialBalanceHealthy: boolean
   unreconciledBatchCount: number
   pendingRevenueRecognitionCount: number
+  /** Phase 3B — vendor bills & AP orchestration (bounded). */
+  accountsPayableOutstandingCents: number
+  approvedBillsAwaitingPaymentCents: number
+  overdueVendorBillsCents: number
+  averageVendorPaymentDays: number | null
+  vendorConcentrationRisk: number
+  treasuryCoverageForPayables: number
+  payableAgingHealthScore: number
 }
 
 /**
@@ -738,6 +746,27 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     /* Phase 3A GL tables optional until migration applied */
   }
 
+  let accountsPayableOutstandingCents = 0
+  let approvedBillsAwaitingPaymentCents = 0
+  let overdueVendorBillsCents = 0
+  let averageVendorPaymentDays: number | null = null
+  let vendorConcentrationRisk = 0
+  let treasuryCoverageForPayables = 0
+  let payableAgingHealthScore = 0
+  try {
+    const { fetchApReportingSnapshotFields } = await import("@/lib/blitzpay/blitzpay-ap-service")
+    const ap = await fetchApReportingSnapshotFields(admin, organizationId)
+    accountsPayableOutstandingCents = ap.accountsPayableOutstandingCents
+    approvedBillsAwaitingPaymentCents = ap.approvedBillsAwaitingPaymentCents
+    overdueVendorBillsCents = ap.overdueVendorBillsCents
+    averageVendorPaymentDays = ap.averageVendorPaymentDays
+    vendorConcentrationRisk = ap.vendorConcentrationRisk
+    treasuryCoverageForPayables = ap.treasuryCoverageForPayables
+    payableAgingHealthScore = ap.payableAgingHealthScore
+  } catch {
+    /* Phase 3B AP tables optional until migration applied */
+  }
+
   const cash2z = deriveBlitzpayCashPlanningMetrics({
     treasuryOperatingCents: tmSnapshot?.operatingBalanceCents ?? 0,
     heldReserveCents: tmSnapshot?.heldReserveCents ?? 0,
@@ -874,5 +903,12 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     trialBalanceHealthy,
     unreconciledBatchCount,
     pendingRevenueRecognitionCount,
+    accountsPayableOutstandingCents,
+    approvedBillsAwaitingPaymentCents,
+    overdueVendorBillsCents,
+    averageVendorPaymentDays,
+    vendorConcentrationRisk,
+    treasuryCoverageForPayables,
+    payableAgingHealthScore,
   }
 }

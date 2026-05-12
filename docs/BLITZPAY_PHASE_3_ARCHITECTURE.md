@@ -60,3 +60,50 @@ Staff UIs and org APIs must **not** expose raw Stripe identifiers in customer-fa
 ## Optional environment
 
 - `BLITZPAY_GL_SOURCE_PEPPER` — server-only secret mixed into `hashAccountingSourceReference` for stable fingerprints of external references (see `.env.local.example`).
+
+---
+
+# BlitzPay Phase 3B — Native AP automation & bill pay foundations
+
+Phase **3B** adds **vendor records**, **vendor bills** (header + lines), **approval-flow rows**, **payment-run + allocation orchestration**, **vendor aging snapshots** (table for future scheduled jobs), and **append-only AP audit events**. It extends the **Phase 3A GL** with **bill accrual** posting on **approve** (debit expense / credit accounts payable), **integer cents**, **deterministic ordering**, and **paid-bill immutability** at the database (updates blocked when `bill_status = paid`; corrections go through reversals / new entries, not silent edits).
+
+## Non-goals (this phase)
+
+- **No autonomous outbound payments** — allocations and pay runs are **planning and bookkeeping scaffolding** only; nothing in this phase transmits ACH/wire/check on a timer.
+- **No OCR / ML extraction** — ingestion is **manual, imported, or integration-typed** with deterministic validation and hashed external references where applicable.
+- **No customer portal** — all AP routes are **org staff** with financial capability gates and schema health guards.
+
+## Workflow (deterministic)
+
+- Bills: **draft → pending_approval → approved → scheduled → paid** (plus **partially_paid**, **disputed**, **voided** as modeled in the migration).
+- **Approval** is **threshold-based** (`BLITZPAY_AP_APPROVAL_THRESHOLD_CENTS` in `blitzpay-ap-automation.ts`); optional **approval flow** row when `approval_required` is true — **no AI approval**.
+- **Schedule** creates a **payment run** (orchestration) and **allocation** rows with `provider` ∈ `stripe | external | manual` and **metadata only** for provider references (hashed where stored on bills).
+
+## Treasury-aware scheduling
+
+- Helpers combine **treasury operating balance** (from existing contractor treasury aggregation) with **approved bills awaiting payment** to produce **coverage basis points** and bounded **health / cash optimization** scores (`blitzpay-ap-automation.ts`, `fetchApHealthDashboard` in `blitzpay-ap-service.ts`).
+
+## Purchase order linkage
+
+- `linked_purchase_order_id` is validated against **`org_purchase_orders.organization_id`** before insert (`assertPurchaseOrderOrgMatch`).
+
+## Reporting & command center
+
+- `fetchApReportingSnapshotFields` feeds **bounded** snapshot fields: open AP, approved awaiting pay, overdue vendor bills, average payment days from **completed** allocations (capped), concentration, treasury coverage (bps), aging health score.
+- Financial command center tiles and **Settings → Payments → Vendor bills & pay planning** (`BlitzpayApBillPayPanel`) surface the same signals in contractor-friendly copy.
+
+## Key files
+
+| Area | Path |
+|------|------|
+| Migration | `supabase/migrations/20261012120000_blitzpay_phase_3b_ap_automation.sql` |
+| Pure AP math / caps | `lib/blitzpay/blitzpay-ap-automation.ts` |
+| Aging buckets | `lib/blitzpay/blitzpay-vendor-aging.ts` |
+| Service (CRUD, approve, GL accrual, health) | `lib/blitzpay/blitzpay-ap-service.ts` |
+| Default vendor COA lines | `BLITZPAY_VENDOR_COA_EXTENSION` in `lib/blitzpay/blitzpay-general-ledger.ts` |
+| Org APIs | `app/api/organizations/[organizationId]/blitzpay/ap/**` |
+| Staff UI | `components/blitzpay/blitzpay-ap-bill-pay-panel.tsx` |
+
+## Tests
+
+- `pnpm test:blitzpay-phase-3b-ap-automation` — deterministic helpers, migration immutability string, API permission/schema guards, schema health table list (no DB).
