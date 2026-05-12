@@ -18,6 +18,7 @@ export async function GET() {
     })
     return NextResponse.json({
       autopayEnrollments: autopayEnrollments.map((a) => ({
+        billingProfileId: a.billingProfileId,
         enrollmentStatus: a.enrollmentStatus,
         paymentTiming: a.paymentTiming,
         failureRetryEnabled: a.failureRetryEnabled,

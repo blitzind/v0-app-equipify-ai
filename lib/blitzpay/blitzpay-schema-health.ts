@@ -66,6 +66,10 @@ const CRITICAL_BLITZPAY_TABLES: ReadonlyArray<{ name: string; select: string }> 
   { name: "blitzpay_customer_billing_profiles", select: "id, organization_id, customer_id" },
   { name: "blitzpay_customer_payment_methods", select: "id, organization_id, customer_id" },
   { name: "blitzpay_autopay_enrollments", select: "id, organization_id, customer_id" },
+  { name: "blitzpay_invoice_collection_states", select: "id, organization_id, invoice_id" },
+  { name: "blitzpay_collection_attempts", select: "id, organization_id, invoice_id" },
+  { name: "blitzpay_collection_recovery_flows", select: "id, organization_id, flow_status" },
+  { name: "blitzpay_collection_activity_log", select: "id, organization_id, activity_type" },
 ]
 
 export type BlitzpaySchemaHealthResult =

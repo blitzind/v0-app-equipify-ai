@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 316,
-  sqlMigrations: 169,
+  apiRouteHandlers: 326,
+  sqlMigrations: 170,
   dashboardPages: 62,
-  componentsTsx: 274,
-  libTsFiles: 610,
+  componentsTsx: 275,
+  libTsFiles: 612,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **316** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **169** |
+| API route handlers (\`app/api/**/route.ts\`) | **326** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **170** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **274** |
-| \`lib/**/*.ts\` | **610** |
+| \`components/**/*.tsx\` | **275** |
+| \`lib/**/*.ts\` | **612** |
 
 ### Vercel crons
 
@@ -108,6 +108,14 @@ organizations/[organizationId]/blitzpay/cash-reserve-rules/[ruleId]/route.ts
 organizations/[organizationId]/blitzpay/cash-reserve-rules/route.ts
 organizations/[organizationId]/blitzpay/cash-runway/route.ts
 organizations/[organizationId]/blitzpay/collections-copilot/route.ts
+organizations/[organizationId]/blitzpay/collections/attempts/route.ts
+organizations/[organizationId]/blitzpay/collections/mark-uncollectible/route.ts
+organizations/[organizationId]/blitzpay/collections/pause/route.ts
+organizations/[organizationId]/blitzpay/collections/recovery-flows/route.ts
+organizations/[organizationId]/blitzpay/collections/resolve/route.ts
+organizations/[organizationId]/blitzpay/collections/resume/route.ts
+organizations/[organizationId]/blitzpay/collections/retry/route.ts
+organizations/[organizationId]/blitzpay/collections/route.ts
 organizations/[organizationId]/blitzpay/commissions/route.ts
 organizations/[organizationId]/blitzpay/enable/route.ts
 organizations/[organizationId]/blitzpay/financial-command-center/route.ts
@@ -312,7 +320,9 @@ platform/import-operations/runs/[runId]/notes/route.ts
 portal/access/exchange/route.ts
 portal/attachments/[attachmentId]/download/route.ts
 portal/billing/autopay/route.ts
+portal/billing/invoices/route.ts
 portal/billing/payment-methods/route.ts
+portal/billing/payment-status/route.ts
 portal/bootstrap/route.ts
 portal/certificate-attachments/[attachmentId]/download/route.ts
 portal/certificates/[recordId]/download/route.ts

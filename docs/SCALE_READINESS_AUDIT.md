@@ -142,6 +142,8 @@ Evidence from migrations under `supabase/migrations/`:
 
 **Phase 3A (billing profiles + payment method metadata + autopay enrollments):** `blitzpay-billing-profiles-service.ts` uses explicit caps (**`BLITZPAY_BILLING_PROFILE_LIST_CAP`**, **`BLITZPAY_PAYMENT_METHOD_LIST_CAP`**, **`BLITZPAY_AUTOPAY_LIST_CAP`**, **`BLITZPAY_PHASE_3A_REPORTING_PROFILE_CAP`**) on all list/reporting paths; only **hashed** Stripe references and **masked** display fields are persisted. Portal billing routes must remain narrow (no staff treasury/reporting payloads). Sync is **metadata-only** — watch Stripe list API volume only if orgs trigger sync very frequently; prefer debounced staff actions until a webhook-driven incremental sync exists.
 
+**Phase 3B (collections engine):** `blitzpay-collections-service.ts` caps state/attempt/flow/activity/reporting scans (`BLITZPAY_COLLECTION_*_CAP`, `BLITZPAY_PHASE_3B_REPORTING_SCAN_CAP`). Staff “retry” schedules **metadata-only** follow-up windows (no email worker in this phase). Portal billing routes are narrow summaries only.
+
 ### 8.1 SaaS Stripe (`/api/stripe/webhook`)
 
 - **Idempotency:** insert into `stripe_webhook_events` by `event.id`; duplicate → `200` + `duplicate: true`.
@@ -192,6 +194,12 @@ Evidence from migrations under `supabase/migrations/`:
 - Tables are **low cardinality** per customer; unique constraints dedupe hashed payment-method rows per org.
 - **No** full credential storage; RLS grants members **read** on profile/method/enrollment rows for support visibility — **writes** remain on authenticated org APIs using service role after permission gates (same pattern as other BlitzPay staff tables).
 - Portal surface is intentionally minimal to avoid leaking internal billing ops or raw processor references at scale.
+
+### 8.9 BlitzPay Phase 3B (invoice collection states + recovery orchestration)
+
+- **Orchestration tables** (`blitzpay_invoice_collection_states`, `blitzpay_collection_attempts`, flows, activity log) stay **low volume** per invoice; indexes on `(organization_id, invoice_id)` / status support bounded staff queries.
+- **Stripe authority:** settlement truth remains on Stripe + existing PI mirror; Phase 3B only **reads** `blitzpay_payment_intents` to refresh safe failure categories — no new money-movement paths.
+- **Portal:** `/api/portal/billing/invoices` + `payment-status` + `/portal/billing` must stay summary-only as adoption grows (avoid expanding payloads with internal scoring).
 
 ---
 

@@ -974,6 +974,26 @@ Use this as a **checklist** when coding — not exhaustive.
 4. Portal session: **GET** payment-methods and autopay — only masked / minimal fields; toggling autopay for another customer’s profile returns **403**.  
 5. Confirm UI copy includes Stripe vault disclosure; no `pm_` / `cus_` strings in network responses for portal billing routes.
 
+### 12.29 Phase 3B (invoice collections engine — deterministic orchestration, no autonomous outreach)
+
+| Area | Details |
+|------|---------|
+| **Schema** | `blitzpay_invoice_collection_states` (per invoice; status, retry counters, `next_retry_at`, failure categories, escalation level, pause flags), `blitzpay_collection_attempts` (orchestration + optional hashed PI reference), `blitzpay_collection_recovery_flows`, `blitzpay_collection_activity_log`. RLS: org-member **SELECT**; writes via **service-role** org APIs after authz. |
+| **Pure libs** | `blitzpay-collections-engine.ts` — capped retry day offsets **1 / 3 / 7 / 14**, `MAX_DETERMINISTIC_RETRY_SLOTS`, `MAX_PAYMENT_ATTEMPT_COUNT`, eligibility, escalation, health score, `phase3bReportingMetrics`, human labels, **no I/O**. |
+| **Server** | `blitzpay-collections-service.ts` — bounded lists, `syncCollectionMetadataFromPaymentIntents` (reads **local** `blitzpay_payment_intents` only), staff schedule/pause/resume/resolve/mark-uncollectible, activity append. **No** email/SMS send, **no** Stripe charge API calls. |
+| **Org APIs** | `GET …/blitzpay/collections` (summary + states + activity), `GET …/collections/attempts`, `GET …/collections/recovery-flows`, `POST …/collections/retry|pause|resume|resolve|mark-uncollectible` — schema guard + `requireAnyOrgPermission`. |
+| **Portal** | `GET /api/portal/billing/invoices`, `GET /api/portal/billing/payment-status`, `/portal/billing` page — **no** internal escalation math, **no** raw Stripe ids; optional pause autopay uses `billingProfileId` from portal autopay GET. |
+| **Reporting** | `fetchBlitzpayOrgReportingSnapshot` adds `collectionSuccessRate`, `retryRecoveryRate`, `failedPaymentRate`, `delinquencyRate`, `recoveryFlowCompletionRate`, `averageRecoveryDurationDays` (best-effort; migration optional). |
+| **UX** | `BlitzpayCollectionsEnginePanel` — Settings → Payments (`#blitzpay-collections-engine-anchor`) + Financial command center; calm copy (“Collection rhythm”, “Follow-up scheduled”). |
+| **Tests** | `pnpm test:blitzpay-phase-3b` — migration markers, retry caps, route guards, portal isolation strings, schema-health tables, reporting fields. |
+
+#### Manual test checklist (Phase 3B)
+
+1. Staff: **Settings → Payments** — Collection rhythm panel loads; **Schedule follow-up** on a tracked invoice returns **200** or **409** when caps apply; **Pause / Resume / Settled / Not collectible** update activity feed.  
+2. **Insights → Financial command center** — same panel renders.  
+3. Portal: **`/portal/billing`** — summary + invoice list; pause autopay when enrollment exists.  
+4. Confirm **no** autonomous messages sent from these routes; network responses contain **no** `pm_` / `cus_` tails in new portal billing payloads.
+
 ---
 
 *Phase 2A–2T vertical slice for hosted invoice pay + estimate deposits + native customer wallet/credits + financing/installment foundations + collections automation + work-order-native collection + **revenue intelligence / forecasting** + **contractor treasury / payout intelligence** + **owner financial command center** (staff + portal + confirmation/history + operational refunds/disputes + receipt comms + platform-managed fee policy + payout ledger + multi-method foundations + recovery/reminders/payment links + consent-based autopay/schedule/partial pay + platform ops / rollout / launch readiness) is implemented; sections §1–§11 remain the design reference for later sub-phases.*

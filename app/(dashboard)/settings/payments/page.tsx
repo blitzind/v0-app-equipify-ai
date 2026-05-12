@@ -18,6 +18,7 @@ import { BlitzpayPayrollDashboard } from "@/components/blitzpay/blitzpay-payroll
 import { BlitzpayCommissionQueue } from "@/components/blitzpay/blitzpay-commission-queue"
 import { BlitzpayVendorPayoutsPanel } from "@/components/blitzpay/blitzpay-vendor-payouts-panel"
 import { BlitzpayCashAccountsPanel } from "@/components/blitzpay/blitzpay-cash-accounts-panel"
+import { BlitzpayCollectionsEnginePanel } from "@/components/blitzpay/blitzpay-collections-engine-panel"
 import { BlitzpayBillingProfilesPanel } from "@/components/blitzpay/blitzpay-billing-profiles-panel"
 import { BlitzpayTreasuryPanel } from "@/components/blitzpay/blitzpay-treasury-panel"
 import { WorkspaceInvoiceDefaultsCard } from "@/components/settings/workspace-invoice-defaults-card"
@@ -959,6 +960,12 @@ function BlitzPaySettingsPageInner() {
               {canViewFinancialCommandCenter && organizationId ? (
                 <div className="border-t border-border pt-4">
                   <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+                </div>
+              ) : null}
+
+              {canViewFinancialCommandCenter && organizationId ? (
+                <div id="blitzpay-collections-engine-anchor" className="border-t border-border pt-4">
+                  <BlitzpayCollectionsEnginePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
                 </div>
               ) : null}
 

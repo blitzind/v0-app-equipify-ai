@@ -59,6 +59,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **No new money-movement paths:** Phase 3A does **not** add Checkout, PaymentIntents, subscriptions, or ACH debits; staff “sync” calls **list/retrieve** payment methods for metadata only. Webhook configuration is unchanged from existing BlitzPay Connect setup.
 - **Client exposure:** Portal billing APIs return **masked** labels only; staff UIs must not print raw `pm_` / `cus_` ids from Phase 3A tables (hashes are internal).
 
+### BlitzPay Phase 3B (collections engine — orchestration only)
+
+- **No autonomous collections:** routes record **state + activity** and deterministic **retry windows**; they do **not** send email/SMS or trigger Stripe charges.
+- **Retry caps:** engine constants bound automated retry slots; staff actions log to `blitzpay_collection_activity_log` for auditability.
+- **Portal:** customer billing overview exposes **counts and plain-language status** only — not internal escalation metadata.
+
 ## Stripe Dashboard setup
 
 1. **API keys:** Use **live** keys on Production; **test** keys on local/preview.

@@ -754,10 +754,11 @@ export default function PortalDashboardPage() {
         <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--portal-foreground)" }}>
           Quick Actions
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <QuickAction href="/portal/request-repair" icon={Wrench} label="Request a Repair" description="Submit a service request" />
           <QuickAction href="/portal/work-orders" icon={Calendar} label="Service Visits" description="View appointments and history" />
           <QuickAction href="/portal/invoices" icon={Receipt} label="Invoices" description="View balances and statements" />
+          <QuickAction href="/portal/billing" icon={Wallet} label="Billing" description="Balances and autopay" />
           <QuickAction
             href="/portal/documents"
             icon={Folder}
