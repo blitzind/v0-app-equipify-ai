@@ -246,3 +246,31 @@ export async function requireOrgMemberSession(
     isPlatformAdmin: platformAdmin,
   }
 }
+
+export type OrgPermissionServerActionGate =
+  | { ok: true; userId: string; supabase: SupabaseClient }
+  | { ok: false; error: string }
+
+/**
+ * Same checks as {@link requireOrgPermission}, but returns a plain `{ ok, error }`
+ * for server actions (instead of a `NextResponse`).
+ */
+export async function requireOrgPermissionForServerAction(
+  organizationId: string,
+  requiredCapabilities: OrgPermissionKey | OrgPermissionKey[],
+): Promise<OrgPermissionServerActionGate> {
+  const res = await requireOrgPermission(organizationId, requiredCapabilities)
+  if ("error" in res) {
+    let message = "You don't have permission for this action."
+    try {
+      const body = (await res.error.json()) as { message?: unknown }
+      if (typeof body.message === "string" && body.message.trim()) {
+        message = body.message.trim()
+      }
+    } catch {
+      /* keep default */
+    }
+    return { ok: false, error: message }
+  }
+  return { ok: true, userId: res.userId, supabase: res.supabase }
+}

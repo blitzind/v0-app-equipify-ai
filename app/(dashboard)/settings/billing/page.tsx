@@ -25,7 +25,19 @@ import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
 import { getEffectivePlanId } from "@/lib/billing/effective-plan"
 import { applyDiscountToMrrCents } from "@/lib/billing/discount-pricing"
 import { createPortalSession } from "@/app/actions/stripe"
-import { createSetupIntent } from "@/app/actions/stripe-setup"
+import {
+  createSetupIntent,
+  getSaaSBillingSetupPrefill,
+  updateSaaSSubscriptionStripeCustomerBilling,
+} from "@/app/actions/stripe-setup"
+import {
+  defaultSaasBillingFormFromWorkspace,
+  emptySaasSubscriptionBillingForm,
+  getBillingCountrySelectOptions,
+  mergeStripeCustomerBillingPrefill,
+  saasSubscriptionBillingFormSchema,
+  type SaasSubscriptionBillingFormValues,
+} from "@/lib/billing/saas-subscription-billing-setup"
 import {
   getStripeBillingSummary,
   type StripeBillingInvoiceRow,
@@ -37,6 +49,8 @@ import {
   Users, Package, Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -104,6 +118,110 @@ function safeStripeClientMessage(raw: string | undefined, fallback: string) {
     return "Billing could not be completed in this environment. Please contact support."
   }
   return m.length > 280 ? fallback : m
+}
+
+function buildStripeElementsBillingDetails(v: SaasSubscriptionBillingFormValues) {
+  const phone = v.billingPhone.trim()
+  return {
+    name: v.billingName,
+    email: v.billingEmail,
+    ...(phone ? { phone } : {}),
+    address: {
+      line1: v.addressLine1,
+      ...(v.addressLine2.trim() ? { line2: v.addressLine2.trim() } : {}),
+      city: v.city,
+      state: v.state,
+      postal_code: v.postalCode,
+      country: v.country,
+    },
+  }
+}
+
+function flattenZodFieldErrors(
+  err: import("zod").ZodError,
+): Partial<Record<keyof SaasSubscriptionBillingFormValues, string>> {
+  const out: Partial<Record<keyof SaasSubscriptionBillingFormValues, string>> = {}
+  for (const issue of err.issues) {
+    const key = issue.path[0]
+    if (typeof key === "string") {
+      const k = key as keyof SaasSubscriptionBillingFormValues
+      if (out[k] == null) out[k] = issue.message
+    }
+  }
+  return out
+}
+
+function SaasCardConfirmStep({
+  clientSecret,
+  billingValues,
+  onSuccess,
+}: {
+  clientSecret: string
+  billingValues: SaasSubscriptionBillingFormValues
+  onSuccess: () => void
+}) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  async function submit() {
+    if (!stripe || !elements) return
+    setBusy(true)
+    setError(null)
+    const cardElement = elements.getElement(CardElement)
+    if (!cardElement) {
+      setError("Card form is not ready yet. Try again in a moment.")
+      setBusy(false)
+      return
+    }
+    const sync = await updateSaaSSubscriptionStripeCustomerBilling(billingValues)
+    if (!sync.ok) {
+      setBusy(false)
+      setError(sync.error)
+      return
+    }
+    const result = await stripe.confirmCardSetup(clientSecret, {
+      payment_method: {
+        card: cardElement,
+        billing_details: buildStripeElementsBillingDetails(billingValues),
+      },
+    })
+    setBusy(false)
+    if (result.error) {
+      setError(safeStripeClientMessage(result.error.message, "Could not save your payment method."))
+      return
+    }
+    toast({
+      title: "Payment method saved",
+      description: "Your billing details were applied to Stripe for receipts and verification.",
+    })
+    onSuccess()
+  }
+
+  return (
+    <div className="space-y-3 min-w-0">
+      <div className="rounded-md border border-border px-3 py-2 bg-background min-w-0">
+        <CardElement options={{ hidePostalCode: true }} />
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-snug">
+        You can still edit the billing fields above; we send the latest values to Stripe when you save.
+      </p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          size="sm"
+          className="min-h-[44px] sm:min-h-8"
+          onClick={() => void submit()}
+          disabled={busy || !stripe || !elements}
+        >
+          {busy ? "Saving…" : "Save payment method"}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function invoiceAmountLabel(inv: StripeBillingInvoiceRow) {
@@ -216,56 +334,6 @@ function UsageBar({ label, icon: Icon, used, limit, unit = "", detail }: UsageBa
   )
 }
 
-function AddCardTrialForm({
-  clientSecret,
-  onSuccess,
-}: {
-  clientSecret: string
-  onSuccess: () => void
-}) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
-
-  async function submit() {
-    if (!stripe || !elements) return
-    setBusy(true)
-    setError(null)
-    const cardElement = elements.getElement(CardElement)
-    if (!cardElement) {
-      setError("Card form is not ready yet. Try again in a moment.")
-      setBusy(false)
-      return
-    }
-    const result = await stripe.confirmCardSetup(clientSecret, {
-      payment_method: { card: cardElement },
-    })
-    setBusy(false)
-    if (result.error) {
-      setError(safeStripeClientMessage(result.error.message, "Could not save your card."))
-      return
-    }
-    toast({ title: "Card saved", description: "Card saved. Choose a plan anytime." })
-    onSuccess()
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="rounded-md border border-border px-3 py-2 bg-background">
-        <CardElement options={{ hidePostalCode: true }} />
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" size="sm" onClick={() => void submit()} disabled={busy || !stripe || !elements}>
-          {busy ? "Saving…" : "Save card"}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 function BillingPageContent() {
   const searchParams = useSearchParams()
   const { workspace, dispatch, workspaceUsers } = useTenant()
@@ -304,8 +372,17 @@ function BillingPageContent() {
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null)
   const [setupBusy, setSetupBusy] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
+  const [setupBillingForm, setSetupBillingForm] = useState<SaasSubscriptionBillingFormValues>(() =>
+    emptySaasSubscriptionBillingForm(),
+  )
+  const [setupBillingFieldErrors, setSetupBillingFieldErrors] = useState<
+    Partial<Record<keyof SaasSubscriptionBillingFormValues, string>>
+  >({})
+  const [setupPrefillKind, setSetupPrefillKind] = useState<"none" | "workspace" | "stripe">("none")
   const [intendedPlanId, setIntendedPlanId] = useState<PlanId | null>(null)
   const [highlightedPlanId, setHighlightedPlanId] = useState<PlanId | null>(null)
+
+  const billingCountrySelectOptions = useMemo(() => getBillingCountrySelectOptions(), [])
 
   useEffect(() => {
     const queryPlan = parseOnboardingPlan(searchParams.get("plan"))
@@ -581,22 +658,65 @@ function BillingPageContent() {
 
   async function openAddCardModal() {
     setSetupError(null)
+    setSetupBillingFieldErrors({})
+    setSetupClientSecret(null)
+    setSetupOpen(true)
     setSetupBusy(true)
-    const res = await createSetupIntent()
+    const ws = defaultSaasBillingFormFromWorkspace(workspace)
+    const pre = await getSaaSBillingSetupPrefill()
+    const merged = pre.ok ? mergeStripeCustomerBillingPrefill(ws, pre.stripeOverlay) : ws
+    setSetupBillingForm(merged)
+    if (
+      pre.ok &&
+      pre.stripeOverlay &&
+      (pre.stripeOverlay.addressLine1?.trim() ||
+        pre.stripeOverlay.city?.trim() ||
+        pre.stripeOverlay.postalCode?.trim())
+    ) {
+      setSetupPrefillKind("stripe")
+    } else if (
+      (workspace.name ?? "").trim() ||
+      (workspace.companyEmail ?? "").trim() ||
+      (workspace.companyAddress ?? "").trim() ||
+      (workspace.companyPhone ?? "").trim()
+    ) {
+      setSetupPrefillKind("workspace")
+    } else {
+      setSetupPrefillKind("none")
+    }
+    if (!pre.ok) setSetupError(pre.error)
+    setSetupBusy(false)
+  }
+
+  async function handlePrepareSetupIntent() {
+    setSetupError(null)
+    setSetupBillingFieldErrors({})
+    const parsed = saasSubscriptionBillingFormSchema.safeParse(setupBillingForm)
+    if (!parsed.success) {
+      setSetupBillingFieldErrors(flattenZodFieldErrors(parsed.error))
+      return
+    }
+    setSetupBusy(true)
+    const res = await createSetupIntent(parsed.data)
     setSetupBusy(false)
     if (!res.clientSecret) {
       setSetupError(res.error ?? "Could not initialize card setup.")
-      setSetupOpen(true)
       return
     }
     setSetupClientSecret(res.clientSecret)
-    setSetupOpen(true)
   }
 
-  function handleSetupSuccess() {
+  function closePaymentSetupModal() {
     setSetupOpen(false)
     setSetupClientSecret(null)
     setSetupError(null)
+    setSetupBillingFieldErrors({})
+    setSetupBillingForm(emptySaasSubscriptionBillingForm())
+    setSetupPrefillKind("none")
+  }
+
+  function handleSetupSuccess() {
+    closePaymentSetupModal()
     setBillingRefreshTick((n) => n + 1)
   }
 
@@ -1355,33 +1475,262 @@ function BillingPageContent() {
       </div>
 
       {setupOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10">
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <CreditCard size={15} />
-                Add payment method
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-6 sm:py-10 px-3 min-[375px]:px-4">
+          <div className="relative bg-card text-foreground rounded-xl border border-border shadow-2xl w-full max-w-md min-w-0 max-h-[calc(100vh-3rem)] flex flex-col mt-2 sm:mt-0">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 min-w-0">
+                <CreditCard size={15} className="shrink-0" />
+                <span className="truncate">Add payment method</span>
               </h3>
-              <Button variant="ghost" size="icon-sm" onClick={() => setSetupOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={closePaymentSetupModal}
+                className="text-muted-foreground shrink-0"
+                aria-label="Close"
+              >
                 <X size={18} />
               </Button>
             </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Add a card on file for when your trial ends. This does not charge you immediately unless your plan requires
-                it at checkout.
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto min-w-0 min-h-0 flex-1">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Add a card on file for when your trial ends. This does not charge you immediately unless your plan
+                requires it at checkout.
               </p>
               {setupError && <p className="text-xs text-destructive">{setupError}</p>}
+              {setupPrefillKind === "workspace" && (
+                <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-border bg-secondary/40 px-3 py-2">
+                  Prefilled from your company profile.
+                </p>
+              )}
+              {setupPrefillKind === "stripe" && (
+                <p className="text-[11px] text-muted-foreground leading-snug rounded-md border border-border bg-secondary/40 px-3 py-2">
+                  Prefilled from your billing details on file.
+                </p>
+              )}
+
+              <div className="space-y-3 min-w-0">
+                <h4 className="text-xs font-semibold text-foreground">Billing information</h4>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  We&apos;ll use this information for receipts, invoices, and payment verification. You can edit it if a
+                  different person or company should be billed.
+                </p>
+                <div className="grid grid-cols-1 gap-3 min-w-0">
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="saas-bill-name" className="text-xs">
+                      Billing name / company <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="saas-bill-name"
+                      className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                      value={setupBillingForm.billingName}
+                      onChange={(e) => {
+                        setSetupBillingForm((p) => ({ ...p, billingName: e.target.value }))
+                        setSetupBillingFieldErrors((er) => ({ ...er, billingName: undefined }))
+                      }}
+                      autoComplete="organization"
+                    />
+                    {setupBillingFieldErrors.billingName && (
+                      <p className="text-[11px] text-destructive">{setupBillingFieldErrors.billingName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="saas-bill-email" className="text-xs">
+                      Billing email <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="saas-bill-email"
+                      type="email"
+                      className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                      value={setupBillingForm.billingEmail}
+                      onChange={(e) => {
+                        setSetupBillingForm((p) => ({ ...p, billingEmail: e.target.value }))
+                        setSetupBillingFieldErrors((er) => ({ ...er, billingEmail: undefined }))
+                      }}
+                      autoComplete="email"
+                    />
+                    {setupBillingFieldErrors.billingEmail && (
+                      <p className="text-[11px] text-destructive">{setupBillingFieldErrors.billingEmail}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="saas-bill-phone" className="text-xs">
+                      Billing phone <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="saas-bill-phone"
+                      type="tel"
+                      className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                      value={setupBillingForm.billingPhone}
+                      onChange={(e) => {
+                        setSetupBillingForm((p) => ({ ...p, billingPhone: e.target.value }))
+                        setSetupBillingFieldErrors((er) => ({ ...er, billingPhone: undefined }))
+                      }}
+                      autoComplete="tel"
+                    />
+                    {setupBillingFieldErrors.billingPhone && (
+                      <p className="text-[11px] text-destructive">{setupBillingFieldErrors.billingPhone}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="saas-bill-a1" className="text-xs">
+                      Address line 1 <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="saas-bill-a1"
+                      className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                      value={setupBillingForm.addressLine1}
+                      onChange={(e) => {
+                        setSetupBillingForm((p) => ({ ...p, addressLine1: e.target.value }))
+                        setSetupBillingFieldErrors((er) => ({ ...er, addressLine1: undefined }))
+                      }}
+                      autoComplete="address-line1"
+                    />
+                    {setupBillingFieldErrors.addressLine1 && (
+                      <p className="text-[11px] text-destructive">{setupBillingFieldErrors.addressLine1}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 min-w-0">
+                    <Label htmlFor="saas-bill-a2" className="text-xs">
+                      Address line 2 <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="saas-bill-a2"
+                      className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                      value={setupBillingForm.addressLine2}
+                      onChange={(e) => {
+                        setSetupBillingForm((p) => ({ ...p, addressLine2: e.target.value }))
+                        setSetupBillingFieldErrors((er) => ({ ...er, addressLine2: undefined }))
+                      }}
+                      autoComplete="address-line2"
+                    />
+                    {setupBillingFieldErrors.addressLine2 && (
+                      <p className="text-[11px] text-destructive">{setupBillingFieldErrors.addressLine2}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                    <div className="space-y-1.5 min-w-0">
+                      <Label htmlFor="saas-bill-city" className="text-xs">
+                        City <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="saas-bill-city"
+                        className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                        value={setupBillingForm.city}
+                        onChange={(e) => {
+                          setSetupBillingForm((p) => ({ ...p, city: e.target.value }))
+                          setSetupBillingFieldErrors((er) => ({ ...er, city: undefined }))
+                        }}
+                        autoComplete="address-level2"
+                      />
+                      {setupBillingFieldErrors.city && (
+                        <p className="text-[11px] text-destructive">{setupBillingFieldErrors.city}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <Label htmlFor="saas-bill-state" className="text-xs">
+                        State / region <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="saas-bill-state"
+                        className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                        value={setupBillingForm.state}
+                        onChange={(e) => {
+                          setSetupBillingForm((p) => ({ ...p, state: e.target.value }))
+                          setSetupBillingFieldErrors((er) => ({ ...er, state: undefined }))
+                        }}
+                        autoComplete="address-level1"
+                      />
+                      {setupBillingFieldErrors.state && (
+                        <p className="text-[11px] text-destructive">{setupBillingFieldErrors.state}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                    <div className="space-y-1.5 min-w-0">
+                      <Label htmlFor="saas-bill-postal" className="text-xs">
+                        Postal code <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="saas-bill-postal"
+                        className="min-h-[44px] sm:min-h-9 text-sm min-w-0"
+                        value={setupBillingForm.postalCode}
+                        onChange={(e) => {
+                          setSetupBillingForm((p) => ({ ...p, postalCode: e.target.value }))
+                          setSetupBillingFieldErrors((er) => ({ ...er, postalCode: undefined }))
+                        }}
+                        autoComplete="postal-code"
+                      />
+                      {setupBillingFieldErrors.postalCode && (
+                        <p className="text-[11px] text-destructive">{setupBillingFieldErrors.postalCode}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <Label htmlFor="saas-bill-country" className="text-xs">
+                        Country <span className="text-destructive">*</span>
+                      </Label>
+                      <select
+                        id="saas-bill-country"
+                        className={cn(
+                          "flex min-h-[44px] sm:min-h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        )}
+                        value={setupBillingForm.country}
+                        onChange={(e) => {
+                          setSetupBillingForm((p) => ({ ...p, country: e.target.value }))
+                          setSetupBillingFieldErrors((er) => ({ ...er, country: undefined }))
+                        }}
+                        autoComplete="country"
+                      >
+                        <option value="">Select country</option>
+                        {billingCountrySelectOptions.map((o) => (
+                          <option key={o.code} value={o.code}>
+                            {o.name} ({o.code})
+                          </option>
+                        ))}
+                      </select>
+                      {setupBillingFieldErrors.country && (
+                        <p className="text-[11px] text-destructive">{setupBillingFieldErrors.country}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {!setupClientSecret ? (
-                <div className="flex justify-end">
-                  <Button type="button" size="sm" onClick={() => void openAddCardModal()} disabled={setupBusy}>
-                    {setupBusy ? "Loading…" : "Retry"}
-                  </Button>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    First we save your billing contact to Stripe, then you can enter your card on the next step.
+                  </p>
+                  <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" className="min-h-[44px] sm:min-h-8" onClick={closePaymentSetupModal}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="min-h-[44px] sm:min-h-8"
+                      onClick={() => void handlePrepareSetupIntent()}
+                      disabled={setupBusy}
+                    >
+                      {setupBusy ? "Continuing…" : "Save payment method"}
+                    </Button>
+                  </div>
                 </div>
               ) : hasStripe ? (
-                <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
-                  <AddCardTrialForm onSuccess={handleSetupSuccess} clientSecret={setupClientSecret} />
-                </Elements>
+                <div className="space-y-3 min-w-0">
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Enter your card below, then tap <span className="font-medium text-foreground">Save payment method</span>{" "}
+                    again.
+                  </p>
+                  <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+                    <SaasCardConfirmStep
+                      onSuccess={handleSetupSuccess}
+                      clientSecret={setupClientSecret}
+                      billingValues={setupBillingForm}
+                    />
+                  </Elements>
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground">Stripe is not configured for card setup.</p>
               )}

@@ -50,6 +50,16 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 | `SUPABASE_SERVICE_ROLE_KEY` | Required for webhook handler (writes `organization_subscriptions`, idempotency) |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | App auth / RLS |
 
+## Settings → Billing (SaaS subscription customer)
+
+When a member with **`canEditOrgBilling`** adds an optional payment method before checkout, the app collects **billing contact + structured address** on `/settings/billing`, validates with `saasSubscriptionBillingFormSchema` (`lib/billing/saas-subscription-billing-setup.ts`), and:
+
+1. **`getSaaSBillingSetupPrefill()`** — merges existing Stripe `Customer` billing fields (when `stripe_customer_id` exists) over workspace company profile defaults for the modal only; **does not** write to `organizations`.
+2. **`createSetupIntent(billing)`** — same permission gate; creates or updates the **Stripe** subscription customer from the form; persists `stripe_customer_id` only when newly created; returns a card **SetupIntent** client secret.
+3. **`updateSaaSSubscriptionStripeCustomerBilling(billing)`** + **`confirmCardSetup`** — immediately before confirmation, re-applies the latest form values to the Stripe customer and passes matching **`billing_details`** on the PaymentMethod so receipts/invoices align with what the user entered.
+
+**Operational customers** (CRM `customers` billing profiles) are separate from this SaaS flow; there is no distinct “billing contact” row for the workspace itself beyond company profile + Stripe.
+
 ## BlitzPay (Connect) vs SaaS subscription webhooks
 
 **BlitzPay** end-customer invoice payments use **`POST /api/blitzpay/webhook`** and the **Connect** webhook secret (`STRIPE_BLITZPAY_WEBHOOK_SECRET` / env naming per deploy). That path is **separate** from **`POST /api/stripe/webhook`** (SaaS subscriptions). Phase **2O** financing/installment features **do not** add new Stripe event types to the SaaS webhook; future third-party financing integrations must keep **PII and application payloads out of Equipify** and use **opaque provider references** only.
