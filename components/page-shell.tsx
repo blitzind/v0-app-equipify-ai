@@ -162,7 +162,6 @@ const ROUTE_META: Record<string, RouteMeta> = {
       "Monitor receivables, cash flow, treasury activity, collections, forecasts, and financial operations health across your business.",
     icon: Landmark,
     heroAccessory: "blitzpay-wordmark",
-    heroSubtitleMultiline: true,
   },
 }
 
@@ -251,7 +250,9 @@ function PageHero({
   const maintenancePlansHero = pathname === "/maintenance-plans"
   const blitzPayFinancialHero = pathname === "/insights/financial-command-center"
   const isSettingsArea = pathname.startsWith("/settings/")
-  const multilineSubtitle = Boolean(isSettingsArea || heroSubtitleMultiline)
+  const multilineSubtitle = Boolean(
+    isSettingsArea || (heroSubtitleMultiline && !blitzPayFinancialHero),
+  )
   const heroIconFrameClass = blitzPayFinancialHero
     ? "w-11 h-11 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center shrink-0"
     : "w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center shrink-0"
@@ -295,23 +296,26 @@ function PageHero({
             <p
               className={cn(
                 "text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed",
-                multilineSubtitle
-                  ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
-                  : "text-xs sm:text-sm line-clamp-1",
+                blitzPayFinancialHero
+                  ? "text-xs sm:text-sm max-sm:text-pretty sm:truncate sm:whitespace-nowrap sm:overflow-hidden sm:text-ellipsis"
+                  : multilineSubtitle
+                    ? "text-sm sm:text-[0.9375rem] max-w-3xl text-pretty"
+                    : "text-xs sm:text-sm line-clamp-1",
               )}
+              title={blitzPayFinancialHero ? subtitle : undefined}
             >
               {subtitle}
             </p>
           </div>
         </div>
         {heroAccessory === "blitzpay-wordmark" ? (
-          <div className="flex shrink-0 items-center justify-start bg-transparent sm:justify-end pl-12 sm:pl-0">
+          <div className="flex shrink-0 items-center justify-start bg-transparent pt-1 sm:justify-end sm:pt-0 pl-0 sm:pl-0 w-full sm:w-auto">
             <Image
               src="/blitzpay-wordmark-transparent.png"
               alt="BlitzPay"
-              width={220}
-              height={48}
-              className="h-7 w-auto max-w-[min(200px,42vw)] sm:h-8 sm:max-w-[220px] object-contain object-left sm:object-right opacity-95 bg-transparent"
+              width={550}
+              height={120}
+              className="h-[70px] w-auto max-w-[min(92vw,360px)] sm:h-20 sm:max-w-[min(520px,48vw)] object-contain object-left sm:object-right opacity-95 bg-transparent"
               priority
             />
           </div>
