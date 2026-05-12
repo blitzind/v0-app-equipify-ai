@@ -1,6 +1,6 @@
 # BlitzPay Phase 4 — AI Financial Copilot (architecture)
 
-This document describes **Phase 4A** (shipped in codebase as migration `20261116120000_blitzpay_phase_4a_ai_financial_copilot.sql` and `lib/blitzpay/blitzpay-ai-*.ts`). Later Phase 4 sub-phases may extend models **without** changing the deterministic-first contract.
+This document describes **Phase 4A** (shipped in codebase as migration `20261116120000_blitzpay_phase_4a_ai_financial_copilot.sql` and `lib/blitzpay/blitzpay-ai-*.ts`) and **Phase 4B** (migration `20261117120000_blitzpay_phase_4b_revenue_optimization.sql` plus `lib/blitzpay/blitzpay-revenue-optimization*.ts`). Later Phase 4 sub-phases may extend models **without** changing the deterministic-first contract.
 
 ## Design principles
 
@@ -38,13 +38,39 @@ All under `GET|POST /api/organizations/[organizationId]/blitzpay/ai/…` with `r
 
 ## UI
 
-- **Financial Command Center** (`/insights/financial-command-center`) embeds `BlitzpayAiFinancialCopilotPanel`.
-- **Insights hub** (`/insights`) shows the same panel for finance-capable users.
-- Required disclaimer is rendered in-panel.
+- **Financial Command Center** (`/insights/financial-command-center`) embeds `BlitzpayAiFinancialCopilotPanel` and `BlitzpayRevenueOptimizationPanel`.
+- **Insights hub** (`/insights`) shows the same panels for finance-capable users.
+- Required disclaimers are rendered in-panel (copilot vs revenue optimization copy differs).
 
 ## Environment
 
 - **`BLITZPAY_AI_AUDIT_PEPPER`** (optional) — server-only; strengthens audit hashes. Distinct from `BLITZPAY_GL_SOURCE_PEPPER`.
+- **`BLITZPAY_REVENUE_OPT_AUDIT_PEPPER`** (optional) — server-only; strengthens `blitzpay_revenue_optimization_audit_log` hashes (Phase 4B).
+
+## Phase 4B — Revenue optimization foundations (deterministic)
+
+**Scope:** Advisory **opportunities**, **human action queue**, **per-customer payment behavior scores** (bounded customer scan), **experiment tracking** rows, and an **append-only optimization audit log**. All math is integer-based (cents, scores 0–100, experiment lift in basis points). **No** autonomous customer messaging, **no** automatic price or membership mutations, **no** financing approvals, **no** treasury movement, **no** override of Phase **2AB** retry caps, and **no** hidden model reasoning.
+
+### Tables (4B)
+
+| Table | Role |
+|-------|------|
+| `blitzpay_revenue_optimization_opportunities` | Advisory queue (`opportunity_type`, `priority`, deterministic scores, `supporting_metrics`, optional revenue impact cents). |
+| `blitzpay_revenue_optimization_actions` | Staff disposition (`action_status`, `action_type`, `deterministic_basis`) — acknowledge/complete only; **no execution**. |
+| `blitzpay_revenue_optimization_experiments` | Operational experiment metadata (control/treatment labels, baseline/observed integers, lift bps). **No** auto rollout. |
+| `blitzpay_customer_payment_behavior_scores` | Daily per-customer deterministic scores from bounded `org_invoices` + billing profile hints. |
+| `blitzpay_revenue_optimization_audit_log` | Immutable audit (`immutable_hash` + optional `BLITZPAY_REVENUE_OPT_AUDIT_PEPPER`). |
+
+### APIs (4B)
+
+Under `GET|POST /api/organizations/[organizationId]/blitzpay/revenue-optimization/…` with the same org permission + schema guard pattern as 4A:
+
+- `GET …/opportunities`, `POST …/generate`, `GET …/actions`, `POST …/actions/[id]/acknowledge|complete`, `POST …/opportunities/[id]/dismiss`
+- `GET|POST …/experiments`, `GET …/payment-behavior`, `GET …/health`
+
+### Reporting
+
+`fetchBlitzpayOrgReportingSnapshot` adds bounded Phase **4B** fields (`revenueOptimizationScore`, `estimatedRevenueOpportunityCents`, coverage + opportunity counts, `optimizationExperimentCount`) computed in `blitzpay-revenue-optimization-metrics.ts`.
 
 ## Future boundaries
 

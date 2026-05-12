@@ -91,6 +91,12 @@ If not set, defaults come from `lib/plans.ts` (must be real `price_…` IDs for 
 - **Schema:** apply `20261116120000_blitzpay_phase_4a_ai_financial_copilot.sql` so staff `…/blitzpay/ai/*` routes pass **schema health** checks.
 - **Optional env:** `BLITZPAY_AI_AUDIT_PEPPER` (server-only) — strengthens immutable audit hashes; distinct from `BLITZPAY_GL_SOURCE_PEPPER`. See `docs/BLITZPAY_PHASE_4_ARCHITECTURE.md`.
 
+### BlitzPay Phase 4B (revenue optimization — deterministic recommendations only)
+
+- **No autonomous execution:** opportunities, behavior scores, and experiments are **internal planning artifacts**; `POST …/generate` refreshes the queue from reporting math — it does **not** message customers, change prices, renew memberships, approve financing, or retry cards outside existing Phase **2AB** caps.
+- **Schema:** apply `20261117120000_blitzpay_phase_4b_revenue_optimization.sql` so staff `…/blitzpay/revenue-optimization/*` routes pass **schema health** checks.
+- **Optional env:** `BLITZPAY_REVENUE_OPT_AUDIT_PEPPER` (server-only) — strengthens immutable optimization audit hashes. See `docs/BLITZPAY_PHASE_4_ARCHITECTURE.md`.
+
 ### BlitzPay Phase 2AA (billing profiles and payment method metadata)
 
 - **Stripe remains the vault:** Equipify stores only **hashed** payment-method references plus **non-sensitive** display fields (brand, last4, exp, type). **No** card or bank account numbers are stored in Postgres.

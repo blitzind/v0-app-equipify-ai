@@ -23,6 +23,7 @@ import {
 import { useSupabaseDashboard } from "@/lib/dashboard/use-supabase-dashboard"
 import type { AiGeneratedInsightItem } from "@/lib/insights/openai-generate-insights"
 import { BlitzpayAiFinancialCopilotPanel } from "@/components/blitzpay/blitzpay-ai-financial-copilot-panel"
+import { BlitzpayRevenueOptimizationPanel } from "@/components/blitzpay/blitzpay-revenue-optimization-panel"
 import { Toaster } from "@/components/ui/toaster"
 import { useBillingAccess } from "@/lib/billing-access-context"
 import { useOrgPermissions } from "@/lib/org-permissions-context"
@@ -616,6 +617,12 @@ export default function InsightsPage() {
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay financial copilot</p>
             <BlitzpayAiFinancialCopilotPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
+          </section>
+        ) : null}
+        {canBlitzpayFinancialCommandCenter && dash.organizationId ? (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">BlitzPay revenue optimization</p>
+            <BlitzpayRevenueOptimizationPanel organizationId={dash.organizationId} orgReady={!dash.loading} />
           </section>
         ) : null}
 

@@ -48,7 +48,8 @@
     "test:blitzpay-phase-3c-tax-compliance": "tsx scripts/test-blitzpay-phase-3c-tax-compliance.ts",
     "test:blitzpay-phase-3d-financing-marketplace": "tsx scripts/test-blitzpay-phase-3d-financing-marketplace.ts",
     "test:blitzpay-phase-3e-procurement-finance": "tsx scripts/test-blitzpay-phase-3e-procurement-finance.ts",
-    "test:blitzpay-phase-4a-ai-financial-copilot": "tsx scripts/test-blitzpay-phase-4a-ai-financial-copilot.ts"
+    "test:blitzpay-phase-4a-ai-financial-copilot": "tsx scripts/test-blitzpay-phase-4a-ai-financial-copilot.ts",
+    "test:blitzpay-phase-4b-revenue-optimization": "tsx scripts/test-blitzpay-phase-4b-revenue-optimization.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

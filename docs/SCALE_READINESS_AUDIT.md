@@ -225,6 +225,12 @@ Evidence from migrations under `supabase/migrations/`:
 - **Append-only audit:** `blitzpay_procurement_audit_log` is **update/delete blocked** in Postgres — growth is append-mostly; keep staff list reads capped (`BLITZPAY_PROCUREMENT_AUDIT_LIST_CAP`).
 - **Inventory movements** are append-only ledger rows (corrections via additional rows, not destructive edits).
 
+### 8.14 BlitzPay Phase 4B (revenue optimization foundations)
+
+- **Staff finance APIs** under `…/blitzpay/revenue-optimization/*` with explicit **list caps** (opportunities, actions, scores, experiments) — same traffic profile as Phase **4A** copilot lists; **no** portal routes.
+- **Append-only audit:** `blitzpay_revenue_optimization_audit_log` is **update/delete blocked** — bounded staff reads only; optional `BLITZPAY_REVENUE_OPT_AUDIT_PEPPER` strengthens hashes.
+- **Reporting snapshot** adds a small bounded query for experiment counts; keep cadence aligned with other snapshot enrichers (avoid per-navigation hot polling at extreme scale).
+
 ---
 
 ## 9. AI / Usage Scale Risks

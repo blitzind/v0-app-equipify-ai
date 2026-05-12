@@ -4,11 +4,11 @@
  */
 
 export const MCG_SCAN_COUNTS = {
-  apiRouteHandlers: 378,
-  sqlMigrations: 176,
+  apiRouteHandlers: 387,
+  sqlMigrations: 177,
   dashboardPages: 62,
-  componentsTsx: 281,
-  libTsFiles: 638,
+  componentsTsx: 282,
+  libTsFiles: 642,
 } as const
 
 export const MCG_SCAN_SECTION = `## Repository scan (auto-generated)
@@ -17,11 +17,11 @@ _Regenerate with \`pnpm update:master-context\` after meaningful changes._
 
 | Metric | Count |
 |--------|------:|
-| API route handlers (\`app/api/**/route.ts\`) | **378** |
-| SQL migrations (\`supabase/migrations/*.sql\`) | **176** |
+| API route handlers (\`app/api/**/route.ts\`) | **387** |
+| SQL migrations (\`supabase/migrations/*.sql\`) | **177** |
 | Dashboard pages (\`app/(dashboard)/**/page.tsx\`) | **62** |
-| \`components/**/*.tsx\` | **281** |
-| \`lib/**/*.ts\` | **638** |
+| \`components/**/*.tsx\` | **282** |
+| \`lib/**/*.ts\` | **642** |
 
 ### Vercel crons
 
@@ -183,6 +183,15 @@ organizations/[organizationId]/blitzpay/procurement/vendor-rebates/route.ts
 organizations/[organizationId]/blitzpay/recurring-revenue/route.ts
 organizations/[organizationId]/blitzpay/retention-report/route.ts
 organizations/[organizationId]/blitzpay/revenue-intelligence/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/actions/[id]/acknowledge/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/actions/[id]/complete/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/actions/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/experiments/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/generate/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/health/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/opportunities/[id]/dismiss/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/opportunities/route.ts
+organizations/[organizationId]/blitzpay/revenue-optimization/payment-behavior/route.ts
 organizations/[organizationId]/blitzpay/settings/route.ts
 organizations/[organizationId]/blitzpay/status/route.ts
 organizations/[organizationId]/blitzpay/sync/route.ts

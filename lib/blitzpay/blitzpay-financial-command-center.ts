@@ -128,6 +128,14 @@ export type BlitzpayFinancialCommandCenterPayload = {
     procurementEfficiencyScore: number
     vendorConcentrationRiskScore: number
     aiInsightCoverageRate: number
+    revenueOptimizationScore: number
+    estimatedRevenueOpportunityCents: number
+    paymentBehaviorCoverageRate: number
+    churnPreventionOpportunityCount: number
+    achNudgeOpportunityCount: number
+    renewalOptimizationOpportunityCount: number
+    technicianCoachingOpportunityCount: number
+    optimizationExperimentCount: number
   }
   combinedForecast: ReturnType<typeof buildCombinedArApCashForecast>
   scorecards: OwnerScorecard[]
@@ -368,6 +376,14 @@ export async function fetchBlitzpayOrgFinancialCommandCenter(
     procurementEfficiencyScore: reporting.procurementEfficiencyScore,
     vendorConcentrationRiskScore: reporting.vendorConcentrationRiskScore,
     aiInsightCoverageRate: reporting.aiInsightCoverageRate,
+    revenueOptimizationScore: reporting.revenueOptimizationScore,
+    estimatedRevenueOpportunityCents: reporting.estimatedRevenueOpportunityCents,
+    paymentBehaviorCoverageRate: reporting.paymentBehaviorCoverageRate,
+    churnPreventionOpportunityCount: reporting.churnPreventionOpportunityCount,
+    achNudgeOpportunityCount: reporting.achNudgeOpportunityCount,
+    renewalOptimizationOpportunityCount: reporting.renewalOptimizationOpportunityCount,
+    technicianCoachingOpportunityCount: reporting.technicianCoachingOpportunityCount,
+    optimizationExperimentCount: reporting.optimizationExperimentCount,
   },
     combinedForecast,
     scorecards,

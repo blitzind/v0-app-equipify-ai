@@ -182,6 +182,14 @@ const baseReporting = (): BlitzpayOrgReportingSnapshot =>
     procurementEfficiencyScore: 0,
     vendorConcentrationRiskScore: 0,
     aiInsightCoverageRate: 0,
+    revenueOptimizationScore: 0,
+    estimatedRevenueOpportunityCents: 0,
+    paymentBehaviorCoverageRate: 0,
+    churnPreventionOpportunityCount: 0,
+    achNudgeOpportunityCount: 0,
+    renewalOptimizationOpportunityCount: 0,
+    technicianCoachingOpportunityCount: 0,
+    optimizationExperimentCount: 0,
   }) as BlitzpayOrgReportingSnapshot
 
 // --- Phase 4a scores ---

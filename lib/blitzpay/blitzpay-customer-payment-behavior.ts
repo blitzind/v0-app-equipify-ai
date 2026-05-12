@@ -1,4 +1,6 @@
-import "server-only"
+/**
+ * Customer payment behavior: deterministic scoring helpers (test-safe) plus bounded invoice summary fetch (server paths).
+ */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { assertUuid } from "@/lib/blitzpay/idempotency-keys"
@@ -14,6 +16,66 @@ function dayDiff(aYmdOrIso: string, bYmdOrIso: string): number {
   const b = Date.parse(`${String(bYmdOrIso).slice(0, 10)}T00:00:00Z`)
   if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
   return Math.floor((a - b) / (1000 * 60 * 60 * 24))
+}
+
+export type CustomerInvoiceSignals = {
+  openNonPaidCount: number
+  overdueCount: number
+  paidLast90dCount: number
+  totalOpenCents: number
+  hasSavedPaymentMethod: boolean
+  autopayEnrolled: boolean
+}
+
+function clamp0to100(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+/** Higher = more reliable payer (inverse of stress). */
+export function computePaymentReliabilityScore0to100(s: CustomerInvoiceSignals): number {
+  let score = 72
+  score -= Math.min(40, s.overdueCount * 12)
+  score -= Math.min(25, s.openNonPaidCount * 4)
+  score += Math.min(15, s.paidLast90dCount * 3)
+  if (s.totalOpenCents > 50_000) score -= 8
+  return clamp0to100(score)
+}
+
+export function computeLatePaymentRiskScore0to100(s: CustomerInvoiceSignals): number {
+  const stress = s.overdueCount * 18 + s.openNonPaidCount * 6
+  return clamp0to100(stress + (s.totalOpenCents > 25_000 ? 12 : 0))
+}
+
+export function computeAutopayFitScore0to100(s: CustomerInvoiceSignals): number {
+  if (s.autopayEnrolled) return 95
+  if (!s.hasSavedPaymentMethod) return 25
+  let v = 55
+  if (s.overdueCount === 0) v += 20
+  if (s.paidLast90dCount >= 2) v += 15
+  return clamp0to100(v)
+}
+
+export function computeAchNudgeFitScore0to100(s: CustomerInvoiceSignals): number {
+  if (!s.hasSavedPaymentMethod) return 40
+  if (s.autopayEnrolled) return 30
+  let v = 50
+  if (s.overdueCount > 0) v += 15
+  if (s.paidLast90dCount >= 1) v += 10
+  return clamp0to100(v)
+}
+
+export function computeRenewalRiskScore0to100(s: CustomerInvoiceSignals, orgChurnProxy0to100: number): number {
+  const local = clamp0to100(s.overdueCount * 22 + s.openNonPaidCount * 8)
+  return clamp0to100(Math.floor((local + orgChurnProxy0to100) / 2))
+}
+
+export function computeFinancingFitScore0to100(s: CustomerInvoiceSignals, orgFinancingReadyQuotes: number): number {
+  let v = 35
+  if (s.totalOpenCents > 15_000) v += 20
+  if (s.overdueCount > 0) v += 15
+  v += Math.min(25, orgFinancingReadyQuotes * 3)
+  return clamp0to100(v)
 }
 
 export type BlitzpayCustomerPaymentBehaviorSummary = {

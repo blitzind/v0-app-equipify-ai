@@ -15,6 +15,10 @@ import { fetchBlitzpayPhase2aaReportingRates } from "@/lib/blitzpay/blitzpay-bil
 import { fetchBlitzpayPhase2abCollectionReporting } from "@/lib/blitzpay/blitzpay-collections-service"
 import { fetchGlReportingSnapshotFields } from "@/lib/blitzpay/blitzpay-general-ledger-service"
 import { computeBlitzpayPhase4aReportingScores } from "@/lib/blitzpay/blitzpay-ai-snapshot-scores"
+import {
+  computeBlitzpayPhase4bReportingFields,
+  normalizeRevenueOptimizationContext,
+} from "@/lib/blitzpay/blitzpay-revenue-optimization-metrics"
 
 export type BlitzpayOrgReportingSnapshot = {
   sinceIso: string | null
@@ -206,6 +210,15 @@ export type BlitzpayOrgReportingSnapshot = {
   procurementEfficiencyScore: number
   vendorConcentrationRiskScore: number
   aiInsightCoverageRate: number
+  /** Phase 4B — deterministic revenue optimization reporting (bounded; advisory). */
+  revenueOptimizationScore: number
+  estimatedRevenueOpportunityCents: number
+  paymentBehaviorCoverageRate: number
+  churnPreventionOpportunityCount: number
+  achNudgeOpportunityCount: number
+  renewalOptimizationOpportunityCount: number
+  technicianCoachingOpportunityCount: number
+  optimizationExperimentCount: number
 }
 
 /**
@@ -894,6 +907,44 @@ export async function fetchBlitzpayOrgReportingSnapshot(
   })
 
   const netCollectedCentsForPhase = Math.max(0, gross - refunded)
+  let optimizationExperimentCount = 0
+  try {
+    const { count, error: expCountErr } = await admin
+      .from("blitzpay_revenue_optimization_experiments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("experiment_status", ["draft", "active", "paused"])
+    if (!expCountErr && count != null) optimizationExperimentCount = count
+  } catch {
+    /* optional until Phase 4B migration applied */
+  }
+
+  const phase4b = computeBlitzpayPhase4bReportingFields(
+    normalizeRevenueOptimizationContext({
+      achAccelerationOpportunityCents,
+      reminderConversionRatePct,
+      fieldCollectionRecoveryRatePct,
+      recoveryFlowCompletionRate,
+      failedPaymentRate,
+      blitzpayChurnRiskScore0to100,
+      renewalPipelineCents,
+      recurringRevenueCents,
+      delinquentMembershipRevenueCents,
+      membershipAutoPayAdoptionBasisPoints,
+      savedPaymentMethodRate,
+      autopayEnrollmentRate,
+      technicianAssistedRecoveryRatePct,
+      likelyFieldCollectibleCents,
+      workOrdersWithCollectibleBalancesCount,
+      financingReadyQuotesCount,
+      financingRevenueOpportunity,
+      estimatedRecoverableOverdueCents,
+      collectionSuccessRate,
+      billingReadinessRate,
+    }),
+    { activeExperimentCount: optimizationExperimentCount },
+  )
+
   const phase4a = computeBlitzpayPhase4aReportingScores({
     cashRunwayStatus: cash2z.cashRunwayStatus,
     cashReserveGapCents: cash2z.cashReserveGapCents,
@@ -1079,5 +1130,13 @@ export async function fetchBlitzpayOrgReportingSnapshot(
     procurementEfficiencyScore: phase4a.procurementEfficiencyScore,
     vendorConcentrationRiskScore: phase4a.vendorConcentrationRiskScore,
     aiInsightCoverageRate: phase4a.aiInsightCoverageRate,
+    revenueOptimizationScore: phase4b.revenueOptimizationScore,
+    estimatedRevenueOpportunityCents: phase4b.estimatedRevenueOpportunityCents,
+    paymentBehaviorCoverageRate: phase4b.paymentBehaviorCoverageRate,
+    churnPreventionOpportunityCount: phase4b.churnPreventionOpportunityCount,
+    achNudgeOpportunityCount: phase4b.achNudgeOpportunityCount,
+    renewalOptimizationOpportunityCount: phase4b.renewalOptimizationOpportunityCount,
+    technicianCoachingOpportunityCount: phase4b.technicianCoachingOpportunityCount,
+    optimizationExperimentCount: phase4b.optimizationExperimentCount,
   }
 }

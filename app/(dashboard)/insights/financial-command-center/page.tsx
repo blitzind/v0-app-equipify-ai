@@ -8,6 +8,7 @@ import { BlitzpayCollectionsCopilotPanel } from "@/components/blitzpay/blitzpay-
 import { BlitzpayRecurringRevenuePanel } from "@/components/blitzpay/blitzpay-recurring-revenue-panel"
 import { BlitzpayExecutiveDashboard } from "@/components/blitzpay/blitzpay-executive-dashboard"
 import { BlitzpayAiFinancialCopilotPanel } from "@/components/blitzpay/blitzpay-ai-financial-copilot-panel"
+import { BlitzpayRevenueOptimizationPanel } from "@/components/blitzpay/blitzpay-revenue-optimization-panel"
 import { BlitzpayFinancialCommandCenterPanel } from "@/components/blitzpay/blitzpay-financial-command-center-panel"
 import { BlitzpayAccountingOverviewPanel } from "@/components/blitzpay/blitzpay-accounting-overview-panel"
 import { BlitzpayApBillPayPanel } from "@/components/blitzpay/blitzpay-ap-bill-pay-panel"
@@ -94,6 +95,7 @@ export default function FinancialCommandCenterPage() {
       </p>
       <BlitzpayExecutiveDashboard organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayAiFinancialCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
+      <BlitzpayRevenueOptimizationPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayRecurringRevenuePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCollectionsCopilotPanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
       <BlitzpayCollectionsEnginePanel organizationId={organizationId} orgReady={orgStatus === "ready"} />
