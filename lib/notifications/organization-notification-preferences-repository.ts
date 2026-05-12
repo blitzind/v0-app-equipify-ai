@@ -13,7 +13,7 @@ export type NotificationPreferenceDto = {
   alertType: WorkspaceAlertType
   inAppEnabled: boolean
   emailEnabled: boolean
-  /** SMS delivery is not wired yet; always false in API responses and persisted rows. */
+  /** Persisted when workspace SMS policy allows; sending still gated in `queueTransactionalSmsNotification`. */
   smsEnabled: boolean
 }
 
@@ -84,7 +84,7 @@ export function mergePreferenceDtos(
       alertType: r.alert_type,
       inAppEnabled: Boolean(r.in_app_enabled),
       emailEnabled: Boolean(r.email_enabled),
-      smsEnabled: false,
+      smsEnabled: Boolean(r.sms_enabled),
     })
   }
   return WORKSPACE_ALERT_TYPES.map((t) => byType.get(t)!)
@@ -219,7 +219,7 @@ export async function upsertOrganizationNotificationPreferences(
         alert_type: p.alertType,
         in_app_enabled: p.inAppEnabled,
         email_enabled: p.emailEnabled,
-        sms_enabled: false,
+        sms_enabled: p.smsEnabled,
       },
       { onConflict: "organization_id,alert_type" },
     )

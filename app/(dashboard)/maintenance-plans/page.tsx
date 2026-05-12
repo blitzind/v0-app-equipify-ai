@@ -54,7 +54,8 @@ import {
   Zap,
   Wrench,
   Calendar,
-  Settings2,
+  Settings,
+  History,
   CheckCircle2,
   PauseCircle,
   AlertTriangle,
@@ -664,13 +665,14 @@ function PlanDetailSheet({ plan, onClose }: { plan: MaintenancePlan; onClose: ()
         >
           <TabsList className={tabsListDrawerRowClassName}>
             {[
-              { value: "services",      label: "Services" },
-              { value: "work_orders",   label: "Work Orders" },
-              { value: "notifications", label: "Notifications" },
-              { value: "log",           label: "Notification Log" },
-              { value: "settings",      label: "Settings" },
-            ].map(({ value, label }) => (
-              <TabsTrigger key={value} value={value} className={tabsTriggerDrawerRowClassName()}>
+              { value: "services",      label: "Services",           Icon: Wrench },
+              { value: "work_orders",   label: "Work Orders",        Icon: ClipboardList },
+              { value: "notifications", label: "Notifications",      Icon: Bell },
+              { value: "log",           label: "Notification Log", Icon: History },
+              { value: "settings",      label: "Settings",           Icon: Settings },
+            ].map(({ value, label, Icon }) => (
+              <TabsTrigger key={value} value={value} className={tabsTriggerDrawerRowClassName("gap-2")}>
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
               </TabsTrigger>
             ))}

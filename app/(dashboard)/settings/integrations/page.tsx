@@ -71,6 +71,8 @@ const INTEGRATIONS: Integration[] = [
     description: "Send SMS reminders to customers for upcoming appointments and maintenance.",
     category: "Notifications",
     logo: "TW",
+    detailHref: "/settings/workspace#workspace-sms",
+    detailLabel: "SMS workspace",
   },
   {
     id: "salesforce",

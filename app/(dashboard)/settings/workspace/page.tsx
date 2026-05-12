@@ -11,6 +11,7 @@ import {
   logWorkspaceLogoUpload,
   showWorkspaceLogoDiagnostics,
 } from "@/lib/workspace-logo-diagnostics-client"
+import { WorkspaceSmsStatusCard } from "@/components/settings/workspace-sms-status-card"
 
 const TIMEZONES = [
   "America/New_York",
@@ -755,6 +756,10 @@ export default function WorkspacePage() {
           </p>
         </div>
       )}
+
+      <div id="workspace-sms" className="scroll-mt-24">
+        <WorkspaceSmsStatusCard organizationId={organizationId} canEdit={canEdit} />
+      </div>
 
       {/* General */}
       <SettingCard title="General" description="Basic workspace information shown across the platform.">

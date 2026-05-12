@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { Bell, Mail, Smartphone, Monitor, Loader2, Info } from "lucide-react"
 import { AiOpsDigestSettingsCard } from "@/components/ai-ops/digest-settings-card"
 import { InternalEscalationRulesPanel } from "@/components/settings/internal-escalation-rules-panel"
@@ -18,6 +19,9 @@ import {
 } from "@/lib/notifications/workspace-alert-registry"
 import { DEFAULT_DIGEST_TIME_LOCAL, normalizeLocalHm } from "@/lib/notifications/notification-time-local"
 import { cn } from "@/lib/utils"
+import type { WorkspaceSmsWorkspaceDto } from "@/lib/sms/workspace-sms-types"
+import { DEFAULT_WORKSPACE_SMS_DTO } from "@/lib/sms/workspace-sms-types"
+import { isTransactionalSmsAlertType } from "@/lib/sms/transactional-sms-allowlist"
 
 const TIMES = [
   "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00",
@@ -49,7 +53,8 @@ type ApiBundle = {
 type ApiResponse = ApiBundle & {
   message?: string
   error?: string
-  meta?: { persistenceReady?: boolean }
+  meta?: { persistenceReady?: boolean; smsPersistenceReady?: boolean }
+  smsWorkspace?: WorkspaceSmsWorkspaceDto
   quietHours?: {
     enabled?: unknown
     startLocal?: unknown
@@ -87,11 +92,12 @@ function normalizeApiPreferences(raw: unknown): ApiPreference[] {
     if (typeof o.alertType !== "string" || !isWorkspaceAlertType(o.alertType)) continue
     const inAppEnabled = Boolean(o.inAppEnabled ?? o.inApp)
     const emailEnabled = Boolean(o.emailEnabled ?? o.email)
+    const smsEnabled = Boolean(o.smsEnabled ?? o.sms)
     by.set(o.alertType, {
       alertType: o.alertType,
       inAppEnabled,
       emailEnabled,
-      smsEnabled: false,
+      smsEnabled,
     })
   }
   return WORKSPACE_ALERT_TYPES.map((t) => by.get(t)!)
@@ -154,6 +160,9 @@ function friendMutateMessage(res: Response, json: { message?: string; error?: st
   if (res.status === 403) {
     return "You do not have permission to change these settings."
   }
+  if (json?.error === "sms_not_ready") {
+    return "SMS is not enabled for this workspace yet. Configure SMS under Settings → Workspace, then try again."
+  }
   if (typeof json?.message === "string" && json.message.trim()) {
     return json.message.trim()
   }
@@ -168,7 +177,7 @@ function preferencesPayload(prefs: ApiPreference[]): ApiPreference[] {
       alertType: t,
       inAppEnabled: p?.inAppEnabled ?? false,
       emailEnabled: p?.emailEnabled ?? false,
-      smsEnabled: false,
+      smsEnabled: p?.smsEnabled ?? false,
     }
   })
 }
@@ -221,6 +230,7 @@ export default function NotificationsPage() {
   const canManageWorkspaceSettings =
     permStatus === "ready" && permissions.canManageWorkspaceSettings
   const [persistenceReady, setPersistenceReady] = useState(true)
+  const [smsWorkspace, setSmsWorkspace] = useState<WorkspaceSmsWorkspaceDto>({ ...DEFAULT_WORKSPACE_SMS_DTO })
 
   const mutateBlockReason = useMemo(() => {
     if (orgStatus !== "ready" || !organizationId) return "no_workspace" as const
@@ -270,6 +280,8 @@ export default function NotificationsPage() {
 
   const digest = draftBundle?.digest
 
+  const smsChannelConfigurable = smsWorkspace.smsChannelConfigurable
+
   const applyServerPayload = useCallback((json: ApiResponse) => {
     const next: ApiBundle = {
       preferences: normalizeApiPreferences(json.preferences),
@@ -278,6 +290,7 @@ export default function NotificationsPage() {
     setServerBundle(cloneBundle(next))
     setDraftBundle(cloneBundle(next))
     setPersistenceReady(json.meta?.persistenceReady !== false)
+    setSmsWorkspace(json.smsWorkspace ? { ...json.smsWorkspace } : { ...DEFAULT_WORKSPACE_SMS_DTO })
   }, [])
 
   const load = useCallback(async () => {
@@ -286,6 +299,7 @@ export default function NotificationsPage() {
       setServerBundle(null)
       setDraftBundle(null)
       setPersistenceReady(true)
+      setSmsWorkspace({ ...DEFAULT_WORKSPACE_SMS_DTO })
       return
     }
     abortRef.current?.abort()
@@ -404,6 +418,8 @@ export default function NotificationsPage() {
 
   const controlsDisabled = saving || !canMutate || !persistenceReady
 
+  const smsSwitchDisabled = controlsDisabled || !smsChannelConfigurable
+
   const controlsDisableExplanation = useMemo(() => {
     if (orgStatus !== "ready" || !organizationId) {
       return "Workspace unavailable — select a workspace above to load preferences."
@@ -430,24 +446,27 @@ export default function NotificationsPage() {
     saving,
   ])
 
-  const setDraftPreference = useCallback((alertType: WorkspaceAlertType, channel: "inApp" | "email", value: boolean) => {
-    setDraftBundle((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        preferences: prev.preferences.map((p) =>
-          p.alertType === alertType ?
-            {
-              ...p,
-              inAppEnabled: channel === "inApp" ? value : p.inAppEnabled,
-              emailEnabled: channel === "email" ? value : p.emailEnabled,
-              smsEnabled: false,
-            }
-          : p,
-        ),
-      }
-    })
-  }, [])
+  const setDraftPreference = useCallback(
+    (alertType: WorkspaceAlertType, channel: "inApp" | "email" | "sms", value: boolean) => {
+      setDraftBundle((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          preferences: prev.preferences.map((p) =>
+            p.alertType === alertType ?
+              {
+                ...p,
+                inAppEnabled: channel === "inApp" ? value : p.inAppEnabled,
+                emailEnabled: channel === "email" ? value : p.emailEnabled,
+                smsEnabled: channel === "sms" ? value : p.smsEnabled,
+              }
+            : p,
+          ),
+        }
+      })
+    },
+    [],
+  )
 
   const showMatrix = loadState === "ready" && draftBundle && serverBundle
 
@@ -557,14 +576,28 @@ export default function NotificationsPage() {
         </Alert>
       : null}
 
-      <Alert>
-        <Smartphone className="h-4 w-4" />
-        <AlertTitle>SMS alerts are not active yet.</AlertTitle>
-        <AlertDescription>
-          In-app and email choices are saved for your workspace. SMS stays off until SMS delivery is enabled for these
-          alerts.
-        </AlertDescription>
-      </Alert>
+      <div id="workspace-sms" className="scroll-mt-24">
+        <Alert>
+          <Smartphone className="h-4 w-4" />
+          <AlertTitle>SMS alerts are not active yet.</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              In-app and email choices save from this page. SMS stays read-only until the workspace enables SMS under{" "}
+              <Link href="/settings/workspace#workspace-sms" className="font-medium text-primary hover:underline">
+                Settings → Workspace
+              </Link>{" "}
+              (master toggle, provider configured, compliance approved). Only transactional alerts{" "}
+              <span className="font-medium text-foreground">Work order completed</span> and{" "}
+              <span className="font-medium text-foreground">Schedule changes</span> can send SMS in phase 1.
+            </p>
+            {!smsChannelConfigurable ?
+              <p className="text-xs text-muted-foreground">
+                SMS column switches stay disabled until workspace SMS is fully configured and compliant.
+              </p>
+            : null}
+          </AlertDescription>
+        </Alert>
+      </div>
 
       {/* Alert matrix */}
       <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -622,6 +655,7 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
+                const smsRowDisabled = smsSwitchDisabled || !isTransactionalSmsAlertType(row.alertType)
                 return (
                   <div key={row.alertType} className="space-y-3 px-4 py-4">
                     <div className="flex min-w-0 items-start gap-3">
@@ -661,9 +695,10 @@ export default function NotificationsPage() {
                           SMS
                         </span>
                         <Switch
-                          checked={false}
-                          disabled
-                          aria-label={`${row.label} SMS (inactive)`}
+                          checked={pref.smsEnabled}
+                          disabled={smsRowDisabled}
+                          aria-label={`${row.label} SMS`}
+                          onCheckedChange={(v) => setDraftPreference(row.alertType, "sms", v)}
                         />
                       </div>
                     </div>
@@ -678,6 +713,7 @@ export default function NotificationsPage() {
                 const pref = prefsByType.get(row.alertType)
                 if (!pref) return null
                 const Icon = row.icon
+                const smsRowDisabled = smsSwitchDisabled || !isTransactionalSmsAlertType(row.alertType)
                 return (
                   <div
                     key={row.alertType}
@@ -709,7 +745,12 @@ export default function NotificationsPage() {
                       />
                     </div>
                     <div className="flex w-12 justify-center">
-                      <Switch checked={false} disabled aria-label={`${row.label} SMS (inactive)`} />
+                      <Switch
+                        checked={pref.smsEnabled}
+                        disabled={smsRowDisabled}
+                        aria-label={`${row.label} SMS`}
+                        onCheckedChange={(v) => setDraftPreference(row.alertType, "sms", v)}
+                      />
                     </div>
                   </div>
                 )
@@ -911,17 +952,10 @@ export default function NotificationsPage() {
             </div>
             <div>last save result: {devTransport.lastSaveResult}</div>
             <div>isDirty: {String(isDirty)}</div>
+            <div>smsChannelConfigurable: {String(smsChannelConfigurable)}</div>
           </AlertDescription>
         </Alert>
       : null}
-
-      {/* Temporary deploy/render proof — remove after confirming production shows this route */}
-      <p
-        className="mt-2 text-center text-[10px] text-muted-foreground"
-        data-equipify-notifications-settings="v2"
-      >
-        Notifications settings v2
-      </p>
     </div>
   )
 }

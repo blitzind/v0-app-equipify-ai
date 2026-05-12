@@ -13,6 +13,14 @@ import {
   type OrganizationNotificationSettingsBundle,
 } from "@/lib/notifications/organization-notification-preferences-repository"
 import { WORKSPACE_ALERT_TYPES, isWorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
+import { isTransactionalSmsAlertType } from "@/lib/sms/transactional-sms-allowlist"
+import {
+  fetchWorkspaceSmsSettingsRow,
+  looksLikeMissingSmsWorkspaceTablesError,
+  workspaceSmsRowToDto,
+} from "@/lib/sms/workspace-sms-repository.server"
+import type { WorkspaceSmsWorkspaceDto } from "@/lib/sms/workspace-sms-types"
+import { DEFAULT_WORKSPACE_SMS_DTO } from "@/lib/sms/workspace-sms-types"
 
 export const runtime = "nodejs"
 /** Avoid edge/CDN caching so clients always see fresh workspace notification prefs after writes. */
@@ -52,10 +60,16 @@ function serializeBundle(bundle: OrganizationNotificationSettingsBundle) {
   }
 }
 
-function notificationPreferencesJsonResponse(bundle: OrganizationNotificationSettingsBundle, persistenceReady: boolean) {
+function notificationPreferencesJsonResponse(
+  bundle: OrganizationNotificationSettingsBundle,
+  persistenceReady: boolean,
+  smsWorkspace: WorkspaceSmsWorkspaceDto,
+  smsPersistenceReady: boolean,
+) {
   return {
     ...serializeBundle(bundle),
-    meta: { persistenceReady },
+    smsWorkspace,
+    meta: { persistenceReady, smsPersistenceReady },
   }
 }
 
@@ -114,13 +128,6 @@ const PatchBodySchema = z
           path: ["preferences"],
         })
       }
-      if (body.preferences.some((p) => p.smsEnabled === true)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "SMS alerts are not active yet.",
-          path: ["preferences"],
-        })
-      }
       for (const t of WORKSPACE_ALERT_TYPES) {
         if (!body.preferences.some((p) => p.alertType === t)) {
           ctx.addIssue({
@@ -143,7 +150,10 @@ const PatchBodySchema = z
     }
   })
 
-function orderPreferences(parsed: z.infer<typeof PreferenceItemSchema>[]): NotificationPreferenceDto[] {
+function orderPreferences(
+  parsed: z.infer<typeof PreferenceItemSchema>[],
+  smsChannelConfigurable: boolean,
+): NotificationPreferenceDto[] {
   const byType = new Map(parsed.map((p) => [p.alertType, p]))
   return WORKSPACE_ALERT_TYPES.map((t) => {
     const row = byType.get(t)
@@ -151,7 +161,8 @@ function orderPreferences(parsed: z.infer<typeof PreferenceItemSchema>[]): Notif
       alertType: t,
       inAppEnabled: Boolean(row?.inAppEnabled),
       emailEnabled: Boolean(row?.emailEnabled),
-      smsEnabled: false,
+      smsEnabled:
+        smsChannelConfigurable && isTransactionalSmsAlertType(t) ? Boolean(row?.smsEnabled) : false,
     }
   })
 }
@@ -168,7 +179,10 @@ export async function GET(
   const gate = await requireOrgMemberSession(organizationId)
   if ("error" in gate) return gate.error
 
-  const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
+  const [loaded, smsLoaded] = await Promise.all([
+    fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId),
+    fetchWorkspaceSmsSettingsRow(gate.supabase, organizationId),
+  ])
   if (loaded.error || !loaded.data) {
     console.error("[notification-preferences GET]", {
       organizationId,
@@ -180,9 +194,32 @@ export async function GET(
     )
   }
 
-  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady), {
-    headers: { "Cache-Control": "private, no-store, max-age=0" },
-  })
+  let smsWorkspace: WorkspaceSmsWorkspaceDto = { ...DEFAULT_WORKSPACE_SMS_DTO }
+  let smsPersistenceReady = false
+  if (smsLoaded.error) {
+    if (looksLikeMissingSmsWorkspaceTablesError(smsLoaded.error)) {
+      smsPersistenceReady = false
+    } else {
+      console.error("[notification-preferences GET] sms_workspace", {
+        organizationId,
+        message: smsLoaded.error.message,
+      })
+      return NextResponse.json(
+        { error: "query_failed", message: "Could not load notification settings." },
+        { status: 500 },
+      )
+    }
+  } else {
+    smsWorkspace = workspaceSmsRowToDto(smsLoaded.row)
+    smsPersistenceReady = smsLoaded.persistenceReady
+  }
+
+  return NextResponse.json(
+    notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady, smsWorkspace, smsPersistenceReady),
+    {
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    },
+  )
 }
 
 export async function PATCH(
@@ -227,8 +264,30 @@ export async function PATCH(
     return NextResponse.json({ error: "bad_request", message: "Invalid request body." }, { status: 400 })
   }
 
+  const smsForPatch = await fetchWorkspaceSmsSettingsRow(gate.supabase, organizationId)
+  if (smsForPatch.error && !looksLikeMissingSmsWorkspaceTablesError(smsForPatch.error)) {
+    console.error("[notification-preferences PATCH] sms_workspace", {
+      organizationId,
+      message: smsForPatch.error.message,
+    })
+    return NextResponse.json(
+      { error: "query_failed", message: "Could not verify SMS workspace policy for this save." },
+      { status: 500 },
+    )
+  }
+  const smsWorkspaceGate = workspaceSmsRowToDto(smsForPatch.error ? null : smsForPatch.row)
+  if (body.preferences?.some((p) => p.smsEnabled === true) && !smsWorkspaceGate.smsChannelConfigurable) {
+    return NextResponse.json(
+      {
+        error: "sms_not_ready",
+        message: "SMS alerts are not active for this workspace until SMS is fully enabled and compliant.",
+      },
+      { status: 400 },
+    )
+  }
+
   if (body.preferences) {
-    const ordered = orderPreferences(body.preferences)
+    const ordered = orderPreferences(body.preferences, smsWorkspaceGate.smsChannelConfigurable)
     console.info("[notification-preferences PATCH] preferences_upsert_attempt", {
       organizationId,
       rowCount: ordered.length,
@@ -316,7 +375,31 @@ export async function PATCH(
     persistenceReady: loaded.persistenceReady,
   })
 
-  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady), {
-    headers: { "Cache-Control": "private, no-store, max-age=0" },
-  })
+  const smsReload = await fetchWorkspaceSmsSettingsRow(svc, organizationId)
+  let smsWorkspaceOut: WorkspaceSmsWorkspaceDto = { ...DEFAULT_WORKSPACE_SMS_DTO }
+  let smsPersistenceOut = false
+  if (smsReload.error) {
+    if (looksLikeMissingSmsWorkspaceTablesError(smsReload.error)) {
+      smsPersistenceOut = false
+    } else {
+      console.error("[notification-preferences PATCH] sms_reload", { organizationId, message: smsReload.error.message })
+      smsWorkspaceOut = { ...DEFAULT_WORKSPACE_SMS_DTO }
+      smsPersistenceOut = false
+    }
+  } else {
+    smsWorkspaceOut = workspaceSmsRowToDto(smsReload.row)
+    smsPersistenceOut = smsReload.persistenceReady
+  }
+
+  return NextResponse.json(
+    notificationPreferencesJsonResponse(
+      loaded.data,
+      loaded.persistenceReady,
+      smsWorkspaceOut,
+      smsPersistenceOut,
+    ),
+    {
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    },
+  )
 }
