@@ -15,6 +15,8 @@ import {
 import { WORKSPACE_ALERT_TYPES, isWorkspaceAlertType } from "@/lib/notifications/workspace-alert-registry"
 
 export const runtime = "nodejs"
+/** Avoid edge/CDN caching so clients always see fresh workspace notification prefs after writes. */
+export const dynamic = "force-dynamic"
 
 const LOCAL_HM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/
 
@@ -165,7 +167,9 @@ export async function GET(
     )
   }
 
-  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady))
+  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady), {
+    headers: { "Cache-Control": "private, no-store, max-age=0" },
+  })
 }
 
 export async function PATCH(
@@ -226,6 +230,10 @@ export async function PATCH(
         { status: 500 },
       )
     }
+    console.info("[notification-preferences PATCH] preferences_upsert_ok", {
+      organizationId,
+      rowCount: ordered.length,
+    })
   }
 
   if (body.digest) {
@@ -259,9 +267,11 @@ export async function PATCH(
         { status: 500 },
       )
     }
+    console.info("[notification-preferences PATCH] digest_upsert_ok", { organizationId })
   }
 
-  const loaded = await fetchOrganizationNotificationSettingsBundle(gate.supabase, organizationId)
+  // Reload with service role so the response reflects rows just written (avoids replica / session read lag vs user JWT).
+  const loaded = await fetchOrganizationNotificationSettingsBundle(svc, organizationId)
   if (loaded.error || !loaded.data) {
     console.error("[notification-preferences PATCH] reload after save", {
       organizationId,
@@ -273,5 +283,7 @@ export async function PATCH(
     )
   }
 
-  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady))
+  return NextResponse.json(notificationPreferencesJsonResponse(loaded.data, loaded.persistenceReady), {
+    headers: { "Cache-Control": "private, no-store, max-age=0" },
+  })
 }

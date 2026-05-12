@@ -186,6 +186,17 @@ export async function fetchOrganizationNotificationSettingsBundle(
     digestRow = digestRes.data as DigestRow | null
   }
 
+  const prefsRowCount = prefsRows?.length ?? 0
+  const digestRowPresent = digestRow != null
+  if (process.env.NODE_ENV !== "production" || !persistenceReady || prefsRowCount === 0) {
+    console.info("[notification-preferences] fetch_bundle", {
+      organizationId,
+      persistenceReady,
+      prefsRowCount,
+      digestRowPresent,
+    })
+  }
+
   return {
     data: {
       preferences: mergePreferenceDtos(prefsRows),
@@ -201,17 +212,22 @@ export async function upsertOrganizationNotificationPreferences(
   organizationId: string,
   preferences: NotificationPreferenceDto[],
 ): Promise<{ error: PostgrestError | null }> {
-  const rows = preferences.map((p) => ({
-    organization_id: organizationId,
-    alert_type: p.alertType,
-    in_app_enabled: p.inAppEnabled,
-    email_enabled: p.emailEnabled,
-    sms_enabled: false,
-  }))
-  const { error } = await svc.from("organization_notification_preferences").upsert(rows, {
-    onConflict: "organization_id,alert_type",
-  })
-  return { error }
+  for (const p of preferences) {
+    const { error } = await svc.from("organization_notification_preferences").upsert(
+      {
+        organization_id: organizationId,
+        alert_type: p.alertType,
+        in_app_enabled: p.inAppEnabled,
+        email_enabled: p.emailEnabled,
+        sms_enabled: false,
+      },
+      { onConflict: "organization_id,alert_type" },
+    )
+    if (error) {
+      return { error }
+    }
+  }
+  return { error: null }
 }
 
 export async function upsertOrganizationDigestSettings(

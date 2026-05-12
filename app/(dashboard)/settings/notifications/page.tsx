@@ -251,6 +251,7 @@ export default function NotificationsPage() {
     try {
       const res = await fetch(`/api/organizations/${organizationId}/notification-preferences`, {
         signal: ac.signal,
+        cache: "no-store",
       })
       const json = (await res.json().catch(() => null)) as ApiResponse | null
       if (!res.ok) {
@@ -287,6 +288,7 @@ export default function NotificationsPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          cache: "no-store",
         })
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!res.ok) {
@@ -297,7 +299,7 @@ export default function NotificationsPage() {
           throw new Error("Could not save settings.")
         }
         applyApiNotificationResponse(json)
-        toast({ title: "Saved", description: "Notification preferences were updated." })
+        toast({ title: "Saved", description: "Your notification settings were saved." })
       } catch (e) {
         setBundle(rollback)
         const msg = e instanceof Error ? e.message : "Could not save settings."
